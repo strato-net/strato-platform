@@ -63,6 +63,8 @@ data Value =
   | SNULL
   | SDefault -- TODO(tim): The default value, but does not yet have a type hint
              -- It would be better to have `fromBasic :: Type -> BasicValue -> Value`,
+  | SReference MS.StoragePath -- An alias to an existing variable, so that modifications
+                              -- can be canonicalized
   deriving (Show)
 
 

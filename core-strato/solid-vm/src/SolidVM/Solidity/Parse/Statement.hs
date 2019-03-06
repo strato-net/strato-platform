@@ -98,7 +98,9 @@ expression :: SolidityParser Expression
 expression =
   buildExpressionParser
   [
-    [Postfix (do { exps <- many1 $ brackets $ optionMaybe expression; return $ foldl1 (.) $ map (flip IndexAccess) exps })],
+    [Postfix $ do
+      idxs <- many1 . brackets $ optionMaybe expression
+      return $ \x -> foldl IndexAccess x idxs],
     [postfix $ choice
      [
        (do { name <- (reservedOp "." >> memberName); return $ flip MemberAccess name}),

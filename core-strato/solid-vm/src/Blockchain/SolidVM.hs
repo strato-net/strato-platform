@@ -8,7 +8,7 @@ module Blockchain.SolidVM
       call
     , create
     ) where
-
+-- import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -44,7 +44,6 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.SolidStorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
-import           Blockchain.SolidVM.Account
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
@@ -54,6 +53,8 @@ import           Blockchain.SolidVM.SM
 
 import qualified SolidVM.Model.Storable as MS
 
+import           SolidVM.Solidity.Parse.Declarations
+import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement)
 import qualified SolidVM.Solidity.Xabi as Xabi
@@ -88,44 +89,50 @@ create :: Bool
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ (PrecompiledCode _) _ _ _ = error "you can't call a precompiled function in SolidVM"
-create _ _ _ blockData _ sender' _ _ _ _ newAddress (Code initCode) _ _ metadata = do
-  addCode SolidVM $ initCode
+create _ _ _ blockData _ sender' _ _ _ _ _ (Code initCode) _ _ metadata = do
 
   let maybeContractName = join $ fmap (M.lookup "name") metadata
-      contractName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
-
-  newAddressState <- getAddressState newAddress
-  putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode "<unknown>" $ hash initCode}
+      contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
 
   let maybeArgString = join $ fmap (M.lookup "args") metadata
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
-      maybeArgs = runParser parseArgs "qq" "qq" argString
+      maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
+      maybeFile = runParser solidityFile "" "" $ BC.unpack initCode
+      file =
+        case maybeFile of
+          Left e -> error $ show e
+          Right v -> v
 
-  runSM initCode blockData $ do
-    create' sender' contractName args
+      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi) | NamedXabi name (xabi, parents') <- unsourceUnits file]
 
-create' :: Address -> String -> [Xabi.Expression] -> SM ExecResults
-create' creator name argExps = do
-  sstate <- get
-  let cc = codeCollection sstate
+      cc = applyInheritence
+        $ CodeCollection {
+            _contracts=M.fromList namedContracts
+          }
 
-  nonce' <- getNonce creator
-  setNonce creator $ nonce'+1
-  let address = getNewAddress_unsafe creator nonce'
-  --------------------------------
 
-  when trace $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show address ++ " of type " ++ name
+  runSM blockData $ do
+    create' sender' cc contractName' args
 
-  let account = initialAccount{contract=(name, cc)}
+create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
+create' creator cc contractName' argExps = do
+  nonce' <- fmap addressStateNonce $ getAddressState creator
+  let newAddress = getNewAddress_unsafe creator nonce'
+      ccString = BC.pack $ show cc
 
-  addAccount address account
+  newAddressState <- getAddressState newAddress
+  putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' $ hash ccString}
 
-  let contract' = fromMaybe (error $ "no contract with name " ++ name) (cc ^. contracts . at name)
+  addCode SolidVM ccString
+
+  when trace $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
+
+  let contract' = fromMaybe (error $ "no contract with name " ++ contractName') (cc ^. contracts . at contractName')
 
   -- Add Storage
 
-  addCallInfo address contract' M.empty
+  addCallInfo newAddress contract' cc M.empty
 
   forM_ (M.toList $ contract'^.storageDefs) $ \(n, (Xabi.VariableDecl theType _ maybeExpression)) -> do
     initialValue <-
@@ -145,13 +152,13 @@ create' creator name argExps = do
                  \(f, var) -> ((fieldName [MS.Field $ BC.pack f],) . toBasic) <$> getVar var
 
              x -> return [(fieldName [], toBasic x)]
-    mapM_ (uncurry $ putSolidStorageKeyVal' address) kvs
+    mapM_ (uncurry $ putSolidStorageKeyVal' newAddress) kvs
   popCallInfo
 
   -- Run the constructor
-  runTheConstructors cc address name argExps
+  runTheConstructors cc newAddress contractName' argExps
 
-  when trace $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show address ++ " of type " ++ name
+  when trace $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -159,7 +166,7 @@ create' creator name argExps = do
     erReturnVal = Just BSS.empty,
     erTrace = [],
     erLogs = [],
-    erNewContractAddress = Just address,
+    erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
     erAction = Nothing,
     erException = Nothing
@@ -191,23 +198,14 @@ call :: Bool
 
 call _ _ _ _ blockData _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
 
-
   let maybeFuncName = join $ fmap (M.lookup "funcName") metadata
       funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
       maybeArgString = join $ fmap (M.lookup "args") metadata
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
-      maybeArgs = runParser parseArgs "qq" "qq" argString
+      maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
 
-  addressState <- getAddressState codeAddress
-
-  ccString <-
-    case addressStateCodeHash addressState of
-      SolidVMCode _ ch -> getEVMCode ch
-      _ -> error "internal error- SolidVM was called for non-solid-vm code"
-
-
-  returnValue <- runSM ccString blockData $ do
+  returnValue <- runSM blockData $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
            call'' codeAddress funcName argValues
 
@@ -226,26 +224,49 @@ call _ _ _ _ blockData _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
     }
 
 
+getCodeAndCollection :: Address -> SM (Contract, CodeCollection)
+getCodeAndCollection address' = do
+  callStack' <- fmap callStack get
+  let maybeAddress =
+        case callStack' of
+          (current:_) -> Just $ currentAddress current
+          _ -> Nothing
+
+  liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+  liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
+  if Just address' == maybeAddress
+    then do
+    c' <- getCurrentContract
+    cc' <- getCurrentCodeCollection
+    return (c', cc')
+    else do
+    addressState <- getAddressState address'
+
+    (contractName', codeString) <-
+      case addressStateCodeHash addressState of
+        SolidVMCode cn ch -> do
+          c <- getEVMCode ch
+          return (cn, c)
+        _ -> error "internal error- SolidVM was called for non-solid-vm code"
+
+    let cc = read $ BC.unpack codeString
+
+        contract' = fromMaybe (error $ "no contract with name: " ++ contractName') $ M.lookup contractName' $ cc^.contracts
+
+    return (contract', cc)
+
 
 call'' :: Address -> String -> [Value] -> SM (Maybe Value)
 call'' address functionName args = do
-  sstate <- get
-
-  let contractName = "qq"
-      cc = codeCollection sstate
+  (contract, cc) <-getCodeAndCollection address
 
   when trace $ do
     argStrings <- forM args showSM
-    liftIO $ putStrLn $ box ["calling function: " ++ format address, contractName ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
+    liftIO $ putStrLn $ box ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
 
-  let contract' = fromMaybe (error $ "contract name doesn't exist in CodeCollection: " ++ contractName) $  M.lookup contractName $ cc^.contracts
-
---  liftIO $ putStrLn $ "            available contracts: " ++ show (M.keys $ cc^.contracts)
---  liftIO $ putStrLn $ "            available functions: " ++ show (M.keys $ contract'^.functions)
-
-  case M.lookup functionName $ contract'^.functions of
+  case M.lookup functionName $ contract^.functions of
     Just theFunction -> do
-      result <- call' address contract' theFunction args
+      result <- call' address contract cc theFunction args
 
       when trace $ do
         resultString <-
@@ -258,11 +279,11 @@ call'' address functionName args = do
       return result
 
     _ -> do --Maybe the function is actually a getter
-      case M.lookup functionName $ contract'^.storageDefs of
+      case M.lookup functionName $ contract^.storageDefs of
         Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
           val <- getVar $ StorageItem [MS.Field (BC.pack $ '.':functionName)]
           return $ Just val
-        Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ contractName ++ "'"
+        Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ (contract^.contractName) ++ "'"
 
 
 ---------------------------------------------
@@ -323,7 +344,20 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
 runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybeExpression)) = do
   value <-
     case maybeExpression of
-      Just e -> getVar =<< expToVar e
+      Just e -> do
+        let getRef = SReference <$> expToPath e
+            getValue = getVar =<< expToVar e
+        case mType of
+          Just (Xabi.Label name) -> do
+            ty <- getTypeOfName name
+            case ty of
+              StructTypo{} -> getRef
+              _ -> getValue
+          Just Xabi.Array{} -> getRef
+          Just Xabi.Struct{} -> getRef
+          Just Xabi.Mapping{} -> getRef
+          _ -> getValue
+
       Nothing ->
         case varNames of
            [Just name] ->
@@ -335,9 +369,8 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
                     StructTypo fs ->  SStruct name <$> initializeStruct fs
                     _ -> error $ "TODO(tim): initialize type " ++ show t'
                Just (Xabi.Bytes {}) -> return $ SString ""
-               Just t -> error $ "TODO(tim): Require a default value for type: " ++ show t
+               Just _ -> return SDefault
            _ -> error $ "TODO(tim): handle multiple names: " ++ show varNames
-
   when trace $ do
     valueString <- showSM value
     liftIO $ putStrLn $ "             creating and setting variables: (" ++ intercalate ", " (map (fromMaybe "") varNames) ++ ")"
@@ -427,20 +460,27 @@ while condition code = do
 
 getIndexType :: MS.StoragePath -> SM IndexType
 getIndexType [] = error "TODO(tim): getIndexType of empty"
-getIndexType [MS.Field field] = do
+getIndexType p@(MS.Field field:_) = do
   ctract <- getCurrentContract
   let decls = ctract ^. storageDefs
+  let n = length p - 1
   case M.lookup (BC.unpack field) decls of
     Nothing -> error $ "TODO(tim): unknown storage reference: " ++ show field
-    Just Xabi.VariableDecl {Xabi.varType=v} -> return $
-      case v of
+    Just Xabi.VariableDecl {Xabi.varType=v} -> return $! loop n v
+ where loop :: Int -> Xabi.Type -> IndexType
+       loop 0 t = case t of
          Xabi.Mapping{Xabi.key=Xabi.Int{}} -> MapIntIndex
          Xabi.Mapping{Xabi.key=Xabi.String{}} -> MapStringIndex
+         Xabi.Mapping{Xabi.key=Xabi.Bytes{}} -> MapStringIndex
          Xabi.Mapping{Xabi.key=Xabi.Address{}} -> MapAddressIndex
          Xabi.Mapping{Xabi.key=Xabi.Bool{}} -> MapBoolIndex
          Xabi.Array{} -> ArrayIndex
-         _ -> error $ "TODO(tim): unanticipated type in variable declarations: " ++ show v
-getIndexType xs = error $ "TODO(tim): higher order index references: " ++ show xs
+         _ -> error $ "TODO(tim): unanticipated index type in variable declarations: " ++ show t
+       loop n t = case t of
+         Xabi.Mapping{Xabi.value=t'} -> loop (n - 1) t'
+         Xabi.Array{Xabi.entry=t'} -> loop (n - 1) t'
+         _ -> error $ "incorrect indexing type in variable declarations: " ++ show t
+getIndexType xs = error $ "TODO(tim): getIndexType starting from non-field: " ++ show xs
 
 expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
@@ -452,10 +492,15 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
   return . (parPath ++) $ case (idxType, idx) of
     (MapAddressIndex, SAddress a) -> [MS.MapIndex $ MS.IAddress a]
     (MapAddressIndex, SInteger i) -> [MS.MapIndex $ MS.IAddress $ fromIntegral i]
+    (MapAddressIndex, SDefault) -> [MS.MapIndex $ MS.IAddress 0x0]
     (MapBoolIndex, SBool b) -> [MS.MapIndex $ MS.IBool b]
+    (MapBoolIndex, SDefault) -> [MS.MapIndex $ MS.IBool False]
     (MapIntIndex, SInteger i) -> [MS.MapIndex $ MS.INum i]
+    (MapIntIndex, SDefault) -> [MS.MapIndex $ MS.INum 0]
     (MapStringIndex, SString s) -> [MS.MapIndex $ MS.IText $ BC.pack s]
+    (MapStringIndex, SDefault) -> [MS.MapIndex $ MS.IText ""]
     (ArrayIndex, SInteger i) -> [MS.ArrayIndex $ fromIntegral i]
+    (ArrayIndex, SDefault) -> [MS.ArrayIndex 0]
     p -> error $ "TODO(tim): unsupported index combination: " ++ show p
 expToPath (Xabi.MemberAccess parent field) = do
   parPath <- expToPath parent
@@ -538,13 +583,12 @@ expToVar (Xabi.MemberAccess expr name) = do
     (SStruct _ theMap, fieldName) -> do
       let x = fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ fieldName) $ M.lookup fieldName theMap
       return x
-    (SContractDef contractName, constName) -> do
-      sstate <- get
+    (SContractDef contractName', constName) -> do
+      cc <- getCurrentCodeCollection
 
+      let c = fromMaybe (error $ "code refers to a contract that doesn't exist: " ++ contractName') (M.lookup contractName' $ cc^.contracts)
 
-      let c = fromMaybe (error $ "code refers to a contract that doesn't exist: " ++ contractName) (M.lookup contractName $ codeCollection sstate^.contracts)
-
-      let Xabi.ConstantDecl _ _ constExp = fromMaybe (error $ "code refers to a const that doesn't exist: " ++ contractName ++ "." ++ constName) (M.lookup constName $ c^.constants)
+      let Xabi.ConstantDecl _ _ constExp = fromMaybe (error $ "code refers to a const that doesn't exist: " ++ contractName' ++ "." ++ constName) (M.lookup constName $ c^.constants)
 
       fmap Constant $ getVar =<< expToVar constExp
 
@@ -560,9 +604,11 @@ expToVar (Xabi.MemberAccess expr name) = do
       return $ Constant $ SContractItem (toInteger a) itemName
 
 
-    (SContract contractName a, funcName) -> do
-      return $ Constant $ SContractFunction contractName a funcName
-
+    (SContract contractName' a, funcName) -> do
+      return $ Constant $ SContractFunction contractName' a funcName
+    (_, "length") -> do
+      pt <- expToPath expr
+      return . StorageItem $ pt ++ [MS.Field "length"]
     _ -> return $ Property name var
 
 expToVar x@(Xabi.IndexAccess{}) = do
@@ -672,10 +718,12 @@ expToVar (Xabi.Ternary condition expr1 expr2) = do
     x -> error $ "ternary condition is not a bool: " ++ show x
 
 
-expToVar (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName)) args) = do
+expToVar (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
   creator <- getCurrentAddress
   let argExps = map (\(Nothing, arg) -> arg) args  --TODO- add support for named arguments
-  execResults <- create' creator contractName argExps
+  cc <- getCurrentCodeCollection
+  incrementNonce creator
+  execResults <- create' creator cc contractName' argExps
   return $ Constant $ SAddress $ fromMaybe (error "a call to create did not create an address") $  erNewContractAddress execResults
 
 expToVar (Xabi.FunctionCall e args) = do
@@ -686,8 +734,9 @@ expToVar (Xabi.FunctionCall e args) = do
     Constant (SFunction name) -> do
       contract' <- getCurrentContract
       address <- getCurrentAddress
+      cc <- getCurrentCodeCollection
 
-      res <- call' address contract' name argVals
+      res <- call' address contract' cc name argVals
       case res of
         Just v -> return $ Constant $ v
         Nothing -> return $ Constant $ SNULL
@@ -697,12 +746,12 @@ expToVar (Xabi.FunctionCall e args) = do
       let vals = fromMaybe (error $ "code refers to a struct that does not exist in the contract: " ++ structName) $ M.lookup structName $ contract'^.structs
       return $ Constant $ SStruct structName $ M.fromList $ zip (map (T.unpack . fst) vals) $ map Constant argVals
 
-    Constant (SContractDef contractName) -> do
+    Constant (SContractDef contractName') -> do
       case argVals of
         [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
-          return $ Constant $ SContract contractName address
+          return $ Constant $ SContract contractName' address
         [SAddress (Address address)] ->
-          return $ Constant $ SContract contractName $ toInteger address
+          return $ Constant $ SContract contractName' $ toInteger address
         _ -> error $ "args wrong for contract variable creation: " ++ show argVals
 
     Constant (SContractItem address itemName) -> do
@@ -725,10 +774,14 @@ expToVar (Xabi.FunctionCall e args) = do
           return $ Constant $ SEnumVal enumName $ theEnum !! fromInteger i
         _ -> error "called enum constructor with improper args"
 
-    Property "push" var' -> do
-      let prefix' = case var' of
-                        StorageItem [MS.Field f] -> [MS.Field f]
-                        _ -> error $ "unimplemented array access: " ++ show var'
+    Property "push" _ -> do
+      path <- expToPath e
+      let dropPushField :: MS.StoragePath -> MS.StoragePath
+          dropPushField [] = error "should not reach empty path"
+          dropPushField [MS.Field "push"] = []
+          dropPushField [_] = error $ "invalid base of path: " ++ show path
+          dropPushField (x:xs) = x:dropPushField xs
+      let prefix' = dropPushField path
           lenPath = prefix' ++ [MS.Field "length"]
       len' <- getVar $ StorageItem lenPath
       let len ::Int = case len' of
@@ -836,18 +889,18 @@ bytesToInteger bytes =
 
 
 runTheConstructors :: CodeCollection -> Address -> String -> [Xabi.Expression] -> SM ()
-runTheConstructors cc address contractName argExps = do
+runTheConstructors cc address contractName' argExps = do
   let contract' =
-          fromMaybe (error $ "contract inherits from a contract that doesn't exits: " ++ contractName)
-          $ cc^.contracts . at contractName
+          fromMaybe (error $ "contract inherits from a contract that doesn't exits: " ++ contractName')
+          $ cc^.contracts . at contractName'
 
       argNames = map fst $ sortWith snd $ [ (T.unpack n, i) | (n, Xabi.IndexedType{Xabi.indexedTypeIndex=i}) <- M.toList $ fromMaybe M.empty $ fmap Xabi.funcArgs $ contract'^.constructor]
 
-  when trace $ liftIO $ putStrLn $ box ["running constructor: " ++ contractName ++ "(" ++ intercalate ", " argNames ++ ")"]
+  when trace $ liftIO $ putStrLn $ box ["running constructor: " ++ contractName' ++ "(" ++ intercalate ", " argNames ++ ")"]
 
   argVals <- for argExps $ \arg -> getVar =<< expToVar arg
 
-  addCallInfo address contract' (M.fromList $ zip argNames (map Constant argVals))
+  addCallInfo address contract' cc (M.fromList $ zip argNames (map Constant argVals))
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = fromMaybe []
@@ -872,13 +925,13 @@ runTheConstructors cc address contractName argExps = do
 
 
 
-call' :: Address -> Contract -> Xabi.Func -> [Value] -> SM (Maybe Value)
-call' address' contract' theFunction argVals = do
+call' :: Address -> Contract -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
+call' address' contract' cc theFunction argVals = do
   let argNames = map fst $ sortWith snd $ [ (T.unpack n, i) | (n, Xabi.IndexedType{Xabi.indexedTypeIndex=i}) <- M.toList $ Xabi.funcArgs theFunction]
 
   when trace $ liftIO $ putStrLn $ "            args: " ++ show argNames
 
-  addCallInfo address' contract' (M.fromList $ zip argNames (map Constant argVals))
+  addCallInfo address' contract' cc (M.fromList $ zip argNames (map Constant argVals))
 
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands

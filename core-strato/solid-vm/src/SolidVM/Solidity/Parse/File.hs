@@ -26,7 +26,7 @@ import           SolidVM.Solidity.Parse.Pragmas
 
 newtype File = File {
   unsourceUnits :: [SourceUnit]
-} deriving (Show)
+} deriving (Show, Read)
 
 solidityFile :: SolidityParser File
 solidityFile = do

@@ -90,6 +90,7 @@ library:
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
+    - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Xabi.Statement
   ghc-options: -Wall -O2
 

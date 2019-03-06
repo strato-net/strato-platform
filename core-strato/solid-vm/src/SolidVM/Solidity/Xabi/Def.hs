@@ -22,7 +22,7 @@ defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="t
 data Def = Enum { names::[Text], bytes::Word }
          | Struct { fields::[(Text, Xabi.FieldType)], bytes::Word }
          | Contract { bytes::Word }
-         deriving (Eq, Show, Generic)
+         deriving (Eq, Show, Read, Generic)
 
 instance Arbitrary Def where arbitrary = GR.genericArbitrary GR.uniform
 instance ToJSON Def where
