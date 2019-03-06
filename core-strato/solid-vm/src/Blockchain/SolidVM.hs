@@ -256,41 +256,39 @@ getCodeAndCollection address' = do
     return (contract', cc)
 
 
-call'' :: Address -> String -> [Value] -> SM (Maybe Value)
-call'' address functionName args = do
-  (contract, cc) <-getCodeAndCollection address
-
+logFunctionCall :: [Value] -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
+logFunctionCall args address contract functionName f = do
   when trace $ do
     argStrings <- forM args showSM
     liftIO $ putStrLn $ box ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
 
-  case M.lookup functionName $ contract^.functions of
-    Just theFunction -> do
-      result <- call' address contract cc theFunction args
+  result <- f
 
-      when trace $ do
-        resultString <-
-          case result of
-            Nothing -> return ""
-            Just v -> showSM v
+  when trace $ do
+    resultString <-
+      case result of
+        Nothing -> return ""
+        Just v -> showSM v
 
-        liftIO $ putStrLn $ box ["returning from " ++ functionName ++ ":", resultString]
+    liftIO $ putStrLn $ box ["returning from " ++ functionName ++ ":", resultString]
 
-      return result
-
-    _ -> do --Maybe the function is actually a getter
-      case M.lookup functionName $ contract^.storageDefs of
-        Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
-          val <- getVar $ StorageItem [MS.Field (BC.pack $ '.':functionName)]
-          return $ Just val
-        Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ (contract^.contractName) ++ "'"
+  
+  return result
 
 
----------------------------------------------
+call'' :: Address -> String -> [Value] -> SM (Maybe Value)
+call'' address functionName args = do
+  (contract, cc) <-getCodeAndCollection address
 
-
-
-
+  logFunctionCall args address contract functionName $
+    case M.lookup functionName $ contract^.functions of
+      Just theFunction -> do
+        call' address contract cc theFunction args
+      _ -> do --Maybe the function is actually a getter
+        case M.lookup functionName $ contract^.storageDefs of
+          Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
+            fmap Just $ getVar $ StorageItem [MS.Field (BC.pack $ '.':functionName)]
+          Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ (contract^.contractName) ++ "'"
 
 
 runStatements :: [Xabi.Statement] -> SM (Maybe Value)
