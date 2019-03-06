@@ -251,8 +251,15 @@ contract qq {
 |]
       getAll [ [Field "x", Field "a"]
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 900, BString "ok"]
-    it "can assign a struct" . runTest $ do
-      void $ runFile "testdata/StructAssign.sol"
+    it "can directy initialize a struct" . runTest $ do
+      void $ runBS [r|
+contract qq {
+  struct X {
+    int a;
+    int b;
+  }
+  X x = X(3, 4);
+}|]
       getAll [ [Field "x", Field "a"]
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 3, BInteger 4]
 
@@ -517,3 +524,43 @@ contract qq {
   }
 }|]
     getAll [ [Field "y"] ] `shouldReturn` [BInteger 0xdeadbeef]
+
+  it "should not treat local ints as references" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x = 20;
+  constructor() {
+    uint l = x;
+    l += 10;
+  }
+}|]
+    getAll [[Field "x"]] `shouldReturn` [BInteger 20]
+
+  it "should remember modifications to locals" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  constructor() {
+    uint l = 99;
+    l += 101;
+    x = l;
+  }
+}|]
+    liftIO $ pendingWith "TODO(tim): modifications to locals"
+    getAll [[Field "x"]] `shouldReturn` [BInteger 200]
+
+  it "can assign a local struct" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint z;
+  struct X {
+    uint a;
+  }
+
+  constructor() {
+    X x = X(777);
+    z = x.a;
+  }
+}|]
+    getAll [[Field "z"]] `shouldReturn` [BInteger 777]
+

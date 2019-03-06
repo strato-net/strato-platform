@@ -8,7 +8,7 @@ module Blockchain.SolidVM
       call
     , create
     ) where
--- import Debug.Trace hiding (trace)
+
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -345,17 +345,16 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
   value <-
     case maybeExpression of
       Just e -> do
+        rhs <- expToVar e
         let getRef = SReference <$> expToPath e
             getValue = getVar =<< expToVar e
-        case mType of
-          Just (Xabi.Label name) -> do
+        case (rhs, mType) of
+          (Constant c, _) -> return c
+          (_, Just (Xabi.Label name)) -> do
             ty <- getTypeOfName name
             case ty of
               StructTypo{} -> getRef
               _ -> getValue
-          Just Xabi.Array{} -> getRef
-          Just Xabi.Struct{} -> getRef
-          Just Xabi.Mapping{} -> getRef
           _ -> getValue
 
       Nothing ->
@@ -557,7 +556,14 @@ expToVar (Xabi.Unitary "--" e) = do
   setVar path next
   return $ Constant next
 
-
+expToVar (Xabi.Binary "+=" lhs rhs) = do
+  let readInt e = fmap castToInt $ getVar =<< expToVar e
+  delta <- readInt rhs
+  curValue <- readInt lhs
+  path <- expToPath lhs
+  let next = SInteger $ curValue + delta
+  setVar path next
+  return $ Constant next
 
 expToVar (Xabi.MemberAccess (Xabi.Variable "Util") "bytes32ToString") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
