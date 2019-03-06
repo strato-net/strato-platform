@@ -481,9 +481,13 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
     (MapAddressIndex, SAddress a) -> [MS.MapIndex $ MS.IAddress a]
     (MapAddressIndex, SInteger i) -> [MS.MapIndex $ MS.IAddress $ fromIntegral i]
     (MapBoolIndex, SBool b) -> [MS.MapIndex $ MS.IBool b]
+    (MapBoolIndex, SDefault) -> [MS.MapIndex $ MS.IBool False]
     (MapIntIndex, SInteger i) -> [MS.MapIndex $ MS.INum i]
+    (MapIntIndex, SDefault) -> [MS.MapIndex $ MS.INum 0]
     (MapStringIndex, SString s) -> [MS.MapIndex $ MS.IText $ BC.pack s]
+    (MapStringIndex, SDefault) -> [MS.MapIndex $ MS.IText ""]
     (ArrayIndex, SInteger i) -> [MS.ArrayIndex $ fromIntegral i]
+    (ArrayIndex, SDefault) -> [MS.ArrayIndex 0]
     p -> error $ "TODO(tim): unsupported index combination: " ++ show p
 expToPath (Xabi.MemberAccess parent field) = do
   parPath <- expToPath parent
