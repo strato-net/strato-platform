@@ -1,7 +1,6 @@
 -- for openid reference see https://github.com/zmartzone/lua-resty-openidc 
 
 local openidc = require("resty.openidc")
-local username_cookie_name = "strato_user_name"
 local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
 
 local function isEmpty(s)
@@ -28,11 +27,11 @@ local authenticate_opts = {
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
   -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
-  --session_contents              = {id_token=true, access_token=true}, -- comment out to keep everything
+  --session_contents = {id_token=true, enc_id_token=true, user=true, access_token=true}, -- comment out to keep everything
   renew_access_token_on_expiry = true,
-  access_token_expires_in = 3600,
+  access_token_expires_in = 300,
   logout_path = "/auth/logout",
-  post_logout_redirect_uri = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://" .. ngx.var.http_host .. "/"
+  post_logout_redirect_uri = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 }
 
 if not ngx.var['cookie_strato_session'] and ngx.req.get_headers()["Authorization"] then
@@ -55,16 +54,16 @@ if not ngx.var['cookie_strato_session'] and ngx.req.get_headers()["Authorization
 else
   -- If it's the logout request - unset custom cookies. All the rest is handled by .authenticate()
   if ngx.var.request_uri == authenticate_opts.logout_path then
-    ngx.header['Set-Cookie'] = username_cookie_name .. '=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    ngx.header['Set-Cookie'] = 'strato_user_name=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
   end
 
   local authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts)
 
   if authenticate_err then
     ngx.status = 500
+    ngx.header['Set-Cookie'] = 'strato_user_name=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
     ngx.say(authenticate_err)
     ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
-    ngx.header['Set-Cookie'] = username_cookie_name .. '=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
   end
 
   if not isEmpty(authenticate_res.id_token[username_property]) then
@@ -75,7 +74,9 @@ else
 
   user_id = authenticate_res.id_token.sub
 
-  ngx.header['Set-Cookie'] = username_cookie_name .. '=' .. unique_name .. '; path=/'
+  if not ngx.var['cookie_strato_user_name'] or ngx.var['cookie_strato_user_name'] ~= unique_name then
+    ngx.header['Set-Cookie'] = string.format('strato_user_name=%s; path=/', unique_name)
+  end
 end
 
 -- set request header to forward to APIs
