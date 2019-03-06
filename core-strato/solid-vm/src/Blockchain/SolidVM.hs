@@ -356,7 +356,7 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
                     StructTypo fs ->  SStruct name <$> initializeStruct fs
                     _ -> error $ "TODO(tim): initialize type " ++ show t'
                Just (Xabi.Bytes {}) -> return $ SString ""
-               Just t -> error $ "TODO(tim): Require a default value for type: " ++ show t
+               Just _ -> return SDefault
            _ -> error $ "TODO(tim): handle multiple names: " ++ show varNames
 
   when trace $ do
@@ -589,7 +589,9 @@ expToVar (Xabi.MemberAccess expr name) = do
 
     (SContract contractName' a, funcName) -> do
       return $ Constant $ SContractFunction contractName' a funcName
-
+    (_, "length") -> do
+      pt <- expToPath expr
+      return . StorageItem $ pt ++ [MS.Field "length"]
     _ -> return $ Property name var
 
 expToVar x@(Xabi.IndexAccess{}) = do
@@ -755,10 +757,14 @@ expToVar (Xabi.FunctionCall e args) = do
           return $ Constant $ SEnumVal enumName $ theEnum !! fromInteger i
         _ -> error "called enum constructor with improper args"
 
-    Property "push" var' -> do
-      let prefix' = case var' of
-                        StorageItem [MS.Field f] -> [MS.Field f]
-                        _ -> error $ "unimplemented array access: " ++ show var'
+    Property "push" _ -> do
+      path <- expToPath e
+      let dropPushField :: MS.StoragePath -> MS.StoragePath
+          dropPushField [] = error "should not reach empty path"
+          dropPushField [MS.Field "push"] = []
+          dropPushField [_] = error $ "invalid base of path: " ++ show path
+          dropPushField (x:xs) = x:dropPushField xs
+      let prefix' = dropPushField path
           lenPath = prefix' ++ [MS.Field "length"]
       len' <- getVar $ StorageItem lenPath
       let len ::Int = case len' of

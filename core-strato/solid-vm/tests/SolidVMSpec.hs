@@ -431,3 +431,37 @@ contract qq {
              , MapIndex $ IText "profileName"
              , MapIndex $ IText "ruleName"
              , MapIndex $ IBool True ] ] `shouldReturn` [BContract "X" 0xdeadbeef]
+
+  it "can default construct arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  constructor() {
+    bytes32[] mnames;
+  }
+}|]
+    getAll [ [ Field "mnames", Field "length"]] `shouldReturn` [BDefault]
+
+  it "can push onto local arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  constructor() {
+    bytes32[] mnames;
+    mnames.push("rulename");
+  }
+}|]
+    liftIO $ pendingWith "locals must not be persisted to storage"
+    getAll [ [Field "mnames", Field "length"]
+           , [Field "mnames", ArrayIndex 0]
+           ] `shouldReturn` [BDefault, BDefault]
+
+  it "can access length of local arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint len;
+  constructor() {
+    bytes32[] arr;
+    arr.push("ok");
+    len = arr.length;
+  }
+}|]
+    getAll [ [Field "len"]] `shouldReturn` [BInteger 1]

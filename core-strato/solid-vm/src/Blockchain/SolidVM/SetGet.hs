@@ -58,15 +58,6 @@ setVar key val = do
 getVar :: Variable -> SM Value
 getVar (Variable ioRef) = liftIO $ readIORef ioRef
 getVar (Constant c) = return c
-getVar (Property "length" var) = do
-  case var of
-    StorageItem p -> getVar . StorageItem $ p ++ [MS.Field "length"]
-    _ -> do
-      val <- getVar var
-      case val of
-        SArray _ vec -> return $ SInteger $ toInteger $ V.length vec
-        SString s -> return $ SInteger $ toInteger $ length s
-        x -> error $ "getVar is not defined for property 'length' with value: " ++ show x
 getVar (StorageItem key) = do
   currentAddress' <- getCurrentAddress
   fromBasic <$> getSolidStorageKeyVal' currentAddress' key
