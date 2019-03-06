@@ -21,6 +21,7 @@ services:
     - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     - NODE_HOST=${NODE_HOST}
     - NODE_NAME=${NODE_NAME}
+    - OAUTH_ENABLED=${OAUTH_ENABLED}
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
@@ -148,10 +149,10 @@ services:
     - seqDebugMode=${seqDebugMode}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
-    - seqRTSOPTs=${seqRTSOPTs:-}
+    - seqRTSOPTs=${seqRTSOPTs}
     - useSyncMode=${useSyncMode}
-    - validators=${validators:-}
-    - vmRunnerRTSOPTs=${vmRunnerRTSOPTs:-}
+    - validators=${validators}
+    - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
