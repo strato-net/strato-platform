@@ -577,3 +577,33 @@ contract qq {
 }|]
     getAll [[Field "x"], [Field "z"]] `shouldReturn` [BInteger 0xf07, BInteger 0xf07]
 
+  it "can read from struct references" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  struct S {
+    uint si;
+  }
+  S[] ss;
+  uint z;
+  constructor() public {
+    ss.push(S(222222));
+    S ref = ss[0];
+    z = ref.si;
+  }
+}|]
+
+    getAll [ [Field "ss", Field "length"]
+           , [Field "ss", ArrayIndex 0, Field "si"]
+           , [Field "z"]
+           ] `shouldReturn` [BInteger 1, BInteger 222222, BInteger 222222]
+
+  it "can detect nulls" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping(uint => uint) ns;
+  bool found;
+  constructor() {
+    found = ns[0x0ddba11] != 0x0;
+  }
+}|]
+    getAll [[Field "found"]] `shouldReturn` [BBool False]
