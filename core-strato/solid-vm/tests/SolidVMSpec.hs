@@ -490,19 +490,6 @@ contract qq {
 }|]
     getAll [ [Field "y" ]] `shouldReturn` [BDefault]
 
-  it "can map index with uninitialized numbers" . runTest $ do
-    void $ runBS [r|
-contract qq {
-  mapping(uint => uint) xs;
-  uint y;
-  constructor() {
-    uint idx;
-    y = xs[idx];
-  }
-}|]
-
-    getAll [ [Field "y"]] `shouldReturn` [BDefault]
-
   it "can map index with uninitialized strings" . runTest $ do
     void $ runBS [r|
 contract qq {

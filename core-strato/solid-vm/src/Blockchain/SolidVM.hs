@@ -480,6 +480,7 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
   return . (parPath ++) $ case (idxType, idx) of
     (MapAddressIndex, SAddress a) -> [MS.MapIndex $ MS.IAddress a]
     (MapAddressIndex, SInteger i) -> [MS.MapIndex $ MS.IAddress $ fromIntegral i]
+    (MapAddressIndex, SDefault) -> [MS.MapIndex $ MS.IAddress 0x0]
     (MapBoolIndex, SBool b) -> [MS.MapIndex $ MS.IBool b]
     (MapBoolIndex, SDefault) -> [MS.MapIndex $ MS.IBool False]
     (MapIntIndex, SInteger i) -> [MS.MapIndex $ MS.INum i]
