@@ -18,15 +18,22 @@ import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Format
 import qualified SolidVM.Model.Storable as MS
 
-fromBasic :: MS.BasicValue -> Value
-fromBasic = \case
-  MS.BDefault -> SDefault
+fromBasic :: BasicType -> MS.BasicValue -> Value
+fromBasic t = \case
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a
   MS.BContract n a -> SContract (T.unpack n) (fromIntegral a)
-  MS.BEnumVal k t -> SEnumVal (T.unpack k) (T.unpack t)
+  MS.BEnumVal k v -> SEnumVal (T.unpack k) (T.unpack v)
+  MS.BDefault -> case t of
+    TInteger -> SInteger 0
+    TString -> SString ""
+    TBool -> SBool False
+    TAddress -> SAddress 0x0
+    TContract n -> SContract n 0x0
+    TEnumVal n -> SEnumVal n (error "TODO(tim): unable to know default enum value")
+    Todo msg -> error $ "TODO(tim): type hint needed: " ++ msg
 
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
@@ -36,7 +43,6 @@ toBasic = \case
   SAddress a -> MS.BAddress a
   SContract n a -> MS.BContract (T.pack n) (fromIntegral a)
   SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
-  SDefault -> MS.BDefault
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
 setVar :: MS.StoragePath -> Value -> SM ()
@@ -55,20 +61,40 @@ setVar key val = do
         putSolidStorageKeyVal' currentAddress' dstKey val'
       _ -> putSolidStorageKeyVal' currentAddress' key (toBasic val)
 
-getVar :: Variable -> SM Value
-getVar (Variable ioRef) = do
+deleteVar :: MS.StoragePath -> SM ()
+deleteVar key = do
+  currentAddress' <- getCurrentAddress
+  putSolidStorageKeyVal' currentAddress' key MS.BDefault
+
+
+getInt :: Variable -> SM Integer
+getInt p = do
+  v <- getVar TInteger p
+  case v of
+    SInteger s -> return s
+    _ -> error $ "not an integer: " ++ show v
+
+getBool :: Variable -> SM Bool
+getBool p = do
+  v <- getVar TBool p
+  case v of
+    SBool b -> return b
+    _ -> error $ "not a bool: " ++ show v
+
+getVar :: BasicType -> Variable -> SM Value
+getVar t (Variable ioRef) = do
   val <- liftIO $ readIORef ioRef
   case val of
-    SReference ref -> getVar (StorageItem ref)
+    SReference ref -> getVar t (StorageItem ref)
     _ -> return val
-getVar (Constant c) = do
+getVar t (Constant c) = do
   case c of
-    SReference ref -> getVar (StorageItem ref)
+    SReference ref -> getVar t (StorageItem ref)
     _ -> return c
-getVar (StorageItem key) = do
+getVar t (StorageItem key) = do
   currentAddress' <- getCurrentAddress
-  fromBasic <$> getSolidStorageKeyVal' currentAddress' key
-getVar (Property f var) = do
+  fromBasic t <$> getSolidStorageKeyVal' currentAddress' key
+getVar t (Property f var) = do
   p <- case var of
     StorageItem p -> return p
     Constant (SReference p) -> return p
@@ -78,7 +104,7 @@ getVar (Property f var) = do
         SReference p -> return p
         _ -> error $ "invalid value for property: " ++ show val
     _ -> error $ "invalid variable for property: " ++ show var
-  getVar . StorageItem $ p ++ [MS.Field $! BC.pack f]
+  getVar t . StorageItem $ p ++ [MS.Field $! BC.pack f]
 
 
 showSM :: Value -> SM String
@@ -89,17 +115,17 @@ showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName) = return $ enumName ++ "." ++ valName
 showSM (SAddress a) = return $ format a
 showSM (STuple v) = do
-  vals <- forM (V.toList v) getVar
+  vals <- forM (V.toList v) (getVar (Todo "showSM"))
   strings <- forM vals showSM
   return $ "(" ++ intercalate ", " strings ++ ")"
 showSM (SArray _ v) = do
-  vals <- forM (V.toList v) getVar
+  vals <- forM (V.toList v) (getVar (Todo "showSM"))
   strings <- forM vals showSM
   return $ "[" ++ intercalate ", " strings ++ "]"
 showSM (SStruct name m) = do
   valStrings <-
     forM (M.toList m) $ \(n, var) -> do
-      val <- getVar var
+      val <- getVar (Todo "showSM") var
       valString <- showSM val
       return (n, valString)
   return $ name ++ "{"
@@ -108,7 +134,7 @@ showSM (SStruct name m) = do
 showSM (SMap _ m) = do
   valStrings <-
     forM (M.toList m) $ \(key, var) -> do
-      val <- getVar var
+      val <- getVar (Todo "showSM") var
       valString <- showSM val
       keyString <- showSM key
       return (keyString, valString)
@@ -117,6 +143,5 @@ showSM (SMap _ m) = do
            ++ "}"
 showSM (SContract name address) = do
   return $ "Contract: " ++ name ++ "/" ++ format (Address $ fromInteger address)
-showSM SDefault = return "<default>"
 showSM (SReference p) = return $ "<reference to " ++ BC.unpack (MS.unparsePath p) ++ ">"
 showSM x = error $ "showSM called for unsupported value: " ++ show x

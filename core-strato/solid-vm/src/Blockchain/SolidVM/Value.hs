@@ -36,6 +36,10 @@ instance Show Variable where
 --Sometimes address is and integer (solidity can treat an integer as an address),
 --sometimes it is a proper type.
 
+data BasicType = TInteger | TString | TBool | TAddress
+               | TEnumVal String | TContract String
+               | Todo String deriving (Show, Eq)
+
 data Value =
   SInteger Integer
   | SString String
@@ -57,8 +61,6 @@ data Value =
   | SContract String Integer --second param is address
   | SContractFunction String Integer String -- contractName, address, functionName
   | SNULL
-  | SDefault -- TODO(tim): The default value, but does not yet have a type hint
-             -- It would be better to have `fromBasic :: Type -> BasicValue -> Value`,
   | SReference MS.StoragePath -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
   deriving (Show)
@@ -140,5 +142,4 @@ byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 
 castToInt :: Value -> Integer
 castToInt (SInteger i) = i
-castToInt SDefault = 0
 castToInt s = error $ "cast: not an integer: " ++ show s
