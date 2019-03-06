@@ -8,7 +8,7 @@ module Blockchain.SolidVM
       call
     , create
     ) where
-
+-- import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -344,7 +344,20 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
 runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybeExpression)) = do
   value <-
     case maybeExpression of
-      Just e -> getVar =<< expToVar e
+      Just e -> do
+        let getRef = SReference <$> expToPath e
+            getValue = getVar =<< expToVar e
+        case mType of
+          Just (Xabi.Label name) -> do
+            ty <- getTypeOfName name
+            case ty of
+              StructTypo{} -> getRef
+              _ -> getValue
+          Just Xabi.Array{} -> getRef
+          Just Xabi.Struct{} -> getRef
+          Just Xabi.Mapping{} -> getRef
+          _ -> getValue
+
       Nothing ->
         case varNames of
            [Just name] ->
@@ -358,7 +371,6 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
                Just (Xabi.Bytes {}) -> return $ SString ""
                Just _ -> return SDefault
            _ -> error $ "TODO(tim): handle multiple names: " ++ show varNames
-
   when trace $ do
     valueString <- showSM value
     liftIO $ putStrLn $ "             creating and setting variables: (" ++ intercalate ", " (map (fromMaybe "") varNames) ++ ")"

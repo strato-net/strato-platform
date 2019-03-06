@@ -276,7 +276,7 @@ getCurrentCallInfo = do
   case callStack sstate of
     [] -> error "getCurrentCallInfo called with an empty stack"
     (currentCallInfo:_) -> return currentCallInfo
-        
+
 
 getTypeOfName :: String -> SM Typo
 getTypeOfName s = do
@@ -286,9 +286,9 @@ getTypeOfName s = do
         , fmap EnumTypo (M.lookup s _enums)
         , fmap FuncTypo (M.lookup s _functions)
         ]
-
   CodeCollection ccs <- fmap codeCollection getCurrentCallInfo
-  case concatMap lookInContract ccs of
+  let ctrs = map ContractTypo $ M.keys ccs
+  case concatMap lookInContract ccs ++ ctrs of
     [] -> error $ "TODO(tim): unable to find type: " ++ show s
     (typo:_) -> return typo
 

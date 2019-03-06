@@ -19,6 +19,7 @@ import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 data Typo = StructTypo [(T.Text, Xabi.FieldType)]
           | EnumTypo [String]
           | FuncTypo Func
+          | ContractTypo String
           deriving (Show)
 
 data Contract =

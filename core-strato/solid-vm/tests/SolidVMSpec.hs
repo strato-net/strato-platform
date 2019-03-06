@@ -501,3 +501,19 @@ contract qq {
   }
 }|]
     getAll [ [Field "y"] ] `shouldReturn` [BDefault]
+
+  it "can access fields of structs from arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  struct S {
+    uint f;
+  }
+  S[] ss;
+  uint y;
+  constructor() {
+    ss.push(S(0xdeadbeef));
+    S s = ss[0];
+    y = s.f;
+  }
+}|]
+    getAll [ [Field "y"] ] `shouldReturn` [BInteger 0xdeadbeef]
