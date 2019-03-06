@@ -205,16 +205,17 @@ call _ _ _ _ blockData _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
       maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
 
-  returnValue <- runSM blockData $ do
+  encodedReturnValue <- runSM blockData $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
-           call'' codeAddress funcName argValues
-
-
+           maybeRet <- call'' codeAddress funcName argValues
+           case maybeRet of
+             Just x -> fmap Just $ encodeForReturn x
+             Nothing -> return Nothing
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
-    erReturnVal = BSS.toShort . encodeForReturn <$> returnValue,
+    erReturnVal = fmap BSS.toShort encodedReturnValue,
     erTrace = [],
     erLogs = [],
     erNewContractAddress = Nothing,
@@ -973,9 +974,12 @@ logVals val1 val2 = when trace . liftIO . putStrLn $ printf
   \            %%%% val2 = %s" (show val1) (show val2)
 
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
-encodeForReturn :: Value -> ByteString
-encodeForReturn (SInteger i) = rlpSerialize $ rlpEncode i
+encodeForReturn :: Value -> SM ByteString
+encodeForReturn (SInteger i) = return $ rlpSerialize $ rlpEncode i
 encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
-  word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
+  return $ word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
   where stringBytes = BC.pack s
+encodeForReturn (STuple items) = do
+  encodedBytestrings <- forM (V.toList items) $ \i -> encodeForReturn =<< getVar i
+  return $ B.concat encodedBytestrings
 encodeForReturn x = error $ "encodeForReturn called for undefined value: " ++ show x
