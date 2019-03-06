@@ -194,7 +194,6 @@ services:
     - authBasic=${authBasic}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
-    #- NODE_HOST=${NODE_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
