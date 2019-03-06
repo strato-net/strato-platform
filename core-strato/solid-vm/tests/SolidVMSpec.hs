@@ -111,6 +111,9 @@ checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
 getAll :: [StoragePath] -> ContextM [BasicValue]
 getAll = mapM (getSolidStorageKeyVal' uploadAddress)
 
+getFields :: [BC.ByteString] -> ContextM [BasicValue]
+getFields = getAll . map (\t -> [Field t])
+
 spec :: Spec
 spec = do
   describe "Ballot" $ do
@@ -133,7 +136,7 @@ spec = do
 
     it "can reduce a modulus" . runTest $ do
       void $ runFile "testdata/Modulo.sol"
-      getAll [[Field "x"]] `shouldReturn` [BInteger 0xbe]
+      getFields ["x"] `shouldReturn` [BInteger 0xbe]
 
 
     it "should be able to store a string" . runTest $ do
@@ -207,14 +210,14 @@ spec = do
 
     it "can delete" . runTest $ do
       runFile "testdata/Delete.sol" `shouldReturn` defaultExecResults
-      getAll [[Field "x"]] `shouldReturn` [BDefault]
+      getFields ["x"] `shouldReturn` [BDefault]
 
     it "can run complicated constructors" . runTest $ do
       runFile "testdata/Constructor.sol" `shouldReturn` defaultExecResults
 
     it "can exponentiate" . runTest $ do
       void $ runFile "testdata/Exp.sol"
-      getAll [[Field "x"]] `shouldReturn` [BInteger 25]
+      getFields ["x"] `shouldReturn` [BInteger 25]
 
     it "can use addresses as map keys" . runTest $ do
       void $ runFile "testdata/AddressMapping.sol"
@@ -222,8 +225,7 @@ spec = do
 
     it "can hash correctly" . runTest $ do
       void $ runFile "testdata/Keccak256.sol"
-      let input = map (\t -> [Field t]) ["buf1", "buf2", "hash1", "hash2"]
-      getAll input `shouldReturn`
+      getFields ["buf1", "buf2", "hash1", "hash2"] `shouldReturn`
         [ BString (B.replicate 32 0xfe)
         , BString (BC.replicate 32 'x')
         , BString (fst $ B16.decode "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a")
@@ -312,7 +314,7 @@ contract qq {
     y = x++;
   }
 }|]
-      getAll [ [Field "x"], [Field "y"] ] `shouldReturn` [BInteger 400000001, BInteger 400000000]
+      getFields ["x", "y"] `shouldReturn` [BInteger 400000001, BInteger 400000000]
 
     it "can pre increment" . runTest $ do
       void $ runBS [r|
@@ -323,7 +325,7 @@ contract qq {
    y = ++x;
   }
 }|]
-      getAll [ [Field "x"], [Field "y"]] `shouldReturn` [BInteger 100, BInteger 100]
+      getFields ["x", "y"] `shouldReturn` [BInteger 100, BInteger 100]
 
     it "can post decrement" . runTest $ do
       void $ runBS [r|
@@ -335,7 +337,7 @@ contract qq {
 
   }
 }|]
-      getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 9, BInteger 10]
+      getFields ["x", "y"] `shouldReturn` [BInteger 9, BInteger 10]
 
     it "can pre decrement" . runTest $ do
       void $ runBS [r|
@@ -507,7 +509,7 @@ contract qq {
     y = xs[idx];
   }
 }|]
-    getAll [ [Field "y"] ] `shouldReturn` [BDefault]
+    getFields ["y"] `shouldReturn` [BDefault]
 
   it "can access fields of structs from arrays" . runTest $ do
     void $ runBS [r|
@@ -523,7 +525,7 @@ contract qq {
     y = s.f;
   }
 }|]
-    getAll [ [Field "y"] ] `shouldReturn` [BInteger 0xdeadbeef]
+    getFields ["y"] `shouldReturn` [BInteger 0xdeadbeef]
 
   it "should not treat local ints as references" . runTest $ do
     void $ runBS [r|
@@ -534,7 +536,7 @@ contract qq {
     l += 10;
   }
 }|]
-    getAll [[Field "x"]] `shouldReturn` [BInteger 20]
+    getFields ["x"] `shouldReturn` [BInteger 20]
 
   it "should remember modifications to locals" . runTest $ do
     void $ runBS [r|
@@ -547,7 +549,7 @@ contract qq {
   }
 }|]
     liftIO $ pendingWith "TODO(tim): modifications to locals"
-    getAll [[Field "x"]] `shouldReturn` [BInteger 200]
+    getFields ["x"]`shouldReturn` [BInteger 200]
 
   it "can assign a local struct" . runTest $ do
     void $ runBS [r|
@@ -562,7 +564,7 @@ contract qq {
     z = x.a;
   }
 }|]
-    getAll [[Field "z"]] `shouldReturn` [BInteger 777]
+    getFields ["z"] `shouldReturn` [BInteger 777]
 
   it "can do arithmetic with defaults" . runTest $ do
     void $ runBS [r|
@@ -575,7 +577,7 @@ contract qq {
     z = x ^ q;
   }
 }|]
-    getAll [[Field "x"], [Field "z"]] `shouldReturn` [BInteger 0xf07, BInteger 0xf07]
+    getFields ["x", "z"] `shouldReturn` [BInteger 0xf07, BInteger 0xf07]
 
   it "can read from struct references" . runTest $ do
     void $ runBS [r|
@@ -606,4 +608,16 @@ contract qq {
     found = ns[0x0ddba11] != 0x0;
   }
 }|]
-    getAll [[Field "found"]] `shouldReturn` [BBool False]
+    getFields ["found"] `shouldReturn` [BBool False]
+
+  it "compares equal againts default" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x = 0;
+  uint y;
+  bool z;
+  constructor() {
+    z = x == y;
+  }
+}|]
+    getFields ["x", "y", "z"] `shouldReturn` [BInteger 0, BInteger 0, BBool True]

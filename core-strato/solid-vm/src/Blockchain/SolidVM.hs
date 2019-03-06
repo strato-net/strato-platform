@@ -273,7 +273,7 @@ logFunctionCall args address contract functionName f = do
 
     liftIO $ putStrLn $ box ["returning from " ++ functionName ++ ":", resultString]
 
-  
+
   return result
 
 
@@ -645,8 +645,7 @@ expToVar (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Bin
 
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  isEqual <- liftIO $ val1 `valEquals` val2
-  if not $ isEqual
+  if not $ val1 `valEquals` val2
     then return $ Constant $ SBool True
     else return $ Constant $ SBool False
 
@@ -654,7 +653,7 @@ expToVar (Xabi.Binary "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   logVals val1 val2
-  fmap (Constant . SBool) .liftIO $ val1 `valEquals` val2
+  return . Constant . SBool $ val1 `valEquals` val2
 
 expToVar (Xabi.Binary "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
