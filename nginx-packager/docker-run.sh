@@ -56,8 +56,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # Remove OAuth configuration lines if deployment is not OAuth-enabled
   if [ "$OAUTH_ENABLED" != true ]; then
     sed -i '/#TEMPLATE_MARK_OAUTH/d' /tmp/nginx.conf
-    sed -i '/#TEMPLATE_MARK_OAUTH_LOGIN/d' /tmp/nginx.conf
-    sed -i '/#TEMPLATE_MARK_OAUTH_VERIFY/d' /tmp/nginx.conf
   else
     sed -i '/#TEMPLATE_MARK_NO_OAUTH/d' /tmp/nginx.conf
   fi
@@ -104,32 +102,18 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate .lua scripts from templates according to configuration provided
   ########
   if [ "$OAUTH_ENABLED" = true ] ; then
-    cp /tmp/openid-login.tpl.lua /tmp/openid-login.lua
-    cp /tmp/openid-verify.tpl.lua /tmp/openid-verify.lua
-    # Login lua file
-    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid-login.lua
-    sed -i 's*<OAUTH_DISCOVERY_URL>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid-login.lua
-    sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid-login.lua
-    sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid-login.lua
-    # Verify lua file
-    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid-verify.lua
-    sed -i 's*<OAUTH_DISCOVERY_URL>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid-verify.lua
-    #sed -i 's*<NODE_HOST>*'"$NODE_HOST"'*g' /tmp/openid-verify.lua
+    cp /tmp/openid.tpl.lua /tmp/openid.lua
+    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid.lua
+    sed -i 's*<OAUTH_DISCOVERY_URL>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
+    sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
+    sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
 
     if [ "$ssl" = true ] ; then
-      # Login lua file
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-login.lua
-      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid-login.lua
-      # Verify lua file
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid-verify.lua
-      #sed -i 's/<NODE_HOST_PROTOCOL>/https/g' /tmp/openid-verify.lua
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
+      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
     else
-      # Login lua file
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-login.lua
-      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid-login.lua
-      # Verify lua file
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid-verify.lua
-      #sed -i 's/<NODE_HOST_PROTOCOL>/http/g' /tmp/openid-verify.lua
+      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
+      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
     fi
   fi
 
@@ -139,8 +123,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
   if [ "$OAUTH_ENABLED" = true ]; then
-    mv /tmp/openid-login.lua /usr/local/openresty/nginx/lua/openid-login.lua
-    mv /tmp/openid-verify.lua /usr/local/openresty/nginx/lua/openid-verify.lua
+    mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
   fi
 
   if [ "$ssl" = true ] ; then

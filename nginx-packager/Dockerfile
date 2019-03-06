@@ -15,12 +15,10 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
   CMD curl  --silent --output /dev/null --fail localhost:80/ || \
         exit 1
 
-COPY nginx.tpl.conf auth.htpasswd openid-login.tpl.lua openid-verify.tpl.lua /tmp/
+COPY nginx.tpl.conf auth.htpasswd openid.tpl.lua /tmp/
 
 COPY docker-run.sh /
 
 COPY licenses /licenses
-
-RUN chmod a+x /docker-run.sh
 
 ENTRYPOINT ["/docker-run.sh"]
