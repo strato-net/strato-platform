@@ -9,6 +9,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -381,9 +382,7 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
                  case t' of
                     StructTypo fs ->  SStruct name <$> initializeStruct fs
                     _ -> error $ "TODO(tim): initialize type " ++ show t'
-               Just (Xabi.Bytes {}) -> return $ SString ""
-               -- TODO(tim): 2/n initializing to default type value
-               Just t -> error $ "TODO(tim): how to init without SDefault: " ++ show t
+               Just t -> return $ defaultValue t
            _ -> error $ "TODO(tim): handle multiple names: " ++ show varNames
   when trace $ do
     valueString <- showSM value
@@ -637,7 +636,14 @@ expToVar (Xabi.MemberAccess expr name) = do
 
 expToVar x@(Xabi.IndexAccess{}) = do
   idxPath <- expToPath x
-  value <- getVar (Todo "index access") $ StorageItem idxPath
+  var <- expToVar x
+  traceShowM ("IA"::String, x, var)
+  val <- getVar (Todo "don't want from storage, just want value") var
+  let hint = case val of
+              SArray t _ -> hintFromXabi t
+              SMap t _ -> hintFromXabi t
+              _ -> error "user error: cannot index into non-map/non-array type"
+  value <- getVar hint $ StorageItem idxPath
   Variable <$> liftIO (newIORef value)
 
 expToVar (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger

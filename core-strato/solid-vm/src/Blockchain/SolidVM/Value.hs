@@ -38,7 +38,7 @@ instance Show Variable where
 
 data BasicType = TInteger | TString | TBool | TAddress
                | TEnumVal String | TContract String
-               | Todo String deriving (Show, Eq)
+               | Todo String  deriving (Show, Eq)
 
 data Value =
   SInteger Integer
@@ -132,7 +132,14 @@ defaultValue (Xabi.Bytes _ _) = SString ""
 defaultValue (Xabi.Label name) = SString $ "Label: " ++ name  --TODO- clearly this is wrong.......  I just need something here to run the program through to the end, this needs to be fixed later
 defaultValue x = error $ "missing type in defaultValue: " ++ show x
 
-
+hintFromXabi :: Xabi.Type -> BasicType
+hintFromXabi = \case
+  Xabi.Bool -> TBool
+  Xabi.Int{} -> TInteger
+  Xabi.Bytes{} -> TString
+  Xabi.String{} -> TString
+  Xabi.Address{} -> TAddress
+  v -> Todo $ "hintFromXabi: might need context to determine: " ++ show v
 
 
 
