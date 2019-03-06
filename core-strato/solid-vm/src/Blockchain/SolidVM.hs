@@ -9,7 +9,6 @@ module Blockchain.SolidVM
     , create
     ) where
 
-import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -455,7 +454,7 @@ getIndexType p@(MS.Field field:_) = do
   let n = length p - 1
   case M.lookup (BC.unpack field) decls of
     Nothing -> error $ "TODO(tim): unknown storage reference: " ++ show field
-    Just Xabi.VariableDecl {Xabi.varType=v} -> return $! loop n $ traceShowId v
+    Just Xabi.VariableDecl {Xabi.varType=v} -> return $! loop n v
  where loop :: Int -> Xabi.Type -> IndexType
        loop 0 t = case t of
          Xabi.Mapping{Xabi.key=Xabi.Int{}} -> MapIntIndex
@@ -474,7 +473,6 @@ getIndexType xs = error $ "TODO(tim): getIndexType starting from non-field: " ++
 expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
-  traceShowM x
   parPath <- expToPath parent
   idxType <- getIndexType parPath
   idxVar <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
