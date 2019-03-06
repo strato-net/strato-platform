@@ -626,6 +626,7 @@ expToVar (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SIntege
 expToVar (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar (Xabi.Binary "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar (Xabi.Binary "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
+expToVar (Xabi.Binary "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
 expToVar (Xabi.Binary "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
 expToVar (Xabi.Binary "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
 expToVar (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
@@ -817,13 +818,9 @@ expToVarInteger :: Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -
 expToVarInteger expr1 o expr2 retType = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
-  case (val1, val2) of
-    (SInteger i1, SInteger i2) -> return $ Constant $ retType $ i1 `o` i2
-    _ -> error $ "code tried to perform math on two values that aren't SIntegers:\n" ++ show val1 ++ "\n" ++ show val2
-
-
-
-
+  let i1 = castToInt val1
+      i2 = castToInt val2
+  return . Constant . retType $ i1 `o` i2
 
 
 callBuiltin :: String -> [Value] -> Maybe Value -> SM Value

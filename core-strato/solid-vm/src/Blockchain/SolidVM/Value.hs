@@ -180,4 +180,5 @@ byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 
 castToInt :: Value -> Integer
 castToInt (SInteger i) = i
+castToInt SDefault = 0
 castToInt s = error $ "cast: not an integer: " ++ show s

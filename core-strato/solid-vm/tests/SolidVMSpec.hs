@@ -564,3 +564,16 @@ contract qq {
 }|]
     getAll [[Field "z"]] `shouldReturn` [BInteger 777]
 
+  it "can do arithmetic with defaults" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x = 0xf07;
+  uint z;
+
+  constructor() {
+    uint q;
+    z = x ^ q;
+  }
+}|]
+    getAll [[Field "x"], [Field "z"]] `shouldReturn` [BInteger 0xf07, BInteger 0xf07]
+
