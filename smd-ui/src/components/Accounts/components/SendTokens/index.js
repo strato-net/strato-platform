@@ -14,7 +14,7 @@ import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import ValueInput from '../../../ValueInput';
 import validate from './validate';
-import { isModePublic } from '../../../../lib/checkMode';
+import { isModePublic, isModeOauth } from '../../../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
 
 // TODO: use solc instead of /contracts/xabi for compile
@@ -377,6 +377,8 @@ class SendTokens extends Component {
                   </div>
                 </div>
               </div>
+              {
+                !isModeOauth &&
               <div className="row">
                 <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
@@ -385,19 +387,19 @@ class SendTokens extends Component {
                 </div>
                 <div className="col-sm-8 smd-pad-4">
                   <Field
-                    id="password"
-                    className="form-width pt-input"
-                    placeholder="Password"
-                    name="password"
-                    type="password"
-                    component="input"
-                    dir="auto"
-                    title="Password"
-                    required
+                      id="password"
+                      className="form-width pt-input"
+                      placeholder="Password"
+                      name="password"
+                      type="password"
+                      component="input"
+                      dir="auto"
+                      title="Password"
+                      required
                   />
                 </div>
               </div>
-
+              }
               {this.checkMode(users, toUserAddresses)}
 
               <div className="row">

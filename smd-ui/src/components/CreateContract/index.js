@@ -19,7 +19,7 @@ import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
-import { isModePublic } from '../../lib/checkMode';
+import { isModePublic, isModeOauth } from '../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
 
 // TODO: use solc instead of /contracts/xabi for compile
@@ -395,6 +395,7 @@ class CreateContract extends Component {
                   {this.renderAddress(isPublicMode)}
                 </div>
               </div>
+              {!isModeOauth &&
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
@@ -403,19 +404,20 @@ class CreateContract extends Component {
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   <Field
-                    id="input-b"
-                    className="form-width pt-input"
-                    placeholder="Password"
-                    name="password"
-                    type="password"
-                    component="input"
-                    dir="auto"
-                    title="Password"
-                    validate={required}
-                    required
+                      id="input-b"
+                      className="form-width pt-input"
+                      placeholder="Password"
+                      name="password"
+                      type="password"
+                      component="input"
+                      dir="auto"
+                      title="Password"
+                      validate={required}
+                      required
                   />
                 </div>
               </div>
+              }
               <div className="row">
                 <div className="col-sm-3">
                 </div>
