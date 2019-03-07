@@ -1,5 +1,5 @@
 import { env } from "../env";
 
 export function isS3Available() {
-  return env.S3_CREDENTIALS
+  return env.EXT_STORAGE_ENABLED === 'true'
 }
