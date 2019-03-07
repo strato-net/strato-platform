@@ -9,7 +9,6 @@ module Blockchain.SolidVM
     , create
     ) where
 
-import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -319,9 +318,7 @@ runStatement :: Xabi.Statement -> SM (Maybe Value)
 --      I checked the Wings contracts, they never use this.
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e))) = do
   var <- expToVar e
-  liftIO $ traceIO "expToPath plus plus v0"
   path <- expToPath e
-  liftIO $ traceIO "plusplus"
   v <- getInt var
 
   logAssigningVariable $ SInteger v
@@ -331,24 +328,16 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 
-runStatement (Xabi.SimpleStatement x@(Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
-  liftIO $ traceIO "expToPath ="
+runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
   v1 <- expToPath e1
   v2 <- expToVar e2
-  traceShowM ("x, v1, v2"::String, x, v1, v2)
   !value <- case v2 of
     Constant c -> return c
     StorageItem p -> do
-      traceShowM ("the storage item is"::String, p)
       t <- getValueType p
-      traceShowM ("the alleged type there is"::String, t, " and the path is "::String, p)
       v <- getVar t $ StorageItem p
-      traceShowM ("The value there is"::String, v)
       return v
     Variable v' -> liftIO $ readIORef v'
-  -- t <_ getVar
-  -- !value <- getVar (Todo "expr =") v2
-  traceShowM ("Value is"::String, value)
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (v1, value)
   logAssigningVariable value
   setVar v1 value
@@ -362,8 +351,7 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
     case maybeExpression of
       Just e -> do
         rhs <- expToVar e
-        liftIO $ traceIO "expToPath vardef"
-        let getRef = SReference <$> (liftIO (traceIO "expToPath vardef") >> expToPath e)
+        let getRef = SReference <$> expToPath e
             getValue = getVar (Todo "vardef") =<< expToVar e
         case (rhs, mType) of
           (Constant c, _) -> return c
@@ -451,7 +439,6 @@ runStatement (Xabi.Return maybeExpression) = do
 
 runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   var <- expToVar $ Xabi.Variable $ T.unpack src;
-  liftIO $ traceIO "expToPath asm"
   path <- expToPath $ Xabi.Variable $ T.unpack dst;
   setVar path =<< getVar TString var
   return Nothing
@@ -500,10 +487,9 @@ getValueType [] = error "TODO(tim): getValueType of empty"
 getValueType p@(MS.Field field:rest) = do
   ctract <- getCurrentContract
   let decls = ctract ^. storageDefs
-  traceShowM ("getValueType"::String, p)
   case M.lookup (BC.unpack field) decls of
     Nothing -> error $ "TODO(tim): unknown storage reference: " ++ show field
-    Just Xabi.VariableDecl {Xabi.varType=v} -> loop rest $ traceShowId v
+    Just Xabi.VariableDecl {Xabi.varType=v} -> loop rest v
  where loop :: MS.StoragePath -> Xabi.Type -> SM BasicType
        loop [] = error $ "getValueType of top level field" ++ show p
        loop [x] = \case
@@ -549,12 +535,10 @@ hintFromType = \case
 expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
-  traceShowM ("expToPath"::String, x)
   parPath <- expToPath parent
-  traceShowM parPath
   idxType <- getIndexType parPath
   idxVar <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
-  traceShowId . (parPath ++) <$> case idxType of
+  (parPath ++) <$> case idxType of
     MapAddressIndex -> do
       idx <- getVar TAddress idxVar
       return $ case idx of
@@ -565,10 +549,7 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
       b <- getBool idxVar
       return [MS.MapIndex $ MS.IBool b]
     MapIntIndex -> do
-      liftIO $ traceIO "mapintidx"
-      traceShowM idxVar
       n <- getInt idxVar
-      traceShowM n
       return [MS.MapIndex $ MS.INum n]
     MapStringIndex -> do
       idx <- getVar TString idxVar
@@ -576,11 +557,9 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
         SString s -> [MS.MapIndex $ MS.IText $ BC.pack s]
         _ -> error $ "invalid map of strings index: " ++ show idx
     ArrayIndex -> do
-      liftIO $ traceIO "arrayindex"
       n <- getInt  idxVar
       return [MS.ArrayIndex $ fromIntegral n]
 expToPath (Xabi.MemberAccess parent field) = do
-  liftIO $ traceIO "expToPath from member access"
   parPath <- expToPath parent
   return $ parPath ++ [MS.Field $ BC.pack field]
 
@@ -600,9 +579,7 @@ expToVar (Xabi.Variable name) = do
 
 expToVar (Xabi.PlusPlus e) = do
   var <- expToVar e
-  liftIO $ traceIO "expToPath from plusplus"
   path <- expToPath e
-  liftIO $ traceIO "plusplusv2"
   value <- getInt var
 
   logAssigningVariable $ SInteger value
@@ -612,9 +589,7 @@ expToVar (Xabi.PlusPlus e) = do
 
 expToVar (Xabi.Unitary "++" e) = do
   var <- expToVar e
-  liftIO $ traceIO "expToPath ++"
   path <- expToPath e
-  liftIO $ traceIO "++"
   value <- getInt var
   let next = SInteger $ value + 1
   logAssigningVariable next
@@ -624,9 +599,7 @@ expToVar (Xabi.Unitary "++" e) = do
 
 expToVar (Xabi.MinusMinus e) = do
   var <- expToVar e
-  liftIO $ traceIO "expToPath minusminus"
   path <- expToPath e
-  liftIO $ traceIO "minusminus"
   value <- getInt var
   logAssigningVariable $ SInteger value
   setVar path . SInteger $ value - 1
@@ -634,9 +607,7 @@ expToVar (Xabi.MinusMinus e) = do
 
 expToVar (Xabi.Unitary "--" e) = do
   var <- expToVar e
-  liftIO $ traceIO "expToPath --"
   path <- expToPath e
-  liftIO $ traceIO "--"
   value <- getInt var
   let next = SInteger $ value -1
   logAssigningVariable next
@@ -645,11 +616,8 @@ expToVar (Xabi.Unitary "--" e) = do
 
 expToVar (Xabi.Binary "+=" lhs rhs) = do
   let readInt e = getInt =<< expToVar e
-  liftIO $ traceIO "delta"
   delta <- readInt rhs
-  liftIO $ traceIO "curValue"
   curValue <- readInt lhs
-  liftIO $ traceIO "expToPath +="
   path <- expToPath lhs
   let next = SInteger $ curValue + delta
   setVar path next
@@ -661,32 +629,8 @@ expToVar (Xabi.MemberAccess (Xabi.Variable "Util") "bytes32ToString") = do --TOD
 expToVar (Xabi.MemberAccess (Xabi.Variable "Util") "b32") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
 
-expToVar x@(Xabi.MemberAccess expr name) = do
+expToVar (Xabi.MemberAccess expr name) = do
   var <- expToVar expr
-  path <- expToPath expr
-  mDef <- case path of
-    (MS.Field field:_) -> do
-      ctract <- getCurrentContract
-      let decls = ctract ^. storageDefs
-      return $ M.lookup (BC.unpack field) decls
-    _ -> error "no field starting the expression"
-  -- t' <- case mDef of
-  --         Just Xabi.VariableDecl{Xabi.varType = Xabi.Label m} -> getTypeOfName m
-  --         _ ->
-  traceShowM (x, var, path, mDef) -- t'
-
-  -- let t = Todo "struct_to_type"
-  -- !val <- case var of
-  --   Constant (SReference s) -> (error $ "TODO(tim): resolve reference: " ++ show s)
-  --   Constant c -> return c
-  --   Variable v -> do
-  --     v' <- liftIO $ readIORef v
-  --     error $ "TODO(tim): process var: " ++ show v'
-  --   StorageItem p -> error $ "TODO(tim): path is here: " ++ show p
-  --   Property a b -> error $ "TODO(tim): properties are not values" ++ show (a, b)
-  -- !val <- getVar t var
-  traceM "How does that fail?"
-  -- when trace $ liftIO $ putStrLn $ "         val = " ++ show val
 
   case var of
     Constant c -> Constant <$> case (c, name) of
@@ -730,7 +674,6 @@ expToVar x@(Xabi.MemberAccess expr name) = do
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
         SReference ref -> do
-          traceShowM ("there is a variable reference to "::String, ref)
           return $ StorageItem $ ref ++ [MS.Field $ BC.pack name]
         _ -> error $ "TODO(tim): access member of variable " ++ show (val', name)
     StorageItem p -> return $
@@ -758,7 +701,6 @@ expToVar (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SIntege
 expToVar (Xabi.Unitary "!" expr) = do
   (Constant . SBool . not) <$> (getBool =<< expToVar expr)
 expToVar (Xabi.Unitary "delete" expr) = do
-  liftIO $ traceIO "delete expToPath"
   p <- expToPath expr
   deleteVar p
   return . Constant $ SNULL
@@ -841,8 +783,7 @@ expToVar (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args
   execResults <- create' creator cc contractName' argExps
   return $ Constant $ SAddress $ fromMaybe (error "a call to create did not create an address") $  erNewContractAddress execResults
 
-expToVar x'@(Xabi.FunctionCall e args) = do
-  traceShowM ("function call" ::String, x')
+expToVar (Xabi.FunctionCall e args) = do
   var <- expToVar e
   argVals <- for args $ \(Nothing, arg) -> getVar (Todo "function call args") =<< expToVar arg --TODO- add support for named arguments
   case var of
@@ -891,9 +832,7 @@ expToVar x'@(Xabi.FunctionCall e args) = do
         _ -> error "called enum constructor with improper args"
 
     Constant (SPush path) -> do
-      liftIO $ traceIO "expToPath push"
       let lenPath = path ++ [MS.Field "length"]
-      liftIO $ traceIO "pushlen"
       len' <- getInt $ StorageItem lenPath
       let len :: Int = fromIntegral len'
           newLen = SInteger $ fromIntegral $ len + 1
@@ -917,7 +856,6 @@ expToVar x = error $ "unhandled expression in call to expToVar: " ++ show x
 
 expToVarInteger :: Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -> (a->Value) -> SM Variable
 expToVarInteger expr1 o expr2 retType = do
-  traceShowM ("exPToVarInteger"::String, expr1)
   i1 <- getInt =<< expToVar expr1
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
