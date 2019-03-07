@@ -20,6 +20,7 @@ module BlockApps.Ethereum
   , Hex (..)
   -- * Addresses
   , Address (..)
+  , unAddress
   , deriveAddress
   , addressString
   , stringAddress
@@ -104,6 +105,7 @@ import           Text.Read.Lex
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
 import qualified Data.LargeWord as LW
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
 
@@ -150,11 +152,6 @@ instance (Integral n, Show n) => ToHttpApiData (Hex n) where
 instance Arbitrary x => Arbitrary (Hex x) where
   arbitrary = genericArbitrary uniform
 
-newtype Address = Address { unAddress :: Word160 }
-  deriving (Eq, Ord, Generic, Bounded, NFData, Binary.Binary)
-
-instance Show Address where show = addressString
-
 instance PersistField Address where
   toPersistValue = PersistText . Text.pack . addressString
   fromPersistValue (PersistText t) = maybeToEither "could not decode address"
@@ -167,11 +164,6 @@ instance PersistField Address where
 instance PersistFieldSql Address where
   sqlType _ = SqlOther "text"
 
-instance ToJSONKey Address where
-  toJSONKey = ToJSONKeyText f g
-    where f x = Text.pack $ addressString x
-          g x = AesonEnc.text . Text.pack $ addressString x
-
 padZeros :: Int -> String -> String
 padZeros n string = replicate (n - length string) '0' ++ string
 
@@ -179,22 +171,10 @@ show256 :: Word256 -> String
 show256 = padZeros 64 . flip showHex ""
 
 addressString :: Address -> String
-addressString (Address address) = padZeros 40 $ showHex address ""
+addressString = formatAddress
 
-stringAddress :: String -> Maybe Address
-stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
-
-instance ToJSON Address where toJSON = toJSON . addressString
-
-instance FromJSON Address where
-  parseJSON value = do
-    string <- parseJSON value
-    case stringAddress string of
-      Nothing      -> fail $ "Could not decode Address: " <> string
-      Just address -> return address
-
-instance ToHttpApiData Address where
-  toUrlPiece = Text.pack . addressString
+unAddress :: Address -> Word160
+unAddress (Address n) = n
 
 instance FromHttpApiData Address where
   parseUrlPiece text = case stringAddress (Text.unpack text) of
@@ -205,9 +185,6 @@ instance ToForm Address where
   toForm address = [("address", toQueryParam address)]
 
 instance FromForm Address where fromForm = parseUnique "address"
-
-instance Arbitrary Address where
-  arbitrary = Address . fromInteger <$> arbitrary
 
 instance ToSample Address where
   toSamples _ = samples [Address 0xdeadbeef, Address 0x12345678]

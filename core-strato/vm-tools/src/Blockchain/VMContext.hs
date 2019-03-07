@@ -36,6 +36,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
+import qualified Data.ByteString                    as B
 import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
 import qualified Data.Sequence                      as Q
@@ -67,11 +68,11 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
-import           Blockchain.ExtWord
 import qualified Blockchain.Strato.Indexer.Kafka    as IK
 import qualified Blockchain.Strato.Indexer.Model    as IM
 import           Blockchain.Strato.Model.SHA
@@ -97,8 +98,8 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextBlockSummaryDB         :: BlockSummaryDB
                        , contextAddressStateTxDBMap    :: M.Map Address AddressStateModification
                        , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
-                       , contextStorageTxMap           :: M.Map (Address, Word256) Word256
-                       , contextStorageBlockMap        :: M.Map (Address, Word256) Word256
+                       , contextStorageTxMap           :: M.Map (Address, B.ByteString) B.ByteString
+                       , contextStorageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
                        , contextBlockHashRoot          :: MP.StateRoot
                        , contextGenesisRoot            :: MP.StateRoot
                        , contextBaggerState            :: !BaggerState
@@ -175,19 +176,19 @@ instance HasMemAddressStateDB ContextM where
     cxt <- get
     put $ cxt{contextAddressStateBlockDBMap=theMap}
 
-instance HasStorageDB ContextM where
-  getStorageTxDB = do
+instance HasRawStorageDB ContextM where
+  getRawStorageTxDB = do
     cxt <- get
     return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
             contextStorageTxMap cxt)
-  putStorageTxMap theMap = do
+  putRawStorageTxMap theMap = do
     cxt <- get
     put cxt{contextStorageTxMap=theMap}
-  getStorageBlockDB = do
+  getRawStorageBlockDB = do
     cxt <- get
     return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
             contextStorageBlockMap cxt)
-  putStorageBlockMap theMap = do
+  putRawStorageBlockMap theMap = do
     cxt <- get
     put cxt{contextStorageBlockMap=theMap}
 
@@ -319,8 +320,8 @@ getNewAddress address = do
 
 purgeStorageMap :: HasStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  (_, storageMap) <- getStorageTxDB
-  putStorageTxMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
+  (_, storageMap) <- getRawStorageTxDB
+  putRawStorageTxMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo
 getContextBestBlockInfo = contextBestBlockInfo <$> get

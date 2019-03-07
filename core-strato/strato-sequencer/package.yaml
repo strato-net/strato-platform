@@ -16,6 +16,7 @@ dependencies:
   - classy-prelude
   - strato-model
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-util
   - strato-conf
   - clock
@@ -59,8 +60,9 @@ dependencies:
   - deepseq
   - exceptions
   - unliftio
+  - seqevents
 
-ghc-options: -Wall -O2 -threaded
+ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 library:
   source-dirs:     src

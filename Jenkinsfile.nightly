@@ -157,15 +157,29 @@ pipeline {
     success {
       slackSend (
         color: 'good',
-        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Nightly develop build success: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
 
     failure {
       slackSend (
         color: 'danger',
-        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        message: "Nightly develop build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#engineering',
+          color: 'danger',
+          message: "Nightly develop build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}"
       )
     }
+
+    fixed {
+      slackSend(
+          channel: '#engineering',
+          color: 'good',
+          message: "Nightly develop build *is fixed after it was failing*: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+    
   }
 }

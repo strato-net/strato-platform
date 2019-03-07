@@ -18,8 +18,10 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-haskoin
   - blockapps-milena
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - containers
@@ -44,6 +46,7 @@ dependencies:
   - persistent-postgresql
   - resourcet
   - scientific
+  - seqevents
   - split
   - strato-conf
   - strato-genesis

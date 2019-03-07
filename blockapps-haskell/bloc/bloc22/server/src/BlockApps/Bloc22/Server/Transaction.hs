@@ -73,7 +73,7 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
                         (contractpayloadMetadata p)
                         chainId
                         resolve
-            fmap (:[]) $ postUsersContract' bcp (callSignature userName userId)
+            fmap (:[]) $ postUsersContractEVM' bcp (callSignature userName userId)
           xs -> do
             p <- mapM fromContract xs
             let bclp = ContractListParameters

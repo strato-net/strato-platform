@@ -24,7 +24,7 @@ import           Numeric
 
 import           Blockchain.Database.MerklePatricia
 
-import qualified Blockchain.Data.Action               as A
+import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
@@ -72,10 +72,10 @@ putAccount acc = case acc of
     putAddressState address blankAddressState{addressStateBalance=balance'}
   ContractNoStorage address balance' codeHash' -> do
     putAddressState address blankAddressState{addressStateBalance=balance',
-                                              addressStateCodeHash=codeHash'}
+                                              addressStateCodeHash=EVMCode codeHash'}
   ContractWithStorage address balance' codeHash' slots -> do
     putAddressState address blankAddressState{addressStateBalance=balance',
-                                              addressStateCodeHash=codeHash'}
+                                              addressStateCodeHash=EVMCode codeHash'}
     putStorageTrie address slots
 
 initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
@@ -117,7 +117,7 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
          ["a", a, b, c]  -> do
            let address = Ad.Address $ parseHex a
            liftIO $ putStrLn $ "adding account: " ++ format address
-           putAddressState address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=SHA $ parseHex c}
+           putAddressState address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ SHA $ parseHex c}
          _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
 
       liftIO $ putStrLn $ "flushing batch: " ++ show batchCount
@@ -136,7 +136,7 @@ parseHex theString =
    _ -> error $ "parseHex: error parsing string: " ++ theString
 
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
-initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _ _) -> bin))
+initializeCodeDB = mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin))
 
 chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => ChainInfo
@@ -230,11 +230,20 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
         , A._actionTransactionSender = Ad.Address 0
         , A._actionData = Map.singleton a $
                            A.ActionData
-                             (codeHash d)
-                             (Map.map fromDiff $ storage d)
+                             ch
+                             EVM
+                             (case storage d of
+                                EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
+                                SolidVMDiff _ -> error "TODO(tim): solid vm genesisblock support")
                              [A.emptyCallData]
-        , A._actionMetadata = getMetadata (codeHash d)
+        , A._actionMetadata = getMetadata ch
         }
+        where
+             ch =
+               case codeHash d of
+                 EVMCode ch' -> ch'
+                 SolidVMCode _ ch' -> ch'
+
       fromDiff (Value v) = v
       squashMap f = map (uncurry f) . Map.toList
       actions = squashMap toAction accountDiffs

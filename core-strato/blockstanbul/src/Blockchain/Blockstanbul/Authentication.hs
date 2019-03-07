@@ -21,7 +21,6 @@ import Text.Printf
 
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication
-import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB(blockHash)
 import Blockchain.Data.ArbitraryInstances()
@@ -29,8 +28,9 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.ExtendedECDSA
 import Blockchain.FastECRecover
-import Blockchain.SHA
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.SHA
 import qualified Network.Haskoin.Crypto as HK
 
 instance Arbitrary IstanbulExtra where

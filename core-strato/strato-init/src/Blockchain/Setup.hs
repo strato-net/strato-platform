@@ -45,16 +45,15 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
-import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
 import           Blockchain.PrivateKeyConf
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ExtendedWord
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery
 
@@ -89,8 +88,8 @@ data SetupDBs =
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
     redisDB :: Redis.Connection,
-    localStorageTx :: IORef (Map.Map (Address, Word256) Word256),
-    localStorageBlock :: IORef (Map.Map (Address, Word256) Word256),
+    localStorageTx :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
+    localStorageBlock :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
     localAddressStateTx :: IORef (Map.Map Address AddressStateModification),
     localAddressStateBlock :: IORef (Map.Map Address AddressStateModification)
     }
@@ -102,21 +101,21 @@ instance HasStateDB SetupDBM where
     dbref <- asks stateDB
     liftIO $ atomicModifyIORef' dbref (\s -> (s{MP.stateRoot=sr}, ()))
 
-instance HasStorageDB SetupDBM where
-  getStorageTxDB = do
+instance HasRawStorageDB SetupDBM where
+  getRawStorageTxDB = do
     cxt <- ask --storage and states use the same database!
     db <- liftIO . readIORef . stateDB $ cxt
     lst <- liftIO . readIORef .localStorageTx $ cxt
     return (MP.ldb db, lst)
-  putStorageTxMap theMap = do
+  putRawStorageTxMap theMap = do
     lstref <- asks localStorageTx
     liftIO $ atomicWriteIORef lstref theMap
-  getStorageBlockDB = do
+  getRawStorageBlockDB = do
     cxt <- ask
     db <- liftIO . readIORef . stateDB $ cxt
     lsb <- liftIO . readIORef . localStorageBlock $ cxt
     return (MP.ldb db, lsb)
-  putStorageBlockMap theMap = do
+  putRawStorageBlockMap theMap = do
     lsbref <- asks localStorageBlock
     liftIO $ atomicWriteIORef lsbref theMap
 
@@ -468,7 +467,7 @@ oneTimeSetup genesisBlockName = do
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
          void . flip runLoggingT printLogMsg $ flip runReaderT (SetupDBs smpdb hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
-           addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
+           addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of
              (False, False) -> initializeGenesisBlock NoBackup genesisBlockName decodedFaucets

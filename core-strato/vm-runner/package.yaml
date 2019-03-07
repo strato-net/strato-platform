@@ -16,7 +16,9 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-milena
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - classy-prelude
@@ -32,13 +34,14 @@ dependencies:
   - ordered-containers
   - prometheus-client
   - resourcet
+  - solid-vm
   - strato-adit
   - strato-conf
   - strato-genesis
   - strato-index
   - strato-model
   - strato-redis-blockdb
-  - strato-sequencer
+  - seqevents
   - strato-statediff
   - text
   - time
@@ -66,7 +69,7 @@ executables:
     main: Main.hs
     dependencies:
       - vm-runner
-    ghc-options: -Wall -O2 -threaded -rtsopts
+    ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 tests:
   ethereum-vm-test:
@@ -85,9 +88,12 @@ benchmarks:
     main: Microbench.hs
     other-modules: []
     dependencies:
+      - blockapps-haskoin
       - criterion
+      - deepseq
       - ethereum-vm
       - hashable
+      - vector
       - unordered-containers
 
   extractbench:

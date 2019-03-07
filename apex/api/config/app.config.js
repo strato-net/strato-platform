@@ -1,5 +1,7 @@
 module.exports = {
-  passwordSaltRounds: 10,
+  apps: {
+      directory: 'apps'
+  },
   jwtConfig: {
     jwtSecret: 'JWT_SECRET_PLACEHOLDER', // random string
     jwtAlgorithm: 'HS512',
@@ -14,22 +16,21 @@ module.exports = {
       'http://localhost',
     ]
   },
-  apps: {
-    directory: 'apps'
-  },
-  webSockets: {
-    dbPollFrequency: 1 * 1000
-  },
   mixpanel: {
-    token: 'd78b8eeb10b9fdb8fb0abca5cdb73639'
+      token: 'd78b8eeb10b9fdb8fb0abca5cdb73639'
+  },
+  oAuthEnabledTrueValue: "true",
+  passwordSaltRounds: 10,
+  s3: {
+      bucket: {
+          Bucket: process.env.EXT_STORAGE_S3_BUCKET
+      },
+      accessKeyId: process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
+      secretAccessKey: process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
   },
   signup: 'https://signup.blockapps.net',
   SMD_MODE: process.env['SMD_MODE'] || 'enterprise',
-  s3: {
-    bucket: {
-      Bucket: process.env.EXT_STORAGE_S3_BUCKET
-    },
-    accessKeyId: process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
-    secretAccessKey: process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
+  webSockets: {
+      dbPollFrequency: 1 * 1000
   }
 };

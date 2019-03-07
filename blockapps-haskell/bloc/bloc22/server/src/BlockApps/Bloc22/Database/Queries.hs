@@ -900,6 +900,32 @@ compileContractFromScratch source = do
   let cmIdDetails = Map.elems . Map.intersectionWith (,) mdIdMap $ Map.fromList idDetails
   return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
 
+getMetadataNoCompile :: Text -> Bloc (Map Text (Int32, ContractDetails))
+getMetadataNoCompile source = do
+  let eVerXabis = parseXabi "-" $ Text.unpack source
+  xabis <- case eVerXabis of
+    Left err -> blocError . UserError . Text.pack $ err
+    Right (_, xs) -> return $ Map.fromList xs
+  let contracts = xabis
+      details = flip Map.mapWithKey contracts $ \ contrName (xabi) ->
+        ContractDetails
+        { contractdetailsBin = source
+        , contractdetailsAddress = Just (Named "Latest")
+        , contractdetailsBinRuntime = contrName `Text.append` source
+        , contractdetailsCodeHash =  keccak256 $ Char8.pack $ Text.unpack $ contrName `Text.append` source
+        , contractdetailsName = contrName
+        , contractdetailsSrc = source
+        , contractdetailsXabi = xabi
+        , contractdetailsChainId = Nothing
+        }
+
+  (_,srcHash) <- insertContractSourceQuery source
+  contractIdMap <- createContractBatchQuery $ Map.keys details
+  let idDetails = Map.elems $ Map.intersectionWith (,) contractIdMap details
+  mdIdMap <- insertContractMetaDataBatchQuery srcHash idDetails
+  let cmIdDetails = Map.elems . Map.intersectionWith (,) mdIdMap $ Map.fromList idDetails
+  return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
+
 getContractXabiByMetadataId :: HasCallStack => Int32 -> Bloc Xabi
 getContractXabiByMetadataId cmId = do
   xabi' <- blocQuery1 "getContractXabiByMetadataId" . fmap ninth $ contractByMetadataId cmId

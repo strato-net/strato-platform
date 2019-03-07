@@ -18,6 +18,8 @@ packages:
 - core-strato/miner-ethash/
 - core-strato/merkle-patricia-db/
 - core-strato/blockapps-data/
+- core-strato/blockapps-datadefs/
+- core-strato/blockapps-mpdbs/
 - core-strato/ecrecover/
 - core-strato/fast-ecrecover/
 - core-strato/fast-keccak256/
@@ -31,6 +33,8 @@ packages:
 - core-strato/strato-api/
 - core-strato/blockapps-tools/
 - core-strato/vrun/
+- core-strato/seqevents/
+- core-strato/solid-vm/
 - core-strato/strato-genesis/
 - core-strato/strato-adit/
 - core-strato/strato-index/
@@ -46,6 +50,7 @@ packages:
 - core-strato/blockstanbul/
 - core-strato/privacy/
 - shared-util/cross-monitoring/
+- shared-util/solid-vm-model/
 - clockwork
 - logserver
 - location:

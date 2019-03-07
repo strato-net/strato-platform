@@ -27,7 +27,6 @@ library:
     - monad-logger
     - mtl
     - network
-    - nibblestring
     - path-pieces
     - resource-pool
     - transformers

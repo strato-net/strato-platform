@@ -4,15 +4,17 @@ const router = express.Router();
 const authHandler = require('../middlewares/authHandler.js');
 
 const authController = require('../controllers/auth');
+const oAuthController = require('../lib/oAuth/oAuth');
 const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
 const trackHandler = require('../controllers/track');
 const healthHandler = require('../controllers/health');
 const checkMode = require('../lib/checkMode').checkMode;
-const fileController = require('../controllers/file');
+const appConfig = require(`${process.cwd()}/config/app.config`);
 const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
 
-var upload = multer({ storage: multer.memoryStorage() });
+const fileController = isOAuth() ? require(`${process.cwd()}/controllers/file.oAuth`) : require('../controllers/file');
 
 const multerMiddleware = (req, res, next) => {
   upload.single('content')(req, res, (error) => {
@@ -60,5 +62,10 @@ router.get('/status', healthHandler.nodeStatus);
 router.get('/_ping', healthHandler.ping);
 
 router.get('/_track', trackHandler._track);
+
+
+function isOAuth(){
+  return process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
+}
 
 module.exports = router;

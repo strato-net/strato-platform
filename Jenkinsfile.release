@@ -194,6 +194,12 @@ pipeline {
         color: 'good',
         message: "Release ${env.RELEASE_VERSION} Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
+
+      slackSend (
+        channel: '#core',
+        color: 'good',
+        message: "STRATO ${env.RELEASE_VERSION} is released"
+      )
     }
 
     failure {

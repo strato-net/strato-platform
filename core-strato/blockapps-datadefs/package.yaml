@@ -1,0 +1,23 @@
+name: blockapps-datadefs
+
+dependencies:
+  - aeson
+  - base
+  - base16-bytestring
+  - binary
+  - bytestring
+  - crypto-pubkey-types
+  - deepseq
+  - lens
+  - persistent
+  - persistent-template
+  - strato-model
+  - text
+  - time
+  - transformers
+
+ghc-options: -Wall -O2
+
+library:
+  source-dirs: src/
+  default-extensions: TemplateHaskell

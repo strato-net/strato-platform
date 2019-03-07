@@ -24,13 +24,13 @@ import qualified Data.Set as S
 import Prelude hiding (round, sequence)
 
 import Blockchain.Data.ArbitraryInstances()
-import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
-import Blockchain.SHA
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.SHA
 import qualified Network.Haskoin.Crypto as HK
 
 testContext :: BlockstanbulContext
@@ -77,10 +77,13 @@ spec = parallel $ do
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
-    it "can handle several rounds in succession" $ property $ \blk'' blk2'' as' seal ->
+    it "can handle several rounds in succession" $ withMaxSuccess 10 $ property $ \blk'' blk2'' as' seal ->
       not (null as') ==> runTest $ do
-        let as = sortOn sender as'
-        let (blk', blk2') = over both (addProposerSeal seal . truncateExtra) (blk'', blk2'')
+        let as = nubBy (\l r -> sender l == sender r) . sortOn sender $ as'
+            -- The nonce is set to avoid voting out the sole validator
+            setNonce :: Block -> Block
+            setNonce blk = blk{blockBlockData = (blockBlockData blk){blockDataNonce = 0x24444}}
+        let (blk', blk2') = over both (addProposerSeal seal . truncateExtra . setNonce) (blk'', blk2'')
             blk = setBlockNo 19 blk'
         (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
@@ -110,7 +113,7 @@ spec = parallel $ do
         let hsh2 = blockHash blk2
         omsgs3 <- sendMessages [IMsg nextPpr $ Preprepare v2 blk2, IMsg ppr $ Preprepare v2 blk2]
         map oMessage omsgs3 `shouldMatchList`
-            if ppr == nextPpr
+            if sender ppr == sender nextPpr
               then [Prepare v2 hsh2, Prepare v2 hsh2]
               else [Prepare v2 hsh2]
         -- Old prepares are now ignored
@@ -170,7 +173,7 @@ spec = parallel $ do
         use proposal `shouldReturn` Nothing
 
     it "rejects a preprepare from a non-proposer" $ property $ \auth blk addr ->
-      runTest $ do
+      (sender auth /= addr) ==> runTest $ do
         proposer .= addr
         validators .= S.fromList [sender auth, addr]
         curView <- use view
@@ -233,7 +236,7 @@ spec = parallel $ do
         sendMessages [IMsg auth $ Prepare curView di] `shouldReturn` []
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "waits until there is more than 2/3s prepares to commit" $ property $ \sig a1 a2 a3 blk ->
-      runTest $ do
+      (S.size (S.fromList [a1, a2, a3]) == 3) ==> runTest $ do
         (curView, di) <- setupRound blk [a1, a2, a3]
         let upgrade a = IMsg (MsgAuth a sig) $ Prepare curView di
         sendMessages (map upgrade [a1, a2]) `shouldReturn` []
@@ -326,7 +329,7 @@ spec = parallel $ do
 
   describe "A round change message" $ do
     it "stores the maximum round seen from round-changes" $ property $ \blk a1 a2 a3 ->
-      runTest $ do
+      (S.size (S.fromList $ map sender [a1, a2, a3]) == 3) ==> runTest $ do
         (curView, _) <- setupRound blk . map sender $ [a1, a2, a3]
         next <- uses view (over round (+4))
         let roundNext = _round next

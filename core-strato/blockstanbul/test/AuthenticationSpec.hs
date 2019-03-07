@@ -15,9 +15,9 @@ import Blockchain.Blockstanbul.Authentication
 import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Database.MerklePatricia.StateRoot
-import Blockchain.SHA
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.StateRoot
 import qualified Network.Haskoin.Crypto as HK
 
 testBlock :: Block

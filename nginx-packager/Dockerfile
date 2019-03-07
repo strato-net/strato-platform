@@ -9,14 +9,16 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
-    opm get zmartzone/lua-resty-openidc=1.7.0
+    opm get zmartzone/lua-resty-openidc=1.7.1
 
-COPY nginx.tpl.conf auth.htpasswd openid-auth.tpl.lua openid-auth-jwt.tpl.lua /tmp/
+HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
+  CMD curl  --silent --output /dev/null --fail localhost:80/ || \
+        exit 1
+
+COPY nginx.tpl.conf auth.htpasswd openid.tpl.lua /tmp/
 
 COPY docker-run.sh /
 
 COPY licenses /licenses
-
-RUN chmod a+x /docker-run.sh
 
 ENTRYPOINT ["/docker-run.sh"]

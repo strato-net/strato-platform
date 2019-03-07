@@ -14,9 +14,9 @@ import           Control.Monad.Logger
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
+import qualified Data.ByteString.Short   as BSS
 import           Data.Maybe
 import qualified Data.Set                as S
-import           Data.Either
 import qualified Data.Text.Encoding      as Text
 
 import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
@@ -26,12 +26,12 @@ import qualified Blockchain.Data.Block as BDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.Data.Code
+import           Blockchain.Data.ExecResults
+import           Blockchain.EVM
+import qualified Blockchain.EVM.MutableStack as MS
+import           Blockchain.EVM.Opcodes
 import           Blockchain.Output    (printLogMsg)
 import           Blockchain.Strato.Model.SHA
-import           Blockchain.VM
-import qualified Blockchain.VM.MutableStack as MS
-import           Blockchain.VM.Opcodes
-import           Blockchain.VM.VMState hiding (isRunningTests)
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
 
@@ -53,7 +53,7 @@ spec :: Spec
 spec = do
   describe "monad transformer over map tests" $ do
     it "stateT get its puts for a map" $ do
-      ((result,vmState),_) <- flip runLoggingT printLogMsg $ runTestContextM $ do
+      (execResults,_) <- flip runLoggingT printLogMsg $ runTestContextM $ do
         let
           isRunningTests = False
           isHomestead = False
@@ -83,7 +83,10 @@ spec = do
                     Nothing
         addressState <- getAddressState newAddress
         liftIO . putStrLn $ show addressState
-        code <- fromMaybe C8.empty <$> getCode (addressStateCodeHash addressState)
+        code <- getEVMCode $
+                case addressStateCodeHash addressState of
+                  EVMCode x -> x
+                  _ -> error "vm-runner tests only support EVMCode"
         liftIO . putStrLn $ show $ B16.encode code
         call isRunningTests
              isHomestead
@@ -102,13 +105,14 @@ spec = do
              (SHA 0)
              Nothing
              Nothing
-      result `shouldSatisfy` isRight
-      print $ theTrace vmState
-      print $ vmException vmState
+      erException execResults `shouldSatisfy` isNothing
+      print $ erTrace execResults
+      print $ erException execResults
       print $ B16.encode "ec630643"
-      case returnVal vmState of
+      case erReturnVal execResults of
         Nothing -> liftIO $ putStrLn "No return value"
-        Just code -> do
+        Just short -> do
+          let code = BSS.fromShort short
           print code
           print . fst . B16.decode $ code
           print . Text.decodeUtf8 $ code

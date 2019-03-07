@@ -3,24 +3,48 @@
 module Blockchain.Data.ExecResults where
 
 import           Control.DeepSeq
-import qualified Data.ByteString         as B
+import qualified Data.ByteString.Short   as BSS
+import qualified Data.Set                as S
 import           GHC.Generics
 
 import           Blockchain.VM.VMException
-import           Blockchain.Data.Action
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
+import           Blockchain.Data.Transaction
 
 data ExecResults =
   ExecResults {
-    erRemainingBlockGas  :: Integer,
     erRemainingTxGas     :: Integer,
-    erReturnVal          :: Maybe B.ByteString,
+    erRefund             :: Integer,
+    erReturnVal          :: Maybe BSS.ShortByteString,
     erTrace              :: [String],
     erLogs               :: [Log],
     erNewContractAddress :: Maybe Address,
+    erSuicideList        :: S.Set Address,
     erAction             :: Maybe Action,
     erException          :: Maybe VMException
-    } deriving (Show, Generic)
+    } deriving (Eq, Show, Generic)
 
 instance NFData ExecResults
+
+
+calculateReturned :: Transaction -> ExecResults -> Integer
+calculateReturned t er =
+  let realRefund = min (erRefund er) ((transactionGasLimit t - erRemainingTxGas er) `div` 2)
+  in realRefund + erRemainingTxGas er
+
+
+errorExecResults :: Integer -> VMException -> ExecResults
+errorExecResults remainingGas e =
+  ExecResults {
+    erRemainingTxGas=remainingGas
+    , erRefund=0
+    , erReturnVal=Nothing
+    , erTrace=[]
+    , erLogs=[]
+    , erNewContractAddress=Nothing
+    , erSuicideList = S.empty
+    , erAction = Nothing
+    , erException = Just e
+    }

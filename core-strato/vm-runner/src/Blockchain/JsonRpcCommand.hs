@@ -66,10 +66,11 @@ runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   addressState <- getAddressState address
-  maybeCode <- getCode $ addressStateCodeHash addressState
-  case maybeCode of
-   Just code -> liftIO $ produceResponse id code
-   Nothing   -> liftIO $ produceResponse id ""
+  code <- getEVMCode $
+               case addressStateCodeHash addressState of
+                 EVMCode ch -> ch
+                 _ -> error "runJsonRpcCommand currently only supported for the EVM"
+  liftIO $ produceResponse id code
 
 runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c

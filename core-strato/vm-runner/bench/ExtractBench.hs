@@ -1,7 +1,7 @@
 import Criterion.Main
 import qualified Data.ByteString        as B
 
-import Blockchain.VM.Opcodes
+import Blockchain.EVM.Opcodes
 
 {-# NOINLINE exampleCode #-}
 exampleCode :: B.ByteString

@@ -88,7 +88,7 @@ main = do
       addressStateNonce=0,
         addressStateBalance=10000000000000000000000000000000000000000,
         addressStateContractRoot=MP.blankStateRoot,
-        addressStateCodeHash=SHA 0,
+        addressStateCodeHash=EVMCode $ SHA 0,
         addressStateChainId=Nothing
       }
 
