@@ -187,12 +187,12 @@ spec = do
       runFile "testdata/MappingRead.sol" `shouldReturn` defaultExecResults
       st <- checkStorage
       -- The z assignment doesn't count, as at is set to the empty string
-      st `shouldSatisfy` (== 2) . length
+      st `shouldSatisfy` (== 3) . length
       getAll
         [ [Field "xs", MapIndex (INum 400)]
         , [Field "y"]
         , [Field "z"]
-        ] `shouldReturn` [BInteger 343, BInteger 343, BDefault] -- z may also be 0
+        ] `shouldReturn` [BInteger 343, BInteger 343, BInteger 0]
 
     it "should be able to set array length" . runTest $ do
       runFile "testdata/Length.sol" `shouldReturn` defaultExecResults
@@ -451,6 +451,8 @@ contract qq {
     getAll [ [ Field "mnames", Field "length"]] `shouldReturn` [BDefault]
 
   it "can push onto local arrays" . runTest $ do
+    liftIO $ pendingWith "This is illegal in solc 0.5.x: either it is an uninitialized storage pointer \
+                \ or it is invalid to push onto `bytes32[] memory`"
     void $ runBS [r|
 contract qq {
   constructor() {
@@ -464,6 +466,8 @@ contract qq {
            ] `shouldReturn` [BDefault, BDefault]
 
   it "can access length of local arrays" . runTest $ do
+    liftIO $ pendingWith "This is illegal in solc 0.5.x: either it is an uninitialized storage pointer \
+                         \ or it is invalid to push onto `bytes32[] memory`"
     void $ runBS [r|
 contract qq {
   uint len;
@@ -485,7 +489,7 @@ contract qq {
     y = xs[idx];
   }
 }|]
-    getAll [ [Field "y" ]] `shouldReturn` [BDefault]
+    getAll [ [Field "y" ]] `shouldReturn` [BInteger 0]
 
   it "can map index with uninitialized numbers" . runTest $ do
     void $ runBS [r|
@@ -497,7 +501,7 @@ contract qq {
     y = xs[idx];
   }
 }|]
-    getAll [ [Field "y" ]] `shouldReturn` [BDefault]
+    getAll [ [Field "y" ]] `shouldReturn` [BInteger 0]
 
   it "can map index with uninitialized strings" . runTest $ do
     void $ runBS [r|
@@ -509,7 +513,7 @@ contract qq {
     y = xs[idx];
   }
 }|]
-    getFields ["y"] `shouldReturn` [BDefault]
+    getFields ["y"] `shouldReturn` [BInteger 0]
 
   it "can access fields of structs from arrays" . runTest $ do
     void $ runBS [r|

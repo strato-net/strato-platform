@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
+import Debug.Trace
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -33,6 +35,7 @@ fromBasic t = \case
     TAddress -> SAddress 0x0
     TContract n -> SContract n 0x0
     TEnumVal n -> SEnumVal n (error "TODO(tim): unable to know default enum value")
+    TStruct n fs -> error $ "TODO(tim) recursion needed: " ++ show (n, fs)
     Todo msg -> error $ "TODO(tim): type hint needed: " ++ msg
 
 toBasic :: Value -> MS.BasicValue
@@ -47,11 +50,17 @@ toBasic = \case
 
 setVar :: MS.StoragePath -> Value -> SM ()
 setVar key val = do
+  traceShowM ("setVar"::String, key, val)
   -- If val is a simple value, assign it. If it
   -- is deeper, read the subfields and assign to their adjustment
   currentAddress' <- getCurrentAddress
   case val of
+      SReference ref -> do
+        traceM "setVar reference"
+        val' <- getSolidStorageKeyVal' currentAddress' ref
+        putSolidStorageKeyVal' currentAddress' key val'
       SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
+        traceShowM ("setVar struct "++ f, key, val)
         let suffix = [MS.Field (BC.pack f)]
             srcKey = (MS.Field (BC.pack name)):suffix
             dstKey = key ++ suffix
@@ -59,7 +68,7 @@ setVar key val = do
           Constant x -> return $ toBasic x
           _ -> getSolidStorageKeyVal' currentAddress' srcKey
         putSolidStorageKeyVal' currentAddress' dstKey val'
-      _ -> putSolidStorageKeyVal' currentAddress' key (toBasic val)
+      _ -> traceM "setVar default" >> putSolidStorageKeyVal' currentAddress' key (toBasic val)
 
 deleteVar :: MS.StoragePath -> SM ()
 deleteVar key = do
@@ -69,7 +78,9 @@ deleteVar key = do
 
 getInt :: Variable -> SM Integer
 getInt p = do
+  traceShowM ("getInt" ::String)
   v <- getVar TInteger p
+  traceShowM ("postGetInt" ::String)
   case v of
     SInteger s -> return s
     _ -> error $ "not an integer: " ++ show v
@@ -83,28 +94,37 @@ getBool p = do
 
 getVar :: BasicType -> Variable -> SM Value
 getVar t (Variable ioRef) = do
+  traceShowM ("getVar::var"::String, t)
   val <- liftIO $ readIORef ioRef
   case val of
     SReference ref -> getVar t (StorageItem ref)
     _ -> return val
 getVar t (Constant c) = do
+  traceShowM ("getVar::const"::String, t, c)
   case c of
     SReference ref -> getVar t (StorageItem ref)
     _ -> return c
 getVar t (StorageItem key) = do
+  traceShowM ("GetVar::storage"::String, t, key)
   currentAddress' <- getCurrentAddress
-  fromBasic t <$> getSolidStorageKeyVal' currentAddress' key
-getVar t (Property f var) = do
-  p <- case var of
-    StorageItem p -> return p
-    Constant (SReference p) -> return p
-    Variable ioref -> do
-      val <- liftIO $ readIORef ioref
-      case val of
-        SReference p -> return p
-        _ -> error $ "invalid value for property: " ++ show val
-    _ -> error $ "invalid variable for property: " ++ show var
-  getVar t . StorageItem $ p ++ [MS.Field $! BC.pack f]
+  traceShowId <$> case t of
+    TStruct name fieldHints -> SStruct name . M.fromList <$> do
+      forM fieldHints $ \(l, t') ->
+        -- TODO(tim): These are not really constants
+        ((BC.unpack l, ) . Constant . fromBasic t') <$> getSolidStorageKeyVal' currentAddress' (key ++ [MS.Field l])
+    _ -> fromBasic t <$> getSolidStorageKeyVal' currentAddress' key
+-- getVar t (Property f var) = do
+--   traceShowM ("getVar::prop"::String, t)
+--   p <- case var of
+--     StorageItem p -> return p
+--     Constant (SReference p) -> return p
+--     Variable ioref -> do
+--       val <- liftIO $ readIORef ioref
+--       case val of
+--         SReference p -> return p
+--         _ -> error $ "invalid value for property: " ++ show val
+--     _ -> error $ "invalid variable for property: " ++ show var
+--   getVar t . StorageItem $ p ++ [MS.Field $! BC.pack f]
 
 
 showSM :: Value -> SM String

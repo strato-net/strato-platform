@@ -22,13 +22,11 @@ import qualified SolidVM.Solidity.Xabi.Type       as Xabi
 data IndexType = ArrayIndex | MapBoolIndex | MapAddressIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
 
 data Variable = Variable (IORef Value)
-  | Property String Variable
   | Constant Value
   | StorageItem MS.StoragePath
 
 instance Show Variable where
   show (Variable _) = "<variable>"
-  show (Property name o) = "<prop:" ++ name ++ "> of " ++ show o
   show (Constant v) = "Constant: " ++ show v
   show (StorageItem key) = "<storage: " ++ show key ++ ">"
 
@@ -38,7 +36,8 @@ instance Show Variable where
 
 data BasicType = TInteger | TString | TBool | TAddress
                | TEnumVal String | TContract String
-               | Todo String  deriving (Show, Eq)
+               | TStruct String [(B.ByteString, BasicType)]
+               | Todo String deriving (Show, Eq)
 
 data Value =
   SInteger Integer
@@ -60,6 +59,7 @@ data Value =
   | SContractItem Integer String
   | SContract String Integer --second param is address
   | SContractFunction String Integer String -- contractName, address, functionName
+  | SPush MS.StoragePath -- The array function
   | SNULL
   | SReference MS.StoragePath -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
@@ -92,33 +92,21 @@ instance RLPSerializable Value where
   rlpDecode (RLPArray [RLPString "S", s]) = SString $ rlpDecode s
   rlpDecode x = error $ "undefined case in rlpDecode for Value: " ++ show x
 
-nullMatch :: Value -> Value -> Bool
-nullMatch SDefault = \case
-  SBool False -> True
-  SInteger 0 -> True
-  SString "" -> True
-  SAddress 0x0 -> True
-  SEnumVal e v -> error $ "TODO(tim): cannot yet determine 0 of an enum:" ++ show (e, v)
-  _ -> False
-nullMatch _ = const False
-
 valEquals :: Value -> Value -> Bool
 valEquals lhs rhs =
-     nullMatch lhs rhs
-  || nullMatch rhs lhs
-  || case (lhs, rhs) of
-           (SInteger i1, SInteger i2) -> i1 == i2
-           (SString s1, SString s2) -> s1 == s2
-           (SBool b1, SBool b2) -> b1 == b2
-           (SAddress v1, SAddress v2) -> v1 == v2
-           (SEnumVal e1 v1, SEnumVal e2 v2) -> (e1 == e2) && (v1 == v2)
+  case (lhs, rhs) of
+    (SInteger i1, SInteger i2) -> i1 == i2
+    (SString s1, SString s2) -> s1 == s2
+    (SBool b1, SBool b2) -> b1 == b2
+    (SAddress v1, SAddress v2) -> v1 == v2
+    (SEnumVal e1 v1, SEnumVal e2 v2) -> (e1 == e2) && (v1 == v2)
 
---Meh, Solidity doesn't recognize a difference between Address and Integer....
-           (SAddress (Address v1), SInteger v2) -> v1 == fromInteger v2
-           (SInteger v1, SAddress (Address v2)) -> fromInteger v1 == v2
-           (SBuiltinVariable v1, SBuiltinVariable v2) ->
-             error $ "Comparison of builtin vars requires evaluation: " ++ show (v1, v2)
-           _ -> error $ "unsupported type combination in valEquals: " ++ show (lhs, rhs)
+    --Meh, Solidity doesn't recognize a difference between Address and Integer....
+    (SAddress (Address v1), SInteger v2) -> v1 == fromInteger v2
+    (SInteger v1, SAddress (Address v2)) -> fromInteger v1 == v2
+    (SBuiltinVariable v1, SBuiltinVariable v2) ->
+      error $ "Comparison of builtin vars requires evaluation: " ++ show (v1, v2)
+    _ -> error $ "unsupported type combination in valEquals: " ++ show (lhs, rhs)
 
 
 defaultValue :: Xabi.Type -> Value
@@ -132,14 +120,7 @@ defaultValue (Xabi.Bytes _ _) = SString ""
 defaultValue (Xabi.Label name) = SString $ "Label: " ++ name  --TODO- clearly this is wrong.......  I just need something here to run the program through to the end, this needs to be fixed later
 defaultValue x = error $ "missing type in defaultValue: " ++ show x
 
-hintFromXabi :: Xabi.Type -> BasicType
-hintFromXabi = \case
-  Xabi.Bool -> TBool
-  Xabi.Int{} -> TInteger
-  Xabi.Bytes{} -> TString
-  Xabi.String{} -> TString
-  Xabi.Address{} -> TAddress
-  v -> Todo $ "hintFromXabi: might need context to determine: " ++ show v
+
 
 
 
