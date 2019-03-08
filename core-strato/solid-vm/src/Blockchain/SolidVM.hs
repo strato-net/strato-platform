@@ -164,7 +164,7 @@ create' creator cc contractName' argExps = do
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
     erReturnVal = Just BSS.empty,
-     erTrace = [],
+    erTrace = [],
     erLogs = [],
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
@@ -329,13 +329,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
   v1 <- expToPath e1
   v2 <- expToVar e2
-  !value <- getVar v2-- v2 of
-    -- Constant c -> return c
-    -- StorageItem p -> get
-    --   t <- getValueType p
-    --   v <- getVar t $ StorageItem p
-    --   return v
-    -- Variable v' -> liftIO $ readIORef v'
+  !value <- getVar v2
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (v1, value)
   logAssigningVariable value
   setVar v1 value
@@ -629,12 +623,9 @@ expToVar (Xabi.MemberAccess expr name) = do
       if name == "push"
         then Constant $ SPush p
         else StorageItem $ p ++ [MS.Field $ BC.pack name]
-    -- pr -> error $ "TODO(tim): what properties could be here?" ++ show pr
-    -- _ -> return $ Property name var
 
 expToVar x@(Xabi.IndexAccess{}) = do
   idxPath <- expToPath x
-  -- hint <- getValueType idxPath
   value <- getVar $ StorageItem idxPath
   Variable <$> liftIO (newIORef value)
 
