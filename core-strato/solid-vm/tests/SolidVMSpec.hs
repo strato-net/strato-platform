@@ -460,14 +460,13 @@ contract qq {
     mnames.push("rulename");
   }
 }|]
-    liftIO $ pendingWith "locals must not be persisted to storage"
     getAll [ [Field "mnames", Field "length"]
            , [Field "mnames", ArrayIndex 0]
            ] `shouldReturn` [BDefault, BDefault]
 
   it "can access length of local arrays" . runTest $ do
-    liftIO $ pendingWith "This is illegal in solc 0.5.x: either it is an uninitialized storage pointer \
-                         \ or it is invalid to push onto `bytes32[] memory`"
+    liftIO $ pendingWith "This is illegal in solc 0.5.x: either it is an uninitialized\
+                         \ storage pointer or it is invalid to push onto `bytes32[] memory`"
     void $ runBS [r|
 contract qq {
   uint len;
@@ -552,7 +551,7 @@ contract qq {
     x = l;
   }
 }|]
-    liftIO $ pendingWith "TODO(tim): modifications to locals"
+    -- liftIO $ pendingWith "TODO(tim): modifications to locals"
     getFields ["x"]`shouldReturn` [BInteger 200]
 
   it "can assign a local struct" . runTest $ do

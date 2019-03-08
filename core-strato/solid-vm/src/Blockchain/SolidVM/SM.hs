@@ -19,7 +19,6 @@ module Blockchain.SolidVM.SM (
   getCurrentCodeCollection,
   getEnv,
   getVariableOfName,
-  addLocalVariable,
   getTypeOfName,
   getValueType
   ) where
@@ -31,7 +30,6 @@ import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
@@ -189,16 +187,6 @@ getEnv :: SM Environment
 getEnv = do
   fmap env get
 
-addLocalVariable :: String -> Value -> SM ()
-addLocalVariable name value = do
-  newVariable <- liftIO $ fmap Variable $ newIORef value
-  sstate <- get
-  case callStack sstate of
-    [] -> internalError "addLocalVariable called with an empty stack" (name, value)
-    (currentSlice:rest) ->
-      put sstate
-          {callStack = currentSlice{localVariables=M.insert name newVariable $ localVariables currentSlice}:rest}
-
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True x = Just x
 toMaybe False _ = Nothing
@@ -211,8 +199,9 @@ getVariableOfName name = do
         case callStack sstate of
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
-      vars = localVariables currentCallInfo
-      maybeLocalValue = M.lookup name $ vars
+      -- vars = localVariables currentCallInfo
+      -- maybeLocalValue = M.lookup name $ vars
+      maybeLocalValue = Just $ StorageItem [MS.Field $ BC.pack name]
 
       maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -241,7 +230,7 @@ getVariableOfName name = do
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
-        then either (internalError "corrupted path") (Just . StorageItem) . MS.parsePath . BC.pack $ '.':name
+        then Just $ StorageItem [MS.Field $ BC.pack name]
         else Nothing
 
       maybeThis :: Maybe Variable
@@ -379,7 +368,7 @@ getValueType (MS.Field field:rest) = do
   ctract <- getCurrentContract
   let decls = ctract ^. storageDefs
   case M.lookup (BC.unpack field) decls of
-    Nothing -> todo "getValueType/unknown storage reference" field
+    Nothing -> return $ Todo "getValueType/unknown storage reference (probably local)"
     Just Xabi.VariableDecl {Xabi.varType=v} -> loop rest v
  where loop :: MS.StoragePath -> Xabi.Type -> SM BasicType
        loop [] = hintFromType

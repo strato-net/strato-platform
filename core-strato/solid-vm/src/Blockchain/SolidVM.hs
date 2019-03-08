@@ -9,6 +9,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -330,6 +331,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
   v1 <- expToPath e1
   v2 <- expToVar e2
+  traceShowM (v1, v2, e1, e2)
   !value <- getVar v2
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (v1, value)
   logAssigningVariable value
@@ -374,7 +376,8 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
 
 
   case (varNames, value) of
-    ([Just name], _) -> addLocalVariable name value
+    ([Just name], _) -> do
+      addLocalVariable name value
     (_, STuple variables) -> do
       checkArity "var declaration tuple" (V.length variables) (length varNames)
       forM_ [(n, v) | (Just n, v) <- zip varNames $ V.toList variables] $ \(name', variable') -> do
@@ -907,6 +910,16 @@ runTheConstructors cc address contractName' argExps = do
   return ()
 
 
+addLocalVariable :: String -> Value -> SM ()
+addLocalVariable name value = do
+  setVar [MS.Field $ BC.pack name] value
+  newVariable <- liftIO $ fmap Variable $ newIORef value
+  sstate <- get
+  case callStack sstate of
+    [] -> internalError "addLocalVariable called with an empty stack" (name, value)
+    (currentSlice:rest) ->
+      put sstate
+          {callStack = currentSlice{localVariables=M.insert name newVariable $ localVariables currentSlice}:rest}
 
 
 call' :: Address -> Contract -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)

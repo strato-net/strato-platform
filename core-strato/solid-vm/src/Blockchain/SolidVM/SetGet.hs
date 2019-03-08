@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
+import Debug.Trace
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -36,6 +37,7 @@ fromBasic t = \case
     TContract n -> SContract n 0x0
     TEnumVal n -> SEnumVal n (todo "enum default value" n)
     TStruct n fs -> todo "recursive struct basic types" (n, fs)
+    Todo msg -> todo "fromBasic" msg
 
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
@@ -101,14 +103,17 @@ getContract _contractName = getVar
 getVar :: Variable -> SM Value
 getVar (Variable ioRef) = do
   val <- liftIO $ readIORef ioRef
+  traceShowM ("ioref read: "::String, val)
   case val of
     SReference ref -> getVar (StorageItem ref)
     _ -> return val
 getVar (Constant c) = do
+  traceShowM ("constant value: "::String, c)
   case c of
     SReference ref -> getVar (StorageItem ref)
     _ -> return c
 getVar (StorageItem key) = do
+  traceShowM ("storage read"::String, key)
   currentAddress' <- getCurrentAddress
   typeHint <- getValueType key
   case typeHint of

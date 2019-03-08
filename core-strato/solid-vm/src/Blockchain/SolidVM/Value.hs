@@ -146,4 +146,5 @@ data Typo = StructTypo [(T.Text, Xabi.FieldType)]
 data BasicType = TInteger | TString | TBool | TAddress
                | TEnumVal String | TContract String
                | TStruct String [(B.ByteString, BasicType)]
+               | Todo String
                deriving (Show, Eq)
