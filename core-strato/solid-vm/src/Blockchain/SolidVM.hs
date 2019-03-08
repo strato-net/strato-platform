@@ -914,6 +914,7 @@ runTheConstructors cc address contractName' argExps = do
 
 addLocalVariable :: String -> Value -> SM ()
 addLocalVariable name value = do
+  traceShowM ("newLocalVariable"::String, name, value)
   setVar [MS.Field $ BC.pack name] value
   newVariable <- liftIO $ fmap Variable $ newIORef value
   sstate <- get

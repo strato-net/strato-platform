@@ -19,6 +19,7 @@ module Blockchain.SolidVM.SM (
   getCurrentCodeCollection,
   getEnv,
   getVariableOfName,
+  getFunctionOfName,
   getTypeOfName,
   getValueType
   ) where
@@ -191,6 +192,25 @@ getEnv = do
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True x = Just x
 toMaybe False _ = Nothing
+
+getFunctionOfName :: String -> SM Function
+getFunctionOfName name = do
+  currentCallInfo <- getCurrentCallInfo
+  let maybeContractFunction = fmap (FFunction) $ M.lookup name
+                            $ currentContract currentCallInfo^.functions
+
+      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "keccak256", "require", "revert",
+                                                   "assert", "sha3", "sha256", "ecrecover",
+                                                   "addmod", "mulmod", "selfdestruct", "suicide"])
+                           $ FBuiltinFunction name Nothing
+
+      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums))
+                $ FEnum name
+
+      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs))
+                     $ FStructDef name
+  return $ fromMaybe (unknownFunction "getFunctionOfName" name) . foldr1 (<|>) $
+           [maybeContractFunction, maybeBuiltinFunction, maybeEnum, maybeStructDef]
 
 getVariableOfName :: String -> SM Variable
 getVariableOfName name = do
@@ -369,7 +389,7 @@ getValueType (MS.Field field:rest) = do
   ctract <- getCurrentContract
   let decls = ctract ^. storageDefs
   case M.lookup (BC.unpack field) decls of
-    Nothing -> return $ Todo "getValueType/unknown storage reference (probably local)"
+    Nothing -> return $ Todo $ "getValueType/unknown storage reference (probably local):" ++ show field
     Just Xabi.VariableDecl {Xabi.varType=v} -> loop rest v
  where loop :: MS.StoragePath -> Xabi.Type -> SM BasicType
        loop [] = hintFromType

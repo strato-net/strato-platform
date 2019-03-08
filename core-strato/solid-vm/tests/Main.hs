@@ -8,7 +8,7 @@ import Executable.EVMFlags() -- for HFlags
 import qualified Spec
 
 predicate :: Path -> Bool
-predicate (_, "can run complicated constructors") = True
+predicate (_, _) = True
 predicate _ = False
 
 main :: IO ()

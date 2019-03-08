@@ -56,8 +56,10 @@ setVar key val = do
   currentAddress' <- getCurrentAddress
   case val of
       SReference ref -> do
-        val' <- getSolidStorageKeyVal' currentAddress' ref
-        putSolidStorageKeyVal' currentAddress' key val'
+        val' <- getVar $ StorageItem ref
+        -- val' <- getSolidStorageKeyVal' currentAddress' ref
+        traceShowM ("Value read from the reference:"::String, ref, val')
+        setVar key val'
       SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = [MS.Field (BC.pack f)]
             srcKey = (MS.Field (BC.pack name)):suffix

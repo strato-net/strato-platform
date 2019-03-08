@@ -64,6 +64,15 @@ data Value =
                               -- can be canonicalized
   deriving (Show)
 
+data Function = FBuiltinFunction String (Maybe Value)
+              | FFunction Xabi.Func
+              | FStructDef String
+              | FContractDef String
+              | FContractItem Integer String
+              | FContractFunction String Integer String
+              | FEnum String
+              | FPush MS.StoragePath
+              deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing
 --This only allows for comparison within the same type of values
