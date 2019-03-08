@@ -164,7 +164,7 @@ create' creator cc contractName' argExps = do
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
     erReturnVal = Just BSS.empty,
-    erTrace = [],
+     erTrace = [],
     erLogs = [],
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
@@ -287,8 +287,10 @@ call'' address functionName args = do
         call' address contract cc theFunction args
       _ -> do --Maybe the function is actually a getter
         case M.lookup functionName $ contract^.storageDefs of
-          Just _ -> do --TODO- this should only exist if the storage variable is declared "public", right now I just ignore this and allow anything to be called as a getter
-            fmap Just $ getVar $ StorageItem [MS.Field (BC.pack $ '.':functionName)]
+          Just _ -> do
+            --TODO- this should only exist if the storage variable is declared
+            -- "public", right now I just ignore this and allow anything to be called as a getter
+            fmap Just $ getVar $ StorageItem [MS.Field $ BC.pack functionName]
           Nothing -> error $ "No function '" ++ functionName ++ "' in contract '" ++ (contract^.contractName) ++ "'"
 
 
@@ -315,15 +317,11 @@ runStatement :: Xabi.Statement -> SM (Maybe Value)
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e))) = do
   var <- expToVar e
   path <- expToPath e
-  v <- getVar var
-  let value =
-        case v of
-          (SInteger i) -> i
-          _ -> error "PlusPlus applied to a non integer"
+  v <- getInt var
 
-  logAssigningVariable $ SInteger value
+  logAssigningVariable $ SInteger v
 
-  setVar path $ SInteger $ value + 1
+  setVar path $ SInteger $ v + 1
   return Nothing
 
 
@@ -331,8 +329,14 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
   v1 <- expToPath e1
   v2 <- expToVar e2
-  value <- getVar v2
-  when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show v1
+  !value <- getVar v2-- v2 of
+    -- Constant c -> return c
+    -- StorageItem p -> get
+    --   t <- getValueType p
+    --   v <- getVar t $ StorageItem p
+    --   return v
+    -- Variable v' -> liftIO $ readIORef v'
+  when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (v1, value)
   logAssigningVariable value
   setVar v1 value
   return Nothing
@@ -366,8 +370,7 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
                  case t' of
                     StructTypo fs ->  SStruct name <$> initializeStruct fs
                     _ -> error $ "TODO(tim): initialize type " ++ show t'
-               Just (Xabi.Bytes {}) -> return $ SString ""
-               Just _ -> return SDefault
+               Just t -> return $ defaultValue t
            _ -> error $ "TODO(tim): handle multiple names: " ++ show varNames
   when trace $ do
     valueString <- showSM value
@@ -395,14 +398,12 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
 
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
-  conditionResult <- getVar =<< expToVar condition
-  case conditionResult of
-    SBool True -> runStatements code'
-    SBool False ->
-      case maybeElseCode of
-        Just elseCode -> runStatements elseCode
-        Nothing -> return Nothing
-    _ -> error "IfStatement returned a non bool value"
+  conditionResult <- getBool =<< expToVar condition
+  if conditionResult
+    then runStatements code'
+    else case maybeElseCode of
+      Just elseCode -> runStatements elseCode
+      Nothing -> return Nothing
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
@@ -421,7 +422,7 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
           Just x -> x
           Nothing -> error "can't handle for loops with no loop expression yet"
 
-  let condition = getVar =<< expToVar conditionExp
+  let condition = getBool =<< expToVar conditionExp
 
   while condition $ do
       when trace $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
@@ -437,24 +438,22 @@ runStatement (Xabi.Return maybeExpression) = do
 runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   var <- expToVar $ Xabi.Variable $ T.unpack src;
   path <- expToPath $ Xabi.Variable $ T.unpack dst;
-  setVar path =<< getVar var
+  setVar path =<< getString var
   return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
 
-while :: SM Value -> SM (Maybe Value) -> SM (Maybe Value)
+while :: SM Bool -> SM (Maybe Value) -> SM (Maybe Value)
 while condition code = do
-  val <- condition
-  when trace $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show val
-
-  case val of
-    SBool True -> do
+  c <- condition
+  when trace $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+  if c
+    then do
       result <- code
       case result of
         Nothing -> while condition code
         _ -> return result
-    SBool False -> return Nothing
-    x -> error $ "condition in for loop didn't evaluate to a bool: " ++ show x
+    else return Nothing
 
 getIndexType :: MS.StoragePath -> SM IndexType
 getIndexType [] = error "TODO(tim): getIndexType of empty"
@@ -480,26 +479,35 @@ getIndexType p@(MS.Field field:_) = do
          _ -> error $ "incorrect indexing type in variable declarations: " ++ show t
 getIndexType xs = error $ "TODO(tim): getIndexType starting from non-field: " ++ show xs
 
+
+
 expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath <- expToPath parent
   idxType <- getIndexType parPath
   idxVar <- maybe (error $ "empty index is only valid at type level: " ++ show x) expToVar mIndex
-  idx <- getVar idxVar
-  return . (parPath ++) $ case (idxType, idx) of
-    (MapAddressIndex, SAddress a) -> [MS.MapIndex $ MS.IAddress a]
-    (MapAddressIndex, SInteger i) -> [MS.MapIndex $ MS.IAddress $ fromIntegral i]
-    (MapAddressIndex, SDefault) -> [MS.MapIndex $ MS.IAddress 0x0]
-    (MapBoolIndex, SBool b) -> [MS.MapIndex $ MS.IBool b]
-    (MapBoolIndex, SDefault) -> [MS.MapIndex $ MS.IBool False]
-    (MapIntIndex, SInteger i) -> [MS.MapIndex $ MS.INum i]
-    (MapIntIndex, SDefault) -> [MS.MapIndex $ MS.INum 0]
-    (MapStringIndex, SString s) -> [MS.MapIndex $ MS.IText $ BC.pack s]
-    (MapStringIndex, SDefault) -> [MS.MapIndex $ MS.IText ""]
-    (ArrayIndex, SInteger i) -> [MS.ArrayIndex $ fromIntegral i]
-    (ArrayIndex, SDefault) -> [MS.ArrayIndex 0]
-    p -> error $ "TODO(tim): unsupported index combination: " ++ show p
+  (parPath ++) <$> case idxType of
+    MapAddressIndex -> do
+      idx <- getAddress idxVar
+      return $ case idx of
+        SAddress a -> [MS.MapIndex $ MS.IAddress a]
+        SInteger i -> [MS.MapIndex $ MS.IAddress $ fromIntegral i]
+        _ -> error $ "invalid map of addresses index: " ++ show idx
+    MapBoolIndex -> do
+      b <- getBool idxVar
+      return [MS.MapIndex $ MS.IBool b]
+    MapIntIndex -> do
+      n <- getInt idxVar
+      return [MS.MapIndex $ MS.INum n]
+    MapStringIndex -> do
+      idx <- getString idxVar
+      return $ case idx of
+        SString s -> [MS.MapIndex $ MS.IText $ BC.pack s]
+        _ -> error $ "invalid map of strings index: " ++ show idx
+    ArrayIndex -> do
+      n <- getInt  idxVar
+      return [MS.ArrayIndex $ fromIntegral n]
 expToPath (Xabi.MemberAccess parent field) = do
   parPath <- expToPath parent
   return $ parPath ++ [MS.Field $ BC.pack field]
@@ -521,7 +529,7 @@ expToVar (Xabi.Variable name) = do
 expToVar (Xabi.PlusPlus e) = do
   var <- expToVar e
   path <- expToPath e
-  value <- castToInt <$> getVar var
+  value <- getInt var
 
   logAssigningVariable $ SInteger value
 
@@ -531,7 +539,7 @@ expToVar (Xabi.PlusPlus e) = do
 expToVar (Xabi.Unitary "++" e) = do
   var <- expToVar e
   path <- expToPath e
-  value <- castToInt <$> getVar var
+  value <- getInt var
   let next = SInteger $ value + 1
   logAssigningVariable next
 
@@ -541,7 +549,7 @@ expToVar (Xabi.Unitary "++" e) = do
 expToVar (Xabi.MinusMinus e) = do
   var <- expToVar e
   path <- expToPath e
-  value <- castToInt <$> getVar var
+  value <- getInt var
   logAssigningVariable $ SInteger value
   setVar path . SInteger $ value - 1
   return $ Constant $ SInteger value
@@ -549,14 +557,14 @@ expToVar (Xabi.MinusMinus e) = do
 expToVar (Xabi.Unitary "--" e) = do
   var <- expToVar e
   path <- expToPath e
-  value <- castToInt <$> getVar var
+  value <- getInt var
   let next = SInteger $ value -1
   logAssigningVariable next
   setVar path next
   return $ Constant next
 
 expToVar (Xabi.Binary "+=" lhs rhs) = do
-  let readInt e = fmap castToInt $ getVar =<< expToVar e
+  let readInt e = getInt =<< expToVar e
   delta <- readInt rhs
   curValue <- readInt lhs
   path <- expToPath lhs
@@ -572,52 +580,61 @@ expToVar (Xabi.MemberAccess (Xabi.Variable "Util") "b32") = do --TODO- remove th
 
 expToVar (Xabi.MemberAccess expr name) = do
   var <- expToVar expr
-  val <- getVar var
-  when trace $ liftIO $ putStrLn $ "         val = " ++ show val
 
-  case (val, name) of
-    (SEnum enumName, _) -> return $ Constant $ SEnumVal enumName name
-    (SBuiltinVariable "msg", "sender") -> do
-      env' <- getEnv
-      let (Address senderInteger) = sender env'
-      return $ Constant $ SInteger $ toInteger senderInteger
-    (SBuiltinVariable "tx", "origin") -> do
-      env' <- getEnv
-      let (Address senderInteger) = origin env'
-      return $ Constant $ SInteger $ toInteger senderInteger
-    (SStruct _ theMap, fieldName) -> do
-      let x = fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ fieldName) $ M.lookup fieldName theMap
-      return x
-    (SContractDef contractName', constName) -> do
-      cc <- getCurrentCodeCollection
+  case var of
+    Constant c -> Constant <$> case (c, name) of
+      (SEnum enumName, _) -> return $ SEnumVal enumName name
+      (SBuiltinVariable "msg", "sender") -> (SAddress . sender) <$> getEnv
+      (SBuiltinVariable "tx", "origin") -> (SAddress . origin) <$> getEnv
+      (SStruct _ theMap, fieldName) ->
+        let f = fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ fieldName)
+              $ M.lookup fieldName theMap
+        in case f of
+             Constant c' -> return c'
+             _ -> error $ "constant struct refers to nonconstant: " ++ show f
+      (SContractDef contractName', constName) -> do
+        cc <- getCurrentCodeCollection
 
-      let c = fromMaybe (error $ "code refers to a contract that doesn't exist: " ++ contractName') (M.lookup contractName' $ cc^.contracts)
+        let cont = fromMaybe (error $ "code refers to a contract that doesn't exist: " ++ contractName')
+                          (M.lookup contractName' $ cc^.contracts)
 
-      let Xabi.ConstantDecl _ _ constExp = fromMaybe (error $ "code refers to a const that doesn't exist: " ++ contractName' ++ "." ++ constName) (M.lookup constName $ c^.constants)
+        let Xabi.ConstantDecl _ _ constExp = fromMaybe
+             (error $ printf "code refers to a const that doesn't exist: %s.%s" contractName' constName)
+             (M.lookup constName $ cont^.constants)
 
-      fmap Constant $ getVar =<< expToVar constExp
+        getContract constName =<< expToVar constExp
 
-    (SBuiltinVariable "block", "timestamp") -> do
-      env' <- getEnv
-      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ blockDataTimestamp $ blockHeader env'
+      (SBuiltinVariable "block", "timestamp") -> do
+        env' <- getEnv
+        return $ SInteger $ round $ utcTimeToPOSIXSeconds $ blockDataTimestamp $ blockHeader env'
 
-    (SBuiltinVariable "block", "number") -> do
-      env' <- getEnv
-      return $ Constant $ SInteger $ blockDataNumber $ blockHeader env'
+      (SBuiltinVariable "block", "number") -> (SInteger . blockDataNumber . blockHeader) <$> getEnv
 
-    (SAddress (Address a), itemName) -> do
-      return $ Constant $ SContractItem (toInteger a) itemName
+      (SAddress (Address a), itemName) -> return $ SContractItem (toInteger a) itemName
 
+      (SContract contractName' a, funcName) -> return $ SContractFunction contractName' a funcName
+      _ -> error $ "invalid constant: " ++ show c
 
-    (SContract contractName' a, funcName) -> do
-      return $ Constant $ SContractFunction contractName' a funcName
-    (_, "length") -> do
-      pt <- expToPath expr
-      return . StorageItem $ pt ++ [MS.Field "length"]
-    _ -> return $ Property name var
+    Variable vref -> do
+      val' <- liftIO $ readIORef vref
+      case val' of
+        SAddress (Address a) -> return . Constant $ SContractItem (toInteger a) name
+        SStruct _ theMap -> return
+                $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
+                $ M.lookup name theMap
+        SReference ref -> do
+          return $ StorageItem $ ref ++ [MS.Field $ BC.pack name]
+        _ -> error $ "TODO(tim): access member of variable " ++ show (val', name)
+    StorageItem p -> return $
+      if name == "push"
+        then Constant $ SPush p
+        else StorageItem $ p ++ [MS.Field $ BC.pack name]
+    -- pr -> error $ "TODO(tim): what properties could be here?" ++ show pr
+    -- _ -> return $ Property name var
 
 expToVar x@(Xabi.IndexAccess{}) = do
   idxPath <- expToPath x
+  -- hint <- getValueType idxPath
   value <- getVar $ StorageItem idxPath
   Variable <$> liftIO (newIORef value)
 
@@ -631,13 +648,10 @@ expToVar (Xabi.Binary "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shif
 expToVar (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
 
 expToVar (Xabi.Unitary "!" expr) = do
-  res <- getVar =<< expToVar expr
-  case res of
-    SBool v -> return $ Constant $ SBool $ not v
-    _ -> error "Unitary ! calculated a non bool value"
+  (Constant . SBool . not) <$> (getBool =<< expToVar expr)
 expToVar (Xabi.Unitary "delete" expr) = do
   p <- expToPath expr
-  setVar p SDefault
+  deleteVar p
   return . Constant $ SNULL
 
 expToVar (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Binary operations to a single function
@@ -645,9 +659,7 @@ expToVar (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Bin
 
   val2 <- getVar =<< expToVar expr2
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  if not $ val1 `valEquals` val2
-    then return $ Constant $ SBool True
-    else return $ Constant $ SBool False
+  return . Constant . SBool . not $ val1 `valEquals` val2
 
 expToVar (Xabi.Binary "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -692,36 +704,25 @@ expToVar (Xabi.Binary "<=" expr1 expr2) = do
     _ -> error $ "binary '<' used on non number values"
 
 expToVar (Xabi.Binary "&&" expr1 expr2) = do
-  val1 <- getVar =<< expToVar expr1
-
-  val2 <- getVar =<< expToVar expr2
-  logVals val1 val2
-  case (val1, val2) of
-    (SBool b1, SBool b2) -> return $ Constant $ SBool $ b1 && b2
-    _ -> error $ "binary '<' used on non number values"
+  b1 <- getBool =<< expToVar expr1
+  b2 <- getBool =<< expToVar expr2
+  logVals b1 b2
+  return $ Constant $ SBool $ b1 && b2
 
 expToVar (Xabi.Binary "||" expr1 expr2) = do
-  val1 <- getVar =<< expToVar expr1
+  b1 <- getBool =<< expToVar expr1
 
-  val2 <- getVar =<< expToVar expr2
-  logVals val1 val2
-  case (val1, val2) of
-    (SBool b1, SBool b2) -> return $ Constant $ SBool $ b1 || b2
-    _ -> error $ "binary '<' used on non number values"
+  b2 <- getBool =<< expToVar expr2
+  logVals b1 b2
+  return $ Constant $ SBool $ b1 || b2
 
 expToVar (Xabi.TupleExpression exps) = do
   vars <- for exps expToVar
   return $ Constant $ STuple $ V.fromList vars
 
 expToVar (Xabi.Ternary condition expr1 expr2) = do
-  conditionVal <- getVar =<< expToVar condition
-  case conditionVal of
-    SBool True -> do
-      expToVar expr1
-    SBool False -> do
-      expToVar expr2
-    x -> error $ "ternary condition is not a bool: " ++ show x
-
+  c <- getBool =<< expToVar condition
+  expToVar $ if c then expr1 else expr2
 
 expToVar (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
   creator <- getCurrentAddress
@@ -779,22 +780,13 @@ expToVar (Xabi.FunctionCall e args) = do
           return $ Constant $ SEnumVal enumName $ theEnum !! fromInteger i
         _ -> error "called enum constructor with improper args"
 
-    Property "push" _ -> do
-      path <- expToPath e
-      let dropPushField :: MS.StoragePath -> MS.StoragePath
-          dropPushField [] = error "should not reach empty path"
-          dropPushField [MS.Field "push"] = []
-          dropPushField [_] = error $ "invalid base of path: " ++ show path
-          dropPushField (x:xs) = x:dropPushField xs
-      let prefix' = dropPushField path
-          lenPath = prefix' ++ [MS.Field "length"]
-      len' <- getVar $ StorageItem lenPath
-      let len ::Int = case len' of
-                        SInteger b -> fromInteger b
-                        SDefault -> 0
-                        _ -> error $ "Invalid length type: " ++ show len'
+    Constant (SPush path) -> do
+      let lenPath = path ++ [MS.Field "length"]
+
+      len' <- getInt $ StorageItem lenPath
+      let len :: Int = fromIntegral len'
           newLen = SInteger $ fromIntegral $ len + 1
-      let idxPath = prefix' ++ [MS.ArrayIndex len]
+      let idxPath = path ++ [MS.ArrayIndex len]
       setVar lenPath newLen
       case argVals of
         [av] -> setVar idxPath av
@@ -814,10 +806,8 @@ expToVar x = error $ "unhandled expression in call to expToVar: " ++ show x
 
 expToVarInteger :: Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -> (a->Value) -> SM Variable
 expToVarInteger expr1 o expr2 retType = do
-  val1 <- getVar =<< expToVar expr1
-  val2 <- getVar =<< expToVar expr2
-  let i1 = castToInt val1
-      i2 = castToInt val2
+  i1 <- getInt =<< expToVar expr1
+  i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
 
 
@@ -967,7 +957,7 @@ logAssigningVariable v = do
   valueString <- showSM v
   liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
 
-logVals :: Value -> Value -> SM ()
+logVals :: (Show a, Show b) => a -> b -> SM ()
 logVals val1 val2 = when trace . liftIO . putStrLn $ printf
   "            %%%% val1 = %s\n\
   \            %%%% val2 = %s" (show val1) (show val2)
