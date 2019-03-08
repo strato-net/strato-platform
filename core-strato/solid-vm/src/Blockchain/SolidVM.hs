@@ -42,7 +42,6 @@ import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
-import           Blockchain.DB.SolidStorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SolidVM.Exception
@@ -141,7 +140,7 @@ create' creator cc contractName' argExps = do
       case maybeExpression of
         Just e -> getVar =<< expToVar e
         Nothing -> return $ defaultValue theType
-    initializeStorage newAddress [MS.Field $ BC.pack n] initialValue
+    initializeStorage [MS.Field $ BC.pack n] initialValue
   popCallInfo
 
   -- Run the constructor
@@ -162,18 +161,14 @@ create' creator cc contractName' argExps = do
     }
 
 
-initializeStorage :: Address -> MS.StoragePath -> Value -> SM ()
-initializeStorage address root value = do
-  kvs <- case value of
-           SArray _ iv -> if V.null iv then return [(root ++ [MS.Field "length"], MS.BInteger 0)]
-                                       else todo "initialized array storage" value
-           SMap _ im -> if M.null im then return []
-                                     else todo "initialize map storage " value
-           SStruct _ fs -> forM (M.toList fs) $
-               \(f, var) -> ((root ++ [MS.Field $ BC.pack f],) . toBasic) <$> getVar var
-           SReference{} -> traceShowM (address, root, value) >> return []
-           x -> return [(root, toBasic x)]
-  mapM_ (uncurry $ putSolidStorageKeyVal' address) kvs
+initializeStorage :: MS.StoragePath -> Value -> SM ()
+initializeStorage root value =
+  mapM_ (uncurry setVar) $ case value of
+     SArray _ iv -> if V.null iv then [(root ++ [MS.Field "length"], SInteger 0)]
+                                 else todo "initialized array storage" value
+     SMap _ im -> if M.null im then []
+                               else todo "initialize map storage " value
+     x -> [(root, x)]
 
 call :: Bool
      -> Bool
@@ -913,8 +908,7 @@ runTheConstructors cc address contractName' argExps = do
 addLocalVariable :: String -> Value -> SM ()
 addLocalVariable name value = do
   traceShowM ("newLocalVariable"::String, name, value)
-  addr <- getCurrentAddress
-  initializeStorage addr [MS.Field $ BC.pack name] value
+  initializeStorage [MS.Field $ BC.pack name] value
   newVariable <- liftIO $ fmap Variable $ newIORef value
   sstate <- get
   case callStack sstate of
