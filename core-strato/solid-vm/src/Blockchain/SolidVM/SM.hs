@@ -15,6 +15,7 @@ module Blockchain.SolidVM.SM (
   getCurrentAddress,
   addCallInfo,
   popCallInfo,
+  getCurrentCallInfo,
   getCurrentContract,
   getCurrentCodeCollection,
   getEnv,
@@ -69,7 +70,7 @@ data CallInfo =
     currentAddress :: Address,
     currentContract :: Contract,
     codeCollection :: CodeCollection,
-    localVariables :: Map String Variable
+    localVariables :: Map String (Xabi.Type, Variable)
     }
 
 {-
@@ -189,6 +190,7 @@ getEnv :: SM Environment
 getEnv = do
   fmap env get
 
+
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True x = Just x
 toMaybe False _ = Nothing
@@ -223,6 +225,8 @@ getVariableOfName name = do
       vars = localVariables currentCallInfo
       -- maybeLocalValue = M.lookup name $ vars
       maybeLocalValue = toMaybe (name `M.member` vars) $ StorageItem [MS.Field $ BC.pack name]
+      -- maybeLocalValue = fmap snd $ M.lookup name vars
+-- >>>>>>> 806362791959c8f173d4daf957dc3af089c0f274
 
       maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -322,7 +326,7 @@ getTypeOfName s = do
 -}
 
 
-addCallInfo :: Address -> Contract -> CodeCollection -> Map String Variable -> SM ()
+addCallInfo :: Address -> Contract -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
 addCallInfo a c cc initialLocalVariables = do
   sstate <- get
 
