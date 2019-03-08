@@ -10,6 +10,7 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
+import qualified Data.Text as T
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
@@ -17,6 +18,7 @@ import           Blockchain.Data.RLP
 import qualified SolidVM.Model.Storable           as MS
 import qualified SolidVM.Solidity.Xabi            as Xabi
 import qualified SolidVM.Solidity.Xabi.Type       as Xabi
+import qualified SolidVM.Solidity.Xabi.VarDef     as Xabi
 
 
 data IndexType = ArrayIndex | MapBoolIndex | MapAddressIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
@@ -33,11 +35,6 @@ instance Show Variable where
 --TODO- we need to figure out this ambiguity on the Address types....
 --Sometimes address is and integer (solidity can treat an integer as an address),
 --sometimes it is a proper type.
-
-data BasicType = TInteger | TString | TBool | TAddress
-               | TEnumVal String | TContract String
-               | TStruct String [(B.ByteString, BasicType)]
-               | Todo String deriving (Show, Eq)
 
 data Value =
   SInteger Integer
@@ -131,3 +128,20 @@ byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 castToInt :: Value -> Integer
 castToInt (SInteger i) = i
 castToInt s = error $ "cast: not an integer: " ++ show s
+
+
+-- Typos are the possible values that a Xabi.Label
+-- is able to resolve to
+data Typo = StructTypo [(T.Text, Xabi.FieldType)]
+          | EnumTypo [String]
+          | ContractTypo String
+          deriving (Show)
+
+-- BasicTypes are approximately what can be stored, but more exactly
+-- they are types which have an `operator=` in the parlance of C++.
+-- Even though structs cannot be stored directly, the operator=
+-- simulates their appearance by retrieving theh individual fields.
+data BasicType = TInteger | TString | TBool | TAddress
+               | TEnumVal String | TContract String
+               | TStruct String [(B.ByteString, BasicType)]
+               | Todo String deriving (Show, Eq)

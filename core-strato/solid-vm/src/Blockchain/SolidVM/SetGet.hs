@@ -72,37 +72,51 @@ deleteVar key = do
   putSolidStorageKeyVal' currentAddress' key MS.BDefault
 
 
+-- TODO(tim): In the following cases, the type lookup can be
+-- elided because it is determined by context.
 getInt :: Variable -> SM Integer
 getInt p = do
-  v <- getVar TInteger p
+  v <- getVar p
   case v of
     SInteger s -> return s
     _ -> error $ "not an integer: " ++ show v
 
 getBool :: Variable -> SM Bool
 getBool p = do
-  v <- getVar TBool p
+  v <- getVar p
   case v of
     SBool b -> return b
     _ -> error $ "not a bool: " ++ show v
 
-getVar :: BasicType -> Variable -> SM Value
-getVar t (Variable ioRef) = do
+getAddress :: Variable -> SM Value
+getAddress = getVar
+
+getString :: Variable -> SM Value
+getString = getVar
+
+getContract :: String -> Variable -> SM Value
+getContract _contractName = getVar
+
+
+getVar :: Variable -> SM Value
+getVar (Variable ioRef) = do
   val <- liftIO $ readIORef ioRef
   case val of
-    SReference ref -> getVar t (StorageItem ref)
+    SReference ref -> getVar (StorageItem ref)
     _ -> return val
-getVar t (Constant c) = do
+getVar (Constant c) = do
   case c of
-    SReference ref -> getVar t (StorageItem ref)
+    SReference ref -> getVar (StorageItem ref)
     _ -> return c
-getVar t (StorageItem key) = do
+getVar (StorageItem key) = do
   currentAddress' <- getCurrentAddress
-  case t of
+  typeHint <- getValueType key
+  case typeHint of
     TStruct name fieldHints -> SStruct name . M.fromList <$> do
-      forM fieldHints $ \(l, t') ->
-        ((BC.unpack l, ) . Constant . fromBasic t') <$> getSolidStorageKeyVal' currentAddress' (key ++ [MS.Field l])
-    _ -> fromBasic t <$> getSolidStorageKeyVal' currentAddress' key
+      forM fieldHints $ \(l, t') -> do
+        fieldValue <- fromBasic t' <$> getSolidStorageKeyVal' currentAddress' (key ++ [MS.Field l])
+        return (BC.unpack l, Constant fieldValue)
+    _ -> fromBasic typeHint <$> getSolidStorageKeyVal' currentAddress' key
 
 
 showSM :: Value -> SM String
@@ -113,17 +127,17 @@ showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName) = return $ enumName ++ "." ++ valName
 showSM (SAddress a) = return $ format a
 showSM (STuple v) = do
-  vals <- forM (V.toList v) (getVar (Todo "showSM"))
+  vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
   return $ "(" ++ intercalate ", " strings ++ ")"
 showSM (SArray _ v) = do
-  vals <- forM (V.toList v) (getVar (Todo "showSM"))
+  vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
   return $ "[" ++ intercalate ", " strings ++ "]"
 showSM (SStruct name m) = do
   valStrings <-
     forM (M.toList m) $ \(n, var) -> do
-      val <- getVar (Todo "showSM") var
+      val <- getVar var
       valString <- showSM val
       return (n, valString)
   return $ name ++ "{"
@@ -132,7 +146,7 @@ showSM (SStruct name m) = do
 showSM (SMap _ m) = do
   valStrings <-
     forM (M.toList m) $ \(key, var) -> do
-      val <- getVar (Todo "showSM") var
+      val <- getVar var
       valString <- showSM val
       keyString <- showSM key
       return (keyString, valString)
