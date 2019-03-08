@@ -72,6 +72,7 @@ data Function = FBuiltinFunction String (Maybe Value)
               | FContractFunction String Integer String
               | FEnum String
               | FPush MS.StoragePath
+              | FNewExpression String
               deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing

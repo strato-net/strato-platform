@@ -224,9 +224,8 @@ getVariableOfName name = do
           (x:_) -> x
       vars = localVariables currentCallInfo
       -- maybeLocalValue = M.lookup name $ vars
-      maybeLocalValue = toMaybe (name `M.member` vars) $ StorageItem [MS.Field $ BC.pack name]
-      -- maybeLocalValue = fmap snd $ M.lookup name vars
--- >>>>>>> 806362791959c8f173d4daf957dc3af089c0f274
+      -- maybeLocalValue = toMaybe (name `M.member` vars) $ StorageItem [MS.Field $ BC.pack name]
+      maybeLocalValue = fmap snd $ M.lookup name vars
 
       maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions

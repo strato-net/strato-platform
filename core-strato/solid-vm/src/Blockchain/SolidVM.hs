@@ -457,7 +457,7 @@ getIndexType p@(MS.Field field:_) = do
   let storageDecls = ctract ^. storageDefs
   let n = length p - 1
   case M.lookup (BC.unpack field) (fmap Xabi.varType storageDecls `M.union` fmap fst localDecls) of
-    Nothing -> todo "unknown storage reference (examine locals?)" field
+    Nothing -> todo "unknown storage reference" field
     Just v -> return $! loop n v
  where loop :: Int -> Xabi.Type -> IndexType
        loop 0 t = case t of
@@ -795,6 +795,10 @@ expToVar x@(Xabi.FunctionCall e args) = do
         [av] -> setVar idxPath av
         _ -> arityMismatch "push" (length argVals) 1
       return $ Constant newLen
+
+    -- It would be nice to reinterpret two element paths as a function.
+    -- How can we get a to resolve to a local variable instead of a path?
+    -- StorageItem [Field a, Field b] -> todo "reinterpret as a function
 
     _ -> typeError "cannot call non-function" var
 
