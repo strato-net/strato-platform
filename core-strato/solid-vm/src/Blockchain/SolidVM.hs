@@ -381,6 +381,7 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
     (_, STuple variables) -> do
       checkArity "var declaration tuple" (V.length variables) (length varNames)
       forM_ [(n, v) | (Just n, v) <- zip varNames $ V.toList variables] $ \(name', variable') -> do
+        traceShowM ("addLocalTuple"::String, name', variable')
         value' <- getVar variable'
         addLocalVariable name' value'
 
@@ -729,7 +730,8 @@ expToVar (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAddress execResults
 
-expToVar (Xabi.FunctionCall e args) = do
+expToVar x@(Xabi.FunctionCall e args) = do
+  traceShowM x
   var <- expToVar e
   argVals <- for args $ \(Nothing, arg) -> getVar =<< expToVar arg --TODO- add support for named arguments
   case var of

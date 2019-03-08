@@ -23,6 +23,7 @@ module Blockchain.SolidVM.SM (
   getValueType
   ) where
 
+import           Control.Applicative ((<|>))
 import           Control.Lens
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
@@ -199,9 +200,9 @@ getVariableOfName name = do
         case callStack sstate of
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
-      -- vars = localVariables currentCallInfo
+      vars = localVariables currentCallInfo
       -- maybeLocalValue = M.lookup name $ vars
-      maybeLocalValue = Just $ StorageItem [MS.Field $ BC.pack name]
+      maybeLocalValue = toMaybe (name `M.member` vars) $ StorageItem [MS.Field $ BC.pack name]
 
       maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -253,18 +254,18 @@ getVariableOfName name = do
         return $ Just $ Constant $ val
 -}
 
-  return
-    $ flip fromMaybe maybeLocalValue
-    $ flip fromMaybe maybeStorageItem
-    $ flip fromMaybe maybeContractFunction
-    $ flip fromMaybe maybeBuiltinFunction
-    $ flip fromMaybe maybeBuiltinVariable
-    $ flip fromMaybe maybeEnum
-    $ flip fromMaybe maybeStructDef
-    $ flip fromMaybe maybeContract
-    $ flip fromMaybe maybeThis
---    $ flip fromMaybe maybeConstantValue
-    $ (unknownVariable "getVariableOfName" name)
+  return . fromMaybe (unknownVariable "getVariableOfName" name) . foldr1 (<|>) $
+      [ maybeLocalValue
+      , maybeStorageItem
+      , maybeContractFunction
+      , maybeBuiltinFunction
+      , maybeBuiltinVariable
+      , maybeEnum
+      , maybeStructDef
+      , maybeContract
+      , maybeThis
+      , unknownVariable "getVariableOfName" name
+      ]
 
 
 getCurrentCallInfo :: SM CallInfo
