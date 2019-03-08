@@ -14,11 +14,13 @@ import qualified Data.Text as T
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
+import           Blockchain.SolidVM.Exception
 
 import qualified SolidVM.Model.Storable           as MS
 import qualified SolidVM.Solidity.Xabi            as Xabi
 import qualified SolidVM.Solidity.Xabi.Type       as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef     as Xabi
+
 
 
 data IndexType = ArrayIndex | MapBoolIndex | MapAddressIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
@@ -71,23 +73,23 @@ instance Eq Value where
   (SInteger i1) == (SInteger i2) = i1 == i2
   (SString s1) == (SString s2) = s1 == s2
   (SBool b1) == (SBool b2) = b1 == b2
-  x == y = error $ "(==) not defined for Values given:\n" ++ show x ++ "\n" ++ show y
+  x == y = todo "Value/Eq" (x, y)
 
 instance Ord Value where
   compare (SInteger i1) (SInteger i2) = compare i1 i2
   compare (SString s1) (SString s2) = compare s1 s2
   compare (SBool b1) (SBool b2) = compare b1 b2
-  compare x y = error $ "Ord not defined for Values given:\n" ++ show x ++ "\n" ++ show y
+  compare x y = todo "Value/Ord" (x, y)
 
 
 instance RLPSerializable Value where
   rlpEncode (SInteger i) = RLPArray [RLPString "I", rlpEncode i]
   rlpEncode (SString s) = RLPArray [RLPString "S", rlpEncode s]
-  rlpEncode x = error $ "undefined case in rlpEncode for Value: " ++ show x
+  rlpEncode x = todo "Value/rlpEncode" x
 
   rlpDecode (RLPArray [RLPString "I", i]) = SInteger $ rlpDecode i
   rlpDecode (RLPArray [RLPString "S", s]) = SString $ rlpDecode s
-  rlpDecode x = error $ "undefined case in rlpDecode for Value: " ++ show x
+  rlpDecode x = todo "Value/rlpDecode" x
 
 valEquals :: Value -> Value -> Bool
 valEquals lhs rhs =
@@ -102,8 +104,8 @@ valEquals lhs rhs =
     (SAddress (Address v1), SInteger v2) -> v1 == fromInteger v2
     (SInteger v1, SAddress (Address v2)) -> fromInteger v1 == v2
     (SBuiltinVariable v1, SBuiltinVariable v2) ->
-      error $ "Comparison of builtin vars requires evaluation: " ++ show (v1, v2)
-    _ -> error $ "unsupported type combination in valEquals: " ++ show (lhs, rhs)
+      todo "comparison of builtin vars requires evaluation: " (v1, v2)
+    _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
 
 
 defaultValue :: Xabi.Type -> Value
@@ -115,7 +117,7 @@ defaultValue (Xabi.Address) = SAddress $ Address 0
 defaultValue (Xabi.String _) = SString ""
 defaultValue (Xabi.Bytes _ _) = SString ""
 defaultValue (Xabi.Label name) = SString $ "Label: " ++ name  --TODO- clearly this is wrong.......  I just need something here to run the program through to the end, this needs to be fixed later
-defaultValue x = error $ "missing type in defaultValue: " ++ show x
+defaultValue x = todo "defaultValue" x
 
 
 
@@ -127,7 +129,7 @@ byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 
 castToInt :: Value -> Integer
 castToInt (SInteger i) = i
-castToInt s = error $ "cast: not an integer: " ++ show s
+castToInt s = typeError "castToInt" s
 
 
 -- Typos are the possible values that a Xabi.Label
@@ -144,4 +146,4 @@ data Typo = StructTypo [(T.Text, Xabi.FieldType)]
 data BasicType = TInteger | TString | TBool | TAddress
                | TEnumVal String | TContract String
                | TStruct String [(B.ByteString, BasicType)]
-               | Todo String deriving (Show, Eq)
+               deriving (Show, Eq)

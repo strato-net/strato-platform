@@ -14,6 +14,7 @@ import qualified Data.Vector as V
 
 import           Blockchain.Data.Address
 import           Blockchain.DB.SolidStorageDB
+import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Format
@@ -33,9 +34,8 @@ fromBasic t = \case
     TBool -> SBool False
     TAddress -> SAddress 0x0
     TContract n -> SContract n 0x0
-    TEnumVal n -> SEnumVal n (error "TODO(tim): unable to know default enum value")
-    TStruct n fs -> error $ "TODO(tim) recursion needed: " ++ show (n, fs)
-    Todo msg -> error $ "TODO(tim): type hint needed: " ++ msg
+    TEnumVal n -> SEnumVal n (todo "enum default value" n)
+    TStruct n fs -> todo "recursive struct basic types" (n, fs)
 
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
@@ -79,14 +79,14 @@ getInt p = do
   v <- getVar p
   case v of
     SInteger s -> return s
-    _ -> error $ "not an integer: " ++ show v
+    _ -> typeError "getInt" (p, v)
 
 getBool :: Variable -> SM Bool
 getBool p = do
   v <- getVar p
   case v of
     SBool b -> return b
-    _ -> error $ "not a bool: " ++ show v
+    _ -> typeError "getBool" (p, v)
 
 getAddress :: Variable -> SM Value
 getAddress = getVar
@@ -156,4 +156,4 @@ showSM (SMap _ m) = do
 showSM (SContract name address) = do
   return $ "Contract: " ++ name ++ "/" ++ format (Address $ fromInteger address)
 showSM (SReference p) = return $ "<reference to " ++ BC.unpack (MS.unparsePath p) ++ ">"
-showSM x = error $ "showSM called for unsupported value: " ++ show x
+showSM x = todo "showSM called for unsupported value: " x
