@@ -52,12 +52,14 @@ if not ngx.var['cookie_strato_session'] and ngx.req.get_headers()["Authorization
   user_id = verify_res.sub
 
 else
+  local referer_url = ngx.var.http_referer
   -- If it's the logout request - unset custom cookies. All the rest is handled by .authenticate()
   if ngx.var.request_uri == authenticate_opts.logout_path then
     ngx.header['Set-Cookie'] = 'strato_user_name=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    referer_url = nil
   end
 
-  local authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts)
+  local authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, referer_url)
 
   if authenticate_err then
     ngx.status = 500
