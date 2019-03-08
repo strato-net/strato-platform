@@ -340,16 +340,18 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
-runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybeExpression)) = do
+runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames maybeExpression)) = do
+  let theType = fromMaybe (error "TODO(tim): type inference not implemented") maybeType
+
   value <-
     case maybeExpression of
       Just e -> do
         rhs <- expToVar e
         let getRef = SReference <$> expToPath e
             getValue = getVar =<< expToVar e
-        case (rhs, mType) of
+        case (rhs, theType) of
           (Constant c, _) -> return c
-          (_, Just (Xabi.Label name)) -> do
+          (_, Xabi.Label name) -> do
             ty <- getTypeOfName name
             case ty of
               StructTypo{} -> getRef
@@ -359,15 +361,14 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
       Nothing ->
         case varNames of
            [Just name] ->
-             case mType of
-               Nothing -> error $ "TODO(tim): type inference not implemented"
-               Just (Xabi.Label l) -> do
+             case theType of
+               Xabi.Label l -> do
                  t' <- getTypeOfName l
                  case t' of
                     StructTypo fs ->  SStruct name <$> initializeStruct fs
                     _ -> error $ "TODO(tim): initialize type " ++ show t'
-               Just (Xabi.Bytes {}) -> return $ SString ""
-               Just _ -> return SDefault
+               Xabi.Bytes {} -> return $ SString ""
+               _ -> return SDefault
            _ -> error $ "TODO(tim): handle multiple names: " ++ show varNames
   when trace $ do
     valueString <- showSM value
@@ -376,12 +377,12 @@ runStatement (Xabi.SimpleStatement (Xabi.VariableDefinition mType varNames maybe
 
 
   case (varNames, value) of
-    ([Just name], _) -> addLocalVariable name value
+    ([Just name], _) -> addLocalVariable theType name value
     (_, STuple variables) -> do
       when (V.length variables /= length varNames) $ error $ "var declaration returned a tuple of the wrong length"
       forM_ [(n, v) | (Just n, v) <- zip varNames $ V.toList variables] $ \(name', variable') -> do
         value' <- getVar variable'
-        addLocalVariable name' value'
+        addLocalVariable theType name' value'
 
     _ -> error "VariableDefinition expected a tuple, but the returned value was not one"
 
@@ -460,11 +461,13 @@ getIndexType :: MS.StoragePath -> SM IndexType
 getIndexType [] = error "TODO(tim): getIndexType of empty"
 getIndexType p@(MS.Field field:_) = do
   ctract <- getCurrentContract
-  let decls = ctract ^. storageDefs
+  currentCallInfo <- getCurrentCallInfo
+  let localDecls = localVariables currentCallInfo
+  let storageDecls = ctract ^. storageDefs
   let n = length p - 1
-  case M.lookup (BC.unpack field) decls of
+  case M.lookup (BC.unpack field) (fmap Xabi.varType storageDecls `M.union` fmap fst localDecls) of
     Nothing -> error $ "TODO(tim): unknown storage reference: " ++ show field
-    Just Xabi.VariableDecl {Xabi.varType=v} -> return $! loop n v
+    Just v -> return $! loop n v
  where loop :: Int -> Xabi.Type -> IndexType
        loop 0 t = case t of
          Xabi.Mapping{Xabi.key=Xabi.Int{}} -> MapIntIndex
@@ -634,7 +637,7 @@ expToVar (Xabi.Unitary "!" expr) = do
   res <- getVar =<< expToVar expr
   case res of
     SBool v -> return $ Constant $ SBool $ not v
-    _ -> error "Unitary ! calculated a non bool value"
+    _ -> error $ "Unitary ! calculated a non bool value: " ++ show res
 expToVar (Xabi.Unitary "delete" expr) = do
   p <- expToPath expr
   setVar p SDefault
@@ -712,6 +715,11 @@ expToVar (Xabi.Binary "||" expr1 expr2) = do
 expToVar (Xabi.TupleExpression exps) = do
   vars <- for exps expToVar
   return $ Constant $ STuple $ V.fromList vars
+
+expToVar (Xabi.ArrayExpression exps) = do
+  vars <- for exps expToVar
+--  return $ Constant $ SArray (error "array type from array literal not known") $ V.fromList vars
+  return $ Constant $ SArray (Xabi.Int Nothing Nothing) $ V.fromList vars
 
 expToVar (Xabi.Ternary condition expr1 expr2) = do
   conditionVal <- getVar =<< expToVar condition
@@ -895,13 +903,13 @@ runTheConstructors cc address contractName' argExps = do
           fromMaybe (error $ "contract inherits from a contract that doesn't exits: " ++ contractName')
           $ cc^.contracts . at contractName'
 
-      argNames = map fst $ sortWith snd $ [ (T.unpack n, i) | (n, Xabi.IndexedType{Xabi.indexedTypeIndex=i}) <- M.toList $ fromMaybe M.empty $ fmap Xabi.funcArgs $ contract'^.constructor]
+      argTypeNames = map fst $ sortWith snd $ [ ((t, T.unpack n), i) | (n, Xabi.IndexedType{Xabi.indexedTypeType=t, Xabi.indexedTypeIndex=i}) <- M.toList $ fromMaybe M.empty $ fmap Xabi.funcArgs $ contract'^.constructor]
 
-  when trace $ liftIO $ putStrLn $ box ["running constructor: " ++ contractName' ++ "(" ++ intercalate ", " argNames ++ ")"]
+  when trace $ liftIO $ putStrLn $ box ["running constructor: " ++ contractName' ++ "(" ++ intercalate ", " (map snd argTypeNames) ++ ")"]
 
   argVals <- for argExps $ \arg -> getVar =<< expToVar arg
 
-  addCallInfo address contract' cc (M.fromList $ zip argNames (map Constant argVals))
+  addCallInfo address contract' cc (M.fromList $ zipWith (\(t, n) v -> (n, (t, v))) argTypeNames (map Constant argVals))
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = fromMaybe []
@@ -928,11 +936,14 @@ runTheConstructors cc address contractName' argExps = do
 
 call' :: Address -> Contract -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
 call' address' contract' cc theFunction argVals = do
-  let argNames = map fst $ sortWith snd $ [ (T.unpack n, i) | (n, Xabi.IndexedType{Xabi.indexedTypeIndex=i}) <- M.toList $ Xabi.funcArgs theFunction]
+  let argTypeNames = map fst $ sortWith snd $ [ ((t, T.unpack n), i) | (n, Xabi.IndexedType{Xabi.indexedTypeType=t, Xabi.indexedTypeIndex=i}) <- M.toList $ Xabi.funcArgs theFunction]
 
-  when trace $ liftIO $ putStrLn $ "            args: " ++ show argNames
+  when trace $ liftIO $ putStrLn $ "            args: " ++ show (map snd argTypeNames)
 
-  addCallInfo address' contract' cc (M.fromList $ zip argNames (map Constant argVals))
+  addCallInfo address' contract' cc (M.fromList $ zipWith (\(t, n) v -> (n, (t, v))) argTypeNames (map Constant argVals))
+
+  forM_ (zip argTypeNames argVals) $ \((_, n), v) -> do
+    setVar [MS.Field $ BC.pack n] v
 
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands

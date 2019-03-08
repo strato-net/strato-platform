@@ -14,6 +14,7 @@ module Blockchain.SolidVM.SM (
   getCurrentAddress,
   addCallInfo,
   popCallInfo,
+  getCurrentCallInfo,
   getCurrentContract,
   getCurrentCodeCollection,
   getEnv,
@@ -33,8 +34,6 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
 
-import qualified SolidVM.Model.Storable as MS
-
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs (BlockData(..))
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -45,6 +44,10 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
+
+import qualified SolidVM.Model.Storable as MS
+import qualified SolidVM.Solidity.Xabi.Type as Xabi
+
 
 import CodeCollection
 
@@ -60,7 +63,7 @@ data CallInfo =
     currentAddress :: Address,
     currentContract :: Contract,
     codeCollection :: CodeCollection,
-    localVariables :: Map String Variable
+    localVariables :: Map String (Xabi.Type, Variable)
     }
 
 {-
@@ -180,15 +183,15 @@ getEnv :: SM Environment
 getEnv = do
   fmap env get
 
-addLocalVariable :: String -> Value -> SM ()
-addLocalVariable name value = do
+addLocalVariable :: Xabi.Type -> String -> Value -> SM ()
+addLocalVariable theType name value = do
   newVariable <- liftIO $ fmap Variable $ newIORef value
   sstate <- get
   case callStack sstate of
     [] -> error "addLocalVariable called with an empty stack"
     (currentSlice:rest) ->
       put sstate
-          {callStack = currentSlice{localVariables=M.insert name newVariable $ localVariables currentSlice}:rest}
+          {callStack = currentSlice{localVariables=M.insert name (theType, newVariable) $ localVariables currentSlice}:rest}
 
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True x = Just x
@@ -203,7 +206,7 @@ getVariableOfName name = do
           [] -> error "getVariableValue called with an empty stack"
           (x:_) -> x
       vars = localVariables currentCallInfo
-      maybeLocalValue = M.lookup name $ vars
+      maybeLocalValue = fmap snd $ M.lookup name vars
 
       maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -305,7 +308,7 @@ getTypeOfName s = do
 -}
 
 
-addCallInfo :: Address -> Contract -> CodeCollection -> Map String Variable -> SM ()
+addCallInfo :: Address -> Contract -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
 addCallInfo a c cc initialLocalVariables = do
   sstate <- get
 
