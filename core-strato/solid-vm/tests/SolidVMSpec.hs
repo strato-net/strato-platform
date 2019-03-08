@@ -285,6 +285,7 @@ contract qq {
              ] `shouldReturn` [BDefault, BInteger 1, BInteger 88, BInteger 73]
 
     it "can explicitly push a struct" . runTest $ do
+      liftIO $ pendingWith "type lookups for locals"
       void $ runBS [r|
 contract qq {
   struct X {
@@ -448,7 +449,7 @@ contract qq {
     bytes32[] mnames;
   }
 }|]
-    getAll [ [ Field "mnames", Field "length"]] `shouldReturn` [BDefault]
+    getAll [ [ Field "mnames", Field "length"]] `shouldReturn` [BInteger 0]
 
   it "can push onto local arrays" . runTest $ do
     liftIO $ pendingWith "This is illegal in solc 0.5.x: either it is an uninitialized storage pointer \
@@ -551,7 +552,6 @@ contract qq {
     x = l;
   }
 }|]
-    -- liftIO $ pendingWith "TODO(tim): modifications to locals"
     getFields ["x"]`shouldReturn` [BInteger 200]
 
   it "can assign a local struct" . runTest $ do

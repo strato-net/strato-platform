@@ -141,20 +141,7 @@ create' creator cc contractName' argExps = do
       case maybeExpression of
         Just e -> getVar =<< expToVar e
         Nothing -> return $ defaultValue theType
-    let fieldName :: MS.StoragePath -> MS.StoragePath
-        fieldName = (MS.Field (BC.pack n):)
-    -- TODO: It might make more sense to just leave it at BDefault and
-    -- determine the result from that
-    kvs <- case initialValue of
-             SArray _ iv -> if V.null iv then return [(fieldName [MS.Field "length"], MS.BInteger 0)]
-                                         else todo "initialized array storage" initialValue
-             SMap _ im -> if M.null im then return [(fieldName [], MS.BDefault)]
-                                       else todo "initialize map storage " initialValue
-             SStruct _ fs -> forM (M.toList fs) $
-                 \(f, var) -> ((fieldName [MS.Field $ BC.pack f],) . toBasic) <$> getVar var
-
-             x -> return [(fieldName [], toBasic x)]
-    mapM_ (uncurry $ putSolidStorageKeyVal' newAddress) kvs
+    initializeStorage newAddress [MS.Field $ BC.pack n] initialValue
   popCallInfo
 
   -- Run the constructor
@@ -175,7 +162,18 @@ create' creator cc contractName' argExps = do
     }
 
 
-
+initializeStorage :: Address -> MS.StoragePath -> Value -> SM ()
+initializeStorage address root value = do
+  kvs <- case value of
+           SArray _ iv -> if V.null iv then return [(root ++ [MS.Field "length"], MS.BInteger 0)]
+                                       else todo "initialized array storage" value
+           SMap _ im -> if M.null im then return []
+                                     else todo "initialize map storage " value
+           SStruct _ fs -> forM (M.toList fs) $
+               \(f, var) -> ((root ++ [MS.Field $ BC.pack f],) . toBasic) <$> getVar var
+           SReference{} -> traceShowM (address, root, value) >> return []
+           x -> return [(root, toBasic x)]
+  mapM_ (uncurry $ putSolidStorageKeyVal' address) kvs
 
 call :: Bool
      -> Bool
@@ -915,7 +913,8 @@ runTheConstructors cc address contractName' argExps = do
 addLocalVariable :: String -> Value -> SM ()
 addLocalVariable name value = do
   traceShowM ("newLocalVariable"::String, name, value)
-  setVar [MS.Field $ BC.pack name] value
+  addr <- getCurrentAddress
+  initializeStorage addr [MS.Field $ BC.pack name] value
   newVariable <- liftIO $ fmap Variable $ newIORef value
   sstate <- get
   case callStack sstate of

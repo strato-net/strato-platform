@@ -8,7 +8,7 @@ import Executable.EVMFlags() -- for HFlags
 import qualified Spec
 
 predicate :: Path -> Bool
-predicate (_, _) = True
+predicate (_, "can access fields of structs from arrays") = True
 predicate _ = False
 
 main :: IO ()
