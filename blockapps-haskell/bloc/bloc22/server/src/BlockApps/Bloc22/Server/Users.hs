@@ -820,13 +820,11 @@ constructArgValuesAndSource args argNamesTypes = do
           else throwError (UserError "no arguments provided to function.")
       Just argsMap -> do
         vals <- getArgValues argsMap argNamesTypes
-        --TODO- valueToText returns type "Maybe Text", but as far as I can tell from reading the code, "Nothing" is not a possible return value....  I can't imagine why it ever would be.  We should either figure out what was intended, or change the return value of `valueToText` to "Text"
-        --For now, I'll just treat a nothing as an internal developer error, and crash the program.
-        let valsAsText = fromMaybe (error $ "Internal error: args can not be represented as source code: " ++ show vals) $ sequence $ map valueToText vals
+        let valsAsText = map valueToText vals
         return $
           (
             toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
-            "(" <> Text.intercalate ", " valsAsText <> ")"
+            "(" <> Text.intercalate "," valsAsText <> ")"
           )
 
 getAccountTxParams :: Address -> Maybe ChainId -> Maybe TxParams -> Bloc TxParams

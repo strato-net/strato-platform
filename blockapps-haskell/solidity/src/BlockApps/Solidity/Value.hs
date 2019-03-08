@@ -13,7 +13,6 @@ import           Data.ByteString         (ByteString)
 import qualified Data.ByteString         as ByteString
 import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Lazy    as ByteString.Lazy
-import           Data.List               (intersperse)
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Map.Strict         as Map
 import           Data.Text               (Text)
@@ -191,20 +190,20 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
                 (tBytes,headType) : rest
 
 
-valueToText :: Value -> Maybe Text
+valueToText :: Value -> Text
 valueToText = \case
   SimpleValue sv -> simpleValueToText sv
   ValueArrayDynamic vals ->
-    Text.concat . intersperse ("," ::Text) <$> sequence (valueToText <$> vals)
+    "[" <> Text.intercalate "," (map valueToText vals) <> "]"
   ValueArrayFixed _ vals ->
-    Text.concat . intersperse ("," ::Text) <$> sequence (valueToText <$> vals)
-  ValueContract addr -> Just . Text.pack $ addressString addr
+    "[" <> Text.intercalate "," (map valueToText vals) <> "]"
+  ValueContract addr -> Text.pack $ addressString addr
   ValueEnum{}        -> undefined -- TODO
   ValueFunction{}    -> undefined -- TODO
   ValueStruct{}      -> undefined
 
-simpleValueToText :: SimpleValue -> Maybe Text
-simpleValueToText sv = Just $ case sv of
+simpleValueToText :: SimpleValue -> Text
+simpleValueToText sv = case sv of
   ValueBool tf -> if tf then "true" else "false"
   ValueAddress addr -> Text.pack $ "0x" ++ addressString addr
   ValueString tx -> Text.pack $ show tx
