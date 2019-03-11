@@ -269,11 +269,6 @@ type GetContractsStates = "contracts"
   :> Get '[JSON] [GetContractsStatesResponse]
 type GetContractsStatesResponse = Map Address (Map Text SolidityValue)
 
-instance FromJSONKey Address where
-  fromJSONKey = FromJSONKeyTextParser
-    $ maybe (fail "could not decode address") return
-    . stringAddress . Text.unpack
-
 instance ToSample GetContractsStatesResponse where
   toSamples _ = noSamples
 
