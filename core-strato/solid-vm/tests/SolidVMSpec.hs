@@ -659,3 +659,16 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 12345]
+
+  it "can unpack tuples" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  uint y;
+  constructor() public {
+    var (a, b) = (98, 7776234);
+    x = a;
+    y = b;
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 98, BInteger 7776234]
