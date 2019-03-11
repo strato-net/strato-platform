@@ -349,16 +349,14 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
       Just e -> do
         rhs <- expToVar e
 
-        let getRef = (traceM "getRef" >>) SReference <$> expToPath e
-            getValue = (traceM "getValue" >> getVar) =<< expToVar e
+        let getRef = SReference <$> expToPath e
+            getValue = getVar =<< expToVar e
         case (rhs, theType) of
           -- Don't use `getVar` here to avoid infinite recurions
           -- on intended references.
           (Constant c, _) -> return c
           (Variable v, _) -> liftIO $ readIORef v
-          (_, Xabi.Array{}) -> do
-            traceM "arrayGetValue"
-            getValue
+          (_, Xabi.Array{}) -> getValue
           (_, Xabi.Label name) -> do
             ty <- getTypeOfName name
             case ty of
@@ -491,13 +489,9 @@ getIndexType xs = internalError "getIndexType from non-field" xs
 expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
-  traceM "Index access start"
-  !parPath <- expToPath parent
-  traceM "parent path exposed"
-  !idxType <- getIndexType parPath
-  traceM "index type calculated"
-  !idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
-  traceM "indexVar found"
+  parPath <- expToPath parent
+  idxType <- getIndexType parPath
+  idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
   (parPath ++) <$> case idxType of
     MapAddressIndex -> do
       idx <- getAddress idxVar
@@ -642,7 +636,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
         _ -> todo "access member of variable" (val', name)
     StorageItem p -> case name of
       -- TODO(tim): This will not work correctly with struct fields named push
-      "push" -> traceM "SPush" >> return . Constant $ SPush p
+      "push" -> return . Constant $ SPush p
       "length" -> return . StorageItem $ p ++ [MS.Field "length"]
       _ -> do
           val' <- getVar $ StorageItem p
@@ -811,7 +805,6 @@ expToVar' (Xabi.FunctionCall e args) = do
         _ -> typeError "called enum constructor with improper args" argVals
 
     Constant (SPush path) -> do
-      traceM "Calling SPush"
       let lenPath = path ++ [MS.Field "length"]
 
       len' <- getInt $ StorageItem lenPath

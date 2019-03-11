@@ -714,3 +714,29 @@ contract qq {
     getAll [ [Field "ruleNames", MapIndex (IText "ok"), Field "length"]
            , [Field "ruleNames", MapIndex (IText "ok"), ArrayIndex 0]
            ] `shouldReturn` [BInteger 1, BString "1"]
+
+  it "can back assign a map value reference" . runTest $ do
+    liftIO $ pendingWith "avoid infinite loop"
+    void $ runBS [r|
+contract qq {
+  mapping (bytes32 => bytes32[]) ruleNames;
+
+  constructor() public {
+    bytes32[] names = ruleNames["ok"];
+    names.push("red");
+    ruleNames["bad"] = names;
+  }
+}|]
+
+  it "can continue" . runTest $ do
+    liftIO $ pendingWith "implement continue"
+    void $ runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    for (i = 0; i < 100; i++) {
+      continue;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 100]
