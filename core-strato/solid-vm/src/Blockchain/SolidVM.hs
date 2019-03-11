@@ -519,7 +519,7 @@ expToVar x = do
   return v
 
 expToVar' :: Xabi.Expression -> SM Variable
-expToVar' (Xabi.NumberLiteral v Nothing) = return $ Constant $ SInteger v --TODO- handle solidity units
+expToVar' (Xabi.NumberLiteral v Nothing) = return . Constant $ SInteger v
 expToVar' (Xabi.StringLiteral s) = return $ Constant $ SString s
 expToVar' (Xabi.BoolLiteral b) = return $ Constant $ SBool b
 expToVar' (Xabi.Variable "bytes32ToString") = do --TODO- remove this hardcoded case
@@ -899,17 +899,25 @@ bytesToInteger bytes =
 
 runTheConstructors :: CodeCollection -> Address -> String -> [Xabi.Expression] -> SM ()
 runTheConstructors cc address contractName' argExps = do
+  -- coerceTo is an ugly hack when interpreting literals without a name.
+  let coerceTo :: Xabi.Type -> Value -> Value
+      coerceTo (Xabi.Address{}) (SInteger x) = SAddress $ fromIntegral x
+      coerceTo _ y = y
+
   let contract' =
-          fromMaybe (missingType "contract inherits from a contract that doesn't exist" contractName')
+          fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.contracts . at contractName'
-
-      argTypeNames = map fst $ sortWith snd $ [ ((t, T.unpack n), i) | (n, Xabi.IndexedType{Xabi.indexedTypeType=t, Xabi.indexedTypeIndex=i}) <- M.toList $ fromMaybe M.empty $ fmap Xabi.funcArgs $ contract'^.constructor]
-
-  when trace $ liftIO $ putStrLn $ box ["running constructor: " ++ contractName' ++ "(" ++ intercalate ", " (map snd argTypeNames) ++ ")"]
+      argPairs = M.toList . fromMaybe M.empty . fmap Xabi.funcArgs $ contract' ^. constructor
+      argTypeNames = map fst $ sortWith snd $
+        [ ((t, T.unpack n), i) |
+          (n, Xabi.IndexedType{Xabi.indexedTypeType=t, Xabi.indexedTypeIndex=i}) <- argPairs]
+  when trace $ liftIO $ putStrLn $ box
+    ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
   argVals <- for argExps $ \arg -> getVar =<< expToVar arg
-
-  addCallInfo address contract' cc (M.fromList $ zipWith (\(t, n) v -> (n, (t, v))) argTypeNames (map Constant argVals))
+  let zipped = zipWith (\(t, n) v -> (n, (t, coerceTo t v))) argTypeNames argVals
+  addCallInfo address contract' cc . fmap (fmap Constant) $ M.fromList zipped
+  mapM_ (\(n, (_, v)) -> initializeStorage [MS.Field $ BC.pack n] v) zipped
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = fromMaybe []

@@ -322,7 +322,6 @@ getTypeOfName s = do
 addCallInfo :: Address -> Contract -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
 addCallInfo a c cc initialLocalVariables = do
   sstate <- get
-
   let newCallInfo =
         CallInfo {
           currentAddress=a,

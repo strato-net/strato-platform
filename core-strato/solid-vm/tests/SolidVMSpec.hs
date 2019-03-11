@@ -62,7 +62,10 @@ runFile :: FilePath -> ContextM ExecResults
 runFile fp = runBS =<< liftIO (B.readFile fp)
 
 runBS :: B.ByteString -> ContextM ExecResults
-runBS bs = do
+runBS = runArgs "()"
+
+runArgs :: T.Text -> B.ByteString -> ContextM ExecResults
+runArgs args bs = do
   let code = Code bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -88,7 +91,7 @@ runBS bs = do
       availableGas = error "TODO: availableGas"
       txHash = error "TODO: txHash"
       chainId = error "TODO: chainId"
-      metadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
+      metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
   SVM.create isTest isHomestead suicides blockData callDepth sender origin
             value gasPrice availableGas newAddress code txHash chainId metadata
@@ -672,3 +675,29 @@ contract qq {
   }
 }|]
     getFields ["x", "y"] `shouldReturn` [BInteger 98, BInteger 7776234]
+
+  it "will run parent constructors" . runTest $ do
+    void $ runBS [r|
+contract Parent {
+  uint x;
+  string name;
+  constructor() public {
+    x = 2346;
+    name = "Sandman";
+  }
+}
+
+contract qq is Parent {
+  constructor() public Parent() {}
+}|]
+    getFields ["x", "name"] `shouldReturn` [BInteger 2346, BString "Sandman"]
+
+  it "will pass arguments to constructors" . runTest $ do
+    void $ runArgs "(0x6662346)" [r|
+contract qq {
+  address target;
+  constructor(address _target) public {
+    target = _target;
+  }
+}|]
+    getFields ["target"] `shouldReturn` [BAddress 0x6662346]
