@@ -37,9 +37,10 @@ findDefault = \case
   TBool -> SBool False
   TAddress -> SAddress 0x0
   TContract n -> SContract n 0x0
-  TEnumVal n -> SEnumVal n (todo "enum default value" n)
-  TStruct n fs -> todo "recursive struct basic types" (n, fs)
-  Todo msg -> todo "fromBasic" msg
+  TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n)
+  TStruct n fs -> todo "findDefault/struct" (n, fs)
+  TComplex -> todo "finddefault/complex" TComplex
+  Todo msg -> todo "findDefault/todo" msg
 
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
@@ -101,7 +102,9 @@ getContract contractName = getVar' (Just $ TContract contractName)
 
 
 getVar :: Variable -> SM Value
-getVar = getVar' Nothing
+getVar v = do
+  val <- getVar' Nothing v
+  return val
 
 getVar' :: Maybe BasicType -> Variable -> SM Value
 getVar' mTypeHint (Variable ioRef) = do
@@ -127,6 +130,7 @@ getVar' mTypeHint (StorageItem key) = do
           forM fieldHints $ \(l, t') -> do
             fieldValue <- getVar' (Just t') . StorageItem $ key ++ [MS.Field l]
             return (BC.unpack l, Constant fieldValue)
+        TComplex -> return $ SReference key
         _ -> return $ findDefault typeHint
 
 

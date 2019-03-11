@@ -33,6 +33,7 @@ import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
@@ -219,9 +220,21 @@ getVariableOfName name = do
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
       vars = localVariables currentCallInfo
-      maybeLocalValue = toMaybe (name `M.member` vars) $ StorageItem [MS.Field $ BC.pack name]
+  maybeLocalValue <-
+    -- TODO(tim): consult memory map for locals instead of storage
+    case M.lookup name vars of
+      Nothing -> return Nothing
+      Just (_, var) -> Just <$> case var of
+        Constant (SReference ref) -> return $ StorageItem ref
+        Variable v -> do
+          val <- liftIO $ readIORef v
+          case val of
+            SReference ref -> return $ StorageItem ref
+            _ -> return $ StorageItem [MS.Field $ BC.pack name]
+        StorageItem p -> return $ StorageItem p
+        Constant{} -> return $ StorageItem [MS.Field $ BC.pack name]
 
-      maybeContractFunction :: Maybe Variable
+  let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
@@ -377,6 +390,7 @@ hintFromType = \case
        let upgrade :: (T.Text, Xabi.FieldType) -> SM (B.ByteString , BasicType)
            upgrade = mapM (hintFromType . Xabi.fieldTypeType) . first encodeUtf8
        TStruct s <$> mapM upgrade fs
+ Xabi.Array{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
 getValueType :: MS.StoragePath -> SM BasicType

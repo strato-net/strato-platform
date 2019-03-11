@@ -171,6 +171,8 @@ initializeStorage root value =
                                  else todo "initialized array storage" value
      SMap _ im -> if M.null im then []
                                else todo "initialize map storage " value
+     -- References are already initialized
+     SReference{} -> []
      x -> [(root, x)]
 
 call :: Bool
@@ -342,15 +344,21 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames maybeExpression)) = do
   let theType = fromMaybe (todo "type inference not implemented" s) maybeType
-
   value <-
     case maybeExpression of
       Just e -> do
         rhs <- expToVar e
-        let getRef = SReference <$> expToPath e
-            getValue = getVar =<< expToVar e
+
+        let getRef = (traceM "getRef" >>) SReference <$> expToPath e
+            getValue = (traceM "getValue" >> getVar) =<< expToVar e
         case (rhs, theType) of
+          -- Don't use `getVar` here to avoid infinite recurions
+          -- on intended references.
           (Constant c, _) -> return c
+          (Variable v, _) -> liftIO $ readIORef v
+          (_, Xabi.Array{}) -> do
+            traceM "arrayGetValue"
+            getValue
           (_, Xabi.Label name) -> do
             ty <- getTypeOfName name
             case ty of
@@ -483,9 +491,13 @@ getIndexType xs = internalError "getIndexType from non-field" xs
 expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
-  parPath <- expToPath parent
-  idxType <- getIndexType parPath
-  idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
+  traceM "Index access start"
+  !parPath <- expToPath parent
+  traceM "parent path exposed"
+  !idxType <- getIndexType parPath
+  traceM "index type calculated"
+  !idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
+  traceM "indexVar found"
   (parPath ++) <$> case idxType of
     MapAddressIndex -> do
       idx <- getAddress idxVar
@@ -505,7 +517,7 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
         SString s -> [MS.MapIndex $ MS.IText $ BC.pack s]
         _ -> typeError "invalid map of strings index" idx
     ArrayIndex -> do
-      n <- getInt  idxVar
+      n <- getInt idxVar
       return [MS.ArrayIndex $ fromIntegral n]
 expToPath (Xabi.MemberAccess parent field) = do
   parPath <- expToPath parent
@@ -630,7 +642,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
         _ -> todo "access member of variable" (val', name)
     StorageItem p -> case name of
       -- TODO(tim): This will not work correctly with struct fields named push
-      "push" -> return . Constant $ SPush p
+      "push" -> traceM "SPush" >> return . Constant $ SPush p
       "length" -> return . StorageItem $ p ++ [MS.Field "length"]
       _ -> do
           val' <- getVar $ StorageItem p
@@ -799,6 +811,7 @@ expToVar' (Xabi.FunctionCall e args) = do
         _ -> typeError "called enum constructor with improper args" argVals
 
     Constant (SPush path) -> do
+      traceM "Calling SPush"
       let lenPath = path ++ [MS.Field "length"]
 
       len' <- getInt $ StorageItem lenPath
@@ -939,6 +952,7 @@ runTheConstructors cc address contractName' argExps = do
 
   return ()
 
+-- Note: this is intentionally nonstrict in `theType`
 addLocalVariable :: Xabi.Type -> String -> Value -> SM ()
 addLocalVariable theType name value = do
   initializeStorage [MS.Field $ BC.pack name] value

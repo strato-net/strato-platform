@@ -700,3 +700,17 @@ contract qq {
   }
 }|]
     getFields ["target"] `shouldReturn` [BAddress 0x6662346]
+
+  it "can create a reference to a map value" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping (bytes32 => bytes32[]) ruleNames;
+
+  constructor() public {
+    bytes32[] names = ruleNames["ok"];
+    names.push("1");
+  }
+}|]
+    getAll [ [Field "ruleNames", MapIndex (IText "ok"), Field "length"]
+           , [Field "ruleNames", MapIndex (IText "ok"), ArrayIndex 0]
+           ] `shouldReturn` [BInteger 1, BString "1"]
