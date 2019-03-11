@@ -97,8 +97,8 @@ tableUpsert = csv . map go
   where go x = let y = wrapDoubleQuotes $ escapeQuotes x
                 in wrap1 y " = excluded."
 
-dbConnect :: PGDatabase
-dbConnect =  PGDatabase
+cirrusInfo :: PGDatabase
+cirrusInfo = PGDatabase
   { pgDBHost = flags_pghost :: HostName
   , pgDBPort = PortNumber . fromIntegral $ flags_pgport
   , pgDBUser = BC.pack flags_pguser :: B.ByteString
