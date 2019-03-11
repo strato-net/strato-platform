@@ -9,6 +9,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -330,13 +331,30 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
-  v1 <- expToPath e1
+runStatement x@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
+  traceShowM x
+  p1 <- expToPath e1
   v2 <- expToVar e2
-  !value <- getVar v2
-  when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (v1, value)
-  logAssigningVariable value
-  setVar v1 value
+  traceShowM ("p1/v2 assign"::String, p1, v2)
+  t1 <- getXabiValueType p1
+  case t1 of
+    -- Arrays are deep copied when the target is storage
+    Xabi.Array{} -> do
+      when trace $ liftIO $ putStrLn $ "Array copy to " ++ show p1
+      let p2 = case v2 of
+                  StorageItem p2' -> p2'
+                  _ -> todo "unhandled array copy" v2
+      len <- getInt . StorageItem $ p2 ++ [MS.Field "length"]
+      setVar (p1 ++ [MS.Field "length"]) $ SInteger len
+      forM_ [0..len-1] $ \i -> do
+        let idx = [MS.ArrayIndex $ fromIntegral i]
+        rhs' <- getVar . StorageItem $ p2 ++ idx
+        setVar (p1 ++ idx) rhs'
+    _ -> do
+      !value <- getVar v2
+      when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p1, value)
+      logAssigningVariable value
+      setVar p1 value
   return Nothing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
@@ -461,12 +479,9 @@ while condition code = do
 getIndexType :: MS.StoragePath -> SM IndexType
 getIndexType [] = internalError "getIndexType for root path" ([]::MS.StoragePath)
 getIndexType p@(MS.Field field:_) = do
-  ctract <- getCurrentContract
-  currentCallInfo <- getCurrentCallInfo
-  let localDecls = localVariables currentCallInfo
-  let storageDecls = ctract ^. storageDefs
+  mType <- getXabiType field
   let n = length p - 1
-  case M.lookup (BC.unpack field) (fmap Xabi.varType storageDecls `M.union` fmap fst localDecls) of
+  case mType of
     Nothing -> todo "unknown storage reference" field
     Just v -> return $! loop n v
  where loop :: Int -> Xabi.Type -> IndexType
@@ -806,14 +821,16 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant (SPush path) -> do
       let lenPath = path ++ [MS.Field "length"]
-
+      traceShowM ("lenpath"::String, lenPath)
       len' <- getInt $ StorageItem lenPath
       let len :: Int = fromIntegral len'
           newLen = SInteger $ fromIntegral $ len + 1
       let idxPath = path ++ [MS.ArrayIndex len]
       setVar lenPath newLen
       case argVals of
-        [av] -> setVar idxPath av
+        [av] -> do
+          traceShowM ("bout to append"::String, idxPath, av)
+          setVar idxPath av
         _ -> arityMismatch "push" (length argVals) 1
       return $ Constant newLen
 

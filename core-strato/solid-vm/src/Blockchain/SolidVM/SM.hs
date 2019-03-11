@@ -22,9 +22,12 @@ module Blockchain.SolidVM.SM (
   getVariableOfName,
   getFunctionOfName,
   getTypeOfName,
+  getXabiType,
+  getXabiValueType,
   getValueType
   ) where
 
+import Debug.Trace
 import           Control.Applicative ((<|>))
 import           Control.Lens
 import           Control.Monad.IO.Class
@@ -225,14 +228,14 @@ getVariableOfName name = do
     case M.lookup name vars of
       Nothing -> return Nothing
       Just (_, var) -> Just <$> case var of
-        Constant (SReference ref) -> return $ StorageItem ref
+        Constant (SReference ref) -> traceM "constant ref" >> return $ StorageItem ref
         Variable v -> do
           val <- liftIO $ readIORef v
           case val of
-            SReference ref -> return $ StorageItem ref
-            _ -> return $ StorageItem [MS.Field $ BC.pack name]
-        StorageItem p -> return $ StorageItem p
-        Constant{} -> return $ StorageItem [MS.Field $ BC.pack name]
+            SReference ref -> traceM "variable ref" >> return $ StorageItem ref
+            _ -> traceM "variable nonref" >> return $ StorageItem [MS.Field $ BC.pack name]
+        StorageItem p -> traceM "storage path" >> return $ StorageItem p
+        Constant{} -> traceM "constant nonref" >> return $ StorageItem [MS.Field $ BC.pack name]
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -393,41 +396,49 @@ hintFromType = \case
  Xabi.Array{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
-getValueType :: MS.StoragePath -> SM BasicType
-getValueType [] = internalError "getValueType" ([]::MS.StoragePath)
-getValueType (MS.Field field:rest) = do
+getXabiType :: B.ByteString -> SM (Maybe Xabi.Type)
+getXabiType field = do
   ctract <- getCurrentContract
   currentCallInfo <- getCurrentCallInfo
   let localDecls = localVariables currentCallInfo
-  let storageDecls = ctract ^. storageDefs
-  let allTypes = (fmap Xabi.varType storageDecls `M.union` fmap fst localDecls)
-  case M.lookup (BC.unpack field) allTypes of
-    Nothing -> return $ Todo $ "getValueType/unknown storage reference:" ++ show field
+      storageDecls = ctract ^. storageDefs
+      allTypes = fmap Xabi.varType storageDecls `M.union` fmap fst localDecls
+  return $ M.lookup (BC.unpack field) allTypes
+
+getXabiValueType :: MS.StoragePath -> SM Xabi.Type
+getXabiValueType [] = internalError "getXabiValueType" ([]::MS.StoragePath)
+getXabiValueType (MS.Field field:rest) = do
+  mType <- getXabiType field
+  case mType of
+    Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> loop rest v
- where loop :: MS.StoragePath -> Xabi.Type -> SM BasicType
-       loop [] = hintFromType
+ where loop :: MS.StoragePath -> Xabi.Type -> SM Xabi.Type
+       loop [] = return
        loop [x] = \case
          Xabi.Mapping{Xabi.value=v} -> case x of
-          MS.MapIndex{} -> hintFromType v
-          _ -> typeError "map index" x
+           MS.MapIndex{} -> return v
+           _ -> typeError "non map index attribute of mapping" x
          Xabi.Array{Xabi.entry=v} -> case x of
-          MS.Field "length" -> return TInteger
-          MS.ArrayIndex{} -> hintFromType v
-          _ -> internalError "array path piece" x
+           MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
+           MS.ArrayIndex{} -> return v
+           _ -> typeError "non-length or array index attribute of array" x
          Xabi.Label s -> do
            t' <- getTypeOfName s
            case (x, t') of
              (MS.Field n, StructTypo fs) -> do
                let mt'' = lookup (decodeUtf8 n) fs
                case mt'' of
-                Just t'' -> hintFromType $ Xabi.fieldTypeType t''
+                Just t'' -> return $ Xabi.fieldTypeType t''
                 Nothing -> error $ "field not present in struct definition: " ++ show (n, fs)
              (_, StructTypo{}) -> typeError "non field access to struct" x
              (_, ContractTypo{}) -> todo "getValueType/contract access" t'
              (_, EnumTypo{}) -> todo "getValueType/enum acess" t'
          t'' -> todo "atomic type does not have value type" t''
        loop (_:rs) = \case
-         Xabi.Mapping{Xabi.value=t'} -> loop rs t'
-         Xabi.Array{Xabi.entry=t'} -> loop rs t'
-         t -> error $ "not an indexable type B: " ++ show t
-getValueType xs = internalError "getValueType started from non-field" xs
+          Xabi.Mapping{Xabi.value=t'} -> loop rs t'
+          Xabi.Array{Xabi.entry=t'} -> loop rs t'
+          t -> todo "getXabiValueType/loopnext unsupported type" t
+getXabiValueType p = internalError "getXabiValueType/storage path not prefixed by field" p
+
+getValueType :: MS.StoragePath -> SM BasicType
+getValueType p = hintFromType =<< getXabiValueType p

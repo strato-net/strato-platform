@@ -715,8 +715,28 @@ contract qq {
            , [Field "ruleNames", MapIndex (IText "ok"), ArrayIndex 0]
            ] `shouldReturn` [BInteger 1, BString "1"]
 
+  it "can back assign a reference" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  bytes32[] src;
+  bytes32[] dst;
+  constructor() public {
+    bytes32[] src2 = src;
+    src2.push("red");
+    dst = src2;
+    // src2 still refers to src, but dst had a deep copy
+    src2.push("blue");
+  }
+}|]
+    getAll [ [Field "src", Field "length"]
+           , [Field "src", ArrayIndex 0]
+           , [Field "src", ArrayIndex 1]
+           , [Field "dst", Field "length"]
+           , [Field "dst", ArrayIndex 0]
+           ] `shouldReturn` [ BInteger 2, BString "red", BString "blue"
+                            , BInteger 1, BString "red"]
+
   it "can back assign a map value reference" . runTest $ do
-    liftIO $ pendingWith "avoid infinite loop"
     void $ runBS [r|
 contract qq {
   mapping (bytes32 => bytes32[]) ruleNames;
