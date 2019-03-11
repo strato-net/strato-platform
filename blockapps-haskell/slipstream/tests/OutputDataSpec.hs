@@ -14,7 +14,6 @@ import Text.RawString.QQ
 
 import BlockApps.Ethereum --(Keccak256, Address)
 import qualified BlockApps.Solidity.Value as V
-
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
