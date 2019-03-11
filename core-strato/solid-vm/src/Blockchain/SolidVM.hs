@@ -621,10 +621,11 @@ expToVar' (Xabi.MemberAccess expr name) = do
         SReference ref -> do
           return $ StorageItem $ ref ++ [MS.Field $ BC.pack name]
         _ -> todo "access member of variable" (val', name)
-    StorageItem p ->
-      if name == "push"
-        then return . Constant $ SPush p
-        else do
+    StorageItem p -> case name of
+      -- TODO(tim): This will not work correctly with struct fields named push
+      "push" -> return . Constant $ SPush p
+      "length" -> return . StorageItem $ p ++ [MS.Field "length"]
+      _ -> do
           val' <- getVar $ StorageItem p
           case val' of
             SAddress (Address a) -> return . Constant $ SContractItem (toInteger a) name
@@ -632,7 +633,6 @@ expToVar' (Xabi.MemberAccess expr name) = do
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
             _ -> todo "access member of storage item" (val', name, p)
-        -- StorageItem $ p ++ [MS.Field $ BC.pack name]
 
 expToVar' x@(Xabi.IndexAccess{}) = do
   idxPath <- expToPath x
