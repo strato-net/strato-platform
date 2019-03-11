@@ -153,17 +153,13 @@ instance HasHashDB SM where
 instance HasCodeDB SM where
   getCodeDB = codeDB <$> get
 
-runSM :: BlockData -> SM a -> ContextM a
-runSM blk f = do
+runSM :: Environment -> SM a -> ContextM a
+runSM env f = do
   vmcontext <- get
 
   let startingState =
         SState {
-        env = Environment {
-            sender = Address 0x1234,
-            origin = Address 0x1234,
-            blockHeader = blk
-            },
+        env = env,
         callStack = [],
         codeDB = contextCodeDB vmcontext,
         hashDB = contextHashDB vmcontext,

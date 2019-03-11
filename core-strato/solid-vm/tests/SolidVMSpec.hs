@@ -38,6 +38,8 @@ import SolidVM.Model.Storable
 sender :: Address
 sender = 0xdeadbeef
 
+origin :: Address
+origin = 0x8341
 -- TODO: It's not clear what the difference between newAddress and uploadAddress,
 -- aside from the fact that one is an argument to create and the other is generated
 -- by SolidVM's create'
@@ -81,7 +83,6 @@ runBS bs = do
                             , blockDataMixHash = SHA 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
-      origin = error "TODO: origin"
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
@@ -624,3 +625,38 @@ contract qq {
   }
 }|]
     getFields ["x", "y", "z"] `shouldReturn` [BInteger 0, BInteger 0, BBool True]
+
+  it "can check msg.sender" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  address x;
+  constructor() {
+    x = msg.sender;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BAddress sender]
+
+  it "can read tx.origin" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  address x;
+  constructor() {
+    x = tx.origin;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BAddress origin]
+
+  it "can infer types" . runTest $ do
+    liftIO $ pendingWith "TODO(tim): type inference"
+    void $ runBS [r|
+contract qq {
+  uint x;
+  function f() returns (uint) {
+    return 12345;
+  }
+  constructor() {
+    var z = f();
+    x = z;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 12345]

@@ -89,7 +89,7 @@ create :: Bool
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ pc@(PrecompiledCode _) _ _ _ = internalError "call precompiled code" pc
-create _ _ _ blockData _ sender' _ _ _ _ _ (Code initCode) _ _ metadata = do
+create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) _ _ metadata = do
 
   let maybeContractName = join $ fmap (M.lookup "name") metadata
       contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
@@ -110,9 +110,13 @@ create _ _ _ blockData _ sender' _ _ _ _ _ (Code initCode) _ _ metadata = do
         $ CodeCollection {
             _contracts=M.fromList namedContracts
           }
+      env' = Environment {
+        blockHeader = blockData,
+        sender = sender',
+        origin = origin'
+      }
 
-
-  runSM blockData $ do
+  runSM env' $ do
     create' sender' cc contractName' args
 
 create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
@@ -190,7 +194,7 @@ call :: Bool
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
-call _ _ _ _ blockData _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
+call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' _ _ metadata = do
 
   let maybeFuncName = join $ fmap (M.lookup "funcName") metadata
       funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
@@ -198,8 +202,12 @@ call _ _ _ _ blockData _ _ codeAddress _ _ _ _ _ _ _ _ metadata = do
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
       maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
-
-  encodedReturnValue <- runSM blockData $ do
+      env' = Environment {
+        blockHeader = blockData,
+        sender = sender',
+        origin = origin'
+      }
+  encodedReturnValue <- runSM env' $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
            maybeRet <- call'' codeAddress funcName argValues
            case maybeRet of
