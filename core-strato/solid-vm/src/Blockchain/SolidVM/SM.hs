@@ -223,9 +223,7 @@ getVariableOfName name = do
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
       vars = localVariables currentCallInfo
-      -- maybeLocalValue = M.lookup name $ vars
-      -- maybeLocalValue = toMaybe (name `M.member` vars) $ StorageItem [MS.Field $ BC.pack name]
-      maybeLocalValue = fmap snd $ M.lookup name vars
+      maybeLocalValue = toMaybe (name `M.member` vars) $ StorageItem [MS.Field $ BC.pack name]
 
       maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -390,10 +388,13 @@ getValueType :: MS.StoragePath -> SM BasicType
 getValueType [] = internalError "getValueType" ([]::MS.StoragePath)
 getValueType (MS.Field field:rest) = do
   ctract <- getCurrentContract
-  let decls = ctract ^. storageDefs
-  case M.lookup (BC.unpack field) decls of
-    Nothing -> return $ Todo $ "getValueType/unknown storage reference (probably local):" ++ show field
-    Just Xabi.VariableDecl {Xabi.varType=v} -> loop rest v
+  currentCallInfo <- getCurrentCallInfo
+  let localDecls = localVariables currentCallInfo
+  let storageDecls = ctract ^. storageDefs
+  let allTypes = (fmap Xabi.varType storageDecls `M.union` fmap fst localDecls)
+  case M.lookup (BC.unpack field) allTypes of
+    Nothing -> return $ Todo $ "getValueType/unknown storage reference:" ++ show field
+    Just v -> loop rest v
  where loop :: MS.StoragePath -> Xabi.Type -> SM BasicType
        loop [] = hintFromType
        loop [x] = \case
