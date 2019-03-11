@@ -9,7 +9,6 @@ module Blockchain.SolidVM
     , create
     ) where
 
-import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -296,7 +295,7 @@ runStatements (s:rest) = do
     if True
     then liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
     else liftIO $ putStrLn $ C.green $ "statement> " ++ show s
-  ret <- traceShowM s >> runStatement s
+  ret <- runStatement s
   case ret of
     Nothing -> runStatements rest
     v -> return v
@@ -324,7 +323,6 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
   v1 <- expToPath e1
   v2 <- expToVar e2
-  traceShowM (v1, v2, e1, e2)
   !value <- getVar v2
   when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (v1, value)
   logAssigningVariable value
@@ -336,7 +334,6 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames maybeExpression)) = do
   let theType = fromMaybe (todo "type inference not implemented" s) maybeType
-  traceShowM s
 
   value <-
     case maybeExpression of
@@ -376,7 +373,6 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
     (_, STuple variables) -> do
       checkArity "var declaration tuple" (V.length variables) (length varNames)
       forM_ [(n, v) | (Just n, v) <- zip varNames $ V.toList variables] $ \(name', variable') -> do
-        traceShowM ("addLocalTuple"::String, name', variable')
         value' <- getVar variable'
         addLocalVariable theType name' value'
 
@@ -512,9 +508,7 @@ expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: Xabi.Expression -> SM Variable
 expToVar x = do
-  traceShowM ("expToVar/in"::String, x)
   v <- expToVar' x
-  traceShowM ("expToVar/out"::String, v)
   return v
 
 expToVar' :: Xabi.Expression -> SM Variable
@@ -525,8 +519,7 @@ expToVar' (Xabi.Variable "bytes32ToString") = do --TODO- remove this hardcoded c
   return $ Constant $ SBuiltinFunction "identity" Nothing
 expToVar' (Xabi.Variable "bytes") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
-expToVar' x@(Xabi.Variable name) = do
-  traceShowM x
+expToVar' (Xabi.Variable name) = do
   getVariableOfName name
 
 expToVar' (Xabi.PlusPlus e) = do
@@ -632,8 +625,6 @@ expToVar' (Xabi.MemberAccess expr name) = do
       if name == "push"
         then return . Constant $ SPush p
         else do
-          ty <- getValueType p
-          traceShowM (ty, p)
           val' <- getVar $ StorageItem p
           case val' of
             SAddress (Address a) -> return . Constant $ SContractItem (toInteger a) name
@@ -935,7 +926,6 @@ runTheConstructors cc address contractName' argExps = do
 
 addLocalVariable :: Xabi.Type -> String -> Value -> SM ()
 addLocalVariable theType name value = do
-  traceShowM ("newLocalVariable"::String, name, value)
   initializeStorage [MS.Field $ BC.pack name] value
   newVariable <- liftIO $ fmap Variable $ newIORef value
   sstate <- get

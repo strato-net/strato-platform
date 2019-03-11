@@ -3,7 +3,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
-import Debug.Trace
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -57,8 +56,6 @@ setVar key val = do
   case val of
       SReference ref -> do
         val' <- getVar $ StorageItem ref
-        -- val' <- getSolidStorageKeyVal' currentAddress' ref
-        traceShowM ("Value read from the reference:"::String, ref, val')
         setVar key val'
       SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = [MS.Field (BC.pack f)]
@@ -105,17 +102,14 @@ getContract _contractName = getVar
 getVar :: Variable -> SM Value
 getVar (Variable ioRef) = do
   val <- liftIO $ readIORef ioRef
-  traceShowM ("ioref read: "::String, val)
   case val of
     SReference ref -> getVar (StorageItem ref)
     _ -> return val
 getVar (Constant c) = do
-  traceShowM ("constant value: "::String, c)
   case c of
     SReference ref -> getVar (StorageItem ref)
     _ -> return c
 getVar (StorageItem key) = do
-  traceShowM ("storage read"::String, key)
   currentAddress' <- getCurrentAddress
   typeHint <- getValueType key
   case typeHint of
