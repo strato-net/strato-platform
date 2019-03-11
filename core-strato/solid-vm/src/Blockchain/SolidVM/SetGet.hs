@@ -20,23 +20,26 @@ import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Format
 import qualified SolidVM.Model.Storable as MS
 
-fromBasic :: BasicType -> MS.BasicValue -> Value
-fromBasic t = \case
+fromBasic :: MS.BasicValue -> Value
+fromBasic = \case
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a
   MS.BContract n a -> SContract (T.unpack n) (fromIntegral a)
   MS.BEnumVal k v -> SEnumVal (T.unpack k) (T.unpack v)
-  MS.BDefault -> case t of
-    TInteger -> SInteger 0
-    TString -> SString ""
-    TBool -> SBool False
-    TAddress -> SAddress 0x0
-    TContract n -> SContract n 0x0
-    TEnumVal n -> SEnumVal n (todo "enum default value" n)
-    TStruct n fs -> todo "recursive struct basic types" (n, fs)
-    Todo msg -> todo "fromBasic" msg
+  MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
+
+findDefault :: BasicType -> Value
+findDefault = \case
+  TInteger -> SInteger 0
+  TString -> SString ""
+  TBool -> SBool False
+  TAddress -> SAddress 0x0
+  TContract n -> SContract n 0x0
+  TEnumVal n -> SEnumVal n (todo "enum default value" n)
+  TStruct n fs -> todo "recursive struct basic types" (n, fs)
+  Todo msg -> todo "fromBasic" msg
 
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
@@ -73,51 +76,58 @@ deleteVar key = do
   putSolidStorageKeyVal' currentAddress' key MS.BDefault
 
 
--- TODO(tim): In the following cases, the type lookup can be
--- elided because it is determined by context.
 getInt :: Variable -> SM Integer
 getInt p = do
-  v <- getVar p
+  v <- getVar' (Just TInteger) p
   case v of
     SInteger s -> return s
     _ -> typeError "getInt" (p, v)
 
 getBool :: Variable -> SM Bool
 getBool p = do
-  v <- getVar p
+  v <- getVar' (Just TBool) p
   case v of
     SBool b -> return b
     _ -> typeError "getBool" (p, v)
 
 getAddress :: Variable -> SM Value
-getAddress = getVar
+getAddress = getVar' (Just TAddress)
 
 getString :: Variable -> SM Value
-getString = getVar
+getString = getVar' (Just TString)
 
 getContract :: String -> Variable -> SM Value
-getContract _contractName = getVar
+getContract contractName = getVar' (Just $ TContract contractName)
 
 
 getVar :: Variable -> SM Value
-getVar (Variable ioRef) = do
+getVar = getVar' Nothing
+
+getVar' :: Maybe BasicType -> Variable -> SM Value
+getVar' mTypeHint (Variable ioRef) = do
   val <- liftIO $ readIORef ioRef
   case val of
-    SReference ref -> getVar (StorageItem ref)
+    SReference ref -> getVar' mTypeHint (StorageItem ref)
     _ -> return val
-getVar (Constant c) = do
+getVar' mTypeHint (Constant c) = do
   case c of
-    SReference ref -> getVar (StorageItem ref)
+    SReference ref -> getVar' mTypeHint (StorageItem ref)
     _ -> return c
-getVar (StorageItem key) = do
+getVar' mTypeHint (StorageItem key) = do
   currentAddress' <- getCurrentAddress
-  typeHint <- getValueType key
-  case typeHint of
-    TStruct name fieldHints -> SStruct name . M.fromList <$> do
-      forM fieldHints $ \(l, t') -> do
-        fieldValue <- fromBasic t' <$> getSolidStorageKeyVal' currentAddress' (key ++ [MS.Field l])
-        return (BC.unpack l, Constant fieldValue)
-    _ -> fromBasic typeHint <$> getSolidStorageKeyVal' currentAddress' key
+  raw <- getSolidStorageKeyVal' currentAddress' key
+  if raw /= MS.BDefault
+    then return $ fromBasic raw
+    else do
+      typeHint <- case mTypeHint of
+                    Just th -> return th
+                    Nothing -> getValueType key
+      case typeHint of
+        TStruct name fieldHints -> SStruct name . M.fromList <$> do
+          forM fieldHints $ \(l, t') -> do
+            fieldValue <- getVar' (Just t') . StorageItem $ key ++ [MS.Field l]
+            return (BC.unpack l, Constant fieldValue)
+        _ -> return $ findDefault typeHint
 
 
 showSM :: Value -> SM String

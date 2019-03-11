@@ -647,7 +647,6 @@ contract qq {
     getFields ["x"] `shouldReturn` [BAddress origin]
 
   it "can infer types" . runTest $ do
-    liftIO $ pendingWith "TODO(tim): type inference"
     void $ runBS [r|
 contract qq {
   uint x;

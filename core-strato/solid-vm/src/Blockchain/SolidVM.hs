@@ -374,7 +374,6 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
     liftIO $ putStrLn $ "             creating and setting variables: (" ++ intercalate ", " (map (fromMaybe "") varNames) ++ ")"
     liftIO $ putStrLn $ "             to: " ++ valueString
 
-
   case (varNames, value) of
     ([Just name], _) -> do
       addLocalVariable theType name value
