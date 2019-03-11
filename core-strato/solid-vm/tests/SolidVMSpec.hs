@@ -289,7 +289,6 @@ contract qq {
              ] `shouldReturn` [BDefault, BInteger 1, BInteger 88, BInteger 73]
 
     it "can explicitly push a struct" . runTest $ do
-      liftIO $ pendingWith "type lookups for locals"
       void $ runBS [r|
 contract qq {
   struct X {
