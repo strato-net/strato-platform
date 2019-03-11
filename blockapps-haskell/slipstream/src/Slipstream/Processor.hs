@@ -31,16 +31,12 @@ import Data.Function
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
-import Data.Pool
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Traversable (for)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
-import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Typed
-import Network.HTTP.Client
-import Servant.Client
+import Database.PostgreSQL.Typed (PGConnection)
 import System.Log.Logger
 
 import Blockapps.Crossmon
@@ -61,7 +57,6 @@ import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Metrics
-import Slipstream.Options
 import Slipstream.OutputData
 import Slipstream.SolidityValue
 
@@ -239,8 +234,8 @@ makeFunctionInserts xabi abi name chain state Action{..} =
           }
       }
 
-processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
-processTheMessages messages conn g = do
+processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> IO ()
+processTheMessages env conn g messages = do
 
   let changes = splitActions
               . filter matters
@@ -256,45 +251,8 @@ processTheMessages messages conn g = do
    1 -> infoM "processTheMessages" "1 message has arrived"
    n -> infoM "processTheMessages" $ show n ++ " messages have arrived"
 
-  let conHost = flags_pghost
-      conPort = fromIntegral flags_pgport
-      conUser = flags_pguser
-      conPass = flags_password
-      conDB = flags_database
-      dbConnectInfo = ConnectInfo
-        { connectHost     = conHost
-        , connectPort     = conPort
-        , connectUser     = conUser
-        , connectPassword = conPass
-        , connectDatabase = conDB
-        }
-
-  pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
-  let strato = flags_stratourl
-      vaultWrapper = flags_vaultwrapperurl
-  stratoUrl <- parseBaseUrl strato
-  vaultwrapperUrl <- parseBaseUrl vaultWrapper
-
-  mgr <- newManager defaultManagerSettings
-
-  --Set Flag on startup
-  let deployFlag = BlockApps.Bloc22.Monad.Public
-      env = BlocEnv
-            {
-              urlStrato=stratoUrl   -- :: BaseUrl
-            , urlVaultWrapper = vaultwrapperUrl
-            , httpManager=mgr -- :: Manager
-            , dbPool=pool     --  :: Pool Connection
-            , logLevel=Error
-            , deployMode= deployFlag   -- :: Severity
-            , stateFetchLimit = 0 -- not relevant since
-                                  -- Slipstream doesn't
-                                  -- call /storage route
-                                  -- anymore
-            }
-
-  enterBloc2 env $ do
-    inserts <- forM changes $ \((addr,chainId),actions) -> do
+  inserts <- enterBloc2 env $ do
+    forM changes $ \((addr,chainId),actions) -> do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
@@ -373,10 +331,10 @@ processTheMessages messages conn g = do
             else pure []
           pure . Right . BatchedInserts indexContract hs $ join fhs
 
-    forM_ (lefts inserts) $ liftIO . errorM "processTheMessages" . T.unpack
+  forM_ (lefts inserts) $ errorM "processTheMessages" . T.unpack
 
-    let insertsByCodeHash = map snd . partitionWith (codehash . indexInsert) $ rights inserts
-    forM_ insertsByCodeHash $ \ins -> do
-      outputData conn . createInsertIndexTable g $ map indexInsert ins
-      outputData conn . createInsertHistoryTable g . join $ map historyInserts ins
-      outputData conn . createInsertFunctionHistoryTable g . join $ map functionInserts ins
+  let insertsByCodeHash = map snd . partitionWith (codehash . indexInsert) $ rights inserts
+  forM_ insertsByCodeHash $ \ins -> do
+    outputData conn . createInsertIndexTable g $ map indexInsert ins
+    outputData conn . createInsertHistoryTable g . join $ map historyInserts ins
+    outputData conn . createInsertFunctionHistoryTable g . join $ map functionInserts ins
