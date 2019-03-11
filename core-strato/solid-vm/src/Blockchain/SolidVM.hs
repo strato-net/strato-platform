@@ -9,7 +9,6 @@ module Blockchain.SolidVM
     , create
     ) where
 
-import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -331,11 +330,9 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 
-runStatement x@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
-  traceShowM x
+runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
   p1 <- expToPath e1
   v2 <- expToVar e2
-  traceShowM ("p1/v2 assign"::String, p1, v2)
   t1 <- getXabiValueType p1
   case t1 of
     -- Arrays are deep copied when the target is storage
@@ -821,16 +818,13 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant (SPush path) -> do
       let lenPath = path ++ [MS.Field "length"]
-      traceShowM ("lenpath"::String, lenPath)
       len' <- getInt $ StorageItem lenPath
       let len :: Int = fromIntegral len'
           newLen = SInteger $ fromIntegral $ len + 1
       let idxPath = path ++ [MS.ArrayIndex len]
       setVar lenPath newLen
       case argVals of
-        [av] -> do
-          traceShowM ("bout to append"::String, idxPath, av)
-          setVar idxPath av
+        [av] -> setVar idxPath av
         _ -> arityMismatch "push" (length argVals) 1
       return $ Constant newLen
 

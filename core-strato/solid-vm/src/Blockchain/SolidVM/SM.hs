@@ -27,7 +27,6 @@ module Blockchain.SolidVM.SM (
   getValueType
   ) where
 
-import Debug.Trace
 import           Control.Applicative ((<|>))
 import           Control.Lens
 import           Control.Monad.IO.Class
@@ -228,14 +227,14 @@ getVariableOfName name = do
     case M.lookup name vars of
       Nothing -> return Nothing
       Just (_, var) -> Just <$> case var of
-        Constant (SReference ref) -> traceM "constant ref" >> return $ StorageItem ref
+        Constant (SReference ref) -> return $ StorageItem ref
         Variable v -> do
           val <- liftIO $ readIORef v
           case val of
-            SReference ref -> traceM "variable ref" >> return $ StorageItem ref
-            _ -> traceM "variable nonref" >> return $ StorageItem [MS.Field $ BC.pack name]
-        StorageItem p -> traceM "storage path" >> return $ StorageItem p
-        Constant{} -> traceM "constant nonref" >> return $ StorageItem [MS.Field $ BC.pack name]
+            SReference ref -> return $ StorageItem ref
+            _ -> return $ StorageItem [MS.Field $ BC.pack name]
+        StorageItem p -> return $ StorageItem p
+        Constant{} -> return $ StorageItem [MS.Field $ BC.pack name]
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
