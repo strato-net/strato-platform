@@ -1,3 +1,5 @@
+import {isModeOauth} from "../../../lib/checkMode";
+
 export function validate(values) {
 
   const errors = {};
@@ -10,7 +12,7 @@ export function validate(values) {
     errors.address = 'Address required';
   }
 
-  if (!values.password) {
+  if (!isModeOauth() && !values.password) {
     errors.password = 'Password required';
   }
 

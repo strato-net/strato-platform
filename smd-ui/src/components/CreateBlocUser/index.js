@@ -7,7 +7,6 @@ import { withRouter } from 'react-router-dom';
 
 import './createBlocUser.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { isModeOauth } from '../../lib/checkMode';
 
 class CreateBlocUser extends Component {
 
@@ -21,8 +20,6 @@ class CreateBlocUser extends Component {
   }
 
   render() {
-    if( isModeOauth ) return null;
-
     return (
     <div className="smd-pad-16">
       <Button onClick={() => {
