@@ -855,3 +855,14 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 100]
+
+  it "can cast address to contract" . runTest $ do
+    void $ runBS [r|
+contract X {}
+contract qq {
+  X x;
+  constructor() public {
+    x = X(0xdeadbeef);
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BContract "X" 0xdeadbeef]
