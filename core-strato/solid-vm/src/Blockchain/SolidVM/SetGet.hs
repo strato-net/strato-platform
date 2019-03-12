@@ -1,8 +1,10 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
+import Debug.Trace hiding (trace)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -19,6 +21,19 @@ import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Format
 import qualified SolidVM.Model.Storable as MS
+
+{-# INLINE putSolid #-}
+putSolid :: FullSolidStorage m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
+putSolid addr key val = do
+  traceShowM ("putSolid"::String, addr, key, val)
+  putSolidStorageKeyVal' addr key val
+
+{-# INLINE getSolid #-}
+getSolid :: FullSolidStorage m => Address -> MS.StoragePath -> m MS.BasicValue
+getSolid addr key = do
+  v' <- getSolidStorageKeyVal' addr key
+  traceShowM ("getSolid"::String, addr, key, v')
+  return v'
 
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
@@ -52,7 +67,6 @@ toBasic = \case
   SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
--- TODO(tim):
 setVar :: AddressedPath-> Value -> SM ()
 setVar apt@(AddressedPath addr key) val = do
   -- If val is a simple value, assign it. If it
@@ -65,14 +79,18 @@ setVar apt@(AddressedPath addr key) val = do
         let suffix = [MS.Field (BC.pack f)]
             srcKey = (MS.Field (BC.pack name)):suffix
             dstKey = key ++ suffix
-        val' <- case var of
-          Constant x -> return $ toBasic x
-          _ -> getSolidStorageKeyVal' addr srcKey
-        putSolidStorageKeyVal' addr dstKey val'
-      _ -> putSolidStorageKeyVal' addr key (toBasic val)
+        !val' <- case var of
+          Constant x -> do
+            traceShowM ("structField"::String, apt, x)
+            return $ toBasic x
+          _ -> getSolid addr srcKey
+        putSolid addr dstKey val'
+      _ -> do
+        traceShowM ("other value"::String, apt, val)
+        putSolid addr key (toBasic val)
 
 deleteVar :: AddressedPath -> SM ()
-deleteVar (AddressedPath addr key) = putSolidStorageKeyVal' addr key MS.BDefault
+deleteVar (AddressedPath addr key) = putSolid addr key MS.BDefault
 
 
 getInt :: Variable -> SM Integer
@@ -115,7 +133,7 @@ getVar' mTypeHint (Constant c) = do
     SReference apt -> getVar' mTypeHint $ StorageItem apt
     _ -> return c
 getVar' mTypeHint (StorageItem apt@(AddressedPath addr key)) = do
-  raw <- getSolidStorageKeyVal' addr key
+  raw <- getSolid addr key
   if raw /= MS.BDefault
     then return $ fromBasic raw
     else do

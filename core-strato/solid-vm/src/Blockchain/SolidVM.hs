@@ -172,14 +172,17 @@ create' creator cc contractName' argExps = do
 
 initializeStorage :: AddressedPath -> Value -> SM ()
 initializeStorage root value =
-  mapM_ (uncurry setVar) $ case value of
-     SArray _ iv -> if V.null iv then [(root `apSnoc` MS.Field "length", SInteger 0)]
-                                 else todo "initialized array storage" value
-     SMap _ im -> if M.null im then []
+  case value of
+     SArray _ iv -> do
+       setVar (root `apSnoc` MS.Field "length") . SInteger . fromIntegral $ V.length iv
+       V.imapM_ (\i v -> case v of
+        Constant c -> initializeStorage (root `apSnoc` MS.ArrayIndex i) c
+        _ -> todo "nonconstant vector init" (root, value)) iv
+     SMap _ im -> if M.null im then return ()
                                else todo "initialize map storage " value
      -- References are already initialized
-     SReference{} -> []
-     x -> [(root, x)]
+     SReference{} -> return ()
+     x -> setVar root x
 
 call :: Bool
      -> Bool
@@ -1003,9 +1006,7 @@ call' address' contract' cc theFunction argVals = do
   traceShowM ("argVals"::String, argVals)
   traceShowM ("Arg/Type/Names"::String, argTypeNames)
   forM_ (zip argTypeNames argVals) $ \((_, n), v) -> do
-    case v of
-      SReference{} -> return ()
-      _ -> setVar (AddressedPath address' [MS.Field $ BC.pack n]) v
+    initializeStorage (AddressedPath address' [MS.Field $ BC.pack n]) v
 
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands

@@ -887,7 +887,7 @@ contract qq is P {
     getFields ["x"] `shouldReturn` [BInteger 774]
 
   it "can use super to call parent methods" . runTest $ do
-    liftIO $ pendingWith "Implement `super`"
+    liftIO $ pendingWith "implement `super`"
     void $ runBS [r|
 contract P {
   function callable() public {}
@@ -963,3 +963,24 @@ contract qq {
            , [Field "x"]
            ] `shouldReturn` [BInteger 1, BInteger 23145, BInteger 23146]
 
+  it "can accept remote arrays" . runTest $ do
+    void $ runCall "addHead" "([10, 17])" [r|
+contract qq {
+  uint x;
+  function addHead(uint[] ts) public {
+    x += ts[0];
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 10]
+
+
+  it "can store array literals" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint[] xs = [10, 20, 90];
+}|]
+    getAll [ [Field "xs", Field "length"]
+           , [Field "xs", ArrayIndex 0]
+           , [Field "xs", ArrayIndex 1]
+           , [Field "xs", ArrayIndex 2]
+           ] `shouldReturn` [BInteger 3, BInteger 10, BInteger 20, BInteger 90]

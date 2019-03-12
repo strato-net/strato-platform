@@ -5,7 +5,8 @@ module Blockchain.DB.SolidStorageDB (
   getSolidStorageKeyVal',
   getAllSolidStorageKeyVals',
   flushSolidStorageTxDBToBlockDB,
-  flushMemSolidStorageDB
+  flushMemSolidStorageDB,
+  FullSolidStorage
   ) where
 
 import           Data.Bifunctor                              (second)
