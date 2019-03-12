@@ -96,6 +96,45 @@ runArgs args bs = do
   SVM.create isTest isHomestead suicides blockData callDepth sender origin
             value gasPrice availableGas newAddress code txHash chainId metadata
 
+runCall :: T.Text -> T.Text -> B.ByteString -> ContextM ExecResults
+runCall funcName callArgs bs = do
+  let code = Code bs
+      isTest = error "TODO: isTest"
+      isHomestead = error "TODO: isHomestead"
+      suicides = error "TODO: suicides"
+      blockData = BlockData { blockDataParentHash = SHA 0x0
+                            , blockDataUnclesHash = SHA 0x0
+                            , blockDataCoinbase = Address 0x0
+                            , blockDataStateRoot = ""
+                            , blockDataTransactionsRoot = ""
+                            , blockDataReceiptsRoot = ""
+                            , blockDataLogBloom = ""
+                            , blockDataDifficulty = 900
+                            , blockDataNumber = 8033
+                            , blockDataGasLimit = 1000000
+                            , blockDataGasUsed = 10000
+                            , blockDataExtraData = ""
+                            , blockDataNonce = 22
+                            , blockDataMixHash = SHA 0x0
+                            , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
+      callDepth = 0
+      value = error "TODO: value"
+      gasPrice = error "TODO: gasPrice"
+      availableGas = error "TODO: availableGas"
+      txHash = error "TODO: txHash"
+      chainId = error "TODO: chainId"
+      createMetadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
+      noValueTransfer = error "TODO: noValueTransfer"
+      receiveAddress = error "TODO: receiveAddress"
+      theData = error "TODO: theData"
+      callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
+  void $ SVM.create isTest isHomestead suicides blockData callDepth sender origin
+    value gasPrice availableGas newAddress code txHash chainId createMetadata
+  SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
+    uploadAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+
+
+
 defaultExecResults :: ExecResults
 defaultExecResults = ExecResults
  { erRemainingTxGas = 0
@@ -760,3 +799,59 @@ contract qq {
   }
 }|]
     getFields ["i"] `shouldReturn` [BInteger 100]
+
+  it "can call functions on local contracts" . runTest $ do
+    void $ runBS [r|
+contract Auth {
+  function check(address _to_check) public returns (bool) {
+    return _to_check == 0xdeadbeef;
+  }
+}
+
+contract qq {
+  bool auth;
+  constructor() {
+    Auth a = new Auth();
+    auth = a.check(msg.sender);
+  }
+}|]
+    getFields ["auth"] `shouldReturn` [BBool True]
+
+  it "can call functions on stored contracts" . runTest $ do
+    void $ runBS [r|
+contract Auth {
+  function check(address _to_check) public returns (bool) {
+    return _to_check == 0xdeadbeef;
+  }
+}
+
+contract qq {
+  Auth a;
+  bool auth;
+  constructor() {
+    a = new Auth();
+    auth = a.check(msg.sender);
+  }
+}|]
+    getFields ["auth"] `shouldReturn` [BBool True]
+
+  it "can inherit storage" . runTest $ do
+    void $ runBS [r|
+contract Parent {
+  uint public x = 3;
+}
+
+contract qq is Parent {
+  uint y = 999;
+}|]
+    getFields ["x", "y"]` shouldReturn` [BInteger 3, BInteger 999]
+
+  it "can call functions" . runTest $ do
+    void $ runCall "inc" "()" [r|
+contract qq {
+  uint x = 99;
+  function inc() {
+    x++;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 100]
