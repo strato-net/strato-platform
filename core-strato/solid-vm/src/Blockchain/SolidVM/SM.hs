@@ -27,7 +27,6 @@ module Blockchain.SolidVM.SM (
   getValueType
   ) where
 
-import Debug.Trace
 import           Control.Applicative ((<|>))
 import           Control.Lens
 import           Control.Monad.IO.Class
@@ -347,7 +346,6 @@ getTypeOfName s = do
 
 addCallInfo :: Address -> Contract -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
 addCallInfo a c cc initialLocalVariables = do
-  traceShowM ("addCallInfo"::String, a, initialLocalVariables)
   sstate <- get
   let newCallInfo =
         CallInfo {

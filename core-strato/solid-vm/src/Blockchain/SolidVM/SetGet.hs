@@ -4,7 +4,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
-import Debug.Trace hiding (trace)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -25,14 +24,12 @@ import qualified SolidVM.Model.Storable as MS
 {-# INLINE putSolid #-}
 putSolid :: FullSolidStorage m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 putSolid addr key val = do
-  traceShowM ("putSolid"::String, addr, key, val)
   putSolidStorageKeyVal' addr key val
 
 {-# INLINE getSolid #-}
 getSolid :: FullSolidStorage m => Address -> MS.StoragePath -> m MS.BasicValue
 getSolid addr key = do
   v' <- getSolidStorageKeyVal' addr key
-  traceShowM ("getSolid"::String, addr, key, v')
   return v'
 
 fromBasic :: MS.BasicValue -> Value
@@ -81,12 +78,10 @@ setVar apt@(AddressedPath addr key) val = do
             dstKey = key ++ suffix
         !val' <- case var of
           Constant x -> do
-            traceShowM ("structField"::String, apt, x)
             return $ toBasic x
           _ -> getSolid addr srcKey
         putSolid addr dstKey val'
       _ -> do
-        traceShowM ("other value"::String, apt, val)
         putSolid addr key (toBasic val)
 
 deleteVar :: AddressedPath -> SM ()
