@@ -12,6 +12,7 @@ import qualified Data.Map as M
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Data.Text as T
+import           Text.Printf
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
@@ -26,14 +27,25 @@ import qualified SolidVM.Solidity.Xabi.VarDef     as Xabi
 
 data IndexType = ArrayIndex | MapBoolIndex | MapAddressIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
 
+data AddressedPath = AddressedPath
+  { apAddress :: Address
+  , apPath :: MS.StoragePath
+  } deriving (Eq)
+
+apSnoc :: AddressedPath -> MS.StoragePathPiece -> AddressedPath
+apSnoc (AddressedPath addr p) piece = AddressedPath addr $! p ++ [piece]
+
+instance Show AddressedPath where
+  show (AddressedPath a p) = printf "%s//%s" (show a) (show p)
+
 data Variable = Variable (IORef Value)
   | Constant Value
-  | StorageItem MS.StoragePath
+  | StorageItem AddressedPath
 
 instance Show Variable where
   show (Variable _) = "<variable>"
   show (Constant v) = "Constant: " ++ show v
-  show (StorageItem key) = "<storage: " ++ show key ++ ">"
+  show (StorageItem ap) = printf "<storage %s>" (show ap)
 
 --TODO- we need to figure out this ambiguity on the Address types....
 --Sometimes address is and integer (solidity can treat an integer as an address),
@@ -59,9 +71,9 @@ data Value =
   | SContractItem Integer String
   | SContract String Integer --second param is address
   | SContractFunction String Integer String -- contractName, address, functionName
-  | SPush MS.StoragePath -- The array function
+  | SPush AddressedPath -- The array function
   | SNULL
-  | SReference MS.StoragePath -- An alias to an existing variable, so that modifications
+  | SReference AddressedPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
   deriving (Show)
 

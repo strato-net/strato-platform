@@ -943,7 +943,6 @@ contract qq {
            ] `shouldReturn` [BInteger 1, BInteger 0x44444, BInteger 0x44444]
 
   it "can pass arrays by reference to other contracts" . runTest $ do
-    liftIO $ pendingWith "SReference or StoragePath needs to include address of contract"
     void $ runBS [r|
 contract H {
   function head(uint[] ts) returns (uint) {

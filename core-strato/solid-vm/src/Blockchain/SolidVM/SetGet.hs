@@ -52,29 +52,27 @@ toBasic = \case
   SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
-setVar :: MS.StoragePath -> Value -> SM ()
-setVar key val = do
+-- TODO(tim):
+setVar :: AddressedPath-> Value -> SM ()
+setVar apt@(AddressedPath addr key) val = do
   -- If val is a simple value, assign it. If it
   -- is deeper, read the subfields and assign to their adjustment
-  currentAddress' <- getCurrentAddress
   case val of
-      SReference ref -> do
-        val' <- getVar $ StorageItem ref
-        setVar key val'
+      SReference apt' -> do
+        val' <- getVar $ StorageItem apt'
+        setVar apt val'
       SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = [MS.Field (BC.pack f)]
             srcKey = (MS.Field (BC.pack name)):suffix
             dstKey = key ++ suffix
         val' <- case var of
           Constant x -> return $ toBasic x
-          _ -> getSolidStorageKeyVal' currentAddress' srcKey
-        putSolidStorageKeyVal' currentAddress' dstKey val'
-      _ -> putSolidStorageKeyVal' currentAddress' key (toBasic val)
+          _ -> getSolidStorageKeyVal' addr srcKey
+        putSolidStorageKeyVal' addr dstKey val'
+      _ -> putSolidStorageKeyVal' addr key (toBasic val)
 
-deleteVar :: MS.StoragePath -> SM ()
-deleteVar key = do
-  currentAddress' <- getCurrentAddress
-  putSolidStorageKeyVal' currentAddress' key MS.BDefault
+deleteVar :: AddressedPath -> SM ()
+deleteVar (AddressedPath addr key) = putSolidStorageKeyVal' addr key MS.BDefault
 
 
 getInt :: Variable -> SM Integer
@@ -110,27 +108,26 @@ getVar' :: Maybe BasicType -> Variable -> SM Value
 getVar' mTypeHint (Variable ioRef) = do
   val <- liftIO $ readIORef ioRef
   case val of
-    SReference ref -> getVar' mTypeHint (StorageItem ref)
+    SReference apt -> getVar' mTypeHint $ StorageItem apt
     _ -> return val
 getVar' mTypeHint (Constant c) = do
   case c of
-    SReference ref -> getVar' mTypeHint (StorageItem ref)
+    SReference apt -> getVar' mTypeHint $ StorageItem apt
     _ -> return c
-getVar' mTypeHint (StorageItem key) = do
-  currentAddress' <- getCurrentAddress
-  raw <- getSolidStorageKeyVal' currentAddress' key
+getVar' mTypeHint (StorageItem apt@(AddressedPath addr key)) = do
+  raw <- getSolidStorageKeyVal' addr key
   if raw /= MS.BDefault
     then return $ fromBasic raw
     else do
       typeHint <- case mTypeHint of
                     Just th -> return th
-                    Nothing -> getValueType key
+                    Nothing -> getValueType apt
       case typeHint of
         TStruct name fieldHints -> SStruct name . M.fromList <$> do
           forM fieldHints $ \(l, t') -> do
-            fieldValue <- getVar' (Just t') . StorageItem $ key ++ [MS.Field l]
+            fieldValue <- getVar' (Just t') . StorageItem $ apt `apSnoc` MS.Field l
             return (BC.unpack l, Constant fieldValue)
-        TComplex -> return $ SReference key
+        TComplex -> SReference . flip AddressedPath key <$> getCurrentAddress
         _ -> return $ findDefault typeHint
 
 
@@ -170,5 +167,5 @@ showSM (SMap _ m) = do
            ++ "}"
 showSM (SContract name address) = do
   return $ "Contract: " ++ name ++ "/" ++ format (Address $ fromInteger address)
-showSM (SReference p) = return $ "<reference to " ++ BC.unpack (MS.unparsePath p) ++ ">"
+showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
 showSM x = todo "showSM called for unsupported value: " x

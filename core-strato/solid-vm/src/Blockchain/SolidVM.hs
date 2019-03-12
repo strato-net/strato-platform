@@ -149,7 +149,7 @@ create' creator cc contractName' argExps = do
             SInteger i -> return $ coerceFromInt def i
             _ -> return val
         Nothing -> return def
-    initializeStorage [MS.Field $ BC.pack n] initialValue
+    initializeStorage (AddressedPath newAddress [MS.Field $ BC.pack n]) initialValue
   popCallInfo
 
   -- Run the constructor
@@ -170,10 +170,10 @@ create' creator cc contractName' argExps = do
     }
 
 
-initializeStorage :: MS.StoragePath -> Value -> SM ()
+initializeStorage :: AddressedPath -> Value -> SM ()
 initializeStorage root value =
   mapM_ (uncurry setVar) $ case value of
-     SArray _ iv -> if V.null iv then [(root ++ [MS.Field "length"], SInteger 0)]
+     SArray _ iv -> if V.null iv then [(root `apSnoc` MS.Field "length", SInteger 0)]
                                  else todo "initialized array storage" value
      SMap _ im -> if M.null im then []
                                else todo "initialize map storage " value
@@ -300,7 +300,7 @@ call'' address functionName args = do
           Just _ -> do
             --TODO- this should only exist if the storage variable is declared
             -- "public", right now I just ignore this and allow anything to be called as a getter
-            fmap Just $ getVar $ StorageItem [MS.Field $ BC.pack functionName]
+            fmap Just $ getVar $ StorageItem $ AddressedPath address [MS.Field $ BC.pack functionName]
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
@@ -347,12 +347,12 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
       let p2 = case v2 of
                   StorageItem p2' -> p2'
                   _ -> todo "unhandled array copy" v2
-      len <- getInt . StorageItem $ p2 ++ [MS.Field "length"]
-      setVar (p1 ++ [MS.Field "length"]) $ SInteger len
+      len <- getInt . StorageItem $ p2 `apSnoc` MS.Field "length"
+      setVar (p1 `apSnoc` MS.Field "length") $ SInteger len
       forM_ [0..len-1] $ \i -> do
-        let idx = [MS.ArrayIndex $ fromIntegral i]
-        rhs' <- getVar . StorageItem $ p2 ++ idx
-        setVar (p1 ++ idx) rhs'
+        let idx = MS.ArrayIndex $ fromIntegral i
+        rhs' <- getVar . StorageItem $ p2 `apSnoc` idx
+        setVar (p1 `apSnoc` idx) rhs'
     _ -> do
       !value <- getVar v2
       when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p1, value)
@@ -479,10 +479,10 @@ while condition code = do
         _ -> return result
     else return Nothing
 
-getIndexType :: MS.StoragePath -> SM IndexType
-getIndexType [] = internalError "getIndexType for root path" ([]::MS.StoragePath)
-getIndexType p@(MS.Field field:_) = do
-  mType <- getXabiType field
+getIndexType :: AddressedPath -> SM IndexType
+getIndexType apt@(AddressedPath _ []) = internalError "getIndexType for root path" apt
+getIndexType (AddressedPath addr p@(MS.Field field:_)) = do
+  mType <- getXabiType addr field
   let n = length p - 1
   case mType of
     Nothing -> todo "unknown storage reference" field
@@ -504,46 +504,48 @@ getIndexType xs = internalError "getIndexType from non-field" xs
 
 
 
-expToPath :: Xabi.Expression -> SM MS.StoragePath
-expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
+expToPath :: Xabi.Expression -> SM AddressedPath
+expToPath (Xabi.Variable x) = do
+  addr <- getCurrentAddress
+  return $ AddressedPath addr [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
-  parPath <- do
+  parPath  <- do
     parvar <- expToVar parent
     case parvar of
-      StorageItem p -> return p
+      StorageItem apt -> return apt
       _ -> expToPath parent
     -- parValue <- getVar parPath
 
   idxType <- getIndexType parPath
   idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
-  (parPath ++) <$> case idxType of
+  apSnoc parPath <$> case idxType of
     MapAddressIndex -> do
       idx <- getAddress idxVar
       return $ case idx of
-        SAddress a -> [MS.MapIndex $ MS.IAddress a]
-        SInteger i -> [MS.MapIndex $ MS.IAddress $ fromIntegral i]
+        SAddress a -> MS.MapIndex $ MS.IAddress a
+        SInteger i -> MS.MapIndex $ MS.IAddress $ fromIntegral i
         _ -> typeError "invalid map of addresses index" idx
     MapBoolIndex -> do
       b <- getBool idxVar
-      return [MS.MapIndex $ MS.IBool b]
+      return $ MS.MapIndex $ MS.IBool b
     MapIntIndex -> do
       n <- getInt idxVar
-      return [MS.MapIndex $ MS.INum n]
+      return . MS.MapIndex $ MS.INum n
     MapStringIndex -> do
       idx <- getString idxVar
       return $ case idx of
-        SString s -> [MS.MapIndex $ MS.IText $ BC.pack s]
+        SString s -> MS.MapIndex $ MS.IText $ BC.pack s
         _ -> typeError "invalid map of strings index" idx
     ArrayIndex -> do
       n <- getInt idxVar
-      return [MS.ArrayIndex $ fromIntegral n]
+      return . MS.ArrayIndex $ fromIntegral n
 expToPath (Xabi.MemberAccess parent field) = do
-  parPath <- do
+  apt <- do
     parvar <- expToVar parent
     case parvar of
       StorageItem p -> return p
       _ -> expToPath parent
-  return $ parPath ++ [MS.Field $ BC.pack field]
+  return . apSnoc apt . MS.Field $ BC.pack field
 
 expToPath x = todo "expToPath/unhandled" x
 
@@ -663,22 +665,22 @@ expToVar' (Xabi.MemberAccess expr name) = do
         SStruct _ theMap -> return
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
-        SReference ref -> do
-          return $ StorageItem $ ref ++ [MS.Field $ BC.pack name]
+        SReference apt -> do
+          return . StorageItem . apSnoc apt . MS.Field $ BC.pack name
         _ -> todo "access member of variable" (val', name)
-    StorageItem p -> case name of
+    StorageItem apt -> case name of
       -- TODO(tim): This will not work correctly with struct fields named push
-      "push" -> return . Constant $ SPush p
-      "length" -> return . StorageItem $ p ++ [MS.Field "length"]
+      "push" -> return . Constant $ SPush apt
+      "length" -> return . StorageItem . apSnoc apt $ MS.Field "length"
       _ -> do
-          val' <- getVar $ StorageItem p
+          val' <- getVar $ StorageItem apt
           case val' of
             SAddress (Address a) -> return . Constant $ SContractItem (toInteger a) name
             SContract _ addr -> return . Constant $ SContractItem (toInteger addr) name
             SStruct _ theMap -> return
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
-            _ -> todo "access member of storage item" (val', name, p)
+            _ -> todo "access member of storage item" (val', name, apt)
 
 expToVar' x@(Xabi.IndexAccess{}) = StorageItem <$> expToPath x
 
@@ -834,12 +836,12 @@ expToVar' (Xabi.FunctionCall e args) = do
           return $ Constant $ SEnumVal enumName $ theEnum !! fromInteger i
         _ -> typeError "called enum constructor with improper args" argVals
 
-    Constant (SPush path) -> do
-      let lenPath = path ++ [MS.Field "length"]
+    Constant (SPush apt) -> do
+      let lenPath = apt `apSnoc` MS.Field "length"
       len' <- getInt $ StorageItem lenPath
       let len :: Int = fromIntegral len'
           newLen = SInteger $ fromIntegral $ len + 1
-      let idxPath = path ++ [MS.ArrayIndex len]
+          idxPath = apt `apSnoc` MS.ArrayIndex len
       setVar lenPath newLen
       case argVals of
         [av] -> setVar idxPath av
@@ -954,7 +956,7 @@ runTheConstructors cc address contractName' argExps = do
   argVals <- for argExps $ \arg -> getVar =<< expToVar arg
   let zipped = zipWith (\(t, n) v -> (n, (t, coerceType t v))) argTypeNames argVals
   addCallInfo address contract' cc . fmap (fmap Constant) $ M.fromList zipped
-  mapM_ (\(n, (_, v)) -> initializeStorage [MS.Field $ BC.pack n] v) zipped
+  mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath address [MS.Field $ BC.pack n]) v) zipped
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = fromMaybe []
@@ -979,7 +981,8 @@ runTheConstructors cc address contractName' argExps = do
 -- Note: this is intentionally nonstrict in `theType`
 addLocalVariable :: Xabi.Type -> String -> Value -> SM ()
 addLocalVariable theType name value = do
-  initializeStorage [MS.Field $ BC.pack name] value
+  addr <- getCurrentAddress
+  initializeStorage (AddressedPath addr [MS.Field $ BC.pack name]) value
   newVariable <- liftIO $ fmap Variable $ newIORef value
   sstate <- get
   case callStack sstate of
@@ -1002,7 +1005,7 @@ call' address' contract' cc theFunction argVals = do
   forM_ (zip argTypeNames argVals) $ \((_, n), v) -> do
     case v of
       SReference{} -> return ()
-      _ -> setVar [MS.Field $ BC.pack n] v
+      _ -> setVar (AddressedPath address' [MS.Field $ BC.pack n]) v
 
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands

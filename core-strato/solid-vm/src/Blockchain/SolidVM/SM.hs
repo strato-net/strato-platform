@@ -236,6 +236,7 @@ getVariableOfName name = do
         case callStack sstate of
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
+      addr = currentAddress currentCallInfo
       vars = localVariables currentCallInfo
       t s v = ('x':s) `seq` v
   maybeLocalValue <-
@@ -243,14 +244,14 @@ getVariableOfName name = do
     case M.lookup name vars of
       Nothing -> return Nothing
       Just (_, var) -> Just <$> case var of
-        Constant (SReference ref) -> return $ t "const local ref" $ StorageItem ref
+        Constant (SReference ap) -> return $ StorageItem ap
         Variable v -> do
           val <- liftIO $ readIORef v
           case val of
-            SReference ref -> return $ t "var local ref" $ StorageItem ref
-            _ -> return $ t "var local nonref" $ StorageItem [MS.Field $ BC.pack name]
-        StorageItem p -> return $ t "path local" $ StorageItem p
-        Constant{} -> return $ t "constant local" $StorageItem [MS.Field $ BC.pack name]
+            SReference ap -> return $ StorageItem ap
+            _ -> return $ StorageItem $ AddressedPath addr [MS.Field $ BC.pack name]
+        s@StorageItem{} -> return s
+        Constant{} -> return $ StorageItem $ AddressedPath addr [MS.Field $ BC.pack name]
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -279,7 +280,8 @@ getVariableOfName name = do
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
-        then Just $ t "storage item" $ StorageItem [MS.Field $ BC.pack name]
+        then Just . StorageItem $ AddressedPath
+              (currentAddress currentCallInfo) [MS.Field $ BC.pack name]
         else Nothing
 
       maybeThis :: Maybe Variable
@@ -412,9 +414,9 @@ hintFromType = \case
  Xabi.Array{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
-getXabiType :: B.ByteString -> SM (Maybe Xabi.Type)
-getXabiType field = do
-  -- ctract <- getCurrentContract
+getXabiType :: Address -> B.ByteString -> SM (Maybe Xabi.Type)
+getXabiType _ field = do
+  -- TODO(tim): Filter for address of callInfo
   -- This field might have been defined in e.g. a caller contract.
   -- (<>) is left biased for map, so by working from the top of
   -- the stack down we respect shadowing rules
@@ -426,10 +428,10 @@ getXabiType field = do
           in localDecls `M.union` storageDecls
   return . M.lookup (BC.unpack field) . mconcat . map findTypesForFrame $ stack
 
-getXabiValueType :: MS.StoragePath -> SM Xabi.Type
-getXabiValueType [] = internalError "getXabiValueType" ([]::MS.StoragePath)
-getXabiValueType (MS.Field field:rest) = do
-  mType <- getXabiType field
+getXabiValueType :: AddressedPath -> SM Xabi.Type
+getXabiValueType apt@(AddressedPath _ []) = internalError "getXabiValueType" apt
+getXabiValueType (AddressedPath addr (MS.Field field:rest)) = do
+  mType <- getXabiType addr field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> loop rest v
@@ -461,5 +463,5 @@ getXabiValueType (MS.Field field:rest) = do
           t -> todo "getXabiValueType/loopnext unsupported type" t
 getXabiValueType p = internalError "getXabiValueType/storage path not prefixed by field" p
 
-getValueType :: MS.StoragePath -> SM BasicType
+getValueType :: AddressedPath -> SM BasicType
 getValueType p = hintFromType =<< getXabiValueType p
