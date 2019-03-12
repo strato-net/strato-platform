@@ -5,6 +5,8 @@
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
 module SolidVMSpec where
 
+import Control.Concurrent
+import Control.Concurrent.Async
 import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.IO.Class
@@ -19,6 +21,7 @@ import Data.Time.Clock.POSIX
 import HFlags
 import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith)
 import Test.Hspec.Expectations.Lifted
+import Text.Printf
 import Text.RawString.QQ
 
 import Blockchain.Data.DataDefs (BlockData(..))
@@ -53,10 +56,12 @@ devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
 
 runTest :: ContextM a -> IO ()
-runTest f = void . flip runLoggingT devNull . runTestContextM $ do
-  MP.initializeBlank =<< getStateDB
-  setStateDBStateRoot MP.emptyTriePtr
-  f
+runTest f = do
+  let timeout = 5000000
+  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM f) devNull
+  case result of
+    Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
+    Right{} -> return ()
 
 runFile :: FilePath -> ContextM ExecResults
 runFile fp = runBS =<< liftIO (B.readFile fp)
@@ -918,3 +923,21 @@ contract qq {
   address a = 0xdeadbeef;
 }|]
     getFields ["a"] `shouldReturn` [BAddress 0xdeadbeef]
+
+  it "can pass arrays by reference to functions" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint[] xs;
+  uint x;
+  function head(uint[] ts) returns (uint) {
+    return ts[0];
+  }
+  constructor() public {
+    xs.push(0x44444);
+    x = head(xs);
+  }
+}|]
+    getAll [ [Field "xs", Field "length"]
+           , [Field "xs", ArrayIndex 0]
+           , [Field "x"]
+           ] `shouldReturn` [BInteger 1, BInteger 0x44444, BInteger 0x44444]

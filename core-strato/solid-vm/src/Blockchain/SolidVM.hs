@@ -9,7 +9,6 @@ module Blockchain.SolidVM
     , create
     ) where
 
-import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -507,7 +506,13 @@ getIndexType xs = internalError "getIndexType from non-field" xs
 expToPath :: Xabi.Expression -> SM MS.StoragePath
 expToPath (Xabi.Variable x) = return [MS.Field $ BC.pack x]
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
-  parPath <- expToPath parent
+  parPath <- do
+    parvar <- expToVar parent
+    case parvar of
+      StorageItem p -> return p
+      _ -> expToPath parent
+    -- parValue <- getVar parPath
+
   idxType <- getIndexType parPath
   idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
   (parPath ++) <$> case idxType of
@@ -532,16 +537,18 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
       n <- getInt idxVar
       return [MS.ArrayIndex $ fromIntegral n]
 expToPath (Xabi.MemberAccess parent field) = do
-  parPath <- expToPath parent
+  parPath <- do
+    parvar <- expToVar parent
+    case parvar of
+      StorageItem p -> return p
+      _ -> expToPath parent
   return $ parPath ++ [MS.Field $ BC.pack field]
 
 expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: Xabi.Expression -> SM Variable
 expToVar x = do
-  traceShowM ("expToVar/inbound"::String, x)
   v <- expToVar' x
-  traceShowM ("expToVar/outbound"::String, v)
   return v
 
 expToVar' :: Xabi.Expression -> SM Variable
@@ -623,10 +630,8 @@ expToVar' (Xabi.MemberAccess expr name) = do
              _ -> internalError "constant struct refers to nonconstant" f
       (SContractDef contractName', constName) -> do
         cc <- getCurrentCodeCollection
-        traceShowM ("the current code collection:"::String, cc)
         let cont = fromMaybe (missingType "contract function lookup" contractName')
                           (M.lookup contractName' $ cc^.contracts)
-        traceShowM ("favorite constract"::String, cont)
         if constName `M.member` _functions cont
           then do
             -- TODO: Check that this contract actually is a contractName'
@@ -672,10 +677,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
                 $ M.lookup name theMap
             _ -> todo "access member of storage item" (val', name, p)
 
-expToVar' x@(Xabi.IndexAccess{}) = do
-  idxPath <- expToPath x
-  value <- getVar $ StorageItem idxPath
-  Variable <$> liftIO (newIORef value)
+expToVar' x@(Xabi.IndexAccess{}) = StorageItem <$> expToPath x
 
 expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar' (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
@@ -993,7 +995,9 @@ call' address' contract' cc theFunction argVals = do
   addCallInfo address' contract' cc (M.fromList $ zipWith (\(t, n) v -> (n, (t, v))) argTypeNames (map Constant argVals))
 
   forM_ (zip argTypeNames argVals) $ \((_, n), v) -> do
-    setVar [MS.Field $ BC.pack n] v
+    case v of
+      SReference{} -> return ()
+      _ -> setVar [MS.Field $ BC.pack n] v
 
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands

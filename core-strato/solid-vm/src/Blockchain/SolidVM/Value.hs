@@ -84,12 +84,14 @@ instance Eq Value where
   (SInteger i1) == (SInteger i2) = i1 == i2
   (SString s1) == (SString s2) = s1 == s2
   (SBool b1) == (SBool b2) = b1 == b2
+  (SAddress a1) == (SAddress a2) = a1 == a2
   x == y = todo "Value/Eq" (x, y)
 
 instance Ord Value where
   compare (SInteger i1) (SInteger i2) = compare i1 i2
   compare (SString s1) (SString s2) = compare s1 s2
   compare (SBool b1) (SBool b2) = compare b1 b2
+  compare (SAddress a1) (SAddress a2) = compare a1 a2
   compare x y = todo "Value/Ord" (x, y)
 
 

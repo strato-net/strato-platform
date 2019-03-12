@@ -27,7 +27,6 @@ module Blockchain.SolidVM.SM (
   getValueType
   ) where
 
-import Debug.Trace hiding (trace)
 import           Control.Applicative ((<|>))
 import           Control.Lens
 import           Control.Monad.IO.Class
@@ -67,7 +66,21 @@ import CodeCollection
 
 
 
+-- data Location = Storage | Memory deriving (Eq, Show)
 
+-- findLocation :: MS.StoragePath -> SM Location
+-- findLocation (MS.Field f:_) = do
+--   ctract <- getCurrentContract
+--   currentCallInfo <- getCurrentCallInfo
+--   let localDecls = localVariables currentCallInfo
+--       storageDecls = ctract ^. storageDefs
+--       s = BC.unpack f
+--   if s `M.member` localDecls
+--     then return Memory
+--     else if s `M.member` storageDecls
+--            then return Storage
+--            else internalError "path is neither found locally nor in storage" f
+-- findLocation x = internalError "storage path without field prefix" x
 
 data CallInfo =
   CallInfo {
@@ -223,7 +236,7 @@ getVariableOfName name = do
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
       vars = localVariables currentCallInfo
-      t s v = traceShow ("getVariableOfName/"++s, v) v
+      t s v = ('x':s) `seq` v
   maybeLocalValue <-
     -- TODO(tim): consult memory map for locals instead of storage
     case M.lookup name vars of
