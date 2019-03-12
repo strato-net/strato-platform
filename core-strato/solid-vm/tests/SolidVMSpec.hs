@@ -866,3 +866,33 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BContract "X" 0xdeadbeef]
+
+  it "can call methods of superclasses" . runTest $ do
+    void $ runBS [r|
+contract P {
+  function callable() public {}
+}
+contract qq is P {
+  uint x;
+  constructor() public {
+    P.callable();
+    x  = 774;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 774]
+
+  it "can use super to call parent methods" . runTest $ do
+    liftIO $ pendingWith "Implement `super`"
+    void $ runBS [r|
+contract P {
+  function callable() public {}
+}
+contract qq is P {
+  uint x;
+  constructor() public {
+    super.callable();
+    x = 908;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 908]
+

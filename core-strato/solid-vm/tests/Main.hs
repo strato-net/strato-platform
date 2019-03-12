@@ -8,7 +8,7 @@ import Executable.EVMFlags() -- for HFlags
 import qualified Spec
 
 predicate :: Path -> Bool
-predicate (_, _) = True
+predicate (_, "can call methods of superclasses") = True
 predicate _ = False
 
 main :: IO ()

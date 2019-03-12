@@ -27,6 +27,7 @@ module Blockchain.SolidVM.SM (
   getValueType
   ) where
 
+import Debug.Trace hiding (trace)
 import           Control.Applicative ((<|>))
 import           Control.Lens
 import           Control.Monad.IO.Class
@@ -222,52 +223,53 @@ getVariableOfName name = do
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
       vars = localVariables currentCallInfo
+      t s v = traceShow ("getVariableOfName/"++s, v) v
   maybeLocalValue <-
     -- TODO(tim): consult memory map for locals instead of storage
     case M.lookup name vars of
       Nothing -> return Nothing
       Just (_, var) -> Just <$> case var of
-        Constant (SReference ref) -> return $ StorageItem ref
+        Constant (SReference ref) -> return $ t "const local ref" $ StorageItem ref
         Variable v -> do
           val <- liftIO $ readIORef v
           case val of
-            SReference ref -> return $ StorageItem ref
-            _ -> return $ StorageItem [MS.Field $ BC.pack name]
-        StorageItem p -> return $ StorageItem p
-        Constant{} -> return $ StorageItem [MS.Field $ BC.pack name]
+            SReference ref -> return $ t "var local ref" $ StorageItem ref
+            _ -> return $ t "var local nonref" $ StorageItem [MS.Field $ BC.pack name]
+        StorageItem p -> return $ t "path local" $ StorageItem p
+        Constant{} -> return $ t "constant local" $StorageItem [MS.Field $ BC.pack name]
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
+      maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["uint", "keccak256", "require", "revert", "assert", "sha3", "sha256", "ecrecover", "addmod", "mulmod", "selfdestruct", "suicide"]) $
-        Constant $ SBuiltinFunction name Nothing
+        t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
       maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx"]) $
-        Constant $ SBuiltinVariable name
+        t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
       maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums)) $
-        Constant $ SEnum name
+        t "enum" $ Constant $ SEnum name
 
       maybeStructDef :: Maybe Variable
       maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs)) $
-        Constant $ SStructDef name
+        t "struct def" $ Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
       maybeContract = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.contracts)) $
-        Constant $ SContractDef name
+        t "contract" $ Constant $ SContractDef name
 
       maybeStorageItem :: Maybe Variable
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
-        then Just $ StorageItem [MS.Field $ BC.pack name]
+        then Just $ t "storage item" $ StorageItem [MS.Field $ BC.pack name]
         else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . Constant . SAddress . currentAddress $ currentCallInfo
+      maybeThis = toMaybe (name == "this") . t "this" . Constant . SAddress . currentAddress $ currentCallInfo
 
 
 

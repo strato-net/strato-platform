@@ -9,6 +9,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -533,7 +534,9 @@ expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: Xabi.Expression -> SM Variable
 expToVar x = do
+  traceShowM ("expToVar/inbound"::String, x)
   v <- expToVar' x
+  traceShowM ("expToVar/outbound"::String, v)
   return v
 
 expToVar' :: Xabi.Expression -> SM Variable
@@ -615,15 +618,19 @@ expToVar' (Xabi.MemberAccess expr name) = do
              _ -> internalError "constant struct refers to nonconstant" f
       (SContractDef contractName', constName) -> do
         cc <- getCurrentCodeCollection
-
+        traceShowM ("the current code collection:"::String, cc)
         let cont = fromMaybe (missingType "contract function lookup" contractName')
                           (M.lookup contractName' $ cc^.contracts)
-
-        let Xabi.ConstantDecl _ _ constExp = fromMaybe
-             (unknownConstant "constant member access" (contractName', constName))
-             (M.lookup constName $ cont^.constants)
-
-        getContract constName =<< expToVar constExp
+        traceShowM ("favorite constract"::String, cont)
+        if constName `M.member` _functions cont
+          then do
+            -- TODO: Check that this contract actually is a contractName'
+            addr <- getCurrentAddress
+            return $ SContractFunction contractName' (toInteger addr) constName
+          else case constName `M.lookup` _constants cont of
+                  Nothing -> unknownConstant "constant member access" (contractName', constName)
+                  Just (Xabi.ConstantDecl _ _ constExp) -> do
+                    getContract constName =<< expToVar constExp
 
       (SBuiltinVariable "block", "timestamp") -> do
         env' <- getEnv
@@ -654,6 +661,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
           val' <- getVar $ StorageItem p
           case val' of
             SAddress (Address a) -> return . Constant $ SContractItem (toInteger a) name
+            SContract _ addr -> return . Constant $ SContractItem (toInteger addr) name
             SStruct _ theMap -> return
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
