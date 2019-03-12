@@ -941,3 +941,26 @@ contract qq {
            , [Field "xs", ArrayIndex 0]
            , [Field "x"]
            ] `shouldReturn` [BInteger 1, BInteger 0x44444, BInteger 0x44444]
+
+  it "can pass arrays by reference to other contracts" . runTest $ do
+    liftIO $ pendingWith "SReference or StoragePath needs to include address of contract"
+    void $ runBS [r|
+contract H {
+  function head(uint[] ts) returns (uint) {
+    return ts[0];
+  }
+}
+contract qq {
+  uint[] xs;
+  uint x;
+  constructor() public {
+    H h = new H();
+    xs.push(23145);
+    x = h.head(xs) + 1;
+  }
+}|]
+    getAll [ [Field "xs", Field "length"]
+           , [Field "xs", ArrayIndex 0]
+           , [Field "x"]
+           ] `shouldReturn` [BInteger 1, BInteger 23145, BInteger 23146]
+

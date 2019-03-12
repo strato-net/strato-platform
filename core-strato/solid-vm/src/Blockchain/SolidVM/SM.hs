@@ -27,6 +27,7 @@ module Blockchain.SolidVM.SM (
   getValueType
   ) where
 
+import Debug.Trace
 import           Control.Applicative ((<|>))
 import           Control.Lens
 import           Control.Monad.IO.Class
@@ -315,13 +316,6 @@ getVariableOfName name = do
       ]
 
 
-getCurrentCallInfo :: SM CallInfo
-getCurrentCallInfo = do
-  sstate <- get
-  case callStack sstate of
-    [] -> internalError "getCurrentCallInfo called with an empty stack" ()
-    (currentCallInfo:_) -> return currentCallInfo
-
 
 getTypeOfName :: String -> SM Typo
 getTypeOfName s = do
@@ -351,6 +345,7 @@ getTypeOfName s = do
 
 addCallInfo :: Address -> Contract -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
 addCallInfo a c cc initialLocalVariables = do
+  traceShowM ("addCallInfo"::String, a, initialLocalVariables)
   sstate <- get
   let newCallInfo =
         CallInfo {
@@ -369,6 +364,13 @@ popCallInfo = do
     [] -> internalError "popCallInfo was called on an already empty stack" ()
     (_:rest) -> put sstate{callStack = rest}
 
+
+getCurrentCallInfo :: SM CallInfo
+getCurrentCallInfo = do
+  sstate <- get
+  case callStack sstate of
+    [] -> internalError "getCurrentCallInfo called with an empty stack" ()
+    (currentCallInfo:_) -> return currentCallInfo
 
 getCurrentContract :: SM Contract
 getCurrentContract = do
@@ -412,12 +414,17 @@ hintFromType = \case
 
 getXabiType :: B.ByteString -> SM (Maybe Xabi.Type)
 getXabiType field = do
-  ctract <- getCurrentContract
-  currentCallInfo <- getCurrentCallInfo
-  let localDecls = localVariables currentCallInfo
-      storageDecls = ctract ^. storageDefs
-      allTypes = fmap Xabi.varType storageDecls `M.union` fmap fst localDecls
-  return $ M.lookup (BC.unpack field) allTypes
+  -- ctract <- getCurrentContract
+  -- This field might have been defined in e.g. a caller contract.
+  -- (<>) is left biased for map, so by working from the top of
+  -- the stack down we respect shadowing rules
+  stack <- gets callStack
+  let findTypesForFrame :: CallInfo -> M.Map String Xabi.Type
+      findTypesForFrame callInfo =
+          let localDecls = fmap fst $ localVariables callInfo
+              storageDecls = fmap Xabi.varType . _storageDefs $ currentContract callInfo
+          in localDecls `M.union` storageDecls
+  return . M.lookup (BC.unpack field) . mconcat . map findTypesForFrame $ stack
 
 getXabiValueType :: MS.StoragePath -> SM Xabi.Type
 getXabiValueType [] = internalError "getXabiValueType" ([]::MS.StoragePath)

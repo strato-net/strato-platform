@@ -9,6 +9,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -289,7 +290,7 @@ logFunctionCall args address contract functionName f = do
 call'' :: Address -> String -> [Value] -> SM (Maybe Value)
 call'' address functionName args = do
   (contract, cc) <-getCodeAndCollection address
-
+  traceShowM ("call''"::String, address, functionName, args)
   logFunctionCall args address contract functionName $
     case M.lookup functionName $ contract^.functions of
       Just theFunction -> do
@@ -548,7 +549,9 @@ expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: Xabi.Expression -> SM Variable
 expToVar x = do
+  traceShowM ("expToVar/inbound"::String, x)
   v <- expToVar' x
+  traceShowM ("expToVar/outbound"::String, v)
   return v
 
 expToVar' :: Xabi.Expression -> SM Variable
@@ -994,6 +997,8 @@ call' address' contract' cc theFunction argVals = do
 
   addCallInfo address' contract' cc (M.fromList $ zipWith (\(t, n) v -> (n, (t, v))) argTypeNames (map Constant argVals))
 
+  traceShowM ("argVals"::String, argVals)
+  traceShowM ("Arg/Type/Names"::String, argTypeNames)
   forM_ (zip argTypeNames argVals) $ \((_, n), v) -> do
     case v of
       SReference{} -> return ()
