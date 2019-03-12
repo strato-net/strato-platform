@@ -896,3 +896,25 @@ contract qq is P {
 }|]
     getFields ["x"] `shouldReturn` [BInteger 908]
 
+  it "can treat 0 literals as strings" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  bytes32 text = "ok";
+  bytes32 notext = "";
+  bytes32 zero = 0;
+  bool nonempty;
+  bool empty;
+  constructor() {
+    nonempty = text == 0;
+    empty = notext == 0;
+  }
+}|]
+    getFields ["text", "notext", "zero", "nonempty", "empty"] `shouldReturn`
+              [BString "ok", BString "", BString "", BBool False, BBool True]
+
+  it "can treat integer literals as addresses" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  address a = 0xdeadbeef;
+}|]
+    getFields ["a"] `shouldReturn` [BAddress 0xdeadbeef]

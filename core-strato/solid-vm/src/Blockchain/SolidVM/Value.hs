@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.SolidVM.Value where
@@ -101,21 +102,27 @@ instance RLPSerializable Value where
   rlpDecode (RLPArray [RLPString "S", s]) = SString $ rlpDecode s
   rlpDecode x = todo "Value/rlpDecode" x
 
-valEquals :: Value -> Value -> Bool
-valEquals lhs rhs =
-  case (lhs, rhs) of
-    (SInteger i1, SInteger i2) -> i1 == i2
-    (SString s1, SString s2) -> s1 == s2
-    (SBool b1, SBool b2) -> b1 == b2
-    (SAddress v1, SAddress v2) -> v1 == v2
-    (SEnumVal e1 v1, SEnumVal e2 v2) -> (e1 == e2) && (v1 == v2)
+-- coerceFromInt is useful to force integer literals
+-- to assume the type that was intended for them, once
+-- it is determined that their expected type is
+coerceFromInt:: Value -> Integer -> Value
+coerceFromInt SInteger{} n = SInteger n
+coerceFromInt SAddress{} n = SAddress $ fromIntegral n
+coerceFromInt SString{} 0 = SString ""
+coerceFromInt t x = typeError "invalid literal for type" (t, x)
 
-    --Meh, Solidity doesn't recognize a difference between Address and Integer....
-    (SAddress (Address v1), SInteger v2) -> v1 == fromInteger v2
-    (SInteger v1, SAddress (Address v2)) -> fromInteger v1 == v2
-    (SBuiltinVariable v1, SBuiltinVariable v2) ->
-      todo "comparison of builtin vars requires evaluation: " (v1, v2)
-    _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
+
+valEquals :: Value -> Value -> Bool
+valEquals lhs rhs = case (lhs, rhs) of
+  (SInteger i, _) -> coerceFromInt rhs i == rhs
+  (_, SInteger i) -> coerceFromInt lhs i == lhs
+  (SString s1, SString s2) -> s1 == s2
+  (SAddress v1, SAddress v2) -> v1 == v2
+  (SEnumVal e1 v1, SEnumVal e2 v2) -> (e1 == e2) && (v1 == v2)
+  (SBuiltinVariable v1, SBuiltinVariable v2) ->
+    todo "comparison of builtin vars requires evaluation: " (v1, v2)
+  _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
+
 
 
 defaultValue :: Xabi.Type -> Value

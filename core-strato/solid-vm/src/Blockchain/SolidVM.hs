@@ -140,10 +140,15 @@ create' creator cc contractName' argExps = do
   addCallInfo newAddress contract' cc M.empty
 
   forM_ (M.toList $ contract'^.storageDefs) $ \(n, (Xabi.VariableDecl theType _ maybeExpression)) -> do
+    let def = defaultValue theType
     initialValue <-
       case maybeExpression of
-        Just e -> getVar =<< expToVar e
-        Nothing -> return $ defaultValue theType
+        Just e -> do
+          val <- getVar =<< expToVar e
+          case val of
+            SInteger i -> return $ coerceFromInt def i
+            _ -> return val
+        Nothing -> return def
     initializeStorage [MS.Field $ BC.pack n] initialValue
   popCallInfo
 
@@ -924,10 +929,12 @@ bytesToInteger bytes =
 
 runTheConstructors :: CodeCollection -> Address -> String -> [Xabi.Expression] -> SM ()
 runTheConstructors cc address contractName' argExps = do
-  -- coerceTo is an ugly hack when interpreting literals without a name.
-  let coerceTo :: Xabi.Type -> Value -> Value
-      coerceTo (Xabi.Address{}) (SInteger x) = SAddress $ fromIntegral x
-      coerceTo _ y = y
+  -- coerceType allows integer literals to initialize integers, addresses, and
+  -- strings (in the special case of 0)
+  let coerceType :: Xabi.Type -> Value -> Value
+      coerceType xt = \case
+        SInteger i -> coerceFromInt (defaultValue xt) i
+        v -> v
 
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
@@ -940,7 +947,7 @@ runTheConstructors cc address contractName' argExps = do
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
   argVals <- for argExps $ \arg -> getVar =<< expToVar arg
-  let zipped = zipWith (\(t, n) v -> (n, (t, coerceTo t v))) argTypeNames argVals
+  let zipped = zipWith (\(t, n) v -> (n, (t, coerceType t v))) argTypeNames argVals
   addCallInfo address contract' cc . fmap (fmap Constant) $ M.fromList zipped
   mapM_ (\(n, (_, v)) -> initializeStorage [MS.Field $ BC.pack n] v) zipped
 
