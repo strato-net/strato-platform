@@ -127,7 +127,7 @@ data CodePtr = EVMCode SHA | SolidVMCode String SHA
 instance Format CodePtr where
   format (EVMCode ch) = format ch
   format (SolidVMCode n ch) = "<" ++ n ++ ", " ++ format ch ++ ">"
-instance Arbitrary SHA where
-    arbitrary = do
-        random256Bit <- fastRandBs 32
-        return . SHA . fromIntegral . byteString2Integer $ random256Bit
+
+
+
+
