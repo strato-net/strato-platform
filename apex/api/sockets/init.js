@@ -8,7 +8,8 @@ const {
   GET_TRANSACTIONS,
   BLOCKS_PROPAGATION,
   BLOCKS_DIFFICULTY,
-  GET_COINBASE
+  GET_COINBASE,
+  GET_HEALTH
  } = require('./rooms')
 
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('./eventBroker')
@@ -19,6 +20,7 @@ const transactionsTypeAggregator = require('./aggregators/transactionsType')
 const getBlocksAggregator = require('./aggregators/getBlocks')
 const getTransactionsAggregator = require('./aggregators/getTransactions');
 const getCoinbaseAggregator = require('./aggregators/getCoinbase');
+const getHealthAggregator = require('./aggregators/getHealthStatus');
 
 const io = require('socket.io')()
 function init(server) {
@@ -54,6 +56,9 @@ function init(server) {
 
     // register request for Coinbase
     registerRoomAllocation(socket, GET_COINBASE, getCoinbaseAggregator.initialHydrate)
+
+    // register request for Coinbase
+    registerRoomAllocation(socket, GET_HEALTH, getHealthAggregator.initialHydrate)
   });
 }
 
