@@ -116,6 +116,11 @@ instance FromHttpApiData SHA where
                 Nothing -> Left "couldn't parse SHA"
                 Just x  -> Right x
 
+instance Arbitrary SHA where
+    arbitrary = do
+        random256Bit <- fastRandBs 32
+        return . SHA . fromIntegral . byteString2Integer $ random256Bit
+
 data CodePtr = EVMCode SHA | SolidVMCode String SHA
              deriving (Show, Read, Eq, Ord, Generic, NFData, Ae.ToJSON, Ae.FromJSON)
 

@@ -108,9 +108,17 @@ until curl localhost:8000 &> /dev/null; do
 done
 echo "Bloc is up - running slipstream now..."
 
-runBackgroundProcess /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" \
-           --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" --debug="${SLIPSTREAM_DEBUG:-false}" &>> logs/slipstream
+SLIPSTREAM_CMD="/usr/bin/slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
+  --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
+  --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
+  --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --debug=${SLIPSTREAM_DEBUG:-false}"
+
+if [ ${SLIPSTREAM_OPTIONAL:-true} = true ]; then
+  $SLIPSTREAM_CMD &>> logs/slipstream &
+else
+  runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
+fi
+
 
 set +x
 if [ "${PROCESS_MONITORING}" = true ] ; then

@@ -6,7 +6,7 @@ import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
-import { isModePublic } from '../../../lib/checkMode';
+import { isModePublic, isModeOauth } from '../../../lib/checkMode';
 import { toasts } from '../../Toasts';
 import { fetchUserAddresses } from '../../Accounts/accounts.actions';
 
@@ -74,6 +74,56 @@ class Attest extends Component {
     </div>)
   };
 
+  renderAuth = () => {
+    if (isModeOauth()) return null;
+
+    const isPublicMode = isModePublic();
+
+    return <React.Fragment>
+      <div className="row">
+        <div className="col-sm-3 text-right">
+          <label className="pt-label smd-pad-4">
+            Username
+          </label>
+        </div>
+        <div className="col-sm-9 smd-pad-4">
+          {this.renderUsername(isPublicMode)}
+          <br /><span className="error-text">{this.errorMessageFor('username')}</span>
+        </div>
+      </div>
+      <div className="row">
+        <div className="col-sm-3 text-right">
+          <label className="pt-label smd-pad-4">
+            Address
+          </label>
+        </div>
+        <div className="col-sm-9 smd-pad-4">
+          {this.renderAddress(isPublicMode)}
+          <br /> <span className="error-text">{this.errorMessageFor('address')}</span>
+        </div>
+      </div>
+      <div className="row">
+        <div className="col-sm-3 text-right">
+          <label className="pt-label smd-pad-4">
+            Password
+          </label>
+        </div>
+        <div className="col-sm-9 smd-pad-4">
+          <Field
+              name="password"
+              component="input"
+              type="password"
+              placeholder="Password"
+              className="pt-input form-width"
+              tabIndex="3"
+              required
+          /> <br/>
+          <span className="error-text">{this.errorMessageFor('password')}</span>
+        </div>
+      </div>
+    </React.Fragment>
+  }
+
   renderAddress = (isPublicMode) => {
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
@@ -106,49 +156,7 @@ class Attest extends Component {
     return (
       <div className="pt-dialog-body upload-form">
 
-        <div className="row">
-          <div className="col-sm-3 text-right">
-            <label className="pt-label smd-pad-4">
-              Username
-            </label>
-          </div>
-          <div className="col-sm-9 smd-pad-4">
-            {this.renderUsername(isPublicMode)}
-            <br /><span className="error-text">{this.errorMessageFor('username')}</span>
-          </div>
-        </div>
-
-        <div className="row">
-          <div className="col-sm-3 text-right">
-            <label className="pt-label smd-pad-4">
-              Address
-            </label>
-          </div>
-          <div className="col-sm-9 smd-pad-4">
-            {this.renderAddress(isPublicMode)}
-            <br /> <span className="error-text">{this.errorMessageFor('address')}</span>
-          </div>
-        </div>
-
-        <div className="row">
-          <div className="col-sm-3 text-right">
-            <label className="pt-label smd-pad-4">
-              Password
-            </label>
-          </div>
-          <div className="col-sm-9 smd-pad-4">
-            <Field
-              name="password"
-              component="input"
-              type="password"
-              placeholder="Password"
-              className="pt-input form-width"
-              tabIndex="3"
-              required
-            /> <br />
-            <span className="error-text">{this.errorMessageFor('password')}</span>
-          </div>
-        </div>
+        { this.renderAuth() }
 
         <div className="row">
           <div className="col-sm-3 text-right">

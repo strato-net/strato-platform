@@ -39,6 +39,7 @@ services:
     - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
     - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     - NODE_HOST=${NODE_HOST}
+    - OAUTH_ENABLED=${OAUTH_ENABLED}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
@@ -80,6 +81,7 @@ services:
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
     - PROCESS_MONITORING=${PROCESS_MONITORING}
+    - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}

@@ -122,7 +122,8 @@ function newnode {
       for monitored_pid in "${!MONITORED_PIDS[@]}"; do
         # if process with pid does not exist
         if ! (ps -p ${monitored_pid} > /dev/null); then
-          echo "Process ${MONITORED_PIDS[${monitored_pid}]} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+          DEAD_PROCESS=${MONITORED_PIDS[${monitored_pid}]}
+          echo "Process ${DEAD_PROCESS} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
           # Kill all the rest of monitored processes
           for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
             if ps -p ${pid_to_kill} > /dev/null; then
@@ -131,6 +132,11 @@ function newnode {
               echo "done"
             fi
           done
+          FILE_NAME="/var/lib/strato/logs/$(echo ${DEAD_PROCESS} | cut -d ' ' -f 1)"
+          echo "Tail of logs for crashed process:"
+          echo "+tail -n 20 ${FILE_NAME}"
+          tail -n 20 $FILE_NAME
+          echo "End of logs."
           echo "STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/ in the container"
           # Keep container running idle
           tail -f /dev/null

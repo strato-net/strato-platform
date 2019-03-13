@@ -14,6 +14,7 @@ import           Control.Monad                (liftM2)
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString              as B
+import           Data.DeriveTH
 import qualified Data.ByteString.Short        as BSS
 import           Data.DeriveTH
 import           Data.Function                (on)
