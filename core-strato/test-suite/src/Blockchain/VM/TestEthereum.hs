@@ -19,6 +19,7 @@ import           Control.Monad.Trans.State
 import           Data.Aeson
 import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Lazy                        as BL
+import qualified Data.ByteString.Short                       as BSS
 import           Data.Either
 import           Data.IORef.Unboxed
 import           Data.List
@@ -274,7 +275,7 @@ runTest test = do
 
         return $ case result of
             Right (er@(ExecResults _ _ retVal _ rLogs _ _ _ _)) ->
-                      (Right (), retVal,
+                      (Right (), BSS.fromShort <$> retVal,
                        fromIntegral $ currentGasLimit (env test) - (transactionGasLimit signedTransaction' - calculateReturned signedTransaction' er),
                        rLogs, Just [], Nothing)
             Left _ -> (Right (), Nothing, 0, [], Just [], Nothing)

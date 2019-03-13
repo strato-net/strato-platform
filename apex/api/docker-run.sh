@@ -8,6 +8,11 @@ export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WEL
 export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
 export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
 
+if [[ ${OAUTH_ENABLED} = true && ${SMD_MODE} = public ]]; then
+  echo "SMD public mode is incompatible with OAuth"
+  exit 1
+fi
+
 sed -i -e 's|__stratoUrl__|http://'"${stratoHost}"'|g' config-prod.yaml
 sed -i -e 's|__blocUrl__|'"${blocRoot}"'|g' config-prod.yaml
 # Despite blockapps-rest wasn't initially designed for use inside the platform (to interact between micro-services) and 
