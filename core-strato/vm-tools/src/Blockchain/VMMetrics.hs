@@ -5,6 +5,7 @@ import Control.Monad.IO.Class
 import Data.Int
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
+import qualified Data.Set as S
 import Prometheus
 
 import Blockchain.Bagger.BaggerState
@@ -72,4 +73,4 @@ recordBaggerMetrics bs = liftIO $ do
       atlVolume sel = fromIntegral . sum . map M.size . M.elems . sel $ bs
   withLabel vmBaggerTxs "pending" $ \g -> setGauge g (atlVolume pending)
   withLabel vmBaggerTxs "queued" $ \g -> setGauge g (atlVolume queued)
-  withLabel vmBaggerTxs "seen" $ \g -> setGauge g . fromIntegral . M.size . seen $ bs
+  withLabel vmBaggerTxs "seen" $ \g -> setGauge g . fromIntegral . S.size . seen $ bs

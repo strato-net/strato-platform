@@ -111,6 +111,9 @@ checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
 getAll :: [StoragePath] -> ContextM [BasicValue]
 getAll = mapM (getSolidStorageKeyVal' uploadAddress)
 
+getFields :: [BC.ByteString] -> ContextM [BasicValue]
+getFields = getAll . map (\t -> [Field t])
+
 spec :: Spec
 spec = do
   describe "Ballot" $ do
@@ -133,7 +136,7 @@ spec = do
 
     it "can reduce a modulus" . runTest $ do
       void $ runFile "testdata/Modulo.sol"
-      getAll [[Field "x"]] `shouldReturn` [BInteger 0xbe]
+      getFields ["x"] `shouldReturn` [BInteger 0xbe]
 
 
     it "should be able to store a string" . runTest $ do
@@ -207,14 +210,14 @@ spec = do
 
     it "can delete" . runTest $ do
       runFile "testdata/Delete.sol" `shouldReturn` defaultExecResults
-      getAll [[Field "x"]] `shouldReturn` [BDefault]
+      getFields ["x"] `shouldReturn` [BDefault]
 
     it "can run complicated constructors" . runTest $ do
       runFile "testdata/Constructor.sol" `shouldReturn` defaultExecResults
 
     it "can exponentiate" . runTest $ do
       void $ runFile "testdata/Exp.sol"
-      getAll [[Field "x"]] `shouldReturn` [BInteger 25]
+      getFields ["x"] `shouldReturn` [BInteger 25]
 
     it "can use addresses as map keys" . runTest $ do
       void $ runFile "testdata/AddressMapping.sol"
@@ -222,8 +225,7 @@ spec = do
 
     it "can hash correctly" . runTest $ do
       void $ runFile "testdata/Keccak256.sol"
-      let input = map (\t -> [Field t]) ["buf1", "buf2", "hash1", "hash2"]
-      getAll input `shouldReturn`
+      getFields ["buf1", "buf2", "hash1", "hash2"] `shouldReturn`
         [ BString (B.replicate 32 0xfe)
         , BString (BC.replicate 32 'x')
         , BString (fst $ B16.decode "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a")
@@ -251,8 +253,15 @@ contract qq {
 |]
       getAll [ [Field "x", Field "a"]
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 900, BString "ok"]
-    it "can assign a struct" . runTest $ do
-      void $ runFile "testdata/StructAssign.sol"
+    it "can directy initialize a struct" . runTest $ do
+      void $ runBS [r|
+contract qq {
+  struct X {
+    int a;
+    int b;
+  }
+  X x = X(3, 4);
+}|]
       getAll [ [Field "x", Field "a"]
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 3, BInteger 4]
 
@@ -305,7 +314,7 @@ contract qq {
     y = x++;
   }
 }|]
-      getAll [ [Field "x"], [Field "y"] ] `shouldReturn` [BInteger 400000001, BInteger 400000000]
+      getFields ["x", "y"] `shouldReturn` [BInteger 400000001, BInteger 400000000]
 
     it "can pre increment" . runTest $ do
       void $ runBS [r|
@@ -316,7 +325,7 @@ contract qq {
    y = ++x;
   }
 }|]
-      getAll [ [Field "x"], [Field "y"]] `shouldReturn` [BInteger 100, BInteger 100]
+      getFields ["x", "y"] `shouldReturn` [BInteger 100, BInteger 100]
 
     it "can post decrement" . runTest $ do
       void $ runBS [r|
@@ -328,7 +337,7 @@ contract qq {
 
   }
 }|]
-      getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 9, BInteger 10]
+      getFields ["x", "y"] `shouldReturn` [BInteger 9, BInteger 10]
 
     it "can pre decrement" . runTest $ do
       void $ runBS [r|
@@ -405,3 +414,210 @@ contract qq {
 }|]
       getAll [ [Field "result"] ] `shouldReturn` [BString "alright."]
 
+  it "can handle nested mappings" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping(uint => mapping(uint => string)) xs;
+  constructor() {
+    xs[10][20] = "ok";
+  }
+}|]
+    getAll [ [Field "xs", MapIndex (INum 10), MapIndex (INum 20)] ] `shouldReturn` [BString "ok"]
+
+  it "can handle deeply nested mappings" . runTest $ do
+    void $ runBS [r|
+contract X {}
+contract qq {
+  mapping (bytes32 => mapping(bytes32 => mapping(bool => X))) public ruleSets;
+
+  constructor() {
+    bytes32 profileName = "profileName";
+    bytes32 ruleName = "ruleName";
+    ruleSets[profileName][ruleName][true] = X(0xdeadbeef);
+  }
+}|]
+    getAll [ [ Field "ruleSets"
+             , MapIndex $ IText "profileName"
+             , MapIndex $ IText "ruleName"
+             , MapIndex $ IBool True ] ] `shouldReturn` [BContract "X" 0xdeadbeef]
+
+  it "can default construct arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  constructor() {
+    bytes32[] mnames;
+  }
+}|]
+    getAll [ [ Field "mnames", Field "length"]] `shouldReturn` [BDefault]
+
+  it "can push onto local arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  constructor() {
+    bytes32[] mnames;
+    mnames.push("rulename");
+  }
+}|]
+    liftIO $ pendingWith "locals must not be persisted to storage"
+    getAll [ [Field "mnames", Field "length"]
+           , [Field "mnames", ArrayIndex 0]
+           ] `shouldReturn` [BDefault, BDefault]
+
+  it "can access length of local arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint len;
+  constructor() {
+    bytes32[] arr;
+    arr.push("ok");
+    len = arr.length;
+  }
+}|]
+    getAll [ [Field "len"]] `shouldReturn` [BInteger 1]
+
+  it "can array index with uninitialized numbers" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint[] xs;
+  uint y;
+  constructor() public {
+    uint idx;
+    y = xs[idx];
+  }
+}|]
+    getAll [ [Field "y" ]] `shouldReturn` [BDefault]
+
+  it "can map index with uninitialized numbers" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping(uint => uint) xs;
+  uint y;
+  constructor() public {
+    uint idx;
+    y = xs[idx];
+  }
+}|]
+    getAll [ [Field "y" ]] `shouldReturn` [BDefault]
+
+  it "can map index with uninitialized strings" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping(string => uint) xs;
+  uint y;
+  constructor() {
+    string idx;
+    y = xs[idx];
+  }
+}|]
+    getFields ["y"] `shouldReturn` [BDefault]
+
+  it "can access fields of structs from arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  struct S {
+    uint f;
+  }
+  S[] ss;
+  uint y;
+  constructor() {
+    ss.push(S(0xdeadbeef));
+    S s = ss[0];
+    y = s.f;
+  }
+}|]
+    getFields ["y"] `shouldReturn` [BInteger 0xdeadbeef]
+
+  it "should not treat local ints as references" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x = 20;
+  constructor() {
+    uint l = x;
+    l += 10;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 20]
+
+  it "should remember modifications to locals" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  constructor() {
+    uint l = 99;
+    l += 101;
+    x = l;
+  }
+}|]
+    liftIO $ pendingWith "TODO(tim): modifications to locals"
+    getFields ["x"]`shouldReturn` [BInteger 200]
+
+  it "can assign a local struct" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint z;
+  struct X {
+    uint a;
+  }
+
+  constructor() {
+    X x = X(777);
+    z = x.a;
+  }
+}|]
+    getFields ["z"] `shouldReturn` [BInteger 777]
+
+  it "can do arithmetic with defaults" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x = 0xf07;
+  uint z;
+
+  constructor() {
+    uint q;
+    z = x ^ q;
+  }
+}|]
+    getFields ["x", "z"] `shouldReturn` [BInteger 0xf07, BInteger 0xf07]
+
+  it "can read from struct references" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  struct S {
+    uint si;
+  }
+  S[] ss;
+  uint z;
+  constructor() public {
+    ss.push(S(222222));
+    S ref = ss[0];
+    z = ref.si;
+  }
+}|]
+
+    getAll [ [Field "ss", Field "length"]
+           , [Field "ss", ArrayIndex 0, Field "si"]
+           , [Field "z"]
+           ] `shouldReturn` [BInteger 1, BInteger 222222, BInteger 222222]
+
+  it "can detect nulls" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  mapping(uint => uint) ns;
+  bool found;
+  constructor() {
+    found = ns[0x0ddba11] != 0x0;
+  }
+}|]
+    getFields ["found"] `shouldReturn` [BBool False]
+
+  it "compares equal againts default" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x = 0;
+  uint y;
+  bool z;
+  constructor() {
+    z = x == y;
+  }
+}|]
+    getFields ["x", "y", "z"] `shouldReturn` [BInteger 0, BInteger 0, BBool True]

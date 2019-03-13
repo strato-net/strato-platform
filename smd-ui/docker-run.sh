@@ -14,8 +14,6 @@ sed -i "s|__SINGLE_NODE__|$SINGLE_NODE|g" build/index.html
 sed -i "s|__IS_SSL__|$ssl|g" build/index.html
 sed -i "s|__SMD_MODE__|$SMD_MODE|g" build/index.html
 sed -i "s|__EXT_STORAGE_S3_BUCKET__|$EXT_STORAGE_S3_BUCKET|g" build/index.html
-sed -i "s|__EXT_STORAGE_S3_ACCESS_KEY_ID__|$EXT_STORAGE_S3_ACCESS_KEY_ID|g" build/index.html
-sed -i "s|__EXT_STORAGE_S3_SECRET_ACCESS_KEY__|$EXT_STORAGE_S3_SECRET_ACCESS_KEY|g" build/index.html
 
 # Started by non-BA user (smd_container_started)
 if [ "$STRATO_GS_MODE" != "1" ]; then

@@ -56,21 +56,29 @@ setVar key val = do
       _ -> putSolidStorageKeyVal' currentAddress' key (toBasic val)
 
 getVar :: Variable -> SM Value
-getVar (Variable ioRef) = liftIO $ readIORef ioRef
-getVar (Constant c) = return c
-getVar (Property "length" var) = do
-  case var of
-    StorageItem p -> getVar . StorageItem $ p ++ [MS.Field "length"]
-    _ -> do
-      val <- getVar var
-      case val of
-        SArray _ vec -> return $ SInteger $ toInteger $ V.length vec
-        SString s -> return $ SInteger $ toInteger $ length s
-        x -> error $ "getVar is not defined for property 'length' with value: " ++ show x
+getVar (Variable ioRef) = do
+  val <- liftIO $ readIORef ioRef
+  case val of
+    SReference ref -> getVar (StorageItem ref)
+    _ -> return val
+getVar (Constant c) = do
+  case c of
+    SReference ref -> getVar (StorageItem ref)
+    _ -> return c
 getVar (StorageItem key) = do
   currentAddress' <- getCurrentAddress
   fromBasic <$> getSolidStorageKeyVal' currentAddress' key
-getVar x = error $ "getVar called for undefined value: " ++ show x
+getVar (Property f var) = do
+  p <- case var of
+    StorageItem p -> return p
+    Constant (SReference p) -> return p
+    Variable ioref -> do
+      val <- liftIO $ readIORef ioref
+      case val of
+        SReference p -> return p
+        _ -> error $ "invalid value for property: " ++ show val
+    _ -> error $ "invalid variable for property: " ++ show var
+  getVar . StorageItem $ p ++ [MS.Field $! BC.pack f]
 
 
 showSM :: Value -> SM String
@@ -110,4 +118,5 @@ showSM (SMap _ m) = do
 showSM (SContract name address) = do
   return $ "Contract: " ++ name ++ "/" ++ format (Address $ fromInteger address)
 showSM SDefault = return "<default>"
+showSM (SReference p) = return $ "<reference to " ++ BC.unpack (MS.unparsePath p) ++ ">"
 showSM x = error $ "showSM called for unsupported value: " ++ show x

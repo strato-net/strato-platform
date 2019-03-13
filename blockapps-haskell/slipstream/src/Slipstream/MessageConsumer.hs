@@ -10,23 +10,24 @@ module Slipstream.MessageConsumer where
 
 import Control.Concurrent     (threadDelay)
 import Control.Exception.Lifted
+import Control.Lens
 import Control.Monad.Reader
 import Control.Retry
 import Data.Aeson hiding (Error)
-import GHC.Generics
-import qualified Data.Map as M
 import qualified Data.ByteString as B
+import Data.IORef
+import Data.List
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Map as M
+import Data.String
+import Database.PostgreSQL.Typed
+import GHC.Generics
 import Network.Kafka
 import Network.Kafka.Consumer
 import qualified Network.Kafka.Protocol as K hiding (Message)
-import qualified Data.List.NonEmpty as NE
-import Data.String
-import Control.Lens
-import Data.List
-import Database.PostgreSQL.Typed
-import Data.IORef
 import System.Log.Logger
 
+import BlockApps.Bloc22.Monad (BlocEnv)
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.Options
@@ -94,8 +95,8 @@ getTheMessages offset = do
               Left e -> error $ "getTheMessages: " ++ e
               Right bs -> bs
 
-getAndProcessMessages :: Kafka a => PGConnection -> IORef Globals -> K.Offset -> Int -> a ()
-getAndProcessMessages conn cache offset errorCounter = do
+getAndProcessMessages :: Kafka a => BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> a ()
+getAndProcessMessages env conn cache offset errorCounter = do
   eMessages <- try $ getTheMessages offset
   case eMessages of
     Left e -> do
@@ -103,11 +104,11 @@ getAndProcessMessages conn cache offset errorCounter = do
       liftIO . errorM "getTheMessages: " . show $ (e :: KafkaClientError)
       if (errorCounter > exceptionMaxCount )
            then error $ "Slipstream reached exceptionMaxCount."
-           else getAndProcessMessages conn cache offset (errorCounter + 1)
+           else getAndProcessMessages env conn cache offset (errorCounter + 1)
     Right messages -> do
       recordKafkaMessages messages
       forceGlobalEval cache
-      liftIO $ processTheMessages messages conn cache
+      liftIO $ processTheMessages env conn cache messages
       when (null messages) $
         liftIO $ threadDelay 1000000
-      getAndProcessMessages conn cache (offset + fromIntegral (length messages)) errorCounter
+      getAndProcessMessages env conn cache (offset + fromIntegral (length messages)) errorCounter

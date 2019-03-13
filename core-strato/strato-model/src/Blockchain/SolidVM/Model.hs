@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Blockchain.SolidVM.Model where
 
 import Control.DeepSeq
@@ -9,9 +10,11 @@ import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import Data.DeriveTH
 import qualified Data.Text as T
 import Data.Text.Encoding
 import GHC.Generics
+import Test.QuickCheck
 
 import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
@@ -41,3 +44,5 @@ instance ToJSON CodeKind where
 instance FromJSON CodeKind where
   parseJSON (String t) = return . read . T.unpack $ t
   parseJSON x = typeMismatch "CodeKind" x
+
+derive makeArbitrary ''CodeKind

@@ -4,7 +4,6 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   parameters {
-    string(name: 'BUILD_TYPE', defaultValue: 'full', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the test job). DEFAULT: "full"')
     string(name: 'REFSPEC', defaultValue: '0.0.0-rc0', description: 'The strato-platform refspec to build as a release candidate. Use `tags/<tag_name>` to build specific tag or origin/<branch_name> to build the branch.')
     string(name: 'RELEASE_VERSION', defaultValue: '0.0.0', description: 'The version tag for the future release')
   }
@@ -13,7 +12,6 @@ pipeline {
       steps {
         withEnv([
           "REFSPEC=${env.REFSPEC}",
-          "BUILD_TYPE=${env.BUILD_TYPE}"
         ]) {
           sh '''#!/bin/bash -le
             set -x
@@ -29,16 +27,10 @@ pipeline {
               go get github.com/aktau/github-release
             fi
             
-            if [ "$BUILD_TYPE" == "full" ]; then
-              git worktree remove --force strato-worktree || true
-              git worktree add strato-worktree develop
-              cd strato-worktree
-              git checkout ${REFSPEC}
-            else
-              cd strato-worktree
-              rm -rf docker-compose.push.yml docker-compose.yml
-              git checkout ${REFSPEC}
-            fi
+            git worktree remove --force strato-worktree || true
+            git worktree add strato-worktree develop
+            cd strato-worktree
+            git checkout ${REFSPEC}
             git worktree list
             docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
             docker ps

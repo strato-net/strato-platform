@@ -383,18 +383,15 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 
     let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
 
-    theAddress <- if isContractCreationTX bt
-                  then lift $ getNewAddress tAddr
-                  else do
-                      lift $ incrementNonce tAddr
-                      return (transactionTo bt)
+    lift $ incrementNonce tAddr
+
     success <- lift $ addToBalance tAddr (-transactionGasLimit bt * transactionGasPrice bt)
     when flags_debug $ $logDebugS "addTx" "running code"
     let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
     lift $ P.incCounter txTypeCounter
     if success
         then do
-            execResults <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr theAddress t
+            execResults <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr t
             s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
@@ -430,10 +427,9 @@ runCodeForTransaction :: Bool
                       -> BlockData
                       -> Gas
                       -> Address
-                      -> Address
                       -> OutputTx
                       -> ContextM ExecResults
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddress OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
+runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
   when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
   let create =
@@ -444,6 +440,10 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
           Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
             \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
                          return $ errorExecResults (toInteger ag) (UnsupportedVM vmName)
+
+  --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
+  addressState <- getAddressState tAddr
+  let newAddress = getNewAddress_unsafe tAddr (addressStateNonce addressState-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
 
   create isRunningTests'
            isHomestead
@@ -461,8 +461,11 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
            (txChainId ut)
            (txMetadata ut)
 
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner OutputTx{otBaseTx=ut} = do --MessageTX
+runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{otBaseTx=ut} = do --MessageTX
   when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)
+
+  let owner = transactionTo ut
+
 
   addressState <- getAddressState owner
 

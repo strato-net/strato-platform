@@ -31,16 +31,12 @@ import Data.Function
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
-import Data.Pool
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Traversable (for)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
-import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Typed
-import Network.HTTP.Client
-import Servant.Client
+import Database.PostgreSQL.Typed (PGConnection)
 import System.Log.Logger
 
 import Blockapps.Crossmon
@@ -57,13 +53,19 @@ import BlockApps.Solidity.Xabi
 import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
 
+import qualified Blockchain.Strato.Model.Action as BS
+
 import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Metrics
-import Slipstream.Options
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+
+todoToMap :: BS.ActionDataDiff -> Map.Map Word256 Word256
+todoToMap = \case
+  BS.ActionEVMDiff m -> m
+  BS.ActionSolidVMDiff _ -> error "TODO(tim): Processing not implemented for SolidVM"
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
@@ -98,7 +100,7 @@ hasContract::Action->Bool
 hasContract = (/= emptyHash) . actionCodeHash
 
 matters :: Action -> Bool
-matters Action{..} = (actionType == Create) || (not . Map.null $ actionStorage)
+matters Action{..} = (actionType == Create) || (not . Map.null $ todoToMap actionStorage)
 
 on2 :: (b -> b -> c) -> ((a -> a -> b), (a -> a -> b)) -> a -> a -> c
 on2 f p = curry ((uncurry f) . ((uncurry (fst p)) &&& (uncurry (snd p))))
@@ -124,7 +126,7 @@ combineActions [x]    = x
 combineActions (x:xs) = let y = combineActions xs
                          in merge x y
   where
-    merge a b = b { actionStorage  = (Map.union `on` actionStorage) b a
+    merge a b = b { actionStorage  = BS.ActionEVMDiff $ (Map.union `on` todoToMap . actionStorage) b a
                   , actionMetadata = (Map.union `on` actionMetadata) b a
                   }
 
@@ -239,8 +241,8 @@ makeFunctionInserts xabi abi name chain state Action{..} =
           }
       }
 
-processTheMessages :: [B.ByteString] -> PGConnection -> IORef Globals -> IO ()
-processTheMessages messages conn g = do
+processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> IO ()
+processTheMessages env conn g messages = do
 
   let changes = splitActions
               . filter matters
@@ -256,45 +258,8 @@ processTheMessages messages conn g = do
    1 -> infoM "processTheMessages" "1 message has arrived"
    n -> infoM "processTheMessages" $ show n ++ " messages have arrived"
 
-  let conHost = flags_pghost
-      conPort = fromIntegral flags_pgport
-      conUser = flags_pguser
-      conPass = flags_password
-      conDB = flags_database
-      dbConnectInfo = ConnectInfo
-        { connectHost     = conHost
-        , connectPort     = conPort
-        , connectUser     = conUser
-        , connectPassword = conPass
-        , connectDatabase = conDB
-        }
-
-  pool <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
-  let strato = flags_stratourl
-      vaultWrapper = flags_vaultwrapperurl
-  stratoUrl <- parseBaseUrl strato
-  vaultwrapperUrl <- parseBaseUrl vaultWrapper
-
-  mgr <- newManager defaultManagerSettings
-
-  --Set Flag on startup
-  let deployFlag = BlockApps.Bloc22.Monad.Public
-      env = BlocEnv
-            {
-              urlStrato=stratoUrl   -- :: BaseUrl
-            , urlVaultWrapper = vaultwrapperUrl
-            , httpManager=mgr -- :: Manager
-            , dbPool=pool     --  :: Pool Connection
-            , logLevel=Error
-            , deployMode= deployFlag   -- :: Severity
-            , stateFetchLimit = 0 -- not relevant since
-                                  -- Slipstream doesn't
-                                  -- call /storage route
-                                  -- anymore
-            }
-
-  enterBloc2 env $ do
-    inserts <- forM changes $ \((addr,chainId),actions) -> do
+  inserts <- enterBloc2 env $ do
+    forM changes $ \((addr,chainId),actions) -> do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
@@ -318,7 +283,7 @@ processTheMessages messages conn g = do
               strName = T.replace "\"" "" $ contractdetailsName details
               cont = either error id . xAbiToContract $ contractdetailsXabi details
               chain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
-              cache = flip Map.lookup $ actionStorage row
+              cache = flip Map.lookup . todoToMap $ actionStorage row
               updateGlobal m (k,f) = for_ (Map.lookup k $ actionMetadata row) $ \v -> do
                 let contracts = filter (not . T.null) $ T.splitOn "," v
                 forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
@@ -346,12 +311,12 @@ processTheMessages messages conn g = do
                           0
                           oldState
           setContractState g addr chainId newState
-          let indexContract = processedContract strAbi strName chain (Map.fromList newState) row
+          let indexContract = processedContract strAbi strName chain (Map.fromList $ newState) row
 
           hist <- isHistoric g $ actionCodeHash row
           (hs,fhs) <- unzip <$> if hist
             then accumStateT oldState actions $ \hRow -> do
-              let hCache = flip Map.lookup $ actionStorage hRow
+              let hCache = flip Map.lookup . todoToMap $ actionStorage hRow
               modify $ SVR.decodeCacheValues
                        (typeDefs cont)
                        (mainStruct cont)
@@ -373,10 +338,10 @@ processTheMessages messages conn g = do
             else pure []
           pure . Right . BatchedInserts indexContract hs $ join fhs
 
-    forM_ (lefts inserts) $ liftIO . errorM "processTheMessages" . T.unpack
+  forM_ (lefts inserts) $ errorM "processTheMessages" . T.unpack
 
-    let insertsByCodeHash = map snd . partitionWith (codehash . indexInsert) $ rights inserts
-    forM_ insertsByCodeHash $ \ins -> do
-      outputData conn . createInsertIndexTable g $ map indexInsert ins
-      outputData conn . createInsertHistoryTable g . join $ map historyInserts ins
-      outputData conn . createInsertFunctionHistoryTable g . join $ map functionInserts ins
+  let insertsByCodeHash = map snd . partitionWith (codehash . indexInsert) $ rights inserts
+  forM_ insertsByCodeHash $ \ins -> do
+    outputData conn . createInsertIndexTable g $ map indexInsert ins
+    outputData conn . createInsertHistoryTable g . join $ map historyInserts ins
+    outputData conn . createInsertFunctionHistoryTable g . join $ map functionInserts ins
