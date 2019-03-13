@@ -12,6 +12,9 @@ const node_host = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? win
 const oauth_enabled = window.OAUTH_ENABLED && window.OAUTH_ENABLED !== '__OAUTH_ENABLED__' ? window.OAUTH_ENABLED==='true' : process.env.REACT_APP_OAUTH_ENABLED==='true';
 const smd_mode = window.SMD_MODE && window.SMD_MODE === 'public' ? 'public' : (oauth_enabled ? 'oauth' : 'enterprise');
 
+
+window.EXT_STORAGE_S3_BUCKET = process.env.REACT_APP_EXT_STORAGE_S3_BUCKET ? process.env.REACT_APP_EXT_STORAGE_S3_BUCKET : window.EXT_STORAGE_S3_BUCKET
+
 export const env = {
   NODE_NAME: window.NODE_NAME && window.NODE_NAME !== '__NODE_NAME__' ? window.NODE_NAME : 'LOCALHOST',
   APEX_URL: `${http_protocol}://${node_host}${apex_uri}`,
@@ -29,3 +32,4 @@ export const env = {
   SMD_MODE: smd_mode,
   EXT_STORAGE_ENABLED: window.EXT_STORAGE_S3_BUCKET && window.EXT_STORAGE_S3_BUCKET !== '__EXT_STORAGE_S3_BUCKET__' ? 'true' : (process.env.REACT_APP_EXT_STORAGE_ENABLED ? process.env.REACT_APP_EXT_STORAGE_ENABLED : 'false')
 };
+
