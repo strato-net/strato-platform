@@ -413,18 +413,17 @@ hintFromType = \case
  tt'' -> todo "hintFromType" tt''
 
 getXabiType :: Address -> B.ByteString -> SM (Maybe Xabi.Type)
-getXabiType _ field = do
-  -- TODO(tim): Filter for address of callInfo
+getXabiType addr field = do
   -- This field might have been defined in e.g. a caller contract.
-  -- (<>) is left biased for map, so by working from the top of
-  -- the stack down we respect shadowing rules
+  -- We search from the top down for the home of this data
   stack <- gets callStack
-  let findTypesForFrame :: CallInfo -> M.Map String Xabi.Type
-      findTypesForFrame callInfo =
-          let localDecls = fmap fst $ localVariables callInfo
-              storageDecls = fmap Xabi.varType . _storageDefs $ currentContract callInfo
-          in localDecls `M.union` storageDecls
-  return . M.lookup (BC.unpack field) . mconcat . map findTypesForFrame $ stack
+  case filter ((== addr) . currentAddress) stack of
+    [] -> internalError "address not found in call stack" addr
+    (callInfo:_) -> return $
+        let localDecls = fmap fst $ localVariables callInfo
+            storageDecls = fmap Xabi.varType . _storageDefs $ currentContract callInfo
+            allDecls = localDecls `M.union` storageDecls
+        in M.lookup (BC.unpack field) allDecls
 
 getXabiValueType :: AddressedPath -> SM Xabi.Type
 getXabiValueType apt@(AddressedPath _ []) = internalError "getXabiValueType" apt
