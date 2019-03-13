@@ -1,5 +1,6 @@
 {-# LANGUAGE
       DataKinds
+    , DeriveAnyClass
     , DeriveGeneric
     , FlexibleContexts
     , GeneralizedNewtypeDeriving
@@ -14,6 +15,7 @@
 module Slipstream.Processor where
 
 import Control.Arrow ((&&&))
+import Control.DeepSeq
 import Control.Exception
 import Control.Monad.Except
 import Control.Monad.Log    hiding (Handler)
@@ -40,6 +42,7 @@ import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
+import GHC.Generics
 import Network.HTTP.Client
 import Servant.Client
 import System.Log.Logger
@@ -70,7 +73,7 @@ data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
   , functionInserts :: [ProcessedContract]
-  }
+  } deriving (Generic, NFData)
 
 listHead :: [a] -> [a]
 listHead = maybeToList . listToMaybe
@@ -371,7 +374,7 @@ processTheMessages messages conn g = do
                             else pure []
               pure (hInsert, fInserts)
             else pure []
-          pure . Right . BatchedInserts indexContract hs $ join fhs
+          liftIO . evaluate . force . Right . BatchedInserts indexContract hs $ join fhs
 
     forM_ (lefts inserts) $ liftIO . errorM "processTheMessages" . T.unpack
 

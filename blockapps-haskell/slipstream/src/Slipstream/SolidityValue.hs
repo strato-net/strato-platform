@@ -1,6 +1,7 @@
 {-# LANGUAGE
       OverloadedStrings
     , RecordWildCards
+    , DeriveAnyClass
     , DeriveGeneric
     , QuasiQuotes
     , ScopedTypeVariables
@@ -15,6 +16,7 @@ module Slipstream.SolidityValue where
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Type
+import           Control.DeepSeq
 import           Data.Aeson               hiding (Value)
 import qualified Data.ByteString          as B
 import qualified Data.ByteString.Char8    as BC
@@ -33,7 +35,7 @@ data SolidityValue
   | SolidityArray [SolidityValue]
   | SolidityBytes  B.ByteString
   | SolidityObject [(Text, SolidityValue)]
-  deriving (Eq,Show,Generic)
+  deriving (Eq,Show,Generic, NFData)
 
 instance ToJSON SolidityValue where
   toJSON (SolidityValueAsString str) = toJSON str
