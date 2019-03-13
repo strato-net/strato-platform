@@ -14,6 +14,7 @@
 module Slipstream.Processor where
 
 import Control.Arrow ((&&&))
+import Control.Exception
 import Control.Monad.Except
 import Control.Monad.Log    hiding (Handler)
 import Control.Monad.Reader
@@ -293,8 +294,13 @@ processTheMessages messages conn g = do
                                   -- anymore
             }
 
+  let suppressException :: SomeException -> IO (Either Text BatchedInserts)
+      suppressException = return . Left . T.pack . show
+      safeRun :: Bloc (Either Text BatchedInserts) -> Bloc (Either Text BatchedInserts)
+      safeRun = liftIO . handle suppressException . enterBloc2 env
+
   enterBloc2 env $ do
-    inserts <- forM changes $ \((addr,chainId),actions) -> do
+    inserts <- forM changes $ \((addr,chainId),actions) -> safeRun $ do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
