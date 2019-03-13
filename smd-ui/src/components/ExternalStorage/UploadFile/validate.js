@@ -4,11 +4,11 @@ export function validate(values) {
 
   const errors = {};
 
-  if (!values.username) {
+  if (!isModeOauth() && !values.username) {
     errors.username = 'Select username';
   }
 
-  if (!values.address) {
+  if (!isModeOauth() && !values.address) {
     errors.address = 'Address required';
   }
 

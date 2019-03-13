@@ -12,8 +12,7 @@ const node_host = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? win
 const oauth_enabled = window.OAUTH_ENABLED && window.OAUTH_ENABLED !== '__OAUTH_ENABLED__' ? window.OAUTH_ENABLED==='true' : process.env.REACT_APP_OAUTH_ENABLED==='true';
 const smd_mode = window.SMD_MODE && window.SMD_MODE === 'public' ? 'public' : (oauth_enabled ? 'oauth' : 'enterprise');
 
-window.EXT_STORAGE_S3_SECRET_ACCESS_KEY = process.env.REACT_APP_EXT_STORAGE_S3_SECRET_ACCESS_KEY ? process.env.REACT_APP_EXT_STORAGE_S3_SECRET_ACCESS_KEY : window.EXT_STORAGE_S3_SECRET_ACCESS_KEY
-window.EXT_STORAGE_S3_ACCESS_KEY_ID = process.env.REACT_APP_EXT_STORAGE_S3_ACCESS_KEY_ID ? process.env.REACT_APP_EXT_STORAGE_S3_ACCESS_KEY_ID : window.EXT_STORAGE_S3_ACCESS_KEY_ID
+
 window.EXT_STORAGE_S3_BUCKET = process.env.REACT_APP_EXT_STORAGE_S3_BUCKET ? process.env.REACT_APP_EXT_STORAGE_S3_BUCKET : window.EXT_STORAGE_S3_BUCKET
 
 export const env = {
