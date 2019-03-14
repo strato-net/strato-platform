@@ -14,10 +14,12 @@ dependencies:
   - binary
   - blockapps-haskoin
   - bytestring
+  - bytestring-arbitrary
   - containers
   - cpu
   - cryptonite
   - deepseq
+  - derive
   - ethereum-rlp
   - fast-keccak256
   - hashable

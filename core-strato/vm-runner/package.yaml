@@ -69,7 +69,7 @@ executables:
     main: Main.hs
     dependencies:
       - vm-runner
-    ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto -g
+    ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 tests:
   ethereum-vm-test:
