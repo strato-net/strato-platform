@@ -4,7 +4,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
-import Debug.Trace
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -27,12 +26,8 @@ import qualified SolidVM.Model.Storable as MS
 {-# INLINE putSolid #-}
 putSolid :: Either LocalVar Address -> MS.StoragePath -> MS.BasicValue -> SM ()
 putSolid loc key val = case loc of
-                          Left LocalVar -> do
-                            traceShowM ("putSolid/local"::String, key, val)
-                            setLocal key val
-                          Right addr -> do
-                            traceShowM ("putSolid/storage"::String, addr, key, val)
-                            putSolidStorageKeyVal' addr key val
+                          Left LocalVar -> setLocal key val
+                          Right addr -> putSolidStorageKeyVal' addr key val
 
 {-# INLINE getSolid #-}
 getSolid :: Either LocalVar Address -> MS.StoragePath -> SM MS.BasicValue
@@ -78,13 +73,7 @@ setVar apt@(AddressedPath loc key) val = do
   -- is deeper, read the subfields and assign to their adjustment
   case val of
       SReference apt' -> do
-<<<<<<< HEAD
-        traceShowM ("setVar"::String, apt, apt')
-=======
-        traceShowM ("setVar ref"::String, apt, val)
->>>>>>> 0acf540a3... Do not put local variables in storage
         val' <- getVar $ StorageItem apt'
-        traceShowM ("setVar"::String, apt, val')
         case val' of
           SReference apt'' -> when (apt' == apt'') $
             internalError "setVar infinite loop; (key, val) =" (apt, val)
@@ -100,7 +89,6 @@ setVar apt@(AddressedPath loc key) val = do
           _ -> getSolid loc srcKey
         putSolid loc dstKey val'
       _ -> do
-        traceShowM ("setVar simple"::String, apt, val)
         putSolid loc key $! toBasic val
 
 deleteVar :: AddressedPath -> SM ()
