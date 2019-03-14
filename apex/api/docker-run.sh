@@ -7,6 +7,8 @@ export blocRoot=http://${blocHost}/bloc/v2.2 # Used in apex to compile contracts
 export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WELL
 export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
 export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
+export VAULT_HOST=${VAULT_HOST:-http://vault-wrapper:8000}
+export BLOC_HOST=${BLOC_HOST:-http://bloc:8000}
 
 if [[ ${OAUTH_ENABLED} = true && ${SMD_MODE} = public ]]; then
   echo "SMD public mode is incompatible with OAuth"
