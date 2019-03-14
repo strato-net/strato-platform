@@ -77,24 +77,18 @@ setVar dst@(AddressedPath loc key) val = do
   -- If val is a simple value, assign it. If it
   -- is deeper, read the subfields and assign to their adjustment
   case val of
-      SReference src -> do
-        val' <- getVar $ StorageItem src
-        case (loc, val') of
-          (Right addr, SReference src') -> do
-            t <- getXabiValueType src'
-            case t of
-              Xabi.Array{} -> do
-                len <- getInt (StorageItem $ src' `apSnoc` MS.Field "length")
-                setVar (dst `apSnoc` MS.Field "length") $ SInteger len
-                forM_ [0..len-1] $ \i -> do
-                  let i' = fromIntegral i
-                  setVar (dst `apSnoc` MS.ArrayIndex i') =<<
-                    getVar (StorageItem $ src `apSnoc` MS.ArrayIndex i')
-              _ -> todo "unimplementd type copy to storage" (addr, src', t)
-          (Left LocalVar, SReference src') | src == src' ->
-            putSolid loc key (toBasic val')
-          _ -> setVar src val'
-      SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
+    SReference src -> do
+        t <- getXabiValueType src
+        case t of
+          Xabi.Array{} -> do
+            len <- getInt (StorageItem $ src `apSnoc` MS.Field "length")
+            setVar (dst `apSnoc` MS.Field "length") $ SInteger len
+            forM_ [0..len-1] $ \i -> do
+              let i' = fromIntegral i
+              setVar (dst `apSnoc` MS.ArrayIndex i') =<<
+                getVar (StorageItem $ src `apSnoc` MS.ArrayIndex i')
+          _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
+    SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = [MS.Field (BC.pack f)]
             srcKey = (MS.Field (BC.pack name)):suffix
             dstKey = key ++ suffix
@@ -103,16 +97,7 @@ setVar dst@(AddressedPath loc key) val = do
             return $ toBasic x
           _ -> getSolid loc srcKey
         putSolid loc dstKey val'
-      SArray _ iv -> do
-        case loc of
-          Left LocalVar -> internalError "assigning array to local variable (not reference!)" (dst, val)
-          Right _ -> do
-            setVar (dst `apSnoc` MS.Field "length") . SInteger . fromIntegral $ V.length iv
-            V.imapM_ (\i v -> case v of
-              Constant c -> setVar (dst `apSnoc` MS.ArrayIndex i) c
-              _ -> todo "nonconstant vector init" (dst, val)) iv
-      _ -> do
-        putSolid loc key $! toBasic val
+    _ -> putSolid loc key $! toBasic val
 
 deleteVar :: AddressedPath -> SM ()
 deleteVar (AddressedPath loc key) = putSolid loc key MS.BDefault
