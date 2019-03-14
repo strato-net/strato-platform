@@ -12,6 +12,7 @@ import qualified Data.Map.Ordered                   as OMap
 import qualified Data.Map.Strict                    as M
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
+import qualified Data.Set                           as S
 
 import           GHC.Generics
 
@@ -48,7 +49,7 @@ instance NFData MiningCache
 data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , pending               :: ATL -- TXs that are going in the next block
                                , queued                :: ATL -- TXs that are lingering in the pool
-                               , seen                  :: M.Map SHA OutputTx
+                               , seen                  :: S.Set SHA
                                , calculateIntrinsicGas :: Integer -> OutputTx -> Integer -- fn that calculates intrinsic
                                                                                          -- gas cost for a given Tx and
                                                                                          -- block number
@@ -68,7 +69,7 @@ defaultBaggerState :: BaggerState
 defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache
                                   , pending               = M.empty
                                   , queued                = M.empty
-                                  , seen                  = M.empty
+                                  , seen                  = S.empty
                                   , calculateIntrinsicGas = \_ _ -> 0xaaaaa
                                   }
 
@@ -130,10 +131,10 @@ addToQueued t s@BaggerState{queued = q} =
   in (oldTx, s { queued = newATL })
 
 addToSeen :: OutputTx -> BaggerState -> BaggerState
-addToSeen t@OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = M.insert sha t seen' }
+addToSeen OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = S.insert sha seen' }
 
 removeFromSeen :: OutputTx -> BaggerState -> BaggerState
-removeFromSeen OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = M.delete sha seen' }
+removeFromSeen OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = S.delete sha seen' }
 
 trimBelowNonceFromQueued :: Address -> Integer -> BaggerState -> ([OutputTx], BaggerState)
 trimBelowNonceFromQueued a nonce s@BaggerState{queued = q} =

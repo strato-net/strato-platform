@@ -12,12 +12,17 @@ const node_host = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? win
 const oauth_enabled = window.OAUTH_ENABLED && window.OAUTH_ENABLED !== '__OAUTH_ENABLED__' ? window.OAUTH_ENABLED==='true' : process.env.REACT_APP_OAUTH_ENABLED==='true';
 const smd_mode = window.SMD_MODE && window.SMD_MODE === 'public' ? 'public' : (oauth_enabled ? 'oauth' : 'enterprise');
 
+
+window.EXT_STORAGE_S3_BUCKET = process.env.REACT_APP_EXT_STORAGE_S3_BUCKET ? process.env.REACT_APP_EXT_STORAGE_S3_BUCKET : window.EXT_STORAGE_S3_BUCKET
+
 export const env = {
   NODE_NAME: window.NODE_NAME && window.NODE_NAME !== '__NODE_NAME__' ? window.NODE_NAME : 'LOCALHOST',
   APEX_URL: `${http_protocol}://${node_host}${apex_uri}`,
   BLOC_URL: `${http_protocol}://${node_host}${bloc_uri}`,
   BLOC_DOC_URL: `${http_protocol}://${node_host}${bloc_doc_uri}`,
   CIRRUS_URL: `${http_protocol}://${node_host}${cirrus_uri}`,
+  NODE_HOST: node_host,
+  OAUTH_ENABLED: oauth_enabled,
   STRATO_URL: `${http_protocol}://${node_host}${strato_uri}`,
   STRATO_DOC_URL: `${http_protocol}://${node_host}${strato_doc_uri}`,
   SOCKET_SERVER: `${ws_protocol}://${node_host}/`,
@@ -25,7 +30,6 @@ export const env = {
   STRATO_GS_MODE: window.STRATO_GS_MODE && window.STRATO_GS_MODE !== '__STRATO_GS_MODE__' ? window.STRATO_GS_MODE : '0',
   SINGLE_NODE: window.SINGLE_NODE && window.SINGLE_NODE !== '__SINGLE_NODE__' ? window.SINGLE_NODE : 'false',
   SMD_MODE: smd_mode,
-  S3_CREDENTIALS: (window.EXT_STORAGE_S3_SECRET_ACCESS_KEY && window.EXT_STORAGE_S3_SECRET_ACCESS_KEY !== '__EXT_STORAGE_S3_SECRET_ACCESS_KEY__') &&
-                  (window.EXT_STORAGE_S3_ACCESS_KEY_ID && window.EXT_STORAGE_S3_ACCESS_KEY_ID !== '__EXT_STORAGE_S3_ACCESS_KEY_ID__') &&
-                  (window.EXT_STORAGE_S3_BUCKET && window.EXT_STORAGE_S3_BUCKET !== '__EXT_STORAGE_S3_BUCKET__')
+  EXT_STORAGE_ENABLED: window.EXT_STORAGE_S3_BUCKET && window.EXT_STORAGE_S3_BUCKET !== '__EXT_STORAGE_S3_BUCKET__' ? 'true' : (process.env.REACT_APP_EXT_STORAGE_ENABLED ? process.env.REACT_APP_EXT_STORAGE_ENABLED : 'false')
 };
+
