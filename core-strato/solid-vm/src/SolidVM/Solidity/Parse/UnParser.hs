@@ -209,6 +209,7 @@ unparseExpression (FunctionCall e args) =
     unparseExpression e ++ "(" ++ List.intercalate "," (map showArg args) ++ ")"
 unparseExpression (Ternary x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression x) = "new " ++ unparseVarType x
+unparseExpression (ArrayExpression xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
 unparseExpression x = error $ "missing case in call to unparseExpression: " ++ show x
 
 unparseModifier :: (Text, Modifier) -> String

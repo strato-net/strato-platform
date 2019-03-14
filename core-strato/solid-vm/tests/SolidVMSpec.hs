@@ -984,3 +984,31 @@ contract qq {
            , [Field "xs", ArrayIndex 1]
            , [Field "xs", ArrayIndex 2]
            ] `shouldReturn` [BInteger 3, BInteger 10, BInteger 20, BInteger 90]
+
+  it "can accept nested arrays" . runTest $ do
+    liftIO $ pendingWith "setVar must distinguish a copy from a copy ref. This means being\
+                         \ able to tell the difference between local and storage, as\
+                         \ storage = [..] is a copy and local = [..] is a reference"
+    void $ runBS [r|
+contract qq {
+  bool[2][] pairs;
+
+  function setPairs(bool[2][] _pairs) {
+    pairs = _pairs;
+  }
+  constructor() public {
+    setPairs([[true, false], [false, false], [true, true]]);
+  }
+}|]
+    let subArrays = do
+          pre <- map ArrayIndex [0, 1, 2]
+          suf <- [Field "length", ArrayIndex 0, ArrayIndex 1]
+          return [pre, suf]
+    getAll (map (Field "pairs":) ([Field "length"]:subArrays))
+           `shouldReturn` [ BInteger 3
+                          , BInteger 2, BBool True, BBool False
+                          , BInteger 2, BBool False, BBool False
+                          , BInteger 2, BBool True, BBool True
+                          ]
+
+

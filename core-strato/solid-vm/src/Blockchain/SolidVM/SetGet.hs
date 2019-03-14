@@ -71,6 +71,10 @@ setVar apt@(AddressedPath addr key) val = do
   case val of
       SReference apt' -> do
         val' <- getVar $ StorageItem apt'
+        case val' of
+          SReference apt'' -> when (apt' == apt'') $
+            internalError "setVar infinite loop; (key, val) =" (apt, val)
+          _ -> return ()
         setVar apt val'
       SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = [MS.Field (BC.pack f)]
