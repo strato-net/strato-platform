@@ -9,6 +9,7 @@ export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
 export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
 export VAULT_HOST=http://${vaultWrapperHost}
 export BLOC_HOST=http://${blocHost}
+export POSTGREST_HOST=http://${postgrestHost}
 
 if [[ ${OAUTH_ENABLED} = true && ${SMD_MODE} = public ]]; then
   echo "SMD public mode is incompatible with OAuth"
@@ -70,4 +71,4 @@ do
 done
 echo 'postgres is available'
 
-NODE_HOST=${NODE_HOST} npm run start:prod
+NODE_HOST=${NODE_HOST} npm run start:prod > stdout.txt
