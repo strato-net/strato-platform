@@ -460,7 +460,7 @@ contract qq {
     stored = result;
   }
 }|]
-      getAll [ [Field "result"] ] `shouldReturn` [BString "alright."]
+      getAll [ [Field "stored"] ] `shouldReturn` [BString "alright."]
 
   it "can handle nested mappings" . runTest $ do
     void $ runBS [r|
@@ -489,14 +489,14 @@ contract qq {
              , MapIndex $ IText "ruleName"
              , MapIndex $ IBool True ] ] `shouldReturn` [BContract "X" 0xdeadbeef]
 
-  it "can default construct arrays" . runTest $ do
+  it "can default construct local arrays" . runTest $ do
     void $ runBS [r|
 contract qq {
   constructor() {
     bytes32[] mnames;
   }
 }|]
-    getAll [ [ Field "mnames", Field "length"]] `shouldReturn` [BInteger 0]
+    checkStorage `shouldReturn` []
 
   it "can push onto local arrays" . runTest $ do
     liftIO $ pendingWith "This is illegal in solc 0.5.x: either it is an uninitialized storage pointer \
