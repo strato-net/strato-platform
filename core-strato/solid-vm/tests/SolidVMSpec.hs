@@ -979,3 +979,21 @@ contract qq {
                           , BInteger 2, BBool False, BBool False
                           , BInteger 2, BBool True, BBool True
                           ]
+
+  it "can declare a local struct" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  struct S {
+    uint x;
+    string s;
+  }
+  uint store_x;
+  string store_s;
+  constructor() {
+    S memory str;
+    str = S(0x777234, "Hello");
+    store_x = str.x;
+    store_s = str.s;
+  }
+}|]
+    getFields ["store_x", "store_s"] `shouldReturn` [BInteger 0x777234, BString "Hello"]

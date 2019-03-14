@@ -18,7 +18,6 @@ import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
-import qualified Data.HashMap.Strict                  as HM
 import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
@@ -171,7 +170,7 @@ create' creator cc contractName' argExps = do
 
 
 initializeStorage :: AddressedPath -> Value -> SM ()
-initializeStorage root value =
+initializeStorage root value = do
   case value of
      SArray _ iv -> do
        setVar (root `apSnoc` MS.Field "length") . SInteger . fromIntegral $ V.length iv
@@ -511,11 +510,9 @@ expToPath (Xabi.Variable x) = do
   callInfo <- getCurrentCallInfo
   let path = [MS.Field $ BC.pack x]
       hasLocalName = x `M.member` localVariables callInfo
-      hasLocalPath = path `HM.member` localByPath callInfo
-  case (hasLocalName, hasLocalPath) of
-    (True, True) -> return $ AddressedPath (Left LocalVar) path
-    (False, False) -> return $ AddressedPath (Right $ currentAddress callInfo) path
-    _ -> internalError "expToPath/consistency:" (x, localVariables callInfo, localByPath callInfo)
+  if hasLocalName
+    then return $ AddressedPath (Left LocalVar) path
+    else return $ AddressedPath (Right $ currentAddress callInfo) path
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
     parvar <- expToVar parent
