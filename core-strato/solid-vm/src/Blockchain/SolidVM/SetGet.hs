@@ -4,6 +4,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
+import Debug.Trace
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -70,7 +71,9 @@ setVar apt@(AddressedPath addr key) val = do
   -- is deeper, read the subfields and assign to their adjustment
   case val of
       SReference apt' -> do
+        traceShowM ("setVar"::String, apt, apt')
         val' <- getVar $ StorageItem apt'
+        traceShowM ("setVar"::String, apt, val')
         case val' of
           SReference apt'' -> when (apt' == apt'') $
             internalError "setVar infinite loop; (key, val) =" (apt, val)

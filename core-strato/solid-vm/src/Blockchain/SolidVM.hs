@@ -9,6 +9,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -341,6 +342,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
   p1 <- expToPath e1
   v2 <- expToVar e2
   t1 <- getXabiValueType p1
+  traceShowM ("assignment"::String, p1, v2, t1)
   case t1 of
     -- Arrays are deep copied when the target is storage
     Xabi.Array{} -> do
@@ -348,12 +350,18 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
       let p2 = case v2 of
                   StorageItem p2' -> p2'
                   _ -> todo "unhandled array copy" v2
+      traceShowM ("Length pairs: "::String, p1 `apSnoc` MS.Field "length", p2 `apSnoc` MS.Field "length")
       len <- getInt . StorageItem $ p2 `apSnoc` MS.Field "length"
+      traceShowM ("Length aquired"::String, len)
       setVar (p1 `apSnoc` MS.Field "length") $ SInteger len
+      traceM "Length set"
       forM_ [0..len-1] $ \i -> do
         let idx = MS.ArrayIndex $ fromIntegral i
+        traceShowM ("Array acces at"::String, p2 `apSnoc` idx)
         rhs' <- getVar . StorageItem $ p2 `apSnoc` idx
+        traceShowM ("rhs'"::String, rhs')
         setVar (p1 `apSnoc` idx) rhs'
+        traceM "Was unable to set at index"
     _ -> do
       !value <- getVar v2
       when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p1, value)
