@@ -36,7 +36,7 @@ import Blockchain.Strato.Model.SHA
 import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
 import Executable.EVMFlags() -- for HFlags
-import SolidVM.Model.Storable
+import SolidVM.Model.Storable as MS
 
 sender :: Address
 sender = 0xdeadbeef
@@ -156,8 +156,8 @@ defaultExecResults = ExecResults
 checkStorage :: ContextM [(MP.Key, B.ByteString)]
 checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
 
-getAll :: [StoragePath] -> ContextM [BasicValue]
-getAll = mapM (getSolidStorageKeyVal' uploadAddress)
+getAll :: [[StoragePathPiece]] -> ContextM [BasicValue]
+getAll = mapM (getSolidStorageKeyVal' uploadAddress . MS.fromList)
 
 getFields :: [BC.ByteString] -> ContextM [BasicValue]
 getFields = getAll . map (\t -> [Field t])

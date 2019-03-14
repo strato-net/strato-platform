@@ -4,17 +4,14 @@
 module Blockchain.SolidVM.Value where
 
 
-import           Control.DeepSeq
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import           Data.Hashable
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Data.Text as T
-import           GHC.Generics
 import           Text.Printf
 
 import           Blockchain.Data.Address
@@ -32,34 +29,15 @@ data IndexType = ArrayIndex | MapBoolIndex | MapAddressIndex | MapIntIndex | Map
 
 data LocalVar = LocalVar deriving (Show, Eq)
 
-newtype MSPath = MSPath [MS.StoragePathPiece] deriving (Eq, Show, Generic, NFData, Hashable)
 
 data AddressedPath = AddressedPath
   { apAddress :: Either LocalVar Address
-  , apPath :: MSPath
+  , apPath :: MS.StoragePath
   } deriving (Eq)
 
 apSnoc :: AddressedPath -> MS.StoragePathPiece -> AddressedPath
-apSnoc (AddressedPath loc path) piece = AddressedPath loc $! path `msSnoc` piece
+apSnoc (AddressedPath loc path) piece = AddressedPath loc $! path `MS.snoc` piece
 
-msEmpty :: MSPath
-msEmpty = MSPath []
-
-msSingleton :: MS.StoragePathPiece -> MSPath
-msSingleton piece = MSPath [piece]
-
-msGetField :: MSPath -> B.ByteString
-msGetField (MSPath (MS.Field f:_)) = f
-msGetField path = internalError "storage path is missing name" path
-
-msSnoc :: MSPath -> MS.StoragePathPiece -> MSPath
-msSnoc (MSPath p) piece = MSPath $ p ++ [piece]
-
-msToList :: MSPath -> [MS.StoragePathPiece]
-msToList (MSPath p) = p
-
-msLength :: MSPath -> Int
-msLength (MSPath p) = length p
 
 instance Show AddressedPath where
   show (AddressedPath a p) = printf "%s//%s" (show a) (show p)

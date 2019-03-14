@@ -36,7 +36,7 @@ import Blockchain.ExtWord
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA
 import qualified Data.NibbleString as N
-import SolidVM.Model.Storable
+import qualified SolidVM.Model.Storable as MS
 
 type SMap = M.Map (Address, B.ByteString) B.ByteString
 type AMap = M.Map Address AddressStateModification
@@ -158,9 +158,10 @@ storageSpec = do
 
   describe "SolidStorageDB" $ do
     it "should get its puts" . runStorM $ do
-      putSolidStorageKeyVal' 0x99 [Field "x", ArrayIndex 99] (BString "txt")
-      getSolidStorageKeyVal' 0x99 [Field "x", ArrayIndex 99] `shouldReturn` BString "txt"
+      putSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BString "txt")
+      getSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.ArrayIndex 99])
+          `shouldReturn` MS.BString "txt"
 
     it "should be able to flush" . runStorM $ do
-      putSolidStorageKeyVal' 0x342 [Field "x"] (BBool True)
+      putSolidStorageKeyVal' 0x342 (MS.singleton $ MS.Field "x") (MS.BBool True)
       flushMemSolidStorageDB

@@ -216,9 +216,11 @@ getVariableOfName name = do
           val <- liftIO $ readIORef v
           case val of
             SReference ap -> return $ StorageItem ap
-            _ -> return $ StorageItem $ AddressedPath (Left LocalVar) . msSingleton . MS.Field $ BC.pack name
+            _ -> return . StorageItem . AddressedPath (Left LocalVar)
+                        . MS.singleton . MS.Field $ BC.pack name
         s@StorageItem{} -> return s
-        Constant{} -> return $ StorageItem $ AddressedPath (Left LocalVar) . msSingleton . MS.Field $ BC.pack name
+        Constant{} -> return . StorageItem . AddressedPath (Left LocalVar)
+                             . MS.singleton . MS.Field $ BC.pack name
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -248,7 +250,8 @@ getVariableOfName name = do
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
         then Just . StorageItem $ AddressedPath
-              (Right $ currentAddress currentCallInfo) . msSingleton . MS.Field $ BC.pack name
+                (Right $ currentAddress currentCallInfo)
+                (MS.singleton . MS.Field $ BC.pack name)
         else Nothing
 
       maybeThis :: Maybe Variable
@@ -407,12 +410,12 @@ getXabiType loc field = do
 
 getXabiValueType :: AddressedPath -> SM Xabi.Type
 getXabiValueType (AddressedPath loc path) = do
-  let field = msGetField path
+  let field = MS.getField path
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> loop (tail $ msToList path) v
- where loop :: MS.StoragePath -> Xabi.Type -> SM Xabi.Type
+    Just v -> loop (tail $ MS.toList path) v
+ where loop :: [MS.StoragePathPiece] -> Xabi.Type -> SM Xabi.Type
        loop [] = return
        loop [x] = \case
          Xabi.Mapping{Xabi.value=v} -> case x of
