@@ -9,6 +9,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace hiding (trace)
 import           Control.Lens hiding (assign)
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -353,8 +354,11 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
       setVar (p1 `apSnoc` MS.Field "length") $ SInteger len
       forM_ [0..len-1] $ \i -> do
         let idx = MS.ArrayIndex $ fromIntegral i
+        traceShowM ("looping over elems"::String, p1, p2, idx)
         rhs' <- getVar . StorageItem $ p2 `apSnoc` idx
+        traceShowM ("rhs has been found: "::String, rhs')
         setVar (p1 `apSnoc` idx) rhs'
+        traceShowM ("But set var failed"::String, p1, rhs')
     _ -> do
       !value <- getVar v2
       when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p1, value)
@@ -487,7 +491,7 @@ getIndexType (AddressedPath addr p@(MS.Field field:_)) = do
   mType <- getXabiType addr field
   let n = length p - 1
   case mType of
-    Nothing -> todo "unknown storage reference" field
+    Nothing -> todo "getIndexType/unknown storage reference" field
     Just v -> return $! loop n v
  where loop :: Int -> Xabi.Type -> IndexType
        loop 0 t = case t of

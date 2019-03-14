@@ -986,9 +986,6 @@ contract qq {
            ] `shouldReturn` [BInteger 3, BInteger 10, BInteger 20, BInteger 90]
 
   it "can accept nested arrays" . runTest $ do
-    liftIO $ pendingWith "setVar must distinguish a copy from a copy ref. This means being\
-                         \ able to tell the difference between local and storage, as\
-                         \ storage = [..] is a copy and local = [..] is a reference"
     void $ runBS [r|
 contract qq {
   bool[2][] pairs;

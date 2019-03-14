@@ -419,7 +419,7 @@ hintFromType = \case
  tt'' -> todo "hintFromType" tt''
 
 getXabiType :: Either LocalVar Address -> B.ByteString -> SM (Maybe Xabi.Type)
-getXabiType loc field =
+getXabiType loc field = do
   -- This field might have been defined in e.g. a caller contract.
   -- We search from the top down for the home of this data
   case loc of
@@ -437,8 +437,8 @@ getXabiType loc field =
 
 getXabiValueType :: AddressedPath -> SM Xabi.Type
 getXabiValueType apt@(AddressedPath _ []) = internalError "getXabiValueType" apt
-getXabiValueType (AddressedPath addr (MS.Field field:rest)) = do
-  mType <- getXabiType addr field
+getXabiValueType (AddressedPath loc (MS.Field field:rest)) = do
+  mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> loop rest v
