@@ -109,6 +109,7 @@ tests:
     source-dirs: tests/
     main: Main.hs
     dependencies:
+      - async
       - base16-bytestring
       - hflags
       - hspec

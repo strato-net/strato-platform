@@ -47,6 +47,7 @@ data Expression =
   | NumberLiteral Integer (Maybe NumberUnit)
   | StringLiteral String
   | TupleExpression [Expression]
+  | ArrayExpression [Expression]
   | Variable String deriving (Show, Read, Eq)
 
 
