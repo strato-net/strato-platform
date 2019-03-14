@@ -7,9 +7,11 @@ module Blockchain.SolidVM.SetGet where
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.HashMap.Strict as HM
 import           Data.IORef
 import           Data.List
 import qualified Data.Map as M
+import           Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
 
@@ -22,15 +24,16 @@ import           Blockchain.Strato.Model.Format
 import qualified SolidVM.Model.Storable as MS
 
 {-# INLINE putSolid #-}
-putSolid :: FullSolidStorage m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
-putSolid addr key val = do
-  putSolidStorageKeyVal' addr key val
+putSolid :: Either LocalVar Address -> MS.StoragePath -> MS.BasicValue -> SM ()
+putSolid loc key val = case loc of
+                          Left LocalVar -> setLocal key val
+                          Right addr -> putSolidStorageKeyVal' addr key val
 
 {-# INLINE getSolid #-}
-getSolid :: FullSolidStorage m => Address -> MS.StoragePath -> m MS.BasicValue
-getSolid addr key = do
-  v' <- getSolidStorageKeyVal' addr key
-  return v'
+getSolid :: Either LocalVar Address -> MS.StoragePath -> SM MS.BasicValue
+getSolid loc key = case loc of
+                      Left LocalVar -> getLocal key
+                      Right addr -> getSolidStorageKeyVal' addr key
 
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
@@ -65,12 +68,16 @@ toBasic = \case
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
 setVar :: AddressedPath-> Value -> SM ()
-setVar apt@(AddressedPath addr key) val = do
+setVar apt@(AddressedPath loc key) val = do
   -- If val is a simple value, assign it. If it
   -- is deeper, read the subfields and assign to their adjustment
   case val of
       SReference apt' -> do
         val' <- getVar $ StorageItem apt'
+        case val' of
+          SReference apt'' -> when (apt' == apt'') $
+            internalError "setVar infinite loop; (key, val) =" (apt, val)
+          _ -> return ()
         setVar apt val'
       SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = [MS.Field (BC.pack f)]
@@ -79,13 +86,13 @@ setVar apt@(AddressedPath addr key) val = do
         !val' <- case var of
           Constant x -> do
             return $ toBasic x
-          _ -> getSolid addr srcKey
-        putSolid addr dstKey val'
+          _ -> getSolid loc srcKey
+        putSolid loc dstKey val'
       _ -> do
-        putSolid addr key (toBasic val)
+        putSolid loc key $! toBasic val
 
 deleteVar :: AddressedPath -> SM ()
-deleteVar (AddressedPath addr key) = putSolid addr key MS.BDefault
+deleteVar (AddressedPath loc key) = putSolid loc key MS.BDefault
 
 
 getInt :: Variable -> SM Integer
@@ -127,8 +134,8 @@ getVar' mTypeHint (Constant c) = do
   case c of
     SReference apt -> getVar' mTypeHint $ StorageItem apt
     _ -> return c
-getVar' mTypeHint (StorageItem apt@(AddressedPath addr key)) = do
-  raw <- getSolid addr key
+getVar' mTypeHint (StorageItem apt@(AddressedPath loc key)) = do
+  raw <- getSolid loc key
   if raw /= MS.BDefault
     then return $ fromBasic raw
     else do
@@ -140,7 +147,7 @@ getVar' mTypeHint (StorageItem apt@(AddressedPath addr key)) = do
           forM fieldHints $ \(l, t') -> do
             fieldValue <- getVar' (Just t') . StorageItem $ apt `apSnoc` MS.Field l
             return (BC.unpack l, Constant fieldValue)
-        TComplex -> SReference . flip AddressedPath key <$> getCurrentAddress
+        TComplex -> SReference . flip AddressedPath key . Right <$> getCurrentAddress
         _ -> return $ findDefault typeHint
 
 

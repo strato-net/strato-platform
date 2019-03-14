@@ -460,7 +460,7 @@ contract qq {
     stored = result;
   }
 }|]
-      getAll [ [Field "result"] ] `shouldReturn` [BString "alright."]
+      getAll [ [Field "stored"] ] `shouldReturn` [BString "alright."]
 
   it "can handle nested mappings" . runTest $ do
     void $ runBS [r|
@@ -489,14 +489,14 @@ contract qq {
              , MapIndex $ IText "ruleName"
              , MapIndex $ IBool True ] ] `shouldReturn` [BContract "X" 0xdeadbeef]
 
-  it "can default construct arrays" . runTest $ do
+  it "can default construct local arrays" . runTest $ do
     void $ runBS [r|
 contract qq {
   constructor() {
     bytes32[] mnames;
   }
 }|]
-    getAll [ [ Field "mnames", Field "length"]] `shouldReturn` [BInteger 0]
+    checkStorage `shouldReturn` []
 
   it "can push onto local arrays" . runTest $ do
     liftIO $ pendingWith "This is illegal in solc 0.5.x: either it is an uninitialized storage pointer \
@@ -984,3 +984,31 @@ contract qq {
            , [Field "xs", ArrayIndex 1]
            , [Field "xs", ArrayIndex 2]
            ] `shouldReturn` [BInteger 3, BInteger 10, BInteger 20, BInteger 90]
+
+  it "can accept nested arrays" . runTest $ do
+    liftIO $ pendingWith "setVar must distinguish a copy from a copy ref. This means being\
+                         \ able to tell the difference between local and storage, as\
+                         \ storage = [..] is a copy and local = [..] is a reference"
+    void $ runBS [r|
+contract qq {
+  bool[2][] pairs;
+
+  function setPairs(bool[2][] _pairs) {
+    pairs = _pairs;
+  }
+  constructor() public {
+    setPairs([[true, false], [false, false], [true, true]]);
+  }
+}|]
+    let subArrays = do
+          pre <- map ArrayIndex [0, 1, 2]
+          suf <- [Field "length", ArrayIndex 0, ArrayIndex 1]
+          return [pre, suf]
+    getAll (map (Field "pairs":) ([Field "length"]:subArrays))
+           `shouldReturn` [ BInteger 3
+                          , BInteger 2, BBool True, BBool False
+                          , BInteger 2, BBool False, BBool False
+                          , BInteger 2, BBool True, BBool True
+                          ]
+
+

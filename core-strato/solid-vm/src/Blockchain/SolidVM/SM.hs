@@ -15,6 +15,8 @@ module Blockchain.SolidVM.SM (
   getCurrentAddress,
   addCallInfo,
   popCallInfo,
+  getLocal,
+  setLocal,
   getCurrentCallInfo,
   getCurrentContract,
   getCurrentCodeCollection,
@@ -36,6 +38,7 @@ import           Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.IORef
+import qualified Data.HashMap.Strict as HM
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
@@ -66,29 +69,14 @@ import CodeCollection
 
 
 
--- data Location = Storage | Memory deriving (Eq, Show)
-
--- findLocation :: MS.StoragePath -> SM Location
--- findLocation (MS.Field f:_) = do
---   ctract <- getCurrentContract
---   currentCallInfo <- getCurrentCallInfo
---   let localDecls = localVariables currentCallInfo
---       storageDecls = ctract ^. storageDefs
---       s = BC.unpack f
---   if s `M.member` localDecls
---     then return Memory
---     else if s `M.member` storageDecls
---            then return Storage
---            else internalError "path is neither found locally nor in storage" f
--- findLocation x = internalError "storage path without field prefix" x
-
 data CallInfo =
   CallInfo {
     currentAddress :: Address,
     currentContract :: Contract,
     codeCollection :: CodeCollection,
-    localVariables :: Map String (Xabi.Type, Variable)
-    }
+    localVariables :: Map String (Xabi.Type, Variable),
+    localByPath :: HM.HashMap MS.StoragePath MS.BasicValue
+    } deriving (Show)
 
 {-
 BlockData
@@ -235,7 +223,6 @@ getVariableOfName name = do
         case callStack sstate of
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
-      addr = currentAddress currentCallInfo
       vars = localVariables currentCallInfo
       t s v = ('x':s) `seq` v
   maybeLocalValue <-
@@ -248,9 +235,9 @@ getVariableOfName name = do
           val <- liftIO $ readIORef v
           case val of
             SReference ap -> return $ StorageItem ap
-            _ -> return $ StorageItem $ AddressedPath addr [MS.Field $ BC.pack name]
+            _ -> return $ StorageItem $ AddressedPath (Left LocalVar) [MS.Field $ BC.pack name]
         s@StorageItem{} -> return s
-        Constant{} -> return $ StorageItem $ AddressedPath addr [MS.Field $ BC.pack name]
+        Constant{} -> return $ StorageItem $ AddressedPath (Left LocalVar) [MS.Field $ BC.pack name]
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -280,7 +267,7 @@ getVariableOfName name = do
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
         then Just . StorageItem $ AddressedPath
-              (currentAddress currentCallInfo) [MS.Field $ BC.pack name]
+              (Right $ currentAddress currentCallInfo) [MS.Field $ BC.pack name]
         else Nothing
 
       maybeThis :: Maybe Variable
@@ -352,7 +339,8 @@ addCallInfo a c cc initialLocalVariables = do
           currentAddress=a,
           currentContract=c,
           codeCollection=cc,
-          localVariables=initialLocalVariables
+          localVariables=initialLocalVariables,
+          localByPath=HM.empty
         }
 
   put sstate{callStack = newCallInfo:callStack sstate}
@@ -386,6 +374,24 @@ getCurrentAddress = do
     (currentCallInfo:_) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
 
+
+getLocal :: MS.StoragePath -> SM MS.BasicValue
+getLocal path = fromMaybe MS.BDefault . HM.lookup path . localByPath <$> getCurrentCallInfo
+
+setLocal :: MS.StoragePath -> MS.BasicValue -> SM ()
+setLocal path val = do
+  sstate <- get
+  let stack = callStack sstate
+      (info, rest) = case stack of
+                (ci:r) -> (ci,r)
+                [] -> internalError "setLocal stack underflow" ()
+      locals = localByPath info
+      newLocals = case val of
+                    MS.BDefault -> HM.delete path locals
+                    _ -> HM.insert path val locals
+  put sstate{callStack=info{localByPath=newLocals}:rest}
+
+
 getCurrentCodeCollection :: SM CodeCollection
 getCurrentCodeCollection = do
   cs <- fmap callStack get
@@ -412,18 +418,22 @@ hintFromType = \case
  Xabi.Array{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
-getXabiType :: Address -> B.ByteString -> SM (Maybe Xabi.Type)
-getXabiType addr field = do
+getXabiType :: Either LocalVar Address -> B.ByteString -> SM (Maybe Xabi.Type)
+getXabiType loc field =
   -- This field might have been defined in e.g. a caller contract.
   -- We search from the top down for the home of this data
-  stack <- gets callStack
-  case filter ((== addr) . currentAddress) stack of
-    [] -> internalError "address not found in call stack" addr
-    (callInfo:_) -> return $
-        let localDecls = fmap fst $ localVariables callInfo
-            storageDecls = fmap Xabi.varType . _storageDefs $ currentContract callInfo
-            allDecls = localDecls `M.union` storageDecls
-        in M.lookup (BC.unpack field) allDecls
+  case loc of
+    Left LocalVar -> M.lookup (BC.unpack field) . fmap fst . localVariables <$> getCurrentCallInfo
+    Right addr -> do
+      stack <- gets callStack
+      case filter ((== addr) . currentAddress) stack of
+        [] -> internalError "address not found in call stack" (addr, stack)
+        (callInfo:_) -> return
+                      . M.lookup (BC.unpack field)
+                      . fmap Xabi.varType
+                      . _storageDefs
+                      . currentContract
+                      $ callInfo
 
 getXabiValueType :: AddressedPath -> SM Xabi.Type
 getXabiValueType apt@(AddressedPath _ []) = internalError "getXabiValueType" apt
