@@ -216,9 +216,9 @@ getVariableOfName name = do
           val <- liftIO $ readIORef v
           case val of
             SReference ap -> return $ StorageItem ap
-            _ -> return $ StorageItem $ AddressedPath (Left LocalVar) [MS.Field $ BC.pack name]
+            _ -> return $ StorageItem $ AddressedPath (Left LocalVar) . msSingleton . MS.Field $ BC.pack name
         s@StorageItem{} -> return s
-        Constant{} -> return $ StorageItem $ AddressedPath (Left LocalVar) [MS.Field $ BC.pack name]
+        Constant{} -> return $ StorageItem $ AddressedPath (Left LocalVar) . msSingleton . MS.Field $ BC.pack name
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -248,7 +248,7 @@ getVariableOfName name = do
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
         then Just . StorageItem $ AddressedPath
-              (Right $ currentAddress currentCallInfo) [MS.Field $ BC.pack name]
+              (Right $ currentAddress currentCallInfo) . msSingleton . MS.Field $ BC.pack name
         else Nothing
 
       maybeThis :: Maybe Variable
@@ -406,12 +406,12 @@ getXabiType loc field = do
                       $ callInfo
 
 getXabiValueType :: AddressedPath -> SM Xabi.Type
-getXabiValueType apt@(AddressedPath _ []) = internalError "getXabiValueType" apt
-getXabiValueType (AddressedPath loc (MS.Field field:rest)) = do
+getXabiValueType (AddressedPath loc path) = do
+  let field = msGetField path
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> loop rest v
+    Just v -> loop (tail $ msToList path) v
  where loop :: MS.StoragePath -> Xabi.Type -> SM Xabi.Type
        loop [] = return
        loop [x] = \case
@@ -438,7 +438,6 @@ getXabiValueType (AddressedPath loc (MS.Field field:rest)) = do
           Xabi.Mapping{Xabi.value=t'} -> loop rs t'
           Xabi.Array{Xabi.entry=t'} -> loop rs t'
           t -> todo "getXabiValueType/loopnext unsupported type" t
-getXabiValueType p = internalError "getXabiValueType/storage path not prefixed by field" p
 
 getValueType :: AddressedPath -> SM BasicType
 getValueType p = hintFromType =<< getXabiValueType p

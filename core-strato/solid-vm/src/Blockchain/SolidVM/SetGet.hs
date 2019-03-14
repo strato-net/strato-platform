@@ -28,16 +28,16 @@ import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 {-# INLINE putSolid #-}
-putSolid :: Either LocalVar Address -> MS.StoragePath -> MS.BasicValue -> SM ()
-putSolid loc key val = case loc of
-                          Left LocalVar -> setLocal key val
-                          Right addr -> putSolidStorageKeyVal' addr key val
+putSolid :: Either LocalVar Address -> MSPath -> MS.BasicValue -> SM ()
+putSolid loc (MSPath key) val = case loc of
+                                  Left LocalVar -> setLocal key val
+                                  Right addr -> putSolidStorageKeyVal' addr key val
 
 {-# INLINE getSolid #-}
-getSolid :: Either LocalVar Address -> MS.StoragePath -> SM MS.BasicValue
-getSolid loc key = case loc of
-                      Left LocalVar -> getLocal key
-                      Right addr -> getSolidStorageKeyVal' addr key
+getSolid :: Either LocalVar Address -> MSPath -> SM MS.BasicValue
+getSolid loc (MSPath key) = case loc of
+                              Left LocalVar -> getLocal key
+                              Right addr -> getSolidStorageKeyVal' addr key
 
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
@@ -88,9 +88,9 @@ setVar dst@(AddressedPath loc key) val = do
                 getVar (StorageItem $ src `apSnoc` MS.ArrayIndex i')
           _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
     SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
-        let suffix = [MS.Field (BC.pack f)]
-            srcKey = (MS.Field (BC.pack name)):suffix
-            dstKey = key ++ suffix
+        let suffix = MS.Field $ BC.pack f
+            srcKey = msSingleton (MS.Field (BC.pack name)) `msSnoc` suffix
+            dstKey = key `msSnoc` suffix
         !val' <- case var of
           Constant x -> do
             return $ toBasic x

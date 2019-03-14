@@ -31,6 +31,7 @@ dependencies:
   - deepseq
   - extra
   - generic-random
+  - hashable
   - lens
   - memory
   - merkle-patricia-db
