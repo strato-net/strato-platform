@@ -89,7 +89,7 @@ setVar dst@(AddressedPath loc key) val = do
           _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
     SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = MS.Field $ BC.pack f
-            srcKey = MS.singleton (MS.Field (BC.pack name)) `MS.snoc` suffix
+            srcKey = MS.singleton (BC.pack name) `MS.snoc` suffix
             dstKey = key `MS.snoc` suffix
         !val' <- case var of
           Constant x -> do

@@ -217,10 +217,10 @@ getVariableOfName name = do
           case val of
             SReference ap -> return $ StorageItem ap
             _ -> return . StorageItem . AddressedPath (Left LocalVar)
-                        . MS.singleton . MS.Field $ BC.pack name
+                        . MS.singleton $ BC.pack name
         s@StorageItem{} -> return s
         Constant{} -> return . StorageItem . AddressedPath (Left LocalVar)
-                             . MS.singleton . MS.Field $ BC.pack name
+                             . MS.singleton $ BC.pack name
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -251,7 +251,7 @@ getVariableOfName name = do
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
         then Just . StorageItem $ AddressedPath
                 (Right $ currentAddress currentCallInfo)
-                (MS.singleton . MS.Field $ BC.pack name)
+                (MS.singleton $ BC.pack name)
         else Nothing
 
       maybeThis :: Maybe Variable

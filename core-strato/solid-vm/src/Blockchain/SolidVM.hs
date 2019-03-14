@@ -148,7 +148,7 @@ create' creator cc contractName' argExps = do
             SInteger i -> return $ coerceFromInt def i
             _ -> return val
         Nothing -> return def
-    initializeStorage (AddressedPath (Right newAddress) . MS.singleton . MS.Field $ BC.pack n) initialValue
+    initializeStorage (AddressedPath (Right newAddress) . MS.singleton $ BC.pack n) initialValue
   popCallInfo
 
   -- Run the constructor
@@ -301,7 +301,7 @@ call'' address functionName args = do
           Just _ -> do
             --TODO- this should only exist if the storage variable is declared
             -- "public", right now I just ignore this and allow anything to be called as a getter
-            fmap Just $ getVar $ StorageItem $ AddressedPath (Right address) . MS.singleton . MS.Field $ BC.pack functionName
+            fmap Just $ getVar $ StorageItem $ AddressedPath (Right address) . MS.singleton $ BC.pack functionName
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
@@ -507,7 +507,7 @@ getIndexType (AddressedPath addr p) = do
 expToPath :: Xabi.Expression -> SM AddressedPath
 expToPath (Xabi.Variable x) = do
   callInfo <- getCurrentCallInfo
-  let path = MS.singleton . MS.Field $ BC.pack x
+  let path = MS.singleton $ BC.pack x
       hasLocalName = x `M.member` localVariables callInfo
   if hasLocalName
     then return $ AddressedPath (Left LocalVar) path
@@ -958,7 +958,7 @@ runTheConstructors cc address contractName' argExps = do
   argVals <- for argExps $ \arg -> getVar =<< expToVar arg
   let zipped = zipWith (\(t, n) v -> (n, (t, coerceType t v))) argTypeNames argVals
   addCallInfo address contract' cc . fmap (fmap Constant) $ M.fromList zipped
-  mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton . MS.Field $ BC.pack n) v) zipped
+  mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = fromMaybe []
@@ -983,7 +983,7 @@ runTheConstructors cc address contractName' argExps = do
 -- Note: this is intentionally nonstrict in `theType`
 addLocalVariable :: Xabi.Type -> String -> Value -> SM ()
 addLocalVariable theType name value = do
-  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton . MS.Field $ BC.pack name) value
+  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack name) value
   newVariable <- liftIO $ fmap Variable $ newIORef value
   sstate <- get
   case callStack sstate of
@@ -1002,7 +1002,7 @@ call' address' contract' cc theFunction argVals = do
   addCallInfo address' contract' cc (M.fromList $ zipWith (\(t, n) v -> (n, (t, v))) argTypeNames (map Constant argVals))
 
   forM_ (zip argTypeNames argVals) $ \((_, n), v) -> do
-    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton . MS.Field $ BC.pack n) v
+    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
 
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands

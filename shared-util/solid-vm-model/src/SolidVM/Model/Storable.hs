@@ -58,8 +58,8 @@ newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Show, Generic
 empty :: StoragePath
 empty = StoragePath []
 
-singleton :: StoragePathPiece -> StoragePath
-singleton piece = StoragePath [piece]
+singleton :: B.ByteString -> StoragePath
+singleton bs = StoragePath [Field bs]
 
 getField :: StoragePath -> B.ByteString
 getField (StoragePath (Field f:_)) = f
@@ -223,7 +223,7 @@ replayDelta ((StoragePath (Field f:sp), bv):rs) ts =
     Just sv -> do
       ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta (StoragePath sp) bv sv
       replayDelta rs ts'
-    Nothing -> Left . MissingPath . singleton $ Field f
+    Nothing -> Left . MissingPath $ singleton f
 replayDelta ((p, _):_) _ = Left $ MissingPath p
 
 applyDelta :: StoragePath -> BasicValue -> StorableValue -> Either ReplayFailure StorableValue

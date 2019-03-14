@@ -91,10 +91,10 @@ main = do
                $ B.concat ["<\"", B.concat (replicate 50 "\\\""), "\">"]
              , bench "parse nested" $ nf parsePath ".extra[200]<\"key\">[10].field"
              , bench "unparse nothing" $ nf unparsePath empty
-             , bench "unparse field" $ nf unparsePath . singleton $ Field "field"
+             , bench "unparse field" $ nf unparsePath $ singleton "field"
              , bench "unparse nested" $ nf unparsePath $ fromList
                   [Field "extra", ArrayIndex 200, MapIndex (IText "key"),
                    ArrayIndex 10, Field "field"]
-             , bench "unparse array index" $ nf unparsePath $ singleton $ ArrayIndex 1324098
+             , bench "unparse array index" $ nf unparsePath $ fromList [ArrayIndex 1324098]
              ]
   defaultMain [escapes, parses]

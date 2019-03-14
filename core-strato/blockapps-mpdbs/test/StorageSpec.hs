@@ -163,5 +163,5 @@ storageSpec = do
           `shouldReturn` MS.BString "txt"
 
     it "should be able to flush" . runStorM $ do
-      putSolidStorageKeyVal' 0x342 (MS.singleton $ MS.Field "x") (MS.BBool True)
+      putSolidStorageKeyVal' 0x342 (MS.singleton "x") (MS.BBool True)
       flushMemSolidStorageDB
