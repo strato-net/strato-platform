@@ -4,7 +4,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
-import Debug.Trace
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -130,7 +129,6 @@ getContract contractName = getVar' (Just $ TContract contractName)
 getVar :: Variable -> SM Value
 getVar v = do
   val <- getVar' Nothing v
-  traceShowM ("getVar"::String, v, val)
   return val
 
 getVar' :: Maybe BasicType -> Variable -> SM Value

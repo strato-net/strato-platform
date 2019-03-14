@@ -979,5 +979,3 @@ contract qq {
                           , BInteger 2, BBool False, BBool False
                           , BInteger 2, BBool True, BBool True
                           ]
-
-

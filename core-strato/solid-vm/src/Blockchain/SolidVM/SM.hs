@@ -22,7 +22,6 @@ module Blockchain.SolidVM.SM (
   getCurrentCodeCollection,
   getEnv,
   getVariableOfName,
-  getFunctionOfName,
   getTypeOfName,
   getXabiType,
   getXabiValueType,
@@ -196,24 +195,6 @@ toMaybe :: Bool -> a -> Maybe a
 toMaybe True x = Just x
 toMaybe False _ = Nothing
 
-getFunctionOfName :: String -> SM Function
-getFunctionOfName name = do
-  currentCallInfo <- getCurrentCallInfo
-  let maybeContractFunction = fmap (FFunction) $ M.lookup name
-                            $ currentContract currentCallInfo^.functions
-
-      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "keccak256", "require", "revert",
-                                                   "assert", "sha3", "sha256", "ecrecover",
-                                                   "addmod", "mulmod", "selfdestruct", "suicide"])
-                           $ FBuiltinFunction name Nothing
-
-      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums))
-                $ FEnum name
-
-      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs))
-                     $ FStructDef name
-  return $ fromMaybe (unknownFunction "getFunctionOfName" name) . foldr1 (<|>) $
-           [maybeContractFunction, maybeBuiltinFunction, maybeEnum, maybeStructDef]
 
 getVariableOfName :: String -> SM Variable
 getVariableOfName name = do
@@ -318,17 +299,6 @@ getTypeOfName s = do
     [] -> internalError "getTypeOfName" s
     (typo:_) -> return typo
 
-{-
-  c <- fmap (currentContract . head . callStack) get
-  let contractVariables = undefined
-      theFunction =
-        flip fromMaybe (M.lookup name $ c^.functions)
-        $ flip fromMaybe (M.lookup name contractVariables)
-        $ error $ "No variable named " ++ name
-      Just funcStatements = funcContents theFunction
-
-  runStatements funcStatements
--}
 
 
 addCallInfo :: Address -> Contract -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
