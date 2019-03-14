@@ -93,7 +93,7 @@ spec = do
     it "should fail to do the impossible" $ do
       replayDelta [(empty, BInteger 99)] exStorage `shouldBe` Left (MissingPath empty)
       replayDelta [(forceParse ".no_such_field", BInteger 300)] exStorage
-        `shouldBe` Left (MissingPath . singleton $ Field "no_such_field")
+        `shouldBe` Left (MissingPath $ singleton "no_such_field")
 
     it "should be able to increment" $ do
       replayDelta [(forceParse ".count", BInteger 100)] exStorage `shouldBe`
