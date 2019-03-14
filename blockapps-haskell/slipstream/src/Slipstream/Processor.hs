@@ -304,7 +304,7 @@ processTheMessages messages conn g = do
       mcd <- getContractDetailsByCodeHash $ actionCodeHash row
       mDetails <- withNothing mcd $ do
         fmap join . for (Map.lookup "src" md) $ \src -> do
-          detailsMap <- compileContract src
+          detailsMap <- sourceToContractDetails True src
           fmap join . for (Map.lookup "name" md) $ \name -> do
             traverse pure $ Map.lookup name detailsMap
 
@@ -323,7 +323,7 @@ processTheMessages messages conn g = do
                 let contracts = filter (not . T.null) $ T.splitOn "," v
                 forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f g
 
-          detailsMap <- compileContract $ contractdetailsSrc details -- won't actually recompile the contract
+          detailsMap <- sourceToContractDetails True $ contractdetailsSrc details -- won't actually recompile the contract
           mapM_ (updateGlobal detailsMap) $ [("history", addToHistoryList)
                                             ,("nohistory", removeFromHistoryList)
                                             ,("noindex", addToNoIndexList)

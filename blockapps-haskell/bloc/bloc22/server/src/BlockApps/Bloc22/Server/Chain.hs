@@ -58,7 +58,7 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
   idsAndDetails <- if (Text.null src)
                      then return Map.empty
-                     else compileContract src
+                     else sourceToContractDetails True src
   mContract <- case Map.toList idsAndDetails of
             [] -> return Nothing
             [(_, x)] -> return $ Just x
