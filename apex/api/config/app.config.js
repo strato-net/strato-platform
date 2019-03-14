@@ -35,5 +35,6 @@ module.exports = {
   },
   healthCheck: {
       pollFrequency: 1.5 * 1000,
+      maxResponseRange: 1 * 1000,
   }
 };

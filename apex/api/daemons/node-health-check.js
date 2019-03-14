@@ -26,11 +26,12 @@ function queryHealthStatus() {
 
         try {
             const metricsResult = await getHealthPrometheus()
-            const healthStatus = findTimeStamp(metricsResult)
-            healthStatus.forEach(async (process) => {
+            const healthStatus = await findTimeStamp(metricsResult)
+            winston.info('Create entry for latest health status:', healthStatus);
+            Object.keys(healthStatus).forEach(async (keyProcess) => {
                 await models.healthStat.create({
-                    processName: process,
-                    HealthStatus: healthStatus[process]? "Success" : "Failure",
+                    processName: keyProcess,
+                    HealthStatus: healthStatus[keyProcess]? "Success" : "Failure",
                     timestamp: moment().format()
                 });
             });
@@ -45,7 +46,7 @@ function queryHealthStatus() {
 function getHealthPrometheus() {
     const options = {
         method: 'GET',
-        url: `http://prometheus:9090/api/v1/query?query=health_check`,
+        url: `http://localhost/prometheus/api/v1/query?query=health_check`,
         followRedirects: false,
         timeout: config.healthCheck.requestTimeout-100,
         json: true,
@@ -62,14 +63,19 @@ function findTimeStamp(obj) {
     if (!(obj && obj.data && obj.data.result)) {
         return {};
     }
-    const timeNow = new Date.now();
+    const timeNow = Date.now();
+
     res = obj.data.result;
+
     const ret = {};
     res.forEach((elem) => {
         if (elem && elem.metric && elem.value && elem.value.length >= 2){
-            name = elem.metric.view_field;
-            value = elem.value[0];
-            ret[name] = (timeNow - value) < 10 && (elem.value[1] == 1) ? true : false;
+            name = elem.metric.job;
+            value = elem.value[0].toString().split('.').join('');
+            if (value.length < timeNow.toString().length){
+                value = parseInt(value + '0'*(timeNow.toString().length - value.length));
+            }
+        ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
         }
     })
     return ret;
