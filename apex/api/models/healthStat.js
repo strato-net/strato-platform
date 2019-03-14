@@ -7,14 +7,14 @@ module.exports = function(sequelize, DataTypes) {
         timestamp: {type: DataTypes.STRING, allowNull: true}
     });
 
-    Stat.associate = function(models) {
-        Stat.belongsTo(models.Node, {
-            onDelete: "CASCADE",
-            foreignKey: {
-                allowNull: false
-            }
-        })
-    };
+    //healthStat.associate = function(models) {
+      //  healthStat.belongsTo(models.Node, {
+        //    onDelete: "CASCADE",
+          //  foreignKey: {
+            //    allowNull: false
+           // }
+       // })
+    //};
 
     return healthStat;
 };

@@ -32,5 +32,8 @@ module.exports = {
   SMD_MODE: process.env['SMD_MODE'] || 'enterprise',
   webSockets: {
       dbPollFrequency: 1 * 1000
+  },
+  healthCheck: {
+      pollFrequency: 1.5 * 1000,
   }
 };
