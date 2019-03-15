@@ -7,9 +7,9 @@ export blocRoot=http://${blocHost}/bloc/v2.2 # Used in apex to compile contracts
 export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WELL
 export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
 export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
-export VAULT_HOST=http://${vaultWrapperHost}
-export BLOC_HOST=http://${blocHost}
-export POSTGREST_HOST=http://${postgrestHost}
+export vaultWrapperHttpHost=http://${vaultWrapperHost}
+export blocHttpHost=http://${blocHost}
+export postgrestHttpHost=http://${postgrestHost}
 
 if [[ ${OAUTH_ENABLED} = true && ${SMD_MODE} = public ]]; then
   echo "SMD public mode is incompatible with OAuth"
@@ -71,4 +71,4 @@ do
 done
 echo 'postgres is available'
 
-NODE_HOST=${NODE_HOST} npm run start:prod > stdout.txt
+NODE_HOST=${NODE_HOST} npm run start:prod
