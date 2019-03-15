@@ -47,6 +47,7 @@ dependencies:
   - semver-range
   - servant
   - servant-docs
+  - strato-model
   - swagger2
   - text
   - unordered-containers
