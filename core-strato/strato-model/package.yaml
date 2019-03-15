@@ -30,6 +30,7 @@ dependencies:
   - nibblestring
   - path-pieces
   - primitive
+  - swagger2
   - text
   - time
   - unordered-containers

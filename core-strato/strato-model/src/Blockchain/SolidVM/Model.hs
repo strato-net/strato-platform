@@ -11,6 +11,7 @@ import Data.Aeson.Types
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import Data.DeriveTH
+import Data.Swagger.Schema
 import qualified Data.Text as T
 import Data.Text.Encoding
 import GHC.Generics
@@ -20,7 +21,7 @@ import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
 newtype HexStorage = HexStorage B.ByteString
                    deriving (Eq, Show, Read, Generic)
-                   deriving anyclass NFData
+                   deriving anyclass (NFData, ToSchema)
 
 word256ToHexStorage :: Word256 -> HexStorage
 word256ToHexStorage = HexStorage . word256ToBytes
@@ -36,7 +37,7 @@ instance FromJSON HexStorage where
 
 data CodeKind = EVM
               | SolidVM
-              deriving (Eq, Show, Enum, Ord, Read, Generic, NFData)
+              deriving (Eq, Show, Enum, Ord, Read, Generic, NFData, ToSchema)
 
 instance ToJSON CodeKind where
   toJSON = String . T.pack . show
