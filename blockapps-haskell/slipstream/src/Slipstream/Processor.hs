@@ -253,7 +253,7 @@ detailsForRow row = liftM2 (<|>)
     let lookupT k m = MaybeT . return $ Map.lookup k m
     src <- lookupT "src" md
     name <- lookupT "name" md
-    detailsMap <- lift $ compileContract src
+    detailsMap <- lift $ sourceToContractDetails True src
     lookupT name detailsMap)
   (getContractDetailsByCodeHash $ actionCodeHash row)
 
@@ -262,7 +262,8 @@ adjustGlobals gref row details = do
   let go m (k,f) = for_ (Map.lookup k $ actionMetadata row) $ \v -> do
                 let contracts = filter (not . T.null) $ T.splitOn "," v
                 forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f gref
-  detailsMap <- compileContract $ contractdetailsSrc details -- won't actually recompile the contract
+  -- won't actually recompile the contract
+  detailsMap <- sourceToContractDetails True $ contractdetailsSrc details
   mapM_ (go detailsMap) $ [("history", addToHistoryList)
                           ,("nohistory", removeFromHistoryList)
                           ,("noindex", addToNoIndexList)

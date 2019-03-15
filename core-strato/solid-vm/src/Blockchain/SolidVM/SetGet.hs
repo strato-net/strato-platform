@@ -1,32 +1,65 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Blockchain.SolidVM.SetGet where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.HashMap.Strict as HM
 import           Data.IORef
 import           Data.List
 import qualified Data.Map as M
+import           Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
 
 import           Blockchain.Data.Address
 import           Blockchain.DB.SolidStorageDB
+import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Format
 import qualified SolidVM.Model.Storable as MS
+import qualified SolidVM.Solidity.Xabi as Xabi
+import qualified SolidVM.Solidity.Xabi.Statement as Xabi
+import qualified SolidVM.Solidity.Xabi.Type as Xabi
+import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
+
+{-# INLINE putSolid #-}
+putSolid :: Either LocalVar Address -> MS.StoragePath -> MS.BasicValue -> SM ()
+putSolid loc key val = case loc of
+                          Left LocalVar -> setLocal key val
+                          Right addr -> putSolidStorageKeyVal' addr key val
+
+{-# INLINE getSolid #-}
+getSolid :: Either LocalVar Address -> MS.StoragePath -> SM MS.BasicValue
+getSolid loc key = case loc of
+                      Left LocalVar -> getLocal key
+                      Right addr -> getSolidStorageKeyVal' addr key
 
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
-  MS.BDefault -> SDefault
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a
   MS.BContract n a -> SContract (T.unpack n) (fromIntegral a)
-  MS.BEnumVal k t -> SEnumVal (T.unpack k) (T.unpack t)
+  MS.BEnumVal k v -> SEnumVal (T.unpack k) (T.unpack v)
+  MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
+
+findDefault :: BasicType -> Value
+findDefault = \case
+  TInteger -> SInteger 0
+  TString -> SString ""
+  TBool -> SBool False
+  TAddress -> SAddress 0x0
+  TContract n -> SContract n 0x0
+  TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n)
+  TStruct n fs -> todo "findDefault/struct" (n, fs)
+  TComplex -> todo "finddefault/complex" TComplex
+  Todo msg -> todo "findDefault/todo" msg
 
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
@@ -36,49 +69,93 @@ toBasic = \case
   SAddress a -> MS.BAddress a
   SContract n a -> MS.BContract (T.pack n) (fromIntegral a)
   SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
-  SDefault -> MS.BDefault
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
-setVar :: MS.StoragePath -> Value -> SM ()
-setVar key val = do
+setVar :: AddressedPath-> Value -> SM ()
+setVar dst@(AddressedPath loc key) val = do
   -- If val is a simple value, assign it. If it
   -- is deeper, read the subfields and assign to their adjustment
-  currentAddress' <- getCurrentAddress
   case val of
-      SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
+    SReference src -> do
+        t <- getXabiValueType src
+        case t of
+          Xabi.Array{} -> do
+            len <- getInt (StorageItem $ src `apSnoc` MS.Field "length")
+            setVar (dst `apSnoc` MS.Field "length") $ SInteger len
+            forM_ [0..len-1] $ \i -> do
+              let i' = fromIntegral i
+              setVar (dst `apSnoc` MS.ArrayIndex i') =<<
+                getVar (StorageItem $ src `apSnoc` MS.ArrayIndex i')
+          _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
+    SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = [MS.Field (BC.pack f)]
             srcKey = (MS.Field (BC.pack name)):suffix
             dstKey = key ++ suffix
-        val' <- case var of
-          Constant x -> return $ toBasic x
-          _ -> getSolidStorageKeyVal' currentAddress' srcKey
-        putSolidStorageKeyVal' currentAddress' dstKey val'
-      _ -> putSolidStorageKeyVal' currentAddress' key (toBasic val)
+        !val' <- case var of
+          Constant x -> do
+            return $ toBasic x
+          _ -> getSolid loc srcKey
+        putSolid loc dstKey val'
+    _ -> putSolid loc key $! toBasic val
+
+deleteVar :: AddressedPath -> SM ()
+deleteVar (AddressedPath loc key) = putSolid loc key MS.BDefault
+
+
+getInt :: Variable -> SM Integer
+getInt p = do
+  v <- getVar' (Just TInteger) p
+  case v of
+    SInteger s -> return s
+    _ -> typeError "getInt" (p, v)
+
+getBool :: Variable -> SM Bool
+getBool p = do
+  v <- getVar' (Just TBool) p
+  case v of
+    SBool b -> return b
+    _ -> typeError "getBool" (p, v)
+
+getAddress :: Variable -> SM Value
+getAddress = getVar' (Just TAddress)
+
+getString :: Variable -> SM Value
+getString = getVar' (Just TString)
+
+getContract :: String -> Variable -> SM Value
+getContract contractName = getVar' (Just $ TContract contractName)
+
 
 getVar :: Variable -> SM Value
-getVar (Variable ioRef) = do
+getVar v = do
+  val <- getVar' Nothing v
+  return val
+
+getVar' :: Maybe BasicType -> Variable -> SM Value
+getVar' mTypeHint (Variable ioRef) = do
   val <- liftIO $ readIORef ioRef
   case val of
-    SReference ref -> getVar (StorageItem ref)
+    SReference apt -> getVar' mTypeHint $ StorageItem apt
     _ -> return val
-getVar (Constant c) = do
+getVar' mTypeHint (Constant c) = do
   case c of
-    SReference ref -> getVar (StorageItem ref)
+    SReference apt -> getVar' mTypeHint $ StorageItem apt
     _ -> return c
-getVar (StorageItem key) = do
-  currentAddress' <- getCurrentAddress
-  fromBasic <$> getSolidStorageKeyVal' currentAddress' key
-getVar (Property f var) = do
-  p <- case var of
-    StorageItem p -> return p
-    Constant (SReference p) -> return p
-    Variable ioref -> do
-      val <- liftIO $ readIORef ioref
-      case val of
-        SReference p -> return p
-        _ -> error $ "invalid value for property: " ++ show val
-    _ -> error $ "invalid variable for property: " ++ show var
-  getVar . StorageItem $ p ++ [MS.Field $! BC.pack f]
+getVar' mTypeHint (StorageItem apt@(AddressedPath loc key)) = do
+  raw <- getSolid loc key
+  if raw /= MS.BDefault
+    then return $ fromBasic raw
+    else do
+      typeHint <- case mTypeHint of
+                    Just th -> return th
+                    Nothing -> getValueType apt
+      case typeHint of
+        TStruct name fieldHints -> SStruct name . M.fromList <$> do
+          forM fieldHints $ \(l, t') -> do
+            fieldValue <- getVar' (Just t') . StorageItem $ apt `apSnoc` MS.Field l
+            return (BC.unpack l, Constant fieldValue)
+        TComplex -> return $ SReference apt
+        _ -> return $ findDefault typeHint
 
 
 showSM :: Value -> SM String
@@ -89,11 +166,11 @@ showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName) = return $ enumName ++ "." ++ valName
 showSM (SAddress a) = return $ format a
 showSM (STuple v) = do
-  vals <- forM (V.toList v) getVar
+  vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
   return $ "(" ++ intercalate ", " strings ++ ")"
 showSM (SArray _ v) = do
-  vals <- forM (V.toList v) getVar
+  vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
   return $ "[" ++ intercalate ", " strings ++ "]"
 showSM (SStruct name m) = do
@@ -117,6 +194,5 @@ showSM (SMap _ m) = do
            ++ "}"
 showSM (SContract name address) = do
   return $ "Contract: " ++ name ++ "/" ++ format (Address $ fromInteger address)
-showSM SDefault = return "<default>"
-showSM (SReference p) = return $ "<reference to " ++ BC.unpack (MS.unparsePath p) ++ ">"
-showSM x = error $ "showSM called for unsupported value: " ++ show x
+showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
+showSM x = todo "showSM called for unsupported value: " x
