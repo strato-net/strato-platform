@@ -39,10 +39,10 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
+import           Blockchain.SolidVM.CodeCollectionDB
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
@@ -123,12 +123,11 @@ create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecRe
 create' creator cc contractName' argExps = do
   nonce' <- fmap addressStateNonce $ getAddressState creator
   let newAddress = getNewAddress_unsafe creator nonce'
-      ccString = BC.pack $ show cc
+
+  ch <- putCodeCollection cc
 
   newAddressState <- getAddressState newAddress
-  putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' $ hash ccString}
-
-  addCode SolidVM ccString
+  putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
 
   when trace $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
@@ -255,19 +254,17 @@ getCodeAndCollection address' = do
     else do
     addressState <- getAddressState address'
 
-    (contractName', codeString) <-
+    (contractName', cc) <-
       case addressStateCodeHash addressState of
         SolidVMCode cn ch -> do
-          c <- getEVMCode ch
-          return (cn, c)
+          cc' <- getCodeCollectionCached ch
+          return (cn, cc')
         ch -> internalError "SolidVM for non-solidvm code" ch
 
-    let cc = read $ BC.unpack codeString
 
-        contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
+    let contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
 
     return (contract', cc)
-
 
 logFunctionCall :: [Value] -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
 logFunctionCall args address contract functionName f = do
@@ -815,6 +812,8 @@ expToVar' (Xabi.FunctionCall e args) = do
           return $ Constant $ SContract contractName' address
         [SAddress (Address address)] ->
           return $ Constant $ SContract contractName' $ toInteger address
+        [c@(SContract _ _)] ->
+          return $ Constant c
         _ -> typeError "contract variable creation" argVals
 
     Constant (SContractItem address itemName) -> do
