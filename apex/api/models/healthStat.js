@@ -3,7 +3,7 @@
 module.exports = function(sequelize, DataTypes) {
     let healthStat = sequelize.define('healthStat', {
         processName: {type: DataTypes.STRING, allowNull: true},
-        HealthStatus: {type: DataTypes.STRING, allowNull: true},
+        HealthStatus: {type: DataTypes.BOOLEAN, allowNull: true},
         timestamp: {type: DataTypes.STRING, allowNull: true}
     });
     healthStat.prototype.toJson = function() {
@@ -13,6 +13,14 @@ module.exports = function(sequelize, DataTypes) {
             HealthStatus: this.HealthStatus,
             timestamp: this.timestamp
         };
+    };
+    healthStat.associate = function(models) {
+        healthStat.belongsTo(models.Stat, {
+            onDelete: "CASCADE",
+            foreignKey: {
+                allowNull: true
+            }
+        })
     };
     return healthStat;
 };

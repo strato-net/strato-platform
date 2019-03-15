@@ -13,7 +13,7 @@ function cleanOnce() {
         models.healthStat.destroy({
             where:{
                 createdAt: {
-                    $lt: mData
+                    $lt: mDate
                 }
             }
         }).then(destroyedCount => {

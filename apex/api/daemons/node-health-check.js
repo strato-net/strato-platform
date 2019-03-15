@@ -27,14 +27,31 @@ function queryHealthStatus() {
         try {
             const metricsResult = await getHealthPrometheus()
             const healthStatus = await findTimeStamp(metricsResult)
-            winston.info('Create entry for latest health status:', healthStatus);
+            let overallStat = false;
+            let currentTime = moment().format();
             Object.keys(healthStatus).forEach(async (keyProcess) => {
+                overallStat = healthStatus[keyProcess] ? true : false;
                 await models.healthStat.create({
                     processName: keyProcess,
                     HealthStatus: healthStatus[keyProcess],
-                    timestamp: moment().format()
+                    timestamp: currentTime
                 });
             });
+            await models.Stat.findOrCreate({where: {processName: 'Overall'}, defaults: {
+                latestHealthStatus: overallStat,
+                latestCheckTimestamp: currentTime,
+                lastFailureTimestamp: overallStat ? null : currentTime
+            }}).then(([stat, created]) => {
+                if (!created){
+                    stat.update(
+                        {latestCheckTimestamp: currentTime,
+                            latestHealthStatus: overallStat,
+                            lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
+                        }, {where: {processName: 'Overall'}})
+                }
+            }).catch(err => {
+                    winston.warn(`Error ${error.message ? error.message : ''} occurred while creating and updating tables`);
+                });
             return resolve();
         } catch (error) {
             winston.warn(`Error ${error.message ? error.message : ''} occurred while querying health status`);
@@ -79,9 +96,15 @@ function findTimeStamp(obj) {
             }
         ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
         } else {
-        winston.warn(`Metrics will only be generated after the initiation of the first transaction`);
+        winston.info(`Metric format is updated; need to update its handling`);
         }
     })
+
+    if (res.length == 0){
+        winston.warn(`Metrics will only be generated after the initiation of the first transaction`);
+    } else {
+        winston.info('Create entry for latest health status:', ret);
+    }
 
     return ret;
 }
