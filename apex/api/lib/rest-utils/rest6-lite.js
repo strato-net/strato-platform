@@ -83,23 +83,23 @@ function* isSearchable(codeHash) {
 
 
 function compile (body, node) {
-  return ax.post(process.env.BLOC_HOST, body, '/bloc/v2.2/contracts/compile'); //todo - should probably replace blocHost w/ blocRoot to shorten urls
+  return ax.post(process.env.blocHttpHost, body, '/bloc/v2.2/contracts/compile');
 }
 
 function query(query, node) {
-  return ax.get(process.env.POSTGREST_HOST, `/${query}`);
+  return ax.get(process.env.postgrestHttpHost, `/${query}`);
 }
 
 function sendTransactions(body, headers, resolve, chainId, node) {
   const query = chainResolveQuery(chainId, resolve);
 
-  return ax.post(process.env.BLOC_HOST, body, '/bloc/v2.2/transaction' + query, headers,true); //todo - remove hardcode
+  return ax.post(process.env.blocHttpHost, body, '/bloc/v2.2/transaction' + query, headers,true);
 }
 
 
 function state(name, address, chainId, node) {
   const query = util.buildParam(chainId, "chainid=" + chainId);
-  return ax.get(process.env.BLOC_HOST, '/bloc/v2.2/contracts/' + name + '/' + address + '/state' + query);
+  return ax.get(process.env.blocHttpHost, '/bloc/v2.2/contracts/' + name + '/' + address + '/state' + query);
 }
 
 /**
@@ -262,7 +262,7 @@ function* resolveResults(results, options={}) {
 }
 function *blocResults(hashes, resolve, chainId, node) {
   const query = chainResolveQuery(chainId, resolve);
-  return ax.post(process.env.BLOC_HOST, hashes, '/transactions/results' + query);
+  return ax.post(process.env.blocHttpHost, hashes, '/bloc/v2.2/transactions/results' + query);
 }
 
 

@@ -50,6 +50,7 @@ services:
     - SMD_MODE=${SMD_MODE}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - stratoHost=strato:3000
+    - vaultWrapperHost=vault-wrapper:8000
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
     volumes:
