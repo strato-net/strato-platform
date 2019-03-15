@@ -8,6 +8,7 @@
     "start:prod:node-health": "NODE_ENV=production node daemons/node-health-check.js",
     "start:dev": "PORT=${PORT:-3001} NODE_HOST=${NODE_HOST:-localhost} node $NODE_DEBUG_OPTION ./bin/www --config config-local.yaml",
     "start:dev:node-health": "node daemons/node-health-check.js",
+    "start:dev:db-cleaner": "node daemons/db-cleaner.js",
     "node-ping": "# DELAY=5000 RETENTION=1 node node-ping/index.js",
     "migrate": "# sequelize db:migrate",
     "test": "NODE_ENV=development ./run-tests.sh",
