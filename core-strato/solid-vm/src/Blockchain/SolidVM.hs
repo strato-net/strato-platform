@@ -812,8 +812,8 @@ expToVar' (Xabi.FunctionCall e args) = do
           return $ Constant $ SContract contractName' address
         [SAddress (Address address)] ->
           return $ Constant $ SContract contractName' $ toInteger address
-        [c@(SContract _ _)] ->
-          return $ Constant c
+        [SContract _ addr] ->
+          return $ Constant $ SContract contractName' $ addr
         _ -> typeError "contract variable creation" argVals
 
     Constant (SContractItem address itemName) -> do
