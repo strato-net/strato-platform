@@ -6,15 +6,13 @@ module.exports = function(sequelize, DataTypes) {
         HealthStatus: {type: DataTypes.STRING, allowNull: true},
         timestamp: {type: DataTypes.STRING, allowNull: true}
     });
-
-    //healthStat.associate = function(models) {
-      //  healthStat.belongsTo(models.Node, {
-        //    onDelete: "CASCADE",
-          //  foreignKey: {
-            //    allowNull: false
-           // }
-       // })
-    //};
-
+    healthStat.prototype.toJson = function() {
+        return {
+            id: this.id,
+            processName: this.processName,
+            HealthStatus: this.HealthStatus,
+            timestamp: this.timestamp
+        };
+    };
     return healthStat;
 };

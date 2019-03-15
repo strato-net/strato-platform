@@ -34,7 +34,8 @@ module.exports = {
       dbPollFrequency: 1 * 1000
   },
   healthCheck: {
-      pollFrequency: 1.5 * 1000,
+      requestTimeout: 1 * 1000,
+      pollFrequency: 15 * 1000,
       maxResponseRange: 1 * 1000,
   }
 };

@@ -14,9 +14,9 @@ winston.info('Starting node-health-check with a delay of', config.healthCheck.po
 setInterval(async () => {
     try {
         await queryHealthStatus();
-        winston.info('nodes queried at ' + moment().format());
+        winston.info('Health Status queried at ' + moment().format());
     } catch (err) {
-        winston.error('nodes query error: ' + err.message);
+        winston.error(' Health Status error: ' + err.message);
     }
 }, config.healthCheck.pollFrequency);
 
@@ -31,7 +31,7 @@ function queryHealthStatus() {
             Object.keys(healthStatus).forEach(async (keyProcess) => {
                 await models.healthStat.create({
                     processName: keyProcess,
-                    HealthStatus: healthStatus[keyProcess]? "Success" : "Failure",
+                    HealthStatus: healthStatus[keyProcess],
                     timestamp: moment().format()
                 });
             });
@@ -40,7 +40,7 @@ function queryHealthStatus() {
             winston.warn(`Error ${error.message ? error.message : ''} occurred while querying health status`);
             return resolve();
         }
-    }).timeout(config.healthCheck.pollFrequency - 80);
+    }).timeout(config.healthCheck.requestTimeout - 80);
 }
 
 function getHealthPrometheus() {
@@ -61,6 +61,7 @@ function getHealthPrometheus() {
 
 function findTimeStamp(obj) {
     if (!(obj && obj.data && obj.data.result)) {
+        winston.warn(`Not Found results while querying health status: prometheus path might be incorrect`);
         return {};
     }
     const timeNow = Date.now();
@@ -68,6 +69,7 @@ function findTimeStamp(obj) {
     res = obj.data.result;
 
     const ret = {};
+
     res.forEach((elem) => {
         if (elem && elem.metric && elem.value && elem.value.length >= 2){
             name = elem.metric.job;
@@ -76,7 +78,10 @@ function findTimeStamp(obj) {
                 value = parseInt(value + '0'*(timeNow.toString().length - value.length));
             }
         ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
+        } else {
+        winston.warn(`Metrics will only be generated after the initiation of the first transaction`);
         }
     })
+
     return ret;
 }
