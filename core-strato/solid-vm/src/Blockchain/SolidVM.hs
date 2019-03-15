@@ -91,10 +91,10 @@ create :: Bool
 create _ _ _ _ _ _ _ _ _ _ _ pc@(PrecompiledCode _) _ _ _ = internalError "call precompiled code" pc
 create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) _ _ metadata = do
 
-  let maybeContractName = join $ fmap (M.lookup "name") metadata
+  let maybeContractName = M.lookup "name" =<< metadata
       contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
 
-  let maybeArgString = join $ fmap (M.lookup "args") metadata
+  let maybeArgString = M.lookup "args" =<< metadata
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
       maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
@@ -206,9 +206,9 @@ call :: Bool
 
 call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' _ _ metadata = do
 
-  let maybeFuncName = join $ fmap (M.lookup "funcName") metadata
+  let maybeFuncName = M.lookup "funcName" =<< metadata
       funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
-      maybeArgString = join $ fmap (M.lookup "args") metadata
+      maybeArgString = M.lookup "args" =<< metadata
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
       maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs

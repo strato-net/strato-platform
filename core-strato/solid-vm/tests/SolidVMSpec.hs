@@ -997,3 +997,17 @@ contract qq {
   }
 }|]
     getFields ["store_x", "store_s"] `shouldReturn` [BInteger 0x777234, BString "Hello"]
+
+  it "can cast contracts down" . runTest $ do
+    void $ runBS [r|
+contract X {}
+contract Y {}
+
+contract qq {
+  X public x;
+  constructor() public {
+    Y y = Y(0x7733624642);
+    x = X(y);
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BContract "X" 0x7733624642]
