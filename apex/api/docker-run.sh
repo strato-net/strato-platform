@@ -2,11 +2,14 @@
 set -e
 set -x
 
-postgrestRoot=http://${postgrestHost}
-export blocRoot=http://${blocHost}/bloc/v2.2 # Used in apex to compile contracts
-export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WELL
-export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
-export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
+# exported values are accessible in the app via process.env[]
+export blocRoot=http://${blocHost}/bloc/v2.2
+export stratoRoot=http://${stratoHost}/eth/v1.2
+export STRATO_GS_MODE=${STRATO_GS_MODE}
+export PROD_DEV_MODE=${PROD_DEV_MODE:-false}
+export vaultWrapperHttpHost=http://${vaultWrapperHost}
+export blocHttpHost=http://${blocHost}
+export postgrestHttpHost=http://${postgrestHost}
 
 if [[ ${OAUTH_ENABLED} = true && ${SMD_MODE} = public ]]; then
   echo "SMD public mode is incompatible with OAuth"
@@ -18,7 +21,7 @@ sed -i -e 's|__blocUrl__|'"${blocRoot}"'|g' config-prod.yaml
 # Despite blockapps-rest wasn't initially designed for use inside the platform (to interact between micro-services) and 
 # should only call STRATO platform through nginx - starting with version 6.4.0 it supports different formats of searchUrl
 # to be also used to call postgrest directly, without 'cirrus/(search)' substring in URI
-sed -i -e 's|__searchUrl__|'"${postgrestRoot}"'|g' config-prod.yaml
+sed -i -e 's|__searchUrl__|'"${postgrestHttpHost}"'|g' config-prod.yaml
 
 # Set postgres configurations
 sed -i -e 's|__apex_postgres_user__|'"${postgres_user}"'|g' config/config.json
@@ -53,7 +56,7 @@ done
 echo 'strato is available'
 
 echo 'Waiting for postgrest to be available...'
-until curl --silent --output /dev/null --fail --location ${postgrestRoot}
+until curl --silent --output /dev/null --fail --location ${postgrestHttpHost}
 do
   echo "Check at $(date)"
   sleep 1

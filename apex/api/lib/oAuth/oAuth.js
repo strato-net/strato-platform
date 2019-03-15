@@ -30,7 +30,7 @@ function* createKey(userHeaders, userParams = null) {
     try {
 
       userParams = userParams == null ? {} : userParams;
-      const userAccount = yield ax.post(process.env.VAULT_HOST, userParams, '/strato/v2.3/key', userHeaders);
+      const userAccount = yield ax.post(process.env.vaultWrapperHttpHost, userParams, '/strato/v2.3/key', userHeaders);
 
       //faucet user so they can do stuff
       yield waitFaucet(userAccount.address)
@@ -61,7 +61,7 @@ function* getKey(userHeaders, userQuery = null) {
   try {
     const query = userQuery ? `?${querystring.stringify(userQuery)}` : '';
 
-    const userAccount = yield ax.get(process.env.VAULT_HOST, `/strato/v2.3/key${query}`, {
+    const userAccount = yield ax.get(process.env.vaultWrapperHttpHost, `/strato/v2.3/key${query}`, {
       "x-user-unique-name": username,
       "x-user-id": hash
     });

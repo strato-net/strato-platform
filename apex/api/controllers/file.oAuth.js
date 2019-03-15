@@ -171,7 +171,7 @@ function attest(req, res, next) {
 
     try {
       const result = yield externalStorage.getExternalStorage(contractAddress);
-      const account = yield ax.get(process.env.VAULT_HOST, `/strato/v2.3/key`, userCredentials);
+      const account = yield ax.get(process.env.vaultWrapperHttpHost, `/strato/v2.3/key`, userCredentials);
       if (result.signers.indexOf(account.address) > -1) {
         let err = new Error('You already signed this transaction');
         err.status = RestStatus.BAD_REQUEST;
