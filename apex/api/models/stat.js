@@ -6,6 +6,7 @@ module.exports = function(sequelize, DataTypes) {
         latestHealthStatus : {type: DataTypes.BOOLEAN, allowNull: true},
         latestCheckTimestamp: {type: DataTypes.STRING, allowNull: true},
         lastFailureTimestamp : {type: DataTypes.STRING, allowNull: true},
+        ifBlocksValidInc: {type: DataTypes.BOOLEAN, allowNull: true}
     });
     Stat.prototype.toJson = function() {
         return {
@@ -13,7 +14,8 @@ module.exports = function(sequelize, DataTypes) {
             processName: this.processName,
             latestHealthStatus: this.latestHealthStatus,
             latestCheckTimestamp: this.latestCheckTimestamp,
-            lastFailureTimestamp: this.lastFailureTimestamp
+            lastFailureTimestamp: this.lastFailureTimestamp,
+            ifBlocksValidInc: this.ifBlocksValidInc
         };
     };
     Stat.associate = function(models) {

@@ -27,10 +27,10 @@ function queryHealthStatus() {
         try {
             const metricsResult = await getHealthPrometheus()
             const healthStatus = await findTimeStamp(metricsResult)
-            let overallStat = false;
+            let overallStat = true;
             let currentTime = moment().format();
             Object.keys(healthStatus).forEach(async (keyProcess) => {
-                overallStat = healthStatus[keyProcess] ? true : false;
+                overallStat = healthStatus[keyProcess] && overallStat;
                 await models.healthStat.create({
                     processName: keyProcess,
                     HealthStatus: healthStatus[keyProcess],
@@ -50,7 +50,7 @@ function queryHealthStatus() {
                         }, {where: {processName: 'Overall'}})
                 }
             }).catch(err => {
-                    winston.warn(`Error ${error.message ? error.message : ''} occurred while creating and updating tables`);
+                    winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
                 });
             return resolve();
         } catch (error) {
