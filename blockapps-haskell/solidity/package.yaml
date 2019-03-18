@@ -62,6 +62,7 @@ tests:
     main: Main.hs
     source-dirs: test/
     dependencies:
+     - aeson-qq
      - blockapps-solidity
      - blockapps-strato-api
      - hspec
