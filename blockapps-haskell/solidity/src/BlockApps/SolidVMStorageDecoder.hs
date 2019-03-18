@@ -62,7 +62,7 @@ zeroOf = \case
     -- This is not quite accurate, as the minimum should be the BEnumVal
     -- However, we don't have enough context to know which string is minimum
     BEnumVal{} -> BInteger 0
-  SStruct fs -> SStruct $ map zeroOf fs
+  SStruct fs -> SStruct $ HM.map zeroOf fs
   SArray{} -> SArray I.empty
   SMapping{} -> SMapping HM.empty
 
