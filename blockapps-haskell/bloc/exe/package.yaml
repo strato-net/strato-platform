@@ -15,6 +15,7 @@ dependencies:
   - logging-effect
   - hflags
   - http-client
+  - http-types
   - postgresql-simple
   - resource-pool
   - servant-client
@@ -22,6 +23,7 @@ dependencies:
   - servant-server
   - servant-swagger
   - servant-swagger-ui
+  - wai
   - wai-cors
   - wai-extra
   - warp
