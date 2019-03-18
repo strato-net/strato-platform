@@ -603,14 +603,14 @@ expToVar' (Xabi.Unitary "--" e) = do
   setVar path next
   return $ Constant next
 
-expToVar' (Xabi.Binary "+=" lhs rhs) = do
-  let readInt e = getInt =<< expToVar e
-  delta <- readInt rhs
-  curValue <- readInt lhs
-  path <- expToPath lhs
-  let next = SInteger $ curValue + delta
-  setVar path next
-  return $ Constant next
+expToVar' (Xabi.Binary "+=" lhs rhs) = binopAssign (+) lhs rhs
+expToVar' (Xabi.Binary "-=" lhs rhs) = binopAssign (-) lhs rhs
+expToVar' (Xabi.Binary "*=" lhs rhs) = binopAssign (*) lhs rhs
+expToVar' (Xabi.Binary "/=" lhs rhs) = binopAssign mod lhs rhs
+expToVar' (Xabi.Binary "%=" lhs rhs) = binopAssign rem lhs rhs
+expToVar' (Xabi.Binary "|=" lhs rhs) = binopAssign (.|.) lhs rhs
+expToVar' (Xabi.Binary "&=" lhs rhs) = binopAssign (.&.) lhs rhs
+expToVar' (Xabi.Binary "^=" lhs rhs) = binopAssign xor lhs rhs
 
 expToVar' (Xabi.MemberAccess (Xabi.Variable "Util") "bytes32ToString") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
@@ -870,6 +870,16 @@ expToVarInteger expr1 o expr2 retType = do
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
 
+
+binopAssign :: (Integer -> Integer -> Integer) -> Xabi.Expression -> Xabi.Expression -> SM Variable
+binopAssign oper lhs rhs = do
+  let readInt e = getInt =<< expToVar e
+  delta <- readInt rhs
+  curValue <- readInt lhs
+  path <- expToPath lhs
+  let next = SInteger $ curValue `oper` delta
+  setVar path next
+  return $ Constant next
 
 callBuiltin :: String -> [Value] -> Maybe Value -> SM Value
 callBuiltin "uint" [SEnumVal enumName enumVal] _ = do

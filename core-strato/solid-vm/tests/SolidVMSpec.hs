@@ -1022,3 +1022,19 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 2347]
+
+  it "can <op>=" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    x |= 0xf0f;
+    x &= 0xff0;
+    x ^= 0xff0;
+    x += 0xa;
+    x -= 0x3;
+    x *= 0x10;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0xf70]
+
