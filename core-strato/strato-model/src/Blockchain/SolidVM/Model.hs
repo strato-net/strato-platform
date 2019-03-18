@@ -12,6 +12,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import Data.DeriveTH
 import Data.Swagger.Schema
+import Data.Swagger.Internal.Schema (named)
 import qualified Data.Text as T
 import Data.Text.Encoding
 import GHC.Generics
@@ -21,10 +22,13 @@ import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
 newtype HexStorage = HexStorage B.ByteString
                    deriving (Eq, Show, Read, Generic)
-                   deriving anyclass (NFData, ToSchema)
+                   deriving anyclass (NFData)
 
 word256ToHexStorage :: Word256 -> HexStorage
 word256ToHexStorage = HexStorage . word256ToBytes
+
+instance ToSchema HexStorage where
+  declareNamedSchema _ = return $ named "solidvm hex storage"  binarySchema
 
 instance ToJSON HexStorage where
   toJSON (HexStorage hs) = String . decodeUtf8 . B16.encode $ hs
