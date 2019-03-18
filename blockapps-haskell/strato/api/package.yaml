@@ -15,7 +15,6 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - blockapps-ethereum
-  - blockapps-solidity
   - binary
   - bytestring
   - aeson

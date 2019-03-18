@@ -3,6 +3,7 @@
 module SolidVM.Model.Storable where
 
 import           Control.DeepSeq
+import           Control.Exception
 import qualified Data.Aeson as Ae
 import           Data.Attoparsec.ByteString as Atto
 import           Data.Attoparsec.ByteString.Char8 (scientific)
@@ -24,6 +25,7 @@ import           GHC.Generics
 import           System.IO.Unsafe
 
 import           Blockchain.Data.RLP
+import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Address
 
 
@@ -311,3 +313,21 @@ synthesize' ((sp, bv):rest) =
  where go :: [(StoragePath, BasicValue)] -> StorableValue -> Either ReplayFailure StorableValue
        go [] sv' = Right sv'
        go ((sp',bv'):t) sv' = go t =<< applyDelta sp' bv' sv'
+
+
+pathToHexStorage :: StoragePath -> HexStorage
+pathToHexStorage = HexStorage . unparsePath
+
+basicToHexStorage :: BasicValue -> HexStorage
+basicToHexStorage = HexStorage . rlpSerialize . rlpEncode
+
+hexStorageToPath :: HexStorage -> Either String StoragePath
+hexStorageToPath (HexStorage hs) = parsePath hs
+
+hexStorageToBasic :: HexStorage -> Either String BasicValue
+hexStorageToBasic (HexStorage hs) = unsafeDupablePerformIO . handle handler
+                                  . evaluate . force
+                                  . Right . rlpDecode . rlpDeserialize $ hs
+
+  where handler :: SomeException -> IO (Either String BasicValue)
+        handler = return . Left . show

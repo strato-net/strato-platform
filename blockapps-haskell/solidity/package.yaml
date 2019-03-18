@@ -47,6 +47,7 @@ dependencies:
   - semver-range
   - servant
   - servant-docs
+  - solid-vm-model
   - strato-model
   - swagger2
   - text
@@ -58,7 +59,7 @@ library:
 
 tests:
   blockapps-solidity-test:
-    main: Spec.hs
+    main: Main.hs
     source-dirs: test/
     dependencies:
      - blockapps-solidity
