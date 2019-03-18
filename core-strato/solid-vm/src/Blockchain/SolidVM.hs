@@ -881,7 +881,7 @@ callBuiltin "uint" [SEnumVal enumName enumVal] _ = do
     $ toInteger
     $ fromMaybe (missingType "call builtin enum cast" (enumVal, enumName))
     $ enumVal `elemIndex` enumVals
-
+callBuiltin "uint" [SInteger n] _ = return $ SInteger n
 callBuiltin "uint" args _ = typeError "uint cast" args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v

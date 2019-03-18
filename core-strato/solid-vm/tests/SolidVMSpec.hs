@@ -1011,3 +1011,14 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BContract "X" 0x7733624642]
+
+  it "can cast int to int" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    uint y = 2347;
+    x = uint(y);
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 2347]
