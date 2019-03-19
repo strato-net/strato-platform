@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Blockapps.Crossmon (recordMaxBlockNumber) where
+module Blockapps.Crossmon (recordMaxBlockNumber, recordHealthCheck) where
 
 import Control.Monad
 import Control.Monad.IO.Class
@@ -24,12 +24,16 @@ healthCheck = unsafeRegister
 reportOne :: Integer
 reportOne = 1
 
+recordHealthCheck :: (MonadIO m) => Text -> m ()
+recordHealthCheck label = do
+  liftIO $ withLabel healthCheck label (flip setGauge . fromIntegral $ reportOne)
+
 -- Note: This function is not threadsafe across locations:
 --   recordMaxBlockNumber l1 n | recordMaxBlockNumber l1 m
 -- is nondeterministic in deciding whether to keep n or m.
 recordMaxBlockNumber :: (MonadIO m, Integral a) => Text -> a -> m ()
 recordMaxBlockNumber loc n = liftIO $ do
-  withLabel healthCheck loc (flip setGauge . fromIntegral $ reportOne)
+  recordHealthCheck loc
   withLabel maxBlockNumberSeen loc $ \g -> do
     let new = fromIntegral n
     current <- getGauge g

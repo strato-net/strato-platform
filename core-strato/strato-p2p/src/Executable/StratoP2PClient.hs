@@ -36,6 +36,7 @@ import           UnliftIO.Exception
 import qualified Blockchain.Colors                     as C
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context
+import           Blockapps.Crossmon
 import           Blockchain.ECIES
 import           Blockchain.EthConf                    hiding (genesisHash, port)
 import           Blockchain.EthEncryptionException
@@ -127,6 +128,7 @@ stratoP2PClient = do
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
+    lift $ recordHealthCheck "p2p_client"
     ePeers <- liftIO getAvailablePeers
     case ePeers of
       Left err -> do
