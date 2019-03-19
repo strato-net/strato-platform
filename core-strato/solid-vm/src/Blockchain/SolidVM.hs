@@ -37,7 +37,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
-import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
@@ -121,8 +120,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) _ _ metadata = 
 
 create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
 create' creator cc contractName' argExps = do
-  nonce' <- fmap addressStateNonce $ getAddressState creator
-  let newAddress = getNewAddress_unsafe creator nonce'
+  newAddress <- getNewAddress creator
 
   ch <- putCodeCollection cc
 
@@ -1053,11 +1051,9 @@ logVals val1 val2 = when trace . liftIO . putStrLn $ printf
 
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: Value -> SM ByteString
-encodeForReturn (SInteger i) = return $ rlpSerialize $ rlpEncode i
+encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
 encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
   return $ word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
   where stringBytes = BC.pack s
-encodeForReturn (STuple items) = do
-  encodedBytestrings <- forM (V.toList items) $ \i -> encodeForReturn =<< getVar i
-  return $ B.concat encodedBytestrings
+encodeForReturn (STuple items) = B.concat <$> forM (V.toList items) (encodeForReturn <=< getVar)
 encodeForReturn x = todo "encodeForReturn type case" x

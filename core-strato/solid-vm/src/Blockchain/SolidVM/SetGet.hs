@@ -140,6 +140,7 @@ getVar' mTypeHint (Variable ioRef) = do
 getVar' mTypeHint (Constant c) = do
   case c of
     SReference apt -> getVar' mTypeHint $ StorageItem apt
+    STuple vs -> STuple <$> V.mapM (fmap Constant . getVar' Nothing) vs
     _ -> return c
 getVar' mTypeHint (StorageItem apt@(AddressedPath loc key)) = do
   raw <- getSolid loc key

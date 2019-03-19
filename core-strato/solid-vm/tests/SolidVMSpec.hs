@@ -11,6 +11,7 @@ import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as SB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.Map as M
@@ -51,6 +52,9 @@ newAddress = 0x0ddba11
 
 uploadAddress :: Address
 uploadAddress = getNewAddress_unsafe sender 0
+
+secondAddress :: Address
+secondAddress = getNewAddress_unsafe sender 1
 
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
@@ -138,6 +142,39 @@ runCall funcName callArgs bs = do
   SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
     uploadAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
 
+call2 :: T.Text -> T.Text -> Address -> ContextM ExecResults
+call2 funcName callArgs contractAddress = do
+  let isTest = error "TODO: isTest"
+      isHomestead = error "TODO: isHomestead"
+      suicides = error "TODO: suicides"
+      blockData = BlockData { blockDataParentHash = SHA 0x0
+                            , blockDataUnclesHash = SHA 0x0
+                            , blockDataCoinbase = Address 0x0
+                            , blockDataStateRoot = ""
+                            , blockDataTransactionsRoot = ""
+                            , blockDataReceiptsRoot = ""
+                            , blockDataLogBloom = ""
+                            , blockDataDifficulty = 900
+                            , blockDataNumber = 8033
+                            , blockDataGasLimit = 1000000
+                            , blockDataGasUsed = 10000
+                            , blockDataExtraData = ""
+                            , blockDataNonce = 22
+                            , blockDataMixHash = SHA 0x0
+                            , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
+      callDepth = 0
+      value = error "TODO: value"
+      gasPrice = error "TODO: gasPrice"
+      availableGas = error "TODO: availableGas"
+      txHash = error "TODO: txHash"
+      chainId = error "TODO: chainId"
+      noValueTransfer = error "TODO: noValueTransfer"
+      receiveAddress = error "TODO: receiveAddress"
+      theData = error "TODO: theData"
+      callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
+  SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
+    contractAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+
 
 
 defaultExecResults :: ExecResults
@@ -159,8 +196,14 @@ checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
 getAll :: [[StoragePathPiece]] -> ContextM [BasicValue]
 getAll = mapM (getSolidStorageKeyVal' uploadAddress . MS.fromList)
 
+getAll2 :: [[StoragePathPiece]] -> ContextM [BasicValue]
+getAll2 = mapM (getSolidStorageKeyVal' secondAddress . MS.fromList)
+
 getFields :: [BC.ByteString] -> ContextM [BasicValue]
 getFields = getAll . map (\t -> [Field t])
+
+getFields2 :: [BC.ByteString] -> ContextM [BasicValue]
+getFields2 = getAll2 . map (\t -> [Field t])
 
 spec :: Spec
 spec = do
@@ -1038,3 +1081,109 @@ contract qq {
 }|]
     getFields ["x"] `shouldReturn` [BInteger 0xf70]
 
+  it "can construct two copies" . runTest $ do
+    let qq = [r|
+contract qq {
+  uint x;
+  constructor(uint _x) public {
+    x = _x;
+  }
+}|]
+    void $ runArgs "(1234)" qq
+    void $ runArgs "(887324)" qq
+    getFields ["x"] `shouldReturn` [BInteger 1234]
+    getFields2 ["x"] `shouldReturn` [BInteger 887324]
+
+  it "can call a remote function" . runTest $ do
+    let qq = [r|
+contract qq {
+  qq x;
+  uint num;
+  constructor(address _x, uint _num) public {
+    x = qq(_x);
+    num = _num;
+  }
+  function a() public {
+    num = x.b();
+  }
+  function b() public {
+    return num + 1;
+  }
+}|]
+    void $ runArgs "(0x0,99)" qq
+    getFields ["x", "num"] `shouldReturn` [BContract "qq" 0x0, BInteger 99]
+
+    void $ runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
+    getFields2 ["x", "num"] `shouldReturn` [BContract "qq" uploadAddress, BInteger 400]
+
+    void $ call2 "a" "()" secondAddress
+    getFields2 ["x", "num"] `shouldReturn` [BContract "qq" uploadAddress, BInteger 100]
+
+  it "can locally return locals" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  function f() returns (uint) {
+    uint k = 85;
+    return k;
+  }
+
+  constructor() public {
+    x = f();
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 85]
+
+  it "can locally return tuples" . runTest $ do
+    liftIO $ pendingWith "resolution error for tuples"
+    void $ runBS [r|
+contract qq {
+  uint x;
+  string y;
+
+  function f(uint k, string l) returns (uint, string) {
+    return (k, l);
+  }
+
+  constructor() public {
+    var (a, b) = f(444, "ok");
+    x = a;
+    y = b;
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 444, BString "ok"]
+
+  it "can externally return locals" . runTest $ do
+    void $ runCall "f" "()" [r|
+contract qq {
+  function f() returns (uint) {
+    uint k = 99;
+    return k;
+  }
+}|]
+
+  it "can externally return tuples" . runTest $ do
+    er <- runCall "f" "()" [r|
+contract qq {
+  function f() returns (uint, uint) {
+    uint k = 0x0123456789abcdef0123456789abcdef;
+    return (k, k);
+  }
+}|]
+    let (kBS, "") = B16.decode "0123456789abcdef0123456789abcdef"
+        zero = B.replicate 16 0
+    er `shouldBe` defaultExecResults{ erNewContractAddress=Nothing
+                                    , erReturnVal = Just (SB.toShort $ zero <> kBS <> zero <> kBS) }
+
+
+  it "can assign to tuples" . runTest $ do
+    liftIO $ pendingWith "tuple assignment"
+    void $ runBS [r|
+contract qq {
+  uint x;
+  uint y;
+  constructor() public {
+    (x, y) = (10, 17);
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 10, BInteger 17]
