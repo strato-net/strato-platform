@@ -27,6 +27,7 @@ dependencies:
   - conduit-combinators
   - conduit-extra
   - containers
+  - cross-monitoring
   - cryptohash
   - crypto-pubkey
   - crypto-pubkey-types

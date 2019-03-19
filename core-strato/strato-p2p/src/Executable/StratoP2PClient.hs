@@ -128,7 +128,7 @@ stratoP2PClient = do
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
-    lift $ recordHealthCheck "p2p_client"
+    recordHealthCheck "p2p_client"
     ePeers <- liftIO getAvailablePeers
     case ePeers of
       Left err -> do
