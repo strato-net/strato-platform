@@ -61,6 +61,11 @@ setupRound blk' as = do
 compareNoExtra :: (MonadIO m) => Block -> Block -> m ()
 compareNoExtra b1 b2 = set extraLens "" b1 `shouldBe` set extraLens "" b2
 
+vanityCompare :: (MonadIO m) => BS.ByteString -> BS.ByteString -> m ()
+vanityCompare lhs rhs =
+  let clean = BS.takeWhile (/=0) . BS.take 32
+  in clean lhs `shouldBe` clean rhs
+
 spec :: Spec
 spec = parallel $ do
   describe "The blockstanbul event loop" $ do
@@ -320,7 +325,7 @@ spec = parallel $ do
           let [ToCommit b] = omsgs
           b `compareNoExtra` blk
           let got = cookRawExtra . L.view extraLens $ b
-          _vanity got `shouldBe` (BS.take 32 . L.view extraLens $ blk)
+          _vanity got `vanityCompare` L.view extraLens (blk)
           let Just ist = _istanbul got
           _validatorList ist `shouldBe` S.toList as
           _proposedSig ist `shouldBe` Just seal
@@ -389,7 +394,7 @@ spec = parallel $ do
 
     it "seals the block" $ property $ \blk'' ->
       runTest $ do
-        let blk = over extraLens (BS.take 32) . setBlockNo 19 $ blk''
+        let blk = over extraLens (const $ BS.pack [0, 0, 0]) . setBlockNo 19 $ blk''
         selfElected
         v <- use view
         omsgs <- sendMessages [UnannouncedBlock blk]
@@ -399,7 +404,7 @@ spec = parallel $ do
         set extraLens initData blk' `shouldBe` blk
         blk' `shouldNotBe` blk
         let parsedExtra = cookRawExtra . L.view extraLens $ blk'
-        L.view vanity parsedExtra `shouldBe` initData
+        L.view vanity parsedExtra `vanityCompare` initData
         let Just ist = _istanbul parsedExtra
         me <- selfAddr
         L.view validatorList ist `shouldBe` [me]
