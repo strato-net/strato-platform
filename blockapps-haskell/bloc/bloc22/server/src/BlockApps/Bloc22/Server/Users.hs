@@ -247,7 +247,7 @@ postUsersContractEVM' :: ContractParameters -> Signer -> Bloc BlocTransactionRes
 postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
   --TODO: check what happens with mismatching args
-  idsAndDetails <- compileContract src
+  idsAndDetails <- sourceToContractDetails True src
   logWith logNotice ("constructor arguments: " <> Text.pack (show args))
   (cName,(cmId,ContractDetails{..})) <-
     case contract of
@@ -286,17 +286,16 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
 postUsersContractSolidVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
-  --I had to temporarily replace the compileContract call to get the metadata needed for the transaction results call later on.
-  --At best we should remove the need for the metadata completely, at worst, we should remove the compile and just generate the metadata.  To get the interpreter working, I am just putting this all back in now, and will notate which lines we should eventually remove again
-  idsAndDetails <- getMetadataNoCompile src      --remove
-  (cName,(cmId,ContractDetails{..})) <-     --remove
-    case contract of                        --remove
-     Nothing ->                             --remove
-       case Map.toList idsAndDetails of     --remove
+  --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
+  idsAndDetails <- sourceToContractDetails False src
+  (cName,(cmId,ContractDetails{..})) <-
+    case contract of
+     Nothing ->
+       case Map.toList idsAndDetails of
          [] -> throwError $ UserError "You need to supply at least one contract in the source" --remove
-         [x] -> return x                    --remove
+         [x] -> return x
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
-     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)              --remove
+     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   logWith logNotice ("constructor arguments: " <> Text.pack (show args))
 
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
@@ -315,13 +314,13 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
       chainId
   logWith logNotice ("tx is: " <> Text.pack (show tx))
   hash <- blocStrato $ postTx tx
-  void . blocModify $ \conn -> runInsertMany conn hashNameTable [  --remove
-    ( Nothing                                                      --remove
-    , constant hash                                                --remove
-    , constant cmId                                                --remove
-    , constant (1 :: Int32)                                        --remove
-    , constant contractdetailsName                                 --remove
-    )]                                                             --remove
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable [  
+    ( Nothing
+    , constant hash
+    , constant cmId
+    , constant (1 :: Int32)
+    , constant contractdetailsName
+    )]
   getBlocTransactionResult' chainId [hash] resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
@@ -820,13 +819,11 @@ constructArgValuesAndSource args argNamesTypes = do
           else throwError (UserError "no arguments provided to function.")
       Just argsMap -> do
         vals <- getArgValues argsMap argNamesTypes
-        --TODO- valueToText returns type "Maybe Text", but as far as I can tell from reading the code, "Nothing" is not a possible return value....  I can't imagine why it ever would be.  We should either figure out what was intended, or change the return value of `valueToText` to "Text"
-        --For now, I'll just treat a nothing as an internal developer error, and crash the program.
-        let valsAsText = fromMaybe (error $ "Internal error: args can not be represented as source code: " ++ show vals) $ sequence $ map valueToText vals
+        let valsAsText = map valueToText vals
         return $
           (
             toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
-            "(" <> Text.intercalate ", " valsAsText <> ")"
+            "(" <> Text.intercalate "," valsAsText <> ")"
           )
 
 getAccountTxParams :: Address -> Maybe ChainId -> Maybe TxParams -> Bloc TxParams

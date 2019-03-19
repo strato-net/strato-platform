@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
@@ -14,26 +15,34 @@ module Blockchain.SolidVM.SM (
   getCurrentAddress,
   addCallInfo,
   popCallInfo,
+  getLocal,
+  setLocal,
+  getCurrentCallInfo,
   getCurrentContract,
   getCurrentCodeCollection,
   getEnv,
   getVariableOfName,
-  addLocalVariable,
-  getTypeOfName
+  getTypeOfName,
+  getXabiType,
+  getXabiValueType,
+  getValueType
   ) where
 
+import           Control.Applicative ((<|>))
 import           Control.Lens
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
+import           Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.IORef
+import qualified Data.HashMap.Strict as HM
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
-
-import qualified SolidVM.Model.Storable as MS
+import qualified Data.Text as T
+import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs (BlockData(..))
@@ -43,12 +52,16 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
+import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 
+import qualified SolidVM.Model.Storable as MS
+import qualified SolidVM.Solidity.Xabi as Xabi
+import qualified SolidVM.Solidity.Xabi.Type as Xabi
+import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
+
 import CodeCollection
-
-
 
 
 
@@ -60,8 +73,9 @@ data CallInfo =
     currentAddress :: Address,
     currentContract :: Contract,
     codeCollection :: CodeCollection,
-    localVariables :: Map String Variable
-    }
+    localVariables :: Map String (Xabi.Type, Variable),
+    localByPath :: HM.HashMap MS.StoragePath MS.BasicValue
+    } deriving (Show)
 
 {-
 BlockData
@@ -143,17 +157,13 @@ instance HasHashDB SM where
 instance HasCodeDB SM where
   getCodeDB = codeDB <$> get
 
-runSM :: BlockData -> SM a -> ContextM a
-runSM blk f = do
+runSM :: Environment -> SM a -> ContextM a
+runSM env f = do
   vmcontext <- get
 
   let startingState =
         SState {
-        env = Environment {
-            sender = Address 0x1234,
-            origin = Address 0x1234,
-            blockHeader = blk
-            },
+        env = env,
         callStack = [],
         codeDB = contextCodeDB vmcontext,
         hashDB = contextHashDB vmcontext,
@@ -180,19 +190,11 @@ getEnv :: SM Environment
 getEnv = do
   fmap env get
 
-addLocalVariable :: String -> Value -> SM ()
-addLocalVariable name value = do
-  newVariable <- liftIO $ fmap Variable $ newIORef value
-  sstate <- get
-  case callStack sstate of
-    [] -> error "addLocalVariable called with an empty stack"
-    (currentSlice:rest) ->
-      put sstate
-          {callStack = currentSlice{localVariables=M.insert name newVariable $ localVariables currentSlice}:rest}
 
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True x = Just x
 toMaybe False _ = Nothing
+
 
 getVariableOfName :: String -> SM Variable
 getVariableOfName name = do
@@ -200,43 +202,57 @@ getVariableOfName name = do
 
   let currentCallInfo =
         case callStack sstate of
-          [] -> error "getVariableValue called with an empty stack"
+          [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
       vars = localVariables currentCallInfo
-      maybeLocalValue = M.lookup name $ vars
+      t s v = ('x':s) `seq` v
+  maybeLocalValue <-
+    -- TODO(tim): consult memory map for locals instead of storage
+    case M.lookup name vars of
+      Nothing -> return Nothing
+      Just (_, var) -> Just <$> case var of
+        Constant (SReference ap) -> return $ StorageItem ap
+        Variable v -> do
+          val <- liftIO $ readIORef v
+          case val of
+            SReference ap -> return $ StorageItem ap
+            _ -> return $ StorageItem $ AddressedPath (Left LocalVar) [MS.Field $ BC.pack name]
+        s@StorageItem{} -> return s
+        Constant{} -> return $ StorageItem $ AddressedPath (Left LocalVar) [MS.Field $ BC.pack name]
 
-      maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
+  let maybeContractFunction :: Maybe Variable
+      maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["uint", "keccak256", "require", "revert", "assert", "sha3", "sha256", "ecrecover", "addmod", "mulmod", "selfdestruct", "suicide"]) $
-        Constant $ SBuiltinFunction name Nothing
+        t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
       maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx"]) $
-        Constant $ SBuiltinVariable name
+        t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
       maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums)) $
-        Constant $ SEnum name
+        t "enum" $ Constant $ SEnum name
 
       maybeStructDef :: Maybe Variable
       maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs)) $
-        Constant $ SStructDef name
+        t "struct def" $ Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
       maybeContract = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.contracts)) $
-        Constant $ SContractDef name
+        t "contract" $ Constant $ SContractDef name
 
       maybeStorageItem :: Maybe Variable
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
-        then either (error . show) (Just . StorageItem) . MS.parsePath . BC.pack $ '.':name
+        then Just . StorageItem $ AddressedPath
+              (Right $ currentAddress currentCallInfo) [MS.Field $ BC.pack name]
         else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . Constant . SAddress . currentAddress $ currentCallInfo
+      maybeThis = toMaybe (name == "this") . t "this" . Constant . SAddress . currentAddress $ currentCallInfo
 
 
 
@@ -252,30 +268,22 @@ getVariableOfName name = do
       Nothing -> return Nothing
       Just (Xabi.ConstantDecl _ _ e) -> do
         let val = constExpToVar e
-        --error "gonna constant"
         return $ Just $ Constant $ val
 -}
 
-  return
-    $ flip fromMaybe maybeLocalValue
-    $ flip fromMaybe maybeStorageItem
-    $ flip fromMaybe maybeContractFunction
-    $ flip fromMaybe maybeBuiltinFunction
-    $ flip fromMaybe maybeBuiltinVariable
-    $ flip fromMaybe maybeEnum
-    $ flip fromMaybe maybeStructDef
-    $ flip fromMaybe maybeContract
-    $ flip fromMaybe maybeThis
---    $ flip fromMaybe maybeConstantValue
-    $ (error $ "No variable with name " ++ name)
+  return . fromMaybe (unknownVariable "getVariableOfName" name) . foldr1 (<|>) $
+      [ maybeLocalValue
+      , maybeStorageItem
+      , maybeContractFunction
+      , maybeBuiltinFunction
+      , maybeBuiltinVariable
+      , maybeEnum
+      , maybeStructDef
+      , maybeContract
+      , maybeThis
+      , unknownVariable "getVariableOfName" name
+      ]
 
-
-getCurrentCallInfo :: SM CallInfo
-getCurrentCallInfo = do
-  sstate <- get
-  case callStack sstate of
-    [] -> error "getCurrentCallInfo called with an empty stack"
-    (currentCallInfo:_) -> return currentCallInfo
 
 
 getTypeOfName :: String -> SM Typo
@@ -284,37 +292,25 @@ getTypeOfName s = do
       lookInContract (Contract{..}) = catMaybes
         [ fmap StructTypo (M.lookup s _structs)
         , fmap EnumTypo (M.lookup s _enums)
-        , fmap FuncTypo (M.lookup s _functions)
         ]
   CodeCollection ccs <- fmap codeCollection getCurrentCallInfo
   let ctrs = map ContractTypo $ M.keys ccs
   case concatMap lookInContract ccs ++ ctrs of
-    [] -> error $ "TODO(tim): unable to find type: " ++ show s
+    [] -> internalError "getTypeOfName" s
     (typo:_) -> return typo
 
-{-
-  c <- fmap (currentContract . head . callStack) get
-  let contractVariables = undefined
-      theFunction =
-        flip fromMaybe (M.lookup name $ c^.functions)
-        $ flip fromMaybe (M.lookup name contractVariables)
-        $ error $ "No variable named " ++ name
-      Just funcStatements = funcContents theFunction
-
-  runStatements funcStatements
--}
 
 
-addCallInfo :: Address -> Contract -> CodeCollection -> Map String Variable -> SM ()
+addCallInfo :: Address -> Contract -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
 addCallInfo a c cc initialLocalVariables = do
   sstate <- get
-
   let newCallInfo =
         CallInfo {
           currentAddress=a,
           currentContract=c,
           codeCollection=cc,
-          localVariables=initialLocalVariables
+          localVariables=initialLocalVariables,
+          localByPath=HM.empty
         }
 
   put sstate{callStack = newCallInfo:callStack sstate}
@@ -323,27 +319,126 @@ popCallInfo :: SM ()
 popCallInfo = do
   sstate <- get
   case callStack sstate of
-    [] -> error "popCallInfo was called on an already empty stack"
+    [] -> internalError "popCallInfo was called on an already empty stack" ()
     (_:rest) -> put sstate{callStack = rest}
 
+
+getCurrentCallInfo :: SM CallInfo
+getCurrentCallInfo = do
+  sstate <- get
+  case callStack sstate of
+    [] -> internalError "getCurrentCallInfo called with an empty stack" ()
+    (currentCallInfo:_) -> return currentCallInfo
 
 getCurrentContract :: SM Contract
 getCurrentContract = do
   cs <- fmap callStack get
   case cs of
     (currentCallInfo:_) -> return $ currentContract currentCallInfo
-    _ -> error $ "getCurrentContract called with an empty stack"
+    _ -> internalError "getCurrentContract called with an empty stack" ()
 
 getCurrentAddress :: SM Address
 getCurrentAddress = do
   cs <- fmap callStack get
   case cs of
     (currentCallInfo:_) -> return $ currentAddress currentCallInfo
-    _ -> error $ "getCurrentContract called with an empty stack"
+    _ -> internalError "getCurrentContract called with an empty stack" ()
+
+
+getLocal :: MS.StoragePath -> SM MS.BasicValue
+getLocal path = fromMaybe MS.BDefault . HM.lookup path . localByPath <$> getCurrentCallInfo
+
+setLocal :: MS.StoragePath -> MS.BasicValue -> SM ()
+setLocal path val = do
+  sstate <- get
+  let stack = callStack sstate
+      (info, rest) = case stack of
+                (ci:r) -> (ci,r)
+                [] -> internalError "setLocal stack underflow" ()
+      locals = localByPath info
+      newLocals = case val of
+                    MS.BDefault -> HM.delete path locals
+                    _ -> HM.insert path val locals
+  put sstate{callStack=info{localByPath=newLocals}:rest}
+
 
 getCurrentCodeCollection :: SM CodeCollection
 getCurrentCodeCollection = do
   cs <- fmap callStack get
   case cs of
     (currentCallInfo:_) -> return $ codeCollection currentCallInfo
-    _ -> error $ "getCurrentContract called with an empty stack"
+    _ -> internalError "getCurrentContract called with an empty stack" ()
+
+hintFromType :: Xabi.Type -> SM BasicType
+hintFromType = \case
+ Xabi.Address{} -> return TAddress
+ Xabi.Bool{} -> return TBool
+ Xabi.Bytes{} -> return TString
+ Xabi.Int{} -> return TInteger
+ Xabi.String{} -> return TString
+ Xabi.Label s -> do
+   t' <- getTypeOfName s
+   case t' of
+     ContractTypo{} -> return $ TContract s
+     EnumTypo{} -> return $ TEnumVal s
+     StructTypo fs -> do
+       let upgrade :: (T.Text, Xabi.FieldType) -> SM (B.ByteString , BasicType)
+           upgrade = mapM (hintFromType . Xabi.fieldTypeType) . first encodeUtf8
+       TStruct s <$> mapM upgrade fs
+ Xabi.Array{} -> return TComplex
+ tt'' -> todo "hintFromType" tt''
+
+getXabiType :: Either LocalVar Address -> B.ByteString -> SM (Maybe Xabi.Type)
+getXabiType loc field = do
+  -- This field might have been defined in e.g. a caller contract.
+  -- We search from the top down for the home of this data
+  case loc of
+    Left LocalVar -> M.lookup (BC.unpack field) . fmap fst . localVariables <$> getCurrentCallInfo
+    Right addr -> do
+      stack <- gets callStack
+      case filter ((== addr) . currentAddress) stack of
+        [] -> internalError "address not found in call stack" (addr, stack)
+        (callInfo:_) -> return
+                      . M.lookup (BC.unpack field)
+                      . fmap Xabi.varType
+                      . _storageDefs
+                      . currentContract
+                      $ callInfo
+
+getXabiValueType :: AddressedPath -> SM Xabi.Type
+getXabiValueType apt@(AddressedPath _ []) = internalError "getXabiValueType" apt
+getXabiValueType (AddressedPath loc (MS.Field field:rest)) = do
+  mType <- getXabiType loc field
+  case mType of
+    Nothing -> todo "getXabiValueType/unknown storage reference" field
+    Just v -> loop rest v
+ where loop :: MS.StoragePath -> Xabi.Type -> SM Xabi.Type
+       loop [] = return
+       loop [x] = \case
+         Xabi.Mapping{Xabi.value=v} -> case x of
+           MS.MapIndex{} -> return v
+           _ -> typeError "non map index attribute of mapping" x
+         Xabi.Array{Xabi.entry=v} -> case x of
+           MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
+           MS.ArrayIndex{} -> return v
+           _ -> typeError "non-length or array index attribute of array" x
+         Xabi.Label s -> do
+           t' <- getTypeOfName s
+           case (x, t') of
+             (MS.Field n, StructTypo fs) -> do
+               let mt'' = lookup (decodeUtf8 n) fs
+               case mt'' of
+                Just t'' -> return $ Xabi.fieldTypeType t''
+                Nothing -> error $ "field not present in struct definition: " ++ show (n, fs)
+             (_, StructTypo{}) -> typeError "non field access to struct" x
+             (_, ContractTypo{}) -> todo "getValueType/contract access" t'
+             (_, EnumTypo{}) -> todo "getValueType/enum acess" t'
+         t'' -> todo "atomic type does not have value type" t''
+       loop (_:rs) = \case
+          Xabi.Mapping{Xabi.value=t'} -> loop rs t'
+          Xabi.Array{Xabi.entry=t'} -> loop rs t'
+          t -> todo "getXabiValueType/loopnext unsupported type" t
+getXabiValueType p = internalError "getXabiValueType/storage path not prefixed by field" p
+
+getValueType :: AddressedPath -> SM BasicType
+getValueType p = hintFromType =<< getXabiValueType p

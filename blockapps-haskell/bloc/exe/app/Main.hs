@@ -13,7 +13,9 @@ import           Control.Monad.Log                  (Severity(..))
 import           Database.PostgreSQL.Simple
 import           Data.Pool
 import           HFlags
-import           Network.HTTP.Client hiding (Proxy)
+import           Network.HTTP.Client hiding (Proxy, responseStatus)
+import           Network.HTTP.Types (hContentType, status400)
+import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.RequestLogger
@@ -76,9 +78,17 @@ main = do
 dbExistsQuery22 :: Query
 dbExistsQuery22 = "SELECT 1 FROM pg_database WHERE datname='bloc22';"
 
+serveErrorsPlain :: Middleware
+serveErrorsPlain app req respond = app req $ \resp -> respond $
+  if responseStatus resp < status400
+    then resp
+    else mapResponseHeaders ((hContentType, "text/plain"):) resp
+
+
 appBloc :: Bloc22.BlocEnv -> Application
 appBloc env22 =
   (if Bloc22.logLevel env22 >= Informational then logStdoutDev else logStdout)
+  . serveErrorsPlain
   . cors (const $ Just policy)
   . provideOptions (Proxy @ Bloc22.BlocAPI)
   . serve (Proxy @ (
