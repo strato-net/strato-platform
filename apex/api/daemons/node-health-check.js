@@ -40,7 +40,7 @@ function queryHealthStatus() {
             await models.Stat.findOrCreate({where: {processName: 'Overall'}, defaults: {
                 latestHealthStatus: overallStat,
                 latestCheckTimestamp: currentTime,
-                lastFailureTimestamp: overallStat ? null : currentTime
+                lastFailureTimestamp: currentTime  // default first time marked as failure
             }}).then(([stat, created]) => {
                 if (!created){
                     stat.update(

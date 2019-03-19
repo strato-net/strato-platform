@@ -9,7 +9,8 @@ const {
   BLOCKS_PROPAGATION,
   BLOCKS_DIFFICULTY,
   GET_COINBASE,
-  GET_HEALTH
+  GET_HEALTH,
+  GET_NODE_UPTIME
  } = require('./rooms')
 
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('./eventBroker')
@@ -57,8 +58,12 @@ function init(server) {
     // register request for Coinbase
     registerRoomAllocation(socket, GET_COINBASE, getCoinbaseAggregator.initialHydrate)
 
-    // register request for Coinbase
+    // register request for node health check
     registerRoomAllocation(socket, GET_HEALTH, getHealthAggregator.initialHydrate)
+
+
+    // register request for node uptime duration
+    registerRoomAllocation(socket, GET_NODE_UPTIME, getHealthAggregator.initialHydrate)
   });
 }
 

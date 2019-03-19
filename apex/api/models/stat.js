@@ -3,9 +3,9 @@
 module.exports = function(sequelize, DataTypes) {
     let Stat = sequelize.define('Stat', {
         processName : {type: DataTypes.STRING, defaultValue: false, allowNull: false},
-        latestHealthStatus : {type: DataTypes.BOOLEAN, allowNull: true},
-        latestCheckTimestamp: {type: DataTypes.STRING, allowNull: true},
-        lastFailureTimestamp : {type: DataTypes.STRING, allowNull: true},
+        latestHealthStatus : {type: DataTypes.BOOLEAN, allowNull: false},
+        latestCheckTimestamp: {type: DataTypes.STRING, allowNull: false},
+        lastFailureTimestamp : {type: DataTypes.STRING, allowNull: false},
         ifBlocksValidInc: {type: DataTypes.BOOLEAN, allowNull: true}
     });
     Stat.prototype.toJson = function() {
