@@ -905,7 +905,6 @@ contract qq is P {
     getFields ["x"] `shouldReturn` [BInteger 774]
 
   it "can use super to call parent methods" . runTest $ do
-    liftIO $ pendingWith "implement `super`"
     void $ runBS [r|
 contract P {
   function callable() public {}
@@ -1138,7 +1137,6 @@ contract qq {
     getFields ["x"] `shouldReturn` [BInteger 85]
 
   it "can locally return tuples" . runTest $ do
-    liftIO $ pendingWith "resolution error for tuples"
     void $ runBS [r|
 contract qq {
   uint x;
@@ -1318,3 +1316,46 @@ contract qq is A, B {
     return super.value();
   }
 }|] `shouldReturn` defaultCallResults{erReturnVal=Just "10"}
+
+
+  it "can use named return values" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  function f() public pure returns (uint _x) {
+    _x = 887242634;
+  }
+  constructor() public {
+    x = f();
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 887242634]
+
+  it "can return and used named returns" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  function f() public pure returns (uint _x) {
+    if (true) {
+      _x = 7272;
+      return;
+    }
+    _x = 887;
+  }
+  constructor() public {
+    x = f();
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 7272]
+
+  it "can return early" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  unit x;
+  constructor() {
+    x = 343;
+    return;
+    x = 2401;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 343]

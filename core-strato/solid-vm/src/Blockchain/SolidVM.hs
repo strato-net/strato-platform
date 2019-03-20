@@ -99,10 +99,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) _ _ metadata = 
       maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
       maybeFile = runParser solidityFile "" "" $ BC.unpack initCode
-      file =
-        case maybeFile of
-          Left e -> error $ show e
-          Right v -> v
+      file = either (error . show) id maybeFile
 
       namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
                        | NamedXabi name (xabi, parents') <- unsourceUnits file]
@@ -710,7 +707,7 @@ expToVar' (Xabi.Unitary "!" expr) = do
 expToVar' (Xabi.Unitary "delete" expr) = do
   p <- expToPath expr
   deleteVar p
-  return . Constant $ SNULL
+  return $ Constant SNULL
 
 expToVar' (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Binary operations to a single function
   val1 <- getVar =<< expToVar expr1
@@ -816,7 +813,7 @@ expToVar' (Xabi.FunctionCall e args) = do
       res <- call' address contract' cc name argVals
       case res of
         Just v -> return $ Constant $ v
-        Nothing -> return $ Constant $ SNULL
+        Nothing -> return $ Constant SNULL
 
     Constant (SStructDef structName) -> do
       contract' <- getCurrentContract
@@ -837,15 +834,11 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant (SContractItem address itemName) -> do
       result <- call'' (Address $ fromInteger address) Nothing itemName argVals
-      case result of
-        Just value -> return $ Constant value
-        Nothing -> return $ Constant SNULL
+      return . Constant . fromMaybe SNULL $ result
 
     Constant (SContractFunction name address functionName) -> do
       result <- call'' (Address $ fromInteger address) (Just name) functionName argVals
-      case result of
-        Just value -> return $ Constant value
-        Nothing -> return $ Constant SNULL
+      return . Constant . fromMaybe SNULL $ result
 
     Constant (SEnum enumName) -> do
       case argVals of
@@ -1040,21 +1033,38 @@ addLocalVariable theType name value = do
 
 call' :: Address -> Contract -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
 call' address' contract' cc theFunction argVals = do
-  let argTypeNames = map fst $ sortWith snd $ [ ((t, T.unpack n), i) | (n, Xabi.IndexedType{Xabi.indexedTypeType=t, Xabi.indexedTypeIndex=i}) <- M.toList $ Xabi.funcArgs theFunction]
+  --
+  let returnMeta = map (\(n, Xabi.IndexedType _ t) -> (T.unpack n, t)) .  M.toList $ Xabi.funcVals theFunction
+      returns = map (\(n, t) -> (n, (t, defaultValue t))) returnMeta
+      argMeta = map fst . sortWith snd
+              . map (\(n, Xabi.IndexedType i t) -> ((T.unpack n, t), i))
+              . M.toList $ Xabi.funcArgs theFunction
+      args = zipWith (\(n, t) v -> (n, (t, v))) argMeta argVals
+      locals = args ++ returns
 
-  when trace $ liftIO $ putStrLn $ "            args: " ++ show (map snd argTypeNames)
+  when trace $ liftIO $ putStrLn $ "            args: " ++ show (map fst args)
+  when trace $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
-  addCallInfo address' contract' cc (M.fromList $ zipWith (\(t, n) v -> (n, (t, v))) argTypeNames (map Constant argVals))
-
-  forM_ (zip argTypeNames argVals) $ \((_, n), v) -> do
+  addCallInfo address' contract' cc $ M.fromList [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  forM_ locals $ \(n, (_, v)) -> do
     initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
 
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands
-
+  let findNamedReturns = do
+        let paths = map (AddressedPath (Left LocalVar) . MS.singleton . BC.pack . fst) returns
+        rs <- mapM (getVar . StorageItem) paths
+        case rs of
+          [] -> return Nothing
+          [x] -> return $ Just x
+          _ -> todo "multiple named return values" rs
+  val' <- case val of
+             Nothing -> findNamedReturns
+             Just SNULL -> findNamedReturns
+             Just{} -> return val
   popCallInfo
 
-  return val
+  return val'
 
 
 
