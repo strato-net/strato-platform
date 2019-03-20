@@ -51,7 +51,9 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
-import           Blockchain.SolidVM.Environment
+import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Class
+import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
@@ -100,7 +102,7 @@ BlockData
 
 data SState =
   SState {
-    env :: Environment,
+    env :: Env.Environment,
     callStack :: [CallInfo],
     codeDB                 :: CodeDB,
     hashDB                 :: HashDB,
@@ -108,7 +110,8 @@ data SState =
     addressStateTxDBMap    :: M.Map Address AddressStateModification,
     addressStateBlockDBMap :: M.Map Address AddressStateModification,
     storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
-    storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
+    storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString,
+    action                 :: Action
   }
 
 type SM = StateT SState (ResourceT IO)
@@ -151,7 +154,7 @@ instance HasHashDB SM where
 instance HasCodeDB SM where
   getCodeDB = codeDB <$> get
 
-runSM :: Environment -> SM a -> ContextM a
+runSM :: Env.Environment -> SM a -> ContextM a
 runSM env f = do
   vmcontext <- get
 
@@ -165,7 +168,8 @@ runSM env f = do
         addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
         addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
         storageTxMap = contextStorageTxMap vmcontext,
-        storageBlockMap = contextStorageBlockMap vmcontext
+        storageBlockMap = contextStorageBlockMap vmcontext,
+        action = startingAction env
         }
 
   (value, sstateAfter) <- liftIO $ runResourceT $ runStateT f startingState
@@ -180,7 +184,23 @@ runSM env f = do
   setStateDBStateRoot $ MP.stateRoot $ stateDB sstateAfter
   return value
 
-getEnv :: SM Environment
+
+startingAction :: Env.Environment -> Action
+startingAction env' = Action
+  { _actionBlockHash          = blockHeaderHash $ Env.blockHeader env'
+  , _actionBlockTimestamp     = blockHeaderTimestamp $ Env.blockHeader env'
+  , _actionBlockNumber        = blockHeaderBlockNumber $ Env.blockHeader env'
+  , _actionTransactionHash    = Env.txHash env'
+  , _actionTransactionChainId = Env.chainId env'
+  , _actionTransactionSender  = Env.sender env'
+  , _actionData               = M.empty
+  , _actionMetadata           = Env.metadata env'
+  }
+
+
+
+
+getEnv :: SM Env.Environment
 getEnv = do
   fmap env get
 

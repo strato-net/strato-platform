@@ -43,14 +43,11 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SolidVM.CodeCollectionDB
-import           Blockchain.SolidVM.Environment       (Environment)
 import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
-import           Blockchain.Strato.Model.Action
-import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
@@ -159,6 +156,8 @@ create' creator cc contractName' argExps = do
 
   when trace $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
+  sstate <- get
+
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
     erRefund = 0,
@@ -167,7 +166,7 @@ create' creator cc contractName' argExps = do
     erLogs = [],
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
-    erAction = Nothing,
+    erAction = Just $ action sstate,
     erException = Nothing
     }
 
@@ -223,12 +222,13 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         Env.chainId=chainId',
         Env.metadata=metadata
         }
-  encodedReturnValue <- runSM env' $ do
+  (encodedReturnValue, sstate) <- runSM env' $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
            maybeRet <- call'' codeAddress Nothing funcName argValues
+           sstate <- get
            case maybeRet of
-             Just x -> fmap Just $ encodeForReturn x
-             Nothing -> return Nothing
+             Just x -> fmap (\v -> (Just v, sstate)) $ encodeForReturn x
+             Nothing -> return (Nothing, sstate)
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -238,23 +238,10 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
     erLogs = [],
     erNewContractAddress = Nothing,
     erSuicideList = S.empty,
-    erAction = Just $ startingAction env',
+    erAction = Just $ action sstate,
     erException = Nothing
     }
 
-
-
-startingAction :: Environment -> Action
-startingAction env' = Action
-  { _actionBlockHash          = blockHeaderHash $ Env.blockHeader env'
-  , _actionBlockTimestamp     = blockHeaderTimestamp $ Env.blockHeader env'
-  , _actionBlockNumber        = blockHeaderBlockNumber $ Env.blockHeader env'
-  , _actionTransactionHash    = Env.txHash env'
-  , _actionTransactionChainId = Env.chainId env'
-  , _actionTransactionSender  = Env.sender env'
-  , _actionData               = M.empty
-  , _actionMetadata           = Env.metadata env'
-  }
 
 
 getCodeAndCollection :: Address -> SM (Contract, CodeCollection)
