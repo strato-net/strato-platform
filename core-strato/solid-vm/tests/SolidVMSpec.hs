@@ -1317,6 +1317,25 @@ contract qq is A, B {
   }
 }|] `shouldReturn` defaultCallResults{erReturnVal=Just "10"}
 
+  it "can determine super instance by function name" . runTest $ do
+    liftIO $ pendingWith "MRO by ADL"
+    void $ runBS [r|
+contract A {
+  function a() public pure returns (uint) { return 0xaaaa;}
+}
+contract B {
+  function b() public pure returns (uint) { return 0xbbbb;}
+}
+contract qq is A, B{
+  uint x;
+  uint y;
+  constructor() public {
+    x = super.a();
+    y = super.b();
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 0xaaaa, BInteger 0xbbbb]
+
 
   it "can use named return values" . runTest $ do
     void $ runBS [r|
@@ -1359,3 +1378,37 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 343]
+
+  it "can initialize from constants" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint constant c = 995;
+  uint x = c;
+}|]
+    getFields ["c", "x"] `shouldReturn` [BDefault, BInteger 995]
+
+  it "can assign from constants" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint constant c = 2007;
+  uint x;
+  constructor() public {
+    x = c;
+  }
+}|]
+    getFields ["c", "x"] `shouldReturn` [BDefault, BInteger 2007]
+
+  it "can read parent constants" . runTest $ do
+    void $ runBS [r|
+contract Constants {
+  uint constant VALIDATION_PASSED = 200;
+}
+
+contract qq is Constants {
+  uint x;
+  constructor() public {
+    x = VALIDATION_PASSED;
+  }
+}|]
+
+    getFields ["VALIDATION_PASSED", "x"] `shouldReturn` [BDefault, BInteger 200]

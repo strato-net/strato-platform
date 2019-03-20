@@ -122,6 +122,13 @@ coerceFromInt SString{} 0 = SString ""
 coerceFromInt SString{} n = SString $ showHex n ""
 coerceFromInt t x = typeError "invalid literal for type" (t, x)
 
+-- coerceType allows integer literals to initialize integers, addresses, and
+-- strings (in the special case of 0) and bytes32, determined by type instead of value
+coerceType :: Xabi.Type -> Value -> Value
+coerceType xt = \case
+    SInteger i -> coerceFromInt (defaultValue xt) i
+    v -> v
+
 
 valEquals :: Value -> Value -> Bool
 valEquals lhs rhs = case (lhs, rhs) of

@@ -976,13 +976,6 @@ bytesToInteger bytes =
 
 runTheConstructors :: CodeCollection -> Address -> String -> [Xabi.Expression] -> SM ()
 runTheConstructors cc address contractName' argExps = do
-  -- coerceType allows integer literals to initialize integers, addresses, and
-  -- strings (in the special case of 0)
-  let coerceType :: Xabi.Type -> Value -> Value
-      coerceType xt = \case
-        SInteger i -> coerceFromInt (defaultValue xt) i
-        v -> v
-
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.contracts . at contractName'
