@@ -62,6 +62,7 @@ import           Blockchain.VMContext
 
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
+import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
@@ -216,7 +217,6 @@ toMaybe False _ = Nothing
 getVariableOfName :: String -> SM Variable
 getVariableOfName name = do
   sstate <- get
-
   let currentCallInfo =
         case callStack sstate of
           [] -> internalError "getVariableValue called with an empty stack" name
@@ -256,6 +256,14 @@ getVariableOfName name = do
       maybeEnum :: Maybe Variable
       maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums)) $
         t "enum" $ Constant $ SEnum name
+
+      maybeConstant :: Maybe Variable
+      maybeConstant = fmap (t "constant constant" . Constant) $ do
+        let ctract = currentContract currentCallInfo
+        Xabi.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
+        return $ coerceType constType $ case constInitialVal of
+                                            Xabi.NumberLiteral x _ -> SInteger x
+                                            x -> todo "constant initial val" x
 
       maybeStructDef :: Maybe Variable
       maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs)) $
@@ -304,6 +312,7 @@ getVariableOfName name = do
       , maybeStructDef
       , maybeContract
       , maybeThis
+      , maybeConstant
       , unknownVariable "getVariableOfName" name
       ]
 

@@ -9,8 +9,8 @@ import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.Text as T
 
-import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Parse.File
+import           Blockchain.SolidVM.Exception
+
 import           SolidVM.Solidity.Xabi
 import qualified SolidVM.Solidity.Xabi as Xabi
 import qualified SolidVM.Solidity.Xabi.Def as Xabi
@@ -74,43 +74,20 @@ applyInheritence cc =
 addInheritedObjects :: CodeCollection -> Contract -> Contract
 addInheritedObjects cc c =
   c{
-  _functions=getContractFunctions cc c,
-  _storageDefs=getContractStorageDefs cc c,
-  _enums=getContractEnums cc c,
-  _structs=getContractStructs cc c
+  _functions=toUnionMaker _functions cc c,
+  _storageDefs=toUnionMaker _storageDefs cc c,
+  _enums=toUnionMaker _enums cc c,
+  _structs=toUnionMaker _structs cc c,
+  _constants=toUnionMaker _constants cc c
   }
 
-getContractFunctions :: CodeCollection -> Contract -> Map String Xabi.Func
-getContractFunctions cc c =
-  let parentContracts = map (\p -> fromMaybe (error $ "contract parent name doesn't exist: " ++ p) $ M.lookup p $ cc^.contracts) $ c^.parents
-      parentFunctions = map (getContractFunctions cc) parentContracts :: [Map String Xabi.Func]
-  in M.unions $ c^.functions:parentFunctions
+getParents :: CodeCollection -> Contract -> [Contract]
+getParents cc c =
+  let toErr p = fromMaybe (internalError "contract parent does not exist" p)
+  in map (\p -> toErr p . M.lookup p $ cc ^. contracts) $ c ^. parents
 
-getContractStorageDefs :: CodeCollection -> Contract -> Map String Xabi.VariableDecl
-getContractStorageDefs cc c =
-  let parentContracts = map (\p -> fromMaybe (error $ "contract parent name doesn't exist: " ++ p) $ M.lookup p $ cc^.contracts) $ c^.parents
-      parentStorageDefs = map (getContractStorageDefs cc) parentContracts
-  in M.unions $ c^.storageDefs:parentStorageDefs
-
-getContractEnums :: CodeCollection -> Contract -> Map String [String]
-getContractEnums cc c =
-  let parentContracts = map (\p -> fromMaybe (error $ "contract parent name doesn't exist: " ++ p) $ M.lookup p $ cc^.contracts) $ c^.parents
-      parentEnums = map (getContractEnums cc) parentContracts :: [Map String [String]]
-  in M.unions $ c^.enums:parentEnums
-
-getContractStructs :: CodeCollection -> Contract -> Map String [(T.Text, Xabi.FieldType)]
-getContractStructs cc c =
-  let parentContracts = map (\p -> fromMaybe (error $ "contract parent name doesn't exist: " ++ p) $ M.lookup p $ cc^.contracts) $ c^.parents
-      parentStructs = map (getContractStructs cc) parentContracts
-  in M.unions $ c^.structs:parentStructs
-
-
-
-getFunction :: File -> T.Text -> T.Text -> (T.Text, Xabi.Func)
-getFunction file name functionName =
-  let
-    Just contract' = lookup name $ [(name', xabi) | NamedXabi name' (xabi, _) <- unsourceUnits file]
-
-    Just func = M.lookup functionName $ Xabi.xabiFuncs contract'
-  in (functionName, func)
-
+toUnionMaker :: (Ord a) => (Contract -> M.Map a b) -> CodeCollection -> Contract -> M.Map a b
+toUnionMaker f cc c =
+  let parents' = getParents cc c
+      parentMaps = map (toUnionMaker f cc) parents'
+  in M.unions $ f c : parentMaps

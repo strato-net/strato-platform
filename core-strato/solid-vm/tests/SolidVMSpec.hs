@@ -67,13 +67,13 @@ runTest f = do
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
     Right{} -> return ()
 
-runFile :: FilePath -> ContextM ExecResults
-runFile fp = runBS =<< liftIO (B.readFile fp)
+runFile :: FilePath -> ContextM ()
+runFile fp = void $ runBS =<< liftIO (B.readFile fp)
 
-runBS :: B.ByteString -> ContextM ExecResults
+runBS :: B.ByteString -> ContextM ()
 runBS = runArgs "()"
 
-runArgs :: T.Text -> B.ByteString -> ContextM ExecResults
+runArgs :: T.Text -> B.ByteString -> ContextM ()
 runArgs args bs = do
   let code = Code bs
       isTest = error "TODO: isTest"
@@ -98,15 +98,15 @@ runArgs args bs = do
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = error "TODO: txHash"
-      chainId = error "TODO: chainId"
+      txHash = SHA 0x776622233444
+      chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
-  SVM.create isTest isHomestead suicides blockData callDepth sender origin
+  void $ SVM.create isTest isHomestead suicides blockData callDepth sender origin
             value gasPrice availableGas newAddress code txHash chainId metadata
 
-runCall :: T.Text -> T.Text -> B.ByteString -> ContextM ExecResults
-runCall funcName callArgs bs = do
+runCall :: T.Text -> T.Text -> B.ByteString -> ContextM (Maybe SB.ShortByteString)
+runCall funcName callArgs bs = erReturnVal <$> do
   let code = Code bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -130,8 +130,8 @@ runCall funcName callArgs bs = do
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = error "TODO: txHash"
-      chainId = error "TODO: chainId"
+      txHash = SHA 0x234962
+      chainId = Nothing
       createMetadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
@@ -142,8 +142,8 @@ runCall funcName callArgs bs = do
   SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
     uploadAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
 
-call2 :: T.Text -> T.Text -> Address -> ContextM ExecResults
-call2 funcName callArgs contractAddress = do
+call2 :: T.Text -> T.Text -> Address -> ContextM (Maybe SB.ShortByteString)
+call2 funcName callArgs contractAddress = erReturnVal <$> do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -166,8 +166,8 @@ call2 funcName callArgs contractAddress = do
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = error "TODO: txHash"
-      chainId = error "TODO: chainId"
+      txHash = SHA 0xddba11
+      chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
@@ -176,22 +176,6 @@ call2 funcName callArgs contractAddress = do
     contractAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
 
 
-
-defaultExecResults :: ExecResults
-defaultExecResults = ExecResults
- { erRemainingTxGas = 0
- , erRefund = 0
- , erReturnVal = Just ""
- , erTrace = []
- , erLogs = []
- , erNewContractAddress = Just uploadAddress
- , erSuicideList = S.empty
- , erAction = Nothing
- , erException = Nothing
- }
-
-defaultCallResults :: ExecResults
-defaultCallResults = defaultExecResults{erNewContractAddress = Nothing}
 
 checkStorage :: ContextM [(MP.Key, B.ByteString)]
 checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
@@ -213,35 +197,35 @@ spec = do
   describe "Ballot" $ do
     it "can be created" . runTest $ do
       liftIO $ pendingWith "storage vs memory, struct kwargs"
-      runFile "testdata/Ballot.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/Ballot.sol"
 
   describe "Create" $ do
     it "should be able to run an empty contract" . runTest $ do
-      runFile "testdata/Empty.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/Empty.sol"
       checkStorage `shouldReturn` []
 
     it "should be able to store a default int" . runTest $ do
-      runFile "testdata/DefaultInt.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/DefaultInt.sol"
       checkStorage `shouldNotReturn` []
 
     it "should be able to explicitly store an int" . runTest $ do
-      runFile "testdata/SetInt.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/SetInt.sol"
       checkStorage `shouldNotReturn` []
 
     it "can reduce a modulus" . runTest $ do
-      void $ runFile "testdata/Modulo.sol"
+      runFile "testdata/Modulo.sol"
       getFields ["x"] `shouldReturn` [BInteger 0xbe]
 
 
     it "should be able to store a string" . runTest $ do
-      runFile "testdata/SetString.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/SetString.sol"
       checkStorage `shouldNotReturn` []
 
     it "should be able to store an array" . runTest $ do
       getAll [ [Field "nums", Field "length"]
              , [Field "nums", ArrayIndex 0]
              ] `shouldReturn` [BDefault, BDefault]
-      runFile "testdata/ArrayPush.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/ArrayPush.sol"
       st <- checkStorage
       st `shouldSatisfy` (== 2) . length
       getAll [ [Field "nums", Field "length"]
@@ -250,7 +234,7 @@ spec = do
 
     it "should be able to read an array" . runTest $ do
       checkStorage `shouldReturn` []
-      runFile "testdata/ArrayRead.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/ArrayRead.sol"
       st <- checkStorage
       st `shouldSatisfy` (== 5) . length
       getAll
@@ -268,7 +252,7 @@ spec = do
                          , BInteger 0xffff]
 
     it "should be able to insert into a mapping" . runTest $ do
-      runFile "testdata/MappingSet.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/MappingSet.sol"
       st <- checkStorage
       st `shouldSatisfy` (== 2) . length
       getAll
@@ -278,7 +262,7 @@ spec = do
         ] `shouldReturn` [BInteger 4, BInteger 21, BDefault]
 
     it "should be able to read from a map" . runTest $ do
-      runFile "testdata/MappingRead.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/MappingRead.sol"
       st <- checkStorage
       -- The z assignment doesn't count, as at is set to the empty string
       st `shouldSatisfy` (== 3) . length
@@ -289,13 +273,13 @@ spec = do
         ] `shouldReturn` [BInteger 343, BInteger 343, BInteger 0]
 
     it "should be able to set array length" . runTest $ do
-      runFile "testdata/Length.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/Length.sol"
       st <- checkStorage
       st `shouldSatisfy` (== 1) . length
       getAll [[Field "xs", Field "length"]] `shouldReturn` [BInteger 24]
 
     it "should be able to read array length" . runTest $ do
-      runFile "testdata/ReadLength.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/ReadLength.sol"
       st <- checkStorage
       st `shouldSatisfy` (== 2) . length
       getAll [ [Field "xs", Field "length"]
@@ -303,22 +287,22 @@ spec = do
              ] `shouldReturn` [BInteger 0x400, BInteger 0x400]
 
     it "can delete" . runTest $ do
-      runFile "testdata/Delete.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/Delete.sol"
       getFields ["x"] `shouldReturn` [BDefault]
 
     it "can run complicated constructors" . runTest $ do
-      runFile "testdata/Constructor.sol" `shouldReturn` defaultExecResults
+      runFile "testdata/Constructor.sol"
 
     it "can exponentiate" . runTest $ do
-      void $ runFile "testdata/Exp.sol"
+      runFile "testdata/Exp.sol"
       getFields ["x"] `shouldReturn` [BInteger 25]
 
     it "can use addresses as map keys" . runTest $ do
-      void $ runFile "testdata/AddressMapping.sol"
+      runFile "testdata/AddressMapping.sol"
       getAll [[Field "perms", MapIndex (IAddress 0xdeadbeef)]] `shouldReturn` [BInteger 0xfff]
 
     it "can hash correctly" . runTest $ do
-      void $ runFile "testdata/Keccak256.sol"
+      runFile "testdata/Keccak256.sol"
       getFields ["buf1", "buf2", "hash1", "hash2"] `shouldReturn`
         [ BString (B.replicate 32 0xfe)
         , BString (BC.replicate 32 'x')
@@ -327,12 +311,12 @@ spec = do
         ]
 
     it "can create a struct" . runTest $ do
-      void $ runFile "testdata/Struct.sol"
+      runFile "testdata/Struct.sol"
       getAll [ [Field "x", Field "a"]
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 900, BString "ok"]
 
     it "can inline create a struct" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
   struct X {
     int a;
@@ -348,7 +332,7 @@ contract qq {
       getAll [ [Field "x", Field "a"]
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 900, BString "ok"]
     it "can directy initialize a struct" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
   struct X {
     int a;
@@ -360,7 +344,7 @@ contract qq {
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 3, BInteger 4]
 
     it "can push a struct" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
   struct X {
     int a;
@@ -379,7 +363,7 @@ contract qq {
              ] `shouldReturn` [BDefault, BInteger 1, BInteger 88, BInteger 73]
 
     it "can explicitly push a struct" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
   struct X {
     uint a;
@@ -400,7 +384,7 @@ contract qq {
              , [Field "xs", ArrayIndex 0, Field "b"]
              ] `shouldReturn` [BDefault, BInteger 1, BInteger 9000, BInteger 3000]
     it "can post increment" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
   uint x = 400000000;
   uint y;
@@ -411,7 +395,7 @@ contract qq {
       getFields ["x", "y"] `shouldReturn` [BInteger 400000001, BInteger 400000000]
 
     it "can pre increment" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
  uint x = 99;
  uint y = 17;
@@ -422,7 +406,7 @@ contract qq {
       getFields ["x", "y"] `shouldReturn` [BInteger 100, BInteger 100]
 
     it "can post decrement" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
   uint x = 10;
   uint y;
@@ -434,7 +418,7 @@ contract qq {
       getFields ["x", "y"] `shouldReturn` [BInteger 9, BInteger 10]
 
     it "can pre decrement" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
   uint x = 20;
   uint y;
@@ -450,7 +434,7 @@ contract qq {
   constructor() {
     require(3 == 3, "Who is John Galt?");
   }
-}|] `shouldReturn` defaultExecResults
+}|]
 
     it "can multiline require" . runTest $ do
       runBS [r|
@@ -461,10 +445,10 @@ contract qq {
       "Who is John Galt????"
     );
   }
-}|] `shouldReturn` defaultExecResults
+}|]
 
     it "can index into maps with bool" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
   mapping(bool => uint) bs;
   constructor() public {
@@ -476,7 +460,7 @@ contract qq {
              , [Field "bs", MapIndex $ IBool True]] `shouldReturn` [BInteger 0, BInteger 0x87324]
 
     it "should be able to store a contract" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract X {}
 contract qq {
   X x = X(0x999999);
@@ -484,7 +468,7 @@ contract qq {
       getAll [ [Field "x"] ] `shouldReturn` [BContract "X" 0x999999]
 
     it "should be able to return the time from the header" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
  uint ts;
  constructor() {
@@ -494,7 +478,7 @@ contract qq {
       getAll [ [Field "ts"] ] `shouldReturn` [BInteger 0x4000]
 
     it "can parse one specific assembly block" . runTest $ do
-      void $ runBS [r|
+      runBS [r|
 contract qq {
   bytes32 stored;
   constructor() {
@@ -509,7 +493,7 @@ contract qq {
       getAll [ [Field "stored"] ] `shouldReturn` [BString "alright."]
 
   it "can handle nested mappings" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   mapping(uint => mapping(uint => string)) xs;
   constructor() {
@@ -519,7 +503,7 @@ contract qq {
     getAll [ [Field "xs", MapIndex (INum 10), MapIndex (INum 20)] ] `shouldReturn` [BString "ok"]
 
   it "can handle deeply nested mappings" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract X {}
 contract qq {
   mapping (bytes32 => mapping(bytes32 => mapping(bool => X))) public ruleSets;
@@ -536,7 +520,7 @@ contract qq {
              , MapIndex $ IBool True ] ] `shouldReturn` [BContract "X" 0xdeadbeef]
 
   it "can default construct local arrays" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   constructor() {
     bytes32[] mnames;
@@ -545,7 +529,7 @@ contract qq {
     checkStorage `shouldReturn` []
 
   it "can array index with uninitialized numbers" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint[] xs;
   uint y;
@@ -557,7 +541,7 @@ contract qq {
     getAll [ [Field "y" ]] `shouldReturn` [BInteger 0]
 
   it "can map index with uninitialized numbers" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   mapping(uint => uint) xs;
   uint y;
@@ -569,7 +553,7 @@ contract qq {
     getAll [ [Field "y" ]] `shouldReturn` [BInteger 0]
 
   it "can map index with uninitialized strings" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   mapping(string => uint) xs;
   uint y;
@@ -581,7 +565,7 @@ contract qq {
     getFields ["y"] `shouldReturn` [BInteger 0]
 
   it "can access fields of structs from arrays" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   struct S {
     uint f;
@@ -597,7 +581,7 @@ contract qq {
     getFields ["y"] `shouldReturn` [BInteger 0xdeadbeef]
 
   it "should not treat local ints as references" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x = 20;
   constructor() {
@@ -608,7 +592,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BInteger 20]
 
   it "should remember modifications to locals" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x;
   constructor() {
@@ -620,7 +604,7 @@ contract qq {
     getFields ["x"]`shouldReturn` [BInteger 200]
 
   it "can assign a local struct" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint z;
   struct X {
@@ -635,7 +619,7 @@ contract qq {
     getFields ["z"] `shouldReturn` [BInteger 777]
 
   it "can do arithmetic with defaults" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x = 0xf07;
   uint z;
@@ -648,7 +632,7 @@ contract qq {
     getFields ["x", "z"] `shouldReturn` [BInteger 0xf07, BInteger 0xf07]
 
   it "can read from struct references" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   struct S {
     uint si;
@@ -668,7 +652,7 @@ contract qq {
            ] `shouldReturn` [BInteger 1, BInteger 222222, BInteger 222222]
 
   it "can detect nulls" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   mapping(uint => uint) ns;
   bool found;
@@ -679,7 +663,7 @@ contract qq {
     getFields ["found"] `shouldReturn` [BBool False]
 
   it "compares equal againts default" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x = 0;
   uint y;
@@ -691,7 +675,7 @@ contract qq {
     getFields ["x", "y", "z"] `shouldReturn` [BInteger 0, BInteger 0, BBool True]
 
   it "can check msg.sender" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   address x;
   constructor() {
@@ -701,7 +685,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BAddress sender]
 
   it "can read tx.origin" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   address x;
   constructor() {
@@ -711,7 +695,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BAddress origin]
 
   it "can infer types" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x;
   function f() returns (uint) {
@@ -725,7 +709,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BInteger 12345]
 
   it "can unpack tuples" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x;
   uint y;
@@ -738,7 +722,7 @@ contract qq {
     getFields ["x", "y"] `shouldReturn` [BInteger 98, BInteger 7776234]
 
   it "will run parent constructors" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract Parent {
   uint x;
   string name;
@@ -754,7 +738,7 @@ contract qq is Parent {
     getFields ["x", "name"] `shouldReturn` [BInteger 2346, BString "Sandman"]
 
   it "will pass arguments to constructors" . runTest $ do
-    void $ runArgs "(0x6662346)" [r|
+    runArgs "(0x6662346)" [r|
 contract qq {
   address target;
   constructor(address _target) public {
@@ -764,7 +748,7 @@ contract qq {
     getFields ["target"] `shouldReturn` [BAddress 0x6662346]
 
   it "can create a reference to a map value" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   mapping (bytes32 => bytes32[]) ruleNames;
 
@@ -778,7 +762,7 @@ contract qq {
            ] `shouldReturn` [BInteger 1, BString "1"]
 
   it "can back assign a reference" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   bytes32[] src;
   bytes32[] dst;
@@ -799,7 +783,7 @@ contract qq {
                             , BInteger 1, BString "red"]
 
   it "can back assign a map value reference" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   mapping (bytes32 => bytes32[]) ruleNames;
 
@@ -812,7 +796,7 @@ contract qq {
 
   it "can continue" . runTest $ do
     liftIO $ pendingWith "implement continue"
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint i;
   constructor() public {
@@ -824,7 +808,7 @@ contract qq {
     getFields ["i"] `shouldReturn` [BInteger 100]
 
   it "can call functions on local contracts" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract Auth {
   function check(address _to_check) public returns (bool) {
     return _to_check == 0xdeadbeef;
@@ -841,7 +825,7 @@ contract qq {
     getFields ["auth"] `shouldReturn` [BBool True]
 
   it "can call functions on stored contracts" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract Auth {
   function check(address _to_check) public returns (bool) {
     return _to_check == 0xdeadbeef;
@@ -859,7 +843,7 @@ contract qq {
     getFields ["auth"] `shouldReturn` [BBool True]
 
   it "can inherit storage" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract Parent {
   uint public x = 3;
 }
@@ -870,17 +854,17 @@ contract qq is Parent {
     getFields ["x", "y"]` shouldReturn` [BInteger 3, BInteger 999]
 
   it "can call functions" . runTest $ do
-    void $ runCall "inc" "()" [r|
+    runCall "inc" "()" [r|
 contract qq {
   uint x = 99;
   function inc() {
     x++;
   }
-}|]
+}|] `shouldReturn` Nothing
     getFields ["x"] `shouldReturn` [BInteger 100]
 
   it "can cast address to contract" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract X {}
 contract qq {
   X x;
@@ -891,7 +875,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BContract "X" 0xdeadbeef]
 
   it "can call methods of superclasses" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract P {
   function callable() public {}
 }
@@ -905,8 +889,7 @@ contract qq is P {
     getFields ["x"] `shouldReturn` [BInteger 774]
 
   it "can use super to call parent methods" . runTest $ do
-    liftIO $ pendingWith "implement `super`"
-    void $ runBS [r|
+    runBS [r|
 contract P {
   function callable() public {}
 }
@@ -920,7 +903,7 @@ contract qq is P {
     getFields ["x"] `shouldReturn` [BInteger 908]
 
   it "can treat 0 literals as strings" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   bytes32 text = "ok";
   bytes32 notext = "";
@@ -936,14 +919,14 @@ contract qq {
               [BString "ok", BString "", BString "", BBool False, BBool True]
 
   it "can treat integer literals as addresses" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   address a = 0xdeadbeef;
 }|]
     getFields ["a"] `shouldReturn` [BAddress 0xdeadbeef]
 
   it "can pass arrays by reference to functions" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint[] xs;
   uint x;
@@ -961,7 +944,7 @@ contract qq {
            ] `shouldReturn` [BInteger 1, BInteger 0x44444, BInteger 0x44444]
 
   it "can pass arrays by reference to other contracts" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract H {
   function head(uint[] ts) returns (uint) {
     return ts[0];
@@ -982,18 +965,18 @@ contract qq {
            ] `shouldReturn` [BInteger 1, BInteger 23145, BInteger 23146]
 
   it "can accept remote arrays" . runTest $ do
-    void $ runCall "addHead" "([10, 17])" [r|
+    runCall "addHead" "([10, 17])" [r|
 contract qq {
   uint x;
   function addHead(uint[] ts) public {
     x += ts[0];
   }
-}|]
+}|] `shouldReturn` Nothing
     getFields ["x"] `shouldReturn` [BInteger 10]
 
 
   it "can store array literals" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint[] xs = [10, 20, 90];
 }|]
@@ -1004,7 +987,7 @@ contract qq {
            ] `shouldReturn` [BInteger 3, BInteger 10, BInteger 20, BInteger 90]
 
   it "can accept nested arrays" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   bool[2][] pairs;
 
@@ -1027,7 +1010,7 @@ contract qq {
                           ]
 
   it "can declare a local struct" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   struct S {
     uint x;
@@ -1045,7 +1028,7 @@ contract qq {
     getFields ["store_x", "store_s"] `shouldReturn` [BInteger 0x777234, BString "Hello"]
 
   it "can cast contracts down" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract X {}
 contract Y {}
 
@@ -1059,7 +1042,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BContract "X" 0x7733624642]
 
   it "can cast int to int" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x;
   constructor() public {
@@ -1070,7 +1053,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BInteger 2347]
 
   it "can <op>=" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x;
   constructor() public {
@@ -1092,8 +1075,8 @@ contract qq {
     x = _x;
   }
 }|]
-    void $ runArgs "(1234)" qq
-    void $ runArgs "(887324)" qq
+    runArgs "(1234)" qq
+    runArgs "(887324)" qq
     getFields ["x"] `shouldReturn` [BInteger 1234]
     getFields2 ["x"] `shouldReturn` [BInteger 887324]
 
@@ -1113,17 +1096,17 @@ contract qq {
     return num + 1;
   }
 }|]
-    void $ runArgs "(0x0,99)" qq
+    runArgs "(0x0,99)" qq
     getFields ["x", "num"] `shouldReturn` [BContract "qq" 0x0, BInteger 99]
 
-    void $ runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
+    runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
     getFields2 ["x", "num"] `shouldReturn` [BContract "qq" uploadAddress, BInteger 400]
 
-    void $ call2 "a" "()" secondAddress
+    call2 "a" "()" secondAddress `shouldReturn` Nothing
     getFields2 ["x", "num"] `shouldReturn` [BContract "qq" uploadAddress, BInteger 100]
 
   it "can locally return locals" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x;
   function f() returns (uint) {
@@ -1138,8 +1121,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BInteger 85]
 
   it "can locally return tuples" . runTest $ do
-    liftIO $ pendingWith "resolution error for tuples"
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x;
   string y;
@@ -1157,13 +1139,13 @@ contract qq {
     getFields ["x", "y"] `shouldReturn` [BInteger 444, BString "ok"]
 
   it "can externally return locals" . runTest $ do
-    void $ runCall "f" "()" [r|
+    runCall "f" "()" [r|
 contract qq {
   function f() returns (uint) {
     uint k = 99;
     return k;
   }
-}|]
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 99)
 
   it "can externally return tuples" . runTest $ do
     er <- runCall "f" "()" [r|
@@ -1175,13 +1157,12 @@ contract qq {
 }|]
     let (kBS, "") = B16.decode "0123456789abcdef0123456789abcdef"
         zero = B.replicate 16 0
-    er `shouldBe` defaultExecResults{ erNewContractAddress=Nothing
-                                    , erReturnVal = Just (SB.toShort $ zero <> kBS <> zero <> kBS) }
+    er `shouldBe` Just (SB.toShort $ zero <> kBS <> zero <> kBS)
 
 
   it "can assign to tuples" . runTest $ do
     liftIO $ pendingWith "tuple assignment"
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint x;
   uint y;
@@ -1192,7 +1173,7 @@ contract qq {
     getFields ["x", "y"] `shouldReturn` [BInteger 10, BInteger 17]
 
   it "can assign numeric to bytes32" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
    bytes32 x = 0x5816f723b08edfdb4148b98e7be9d2e8000bab79b78e4e1615865eb92b1d7068;
 }|]
@@ -1200,7 +1181,7 @@ contract qq {
       [BString "5816f723b08edfdb4148b98e7be9d2e8000bab79b78e4e1615865eb92b1d7068"]
 
   it "can convert bytes32toString" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract Util {
   function bytes32ToString(bytes32 x) constant returns (string) {
       bytes memory bytesString = new bytes(32);
@@ -1233,7 +1214,7 @@ contract qq is Util {
       ]
 
   it "can read the length of new arrays" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract qq {
   uint public len;
   constructor() public {
@@ -1244,7 +1225,7 @@ contract qq {
     getFields ["len"] `shouldReturn` [BInteger 2]
 
   it "can pass local arrays as arguments" . runTest $ do
-    void $ runBS [r|
+    runBS [r|
 contract Validator {
   function isEmptyArray(bytes32[] memory _arr) pure internal returns (bool) {
     return _arr.length == 0;
@@ -1280,10 +1261,10 @@ contract qq is BaseContainer {
     return super.contains(x);
   }
 }|]
-    runCall "contains" "(10)" ctract `shouldReturn` defaultCallResults{
-        erReturnVal = Just . SB.toShort $ B.replicate 32 0}
-    runCall "contains" "(4)" ctract `shouldReturn` defaultCallResults{
-        erReturnVal = Just . SB.toShort $ B.replicate 31 0 <> B.singleton 1}
+    runCall "contains" "(10)" ctract `shouldReturn`
+        Just (SB.toShort $ B.replicate 32 0)
+    runCall "contains" "(4)" ctract `shouldReturn`
+        Just (SB.toShort $ B.replicate 31 0 <> B.singleton 1)
 
   it "selects the correct super with multiple parents" . runTest $ do
     runCall "value" "()" [r|
@@ -1301,8 +1282,7 @@ contract qq is A, B {
     function value() public returns (uint) {
         return super.value();
     }
-}|] `shouldReturn` defaultCallResults{
-        erReturnVal=Just . SB.toShort $ B.replicate 31 0 <> B.singleton 0xb}
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xb)
 
   it "selects the correct super when parents are missing methods" . runTest $ do
     liftIO $ pendingWith "TODO: ADL in MRO"
@@ -1317,4 +1297,100 @@ contract qq is A, B {
   function value() public returns (uint) {
     return super.value();
   }
-}|] `shouldReturn` defaultCallResults{erReturnVal=Just "10"}
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xa)
+
+  it "can determine super instance by function name" . runTest $ do
+    liftIO $ pendingWith "MRO by ADL"
+    runBS [r|
+contract A {
+  function a() public pure returns (uint) { return 0xaaaa;}
+}
+contract B {
+  function b() public pure returns (uint) { return 0xbbbb;}
+}
+contract qq is A, B{
+  uint x;
+  uint y;
+  constructor() public {
+    x = super.a();
+    y = super.b();
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 0xaaaa, BInteger 0xbbbb]
+
+
+  it "can use named return values" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  function f() public pure returns (uint _x) {
+    _x = 887242634;
+  }
+  constructor() public {
+    x = f();
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 887242634]
+
+  it "can return and used named returns" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  function f() public pure returns (uint _x) {
+    if (true) {
+      _x = 7272;
+      return;
+    }
+    _x = 887;
+  }
+  constructor() public {
+    x = f();
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 7272]
+
+  it "can return early" . runTest $ do
+    runBS [r|
+contract qq {
+  unit x;
+  constructor() {
+    x = 343;
+    return;
+    x = 2401;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 343]
+
+  it "can initialize from constants" . runTest $ do
+    runBS [r|
+contract qq {
+  uint constant c = 995;
+  uint x = c;
+}|]
+    getFields ["c", "x"] `shouldReturn` [BDefault, BInteger 995]
+
+  it "can assign from constants" . runTest $ do
+    runBS [r|
+contract qq {
+  uint constant c = 2007;
+  uint x;
+  constructor() public {
+    x = c;
+  }
+}|]
+    getFields ["c", "x"] `shouldReturn` [BDefault, BInteger 2007]
+
+  it "can read parent constants" . runTest $ do
+    runBS [r|
+contract Constants {
+  uint constant VALIDATION_PASSED = 200;
+}
+
+contract qq is Constants {
+  uint x;
+  constructor() public {
+    x = VALIDATION_PASSED;
+  }
+}|]
+
+    getFields ["VALIDATION_PASSED", "x"] `shouldReturn` [BDefault, BInteger 200]
