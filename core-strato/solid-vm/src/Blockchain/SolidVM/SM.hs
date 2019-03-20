@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
 
@@ -10,6 +11,7 @@ module Blockchain.SolidVM.SM (
   CallInfo(..),
   SState(..),
   SM,
+  action,
   runSM,
   getCurrentAddress,
   addCallInfo,
@@ -110,8 +112,10 @@ data SState =
     addressStateBlockDBMap :: M.Map Address AddressStateModification,
     storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
     storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString,
-    action                 :: Action
+    _action                 :: Action
   }
+
+makeLenses ''SState
 
 type SM = StateT SState (ResourceT IO)
 
@@ -168,7 +172,7 @@ runSM env f = do
         addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
         storageTxMap = contextStorageTxMap vmcontext,
         storageBlockMap = contextStorageBlockMap vmcontext,
-        action = startingAction env
+        _action = startingAction env
         }
 
   (value, sstateAfter) <- liftIO $ runResourceT $ runStateT f startingState

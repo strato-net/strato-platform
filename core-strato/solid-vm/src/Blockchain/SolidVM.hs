@@ -48,6 +48,8 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
+--import           Blockchain.SolidVM.Model
+--import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
@@ -64,8 +66,6 @@ import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           CodeCollection
-
-
 
 
 trace :: Bool
@@ -127,7 +127,9 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
 create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
 create' creator cc contractName' argExps = do
   newAddress <- getNewAddress creator
-
+  
+  -- action . actionData %= M.insert newAddress (ActionData (SHA 0) SolidVM (ActionEVMDiff M.empty) [])
+  
   ch <- putCodeCollection cc
 
   newAddressState <- getAddressState newAddress
@@ -169,7 +171,7 @@ create' creator cc contractName' argExps = do
     erLogs = [],
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
-    erAction = Just $ action sstate,
+    erAction = Just $ sstate ^. action,
     erException = Nothing
     }
 
@@ -241,7 +243,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
     erLogs = [],
     erNewContractAddress = Nothing,
     erSuicideList = S.empty,
-    erAction = Just $ action sstate,
+    erAction = Just $ sstate ^. action,
     erException = Nothing
     }
 
