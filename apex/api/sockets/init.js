@@ -25,8 +25,7 @@ const getHealthAggregator = require('./aggregators/getHealthStatus');
 
 const io = require('socket.io')()
 function init(server) {
-  let socketOptions = process.env.NODE_ENV != 'production' ? { path: '/apex-ws' } : {};
-  io.listen(server, socketOptions);
+  io.listen(server, { path: '/apex-ws' });
   io.on('connection', function (socket) {
     // register request to block number
     registerRoomAllocation(socket, LAST_BLOCK_NUMBER, getBlocksAggregator.initialHydrateLastBlock)
