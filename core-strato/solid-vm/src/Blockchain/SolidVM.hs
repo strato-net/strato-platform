@@ -113,12 +113,12 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
             _contracts=M.fromList namedContracts
           }
       env' = Env.Environment {
-        blockHeader = blockData,
-        sender = sender',
-        origin = origin',
-        txHash=txHash',
-        chainId=chainId',
-        metadata=metadata
+        Env.blockHeader = blockData,
+        Env.sender = sender',
+        Env.origin = origin',
+        Env.txHash=txHash',
+        Env.chainId=chainId',
+        Env.metadata=metadata
       }
 
   runSM env' $ do
@@ -216,12 +216,12 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
       env' = Env.Environment {
-        blockHeader = blockData,
-        sender = sender',
-        origin = origin',
-        txHash=txHash',
-        chainId=chainId',
-        metadata=metadata
+        Env.blockHeader = blockData,
+        Env.sender = sender',
+        Env.origin = origin',
+        Env.txHash=txHash',
+        Env.chainId=chainId',
+        Env.metadata=metadata
         }
   encodedReturnValue <- runSM env' $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg

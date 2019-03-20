@@ -98,15 +98,15 @@ runArgs args bs = do
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = error "TODO: txHash"
-      chainId = error "TODO: chainId"
+      txHash = SHA 0x776622233444
+      chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
   SVM.create isTest isHomestead suicides blockData callDepth sender origin
             value gasPrice availableGas newAddress code txHash chainId metadata
 
-runCall :: T.Text -> T.Text -> B.ByteString -> ContextM ExecResults
-runCall funcName callArgs bs = do
+runCall :: T.Text -> T.Text -> B.ByteString -> ContextM (Maybe SB.ShortByteString)
+runCall funcName callArgs bs = erReturnVal <$> do
   let code = Code bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -130,8 +130,8 @@ runCall funcName callArgs bs = do
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = error "TODO: txHash"
-      chainId = error "TODO: chainId"
+      txHash = SHA 0x234962
+      chainId = Nothing
       createMetadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
@@ -166,8 +166,8 @@ call2 funcName callArgs contractAddress = do
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = error "TODO: txHash"
-      chainId = error "TODO: chainId"
+      txHash = SHA 0xddba11
+      chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
@@ -1173,8 +1173,7 @@ contract qq {
 }|]
     let (kBS, "") = B16.decode "0123456789abcdef0123456789abcdef"
         zero = B.replicate 16 0
-    er `shouldBe` defaultExecResults{ erNewContractAddress=Nothing
-                                    , erReturnVal = Just (SB.toShort $ zero <> kBS <> zero <> kBS) }
+    er `shouldBe` Just (SB.toShort $ zero <> kBS <> zero <> kBS)
 
 
   it "can assign to tuples" . runTest $ do
@@ -1278,10 +1277,10 @@ contract qq is BaseContainer {
     return super.contains(x);
   }
 }|]
-    runCall "contains" "(10)" ctract `shouldReturn` defaultCallResults{
-        erReturnVal = Just . SB.toShort $ B.replicate 32 0}
-    runCall "contains" "(4)" ctract `shouldReturn` defaultCallResults{
-        erReturnVal = Just . SB.toShort $ B.replicate 31 0 <> B.singleton 1}
+    runCall "contains" "(10)" ctract `shouldReturn`
+        Just (SB.toShort $ B.replicate 32 0)
+    runCall "contains" "(4)" ctract `shouldReturn`
+        Just (SB.toShort $ B.replicate 31 0 <> B.singleton 1)
 
   it "selects the correct super with multiple parents" . runTest $ do
     runCall "value" "()" [r|
@@ -1299,8 +1298,7 @@ contract qq is A, B {
     function value() public returns (uint) {
         return super.value();
     }
-}|] `shouldReturn` defaultCallResults{
-        erReturnVal=Just . SB.toShort $ B.replicate 31 0 <> B.singleton 0xb}
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xb)
 
   it "selects the correct super when parents are missing methods" . runTest $ do
     liftIO $ pendingWith "TODO: ADL in MRO"
@@ -1315,7 +1313,7 @@ contract qq is A, B {
   function value() public returns (uint) {
     return super.value();
   }
-}|] `shouldReturn` defaultCallResults{erReturnVal=Just "10"}
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xa)
 
   it "can determine super instance by function name" . runTest $ do
     liftIO $ pendingWith "MRO by ADL"
