@@ -38,15 +38,19 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.SolidVM.CodeCollectionDB
+import           Blockchain.SolidVM.Environment       (Environment)
+import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
@@ -89,7 +93,7 @@ create :: Bool
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ pc@(PrecompiledCode _) _ _ _ = internalError "call precompiled code" pc
-create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) _ _ metadata = do
+create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId' metadata = do
 
   let maybeContractName = M.lookup "name" =<< metadata
       contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
@@ -111,10 +115,13 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) _ _ metadata = 
         $ CodeCollection {
             _contracts=M.fromList namedContracts
           }
-      env' = Environment {
+      env' = Env.Environment {
         blockHeader = blockData,
         sender = sender',
-        origin = origin'
+        origin = origin',
+        txHash=txHash',
+        chainId=chainId',
+        metadata=metadata
       }
 
   runSM env' $ do
@@ -203,7 +210,7 @@ call :: Bool
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
-call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' _ _ metadata = do
+call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
 
   let maybeFuncName = M.lookup "funcName" =<< metadata
       funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
@@ -211,11 +218,14 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' _ _ metadata = do
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
       maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
-      env' = Environment {
+      env' = Env.Environment {
         blockHeader = blockData,
         sender = sender',
-        origin = origin'
-      }
+        origin = origin',
+        txHash=txHash',
+        chainId=chainId',
+        metadata=metadata
+        }
   encodedReturnValue <- runSM env' $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
            maybeRet <- call'' codeAddress Nothing funcName argValues
@@ -231,9 +241,23 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' _ _ metadata = do
     erLogs = [],
     erNewContractAddress = Nothing,
     erSuicideList = S.empty,
-    erAction = Nothing,
+    erAction = Just $ startingAction env',
     erException = Nothing
     }
+
+
+
+startingAction :: Environment -> Action
+startingAction env' = Action
+  { _actionBlockHash          = blockHeaderHash $ Env.blockHeader env'
+  , _actionBlockTimestamp     = blockHeaderTimestamp $ Env.blockHeader env'
+  , _actionBlockNumber        = blockHeaderBlockNumber $ Env.blockHeader env'
+  , _actionTransactionHash    = Env.txHash env'
+  , _actionTransactionChainId = Env.chainId env'
+  , _actionTransactionSender  = Env.sender env'
+  , _actionData               = M.empty
+  , _actionMetadata           = Env.metadata env'
+  }
 
 
 getCodeAndCollection :: Address -> SM (Contract, CodeCollection)
@@ -625,8 +649,8 @@ expToVar' (Xabi.MemberAccess expr name) = do
   case var of
     Constant c -> Constant <$> case (c, name) of
       (SEnum enumName, _) -> return $ SEnumVal enumName name
-      (SBuiltinVariable "msg", "sender") -> (SAddress . sender) <$> getEnv
-      (SBuiltinVariable "tx", "origin") -> (SAddress . origin) <$> getEnv
+      (SBuiltinVariable "msg", "sender") -> (SAddress . Env.sender) <$> getEnv
+      (SBuiltinVariable "tx", "origin") -> (SAddress . Env.origin) <$> getEnv
       (SStruct _ theMap, fieldName) ->
         let f = fromMaybe (missingField "struct member access" fieldName)
               $ M.lookup fieldName theMap
@@ -649,9 +673,9 @@ expToVar' (Xabi.MemberAccess expr name) = do
 
       (SBuiltinVariable "block", "timestamp") -> do
         env' <- getEnv
-        return $ SInteger $ round $ utcTimeToPOSIXSeconds $ blockDataTimestamp $ blockHeader env'
+        return $ SInteger $ round $ utcTimeToPOSIXSeconds $ blockDataTimestamp $ Env.blockHeader env'
 
-      (SBuiltinVariable "block", "number") -> (SInteger . blockDataNumber . blockHeader) <$> getEnv
+      (SBuiltinVariable "block", "number") -> (SInteger . blockDataNumber . Env.blockHeader) <$> getEnv
 
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract

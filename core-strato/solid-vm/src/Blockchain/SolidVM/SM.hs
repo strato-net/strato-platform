@@ -9,7 +9,6 @@
 module Blockchain.SolidVM.SM (
   CallInfo(..),
   SState(..),
-  Environment(..),
   SM,
   runSM,
   getCurrentAddress,
@@ -46,13 +45,13 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.Address
-import           Blockchain.Data.DataDefs (BlockData(..))
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
+import           Blockchain.SolidVM.Environment
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
@@ -97,13 +96,6 @@ BlockData
     mixHash SHA
     deriving Eq Read Show Generic
 -}
-
-data Environment =
-  Environment {
-    sender :: Address,
-    origin :: Address,
-    blockHeader :: BlockData
-    }
 
 data SState =
   SState {
