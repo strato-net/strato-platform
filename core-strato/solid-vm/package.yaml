@@ -24,6 +24,7 @@ dependencies:
   - blockapps-datadefs
   - blockapps-mpdbs
   - ethereum-rlp
+  - base16-bytestring
   - blockapps-util
   - bytestring
   - containers

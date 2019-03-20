@@ -12,6 +12,7 @@ import qualified Data.Map as M
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Data.Text as T
+import           Numeric
 import           Text.Printf
 
 import           Blockchain.Data.Address
@@ -79,6 +80,8 @@ data Value =
   | SNULL
   | SReference AddressedPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
+  | SHexDecodeAndTrim -- Hack to implement blockapps-sol's bytes32ToString without
+                      -- supporting indexing into bytes32s.
   deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing
@@ -116,6 +119,7 @@ coerceFromInt:: Value -> Integer -> Value
 coerceFromInt SInteger{} n = SInteger n
 coerceFromInt SAddress{} n = SAddress $ fromIntegral n
 coerceFromInt SString{} 0 = SString ""
+coerceFromInt SString{} n = SString $ showHex n ""
 coerceFromInt t x = typeError "invalid literal for type" (t, x)
 
 

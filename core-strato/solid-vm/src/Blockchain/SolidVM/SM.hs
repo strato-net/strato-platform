@@ -38,6 +38,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.IORef
 import qualified Data.HashMap.Strict as HM
+import           Data.List (foldl')
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
@@ -226,11 +227,14 @@ getVariableOfName name = do
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "keccak256", "require", "revert", "assert", "sha3", "sha256", "ecrecover", "addmod", "mulmod", "selfdestruct", "suicide"]) $
+      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "byte", "string", "keccak256"
+                                                  , "require", "revert", "assert", "sha3"
+                                                  , "sha256", "ecrecover", "addmod", "mulmod"
+                                                  , "selfdestruct", "suicide", "bytes32ToString"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
-      maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx"]) $
+      maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx", "super"]) $
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
@@ -349,7 +353,9 @@ getCurrentAddress = do
 
 
 getLocal :: MS.StoragePath -> SM MS.BasicValue
-getLocal path = fromMaybe MS.BDefault . HM.lookup path . localByPath <$> getCurrentCallInfo
+getLocal path = do
+  locals <- gets (map localByPath . callStack)
+  return . fromMaybe MS.BDefault . foldl' (<|>) Nothing . map (HM.lookup path) $ locals
 
 setLocal :: MS.StoragePath -> MS.BasicValue -> SM ()
 setLocal path val = do
@@ -396,7 +402,14 @@ getXabiType loc field = do
   -- This field might have been defined in e.g. a caller contract.
   -- We search from the top down for the home of this data
   case loc of
-    Left LocalVar -> M.lookup (BC.unpack field) . fmap fst . localVariables <$> getCurrentCallInfo
+    Left LocalVar -> do
+      -- Reading the entire stack of locals solves the problem of passing
+      -- local arrays as arguments to functions. The parameter is a reference
+      -- to the argument, so the parent or higher must be consulted to resolve it.
+      -- This solution has the downside of potentially resolving variables that are not in scope:
+      -- function called() { return x; }, function caller() { uint x = 200; uint y = called(); }
+      locals_stack <- gets (map localVariables . callStack)
+      return . foldl' (<|>) Nothing $ map (fmap fst . M.lookup (BC.unpack field)) locals_stack
     Right addr -> do
       stack <- gets callStack
       case filter ((== addr) . currentAddress) stack of

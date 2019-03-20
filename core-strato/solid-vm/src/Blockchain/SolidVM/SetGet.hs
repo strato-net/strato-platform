@@ -6,6 +6,7 @@ module Blockchain.SolidVM.SetGet where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Data.Bits ((.&.))
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.HashMap.Strict as HM
 import           Data.IORef
@@ -14,6 +15,8 @@ import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
+import           Data.Word (Word8)
+import           Text.Printf
 
 import           Blockchain.Data.Address
 import           Blockchain.DB.SolidStorageDB

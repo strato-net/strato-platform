@@ -16,6 +16,7 @@ import           Control.Monad.Trans.State
 import           Data.Bits
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
+import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import           Data.IORef
@@ -28,7 +29,7 @@ import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
 import           GHC.Exts
-import           Text.Parsec
+import           Text.Parsec (runParser)
 import           Text.Printf
 
 import qualified Blockchain.Colors                    as C
@@ -103,7 +104,8 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) _ _ metadata = 
           Left e -> error $ show e
           Right v -> v
 
-      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi) | NamedXabi name (xabi, parents') <- unsourceUnits file]
+      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
+                       | NamedXabi name (xabi, parents') <- unsourceUnits file]
 
       cc = applyInheritence
         $ CodeCollection {
@@ -216,7 +218,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' _ _ metadata = do
       }
   encodedReturnValue <- runSM env' $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
-           maybeRet <- call'' codeAddress funcName argValues
+           maybeRet <- call'' codeAddress Nothing funcName argValues
            case maybeRet of
              Just x -> fmap Just $ encodeForReturn x
              Nothing -> return Nothing
@@ -284,9 +286,10 @@ logFunctionCall args address contract functionName f = do
   return result
 
 
-call'' :: Address -> String -> [Value] -> SM (Maybe Value)
-call'' address functionName args = do
-  (contract, cc) <-getCodeAndCollection address
+call'' :: Address -> Maybe String -> String -> [Value] -> SM (Maybe Value)
+call'' address mContract functionName args = do
+  (contract', cc) <- getCodeAndCollection address
+  let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
   logFunctionCall args address contract functionName $
     case M.lookup functionName $ contract^.functions of
       Just theFunction -> do
@@ -458,6 +461,7 @@ runStatement (Xabi.Return maybeExpression) = do
 runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   var <- expToVar $ Xabi.Variable $ T.unpack src;
   path <- expToPath $ Xabi.Variable $ T.unpack dst;
+  -- TODO(tim): should this hex encode src and pad?
   setVar path =<< getString var
   return Nothing
 
@@ -557,8 +561,7 @@ expToVar' :: Xabi.Expression -> SM Variable
 expToVar' (Xabi.NumberLiteral v Nothing) = return . Constant $ SInteger v
 expToVar' (Xabi.StringLiteral s) = return $ Constant $ SString s
 expToVar' (Xabi.BoolLiteral b) = return $ Constant $ SBool b
-expToVar' (Xabi.Variable "bytes32ToString") = do --TODO- remove this hardcoded case
-  return $ Constant $ SBuiltinFunction "identity" Nothing
+expToVar' (Xabi.Variable "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
 expToVar' (Xabi.Variable "bytes") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
 expToVar' (Xabi.Variable name) = do
@@ -610,8 +613,8 @@ expToVar' (Xabi.Binary "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (Xabi.Binary "&=" lhs rhs) = binopAssign (.&.) lhs rhs
 expToVar' (Xabi.Binary "^=" lhs rhs) = binopAssign xor lhs rhs
 
-expToVar' (Xabi.MemberAccess (Xabi.Variable "Util") "bytes32ToString") = do --TODO- remove this hardcoded case
-  return $ Constant $ SBuiltinFunction "identity" Nothing
+expToVar' (Xabi.MemberAccess (Xabi.Variable "Util") "bytes32ToString") = do
+  return $ Constant $ SHexDecodeAndTrim
 
 expToVar' (Xabi.MemberAccess (Xabi.Variable "Util") "b32") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
@@ -650,6 +653,15 @@ expToVar' (Xabi.MemberAccess expr name) = do
 
       (SBuiltinVariable "block", "number") -> (SInteger . blockDataNumber . blockHeader) <$> getEnv
 
+      (SBuiltinVariable "super", method) -> do
+        ctract <- getCurrentContract
+        case _parents ctract of
+          -- TODO: Is this the correct MRO, or should it scan all ancestors for a match?
+          [] -> typeError "cannot use super without a parent contract" (method, ctract)
+          ps -> do
+            addr <- getCurrentAddress
+            return $ SContractFunction (last ps) (toInteger addr) method
+
       (SAddress (Address a), itemName) -> return $ SContractItem (toInteger a) itemName
 
       (SContract contractName' a, funcName) -> return $ SContractFunction contractName' a funcName
@@ -682,13 +694,16 @@ expToVar' (Xabi.MemberAccess expr name) = do
 expToVar' x@(Xabi.IndexAccess{}) = StorageItem <$> expToPath x
 
 expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
-expToVar' (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
+expToVar' (Xabi.Binary "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
+expToVar' (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
+expToVar' (Xabi.Binary "/" expr1 expr2) = expToVarInteger expr1 div expr2 SInteger
+expToVar' (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
 expToVar' (Xabi.Binary "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (Xabi.Binary "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
 expToVar' (Xabi.Binary "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
 expToVar' (Xabi.Binary "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
 expToVar' (Xabi.Binary "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
-expToVar' (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
+expToVar' (Xabi.Binary ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger
 
 expToVar' (Xabi.Unitary "!" expr) = do
   (Constant . SBool . not) <$> (getBool =<< expToVar expr)
@@ -772,6 +787,12 @@ expToVar' (Xabi.Ternary condition expr1 expr2) = do
   c <- getBool =<< expToVar condition
   expToVar $ if c then expr1 else expr2
 
+expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array {Xabi.entry=t})) args) = do
+  case args of
+    [(Nothing, a)] -> do
+      len <- getInt =<< expToVar a
+      return . Constant . SArray t . V.replicate (fromIntegral len) . Constant $ defaultValue t
+    _ -> arityMismatch "new array" 1 (length args)
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
   creator <- getCurrentAddress
   let argExps = map (\(Nothing, arg) -> arg) args  --TODO- add support for named arguments
@@ -815,13 +836,13 @@ expToVar' (Xabi.FunctionCall e args) = do
         _ -> typeError "contract variable creation" argVals
 
     Constant (SContractItem address itemName) -> do
-      result <- call'' (Address $ fromInteger address) itemName argVals
+      result <- call'' (Address $ fromInteger address) Nothing itemName argVals
       case result of
         Just value -> return $ Constant value
         Nothing -> return $ Constant SNULL
 
-    Constant (SContractFunction _ address functionName) -> do
-      result <- call'' (Address $ fromInteger address) functionName argVals
+    Constant (SContractFunction name address functionName) -> do
+      result <- call'' (Address $ fromInteger address) (Just name) functionName argVals
       case result of
         Just value -> return $ Constant value
         Nothing -> return $ Constant SNULL
@@ -846,6 +867,14 @@ expToVar' (Xabi.FunctionCall e args) = do
         [av] -> setVar idxPath av
         _ -> arityMismatch "push" (length argVals) 1
       return $ Constant newLen
+
+    Constant SHexDecodeAndTrim ->
+        case argVals of
+          [SString s] ->
+            case B16.decode (BC.pack s) of
+              (b32, "") -> return . Constant . SString . BC.unpack . B.takeWhile (/= 0) $ b32
+              _ -> typeError "invalid hex for bytes" s
+          _ -> typeError "bytes32ToString with incorrect arguments" argVals
 
     -- It would be nice to reinterpret two element paths as a function.
     -- How can we get a to resolve to a local variable instead of a path?
@@ -880,6 +909,10 @@ binopAssign oper lhs rhs = do
   return $ Constant next
 
 callBuiltin :: String -> [Value] -> Maybe Value -> SM Value
+callBuiltin "string" [SString s] _ = return $ SString s
+callBuiltin "string" vs _ = typeError "string cast" vs
+callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
+callBuiltin "byte"  vs _ = typeError "byte cast" vs
 callBuiltin "uint" [SEnumVal enumName enumVal] _ = do
   contract' <- getCurrentContract
   let maybeEnumVals = M.lookup enumName $ contract'^.enums
@@ -890,6 +923,11 @@ callBuiltin "uint" [SEnumVal enumName enumVal] _ = do
     $ fromMaybe (missingType "call builtin enum cast" (enumVal, enumName))
     $ enumVal `elemIndex` enumVals
 callBuiltin "uint" [SInteger n] _ = return $ SInteger n
+callBuiltin "uint" [SString hex] _ =
+  case B16.decode (BC.pack hex) of
+    (l, "") -> return . SInteger . fromIntegral . bytesToWord256 $ l
+    _ -> typeError "uint cast - not a hex string" hex
+
 callBuiltin "uint" args _ = typeError "uint cast" args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
@@ -1052,6 +1090,7 @@ logVals val1 val2 = when trace . liftIO . putStrLn $ printf
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: Value -> SM ByteString
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
+encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
 encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
   return $ word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
   where stringBytes = BC.pack s

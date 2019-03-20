@@ -190,6 +190,9 @@ defaultExecResults = ExecResults
  , erException = Nothing
  }
 
+defaultCallResults :: ExecResults
+defaultCallResults = defaultExecResults{erNewContractAddress = Nothing}
+
 checkStorage :: ContextM [(MP.Key, B.ByteString)]
 checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
 
@@ -1187,3 +1190,131 @@ contract qq {
   }
 }|]
     getFields ["x", "y"] `shouldReturn` [BInteger 10, BInteger 17]
+
+  it "can assign numeric to bytes32" . runTest $ do
+    void $ runBS [r|
+contract qq {
+   bytes32 x = 0x5816f723b08edfdb4148b98e7be9d2e8000bab79b78e4e1615865eb92b1d7068;
+}|]
+    getFields ["x"] `shouldReturn`
+      [BString "5816f723b08edfdb4148b98e7be9d2e8000bab79b78e4e1615865eb92b1d7068"]
+
+  it "can convert bytes32toString" . runTest $ do
+    void $ runBS [r|
+contract Util {
+  function bytes32ToString(bytes32 x) constant returns (string) {
+      bytes memory bytesString = new bytes(32);
+      uint charCount = 0;
+      for (charCount = 0; charCount < 32; charCount++) {
+        byte char = byte((uint(x) >> (32 - charCount - 1) * 8) & 0xFF);
+        if (char == 0) {
+          break;
+        }
+        bytesString[charCount] = char;
+      }
+      bytes memory bytesStringTrimmed = new bytes(charCount);
+      for (uint j = 0; j < charCount; j++) {
+          bytesStringTrimmed[j] = bytesString[j];
+      }
+      return string(bytesStringTrimmed);
+  }
+}
+
+contract qq is Util {
+  bytes32 bs = 0x32324f4354323000000000000000000000000000000000000000000000000000;
+  string str;
+  constructor() public {
+    str = Util.bytes32ToString(bs);
+  }
+}|]
+    getFields ["bs", "str"] `shouldReturn`
+      [ BString "32324f4354323000000000000000000000000000000000000000000000000000"
+      , BString "22OCT20"
+      ]
+
+  it "can read the length of new arrays" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint public len;
+  constructor() public {
+    uint[] memory xs = new uint[](2);
+    len = xs.length;
+  }
+}|]
+    getFields ["len"] `shouldReturn` [BInteger 2]
+
+  it "can pass local arrays as arguments" . runTest $ do
+    void $ runBS [r|
+contract Validator {
+  function isEmptyArray(bytes32[] memory _arr) pure internal returns (bool) {
+    return _arr.length == 0;
+  }
+}
+
+contract qq is Validator {
+  bool public empty_is_empty;
+  bool public nonempty_is_empty;
+  uint public nonempty_length;
+  constructor() public {
+    bytes32[] memory empty;
+    empty_is_empty = isEmptyArray(empty);
+
+    bytes32[] memory nonempty = new bytes32[](1);
+    nonempty_is_empty = isEmptyArray(nonempty);
+
+  }
+}
+|]
+    getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True, BBool False]
+
+  it "can resolve super" . runTest $ do
+    let ctract = [r|
+contract BaseContainer {
+  function contains(uint x) internal returns (bool) {
+    return x == 4;
+  }
+}
+
+contract qq is BaseContainer {
+  function contains(uint x) external returns (bool) {
+    return super.contains(x);
+  }
+}|]
+    runCall "contains" "(10)" ctract `shouldReturn` defaultCallResults{
+        erReturnVal = Just . SB.toShort $ B.replicate 32 0}
+    runCall "contains" "(4)" ctract `shouldReturn` defaultCallResults{
+        erReturnVal = Just . SB.toShort $ B.replicate 31 0 <> B.singleton 1}
+
+  it "selects the correct super with multiple parents" . runTest $ do
+    runCall "value" "()" [r|
+contract A {
+    function value() public returns (uint) {
+        return 0xa;
+    }
+}
+contract B {
+    function value() public returns (uint) {
+        return 0xb;
+    }
+}
+contract qq is A, B {
+    function value() public returns (uint) {
+        return super.value();
+    }
+}|] `shouldReturn` defaultCallResults{
+        erReturnVal=Just . SB.toShort $ B.replicate 31 0 <> B.singleton 0xb}
+
+  it "selects the correct super when parents are missing methods" . runTest $ do
+    liftIO $ pendingWith "TODO: ADL in MRO"
+    runCall "value" "()" [r|
+contract A {
+  function value() public returns (uint) {
+    return 0xa;
+  }
+}
+contract B {}
+contract qq is A, B {
+  function value() public returns (uint) {
+    return super.value();
+  }
+}|] `shouldReturn` defaultCallResults{erReturnVal=Just "10"}
