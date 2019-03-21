@@ -118,7 +118,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
         Env.metadata=metadata
       }
 
-  runSM env' $ do
+  runSM (Just initCode) env' $ do
     create' sender' cc contractName' args
 
 create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
@@ -224,7 +224,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         Env.chainId=chainId',
         Env.metadata=metadata
         }
-  (encodedReturnValue, sstate) <- runSM env' $ do
+  (encodedReturnValue, sstate) <- runSM Nothing env' $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
            maybeRet <- call'' codeAddress Nothing funcName argValues
            sstate <- get
