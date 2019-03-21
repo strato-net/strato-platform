@@ -37,6 +37,7 @@ dependencies:
   - memory
   - merkle-patricia-db
   - parsec
+  - prometheus-client
   - QuickCheck
   - quickcheck-instances
   - resourcet
