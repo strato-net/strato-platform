@@ -4,6 +4,7 @@
 
 module SolidVM.Solidity.Xabi.Type where
 
+import           Control.DeepSeq
 import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Int                  (Int32)
@@ -31,7 +32,7 @@ data Type
   | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
   | Array { entry:: Type, length :: Maybe Word }
   | Contract {typedef::Text}
-  | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Read, Generic)
+  | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Read, Generic, NFData)
 
 instance ToJSON Type where
   toJSON = genericToJSON typeAesonOptions{omitNothingFields = True}

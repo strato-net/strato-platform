@@ -4,6 +4,7 @@
 
 module SolidVM.Solidity.Xabi.Def where
 
+import           Control.DeepSeq
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Swagger
@@ -22,7 +23,7 @@ defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="t
 data Def = Enum { names::[Text], bytes::Word }
          | Struct { fields::[(Text, Xabi.FieldType)], bytes::Word }
          | Contract { bytes::Word }
-         deriving (Eq, Show, Read, Generic)
+         deriving (Eq, Show, Read, Generic, NFData)
 
 instance Arbitrary Def where arbitrary = GR.genericArbitrary GR.uniform
 instance ToJSON Def where

@@ -105,7 +105,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
       namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
                        | NamedXabi name (xabi, parents') <- unsourceUnits file]
 
-      cc = applyInheritence
+      cc = applyInheritance
         $ CodeCollection {
             _contracts=M.fromList namedContracts
           }
@@ -124,9 +124,9 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
 create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
 create' creator cc contractName' argExps = do
   newAddress <- getNewAddress creator
-  
+
   -- action . actionData %= M.insert newAddress (ActionData (SHA 0) SolidVM (ActionEVMDiff M.empty) [])
-  
+
   ch <- putCodeCollection cc
 
   newAddressState <- getAddressState newAddress
