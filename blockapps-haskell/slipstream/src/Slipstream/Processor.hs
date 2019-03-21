@@ -65,7 +65,7 @@ import Slipstream.SolidityValue
 todoToMap :: BS.ActionDataDiff -> Map.Map Word256 Word256
 todoToMap = \case
   BS.ActionEVMDiff m -> m
-  BS.ActionSolidVMDiff _ -> error "TODO(tim): Processing not implemented for SolidVM"
+  BS.ActionSolidVMDiff _ -> Map.empty -- error "TODO(tim): Processing not implemented for SolidVM"
 
 diffNull :: BS.ActionDataDiff -> Bool
 diffNull (BS.ActionEVMDiff m) = Map.null m

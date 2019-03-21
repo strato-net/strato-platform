@@ -35,6 +35,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.IORef
@@ -158,8 +159,8 @@ instance HasHashDB SM where
 instance HasCodeDB SM where
   getCodeDB = codeDB <$> get
 
-runSM :: Env.Environment -> SM a -> ContextM a
-runSM env f = do
+runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM a
+runSM maybeCode env f = do
   vmcontext <- get
 
   let startingState =
@@ -173,7 +174,7 @@ runSM env f = do
         addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
         storageTxMap = contextStorageTxMap vmcontext,
         storageBlockMap = contextStorageBlockMap vmcontext,
-        _action = startingAction env
+        _action = startingAction maybeCode env
         }
 
   (value, sstateAfter) <- liftIO $ runResourceT $ runStateT f startingState
@@ -189,8 +190,8 @@ runSM env f = do
   return value
 
 
-startingAction :: Env.Environment -> Action
-startingAction env' = Action
+startingAction :: Maybe ByteString -> Env.Environment -> Action
+startingAction maybeCode env' = Action
   { _actionBlockHash          = blockHeaderHash $ Env.blockHeader env'
   , _actionBlockTimestamp     = blockHeaderTimestamp $ Env.blockHeader env'
   , _actionBlockNumber        = blockHeaderBlockNumber $ Env.blockHeader env'
@@ -198,7 +199,11 @@ startingAction env' = Action
   , _actionTransactionChainId = Env.chainId env'
   , _actionTransactionSender  = Env.sender env'
   , _actionData               = M.empty
-  , _actionMetadata           = Env.metadata env'
+  , _actionMetadata           =
+      case maybeCode of
+        Just theCode ->
+          Just $ M.insert "src" (T.pack $ BC.unpack theCode) $ fromMaybe M.empty $ Env.metadata env'
+        Nothing -> Env.metadata env'
   }
 
 

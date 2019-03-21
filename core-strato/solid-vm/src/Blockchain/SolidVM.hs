@@ -49,8 +49,8 @@ import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
---import           Blockchain.SolidVM.Model
---import           Blockchain.Strato.Model.Action
+import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
@@ -120,14 +120,14 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
         Env.metadata=metadata
       }
 
-  runSM env' $ do
+  runSM (Just initCode) env' $ do
     create' sender' cc contractName' args
 
 create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
 create' creator cc contractName' argExps = do
   newAddress <- getNewAddress creator
 
-  -- action . actionData %= M.insert newAddress (ActionData (SHA 0) SolidVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert newAddress (ActionData (SHA 0) SolidVM (ActionEVMDiff M.empty) [])
 
   ch <- putCodeCollection cc
 
@@ -227,7 +227,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         Env.chainId=chainId',
         Env.metadata=metadata
         }
-  (encodedReturnValue, sstate) <- runSM env' $ do
+  (encodedReturnValue, sstate) <- runSM Nothing env' $ do
            argValues <- forM args $ \arg -> getVar =<< expToVar arg
            maybeRet <- call'' codeAddress Nothing funcName argValues
            sstate <- get
