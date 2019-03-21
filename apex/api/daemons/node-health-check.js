@@ -31,7 +31,7 @@ function queryHealthStatus() {
             let currentTime = moment().format();
             Object.keys(healthStatus).forEach(async (keyProcess) => {
                 overallStat = healthStatus[keyProcess] && overallStat;
-                await models.healthStat.create({
+                await models.HealthStat.create({
                     processName: keyProcess,
                     HealthStatus: healthStatus[keyProcess],
                     timestamp: currentTime
