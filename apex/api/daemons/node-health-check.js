@@ -28,7 +28,7 @@ function queryHealthStatus() {
             const metricsResult = await getHealthPrometheus()
             const healthStatus = await findTimeStamp(metricsResult)
             let overallStat = true;
-            let currentTime = moment().format();
+            let currentTime = Date.now();
             Object.keys(healthStatus).forEach(async (keyProcess) => {
                 overallStat = healthStatus[keyProcess] && overallStat;
                 await models.HealthStat.create({

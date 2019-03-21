@@ -4,7 +4,7 @@ module.exports = function(sequelize, DataTypes) {
     let HealthStat = sequelize.define('HealthStat', {
         processName: {type: DataTypes.STRING, allowNull: true},
         HealthStatus: {type: DataTypes.BOOLEAN, allowNull: true},
-        timestamp: {type: DataTypes.STRING, allowNull: true}
+        timestamp: {type: DataTypes.DATE, allowNull: true}
     });
     HealthStat.prototype.toJson = function() {
         return {

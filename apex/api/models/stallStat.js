@@ -4,7 +4,7 @@ module.exports = function(sequelize, DataTypes) {
     let StallStat = sequelize.define('StallStat', {
         blockType: {type: DataTypes.STRING, allowNull: true},
         blockCount: {type: DataTypes.INTEGER, allowNull: true},
-        timestamp: {type: DataTypes.STRING, allowNull: true}
+        timestamp: {type: DataTypes.DATE, allowNull: true}
     });
     StallStat.prototype.toJson = function() {
         return {

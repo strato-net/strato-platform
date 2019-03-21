@@ -26,7 +26,8 @@ function queryHealthStatus() {
         try {
             const blocksValid = await getVmBlocksValid();
     const blocksPending = await getBaggerPending();
-    let currentTime = moment().format();
+
+    let currentTime = Date.now();
     const lastBlocksValid = await models.StallStat.findOne({
         where: {
             blockType: "Valid",
