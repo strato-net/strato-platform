@@ -7,6 +7,7 @@ module SolidVM.Solidity.Xabi.VarDef where
 import           Control.DeepSeq
 import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson
+import           Data.Binary
 import qualified Data.HashMap.Lazy         as HashMap
 import           Data.Int                  (Int32)
 import           Data.Swagger
@@ -23,7 +24,7 @@ typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="ty
 
 
 data IndexedType = IndexedType { indexedTypeIndex::Int32, indexedTypeType::Type }
-                 deriving (Eq, Show, Read, Generic, NFData)
+                 deriving (Eq, Show, Read, Generic, NFData, Binary)
 
 instance FromJSON IndexedType where
   parseJSON =
@@ -56,7 +57,7 @@ data VarType =
   , varTypeConstant       :: Maybe Bool
   , varTypeInitialValue   :: Maybe Expression
   , varTypeType           :: Type
-  } deriving (Eq, Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData, Binary)
 {-
 instance FromJSON VarType where
   parseJSON =
@@ -90,7 +91,7 @@ instance ToSchema VarType where
 instance Arbitrary VarType where arbitrary = GR.genericArbitrary GR.uniform
 -}
 data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
-               deriving (Eq, Show, Read, Generic, NFData)
+               deriving (Eq, Show, Read, Generic, NFData, Binary)
 
 instance FromJSON FieldType where
   parseJSON =

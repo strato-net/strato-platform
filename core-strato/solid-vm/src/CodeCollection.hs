@@ -5,6 +5,7 @@ module CodeCollection where
 
 import Control.DeepSeq
 import Control.Lens
+import Data.Binary
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
@@ -28,14 +29,14 @@ data Contract =
     _structs :: Map String [(T.Text, Xabi.FieldType)],
     _functions :: Map String Func,
     _constructor :: Maybe Func
-  } deriving (Show, Read, Generic, NFData)
+  } deriving (Show, Read, Generic, NFData, Binary)
 
 makeLenses ''Contract
 
 data CodeCollection =
   CodeCollection {
     _contracts :: Map String Contract
-  } deriving (Show, Read, Generic, NFData)
+  } deriving (Show, Read, Generic, NFData, Binary)
 
 makeLenses ''CodeCollection
 
