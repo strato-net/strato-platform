@@ -525,7 +525,6 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
     case parvar of
       StorageItem apt -> return apt
       _ -> expToPath parent
-    -- parValue <- getVar parPath
 
   idxType <- getIndexType parPath
   idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
@@ -673,6 +672,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
       (SAddress (Address a), itemName) -> return $ SContractItem (toInteger a) itemName
 
       (SContract contractName' a, funcName) -> return $ SContractFunction contractName' a funcName
+      (SString s, "length") -> return . SInteger . fromIntegral $ length s
       _ -> error $ "invalid constant: " ++ show c
 
     Variable vref -> do
@@ -688,7 +688,13 @@ expToVar' (Xabi.MemberAccess expr name) = do
     StorageItem apt -> case name of
       -- TODO(tim): This will not work correctly with struct fields named push
       "push" -> return . Constant $ SPush apt
-      "length" -> return . StorageItem . apSnoc apt $ MS.Field "length"
+      "length" -> do
+        ty <- getValueType apt
+        case ty of
+          TString -> do
+            SString s <- getVar var
+            return . Constant . SInteger . fromIntegral $ length s
+          _ -> return . StorageItem . apSnoc apt $ MS.Field "length"
       _ -> do
           val' <- getVar $ StorageItem apt
           case val' of

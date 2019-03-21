@@ -1394,3 +1394,25 @@ contract qq is Constants {
 }|]
 
     getFields ["VALIDATION_PASSED", "x"] `shouldReturn` [BDefault, BInteger 200]
+
+  it "can get the length of a string" . runTest $ do
+    runBS [r|
+contract qq {
+  uint strlen;
+  constructor() public {
+    string s = "hello, world";
+    strlen = s.length;
+  }
+}|]
+    getFields ["strlen"] `shouldReturn` [BInteger 12]
+
+  it "can get the length of bytes" . runTest $ do
+    runBS [r|
+contract qq {
+  uint strlen;
+  constructor() public {
+    string s = "hello, world";
+    strlen = bytes(s).length;
+  }
+}|]
+    getFields ["strlen"] `shouldReturn` [BInteger 12]
