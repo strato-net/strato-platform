@@ -45,6 +45,7 @@ import           Blockchain.Format
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
+import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
@@ -91,6 +92,7 @@ create :: Bool
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ pc@(PrecompiledCode _) _ _ _ = internalError "call precompiled code" pc
 create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId' metadata = do
+  recordCreate
 
   let maybeContractName = M.lookup "name" =<< metadata
       contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
@@ -209,6 +211,7 @@ call :: Bool
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
 call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
+  recordCall
 
   let maybeFuncName = M.lookup "funcName" =<< metadata
       funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName

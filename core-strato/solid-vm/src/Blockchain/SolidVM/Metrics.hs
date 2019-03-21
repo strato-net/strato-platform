@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Blockchain.SolidVM.Metrics (CacheEvent(..), recordCacheEvent) where
+module Blockchain.SolidVM.Metrics (CacheEvent(..), recordCacheEvent, recordCall, recordCreate) where
 
 import Control.Monad.IO.Class
 import Prometheus
@@ -20,3 +20,17 @@ codeCacheEvents = unsafeRegister
 recordCacheEvent :: MonadIO m => CacheEvent ->m ()
 recordCacheEvent ce = liftIO $ do
   withLabel codeCacheEvents (T.pack $ show ce) incCounter
+
+{-# NOINLINE txKinds #-}
+txKinds :: Vector T.Text Counter
+txKinds = unsafeRegister
+        . vector "kind"
+        . counter
+        $ Info "solidvm_tx_kind" "Number of calls and creates in SolidVM"
+
+
+recordCreate :: MonadIO m => m ()
+recordCreate = liftIO $ withLabel txKinds "create" incCounter
+
+recordCall :: MonadIO m => m ()
+recordCall = liftIO $ withLabel txKinds "call" incCounter

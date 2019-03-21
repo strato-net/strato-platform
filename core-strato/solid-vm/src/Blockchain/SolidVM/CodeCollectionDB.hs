@@ -20,7 +20,6 @@ putCodeCollection cc = do
   recordCacheEvent StorageWrite
   let ccString = BC.pack $ show cc
   addCode SolidVM ccString
-  return $ hash ccString
 
 getCodeCollection :: SHA -> SM CodeCollection
 getCodeCollection hsh = do

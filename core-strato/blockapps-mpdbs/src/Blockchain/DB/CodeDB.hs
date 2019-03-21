@@ -37,7 +37,7 @@ toWord8 = fromIntegral . fromEnum
 fromWord8 :: Word8 -> CodeKind
 fromWord8 = toEnum . fromIntegral
 
-addCode :: (HasCodeDB m, MonadResource m) => CodeKind -> B.ByteString -> m ()
+addCode :: (HasCodeDB m, MonadResource m) => CodeKind -> B.ByteString -> m SHA
 addCode = codeDBPut . toWord8
 
 getCode :: (HasCodeDB m, MonadResource m) => SHA -> m (Maybe (CodeKind, B.ByteString))
@@ -49,10 +49,12 @@ getEVMCode hsh = maybe "" snd <$> getCode hsh
 getCodeKind :: HasCodeDB m => SHA -> m CodeKind
 getCodeKind hsh = maybe (error $ "no codekind found for " ++ show hsh) fst <$> getCode hsh
 
-codeDBPut :: HasCodeDB m => Word8 -> B.ByteString -> m ()
+codeDBPut :: HasCodeDB m => Word8 -> B.ByteString -> m SHA
 codeDBPut kind code = do
   db <- getCodeDB
-  DB.put db def (BL.toStrict $ encode $ hash code) $ B.cons kind code
+  let hsh = hash code
+  DB.put db def (BL.toStrict $ encode hsh) $ B.cons kind code
+  return hsh
 
 
 codeDBGet :: HasCodeDB m => B.ByteString -> m (Maybe (CodeKind, B.ByteString))

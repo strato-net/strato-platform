@@ -70,7 +70,7 @@ defineFlag "debugEnabled2" False "enable debugging"
 
 populateAndConvertAddressState :: Maybe Word256 -> Address -> AddressState' -> ContextM AddressState
 populateAndConvertAddressState cid owner addressState' = do
-  addCode EVM . codeBytes . contractCode' $ addressState'
+  hsh <- addCode EVM . codeBytes . contractCode' $ addressState'
 
   forM_ (M.toList $ storage' addressState') $
     \(key, val) -> putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
@@ -82,7 +82,7 @@ populateAndConvertAddressState cid owner addressState' = do
       (nonce' addressState')
       (balance' addressState')
       (addressStateContractRoot addressState)
-      (EVMCode $ hash $ codeBytes $ contractCode' addressState')
+      (EVMCode hsh)
       cid
 
 showHexInt::Integer->String

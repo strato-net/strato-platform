@@ -1147,9 +1147,9 @@ create' = do
   where
     assignCode::B.ByteString->Address->VMM ()
     assignCode codeBytes address = do
-      addCode EVM codeBytes
+      hsh <- addCode EVM codeBytes
       newAddressState <- getAddressState address
-      putAddressState address newAddressState{addressStateCodeHash=EVMCode $ hash codeBytes}
+      putAddressState address newAddressState{addressStateCodeHash=EVMCode hsh}
     assignDetails = do
       vmState <- lift get
       let Environment{..} = environment vmState
