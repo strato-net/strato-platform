@@ -13,20 +13,20 @@ async function getHealthStatus() {
     // todo
     await models.Stat.findAll({ attributes: ['processName', 'latestHealthStatus', 'latestCheckTimestamp','lastFailureTimestamp']}).then(function (data) {
         if (data.length) {
-            let ifStalled, ifHealthy;
+            let ifNotStalled, ifHealthy;
             let failureTimeStalled, failureTimeHealth;
             data.forEach(function(element){
                 if (element.processName == "Overall"){
                     ifHealthy = element.latestHealthStatus;
                     failureTimeHealth = element.lastFailureTimestamp;
 
-                } else if (element.processName == "Uptime"){
-                    ifStalled = element.latestHealthStatus;
+                } else if (element.processName == "StallCheck"){
+                    ifNotStalled = element.latestHealthStatus;
                     failureTimeStalled = element.lastFailureTimestamp;
                 }
             })
 
-            healthStatus = ifHealthy && ifStalled;
+            healthStatus = ifHealthy && ifNotStalled;
             emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
 
             const currentTime = moment();

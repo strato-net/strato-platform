@@ -17,10 +17,26 @@ function cleanOnce() {
                 }
             }
         }).then(destroyedCount => {
-            winston.info(`CLEANUP: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
+            winston.info(`CLEANUP - healthStat: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
             return resolve();
         }).catch(err => {
-        winston.error('CLEANUP: Failed with error: ' + err.message);
+        winston.error('CLEANUP - healthStat: Failed with error: ' + err.message);
+        return resolve();
+        })
+
+        winston.info('Cleaning StallChecks Data');
+        const mDate = moment().subtract(config.healthCheck.retention, "hours");
+        models.StallCheck.destroy({
+            where:{
+                createdAt: {
+                    $lt: mDate
+                }
+            }
+        }).then(destroyedCount => {
+            winston.info(`CLEANUP - stallCheck: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
+            return resolve();
+        }).catch(err => {
+        winston.error('CLEANUP - stallCheck: Failed with error: ' + err.message);
         return resolve();
         })
     })

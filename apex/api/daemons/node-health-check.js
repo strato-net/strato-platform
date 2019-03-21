@@ -90,6 +90,7 @@ function findTimeStamp(obj) {
     res.forEach((elem) => {
         if (elem && elem.metric && elem.value && elem.value.length >= 2){
             name = elem.metric.job;
+            // consistent format for millisec timestamps
             value = elem.value[0].toString().split('.').join('');
             if (value.length < timeNow.toString().length){
                 value = parseInt(value + '0'*(timeNow.toString().length - value.length));

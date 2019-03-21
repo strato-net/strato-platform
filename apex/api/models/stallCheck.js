@@ -1,12 +1,12 @@
 'use strict';
 
 module.exports = function(sequelize, DataTypes) {
-    let Uptime = sequelize.define('Uptime', {
+    let StallCheck = sequelize.define('StallCheck', {
         blockType: {type: DataTypes.STRING, allowNull: true},
         blockCount: {type: DataTypes.INTEGER, allowNull: true},
         timestamp: {type: DataTypes.STRING, allowNull: true}
     });
-    Uptime.prototype.toJson = function() {
+    StallCheck.prototype.toJson = function() {
         return {
             id: this.id,
             blockType: this.blockType,
@@ -14,13 +14,13 @@ module.exports = function(sequelize, DataTypes) {
             timestamp: this.timestamp
         };
     };
-    Uptime.associate = function(models) {
-        Uptime.belongsTo(models.Stat, {
+    StallCheck.associate = function(models) {
+        StallCheck.belongsTo(models.Stat, {
             onDelete: "CASCADE",
             foreignKey: {
                 allowNull: true
             }
         })
     };
-    return Uptime;
+    return StallCheck;
 };
