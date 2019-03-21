@@ -10,32 +10,32 @@ function cleanOnce() {
     return new Promise(async (resolve) => {
         winston.info('Cleaning HealthStats Data');
         const mDate = moment().subtract(config.healthCheck.retention, "hours");
-        models.healthStat.destroy({
+        models.HealthStat.destroy({
             where:{
                 createdAt: {
                     $lt: mDate
                 }
             }
         }).then(destroyedCount => {
-            winston.info(`CLEANUP - healthStat: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
+            winston.info(`CLEANUP - HealthStat: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
             return resolve();
         }).catch(err => {
-        winston.error('CLEANUP - healthStat: Failed with error: ' + err.message);
+        winston.error('CLEANUP - HealthStat: Failed with error: ' + err.message);
         return resolve();
         })
 
-        winston.info('Cleaning StallChecks Data');
-        models.StallCheck.destroy({
+        winston.info('Cleaning StallStats Data');
+        models.StallStat.destroy({
             where:{
                 createdAt: {
                     $lt: mDate
                 }
             }
         }).then(destroyedCount => {
-            winston.info(`CLEANUP - stallCheck: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
+            winston.info(`CLEANUP - StallStats: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
             return resolve();
         }).catch(err => {
-        winston.error('CLEANUP - stallCheck: Failed with error: ' + err.message);
+        winston.error('CLEANUP - StallStats: Failed with error: ' + err.message);
         return resolve();
         })
     })

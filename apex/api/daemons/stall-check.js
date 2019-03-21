@@ -27,26 +27,26 @@ function queryHealthStatus() {
             const blocksValid = await getVmBlocksValid();
     const blocksPending = await getBaggerPending();
     let currentTime = moment().format();
-    const lastBlocksValid = await models.StallCheck.findOne({
+    const lastBlocksValid = await models.StallStat.findOne({
         where: {
             blockType: "Valid",
         },
         order: [ [ 'createdAt', 'DESC' ]],
     });
-    const lastBlocksPending = await models.StallCheck.findOne({
+    const lastBlocksPending = await models.StallStat.findOne({
         where: {
             blockType: "Pending",
         },
         order: [ [ 'createdAt', 'DESC' ]],
     });
 
-    await models.StallCheck.create({
+    await models.StallStat.create({
         blockType: "Valid",
         blockCount: blocksValid,
         timestamp: currentTime
     });
 
-    await models.StallCheck.create({
+    await models.StallStat.create({
         blockType: "Pending",
         blockCount: blocksPending,
         timestamp: currentTime
@@ -55,7 +55,7 @@ function queryHealthStatus() {
     // The only unmatch case: lastPendingBlock is nonzero but there is no increment in blocksValid (See spec - uptime sheet)
     const overallStat = lastBlocksPending > 0 && blocksValid == lastBlocksValid.blockCount ? false : true;
     const blocksValidInc = blocksValid > lastBlocksValid.blockCount;
-    await models.Stat.findOrCreate({where: {processName: 'StallCheck'}, defaults: {
+    await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
             latestHealthStatus: overallStat,
             latestCheckTimestamp: currentTime,
             lastFailureTimestamp: currentTime,   //default first time marked as failure
@@ -67,7 +67,7 @@ function queryHealthStatus() {
                 latestHealthStatus: overallStat,
                 ifBlocksValidInc: blocksValidInc,
                 lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
-            }, {where: {processName: 'StallCheck'}})
+            }, {where: {processName: 'StallStat'}})
     }}).catch(err => {
         winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
 });

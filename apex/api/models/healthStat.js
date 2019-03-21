@@ -1,26 +1,26 @@
 'use strict';
 
 module.exports = function(sequelize, DataTypes) {
-    let healthStat = sequelize.define('healthStat', {
+    let HealthStat = sequelize.define('HealthStat', {
         processName: {type: DataTypes.STRING, allowNull: true},
-        HealthStatus: {type: DataTypes.BOOLEAN, allowNull: true},
+        HealthStat: {type: DataTypes.BOOLEAN, allowNull: true},
         timestamp: {type: DataTypes.STRING, allowNull: true}
     });
-    healthStat.prototype.toJson = function() {
+    HealthStat.prototype.toJson = function() {
         return {
             id: this.id,
             processName: this.processName,
-            HealthStatus: this.HealthStatus,
+            HealthStat: this.HealthStat,
             timestamp: this.timestamp
         };
     };
-    healthStat.associate = function(models) {
-        healthStat.belongsTo(models.Stat, {
+    HealthStat.associate = function(models) {
+        HealthStat.belongsTo(models.CurrentHealth, {
             onDelete: "CASCADE",
             foreignKey: {
                 allowNull: true
             }
         })
     };
-    return healthStat;
+    return HealthStat;
 };

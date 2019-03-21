@@ -37,7 +37,7 @@ function queryHealthStatus() {
                     timestamp: currentTime
                 });
             });
-            await models.Stat.findOrCreate({where: {processName: 'Overall'}, defaults: {
+            await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
                 latestHealthStatus: overallStat,
                 latestCheckTimestamp: currentTime,
                 lastFailureTimestamp: currentTime  // default first time marked as failure
@@ -47,7 +47,7 @@ function queryHealthStatus() {
                         {latestCheckTimestamp: currentTime,
                             latestHealthStatus: overallStat,
                             lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
-                        }, {where: {processName: 'Overall'}})
+                        }, {where: {processName: 'HealthStat'}})
                 }
             }).catch(err => {
                     winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);

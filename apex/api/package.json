@@ -6,6 +6,8 @@
     "start": "# npm-run-all -p start-dev",
     "start:prod": "PORT=3001 NODE_HOST=${NODE_HOST} NODE_ENV=production node ./bin/www --config config-prod.yaml",
     "start:prod:node-health": "NODE_ENV=production node daemons/node-health-check.js",
+    "start:prod:stall-check": "NODE_ENV=production node daemons/stall-check.js",
+    "start:prod:db-cleaner": "NODE_ENV=production node daemons/db-cleaner.js",
     "start:dev": "PORT=${PORT:-3001} NODE_HOST=${NODE_HOST:-localhost} node $NODE_DEBUG_OPTION ./bin/www --config config-local.yaml",
     "start:dev:node-health": "node daemons/node-health-check.js",
     "start:dev:db-cleaner": "node daemons/db-cleaner.js",
