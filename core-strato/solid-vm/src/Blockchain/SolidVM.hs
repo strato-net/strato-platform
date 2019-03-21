@@ -883,7 +883,12 @@ expToVar' (Xabi.FunctionCall e args) = do
           [SString s] ->
             case B16.decode (BC.pack s) of
               (b32, "") -> return . Constant . SString . BC.unpack . B.takeWhile (/= 0) $ b32
-              _ -> typeError "invalid hex for bytes" s
+              -- TODO(tim): This is a hack, to deal with the assymmetry created
+              -- between bytes32 literals (that need no conversion)
+              -- and bytes32 external arguments (that need decoding and trimming). It
+              -- would be cleaner to decode arguments in `call`, using `id`
+              -- on strings and `B16.decode` on bytes32
+              _ -> return . Constant $ SString s
           _ -> typeError "bytes32ToString with incorrect arguments" argVals
 
     -- It would be nice to reinterpret two element paths as a function.
@@ -1110,6 +1115,7 @@ logVals val1 val2 = when trace . liftIO . putStrLn $ printf
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: Value -> SM ByteString
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
+encodeForReturn (SAddress a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
 encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
   return $ word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0

@@ -20,6 +20,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
+import Numeric
 import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
@@ -1416,3 +1417,24 @@ contract qq {
   }
 }|]
     getFields ["strlen"] `shouldReturn` [BInteger 12]
+
+  it "can call bytes32toString on literals" . runTest $ do
+    runBS [r|
+contract qq {
+  string s;
+  constructor() public {
+    bytes32 x = "Will the real ";
+    s = Util.bytes32ToString(x);
+  }
+}|]
+    getFields ["s"] `shouldReturn` [BString "Will the real "]
+
+  it "can return an address" . runTest $ do
+    let want' = fst . B16.decode . BC.pack $ showHex sender ""
+        want = B.replicate (32 - B.length want') 0x0 <> want'
+    runCall "a" "()" [r|
+contract qq {
+  function a() public returns (address) {
+    return msg.sender;
+  }
+}|] `shouldReturn` Just (SB.toShort want)
