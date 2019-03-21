@@ -39,6 +39,6 @@ module.exports = {
       maxResponseRange: 1 * 1000,
       cleanFrequency: 5 * 60 * 1000, //clean db every 5 mins
       retention: 1 * 24,
-      uptimeProgressWindow: 10 * 60 * 1000
+      progressWindow: 10 * 60 * 1000
   }
 };

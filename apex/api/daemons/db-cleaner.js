@@ -25,7 +25,6 @@ function cleanOnce() {
         })
 
         winston.info('Cleaning StallChecks Data');
-        const mDate = moment().subtract(config.healthCheck.retention, "hours");
         models.StallCheck.destroy({
             where:{
                 createdAt: {
