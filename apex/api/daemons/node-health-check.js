@@ -23,40 +23,15 @@ setInterval(async () => {
 
 function queryHealthStatus() {
     return new Promise(async (resolve, _void) => {
-
         try {
-            const metricsResult = await getHealthPrometheus()
-            const healthStatus = await findTimeStamp(metricsResult)
-            let overallStat = true;
-            let currentTime = Date.now();
-            Object.keys(healthStatus).forEach(async (keyProcess) => {
-                overallStat = healthStatus[keyProcess] && overallStat;
-                await models.HealthStat.create({
-                    processName: keyProcess,
-                    HealthStatus: healthStatus[keyProcess],
-                    timestamp: currentTime
-                });
-            });
-            await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
-                latestHealthStatus: overallStat,
-                latestCheckTimestamp: currentTime,
-                lastFailureTimestamp: currentTime  // default first time marked as failure
-            }}).then(([stat, created]) => {
-                if (!created){
-                    stat.update(
-                        {latestCheckTimestamp: currentTime,
-                            latestHealthStatus: overallStat,
-                            lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
-                        }, {where: {processName: 'HealthStat'}})
-                }
-            }).catch(err => {
-                    winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
-                });
+            const metricsResult = await getHealthPrometheus();
+            const healthStatus = await compareTimeStamp(metricsResult);
+            const overallStatus = await updateHealthStat(healthStatus);
+            await updateCurrentHealth(overallStatus);
             return resolve();
         } catch (error) {
-            winston.warn(`Error ${error.message ? error.message : ''} occurred while querying health status`);
-            return resolve();
-        }
+        winston.warn(`Error ${error.message ? error.message : ''} occurred while querying health status`);
+    }
     }).timeout(config.healthCheck.requestTimeout - 80);
 }
 
@@ -76,12 +51,12 @@ function getHealthPrometheus() {
     return rp(options);
 }
 
-function findTimeStamp(obj) {
+function compareTimeStamp(obj) {
     if (!(obj && obj.data && obj.data.result)) {
         winston.warn(`Not Found results while querying health status: prometheus path might be incorrect`);
         return {};
     }
-    const timeNow = Date.now();
+    const timeNow = Date.now() / 1000;
 
     res = obj.data.result;
 
@@ -90,12 +65,8 @@ function findTimeStamp(obj) {
     res.forEach((elem) => {
         if (elem && elem.metric && elem.value && elem.value.length >= 2){
             name = elem.metric.job;
-            // consistent format for millisec timestamps
-            value = elem.value[0].toString().split('.').join('');
-            if (value.length < timeNow.toString().length){
-                value = parseInt(value + '0'*(timeNow.toString().length - value.length));
-            }
-        ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
+            value = formatPromethusTimestamp(elem.value[0]);
+            ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
         } else {
         winston.info(`Metric format is updated; need to update its handling`);
         }
@@ -108,4 +79,41 @@ function findTimeStamp(obj) {
     }
 
     return ret;
+}
+
+function updateHealthStat(healthStatus) {
+    let overallStat = true;
+    let currentTime = Date.now();
+    Object.keys(healthStatus).forEach(async(keyProcess) => {
+        overallStat = healthStatus[keyProcess] && overallStat;
+        await models.HealthStat.create({
+            processName: keyProcess,
+            HealthStatus: healthStatus[keyProcess],
+            timestamp: currentTime
+        })
+    });
+    return overallStat;
+}
+
+async function updateCurrentHealth(overallStat) {
+    let currentTime = Date.now();
+    await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
+                latestHealthStatus: overallStat,
+                latestCheckTimestamp: currentTime,
+                lastFailureTimestamp: currentTime  // default first time marked as failure
+            }}).then(([stat, created]) => {
+                if (!created){
+                    stat.update(
+                        {latestCheckTimestamp: currentTime,
+                            latestHealthStatus: overallStat,
+                            lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
+                        }, {where: {processName: 'HealthStat'}})
+                }
+            }).catch(err => {
+                    winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
+                });
+}
+
+function formatPromethusTimestamp(timestamp) {
+    return ( timestamp.toString().split('.')[0])
 }

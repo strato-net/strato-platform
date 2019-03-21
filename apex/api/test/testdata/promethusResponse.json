@@ -1,0 +1,68 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "__name__": "health_check",
+          "instance": "bloc:10777",
+          "job": "slipstream",
+          "location": "slipstream_processor"
+        },
+        "value": [
+          1553203528.057,
+          "1"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "health_check",
+          "instance": "strato:10248",
+          "job": "strato-p2p",
+          "location": "p2p_client"
+        },
+        "value": [
+          1553203528.057,
+          "1"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "health_check",
+          "instance": "strato:8000",
+          "job": "ethereum-vm",
+          "location": "bagger_build"
+        },
+        "value": [
+          1553203528.057,
+          "1"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "health_check",
+          "instance": "strato:8000",
+          "job": "ethereum-vm",
+          "location": "vm_seqevents"
+        },
+        "value": [
+          1553203528.057,
+          "1"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "health_check",
+          "instance": "strato:8050",
+          "job": "strato-sequencer",
+          "location": "pbft_commit"
+        },
+        "value": [
+          1553203528.057,
+          "1"
+        ]
+      }
+    ]
+  }
+}
