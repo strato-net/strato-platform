@@ -12,6 +12,7 @@ import qualified Data.Map as M
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Data.Text as T
+import           Numeric
 import           Text.Printf
 
 import           Blockchain.Data.Address
@@ -29,13 +30,15 @@ data IndexType = ArrayIndex | MapBoolIndex | MapAddressIndex | MapIntIndex | Map
 
 data LocalVar = LocalVar deriving (Show, Eq)
 
+
 data AddressedPath = AddressedPath
   { apAddress :: Either LocalVar Address
   , apPath :: MS.StoragePath
   } deriving (Eq)
 
 apSnoc :: AddressedPath -> MS.StoragePathPiece -> AddressedPath
-apSnoc (AddressedPath addr p) piece = AddressedPath addr $! p ++ [piece]
+apSnoc (AddressedPath loc path) piece = AddressedPath loc $! path `MS.snoc` piece
+
 
 instance Show AddressedPath where
   show (AddressedPath a p) = printf "%s//%s" (show a) (show p)
@@ -77,6 +80,8 @@ data Value =
   | SNULL
   | SReference AddressedPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
+  | SHexDecodeAndTrim -- Hack to implement blockapps-sol's bytes32ToString without
+                      -- supporting indexing into bytes32s.
   deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing
@@ -114,7 +119,15 @@ coerceFromInt:: Value -> Integer -> Value
 coerceFromInt SInteger{} n = SInteger n
 coerceFromInt SAddress{} n = SAddress $ fromIntegral n
 coerceFromInt SString{} 0 = SString ""
+coerceFromInt SString{} n = SString $ showHex n ""
 coerceFromInt t x = typeError "invalid literal for type" (t, x)
+
+-- coerceType allows integer literals to initialize integers, addresses, and
+-- strings (in the special case of 0) and bytes32, determined by type instead of value
+coerceType :: Xabi.Type -> Value -> Value
+coerceType xt = \case
+    SInteger i -> coerceFromInt (defaultValue xt) i
+    v -> v
 
 
 valEquals :: Value -> Value -> Bool
