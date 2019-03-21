@@ -48,8 +48,8 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
---import           Blockchain.SolidVM.Model
---import           Blockchain.Strato.Model.Action
+import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
@@ -125,7 +125,7 @@ create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecRe
 create' creator cc contractName' argExps = do
   newAddress <- getNewAddress creator
   
-  -- action . actionData %= M.insert newAddress (ActionData (SHA 0) SolidVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert newAddress (ActionData (SHA 0) SolidVM (ActionEVMDiff M.empty) [])
   
   ch <- putCodeCollection cc
 
