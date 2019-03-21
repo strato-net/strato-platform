@@ -94,7 +94,9 @@ library:
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
     - SolidVM.Solidity.Parse.UnParser
+    - SolidVM.Solidity.Parse.Declarations
     - SolidVM.Solidity.Xabi.Statement
+    - CodeCollection
   ghc-options: -Wall -O2
 
 executables:
@@ -121,3 +123,12 @@ tests:
       - monad-logger
       - raw-strings-qq
       - solid-vm
+
+benchmarks:
+    codebench:
+      source-dirs: bench/
+      main: CodeBench.hs
+      dependencies:
+        - criterion
+        - file-embed
+        - solid-vm
