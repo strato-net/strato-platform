@@ -48,6 +48,7 @@ data StorableValue = BasicValue BasicValue
                    | SStruct (HM.HashMap B.ByteString StorableValue)
                    | SArray (I.IntMap StorableValue)
                    | SMapping (HM.HashMap IndexType StorableValue)
+                   | SArraySentinel Int
                    deriving (Eq, Show, Generic, NFData)
 
 data StoragePathPiece = Field B.ByteString
@@ -212,7 +213,7 @@ unparsePath (StoragePath ps) = B.concat . concatMap go $ ps
 type TotalStorage = HM.HashMap B.ByteString StorableValue
 
 data ReplayFailure = MissingPath StoragePath
-                   | TypeMismatch
+                   | TypeMismatch StoragePath BasicValue StorableValue
                    | MissingStructField B.ByteString
                    | FieldRequiredAtTopLevel
                    | NoPathsProvided
@@ -245,13 +246,21 @@ applyDelta' (ArrayIndex n:sp) bv (SArray vs) =
   case I.lookup n vs of
     Just v -> SArray . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
     Nothing -> Right . SArray $ I.insert n (constructFromNothing' sp bv) vs
-applyDelta' _ _ _ = Left TypeMismatch
+applyDelta' (ArrayIndex n:sp) bv sent@(SArraySentinel len) =
+  Right . SArray $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
+applyDelta' [Field "length"] (BInteger n) (SArray vs) =
+  let n' = fromIntegral n
+  in Right . SArray $ I.insert n' (SArraySentinel n') vs
+applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 
 constructFromNothing :: StoragePath -> BasicValue -> StorableValue
 constructFromNothing (StoragePath p) = constructFromNothing' p
 
 constructFromNothing' :: [StoragePathPiece] -> BasicValue -> StorableValue
 constructFromNothing' [] = BasicValue
+constructFromNothing' [Field "length"] = \case
+  BInteger n -> SArraySentinel $ fromIntegral n
+  bv -> SStruct . HM.singleton "length" $ constructFromNothing' [] bv
 constructFromNothing' (Field n:sp) = SStruct . HM.singleton n . constructFromNothing' sp
 constructFromNothing' (MapIndex n:sp) = SMapping . HM.singleton n . constructFromNothing' sp
 constructFromNothing' (ArrayIndex n:sp) = SArray . I.singleton n . constructFromNothing' sp
@@ -296,6 +305,7 @@ analyze' (SStruct ss) = HM.foldlWithKey' go [] ss
   where go prev k sv = map (first (Field k:)) (analyze' sv) <> prev
 analyze' (SArray vs) = I.foldMapWithKey go vs
   where go k sv = map (first (ArrayIndex k:)) $ analyze' sv
+analyze' (SArraySentinel n) = [([Field "length"], BInteger $ fromIntegral n)]
 
 synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
 synthesize spbvs = do

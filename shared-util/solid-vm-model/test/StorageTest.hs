@@ -235,6 +235,7 @@ spec = do
                , (INum 100, BasicValue $ BString "bay")
                ]
       synthesize input `shouldBe` Right want
+      synthesize (reverse input) `shouldBe` Right want
 
     it "can synthesize a complicated contract" $ do
       let input = [ (forceParse ".person.age", BInteger 84)
@@ -256,6 +257,16 @@ spec = do
             , ("age", BasicValue $ BString "Enlightenment")
             ]
       synthesize input `shouldBe` Right want
+      synthesize (reverse input) `shouldBe` Right want
+
+    it "can synthesize an array with length" $ do
+      let input = [ (forceParse ".owners.length", BInteger 2)
+                  , (forceParse ".owners[0]", BAddress 0x88)
+                  ]
+          want = HM.singleton "owners" . SArray $ I.fromList
+            [(0, BasicValue $ BAddress 0x88), (2, SArraySentinel 2)]
+      synthesize input `shouldBe` Right want
+      synthesize (reverse input) `shouldBe` Right want
 
   describe "BasicValue RLP encoding" $ do
     it "should be reversible" $ do
