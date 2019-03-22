@@ -54,6 +54,8 @@ import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
 
 import qualified Blockchain.Strato.Model.Action as BS
+import Blockchain.Strato.Model.SHA (hash)
+
 
 import Slipstream.Data.Action
 import Slipstream.Events
@@ -99,8 +101,8 @@ enterBloc2 env x = do
    Left e -> error $ show e
    Right v -> return v
 
-emptyHash :: Keccak256
-emptyHash = keccak256 B.empty
+emptyHash :: SHA
+emptyHash = hash B.empty
 
 hasContract::Action->Bool
 hasContract = (/= emptyHash) . actionCodeHash
@@ -255,13 +257,13 @@ detailsForRow row = liftM2 (<|>)
     name <- lookupT "name" md
     detailsMap <- lift $ sourceToContractDetails True src
     lookupT name detailsMap)
-  (getContractDetailsByCodeHash $ actionCodeHash row)
+  (getContractDetailsByCodeHash . shaKeccak256 $ actionCodeHash row)
 
 adjustGlobals :: IORef Globals -> Action -> ContractDetails -> Bloc ()
 adjustGlobals gref row details = do
   let go m (k,f) = for_ (Map.lookup k $ actionMetadata row) $ \v -> do
                 let contracts = filter (not . T.null) $ T.splitOn "," v
-                forM_ contracts $ \c -> for_ (fmap (contractdetailsCodeHash . snd) $ Map.lookup c m) $ f gref
+                forM_ contracts $ \c -> for_ (fmap (keccak256SHA . contractdetailsCodeHash . snd) $ Map.lookup c m) $ f gref
   -- won't actually recompile the contract
   detailsMap <- sourceToContractDetails True $ contractdetailsSrc details
   mapM_ (go detailsMap) $ [("history", addToHistoryList)
@@ -277,7 +279,7 @@ ensureContractInstance cmId row = do
   let addr = actionAddress row
       chainId = actionTxChainId row
   (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
-    contractInstancesByCodeHash (actionCodeHash row) addr chainId
+    contractInstancesByCodeHash (shaKeccak256 $ actionCodeHash row) addr chainId
   when (isNothing mInstance) . void $
     insertContractInstance cmId addr chainId
 

@@ -5,15 +5,15 @@ module ActionFidelitySpec where
 import Data.Aeson
 import Data.Aeson.QQ
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
 import Data.Either
-import Data.Maybe
 import qualified Data.Map.Strict as M
 import Data.Time.Clock.POSIX
 import Test.QuickCheck
 import Test.Hspec
 
-import BlockApps.Ethereum (stringKeccak256)
 import qualified Blockchain.Strato.Model.Action as BS
+import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.SHA
 import Blockchain.SolidVM.Model
 import qualified Slipstream.Data.Action as SS
@@ -60,7 +60,7 @@ spec = describe "Action conversions" $ do
      convert a `shouldSatisfy` isRight
 
    it "should be backwards compatible" $ do
-     let forceHash = fromMaybe (error "invalid digest") . stringKeccak256
+     let forceHash = SHA . bytesToWord256 . fst . B16.decode
          oldStyle = [aesonQQ| {
          "chainId": null,
          "data": {

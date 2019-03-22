@@ -30,8 +30,12 @@ module BlockApps.Ethereum
   , stringChainId
     -- * Keccak 256 Hashes
   , Keccak256 (..)
+  , SHA(..)
+  , shaToHex
   , keccak256
   , keccak256lazy
+  , keccak256SHA
+  , shaKeccak256
   , keccak256ByteString
   , byteStringKeccak256
   , keccak256String
@@ -107,6 +111,7 @@ import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 import qualified Data.LargeWord as LW
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.SHA (shaToHex, SHA(..))
 
 
 lastWord64 :: Word256 -> Word64
@@ -314,6 +319,15 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
 
 newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
   deriving (Eq,Ord,Show,Generic, NFData)
+
+keccak256SHA :: Keccak256 -> SHA
+keccak256SHA = SHA . bytesToWord256 . ByteArray.convert . digestKeccak256
+
+shaKeccak256 :: SHA -> Keccak256
+shaKeccak256 (SHA hsh) = Keccak256
+                       . fromMaybe (error $ "internal error: shaKeccak256" ++ show hsh)
+                       . digestFromByteString
+                       $ word256ToBytes hsh
 
 keccak256ByteString :: Keccak256 -> ByteString
 keccak256ByteString = ByteArray.convert . digestKeccak256

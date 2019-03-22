@@ -15,10 +15,10 @@ instance NFData (LRU key val) where
   rnf = (`seq` ()) -- LRU is already pretty strict
 
 
-data Globals = Globals { createdContracts :: S.Set Keccak256 -- list of contacts with a table
-                       , historyList :: S.Set Keccak256
-                       , noIndexList :: S.Set Keccak256
-                       , functionHistoryList :: S.Set Keccak256
+data Globals = Globals { createdContracts :: S.Set SHA -- list of contacts with a table
+                       , historyList :: S.Set SHA
+                       , noIndexList :: S.Set SHA
+                       , functionHistoryList :: S.Set SHA
                        , contractStates :: LRU (Address, Maybe ChainId) [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

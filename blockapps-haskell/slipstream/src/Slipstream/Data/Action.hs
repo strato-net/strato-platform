@@ -74,7 +74,7 @@ instance FromJSON CallData where
   parseJSON o = error $ "parseJSON CallData: Expected object, got: " ++ show o
 
 data ActionData = ActionData
-  { _codeHash     :: Keccak256
+  { _codeHash     :: SHA
   , _codeKind     :: CodeKind
   , _storageDiffs :: BS.ActionDataDiff
   , _callData     :: [CallData]
@@ -101,10 +101,10 @@ instance FromJSON ActionData where
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Action' = Action'
-  { _blockHash          :: Keccak256
+  { _blockHash          :: SHA
   , _blockTimestamp     :: UTCTime
   , _blockNumber        :: Integer
-  , _transactionHash    :: Keccak256
+  , _transactionHash    :: SHA
   , _transactionChainId :: Maybe ChainId
   , _transactionSender  :: Address
   , _actionData         :: Map Address ActionData
@@ -137,14 +137,14 @@ instance FromJSON Action' where
   parseJSON o = error $ "parseJSON Action: Expected object, got: " ++ show o
 
 data Action = Action
-  { actionBlockHash      :: Keccak256
+  { actionBlockHash      :: SHA
   , actionBlockTimestamp :: UTCTime
   , actionBlockNumber    :: Integer
-  , actionTxHash         :: Keccak256
+  , actionTxHash         :: SHA
   , actionTxChainId      :: Maybe ChainId
   , actionTxSender       :: Address
   , actionAddress        :: Address
-  , actionCodeHash       :: Keccak256
+  , actionCodeHash       :: SHA
   , actionStorage        :: BS.ActionDataDiff
   , actionType           :: CallType
   , actionCallData       :: [CallData]

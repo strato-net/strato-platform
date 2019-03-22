@@ -247,7 +247,7 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 insertContractTableQuery :: ProcessedContract -> Text
 insertContractTableQuery ProcessedContract{..} =
   let conVals = wrapAndEscape . map escapeQuotes $
-        [ T.pack $ keccak256String codehash
+        [ T.pack $ shaToHex codehash
         , contractName
         , abi
         , chain
@@ -295,10 +295,10 @@ insertIndexTableQuery contracts@(x:_) =
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
-                 , T.pack . keccak256String . blockHash
+                 , T.pack . shaToHex . blockHash
                  , tshow . blockTimestamp
                  , tshow . blockNumber
-                 , T.pack . keccak256String . transactionHash
+                 , T.pack . shaToHex . transactionHash
                  , tshow . transactionSender
                  ]
       tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
@@ -339,10 +339,10 @@ insertHistoryTableQuery contracts@(x:_) =
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
-                 , T.pack . keccak256String . blockHash
+                 , T.pack . shaToHex . blockHash
                  , tshow . blockTimestamp
                  , tshow . blockNumber
-                 , T.pack . keccak256String . transactionHash
+                 , T.pack . shaToHex . transactionHash
                  , tshow . transactionSender
                  ]
       tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
