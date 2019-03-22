@@ -142,7 +142,7 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
   ch <- use gregorUnseq
   atomically . forM_ inEvents $ writeTQueue ch . snd
   hd <- atomically $ tryPeekTQueue ch
-  $logDebugS "gregor/unseqchHead" . T.pack . show . fmap format $ hd
+  $logDebugS "gregor/unseqchHead" $ maybe "empty" (T.pack . format) hd
   P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length inEvents))
   unless (null inEvents) $ do
     let ofs = maximum . map fst $ inEvents
