@@ -86,7 +86,7 @@ recordGlobals g = liftIO $ do
 recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length
 
-recordActionOn :: MonadIO m => T.Text -> Action -> m ()
+recordActionOn :: MonadIO m => T.Text -> AggregateAction -> m ()
 recordActionOn stage act = do
   let kind = case actionType act of
               Create -> "create"
@@ -95,10 +95,10 @@ recordActionOn stage act = do
   liftIO $ withLabel actionCount (stage, kind) incCounter
   recordMaxBlockNumber "slipstream_processor" . actionBlockNumber $ act
 
-recordAction :: MonadIO m => Action -> m ()
+recordAction :: MonadIO m => AggregateAction -> m ()
 recordAction = recordActionOn "raw"
 
-recordCombinedAction :: MonadIO m => Action -> m ()
+recordCombinedAction :: MonadIO m => AggregateAction -> m ()
 recordCombinedAction = recordActionOn "combined"
 
 incNumTables :: MonadIO m => m ()
