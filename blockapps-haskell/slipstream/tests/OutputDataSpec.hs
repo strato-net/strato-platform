@@ -14,6 +14,7 @@ import Text.RawString.QQ
 
 import BlockApps.Ethereum --(Keccak256, Address)
 import qualified BlockApps.Solidity.Value as V
+import Blockchain.Strato.Model.SHA (hash)
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
@@ -27,14 +28,14 @@ spec = do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
       let input = [ProcessedContract {
             address = testAdd,
-            codehash = keccak256 "<CODEHASH>",
+            codehash = hash "<CODEHASH>",
             abi = "<ABI>",
             contractName = "Vehicle",
             chain = "<CHAIN>",
-            blockHash = keccak256 "<BLOCKHASH>",
+            blockHash = hash "<BLOCKHASH>",
             blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
             blockNumber = 123,
-            transactionHash = keccak256 "<TRANSACTIONHASH>",
+            transactionHash = hash "<TRANSACTIONHASH>",
             transactionSender = testAdd,
             functionCallData = Nothing,
             contractData = M.singleton "owners" $ V.ValueArrayDynamic [
@@ -100,17 +101,17 @@ spec = do
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-          cHash = keccak256 "<CODEHASH>"
+          cHash = hash "<CODEHASH>"
       let input = [ProcessedContract {
              address = testAdd,
              codehash = cHash,
              abi = "<ABI>",
              contractName = "Vehicle",
              chain = "<CHAIN>",
-             blockHash = keccak256 "<BLOCKHASH>",
+             blockHash = hash "<BLOCKHASH>",
              blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
              blockNumber = 123,
-             transactionHash = keccak256 "<TRANSACTIONHASH>",
+             transactionHash = hash "<TRANSACTIONHASH>",
              transactionSender = testAdd,
              functionCallData = Nothing,
              contractData = M.singleton "owners" $ V.ValueArrayDynamic [
@@ -210,14 +211,14 @@ spec = do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
       let input = [ProcessedContract {
             address = testAdd,
-            codehash = keccak256 "<CODEHASH>",
+            codehash = hash "<CODEHASH>",
             abi = "<ABI>",
             contractName = "\"Vehicle''",
             chain = "<CHAIN>",
-            blockHash = keccak256 "<BLOCKHASH>",
+            blockHash = hash "<BLOCKHASH>",
             blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
             blockNumber = 123,
-            transactionHash = keccak256 "<TRANSACTIONHASH>",
+            transactionHash = hash "<TRANSACTIONHASH>",
             transactionSender = testAdd,
             functionCallData = Nothing,
             contractData = M.singleton "\"owners\"" $ V.ValueArrayDynamic [
