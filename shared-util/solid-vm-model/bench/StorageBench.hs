@@ -1,12 +1,17 @@
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-unused-local-binds #-}
 import Control.Monad
 import Criterion.Main
+import Data.Binary (encode)
 import Data.Serialize.Put
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Unsafe as BU
 import Data.Word
 import Text.Printf
 
+import Blockchain.Data.RLP
+import Blockchain.Strato.Model.ExtendedWord
 import SolidVM.Model.Storable
 
 data UnfoldEsc = UnfoldEsc !Int !Bool
@@ -97,4 +102,12 @@ main = do
                    ArrayIndex 10, Field "field"]
              , bench "unparse array index" $ nf unparsePath $ fromList [ArrayIndex 1324098]
              ]
-  defaultMain [escapes, parses]
+  let values = bgroup "Value conversion"
+             [ bench "rlp encode int" $ nf (rlpSerialize . rlpEncode) (BInteger 209318487102)
+             , bench "binary encode int" $ nf (BL.toStrict . encode) (BInteger 209318487102)
+             , bench "word256 to bytes" $ nf (\(BInteger k) -> word256ToBytes (fromIntegral k)) (BInteger 209318487102)
+             , bench "rlp encode string" $ nf (rlpSerialize . rlpEncode) (BString "TKTT")
+             , bench "binary encode string" $ nf (BL.toStrict . encode) (BString "TKTT")
+             , bench "cons...?" $ nf (\(BString s) -> B.cons 6 s) (BString "TKTT")
+             ]
+  defaultMain [escapes, parses, values]

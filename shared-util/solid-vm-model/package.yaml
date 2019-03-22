@@ -5,6 +5,7 @@ dependencies:
   - attoparsec
   - base
   - base16-bytestring
+  - binary
   - bytestring
   - containers
   - deepseq
