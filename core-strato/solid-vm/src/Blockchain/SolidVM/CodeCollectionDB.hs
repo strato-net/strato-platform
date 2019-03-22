@@ -1,46 +1,74 @@
-module Blockchain.SolidVM.CodeCollectionDB where
+module Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromSource, codeCollectionFromHash) where
 
+import           Control.Exception
 import           Control.Monad.IO.Class
+import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as BC
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
+import qualified Data.Text                            as T
 import           System.IO.Unsafe
+import           Text.Parsec                          (runParser)
 
 import           Blockchain.DB.CodeDB
 import           Blockchain.SHA
+import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Metrics
-import           Blockchain.SolidVM.SM
+
+import           SolidVM.Solidity.Parse.Declarations
+import           SolidVM.Solidity.Parse.File
 
 import           CodeCollection
 
-
-putCodeCollection :: CodeCollection -> SM SHA
-putCodeCollection cc = do
-  recordCacheEvent StorageWrite
-  let ccString = BC.pack $ show cc
-  addCode SolidVM ccString
-
-getCodeCollection :: SHA -> SM CodeCollection
-getCodeCollection hsh = do
-  recordCacheEvent StorageRead
-  read . BC.unpack <$> getEVMCode hsh
-
+{-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map SHA CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
--- TODO- We need to replace this with a true IO caching
--- library like http://hackage.haskell.org/package/lrucache
--- currently this never deletes anything, and will eventually fill up all of memory
-getCodeCollectionCached :: SHA -> SM CodeCollection
-getCodeCollectionCached address' = do
-  unsafeCodeMap <- liftIO $ readIORef unsafeCodeMapIORef
-  case M.lookup address' unsafeCodeMap of
+compileSource :: B.ByteString -> CodeCollection
+compileSource initCode =
+  let maybeFile = runParser solidityFile "" "" $ BC.unpack initCode
+      file = either (error . show) id maybeFile
+
+      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
+                       | NamedXabi name (xabi, parents') <- unsourceUnits file]
+  in applyInheritance
+        $ CodeCollection {
+            _contracts=M.fromList namedContracts
+          }
+
+codeCollectionFromSource :: (HasCodeDB m) => B.ByteString -> m (SHA, CodeCollection)
+codeCollectionFromSource initCode = do
+  let hsh = hash initCode
+  codeMap <- liftIO $ readIORef unsafeCodeMapIORef
+  case M.lookup hsh codeMap of
+    Just cc -> do
+      recordCacheEvent CacheHit
+      return (hsh, cc)
+    Nothing -> do
+      recordCacheEvent StorageWrite
+      hsh' <- addCode SolidVM initCode
+      let cc = compileSource initCode
+      let codeMap' = M.insert hsh cc codeMap
+      recordCacheSize $ M.size codeMap'
+      liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+      return $ assert (hsh == hsh') (hsh, cc)
+
+codeCollectionFromHash :: HasCodeDB m => SHA -> m CodeCollection
+codeCollectionFromHash hsh = do
+  codeMap <- liftIO $ readIORef unsafeCodeMapIORef
+  case M.lookup hsh codeMap of
+    Just cc -> do
+      recordCacheEvent CacheHit
+      return cc
     Nothing -> do
       recordCacheEvent CacheMiss
-      x <- getCodeCollection address'
-      liftIO $ writeIORef unsafeCodeMapIORef (M.insert address' x unsafeCodeMap)
-      return x
-    Just x -> do
-      recordCacheEvent CacheHit
-      return x
+      mCode <- getCode hsh
+      case mCode of
+        Just (_, initCode) -> do
+          let cc = compileSource initCode
+              codeMap' = M.insert hsh cc codeMap
+          recordCacheSize $ M.size codeMap'
+          liftIO $ writeIORef unsafeCodeMapIORef codeMap'
+          return cc
+        Nothing -> internalError "unknown code hash" hsh

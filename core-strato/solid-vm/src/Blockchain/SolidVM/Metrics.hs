@@ -1,5 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Blockchain.SolidVM.Metrics (CacheEvent(..), recordCacheEvent, recordCall, recordCreate) where
+module Blockchain.SolidVM.Metrics (
+    CacheEvent(..)
+  , recordCacheEvent
+  , recordCacheSize
+  , recordCall
+  , recordCreate
+  ) where
 
 import Control.Monad.IO.Class
 import Prometheus
@@ -34,3 +40,12 @@ recordCreate = liftIO $ withLabel txKinds "create" incCounter
 
 recordCall :: MonadIO m => m ()
 recordCall = liftIO $ withLabel txKinds "call" incCounter
+
+{-# NOINLINE cacheSize #-}
+cacheSize :: Gauge
+cacheSize = unsafeRegister
+          . gauge
+          $ Info "solidvm_cache_size" "Number of entries in the CodeCollectionDB cache"
+
+recordCacheSize :: MonadIO m => Int -> m ()
+recordCacheSize = liftIO . setGauge cacheSize . fromIntegral

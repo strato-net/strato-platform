@@ -56,6 +56,7 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
@@ -79,6 +80,7 @@ data CallInfo =
     currentAddress :: Address,
     currentContract :: Contract,
     codeCollection :: CodeCollection,
+    collectionHash :: SHA,
     localVariables :: Map String (Xabi.Type, Variable),
     localByPath :: HM.HashMap MS.StoragePath MS.BasicValue
     } deriving (Show)
@@ -338,14 +340,15 @@ getTypeOfName s = do
 
 
 
-addCallInfo :: Address -> Contract -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
-addCallInfo a c cc initialLocalVariables = do
+addCallInfo :: Address -> Contract -> SHA -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
+addCallInfo a c hsh cc initialLocalVariables = do
   sstate <- get
   let newCallInfo =
         CallInfo {
           currentAddress=a,
           currentContract=c,
           codeCollection=cc,
+          collectionHash=hsh,
           localVariables=initialLocalVariables,
           localByPath=HM.empty
         }
@@ -401,11 +404,11 @@ setLocal path val = do
   put sstate{callStack=info{localByPath=newLocals}:rest}
 
 
-getCurrentCodeCollection :: SM CodeCollection
+getCurrentCodeCollection :: SM (SHA, CodeCollection)
 getCurrentCodeCollection = do
   cs <- fmap callStack get
   case cs of
-    (currentCallInfo:_) -> return $ codeCollection currentCallInfo
+    (currentCallInfo:_) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
     _ -> internalError "getCurrentContract called with an empty stack" ()
 
 hintFromType :: Xabi.Type -> SM BasicType
