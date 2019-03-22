@@ -46,6 +46,12 @@ data SeqLoopEvent = TimerFire PBFT.RoundNumber
                   | WaitTerminated
                   deriving (Eq, Show, GHCG.Generic)
 
+instance Format SeqLoopEvent where
+  format (TimerFire rn) = "TimerFire " ++ format rn
+  format (VoteMade vote) = "VoteMade " ++ show vote
+  format (UnseqEvent ev) = "UnseqEvent " ++ format ev
+  format WaitTerminated = "WaitTerminated"
+
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
                  | IEGenesis IngestGenesis
@@ -344,10 +350,10 @@ instance Format IngestBlock where
              format bd ++
              (if null receipts
               then "        (no transactions)\n"
-              else tab (intercalate "\n    " (format <$> receipts))) ++
+              else tab (show $ length receipts)) ++
              (if null uncles
               then "        (no uncles)"
-              else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
+              else tab (show $ length uncles)))
 
 instance Format OutputBlock where
     format b@OutputBlock { obOrigin              = origin
@@ -361,10 +367,10 @@ instance Format OutputBlock where
              format bd ++
              (if null receipts
               then "        (no transactions)\n"
-              else tab (intercalate "\n    " (format <$> receipts))) ++
+              else tab (show $ length receipts)) ++
              (if null uncles
               then "        (no uncles)"
-              else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
+              else tab (show $ length uncles)))
 
 instance Format OutputTx where
     format OutputTx{ otOrigin = origin

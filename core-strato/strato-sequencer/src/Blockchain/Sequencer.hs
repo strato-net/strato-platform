@@ -82,11 +82,11 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   vmEvs <- drainVM
   unless (null vmEvs) $ do
     writeSeqVmEvents vmEvs
-    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
+    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show (length vmEvs) ++ " SeqEvents to VM"
   p2pEvs <- drainP2P
   unless (null p2pEvs) $ do
     writeSeqP2pEvents p2pEvs
-    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
+    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show (length p2pEvs) ++ " SeqEvents to P2P"
   return src'
 
 clearAll :: SequencerM ()
@@ -177,7 +177,7 @@ blockstanbulSend' msg = do
         [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
+  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show (map blockHash blocks)
   let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul
       rewriteBlock b = do
         let msb = getSequencedBlock b
