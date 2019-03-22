@@ -55,6 +55,9 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
 
+formatList :: Format a => [a] -> T.Text
+formatList = T.concat . map (T.pack . format)
+
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
 -- replace with this when debugging tests
@@ -112,7 +115,7 @@ readEventsInBufferedWindow src = do
   (src'', events) <- src' $$++ takeWhileC (/= WaitTerminated)
                           .| takeC maxEvents
                           .| sinkList
-  $logDebugS "sequencer/events" . T.pack . show $ events
+  $logDebugS "sequencer/events" $ formatList events
   logF . printf "read %d events from fused channels" $ length events
   return (src'', events)
 
@@ -197,9 +200,9 @@ blockstanbulSend' msg = do
     now <- liftIO getCurrentTime
     when (now < tNext) $
       liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-  $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
+  $logDebugS "seq/pbft/send_p2p" $ formatList p2pevs
   mapM_ markForP2P p2pevs
-  $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
+  $logDebugS "seq/pbft/send_vm" $ formatList vmevs
   return vmevs
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()

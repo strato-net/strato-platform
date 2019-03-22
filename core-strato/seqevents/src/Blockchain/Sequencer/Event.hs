@@ -122,12 +122,13 @@ data OutputEvent = OETx Timestamp OutputTx
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
-  format (OETx ts o)       = show ts ++ " " ++ format o
-  format (OEBlock o)       = format o
-  format (OEGenesis o)     = show o
-  format (OEGetChain cids) = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
-  format (OEGetTx shas)    = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format x                 = show x
+  format (OETx ts o)        = show ts ++ " " ++ format o
+  format (OEBlock o)        = format o
+  format (OEGenesis o)      = show o
+  format (OEGetChain cids)  = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (OEGetTx shas)     = "[" ++ (intercalate "," $ map format shas) ++ "]"
+  format (OEBlockstanbul o) = format o
+  format x                  = show x
 
 data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otHash   :: SHA
@@ -378,13 +379,13 @@ instance Format OutputTx where
                    , otBaseTx = base
                    } =
            CL.red("OutputTx from address " ++ format signer)
-                ++ tab (" via " ++ format origin ++ "\n" ++ format base)
+                ++ tab (" via " ++ format origin ++ "\n" ++ format (txHash base))
 
 instance Format IngestTx where
     format IngestTx{ itOrigin      = origin
                    , itTransaction = base
                    } =
-           CL.red("IngestTx via " ++ format origin ++ "\n" ++ tab (format base))
+           CL.red("IngestTx via " ++ format origin ++ "\n" ++ tab (format $ txHash base))
 
 -- todo: can we get away with this? seems like there'd be overhead recomputing
 -- todo: otSigner

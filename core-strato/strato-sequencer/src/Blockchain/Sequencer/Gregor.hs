@@ -38,6 +38,7 @@ import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka as SK
 import           Blockchain.Sequencer.Metrics
+import           Blockchain.Strato.Model.Format
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Protocol     as KP
 
@@ -141,7 +142,7 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
   ch <- use gregorUnseq
   atomically . forM_ inEvents $ writeTQueue ch . snd
   hd <- atomically $ tryPeekTQueue ch
-  $logDebugS "gregor/unseqchHead" . T.pack . show $ hd
+  $logDebugS "gregor/unseqchHead" . T.pack . show . fmap format $ hd
   P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length inEvents))
   unless (null inEvents) $ do
     let ofs = maximum . map fst $ inEvents
