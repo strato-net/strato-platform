@@ -3,7 +3,6 @@
 
 module Blockchain.Strato.Model.Format
   ( Format(..)
-  , formatList
   ) where
 
 import qualified Data.ByteString        as B
@@ -26,5 +25,5 @@ instance Format N.NibbleString where
 instance (Format a, Format b) => Format (a, b) where
   format (x, y) = "(" ++ format x ++ ", " ++ format y ++ ")"
 
-formatList :: Format a => [a] -> String
-formatList = show . map format
+instance Format a => Format [a] where
+  format = show . map format
