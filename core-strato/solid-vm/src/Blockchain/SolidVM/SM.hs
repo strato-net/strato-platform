@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
 
@@ -9,8 +10,8 @@
 module Blockchain.SolidVM.SM (
   CallInfo(..),
   SState(..),
-  Environment(..),
   SM,
+  action,
   runSM,
   getCurrentAddress,
   addCallInfo,
@@ -34,10 +35,12 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.IORef
 import qualified Data.HashMap.Strict as HM
+import           Data.List (foldl')
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
@@ -45,19 +48,22 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.Address
-import           Blockchain.Data.DataDefs (BlockData(..))
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
+import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Class
+import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
+import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
@@ -97,16 +103,9 @@ BlockData
     deriving Eq Read Show Generic
 -}
 
-data Environment =
-  Environment {
-    sender :: Address,
-    origin :: Address,
-    blockHeader :: BlockData
-    }
-
 data SState =
   SState {
-    env :: Environment,
+    env :: Env.Environment,
     callStack :: [CallInfo],
     codeDB                 :: CodeDB,
     hashDB                 :: HashDB,
@@ -114,8 +113,11 @@ data SState =
     addressStateTxDBMap    :: M.Map Address AddressStateModification,
     addressStateBlockDBMap :: M.Map Address AddressStateModification,
     storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
-    storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
+    storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString,
+    _action                 :: Action
   }
+
+makeLenses ''SState
 
 type SM = StateT SState (ResourceT IO)
 
@@ -157,8 +159,8 @@ instance HasHashDB SM where
 instance HasCodeDB SM where
   getCodeDB = codeDB <$> get
 
-runSM :: Environment -> SM a -> ContextM a
-runSM env f = do
+runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM a
+runSM maybeCode env f = do
   vmcontext <- get
 
   let startingState =
@@ -171,7 +173,8 @@ runSM env f = do
         addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
         addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
         storageTxMap = contextStorageTxMap vmcontext,
-        storageBlockMap = contextStorageBlockMap vmcontext
+        storageBlockMap = contextStorageBlockMap vmcontext,
+        _action = startingAction maybeCode env
         }
 
   (value, sstateAfter) <- liftIO $ runResourceT $ runStateT f startingState
@@ -186,7 +189,27 @@ runSM env f = do
   setStateDBStateRoot $ MP.stateRoot $ stateDB sstateAfter
   return value
 
-getEnv :: SM Environment
+
+startingAction :: Maybe ByteString -> Env.Environment -> Action
+startingAction maybeCode env' = Action
+  { _actionBlockHash          = blockHeaderHash $ Env.blockHeader env'
+  , _actionBlockTimestamp     = blockHeaderTimestamp $ Env.blockHeader env'
+  , _actionBlockNumber        = blockHeaderBlockNumber $ Env.blockHeader env'
+  , _actionTransactionHash    = Env.txHash env'
+  , _actionTransactionChainId = Env.chainId env'
+  , _actionTransactionSender  = Env.sender env'
+  , _actionData               = M.empty
+  , _actionMetadata           =
+      case maybeCode of
+        Just theCode ->
+          Just $ M.insert "src" (T.pack $ BC.unpack theCode) $ fromMaybe M.empty $ Env.metadata env'
+        Nothing -> Env.metadata env'
+  }
+
+
+
+
+getEnv :: SM Env.Environment
 getEnv = do
   fmap env get
 
@@ -199,7 +222,6 @@ toMaybe False _ = Nothing
 getVariableOfName :: String -> SM Variable
 getVariableOfName name = do
   sstate <- get
-
   let currentCallInfo =
         case callStack sstate of
           [] -> internalError "getVariableValue called with an empty stack" name
@@ -216,24 +238,37 @@ getVariableOfName name = do
           val <- liftIO $ readIORef v
           case val of
             SReference ap -> return $ StorageItem ap
-            _ -> return $ StorageItem $ AddressedPath (Left LocalVar) [MS.Field $ BC.pack name]
+            _ -> return . StorageItem . AddressedPath (Left LocalVar)
+                        . MS.singleton $ BC.pack name
         s@StorageItem{} -> return s
-        Constant{} -> return $ StorageItem $ AddressedPath (Left LocalVar) [MS.Field $ BC.pack name]
+        Constant{} -> return . StorageItem . AddressedPath (Left LocalVar)
+                             . MS.singleton $ BC.pack name
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "keccak256", "require", "revert", "assert", "sha3", "sha256", "ecrecover", "addmod", "mulmod", "selfdestruct", "suicide"]) $
+      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "byte", "string", "keccak256"
+                                                  , "require", "revert", "assert", "sha3"
+                                                  , "sha256", "ecrecover", "addmod", "mulmod"
+                                                  , "selfdestruct", "suicide", "bytes32ToString"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
-      maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx"]) $
+      maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx", "super"]) $
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
       maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums)) $
         t "enum" $ Constant $ SEnum name
+
+      maybeConstant :: Maybe Variable
+      maybeConstant = fmap (t "constant constant" . Constant) $ do
+        let ctract = currentContract currentCallInfo
+        Xabi.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
+        return $ coerceType constType $ case constInitialVal of
+                                            Xabi.NumberLiteral x _ -> SInteger x
+                                            x -> todo "constant initial val" x
 
       maybeStructDef :: Maybe Variable
       maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs)) $
@@ -248,7 +283,8 @@ getVariableOfName name = do
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
         then Just . StorageItem $ AddressedPath
-              (Right $ currentAddress currentCallInfo) [MS.Field $ BC.pack name]
+                (Right $ currentAddress currentCallInfo)
+                (MS.singleton $ BC.pack name)
         else Nothing
 
       maybeThis :: Maybe Variable
@@ -281,6 +317,7 @@ getVariableOfName name = do
       , maybeStructDef
       , maybeContract
       , maybeThis
+      , maybeConstant
       , unknownVariable "getVariableOfName" name
       ]
 
@@ -346,7 +383,9 @@ getCurrentAddress = do
 
 
 getLocal :: MS.StoragePath -> SM MS.BasicValue
-getLocal path = fromMaybe MS.BDefault . HM.lookup path . localByPath <$> getCurrentCallInfo
+getLocal path = do
+  locals <- gets (map localByPath . callStack)
+  return . fromMaybe MS.BDefault . foldl' (<|>) Nothing . map (HM.lookup path) $ locals
 
 setLocal :: MS.StoragePath -> MS.BasicValue -> SM ()
 setLocal path val = do
@@ -393,7 +432,14 @@ getXabiType loc field = do
   -- This field might have been defined in e.g. a caller contract.
   -- We search from the top down for the home of this data
   case loc of
-    Left LocalVar -> M.lookup (BC.unpack field) . fmap fst . localVariables <$> getCurrentCallInfo
+    Left LocalVar -> do
+      -- Reading the entire stack of locals solves the problem of passing
+      -- local arrays as arguments to functions. The parameter is a reference
+      -- to the argument, so the parent or higher must be consulted to resolve it.
+      -- This solution has the downside of potentially resolving variables that are not in scope:
+      -- function called() { return x; }, function caller() { uint x = 200; uint y = called(); }
+      locals_stack <- gets (map localVariables . callStack)
+      return . foldl' (<|>) Nothing $ map (fmap fst . M.lookup (BC.unpack field)) locals_stack
     Right addr -> do
       stack <- gets callStack
       case filter ((== addr) . currentAddress) stack of
@@ -406,13 +452,13 @@ getXabiType loc field = do
                       $ callInfo
 
 getXabiValueType :: AddressedPath -> SM Xabi.Type
-getXabiValueType apt@(AddressedPath _ []) = internalError "getXabiValueType" apt
-getXabiValueType (AddressedPath loc (MS.Field field:rest)) = do
+getXabiValueType (AddressedPath loc path) = do
+  let field = MS.getField path
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> loop rest v
- where loop :: MS.StoragePath -> Xabi.Type -> SM Xabi.Type
+    Just v -> loop (tail $ MS.toList path) v
+ where loop :: [MS.StoragePathPiece] -> Xabi.Type -> SM Xabi.Type
        loop [] = return
        loop [x] = \case
          Xabi.Mapping{Xabi.value=v} -> case x of
@@ -438,7 +484,6 @@ getXabiValueType (AddressedPath loc (MS.Field field:rest)) = do
           Xabi.Mapping{Xabi.value=t'} -> loop rs t'
           Xabi.Array{Xabi.entry=t'} -> loop rs t'
           t -> todo "getXabiValueType/loopnext unsupported type" t
-getXabiValueType p = internalError "getXabiValueType/storage path not prefixed by field" p
 
 getValueType :: AddressedPath -> SM BasicType
 getValueType p = hintFromType =<< getXabiValueType p

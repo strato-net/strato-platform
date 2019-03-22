@@ -6,6 +6,7 @@ module Blockchain.SolidVM.SetGet where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Data.Bits ((.&.))
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.HashMap.Strict as HM
 import           Data.IORef
@@ -14,6 +15,8 @@ import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
+import           Data.Word (Word8)
+import           Text.Printf
 
 import           Blockchain.Data.Address
 import           Blockchain.DB.SolidStorageDB
@@ -88,9 +91,9 @@ setVar dst@(AddressedPath loc key) val = do
                 getVar (StorageItem $ src `apSnoc` MS.ArrayIndex i')
           _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
     SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
-        let suffix = [MS.Field (BC.pack f)]
-            srcKey = (MS.Field (BC.pack name)):suffix
-            dstKey = key ++ suffix
+        let suffix = MS.Field $ BC.pack f
+            srcKey = MS.singleton (BC.pack name) `MS.snoc` suffix
+            dstKey = key `MS.snoc` suffix
         !val' <- case var of
           Constant x -> do
             return $ toBasic x
@@ -140,6 +143,7 @@ getVar' mTypeHint (Variable ioRef) = do
 getVar' mTypeHint (Constant c) = do
   case c of
     SReference apt -> getVar' mTypeHint $ StorageItem apt
+    STuple vs -> STuple <$> V.mapM (fmap Constant . getVar' Nothing) vs
     _ -> return c
 getVar' mTypeHint (StorageItem apt@(AddressedPath loc key)) = do
   raw <- getSolid loc key

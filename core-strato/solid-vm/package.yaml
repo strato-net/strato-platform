@@ -24,6 +24,7 @@ dependencies:
   - blockapps-datadefs
   - blockapps-mpdbs
   - ethereum-rlp
+  - base16-bytestring
   - blockapps-util
   - bytestring
   - containers
@@ -31,6 +32,7 @@ dependencies:
   - deepseq
   - extra
   - generic-random
+  - hashable
   - lens
   - memory
   - merkle-patricia-db

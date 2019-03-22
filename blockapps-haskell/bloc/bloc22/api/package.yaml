@@ -51,5 +51,6 @@ tests:
     source-dirs: test/
     main: APISpec.hs
     dependencies:
+      - aeson-qq
       - blockapps-bloc22-api
       - hspec

@@ -90,10 +90,11 @@ main = do
              , bench "parse one long quoteful map index" $ nf parsePath
                $ B.concat ["<\"", B.concat (replicate 50 "\\\""), "\">"]
              , bench "parse nested" $ nf parsePath ".extra[200]<\"key\">[10].field"
-             , bench "unparse nothing" $ nf unparsePath Null
-             , bench "unparse field" $ nf unparsePath (Field "field" Null)
-             , bench "unparse nested" $ nf unparsePath $ Field "extra" $ ArrayIndex 200
-                 $ MapIndex (Text "key") $ ArrayIndex 10 $ Field "field" Null
-             , bench "unparse array index" $ nf unparsePath $ ArrayIndex 1324098 Null
+             , bench "unparse nothing" $ nf unparsePath empty
+             , bench "unparse field" $ nf unparsePath $ singleton "field"
+             , bench "unparse nested" $ nf unparsePath $ fromList
+                  [Field "extra", ArrayIndex 200, MapIndex (IText "key"),
+                   ArrayIndex 10, Field "field"]
+             , bench "unparse array index" $ nf unparsePath $ fromList [ArrayIndex 1324098]
              ]
   defaultMain [escapes, parses]

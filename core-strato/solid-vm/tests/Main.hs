@@ -4,6 +4,7 @@ import Control.Monad
 import HFlags
 import Test.Hspec.Runner
 
+import Blockchain.VMOptions() -- for HFlags
 import Executable.EVMFlags() -- for HFlags
 import qualified Spec
 

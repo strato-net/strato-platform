@@ -20,7 +20,6 @@ import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Generic.Random               as GR
 import           GHC.Generics
---import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
