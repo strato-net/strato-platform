@@ -6,6 +6,13 @@ const env = process.env.NODE_ENV || 'development';
 const moment = require('moment');
 
 const config = require('../config/app.config');
+const neededJobs = {
+    "slipstream_processor":"slipstream",
+    "p2p_client":"strato-p2p",
+    "bagger_build":"ethereum-vm",
+    "vm_seqevents":"ethereum-vm",
+    "pbft_commit":"strato-sequencer"
+}
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -61,15 +68,29 @@ function compareTimeStamp(obj) {
     res = obj.data.result;
 
     const ret = {};
-
+    const checkJobs = neededJobs;
     res.forEach((elem) => {
+        let name, value,loc;
         if (elem && elem.metric && elem.value && elem.value.length >= 2){
             name = elem.metric.job;
+            loc = elem.metric.location.toString();
+
+            // check and remove from checkJObs list
+            if ((loc in checkJobs) && (checkJobs[loc] == name)){
+                delete checkJobs[loc];
+            } else {
+                winston.warn(`Jobs are updated? The following prometheus job is not in the check list required: `, loc);
+            }
             value = formatPromethusTimestamp(elem.value[0]);
             ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
         } else {
-        winston.info(`Metric format is updated; need to update its handling`);
+            winston.info(`Metric format is updated; need to update its handling`);
         }
+    })
+
+    Object.keys(checkJobs).forEach((elem) => {
+        ret[checkJobs[elem]] = false;
+        winston.warn(`${checkJobs[elem]} : ${elem} not found in the prometheus response; Not started`);
     })
 
     if (res.length == 0){
