@@ -47,8 +47,6 @@ import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
-import           Blockchain.SolidVM.Model
-import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
@@ -119,7 +117,7 @@ create' :: Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM
 create' creator ch cc contractName' argExps = do
   newAddress <- getNewAddress creator
 
-  action . actionData %= M.insert newAddress (ActionData (SHA 0) SolidVM (ActionEVMDiff M.empty) [])
+  initializeAction newAddress ch
 
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
@@ -292,6 +290,7 @@ logFunctionCall args address contract functionName f = do
 call'' :: Address -> Maybe String -> String -> [Value] -> SM (Maybe Value)
 call'' address mContract functionName args = do
   (contract', hsh, cc) <- getCodeAndCollection address
+  initializeAction address hsh
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
   logFunctionCall args address contract functionName $
     case M.lookup functionName $ contract^.functions of

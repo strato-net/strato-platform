@@ -34,7 +34,9 @@ import           Text.Format
 putSolid :: Either LocalVar Address -> MS.StoragePath -> MS.BasicValue -> SM ()
 putSolid loc key val = case loc of
                           Left LocalVar -> setLocal key val
-                          Right addr -> putSolidStorageKeyVal' addr key val
+                          Right addr -> do
+                            markDiffForAction addr key val
+                            putSolidStorageKeyVal' addr key val
 
 {-# INLINE getSolid #-}
 getSolid :: Either LocalVar Address -> MS.StoragePath -> SM MS.BasicValue

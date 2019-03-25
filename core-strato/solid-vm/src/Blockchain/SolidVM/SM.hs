@@ -26,7 +26,9 @@ module Blockchain.SolidVM.SM (
   getTypeOfName,
   getXabiType,
   getXabiValueType,
-  getValueType
+  getValueType,
+  initializeAction,
+  markDiffForAction
   ) where
 
 import           Control.Applicative ((<|>))
@@ -48,6 +50,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
@@ -490,3 +493,16 @@ getXabiValueType (AddressedPath loc path) = do
 
 getValueType :: AddressedPath -> SM BasicType
 getValueType p = hintFromType =<< getXabiValueType p
+
+initializeAction :: Address -> SHA -> SM ()
+initializeAction addr hsh =
+  action . actionData %= M.insert addr (ActionData hsh SolidVM (ActionSolidVMDiff M.empty) [])
+
+markDiffForAction :: Address -> MS.StoragePath -> MS.BasicValue -> SM ()
+markDiffForAction owner key' val' = do
+  let key = MS.unparsePath key'
+      val = rlpSerialize $ rlpEncode val'
+      ins = \case
+              ActionSolidVMDiff m -> ActionSolidVMDiff $ M.insert key val m
+              _ -> error "SolidVM Diff executing in EVM"
+  (action . actionData . at owner . mapped . actionDataStorageDiffs) %= ins
