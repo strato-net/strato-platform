@@ -253,8 +253,11 @@ detailsForRow row = liftM2 (<|>)
   (runMaybeT $ do
     let md = actionMetadata row
     let lookupT k m = MaybeT . return $ Map.lookup k m
+    liftIO $ infoM "detailsForRow" "Querying src"
     src <- lookupT "src" md
+    liftIO $ infoM "source found:" (show src)
     name <- lookupT "name" md
+    liftIO $ infoM "name found: " (show name)
     detailsMap <- lift $ sourceToContractDetails True src
     lookupT name detailsMap)
   (getContractDetailsByCodeHash . shaKeccak256 $ actionCodeHash row)
@@ -348,6 +351,7 @@ processTheMessages env conn g messages = do
       mapM_ recordAction actions
       recordCombinedAction row
       liftIO . infoM "processTheMessages" . T.unpack . formatAction $ row
+      liftIO . infoM "the diff is" . show . actionStorage $ row
 
       mDetails <- detailsForRow row
       case mDetails of
