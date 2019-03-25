@@ -4,8 +4,12 @@ module.exports = function(sequelize, DataTypes) {
     let CurrentHealth = sequelize.define('CurrentHealth', {
         processName : {type: DataTypes.STRING, defaultValue: false, allowNull: false},
         latestHealthStatus : {type: DataTypes.BOOLEAN, allowNull: false},
-        latestCheckTimestamp: {type: DataTypes.DATE, allowNull: false},
-        lastFailureTimestamp : {type: DataTypes.DATE, allowNull: false},
+        latestCheckTimestamp: {
+            type: DataTypes.DATE, //'TIMESTAMP',
+            allowNull: false},
+        lastFailureTimestamp : {
+            type: DataTypes.DATE, //'TIMESTAMP',
+            allowNull: false},
         ifBlocksValidInc: {type: DataTypes.BOOLEAN, allowNull: true}
     });
     CurrentHealth.prototype.toJson = function() {

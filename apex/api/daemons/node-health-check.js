@@ -68,7 +68,7 @@ function compareTimeStamp(obj) {
     res = obj.data.result;
 
     const ret = {};
-    const checkJobs = neededJobs;
+    const checkJobs = Object.assign({}, neededJobs);
     res.forEach((elem) => {
         let name, value,loc;
         if (elem && elem.metric && elem.value && elem.value.length >= 2){
@@ -102,7 +102,7 @@ function compareTimeStamp(obj) {
     return ret;
 }
 
-function updateHealthStat(healthStatus) {
+async function updateHealthStat(healthStatus) {
     let overallStat = true;
     let currentTime = Date.now();
     Object.keys(healthStatus).forEach(async(keyProcess) => {
@@ -137,4 +137,10 @@ async function updateCurrentHealth(overallStat) {
 
 function formatPromethusTimestamp(timestamp) {
     return ( timestamp.toString().split('.')[0])
+}
+
+module.exports = {
+    updateCurrentHealth,
+    updateHealthStat,
+    compareTimeStamp
 }

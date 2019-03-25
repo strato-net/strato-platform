@@ -25,59 +25,61 @@ function queryHealthStatus() {
 
         try {
             const blocksValid = await getVmBlocksValid();
-    const blocksPending = await getBaggerPending();
+            const blocksPending = await getBaggerPending();
+            let currentTime = Date.now() / 1000;
+            const lastBlocksValid = await models.StallStat.findOne({
+                where: {
+                    blockType: "Valid",
+                },
+                order: [ [ 'createdAt', 'DESC' ]],
+            });
+            const lastBlocksPending = await models.StallStat.findOne({
+                where: {
+                    blockType: "Pending",
+                },
+                order: [ [ 'createdAt', 'DESC' ]],
+            });
+            await models.StallStat.create({
+                blockType: "Valid",
+                blockCount: blocksValid,
+                timestamp: currentTime
+            });
 
-    let currentTime = Date.now();
-    const lastBlocksValid = await models.StallStat.findOne({
-        where: {
-            blockType: "Valid",
-        },
-        order: [ [ 'createdAt', 'DESC' ]],
-    });
-    const lastBlocksPending = await models.StallStat.findOne({
-        where: {
-            blockType: "Pending",
-        },
-        order: [ [ 'createdAt', 'DESC' ]],
-    });
+            await models.StallStat.create({
+                blockType: "Pending",
+                blockCount: blocksPending,
+                timestamp: currentTime
+            });
 
-    await models.StallStat.create({
-        blockType: "Valid",
-        blockCount: blocksValid,
-        timestamp: currentTime
-    });
-
-    await models.StallStat.create({
-        blockType: "Pending",
-        blockCount: blocksPending,
-        timestamp: currentTime
-    });
-
-    // The only unmatch case: lastPendingBlock is nonzero but there is no increment in blocksValid (See spec - uptime sheet)
-    const overallStat = lastBlocksPending > 0 && blocksValid == lastBlocksValid.blockCount ? false : true;
-    const blocksValidInc = blocksValid > lastBlocksValid.blockCount;
-    await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
-            latestHealthStatus: overallStat,
-            latestCheckTimestamp: currentTime,
-            lastFailureTimestamp: currentTime,   //default first time marked as failure
-            ifBlocksValidInc: blocksValidInc
-        }}).then(([stat, created]) => {
-        if (!created){
-        stat.update(
-            {latestCheckTimestamp: currentTime,
+            // The only unmatch case: lastPendingBlock is nonzero but there is no increment in blocksValid (See spec - uptime sheet)
+            const overallStat = lastBlocksPending > 0 && blocksValid == lastBlocksValid.blockCount ? false : true;
+            const blocksValidInc = blocksValid > lastBlocksValid.blockCount || false;
+            await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
                 latestHealthStatus: overallStat,
-                ifBlocksValidInc: blocksValidInc,
-                lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
-            }, {where: {processName: 'StallStat'}})
-    }}).catch(err => {
-        winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
-});
-    return resolve();
-} catch (error) {
-        winston.warn(`Error ${error.message ? error.message : ''} occurred while querying stalling status`);
-        return resolve();
-    }
-}).timeout(config.healthCheck.requestTimeout - 80);
+                latestCheckTimestamp: currentTime,
+                lastFailureTimestamp: currentTime,   //default first time marked as failure
+                ifBlocksValidInc: blocksValidInc
+            }}).then(([stat, created]) => {
+                if (!created){
+                    stat.update(
+                    {latestCheckTimestamp: currentTime,
+                    latestHealthStatus: overallStat,
+                    ifBlocksValidInc: blocksValidInc,
+                    lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
+                    }, {where: {processName: 'StallStat'}})
+                }}).catch(err => {
+                    winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
+                });
+                return resolve();
+            } catch (error) {
+                if (error instanceof TypeError){
+                    winston.info(`Cannot detect installing state at the first check`)
+                } else {
+                    winston.warn(`Error ${error.message ? error.message : ''} occurred while querying stalling status`);
+                }
+                return resolve();
+            }
+    }).timeout(config.healthCheck.requestTimeout - 80);
 }
 
 async function getVmBlocksValid() {
