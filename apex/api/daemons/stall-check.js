@@ -58,13 +58,13 @@ function queryHealthStatus() {
                 latestHealthStatus: overallStat,
                 latestCheckTimestamp: currentTime,
                 lastFailureTimestamp: currentTime,   //default first time marked as failure
-                ifBlocksValidInc: blocksValidInc
+                isBlocksValidInc: blocksValidInc
             }}).then(([stat, created]) => {
                 if (!created){
                     stat.update(
                     {latestCheckTimestamp: currentTime,
                     latestHealthStatus: overallStat,
-                    ifBlocksValidInc: blocksValidInc,
+                    isBlocksValidInc: blocksValidInc,
                     lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
                     }, {where: {processName: 'StallStat'}})
                 }}).catch(err => {

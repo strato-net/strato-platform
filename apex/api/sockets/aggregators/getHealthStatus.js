@@ -10,7 +10,13 @@ let healthStatus, uptimeDur
 
 
 async function getHealthStatus() {
-    await models.CurrentHealth.findAll({ attributes: ['processName', 'latestHealthStatus', 'latestCheckTimestamp','lastFailureTimestamp']}).then(function (data) {
+    await models.CurrentHealth.findAll({
+        attributes: [
+            'processName',
+            'latestHealthStatus',
+            'latestCheckTimestamp',
+            'lastFailureTimestamp'
+        ]}).then(function (data) {
         if (data.length) {
             let isNotStalled, isHealthy;
             let failureTimeStalled, failureTimeHealth;
@@ -28,11 +34,9 @@ async function getHealthStatus() {
             healthStatus = isHealthy && isNotStalled;
             emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
 
-            const currentTime = moment();
-
-            const ms = currentTime.diff(moment.max([moment(failureTimeHealth), moment(failureTimeStalled)]))
-            uptimeDur = moment.duration(ms).format("YYYY-MM-DD hh:mm:ss")
-            emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, uptimeDur);
+            const currentTime = Date.now();
+            const ms = Math.min(currentTime - failureTimeStalled, current - failureTimeHealth);
+            emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, ms/1000);
 
         }}).catch(function (err) {
         console.log("getHealthStatus Error:", err);
