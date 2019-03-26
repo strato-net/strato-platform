@@ -116,7 +116,6 @@ async function getBaggerPending() {
 async function getCurrentHealth(lastP, lastV, thisV){
     // The only unmatch case: lastPendingBlock is nonzero but there is no increment in blocksValid (See spec - uptime sheet)
     const overallStat = lastP > 0 && thisV == lastV ? false : true;
-    console.log(lastP > 0 && thisV == lastV )
     const blocksValidInc = thisV > lastV || false;
     return [overallStat, blocksValidInc]
 }
@@ -129,13 +128,14 @@ async function updateCurrentHealth(overallStat){
             lastFailureTimestamp: currentTime,   //default first time marked as failure
             isBlocksValidInc: overallStat[1]
         }}).then(([stat, created]) => {
-        if (!created){
-            stat.update(
-                {latestCheckTimestamp: currentTime,
-                    latestHealthStatus: overallStat[0],
-                    isBlocksValidInc: overallStat[1],
-                    lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
-                }, {where: {processName: 'StallStat'}})
+            if (!created){
+                stat.update(
+                    {latestCheckTimestamp: currentTime,
+                     latestHealthStatus: overallStat[0],
+                     isBlocksValidInc: overallStat[1],
+                     lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
+                    }, {where: {processName: 'StallStat'}})
+                stat.reload();
         }}).catch(err => {
         winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
     });
@@ -147,13 +147,13 @@ async function updateStallStat(blocksValid, blocksPending){
         blockType: "Valid",
         blockCount: blocksValid,
         timestamp: currentTime
-    });
+    }).reload();
 
     await models.StallStat.create({
         blockType: "Pending",
         blockCount: blocksPending,
         timestamp: currentTime
-    });
+    }).reload();
 
 }
 

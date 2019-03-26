@@ -2,6 +2,7 @@
 require('co-mocha')
 const winston = require('winston-color');
 const env = process.env.NODE_ENV || 'development';
+const rp = require('request-promise');
 const models = require('../models');
 const nodeHealthCheckJs = require('../daemons/node-health-check')
 const stallCheckJs = require('../daemons/stall-check')
@@ -49,7 +50,6 @@ describe('Tests - Node-level Health Check', function () {
     })
 
     it('HealthStat update - SUCCESS', async function () {
-        await sleep(2000);
         let testObj = sampleResponse;
         let currentTime = Date.now() / 1000;
         testObj.data.result.forEach((elem) => {
@@ -79,7 +79,6 @@ describe('Tests - Node-level Health Check', function () {
     })
 
     it('StallStat update -- FAILURE', async function () {
-        await sleep(2000);
 
         const lastV = 0;
         const lastP = 1;
@@ -104,7 +103,6 @@ describe('Tests - Node-level Health Check', function () {
 
     it('StallStat update -- SUCCESS', async function () {
 
-        await sleep(2000);
         const lastV = 0;
         const lastP = 1;
         const thisV = 1;
@@ -150,16 +148,27 @@ describe('Tests - Node-level Health Check', function () {
     })
 
 
-    it('check emission of GET_HEALTH', function* () {
+    it('Websocket Emission', function* () {
+
 
     })
 
-    it('check emission of GET_NODE_UPTIME', function* () {
+    it('API endpoints', async function () {
+
+        const response = await getNodeDataApex()
+        console.log(response)
 
     })
 })
 
-const sleep = (milliseconds) => {
-    return new Promise(resolve => setTimeout(resolve, milliseconds))
+function getNodeDataApex() {
+    const options = {
+        method: 'GET',
+        url: `http://localhost/apex-api/health`,
+        followRedirects: false,
+        timeout: 1000,
+        json: true
+    };
+    return rp(options);
 }
 

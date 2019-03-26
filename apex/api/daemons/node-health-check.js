@@ -111,7 +111,7 @@ async function updateHealthStat(healthStatus) {
             processName: keyProcess,
             HealthStatus: healthStatus[keyProcess],
             timestamp: currentTime
-        })
+        }).reload();
     });
     return overallStat;
 }
@@ -129,6 +129,7 @@ async function updateCurrentHealth(overallStat) {
                             latestHealthStatus: overallStat,
                             lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
                         }, {where: {processName: 'HealthStat'}})
+                    stat.reload();
                 }
             }).catch(err => {
                     winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
