@@ -41,9 +41,12 @@ module.exports = {
     }
   },
 
-  uptimeStatus: async function (req, res, next){
+  healthStatus: async function (req, res, next){
     try {
         let uptime, healthStatus, isInc;
+
+        let isNotStalled, isHealthy;
+        let failureTimeStalled, failureTimeHealth;
         await models.CurrentHealth.findAll({
             attributes: [
                 'processName',
@@ -53,28 +56,28 @@ module.exports = {
                 'isBlocksValidInc'
             ]}).then(function (data) {
             if (data.length) {
-                let isNotStalled, isHealthy;
-                let failureTimeStalled, failureTimeHealth;
-                data.forEach(function(element){
-                    if (element.processName == "HealthStat"){
+                data.forEach(function (element) {
+                    if (element.processName == "HealthStat") {
                         isHealthy = element.latestHealthStatus;
                         failureTimeHealth = element.lastFailureTimestamp;
 
-                    } else if (element.processName == "StallStat"){
+                    } else if (element.processName == "StallStat") {
                         isNotStalled = element.latestHealthStatus;
                         failureTimeStalled = element.lastFailureTimestamp;
                         isInc = element.isBlocksValidInc;
                     }
                 })
 
-                healthStatus = isHealthy && isNotStalled;
-
-                const currentTime = Date.now();
-                uptime = Math.min(currentTime - failureTimeStalled, current - failureTimeHealth) / 1000;
 
             }}).catch(function (err) {
-            console.log("getHealthStatus Error:", err);
-        });
+                console.log("getHealthStatus Error:", err);
+            });
+        const currentTime = Date.now();
+
+        uptime = Math.min(currentTime - failureTimeStalled, currentTime - failureTimeHealth) / 1000;
+
+        healthStatus = isHealthy && isNotStalled;
+
         res.status(200).json(
             {
                 healthInfo: {
