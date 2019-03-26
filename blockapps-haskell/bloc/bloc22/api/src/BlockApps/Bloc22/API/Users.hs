@@ -708,7 +708,7 @@ data TransferListParameters = TransferListParameters
   , txs      :: [SendTransaction]
   , chainId  :: Maybe ChainId
   , resolve  :: Bool
-  }
+  } deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 
