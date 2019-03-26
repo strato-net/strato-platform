@@ -26,7 +26,7 @@ function queryHealthStatus() {
         try {
             const blocksValid = await getVmBlocksValid();
             const blocksPending = await getBaggerPending();
-            let currentTime = Date.now() / 1000;
+
             const lastBlocksValid = await models.StallStat.findOne({
                 where: {
                     blockType: "Valid",
@@ -39,38 +39,15 @@ function queryHealthStatus() {
                 },
                 order: [ [ 'createdAt', 'DESC' ]],
             });
-            await models.StallStat.create({
-                blockType: "Valid",
-                blockCount: blocksValid,
-                timestamp: currentTime
-            });
 
-            await models.StallStat.create({
-                blockType: "Pending",
-                blockCount: blocksPending,
-                timestamp: currentTime
-            });
+            await updateStallStat(blocksValid, blocksPending);
 
-            // The only unmatch case: lastPendingBlock is nonzero but there is no increment in blocksValid (See spec - uptime sheet)
-            const overallStat = lastBlocksPending > 0 && blocksValid == lastBlocksValid.blockCount ? false : true;
-            const blocksValidInc = blocksValid > lastBlocksValid.blockCount || false;
-            await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
-                latestHealthStatus: overallStat,
-                latestCheckTimestamp: currentTime,
-                lastFailureTimestamp: currentTime,   //default first time marked as failure
-                isBlocksValidInc: blocksValidInc
-            }}).then(([stat, created]) => {
-                if (!created){
-                    stat.update(
-                    {latestCheckTimestamp: currentTime,
-                    latestHealthStatus: overallStat,
-                    isBlocksValidInc: blocksValidInc,
-                    lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
-                    }, {where: {processName: 'StallStat'}})
-                }}).catch(err => {
-                    winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
-                });
-                return resolve();
+            const overallStat = await getCurrentHealth(lastBlocksPending.blockCount, lastBlocksValid.blockCount, blocksValid);
+
+            await updateCurrentHealth(overallStat);
+
+            return resolve();
+
             } catch (error) {
                 if (error instanceof TypeError){
                     winston.info(`Cannot detect installing state at the first check`)
@@ -134,4 +111,54 @@ async function getBaggerPending() {
     } catch (error) {
         winston.warn(`Error ${error.message ? error.message : ''} occurred while querying vm blocks pending`);
     }
+}
+
+async function getCurrentHealth(lastP, lastV, thisV){
+    // The only unmatch case: lastPendingBlock is nonzero but there is no increment in blocksValid (See spec - uptime sheet)
+    const overallStat = lastP > 0 && thisV == lastV ? false : true;
+    console.log(lastP > 0 && thisV == lastV )
+    const blocksValidInc = thisV > lastV || false;
+    return [overallStat, blocksValidInc]
+}
+
+async function updateCurrentHealth(overallStat){
+    let currentTime = Date.now();
+    await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
+            latestHealthStatus: overallStat[0],
+            latestCheckTimestamp: currentTime,
+            lastFailureTimestamp: currentTime,   //default first time marked as failure
+            isBlocksValidInc: overallStat[1]
+        }}).then(([stat, created]) => {
+        if (!created){
+            stat.update(
+                {latestCheckTimestamp: currentTime,
+                    latestHealthStatus: overallStat[0],
+                    isBlocksValidInc: overallStat[1],
+                    lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
+                }, {where: {processName: 'StallStat'}})
+        }}).catch(err => {
+        winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
+    });
+}
+
+async function updateStallStat(blocksValid, blocksPending){
+    let currentTime = Date.now();
+    await models.StallStat.create({
+        blockType: "Valid",
+        blockCount: blocksValid,
+        timestamp: currentTime
+    });
+
+    await models.StallStat.create({
+        blockType: "Pending",
+        blockCount: blocksPending,
+        timestamp: currentTime
+    });
+
+}
+
+module.exports = {
+    getCurrentHealth,
+    updateStallStat,
+    updateCurrentHealth
 }

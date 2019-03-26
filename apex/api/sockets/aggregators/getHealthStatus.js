@@ -35,7 +35,7 @@ async function getHealthStatus() {
             emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
 
             const currentTime = Date.now();
-            const ms = Math.min(currentTime - failureTimeStalled, current - failureTimeHealth);
+            const ms = Math.min(currentTime - failureTimeStalled, currentTime - failureTimeHealth);
             emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, ms/1000);
 
         }}).catch(function (err) {
