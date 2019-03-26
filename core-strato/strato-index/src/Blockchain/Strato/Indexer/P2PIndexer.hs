@@ -14,13 +14,14 @@ import           Network.Kafka.Protocol
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.EthConf                 (lookupConsumerGroup)
-import           Blockchain.Format
 
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
 
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+
+import           Text.Format
 
 p2pIndexer :: LoggingT IO ()
 p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do

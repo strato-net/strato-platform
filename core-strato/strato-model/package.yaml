@@ -22,6 +22,7 @@ dependencies:
   - derive
   - ethereum-rlp
   - fast-keccak256
+  - format
   - hashable
   - http-api-data
   - integer-gmp

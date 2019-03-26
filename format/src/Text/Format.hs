@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
-module Blockchain.Strato.Model.Format (
+module Text.Format (
   Format(..)
   ) where
 
@@ -24,3 +24,7 @@ instance Format N.NibbleString where
 
 instance (Format a, Format b) => Format (a, b) where
   format (x, y) = "(" ++ format x ++ ", " ++ format y ++ ")"
+
+
+
+

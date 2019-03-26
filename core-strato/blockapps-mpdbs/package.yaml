@@ -21,6 +21,7 @@ dependencies:
   - data-default
   - deepseq
   - ethereum-rlp
+  - format
   - leveldb-haskell
   - merkle-patricia-db
   - mtl

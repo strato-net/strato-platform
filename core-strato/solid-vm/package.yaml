@@ -31,6 +31,7 @@ dependencies:
   - cryptonite
   - deepseq
   - extra
+  - format
   - generic-random
   - hashable
   - lens

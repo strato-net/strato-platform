@@ -6,6 +6,7 @@ dependencies:
   - blockapps-data
   - blockapps-util
   - containers
+  - format
   - lens
   - monad-logger
   - prometheus-client

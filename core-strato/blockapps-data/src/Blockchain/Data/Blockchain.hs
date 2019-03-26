@@ -17,8 +17,6 @@ module Blockchain.Data.Blockchain
       createDB, migrateDB, insertBlockchain, migrateAll
     ) where
 
-import qualified Blockchain.Colors           as CL
-
 import           Database.Persist
 import           Database.Persist.Postgresql hiding (get)
 import           Database.Persist.TH
@@ -30,6 +28,8 @@ import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
 
 import           Blockchain.DB.SQLDB         (runPostgresConn)
+import qualified Text.Colors                 as CL
+
 
 {- global registry of blockchains -}
 

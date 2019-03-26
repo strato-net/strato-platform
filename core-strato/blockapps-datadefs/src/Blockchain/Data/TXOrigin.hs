@@ -4,15 +4,12 @@
 module Blockchain.Data.TXOrigin where
 
 import           Data.Binary
-
+import           Data.Aeson
 import           Database.Persist.TH
 
-import           Data.Aeson
-
 import           Blockchain.Data.PersistTypes ()
-
-import           Blockchain.Strato.Model.Format
 import           Blockchain.Strato.Model.SHA
+import           Text.Format
 
 import           GHC.Generics
 

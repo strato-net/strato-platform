@@ -28,7 +28,6 @@ import           Blockchain.Data.Enode
 import qualified Blockchain.Data.LogDB              as LogDB
 import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
-import           Blockchain.Format
 
 import           Blockchain.SHA                     (hash)
 import           Blockchain.Strato.Indexer.IContext
@@ -39,6 +38,8 @@ import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Util                    (byteString2Integer)
 
 import           Numeric
+
+import           Text.Format
 
 addTopic :: SHA
 addTopic = hash $ C8.pack "MemberAdded(address,string)"

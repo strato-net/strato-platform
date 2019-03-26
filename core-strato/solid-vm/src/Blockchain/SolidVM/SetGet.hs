@@ -23,12 +23,12 @@ import           Blockchain.DB.SolidStorageDB
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
-import           Blockchain.Strato.Model.Format
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
 import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
+import           Text.Format
 
 {-# INLINE putSolid #-}
 putSolid :: Either LocalVar Address -> MS.StoragePath -> MS.BasicValue -> SM ()

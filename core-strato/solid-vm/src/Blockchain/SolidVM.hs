@@ -32,7 +32,6 @@ import           GHC.Exts
 import           Text.Parsec (runParser)
 import           Text.Printf
 
-import qualified Blockchain.Colors                    as C
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -41,7 +40,6 @@ import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
@@ -54,6 +52,9 @@ import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
+import qualified Text.Colors                          as C
+import           Text.Format
+import           Text.Tools
 
 import qualified SolidVM.Model.Storable as MS
 
@@ -246,8 +247,8 @@ getCodeAndCollection address' = do
           (current:_) -> Just $ currentAddress current
           _ -> Nothing
 
-  liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
+  when trace $ liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+  when trace $ liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
     then do
     c' <- getCurrentContract
@@ -1079,19 +1080,6 @@ call' address' contract' hsh cc theFunction argVals = do
 
 
 
-box :: [String] -> String
-box strings = unlines $
-  [C.magenta ("╔" ++ replicate (width - 2) '═' ++ "╗")]
-  ++ map (\s -> C.magenta "║ " ++ C.white s ++ replicate (width - printedLength s - 4) ' ' ++ C.magenta " ║") strings
-  ++ [C.magenta ("╚" ++ replicate (width - 2) '═' ++ "╝")]
-  where width = maximum (map length strings) + 4
-        printedLength = go False
-        go :: Bool -> String -> Int
-        go True ('m':t) = go False t
-        go True (_:t) = go True t
-        go False ('\ESC':t) = go True t
-        go False (_:t) = 1 + go False t
-        go _ [] = 0
 
 
 
@@ -1099,7 +1087,7 @@ box strings = unlines $
 logAssigningVariable :: Value -> SM ()
 logAssigningVariable v = do
   valueString <- showSM v
-  liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
+  when trace $ liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
 
 logVals :: (Show a, Show b) => a -> b -> SM ()
 logVals val1 val2 = when trace . liftIO . putStrLn $ printf

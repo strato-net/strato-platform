@@ -12,8 +12,8 @@ import qualified Database.Esqueleto       as E
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.Format
 import           Blockchain.SHA
+import           Text.Format
 
 getBestBlockHash::HasSQLDB m=>
                   m SHA

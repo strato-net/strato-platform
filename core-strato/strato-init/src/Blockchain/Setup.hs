@@ -36,7 +36,6 @@ import           System.Entropy
 import           System.FilePath
 
 import           Blockchain.APIFiles
-import qualified Blockchain.Colors                  as CL
 import           Blockchain.Constants
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
@@ -56,6 +55,8 @@ import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery
+
+import qualified Text.Colors                        as CL
 
 import           HFlags
 

@@ -32,7 +32,6 @@ import           Text.Printf
 import           UnliftIO.Exception
 
 import           Blockchain.Blockstanbul               (blockstanbulSender)
-import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
@@ -44,7 +43,6 @@ import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.EventModel
 import           Blockchain.EventException
-import           Blockchain.Format
 import           Blockchain.Options
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -60,6 +58,9 @@ import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
 import           Blockchain.Metrics
+
+import           Text.Format
+import           Text.Tools
 
 import           Debug.Trace                           (trace)
 

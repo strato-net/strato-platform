@@ -33,14 +33,12 @@ import           Data.Traversable                      (for)
 import qualified Network.Haskoin.Internals             as H
 import           UnliftIO.Exception
 
-import qualified Blockchain.Colors                     as C
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context
 import           Blockchain.ECIES
 import           Blockchain.EthConf                    hiding (genesisHash, port)
 import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
-import           Blockchain.Format
 import           Blockchain.Options
 import           Blockchain.Output                     (printLogMsg)
 import           Blockchain.P2PRPC
@@ -48,6 +46,9 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.TCPClientWithTimeout
 import           Blockchain.TimerSource
+
+import qualified Text.Colors                           as C
+import           Text.Format
 
 runPeer :: (MonadIO m, MonadLogger m, MonadThrow m, MonadUnliftIO m)
         => PPeer

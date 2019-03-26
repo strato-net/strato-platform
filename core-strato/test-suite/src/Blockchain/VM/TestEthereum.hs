@@ -34,7 +34,6 @@ import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>), (</>
 import           Test.Hspec.Expectations.Lifted
 
 import           Blockchain.BlockChain
-import qualified Blockchain.Colors                           as C
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -55,7 +54,6 @@ import           Blockchain.EVM.Environment
 import           Blockchain.EVM.VMM (readGasRemaining)
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.SHA                 (keccak256)
 import           Blockchain.SHA
@@ -64,6 +62,9 @@ import           Blockchain.VMContext
 
 import           Blockchain.VM.TestDescriptions
 import           Blockchain.VM.TestFiles
+
+import qualified Text.Colors                                 as C
+import           Text.Format
 
 defineFlag "debugEnabled" False "enable debugging"
 defineFlag "debugEnabled2" False "enable debugging"

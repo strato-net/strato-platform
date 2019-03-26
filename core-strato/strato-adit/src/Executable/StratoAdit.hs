@@ -27,7 +27,6 @@ import           UnliftIO.STM
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs       ()
 import qualified Blockchain.Data.TXOrigin       as TO
-import           Blockchain.Format
 import           Blockchain.KafkaTopics
 import           Blockchain.Mining
 import           Blockchain.Mining.Instant
@@ -40,6 +39,7 @@ import           Blockchain.Stream.Raw          (setDefaultKafkaState)
 import           Blockchain.Stream.UnminedBlock
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Executable.AditM
+import           Text.Format
 
 lookupMiner :: MinerType -> Miner
 lookupMiner = \case

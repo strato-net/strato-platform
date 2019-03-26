@@ -51,6 +51,7 @@ packages:
 - core-strato/privacy/
 - shared-util/cross-monitoring/
 - shared-util/solid-vm-model/
+- format
 - clockwork
 - logserver
 - location:

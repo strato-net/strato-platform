@@ -19,17 +19,17 @@ import           Data.Word
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Blockstanbul      as PBFT
-import qualified Blockchain.Colors            as CL
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.PubKey       ()
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.ExtWord
+import qualified Text.Colors                  as CL
+import           Text.Format
 
 data Capability = ETH Integer               -- | Base Ethereum P2P protocol
                 | IST Integer               -- | Istanbul/Blockstanbul/PBFT messages.

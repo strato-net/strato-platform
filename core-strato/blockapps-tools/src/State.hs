@@ -13,11 +13,11 @@ import           System.FilePath
 import           Blockchain.Data.RLP
 import qualified Data.NibbleString                           as N
 
-import qualified Blockchain.Colors                           as CL
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
-import           Blockchain.Format
+import qualified Text.Colors                                 as CL
+import           Text.Format
 
 import           Util
 

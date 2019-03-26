@@ -31,7 +31,6 @@ import           Text.Printf
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -54,6 +53,8 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
+
+import           Text.Format
 
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack

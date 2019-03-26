@@ -24,9 +24,6 @@ import           Blockchain.ExtWord                        (Word256)
 
 import qualified GHC.Generics                              as GHCG
 
-import qualified Blockchain.Colors                         as CL
-import           Blockchain.Format
-
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
@@ -39,6 +36,9 @@ import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
+
+import qualified Text.Colors                               as CL
+import           Text.Format
 
 data SeqLoopEvent = TimerFire PBFT.RoundNumber
                   | VoteMade PBFT.CandidateReceived
