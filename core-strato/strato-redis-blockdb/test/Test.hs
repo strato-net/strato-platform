@@ -20,12 +20,13 @@ import           Test.QuickCheck
 import           Blockchain.Data.ArbitraryInstances        ()
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Transaction
-import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB            as RDB
 import           Blockchain.Strato.RedisBlockDB.Models
 import           Blockchain.Strato.RedisBlockDB.Test.Chain
+
+import           Text.Format
 
 ------------------------------------------------------------------------------
 -- Main and helpers

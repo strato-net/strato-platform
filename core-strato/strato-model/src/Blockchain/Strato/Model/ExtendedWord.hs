@@ -39,7 +39,7 @@ import           System.IO.Unsafe
 
 import           Network.Haskoin.Internals (Word128, Word160, Word256, Word512, BigWord(..))
 import           Blockchain.Data.RLP
-import           Blockchain.Strato.Model.Format
+import           Text.Format
 
 word64ToBytes :: Word64 -> [Word8]
 word64ToBytes word = map (fromIntegral . (word `shiftR`)) [64-8, 64-16..0]

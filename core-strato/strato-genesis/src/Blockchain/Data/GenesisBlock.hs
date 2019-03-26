@@ -17,6 +17,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Crypto.Util                          (i2bs_unsized)
 import qualified Data.ByteString.Lazy.Char8           as BLC
+import qualified Data.Map                             as Map
 import           Data.Maybe                           (catMaybes)
 import           Data.List.Split                      (chunksOf)
 import           Data.Time.Clock.POSIX
@@ -37,7 +38,6 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf                   (runKafkaConfigured)
-import           Blockchain.Format
 import           Blockchain.SHA
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
@@ -45,11 +45,11 @@ import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (c
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Kafka    (writeActionJSONToKafka, filterResponse)
 
-import qualified Data.Map                             as Map
-
 import qualified Blockchain.Strato.Model.Address      as Ad
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
+
+import           Text.Format
 
 initializeBlankStateDB :: HasStateDB m => m ()
 initializeBlankStateDB = do

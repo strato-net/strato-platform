@@ -28,6 +28,7 @@ dependencies:
   - directory
   - entropy
   - ethereum-rlp
+  - format
   - json-stream
   - leveldb-haskell
   - memory

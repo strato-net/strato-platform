@@ -15,6 +15,7 @@ dependencies:
   - bytestring
   - containers
   - ethereum-rlp
+  - format
   - hedis
   - lens-family
   - lens-family-th

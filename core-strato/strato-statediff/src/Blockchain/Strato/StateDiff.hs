@@ -25,7 +25,6 @@ import           Blockchain.DB.StateDB
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.Format
 
 import           Control.Monad                               (when)
 import           Control.Monad.Trans.Resource
@@ -44,6 +43,8 @@ import qualified Data.Map                                    as Map
 import qualified Data.NibbleString                           as N
 
 import           GHC.Generics
+
+import           Text.Format
 
 -- | Describes all the changes that have occurred in the blockchain
 -- database in a given block.

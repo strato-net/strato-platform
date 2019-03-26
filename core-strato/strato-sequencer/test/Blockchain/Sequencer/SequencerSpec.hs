@@ -38,7 +38,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction         (createChainMessageTX)
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin as TO
-import           Blockchain.Format
 import           Blockchain.Output
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.CablePackage
@@ -65,6 +64,8 @@ import           Test.QuickCheck
 
 import           System.Directory                    (createDirectoryIfMissing, getCurrentDirectory,
                                                       removeDirectoryRecursive, setCurrentDirectory)
+
+import           Text.Format
 
 fromLeft :: a -> Either a b -> a
 fromLeft _ (Left a) = a

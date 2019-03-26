@@ -18,13 +18,6 @@ import           Data.Maybe                           (fromMaybe)
 import           Numeric
 import           Test.QuickCheck                      (Arbitrary(..))
 
-import           Blockchain.Data.RLP
-import qualified Blockchain.Strato.Model.Colors       as CL
-import           Blockchain.Strato.Model.Format
-import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
-import           Blockchain.Strato.Model.Util
-
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
@@ -45,6 +38,13 @@ import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
 import           Text.Printf
 import           Web.PathPieces
 import           Web.HttpApiData
+
+import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
+import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
+import           Blockchain.Strato.Model.Util
+import qualified Text.Colors       as CL
+import           Text.Format
 
 import           GHC.Generics
 

@@ -11,10 +11,11 @@ import           Control.Monad.Logger
 import qualified Data.Text                   as T
 
 
-import qualified Blockchain.Colors           as CL
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.Wire
-import           Blockchain.Format
+
+import qualified Text.Colors                 as CL
+import           Text.Format
 
 data MsgDirection = Inbound | Outbound deriving (Eq, Ord)
 

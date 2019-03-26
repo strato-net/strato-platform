@@ -13,6 +13,7 @@ dependencies:
   - deepseq
   - derive
   - ethereum-rlp
+  - format
   - strato-conf
   - strato-model
   - QuickCheck

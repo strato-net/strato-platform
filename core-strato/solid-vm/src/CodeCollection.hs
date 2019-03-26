@@ -3,11 +3,14 @@
 
 module CodeCollection where
 
+import Control.DeepSeq
 import Control.Lens
+import Data.Binary
 import Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe
+import Data.Maybe
 import qualified Data.Text as T
+import GHC.Generics
 
 import           Blockchain.SolidVM.Exception
 
@@ -26,14 +29,14 @@ data Contract =
     _structs :: Map String [(T.Text, Xabi.FieldType)],
     _functions :: Map String Func,
     _constructor :: Maybe Func
-  } deriving (Show, Read)
+  } deriving (Show, Read, Generic, NFData, Binary)
 
 makeLenses ''Contract
 
 data CodeCollection =
   CodeCollection {
     _contracts :: Map String Contract
-  } deriving (Show, Read)
+  } deriving (Show, Read, Generic, NFData, Binary)
 
 makeLenses ''CodeCollection
 
@@ -65,8 +68,8 @@ xabiToContract contractName' parents' xabi =
 
 
 
-applyInheritence :: CodeCollection -> CodeCollection
-applyInheritence cc =
+applyInheritance :: CodeCollection -> CodeCollection
+applyInheritance cc =
   cc{
     _contracts = M.map (addInheritedObjects cc) $ cc^.contracts
   }

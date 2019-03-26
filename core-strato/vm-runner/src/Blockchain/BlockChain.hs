@@ -41,7 +41,6 @@ import           Prometheus                                as P
 import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 
-import qualified Blockchain.Colors                       as CL
 import           Blockchain.Constants
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
@@ -66,7 +65,6 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
-import           Blockchain.Format
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM                      as SolidVM
 import           Blockchain.Strato.Model.Gas
@@ -92,6 +90,9 @@ import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
 import           Blockchain.Timing
+
+import qualified Text.Colors                             as CL
+import           Text.Format
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where

@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
-module Blockchain.Strato.Model.Format
-  ( Format(..)
+module Text.Format (
+  Format(..)
   ) where
 
 import qualified Data.ByteString        as B

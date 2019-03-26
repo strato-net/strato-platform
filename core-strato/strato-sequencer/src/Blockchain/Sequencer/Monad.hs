@@ -64,8 +64,8 @@ import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.Format
 import           System.Directory                          (createDirectoryIfMissing)
+import           Text.Format
 
 import qualified Database.LevelDB                          as LDB
 

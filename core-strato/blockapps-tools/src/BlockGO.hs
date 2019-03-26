@@ -12,8 +12,9 @@ import           System.FilePath
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
 
 import           Blockchain.Constants
-import           Blockchain.Format
 import           DumpLevelDB                  ()
+
+import           Text.Format
 
 ldbForEach :: FilePath -> (B.ByteString -> B.ByteString -> IO ()) -> IO ()
 ldbForEach dbDir' f = runResourceT $ do
