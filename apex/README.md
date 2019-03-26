@@ -8,7 +8,7 @@
     2. strato port mapped to (3333:3000)
     3. bloc port mapped to (8888:8000)
 2. cd `apex/api`
-2. `stratoRoot=http://localhost:3333/strato-api/eth/v1.2/ blocRoot=http://localhost:8888/bloc/v2.2 postgresPort:5433 npm run start:dev`
+3. `stratoRoot=http://localhost:3333/eth/v1.2/ blocRoot=http://localhost:8888/bloc/v2.2 postgresPort=5433 npm run start:dev`
 
 ### To run tests against running STRATO node (be able to debug apex' tests or code)
 (if `apex_dev` database has not yet been created, run dev mode steps above)
