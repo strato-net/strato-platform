@@ -902,4 +902,4 @@ data FunctionListParameters = FunctionListParameters
   , txs      :: [MethodCall]
   , chainId  :: Maybe ChainId
   , resolve  :: Bool
-  }
+  } deriving (Show, Eq)
