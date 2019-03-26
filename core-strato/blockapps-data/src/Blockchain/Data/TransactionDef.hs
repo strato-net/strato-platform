@@ -4,6 +4,7 @@
 
 module Blockchain.Data.TransactionDef (
   Transaction(..),
+  isMessageTX,
   partialRLPEncode,
   partialRLPDecode
   ) where
@@ -19,8 +20,6 @@ import           Data.Text                    (Text)
 import           Data.Text.Encoding           (decodeUtf8, encodeUtf8)
 import           Database.Persist.TH
 import           GHC.Generics
-
-import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
@@ -94,7 +93,7 @@ instance Format Transaction where
       "tNonce: " ++ show n ++ "\n" ++
       "gasPrice: " ++ show gp ++ "\n" ++
       "tGasLimit: " ++ show gl ++ "\n" ++
-      "to: " ++ show (pretty to') ++ "\n" ++
+      "to: " ++ format to' ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
       "tData: " ++ ("\n" ++ format d) ++ "\n" ++
       "chainId: " ++ show cid ++ "\n" ++
@@ -190,7 +189,14 @@ instance RLPSerializable Transaction where
 
 
 instance ShortDescription Transaction where
-  shortDescription = format
+  shortDescription t =
+    if isMessageTX t
+          then "MessageTX to " ++ format (transactionTo t)
+          else "Create Contract"
+
+isMessageTX::Transaction->Bool
+isMessageTX MessageTX{} = True
+isMessageTX _           = False
 
 
 
