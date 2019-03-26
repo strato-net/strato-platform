@@ -3,7 +3,7 @@
 ## SMD backend / STRATO Network Management / Authentication server
 
 ### To run in dev mode:
-1. Run strato-getting-started single node locally with 
+1. Run strato-getting-started single node locally with ports proxied (by changing docker-compose.yml):
     1. postgres port mapped to host (5433:5432)
     2. strato port mapped to (3333:3000)
     3. bloc port mapped to (8888:8000)
