@@ -35,12 +35,13 @@ import           Data.Word
 import           Foreign
 import           System.Exit
 
-import qualified Blockchain.Colors            as CL
 import           Blockchain.EVM.OpcodePrices
 import           Blockchain.EVM.VMM
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.VM.VMException
+
+import qualified Text.Colors                  as CL
 
 safeReadRange :: V.IOVector Word8 -> Int -> Int -> IO B.ByteString
 safeReadRange v !offset !count = do

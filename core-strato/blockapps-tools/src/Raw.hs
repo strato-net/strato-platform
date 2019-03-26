@@ -1,8 +1,9 @@
 module Raw where
 
-import           Blockchain.Format
-import           DumpLevelDB                  ()
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+
+import           DumpLevelDB                  ()
+import           Text.Format
 import           Util
 
 doit :: String -> IO ()

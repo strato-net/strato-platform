@@ -26,6 +26,7 @@ dependencies:
   - cross-monitoring
   - ethereum-rlp
   - ethereum-vm
+  - format
   - hflags
   - lens
   - merkle-patricia-db

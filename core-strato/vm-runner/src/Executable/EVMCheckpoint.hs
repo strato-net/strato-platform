@@ -4,19 +4,19 @@
 {-# OPTIONS -fno-warn-orphans                                   #-}
 module Executable.EVMCheckpoint where
 
-import qualified Data.ByteString.Base16   as B16
-
-import qualified Blockchain.Colors        as CL
-import qualified Blockchain.Data.DataDefs as DD
-import           Blockchain.Data.RLP
-import           Blockchain.Format
-import           Blockchain.SHA
-
-import           Blockchain.VMContext     (ContextBestBlockInfo (..))
-import qualified Network.Kafka.Protocol   as KP
-import qualified Blockchain.MilenaTools   as KP
 
 import           Control.Arrow            ((>>>))
+import qualified Data.ByteString.Base16   as B16
+import qualified Network.Kafka.Protocol   as KP
+
+import qualified Blockchain.Data.DataDefs as DD
+import           Blockchain.Data.RLP
+import qualified Blockchain.MilenaTools   as KP
+import           Blockchain.SHA
+import           Blockchain.VMContext     (ContextBestBlockInfo (..))
+
+import qualified Text.Colors        as CL
+import           Text.Format
 
 data EVMCheckpoint = EVMCheckpoint {
     checkpointSHA    :: SHA,

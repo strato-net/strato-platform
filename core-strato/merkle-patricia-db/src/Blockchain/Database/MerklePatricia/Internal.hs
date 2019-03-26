@@ -36,8 +36,8 @@ import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.MPDB
 import           Blockchain.Database.MerklePatricia.NodeData
 import           Blockchain.Database.MerklePatricia.StateRoot
-import           Blockchain.Format
 import           Blockchain.Strato.Model.SHA                  (keccak256)
+import           Text.Format
 
 unsafePutKeyVal::MonadIO m=>MPDB->Key->Val->m MPDB
 unsafePutKeyVal db key val = do

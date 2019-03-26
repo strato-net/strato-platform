@@ -18,10 +18,10 @@ import           Data.Maybe
 import           Data.Word
 import qualified Network.Haskoin.Internals as H
 
-import qualified Blockchain.Colors         as CL
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord
-import           Blockchain.Format
+import qualified Text.Colors               as CL
+import           Text.Format
 
 stringToPoint::String->Point
 stringToPoint string =

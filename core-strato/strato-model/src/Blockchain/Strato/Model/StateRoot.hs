@@ -20,10 +20,10 @@ import           Data.String
 
 import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON    ()
-import qualified Blockchain.Strato.Model.Colors      as CL
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.Format
 import           Blockchain.Strato.Model.SHA
+import qualified Text.Colors as CL
+import           Text.Format
 
 import           GHC.Generics
 

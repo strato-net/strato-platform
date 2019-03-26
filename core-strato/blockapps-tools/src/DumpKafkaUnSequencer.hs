@@ -7,9 +7,10 @@ import           Control.Monad.IO.Class
 import           Network.Kafka.Protocol
 
 import           Blockchain.EthConf
-import           Blockchain.Format
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Stream.Raw
+
+import           Text.Format
 
 dumpKafkaUnSequencer::Offset->IO ()
 dumpKafkaUnSequencer startingBlock = do

@@ -6,11 +6,15 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Declarations where
 
+import           Control.DeepSeq
+
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
+
+import           GHC.Generics
 
 import           Text.Parsec
 import           Text.Parsec.Token                    (GenLanguageDef(..))
@@ -31,7 +35,7 @@ import qualified SolidVM.Solidity.Xabi.VarDef       as Xabitype
 
 data SourceUnit = Pragma Identifier String
                 | NamedXabi Text.Text (Xabi, [Text.Text])
-                deriving (Eq, Show, Read)
+                deriving (Eq, Show, Read, Generic, NFData)
 
 
 -- | Parses an entire Solidity contract
@@ -255,7 +259,7 @@ functionXabi = do
       , Xabi.funcModifiers = Just modifiers
       }
 
-  
+
 -- | Parses an event definition.  At the moment we don't do anything with
 -- it, but this prevents the parser from rejecting contracts that use
 -- events.

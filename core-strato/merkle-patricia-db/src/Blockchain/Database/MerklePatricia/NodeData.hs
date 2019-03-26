@@ -19,7 +19,7 @@ import           Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.StateRoot
-import           Blockchain.Format
+import           Text.Format
 
 -------------------------
 

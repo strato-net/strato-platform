@@ -8,6 +8,7 @@ dependencies:
   - bytestring
   - crypto-pubkey-types
   - deepseq
+  - format
   - lens
   - persistent
   - persistent-template

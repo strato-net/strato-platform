@@ -28,9 +28,9 @@ import              Test.QuickCheck
 
 import              FastKeccak256
 import              Blockchain.Data.RLP
-import qualified    Blockchain.Strato.Model.Colors       as CL
 import              Blockchain.Strato.Model.ExtendedWord
-import              Blockchain.Strato.Model.Format
+import qualified    Text.Colors                          as CL
+import              Text.Format
 
 newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
 

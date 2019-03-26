@@ -35,6 +35,7 @@ dependencies:
   - ethereum-rlp
   - file-embed
   - filepath
+  - format
   - hedis
   - hflags
   - json-stream
