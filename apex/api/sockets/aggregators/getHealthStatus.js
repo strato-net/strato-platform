@@ -3,8 +3,6 @@ const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker');
 const rp = require('request-promise');
 const models = require('../../models');
 const config = require('../../config/app.config');
-const moment = require('moment');
-const momentDurationFormat = require('moment-duration-format');
 
 let healthStatus, uptimeDur
 
@@ -46,12 +44,16 @@ async function getHealthStatus() {
 getHealthStatus()
 setInterval(getHealthStatus, config.webSockets.dbPollFrequency);
 
-function initialHydrate(socket) {
+function initialHydrateHealthStatus(socket) {
     socket.emit(`PRELOAD_${GET_HEALTH}`, healthStatus);
+}
+
+function initialHydrateUptime(socket) {
     socket.emit(`PRELOAD_${GET_NODE_UPTIME}`, uptimeDur);
 }
 
 module.exports = {
-    initialHydrate
+    initialHydrateHealthStatus,
+    initialHydrateUptime
 }
 
