@@ -1,4 +1,4 @@
-FROM node:9
+FROM node:8.15-stretch-slim
 
 RUN mkdir -p /usr/src/app && \
     npm install -g serve@7.1.1
