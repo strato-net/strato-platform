@@ -40,7 +40,11 @@ import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 
-import qualified Blockchain.Colors                  as CL
+
+import           Control.Lens
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
+
 import           Blockchain.Constants
 import           Blockchain.Data.BlockHeader
 
@@ -53,15 +57,12 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
 
-import           Control.Lens
-import           Control.Monad.State
-import           Control.Monad.Trans.Resource
-
 import           Blockchain.Strato.Model.Class
+import qualified Text.Colors                        as CL
+import           Text.Format
 
 instance Pretty B.ByteString where
   pretty = blue . text . BC.unpack . B16.encode

@@ -11,6 +11,7 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-haskoin
   - blockapps-util
   - bytestring
   - classy-prelude
@@ -22,8 +23,8 @@ dependencies:
   - errors
   - ethereum-encryption
   - ethereum-rlp
-  - blockapps-haskoin
   - exceptions
+  - format
   - lifted-base
   - monad-logger
   - mtl

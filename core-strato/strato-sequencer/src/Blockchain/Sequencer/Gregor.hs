@@ -38,9 +38,9 @@ import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka as SK
 import           Blockchain.Sequencer.Metrics
-import           Blockchain.Strato.Model.Format
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Protocol     as KP
+import           Text.Format
 
 data GregorConfig = GregorConfig
                   { kafkaAddress :: Maybe K.KafkaAddress

@@ -31,17 +31,17 @@ import           System.Timeout
 import           System.Entropy
 import           System.Random
 
-import qualified Blockchain.Colors                       as CL
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.P2PUtil
 import           Blockchain.Strato.Discovery.PeerDB
 import           Blockchain.Strato.Discovery.UDP
+import qualified Text.Colors                             as CL
+import           Text.Format
 
 import qualified Network.Haskoin.Internals               as H
 

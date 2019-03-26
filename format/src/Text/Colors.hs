@@ -1,10 +1,9 @@
 {-# OPTIONS_GHC  -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 
-module Blockchain.Strato.Model.Colors (
+module Text.Colors (
     red, green, yellow, blue,
     magenta, cyan, white2, white, black,
-    bright, dim, underline, blink, reverse, hidden,
-    setTitle
+    bright, dim, underline, blink, reverse, hidden
 ) where
 import Prelude hiding (reverse)
 
@@ -26,9 +25,4 @@ magenta string = "\ESC[35m" ++ string ++ "\ESC[0m" --AKA purple
 cyan string = "\ESC[36m" ++ string ++ "\ESC[0m" --AKA aqua
 white string = "\ESC[37m" ++ string ++ "\ESC[0m"
 white2 string = "\ESC[38m" ++ string ++ "\ESC[0m"
-
-
-setTitle::String->IO()
-setTitle value = do
-  putStr $ "\ESC]0;" ++ value ++ "\007"
 

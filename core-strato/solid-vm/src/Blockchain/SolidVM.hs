@@ -32,7 +32,6 @@ import           GHC.Exts
 import           Text.Parsec (runParser)
 import           Text.Printf
 
-import qualified Blockchain.Colors                    as C
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -41,10 +40,10 @@ import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
+import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
@@ -53,11 +52,12 @@ import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
+import qualified Text.Colors                          as C
+import           Text.Format
+import           Text.Tools
 
 import qualified SolidVM.Model.Storable as MS
 
-import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement)
 import qualified SolidVM.Solidity.Xabi as Xabi
@@ -91,6 +91,7 @@ create :: Bool
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ pc@(PrecompiledCode _) _ _ _ = internalError "call precompiled code" pc
 create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId' metadata = do
+  recordCreate
 
   let maybeContractName = M.lookup "name" =<< metadata
       contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
@@ -99,16 +100,6 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
       maybeArgs = runParser parseArgs "" "" argString
       args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
-      maybeFile = runParser solidityFile "" "" $ BC.unpack initCode
-      file = either (error . show) id maybeFile
-
-      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
-                       | NamedXabi name (xabi, parents') <- unsourceUnits file]
-
-      cc = applyInheritence
-        $ CodeCollection {
-            _contracts=M.fromList namedContracts
-          }
       env' = Env.Environment {
         Env.blockHeader = blockData,
         Env.sender = sender',
@@ -118,16 +109,17 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
         Env.metadata=metadata
       }
 
-  runSM (Just initCode) env' $ do
-    create' sender' cc contractName' args
+  (hsh, cc) <- codeCollectionFromSource initCode
 
-create' :: Address -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
-create' creator cc contractName' argExps = do
+
+  runSM (Just initCode) env' $ do
+    create' sender' hsh cc contractName' args
+
+create' :: Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
+create' creator ch cc contractName' argExps = do
   newAddress <- getNewAddress creator
-  
+
   action . actionData %= M.insert newAddress (ActionData (SHA 0) SolidVM (ActionEVMDiff M.empty) [])
-  
-  ch <- putCodeCollection cc
 
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
@@ -138,7 +130,7 @@ create' creator cc contractName' argExps = do
 
   -- Add Storage
 
-  addCallInfo newAddress contract' cc M.empty
+  addCallInfo newAddress contract' ch cc M.empty
 
   forM_ (M.toList $ contract'^.storageDefs) $ \(n, (Xabi.VariableDecl theType _ maybeExpression)) -> do
     let def = defaultValue theType
@@ -154,7 +146,7 @@ create' creator cc contractName' argExps = do
   popCallInfo
 
   -- Run the constructor
-  runTheConstructors cc newAddress contractName' argExps
+  runTheConstructors newAddress ch cc contractName' argExps
 
   when trace $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
@@ -209,6 +201,7 @@ call :: Bool
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
 call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
+  recordCall
 
   let maybeFuncName = M.lookup "funcName" =<< metadata
       funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
@@ -246,7 +239,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 
 
 
-getCodeAndCollection :: Address -> SM (Contract, CodeCollection)
+getCodeAndCollection :: Address -> SM (Contract, SHA, CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- fmap callStack get
   let maybeAddress =
@@ -254,27 +247,27 @@ getCodeAndCollection address' = do
           (current:_) -> Just $ currentAddress current
           _ -> Nothing
 
-  liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
+  when trace $ liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+  when trace $ liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
     then do
     c' <- getCurrentContract
-    cc' <- getCurrentCodeCollection
-    return (c', cc')
+    (hsh, cc') <- getCurrentCodeCollection
+    return (c', hsh, cc')
     else do
     addressState <- getAddressState address'
 
-    (contractName', cc) <-
+    (contractName', ch, cc) <-
       case addressStateCodeHash addressState of
-        SolidVMCode cn ch -> do
-          cc' <- getCodeCollectionCached ch
-          return (cn, cc')
+        SolidVMCode cn ch' -> do
+          cc' <- codeCollectionFromHash ch'
+          return (cn, ch', cc')
         ch -> internalError "SolidVM for non-solidvm code" ch
 
 
     let contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
 
-    return (contract', cc)
+    return (contract', ch, cc)
 
 logFunctionCall :: [Value] -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
 logFunctionCall args address contract functionName f = do
@@ -298,12 +291,12 @@ logFunctionCall args address contract functionName f = do
 
 call'' :: Address -> Maybe String -> String -> [Value] -> SM (Maybe Value)
 call'' address mContract functionName args = do
-  (contract', cc) <- getCodeAndCollection address
+  (contract', hsh, cc) <- getCodeAndCollection address
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
   logFunctionCall args address contract functionName $
     case M.lookup functionName $ contract^.functions of
       Just theFunction -> do
-        call' address contract cc theFunction args
+        call' address contract hsh cc theFunction args
       _ -> do --Maybe the function is actually a getter
         case M.lookup functionName $ contract^.storageDefs of
           Just _ -> do
@@ -643,7 +636,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
              Constant c' -> return c'
              _ -> internalError "constant struct refers to nonconstant" f
       (SContractDef contractName', constName) -> do
-        cc <- getCurrentCodeCollection
+        (_, cc) <- getCurrentCodeCollection
         let cont = fromMaybe (missingType "contract function lookup" contractName')
                           (M.lookup contractName' $ cc^.contracts)
         if constName `M.member` _functions cont
@@ -812,9 +805,9 @@ expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array {Xabi.entry=t})) ar
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
   creator <- getCurrentAddress
   let argExps = map (\(Nothing, arg) -> arg) args  --TODO- add support for named arguments
-  cc <- getCurrentCodeCollection
+  (hsh, cc) <- getCurrentCodeCollection
   incrementNonce creator
-  execResults <- create' creator cc contractName' argExps
+  execResults <- create' creator hsh cc contractName' argExps
   return $ Constant $ SAddress
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAddress execResults
@@ -827,9 +820,9 @@ expToVar' (Xabi.FunctionCall e args) = do
     Constant (SFunction name) -> do
       contract' <- getCurrentContract
       address <- getCurrentAddress
-      cc <- getCurrentCodeCollection
+      (hsh, cc) <- getCurrentCodeCollection
 
-      res <- call' address contract' cc name argVals
+      res <- call' address contract' hsh cc name argVals
       case res of
         Just v -> return $ Constant $ v
         Nothing -> return $ Constant SNULL
@@ -998,8 +991,8 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: CodeCollection -> Address -> String -> [Xabi.Expression] -> SM ()
-runTheConstructors cc address contractName' argExps = do
+runTheConstructors :: Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM ()
+runTheConstructors address hsh cc contractName' argExps = do
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.contracts . at contractName'
@@ -1012,13 +1005,13 @@ runTheConstructors cc address contractName' argExps = do
 
   argVals <- for argExps $ \arg -> getVar =<< expToVar arg
   let zipped = zipWith (\(t, n) v -> (n, (t, coerceType t v))) argTypeNames argVals
-  addCallInfo address contract' cc . fmap (fmap Constant) $ M.fromList zipped
+  addCallInfo address contract' hsh cc . fmap (fmap Constant) $ M.fromList zipped
   mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = fromMaybe []
                $ M.lookup parent =<< (fmap Xabi.funcConstructorCalls $ contract'^.constructor)
-    runTheConstructors cc address parent args
+    runTheConstructors address hsh cc parent args
 
   _ <-
     case contract'^.constructor of
@@ -1048,8 +1041,8 @@ addLocalVariable theType name value = do
           {callStack = currentSlice{localVariables=M.insert name (theType, newVariable) $ localVariables currentSlice}:rest}
 
 
-call' :: Address -> Contract -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
-call' address' contract' cc theFunction argVals = do
+call' :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
+call' address' contract' hsh cc theFunction argVals = do
   --
   let returnMeta = map (\(n, Xabi.IndexedType _ t) -> (T.unpack n, t)) .  M.toList $ Xabi.funcVals theFunction
       returns = map (\(n, t) -> (n, (t, defaultValue t))) returnMeta
@@ -1062,7 +1055,7 @@ call' address' contract' cc theFunction argVals = do
   when trace $ liftIO $ putStrLn $ "            args: " ++ show (map fst args)
   when trace $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
-  addCallInfo address' contract' cc $ M.fromList [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  addCallInfo address' contract' hsh cc $ M.fromList [(n, (t, Constant v)) | (n, (t, v)) <- locals]
   forM_ locals $ \(n, (_, v)) -> do
     initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
 
@@ -1087,19 +1080,6 @@ call' address' contract' cc theFunction argVals = do
 
 
 
-box :: [String] -> String
-box strings = unlines $
-  [C.magenta ("╔" ++ replicate (width - 2) '═' ++ "╗")]
-  ++ map (\s -> C.magenta "║ " ++ C.white s ++ replicate (width - printedLength s - 4) ' ' ++ C.magenta " ║") strings
-  ++ [C.magenta ("╚" ++ replicate (width - 2) '═' ++ "╝")]
-  where width = maximum (map length strings) + 4
-        printedLength = go False
-        go :: Bool -> String -> Int
-        go True ('m':t) = go False t
-        go True (_:t) = go True t
-        go False ('\ESC':t) = go True t
-        go False (_:t) = 1 + go False t
-        go _ [] = 0
 
 
 
@@ -1107,7 +1087,7 @@ box strings = unlines $
 logAssigningVariable :: Value -> SM ()
 logAssigningVariable v = do
   valueString <- showSM v
-  liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
+  when trace $ liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
 
 logVals :: (Show a, Show b) => a -> b -> SM ()
 logVals val1 val2 = when trace . liftIO . putStrLn $ printf

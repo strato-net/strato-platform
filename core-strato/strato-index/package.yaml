@@ -17,6 +17,7 @@ dependencies:
   - bytestring
   - clock
   - containers
+  - format
   - hedis
   - hflags
   - monad-logger

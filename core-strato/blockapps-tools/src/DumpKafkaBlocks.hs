@@ -6,9 +6,10 @@ import           Control.Monad.IO.Class
 import           Network.Kafka.Protocol
 
 import           Blockchain.EthConf
-import           Blockchain.Format
 import           Blockchain.Stream.Raw     (setDefaultKafkaState)
 import           Blockchain.Stream.VMEvent
+
+import           Text.Format
 
 dumpKafkaBlocks :: Offset -> IO ()
 dumpKafkaBlocks startingBlock = do

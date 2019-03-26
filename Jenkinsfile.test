@@ -156,6 +156,7 @@ pipeline {
               npm run test:truchainz
               npm run test:multicontract
               npm run test:solidvm
+              npm run test:uploadOrder
               popd
               pushd strato-worktree/core-strato/strato-init
               ./check_genesis_ingestion.sh

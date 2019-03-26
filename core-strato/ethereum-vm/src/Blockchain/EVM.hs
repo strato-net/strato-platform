@@ -44,7 +44,6 @@ import           Text.Printf
 
 
 
-import qualified Blockchain.Colors                  as CL
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
@@ -61,7 +60,6 @@ import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.EVM.Code
@@ -78,6 +76,8 @@ import           Blockchain.VMMetrics
 import           Blockchain.VM.VMException
 import           Blockchain.VMOptions
 
+import qualified Text.Colors                        as CL
+import           Text.Format
 
 bool2Word256::Bool->Word256
 bool2Word256 True  = 1
@@ -1147,9 +1147,9 @@ create' = do
   where
     assignCode::B.ByteString->Address->VMM ()
     assignCode codeBytes address = do
-      addCode EVM codeBytes
+      hsh <- addCode EVM codeBytes
       newAddressState <- getAddressState address
-      putAddressState address newAddressState{addressStateCodeHash=EVMCode $ hash codeBytes}
+      putAddressState address newAddressState{addressStateCodeHash=EVMCode hsh}
     assignDetails = do
       vmState <- lift get
       let Environment{..} = environment vmState

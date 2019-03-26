@@ -57,6 +57,7 @@ dependencies:
   - file-embed
   - filepath
   - foreign-store
+  - format
   - hjsmin                        >= 0.1
   - mime-mail
   - monad-logger                  >= 0.3

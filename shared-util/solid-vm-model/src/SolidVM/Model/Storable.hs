@@ -7,6 +7,7 @@ import           Control.Exception
 import qualified Data.Aeson as Ae
 import           Data.Attoparsec.ByteString as Atto
 import           Data.Attoparsec.ByteString.Char8 (scientific)
+import           Data.Binary
 import           Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
@@ -18,7 +19,6 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import           Data.Scientific (isInteger, toBoundedInteger)
 import qualified Data.Text as T
-import           Data.Word
 import           Foreign.Ptr
 import           Foreign.Storable
 import           GHC.Generics
@@ -36,7 +36,7 @@ data BasicValue = BInteger !Integer
                 | BEnumVal !T.Text !T.Text
                 | BContract !T.Text !Address
                 | BDefault -- Indicates a not present value
-                deriving (Show, Eq, Generic, NFData, Hashable)
+                deriving (Show, Eq, Generic, NFData, Hashable, Binary)
 
 data IndexType = INum Integer
                | IText B.ByteString

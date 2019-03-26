@@ -22,8 +22,8 @@ import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
 import Blockchain.Strato.Model.SHA
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Format
-import qualified Blockchain.Strato.Model.Colors as CL
+import qualified Text.Colors as CL
+import Text.Format
 
 type RoundNumber = Word256
 type SequenceNumber = Word256

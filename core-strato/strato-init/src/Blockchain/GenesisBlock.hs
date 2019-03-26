@@ -45,7 +45,6 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Util
@@ -73,6 +72,8 @@ import qualified Blockchain.Strato.Model.Address      as Ad
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
+
+import           Text.Format
 
 readSupplementaryAccounts :: String -> IO [AccountInfo]
 readSupplementaryAccounts genesisBlockName = do

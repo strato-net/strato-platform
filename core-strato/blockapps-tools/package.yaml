@@ -17,6 +17,7 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-haskoin
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
@@ -24,7 +25,7 @@ dependencies:
   - data-default
   - ethereum-rlp
   - filepath
-  - blockapps-haskoin
+  - format
   - leveldb-haskell
   - merkle-patricia-db
   - blockapps-milena

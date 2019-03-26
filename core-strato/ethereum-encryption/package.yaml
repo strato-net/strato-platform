@@ -23,6 +23,7 @@ dependencies:
   - crypto-random
   - entropy
   - ethereum-rlp
+  - format
   - blockapps-haskoin
   - memory
   - monad-logger
