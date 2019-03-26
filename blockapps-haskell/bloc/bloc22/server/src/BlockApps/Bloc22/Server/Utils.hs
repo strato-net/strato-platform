@@ -15,10 +15,9 @@ module BlockApps.Bloc22.Server.Utils
 import           Control.Monad                    (forM)
 import           Control.Monad.Trans.State.Strict
 import qualified Data.ByteString.Base16           as BS16
-import           Data.Foldable                    (toList)
+import           Data.Functor.Identity
 import qualified Data.Map.Strict                  as Map
 import           Data.Maybe
-import qualified Data.Sequence                    as Q
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
 
@@ -58,8 +57,9 @@ binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
 accumStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
 accumStateT s as f = evalStateT (mapM f as) s
 
-partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
-partitionWith f = Map.toList
-                . Map.map toList
-                . Map.fromListWith (<>)
-                . map (\a -> (f a, Q.singleton a))
+buildStateT :: Monad m => s -> [a] -> (a -> StateT s m ()) -> m s
+buildStateT s as f = execStateT (mapM_ f as) s
+
+partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
+partitionWith f as = Map.toList . fmap reverse . runIdentity . buildStateT Map.empty as $ \a ->
+  modify $ Map.alter (Just . (a:) . fromMaybe []) (f a)

@@ -1,4 +1,4 @@
-FROM node:9-slim
+FROM node:8.15-stretch-slim
 
 RUN apt-get update && \
     mkdir -p /usr/share/man/man1 /usr/share/man/man7 && \

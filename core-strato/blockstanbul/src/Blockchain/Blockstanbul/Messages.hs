@@ -47,6 +47,12 @@ data TrustedMessage = Preprepare View Block
                     | RoundChange {roundchangeView :: View }
                     deriving (Eq, Show, Generic)
 
+instance Format TrustedMessage where
+  format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
+  format (Prepare v theSHA) = CL.blue "PREPARE " ++ format v ++ " " ++ format theSHA
+  format (Commit v theSHA _) = CL.blue "COMMIT " ++ format v ++ " " ++ format theSHA
+  format (RoundChange v) = CL.blue "ROUNDCHANGE " ++ format v
+
 data MessageKind = PreprepareK | PrepareK | CommitK | RoundChangeK deriving (Eq, Show, Enum, Generic)
 
 categorize :: TrustedMessage -> MessageKind
@@ -81,11 +87,7 @@ derive makeArbitrary ''TrustedMessage
 derive makeArbitrary ''WireMessage
 
 instance Format WireMessage where
-  format (WireMessage (MsgAuth s _) (Preprepare v theBlock)) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format s ++ "\n" ++ format theBlock
-  format (WireMessage (MsgAuth s _) (Prepare v theSHA)) = CL.blue "PREPARE " ++ format v ++ " " ++ format s ++ " " ++ format theSHA
-  format (WireMessage (MsgAuth s _) (Commit v theSHA _)) = CL.blue "COMMIT " ++ format v ++ " " ++ format s ++ " " ++ format theSHA
-  format (WireMessage (MsgAuth s _) (RoundChange v)) = CL.blue "ROUNDCHANGE " ++ format v ++ " " ++ format s
-
+  format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
 
 preprepareCode, prepareCode, commitCode, roundchangeCode :: Integer
 preprepareCode = 0
@@ -103,8 +105,13 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              deriving (Eq, Show)
 
 instance Format InEvent where
-  format (IMsg a m) = format $ WireMessage a m
-  format x = show x
+  format (IMsg (MsgAuth s _) msg) = "IMsg " ++ format msg ++ " " ++ format s
+  format (Timeout rn) = "Timeout " ++ format rn
+  format (CommitResult (Left text)) = unpack $ "CommitResult Error: " <> text
+  format (CommitResult (Right sha)) = "CommitResult Success: " ++ format sha
+  format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
+  format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
+  format (NewBeneficiary (MsgAuth s _) ben) = "NewBeneficiary " ++ show ben ++ " " ++ format s
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
@@ -116,6 +123,14 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | GapFound {have :: Integer, require :: Integer, peer :: Address}
               | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
               deriving (Eq, Show, Generic)
+
+instance Format OutEvent where
+  format (OMsg (MsgAuth s _) msg) = "OMsg " ++ format msg ++ " " ++ format s
+  format (ToCommit blk) = "ToCommit " ++ format (blockHash blk)
+  format MakeBlockCommand = "MakeBlockCommand"
+  format (ResetTimer rn) = "ResetTimer " ++ format rn
+  format (GapFound we they p) = "GapFound " ++ show (we, they, p)
+  format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -145,10 +160,6 @@ outShortLog loc oev = $logInfoS loc . pack $
     ResetTimer rn -> CL.blue "RESET_TIMER " ++ show rn
     GapFound h r p -> CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
-
-instance Format OutEvent where
-  format (OMsg a m) = format $ WireMessage a m
-  format x = show x
 
 instance NFData OutEvent
 

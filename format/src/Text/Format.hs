@@ -25,6 +25,5 @@ instance Format N.NibbleString where
 instance (Format a, Format b) => Format (a, b) where
   format (x, y) = "(" ++ format x ++ ", " ++ format y ++ ")"
 
-
-
-
+instance Format a => Format [a] where
+  format = show . map format
