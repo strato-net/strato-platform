@@ -58,10 +58,17 @@ function upload(req, res, next) {
       Body: req.file.buffer,
     };
 
-
+    let uploadedFile;
+    
     try {
-      const uploadedFile = yield uploader.upload(params);
-
+      uploadedFile = yield uploader.upload(params);
+    } catch (error) {
+      let err = new Error(`AWS S3 upload file to bucket error: ${JSON.stringify(error)}`);
+      err.status = RestStatus.INTERNAL_SERVER_ERROR;
+      return next(err);
+    }
+    
+    try {
       const args = {
         _uri: uploadedFile.Location,
         _host: provider,
