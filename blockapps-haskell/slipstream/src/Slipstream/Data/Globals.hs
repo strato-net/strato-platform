@@ -3,6 +3,7 @@ module Slipstream.Data.Globals where
 
 import Control.DeepSeq
 import Data.Cache.LRU
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Set as S
 import Data.Text
 import GHC.Generics
@@ -19,6 +20,7 @@ data Globals = Globals { createdContracts :: S.Set SHA -- list of contacts with 
                        , historyList :: S.Set SHA
                        , noIndexList :: S.Set SHA
                        , functionHistoryList :: S.Set SHA
+                       , solidVMDetails :: HM.HashMap SHA (Text, Text)
                        , contractStates :: LRU (Address, Maybe ChainId) [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

@@ -91,6 +91,6 @@ describe('Solid VM: Contract uploads', async () => {
     const gotIndex = await index(contract);
     assert.equal(gotIndex[0].address, contract.address);
     // TODO: enable the following line
-    // assert.equal(gotIndex[0].count, 5);
+    assert.equal(gotIndex[0].count, 5);
   }).timeout(config.timeout);
 })

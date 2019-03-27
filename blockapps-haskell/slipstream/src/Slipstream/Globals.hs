@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Slipstream.Globals
@@ -13,6 +14,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.Cache.LRU              as LRU
 import           Data.Either.Extra
+import qualified Data.HashMap.Strict         as HM
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
@@ -30,6 +32,14 @@ updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
   recordGlobals g
   writeIORef gref g
+
+addSolidVMDetails :: MonadIO m => IORef Globals -> SHA -> Text -> Text -> m ()
+addSolidVMDetails gref !codeHash !name !abi = do
+  globals@Globals{..} <- readIORef gref
+  updateGlobals gref globals{solidVMDetails=HM.insert codeHash (name, abi) solidVMDetails}
+
+getSolidVMDetails :: MonadIO m => IORef Globals -> SHA -> m (Maybe (Text, Text))
+getSolidVMDetails gref codeHash = HM.lookup codeHash . solidVMDetails <$> readIORef gref
 
 setContractCreated :: MonadIO m => IORef Globals -> SHA -> m ()
 setContractCreated globalsIORef codeHash = do

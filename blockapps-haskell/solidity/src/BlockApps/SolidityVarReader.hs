@@ -147,13 +147,14 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
         TypeContract _ -> [(offset, 1)]
 
 decodeCacheValues
-  :: TypeDefs
-  -> Struct
+  :: Contract
   -> Cache
-  -> Word256
   -> [(Text, Value)]
   -> [(Text, Value)]
-decodeCacheValues typeDefs' struct'@Struct{..} cache offset state =
+decodeCacheValues (Contract struct' typeDefs') cache state = decodeCacheValues' typeDefs' struct' cache 0 state
+
+decodeCacheValues' :: TypeDefs -> Struct -> Cache -> Word256 -> [(Text, Value)] -> [(Text, Value)]
+decodeCacheValues' typeDefs' struct' cache offset state =
   zipWith fromMaybe state $ map (decodeCacheValue typeDefs' struct' cache offset) state
 
 decodeCacheValue
@@ -278,7 +279,7 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
     case Map.lookup name structDefs of
      Nothing -> throw $ MissingTypeStruct name
      Just theStruct -> case value of
-       ValueStruct kvs -> ValueStruct $ decodeCacheValues typeDefs' theStruct cache (Storage.alignedByte position) kvs
+       ValueStruct kvs -> ValueStruct $ decodeCacheValues' typeDefs' theStruct cache (Storage.alignedByte position) kvs
        v -> error $ "decodeCacheValue': Expected ValueStruct, but got: " ++ show v
 
 decodeValues

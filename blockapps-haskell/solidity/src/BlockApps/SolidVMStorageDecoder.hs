@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-module BlockApps.SolidVMStorageDecoder (decodeSolidVMValues) where
+module BlockApps.SolidVMStorageDecoder
+  ( decodeSolidVMValues
+  , decodeCacheValues
+  ) where
 
 import Control.Monad.Extra
 import Data.Bifunctor
@@ -8,11 +11,13 @@ import Data.Bitraversable
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
+import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8')
 import Text.Printf
 
 import BlockApps.Solidity.SolidityValue
+import BlockApps.Solidity.Value
 import Blockchain.SolidVM.Model
 import SolidVM.Model.Storable
 
@@ -30,6 +35,9 @@ decodeSolidVMValues hexs = either (error . printf "decodeSolidVMValues: %s" . sh
   pathValues <- mapM (bimapM hexStorageToPath hexStorageToBasic) hexs
   totalStorage <- bimap show HM.toList $ synthesize pathValues
   mapMaybeM (bimapSToS bsToText) totalStorage
+
+decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
+decodeCacheValues _ = (("another_one", SimpleValue $ ValueAddress 0xdeadbeef):)
 
 storableToSolidity :: StorableValue -> Either String (Maybe SolidityValue)
 storableToSolidity = \case

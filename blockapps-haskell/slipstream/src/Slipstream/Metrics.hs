@@ -17,6 +17,7 @@ module Slipstream.Metrics
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.Cache.LRU as LRU
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Prometheus
@@ -73,6 +74,11 @@ recordGlobals g = liftIO $ do
   rec "history_list" (S.size . historyList)
   rec "function_history_list" (S.size . functionHistoryList)
   rec "no_index_list" (S.size . noIndexList)
+  rec "solidvm_details_count" (HM.size . solidVMDetails)
+  rec "solidvm_details_bytes" ( sum
+                              . map (\(t1, t2) -> T.length t1 + T.length t2)
+                              . HM.elems
+                              . solidVMDetails)
   rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()

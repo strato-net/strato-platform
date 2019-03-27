@@ -52,6 +52,7 @@ import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
+import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.SHA (hash)
@@ -253,6 +254,7 @@ detailsForRow row = liftM2 (<|>)
   (runMaybeT $ do
     let md = actionMetadata row
     let lookupT k m = MaybeT . return $ Map.lookup k m
+    liftIO . infoM "metadata is " $ show md
     liftIO $ infoM "detailsForRow" "Querying src"
     src <- lookupT "src" md
     liftIO $ infoM "source found:" (show src)
@@ -286,21 +288,20 @@ ensureContractInstance cmId row = do
   when (isNothing mInstance) . void $
     insertContractInstance cmId addr chainId
 
-readPreviousState :: IORef Globals -> Address -> Maybe ChainId -> Contract -> Bloc [(Text, Value)]
-readPreviousState gref addr chainId cont = do
+readPreviousEVMState :: IORef Globals -> Address -> Maybe ChainId -> Contract -> Bloc [(Text, Value)]
+readPreviousEVMState gref addr chainId cont = do
   let default' = SVR.decodeValues 0 (typeDefs cont) (mainStruct cont) (const 0) 0
   fromMaybe default' <$> getContractState gref addr chainId
+
+readPreviousSolidVMState :: IORef Globals -> Address -> Maybe ChainId -> Bloc [(Text, Value)]
+readPreviousSolidVMState gref addr chainId = fromMaybe [] <$> getContractState gref addr chainId
 
 
 rowToInsert :: IORef Globals -> ABIID -> Action -> Contract -> [(Text, Value)] -> Bloc ProcessedContract
 rowToInsert gref abiid row cont oldState = do
-  let cache = flip Map.lookup . todoToMap $ actionStorage row
-      newState = SVR.decodeCacheValues
-                  (typeDefs cont)
-                  (mainStruct cont)
-                  cache
-                  0
-                  oldState
+  let newState = case actionStorage row of
+                    BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
+                    BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
   setContractState gref (actionAddress row) (actionTxChainId row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
@@ -310,12 +311,9 @@ rowToHistories gref abiid row actions cont details oldState = do
   second join . unzip <$> if not hist
     then pure []
     else accumStateT oldState actions $ \hRow -> do
-      let hCache = flip Map.lookup . todoToMap $ actionStorage hRow
-      modify $ SVR.decodeCacheValues
-               (typeDefs cont)
-               (mainStruct cont)
-               hCache
-               0
+      modify $ case actionStorage hRow of
+                  BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
+                  BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp
       newMap <- gets Map.fromList
       let hInsert = processedContract abiid newMap hRow
       functionHist <- isFunctionHistoric gref $ actionCodeHash hRow
@@ -353,25 +351,35 @@ processTheMessages env conn g messages = do
       liftIO . infoM "processTheMessages" . T.unpack . formatAction $ row
       liftIO . infoM "the diff is" . show . actionStorage $ row
 
-      mDetails <- detailsForRow row
-      case mDetails of
-        Nothing -> pure . Left $ "No details found for code hash "
-                        <> (T.pack . show $ actionCodeHash row)
-                        <> " and no 'src' field found in actionMetadata"
-        Just (cmId, details) -> do
-          let abiid = ABIID
-                { aiAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict
-                        . JSON.encode $ contractdetailsXabi details
-                , aiName = T.replace "\"" "" $ contractdetailsName details
-                , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
-                }
-              cont = either error id . xAbiToContract $ contractdetailsXabi details
+      case actionStorage row of
+        BS.ActionEVMDiff{} -> do
+          mDetails <- detailsForRow row
+          case mDetails of
+            Nothing -> pure . Left $ "No details found for code hash "
+                            <> (T.pack . show $ actionCodeHash row)
+                            <> " and no 'src' field found in actionMetadata"
+            Just (cmId, details) -> do
+              let abiid = ABIID
+                    { aiAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict
+                            . JSON.encode $ contractdetailsXabi details
+                    , aiName = T.replace "\"" "" $ contractdetailsName details
+                    , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
+                    }
+                  cont = either error id . xAbiToContract $ contractdetailsXabi details
 
-          adjustGlobals g row details
+              adjustGlobals g row details
 
-          ensureContractInstance cmId row
+              ensureContractInstance cmId row
 
-          oldState <- readPreviousState g addr chainId cont
+              oldState <- readPreviousEVMState g addr chainId cont
+              indexContract <- rowToInsert g abiid row cont oldState
+              (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
+              pure . Right $ BatchedInserts indexContract hs fhs
+        BS.ActionSolidVMDiff{} -> do
+          let abiid = ABIID "<placeholder_abi>" "<placeholder_name>" "<placeholder_chain>"
+              cont = error "placeholder/unused contract"
+              details = error "placeholder/unused details"
+          oldState <- readPreviousSolidVMState g addr chainId
           indexContract <- rowToInsert g abiid row cont oldState
           (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
           pure . Right $ BatchedInserts indexContract hs fhs
