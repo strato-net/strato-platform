@@ -8,37 +8,32 @@ let healthStatus, uptimeDur
 
 
 async function getHealthStatus() {
-    await models.CurrentHealth.findAll({
+    const healthInfo = await models.CurrentHealth.findOne({
+        where: {
+            processName: "HealthStat"
+        },
         attributes: [
-            'processName',
             'latestHealthStatus',
             'latestCheckTimestamp',
             'lastFailureTimestamp'
-        ]}).then(function (data) {
-        if (data.length) {
-            let isNotStalled, isHealthy;
-            let failureTimeStalled, failureTimeHealth;
-            data.forEach(function(element){
-                if (element.processName == "HealthStat"){
-                    isHealthy = element.latestHealthStatus;
-                    failureTimeHealth = element.lastFailureTimestamp;
+        ]})
+    const stallInfo = await models.CurrentHealth.findOne({
+        where: {
+            processName: "StallStat"
+        },
+        attributes: [
+            'latestHealthStatus',
+            'latestCheckTimestamp',
+            'lastFailureTimestamp'
+        ]})
+    let currentTime = Date.now();
 
-                } else if (element.processName == "StallStat"){
-                    isNotStalled = element.latestHealthStatus;
-                    failureTimeStalled = element.lastFailureTimestamp;
-                }
-            })
-
-            healthStatus = isHealthy && isNotStalled;
-            emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
-
-            const currentTime = Date.now();
-            const ms = Math.min(currentTime - failureTimeStalled, currentTime - failureTimeHealth);
-            emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, ms/1000);
-
-        }}).catch(function (err) {
-        console.log("getHealthStatus Error:", err);
-    });
+    if (healthInfo && stallInfo){
+        healthStatus = healthInfo.dataValues.latestHealthStatus && stallInfo.dataValues.latestHealthStatus;
+        uptimeDur = currentTime - Math.max(healthInfo.dataValues.lastFailureTimestamp, stallInfo.dataValues.lastFailureTimestamp);
+    }
+    emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
+    emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, uptimeDur);
 }
 
 getHealthStatus()

@@ -9,18 +9,12 @@ const config = require('../config/app.config');
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-winston.info('Starting stall-check with a delay of', config.healthCheck.progressWindow);
-setInterval(async () => {
-    try {
-        await queryHealthStatus();
-winston.info('Stalling Status Checked at ' + moment().format());
-} catch (err) {
-    winston.error('Stalling Check error: ' + err.message);
-}
-}, config.healthCheck.progressWindow);
+queryHealthStatus();
+setInterval(queryHealthStatus, config.healthCheck.progressWindow);
 
 
 function queryHealthStatus() {
+    winston.info('Stalling Status Checked at ' + moment().format());
     return new Promise(async (resolve, _void) => {
 
         try {
@@ -31,29 +25,33 @@ function queryHealthStatus() {
                 where: {
                     blockType: "Valid",
                 },
+                attributes: ['blockCount'],
                 order: [ [ 'createdAt', 'DESC' ]],
             });
             const lastBlocksPending = await models.StallStat.findOne({
                 where: {
                     blockType: "Pending",
                 },
+                attributes: ['blockCount'],
                 order: [ [ 'createdAt', 'DESC' ]],
-            });
+            })
+
+            const lastV = (lastBlocksValid) ? lastBlocksValid.dataValues.blockCount : blocksValid;
+            const lastP = (lastBlocksPending) ? lastBlocksPending.dataValues.blockCount : blocksValid;
 
             await updateStallStat(blocksValid, blocksPending);
-
-            const overallStat = await getCurrentHealth(lastBlocksPending.blockCount, lastBlocksValid.blockCount, blocksValid);
+            const overallStat = await getCurrentHealth(lastV, lastP, blocksValid);
 
             await updateCurrentHealth(overallStat);
 
             return resolve();
 
             } catch (error) {
-                if (error instanceof TypeError){
-                    winston.info(`Cannot detect installing state at the first check`)
-                } else {
+                // if (error instanceof TypeError){
+                //     winston.info(`Cannot detect installing state at the first check`)
+                // } else {
                     winston.warn(`Error ${error.message ? error.message : ''} occurred while querying stalling status`);
-                }
+               // }
                 return resolve();
             }
     }).timeout(config.healthCheck.requestTimeout - 80);
@@ -147,13 +145,13 @@ async function updateStallStat(blocksValid, blocksPending){
         blockType: "Valid",
         blockCount: blocksValid,
         timestamp: currentTime
-    }).reload();
+    });
 
     await models.StallStat.create({
         blockType: "Pending",
         blockCount: blocksPending,
         timestamp: currentTime
-    }).reload();
+    });
 
 }
 

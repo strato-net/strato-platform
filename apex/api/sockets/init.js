@@ -58,11 +58,11 @@ function init(server) {
     registerRoomAllocation(socket, GET_COINBASE, getCoinbaseAggregator.initialHydrate)
 
     // register request for node health check
-    registerRoomAllocation(socket, GET_HEALTH, getHealthAggregator.initialHydrateHealthStatus())
+    registerRoomAllocation(socket, GET_HEALTH, getHealthAggregator.initialHydrateHealthStatus)
 
 
     // register request for node uptime duration
-    registerRoomAllocation(socket, GET_NODE_UPTIME, getHealthAggregator.initialHydrateUptime())
+    registerRoomAllocation(socket, GET_NODE_UPTIME, getHealthAggregator.initialHydrateUptime)
   });
 }
 
