@@ -17,6 +17,7 @@ import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (listToMaybe, maybeToList)
 import           Data.Text                    (Text)
+import qualified Data.Text                    as T
 import           Data.Text.Encoding           (decodeUtf8, encodeUtf8)
 import           Database.Persist.TH
 import           GHC.Generics
@@ -189,10 +190,15 @@ instance RLPSerializable Transaction where
 
 
 instance ShortDescription Transaction where
+  shortDescription t | isMessageTX t =
+    case (M.lookup "funcName" =<< transactionMetadata t, M.lookup "args" =<< transactionMetadata t) of
+      (Just n, Just a) -> "calling " ++ format (transactionTo t) ++ "/" ++ T.unpack n ++ T.unpack a
+      _ -> "MessageTX to " ++ format (transactionTo t)
   shortDescription t =
-    if isMessageTX t
-          then "MessageTX to " ++ format (transactionTo t)
-          else "Create Contract"
+    case (M.lookup "name" =<< transactionMetadata t, M.lookup "args" =<< transactionMetadata t) of
+      (Just n, Just "") -> "Create Contract " ++ T.unpack n
+      (Just n, Just a) -> "Create Contract " ++ T.unpack n ++ T.unpack a
+      _ -> "Create Contract"
 
 isMessageTX::Transaction->Bool
 isMessageTX MessageTX{} = True
