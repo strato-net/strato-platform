@@ -50,3 +50,8 @@ setTitle value = do
 shorten :: Int -> String -> String
 shorten maxLen s | length s <= maxLen = s
 shorten maxLen s = take maxLen s ++ "..."
+
+
+wrap :: Int -> String -> [String]
+wrap maxLen s | length s > maxLen = take maxLen s:wrap maxLen (drop maxLen s)
+wrap _ s = [s]

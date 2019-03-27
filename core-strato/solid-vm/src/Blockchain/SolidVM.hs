@@ -273,7 +273,7 @@ logFunctionCall :: [Value] -> Address -> Contract -> String -> SM (Maybe Value) 
 logFunctionCall args address contract functionName f = do
   when trace $ do
     argStrings <- forM args showSM
-    liftIO $ putStrLn $ box ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
+    liftIO $ putStrLn $ box $ concat $ map (wrap 150) ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
 
   result <- f
 
