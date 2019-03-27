@@ -1,8 +1,6 @@
 import qualified Data.ByteString as B
 import Control.Monad
 import Data.Either (isLeft)
-import qualified Data.HashMap.Strict as HM
-import qualified Data.IntMap as I
 import Test.Hspec
 import UnliftIO.Exception
 
@@ -11,9 +9,6 @@ import SolidVM.Model.Storable
 
 main :: IO ()
 main = hspec spec
-
-forceParse :: B.ByteString -> StoragePath
-forceParse = either error id . parsePath
 
 toAns :: [StoragePathPiece] -> Either a StoragePath
 toAns = Right . fromList
@@ -83,190 +78,6 @@ spec = do
 
     it "should escape quotes in map indices" $ do
       unparsePath (StoragePath [MapIndex (IText "dan\"ger")])`shouldBe` "<\"dan\\\"ger\">"
-
-  describe "StorageDelta" $ do
-    let exStorage = HM.fromList [ ("count", BasicValue $ BInteger 99)
-                                , ("name", BasicValue $ BString "iago")]
-    it "should be able to do nothing" $ do
-      replayDelta [] exStorage `shouldBe` Right exStorage
-
-    it "should fail to do the impossible" $ do
-      replayDelta [(empty, BInteger 99)] exStorage `shouldBe` Left (MissingPath empty)
-      replayDelta [(forceParse ".no_such_field", BInteger 300)] exStorage
-        `shouldBe` Left (MissingPath $ singleton "no_such_field")
-
-    it "should be able to increment" $ do
-      replayDelta [(forceParse ".count", BInteger 100)] exStorage `shouldBe`
-        Right (HM.fromList [("count", BasicValue $ BInteger 100), ("name", BasicValue $ BString "iago")])
-
-    it "should be able to insert into a map" $ do
-      let spine = HM.singleton "hashmap" . SMapping . HM.fromList
-          input = spine []
-          want  = spine [(INum 30, BasicValue $ BInteger 0x234)]
-          got = replayDelta [(forceParse ".hashmap<30>", BInteger 0x234)] input
-      got `shouldBe` Right want
-
-    it "should be able to insert into a struct" $ do
-      let spine = HM.singleton "struct" . SStruct . HM.singleton "name" . BasicValue . BString
-          input = spine "iago"
-          want  = spine "alladin"
-          got = replayDelta [(forceParse ".struct.name", BString "alladin")] input
-      got `shouldBe` Right want
-
-    it "should be able to insert into an array" $ do
-      let spine = HM.singleton "array" . SArray . I.fromList
-          input = spine []
-          want  = spine [(0, BasicValue $ BInteger 0x882)]
-          got = replayDelta [(forceParse ".array[0]", BInteger 0x882)] input
-      got `shouldBe` Right want
-
-    it "should be able to target nested fields" $ do
-      let spine = HM.singleton "array" . SArray
-                . I.singleton 3 . SMapping
-                . HM.singleton (IText "brimstone") . SStruct
-                . HM.singleton "and_fire" . BasicValue . BInteger
-          input = spine 0x12345
-          want  = spine 700000
-          got = replayDelta [(forceParse ".array[3]<\"brimstone\">.and_fire", BInteger 700000)] input
-      got `shouldBe` Right want
-
-    it "should be able to guess the intermediate structure from a path" $ do
-      let input = HM.singleton "map" $ SMapping HM.empty
-          want = HM.singleton "map" . SMapping
-               . HM.singleton (IText "array") . SArray
-               . I.singleton 9292 . SStruct
-               . HM.singleton "array2" . SArray
-               . I.singleton 14 . BasicValue . BBool $ True
-          got = replayDelta [(forceParse ".map<\"array\">[9292].array2[14]", BBool True)] input
-      got `shouldBe` Right want
-
-    it "should be able to play multiple deltas" $ do
-      let input = HM.singleton "map" $ SMapping HM.empty
-          want = HM.singleton "map" . SMapping . HM.fromList
-               $ [ (INum 4, BasicValue $ BBool True)
-                 , (INum 5, BasicValue $ BBool False)
-                 , (INum 7, BasicValue $ BInteger 43)]
-          got = flip replayDelta input [ (forceParse ".map<4>", BBool True)
-                                       , (forceParse ".map<7>", BInteger 43)
-                                       , (forceParse ".map<5>", BBool False)]
-      got `shouldBe` Right want
-
-  describe "Analysis" $ do
-    it "can analyze nothing" $ do
-      analyze HM.empty `shouldBe` []
-
-    it "can analyze a number" $ do
-      analyze (HM.singleton "count" (BasicValue (BInteger 99)))
-        `shouldBe` [(forceParse ".count", BInteger 99)]
-
-    it "can analyze a map" $ do
-      let input = HM.singleton "coll" . SMapping
-                $ HM.fromList [(IText "monarch", BasicValue $ BString "4cm"),
-                               (IText "mariposa", BasicValue $ BInteger 6)]
-      analyze input `shouldMatchList` [(forceParse ".coll<\"monarch\">", BString "4cm")
-                                      , (forceParse ".coll<\"mariposa\">", BInteger 6)]
-
-    it "can analyze a map of maps" $ do
-      let input = HM.singleton "coll" . SMapping
-                $ HM.fromList [
-                (IText "results", SMapping $ HM.fromList [
-                  (IText "ok", BasicValue $ BInteger 20),
-                  (IText "fail", BasicValue $ BInteger 4),
-                  (IText "pending", BasicValue $ BInteger 2)]),
-                (IText "todo", SMapping $ HM.fromList [
-                  (IText "tasks", BasicValue $ BInteger 3),
-                  (IText "stories", BasicValue $ BInteger 2)])]
-      analyze input `shouldMatchList`
-         [ (forceParse ".coll<\"results\"><\"ok\">", BInteger 20)
-         , (forceParse ".coll<\"results\"><\"fail\">", BInteger 4)
-         , (forceParse ".coll<\"results\"><\"pending\">", BInteger 2)
-         , (forceParse ".coll<\"todo\"><\"tasks\">", BInteger 3)
-         , (forceParse ".coll<\"todo\"><\"stories\">", BInteger 2)
-         ]
-    it "can analyze an array" $ do
-      let input = HM.singleton "measurements" . SArray
-                $ I.fromList [
-                  (0, BasicValue $ BInteger 22),
-                  (1, BasicValue $ BInteger 30),
-                  (3, BasicValue $ BInteger 0)]
-      analyze input `shouldMatchList`
-        [ (forceParse ".measurements[0]", BInteger 22)
-        , (forceParse ".measurements[1]", BInteger 30)
-        , (forceParse ".measurements[3]", BInteger 0)
-        ]
-
-    it "can analyze a struct" $ do
-      let input = HM.singleton "person" . SStruct
-                $ HM.fromList [
-                  ("age", BasicValue $ BInteger 84),
-                  ("height", BasicValue $ BString "170cm"),
-                  ("name", BasicValue $ BString "Voltaire"),
-                  ("books", SArray $ I.fromList [
-                      (0, BasicValue $ BString "Candide"),
-                      (2, BasicValue $ BString "Treatise on tolerance")
-                      ])
-                ]
-      analyze input `shouldMatchList`
-        [ (forceParse ".person.age", BInteger 84)
-        , (forceParse ".person.height", BString "170cm")
-        , (forceParse ".person.name", BString "Voltaire")
-        , (forceParse ".person.books[0]", BString "Candide")
-        , (forceParse ".person.books[2]", BString "Treatise on tolerance")
-        ]
-  describe "Synthesis" $ do
-    it "can synthesize nothing" $ do
-      synthesize [] `shouldBe` Right HM.empty
-
-    it "can synthesize a number" $ do
-      let input = [(forceParse ".age", BInteger 30)]
-          want = HM.singleton "age" . BasicValue . BInteger $ 30
-      synthesize input `shouldBe` Right want
-
-    it "can synthesize a mapping" $ do
-      let input = [ (forceParse ".byDepth<20>", BString "river")
-                  , (forceParse ".byDepth<4>", BString "stream")
-                  , (forceParse ".byDepth<0>", BString "puddle")
-                  , (forceParse ".byDepth<100>", BString "bay")
-                  ]
-          want = HM.singleton "byDepth" . SMapping $ HM.fromList
-               [ (INum 20, BasicValue $ BString "river")
-               , (INum 4, BasicValue $ BString "stream")
-               , (INum 0, BasicValue $ BString "puddle")
-               , (INum 100, BasicValue $ BString "bay")
-               ]
-      synthesize input `shouldBe` Right want
-      synthesize (reverse input) `shouldBe` Right want
-
-    it "can synthesize a complicated contract" $ do
-      let input = [ (forceParse ".person.age", BInteger 84)
-                  , (forceParse ".person.height", BString "170cm")
-                  , (forceParse ".person.name", BString "Voltaire")
-                  , (forceParse ".person.books[0]", BString "Candide")
-                  , (forceParse ".person.books[2]", BString "Treatise on tolerance")
-                  , (forceParse ".age", BString "Enlightenment")
-                  ]
-          want = HM.fromList
-            [ ("person", SStruct $ HM.fromList
-                [ ("age", BasicValue $ BInteger 84)
-                , ("height", BasicValue $ BString "170cm")
-                , ("name", BasicValue $ BString "Voltaire")
-                , ("books", SArray $ I.fromList
-                    [ (0, BasicValue $ BString "Candide")
-                    , (2, BasicValue $ BString "Treatise on tolerance")
-                    ])])
-            , ("age", BasicValue $ BString "Enlightenment")
-            ]
-      synthesize input `shouldBe` Right want
-      synthesize (reverse input) `shouldBe` Right want
-
-    it "can synthesize an array with length" $ do
-      let input = [ (forceParse ".owners.length", BInteger 2)
-                  , (forceParse ".owners[0]", BAddress 0x88)
-                  ]
-          want = HM.singleton "owners" . SArray $ I.fromList
-            [(0, BasicValue $ BAddress 0x88), (2, SArraySentinel 2)]
-      synthesize input `shouldBe` Right want
-      synthesize (reverse input) `shouldBe` Right want
 
   describe "BasicValue RLP encoding" $ do
     it "should be reversible" $ do
