@@ -51,9 +51,10 @@ data Value
   | ValueContract Address
   | ValueEnum Text Text Word256
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
-  -- | ValueMapping (Map SimpleValue Value)
+  | ValueMapping (Map.Map SimpleValue Value)
   | ValueStruct [(Text, Value)]
-  deriving (Eq, Show, Generic, NFData, Binary.Binary)
+  | ValueArraySentinel Int
+  deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord)
 
 data SimpleValue
   = ValueBool Bool
@@ -66,7 +67,7 @@ data SimpleValue
   | ValueBytes { bytesSize :: Maybe Integer
                , bytesVal  :: ByteString
                }
-    deriving (Eq, Show, Generic, NFData, Binary.Binary)
+    deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord)
 
 bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
 bytesToSimpleValue bs = \case
@@ -197,10 +198,14 @@ valueToText = \case
     "[" <> Text.intercalate "," (map valueToText vals) <> "]"
   ValueArrayFixed _ vals ->
     "[" <> Text.intercalate "," (map valueToText vals) <> "]"
+  ValueMapping m ->
+    let pairs = map (\(sv, v) -> simpleValueToText sv <> ": " <> valueToText v) $ Map.toList m
+    in "{" <> Text.intercalate "," pairs <> "}"
   ValueContract addr -> Text.pack $ addressString addr
-  ValueEnum{}        -> undefined -- TODO
-  ValueFunction{}    -> undefined -- TODO
-  ValueStruct{}      -> undefined
+  ValueEnum{}        -> error "ValueEnum to text"
+  ValueFunction{}    -> error "ValueFunction to text"
+  ValueStruct{}      -> error "ValueStruct to text"
+  ValueArraySentinel{} -> error "ValueArraySentinel to text"
 
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
