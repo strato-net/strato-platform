@@ -1,5 +1,6 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
+const co = require('co');
 
 module.exports = {
   ping: function (req, res) {
@@ -41,55 +42,54 @@ module.exports = {
     }
   },
 
-  healthStatus: async function (req, res, next){
+  healthStatus: function (req, res, next){
+      co(function* (){
     try {
-        let uptime, healthStatus, isInc;
+        let healthStatus, uptime, isInc;
 
-        let isNotStalled, isHealthy;
-        let failureTimeStalled, failureTimeHealth;
-        await models.CurrentHealth.findAll({
+        const healthInfo = yield models.CurrentHealth.findOne({
+            where: {
+                processName: "HealthStat"
+            },
             attributes: [
-                'processName',
                 'latestHealthStatus',
                 'latestCheckTimestamp',
-                'lastFailureTimestamp',
-                'isBlocksValidInc'
-            ]}).then(function (data) {
-            if (data.length) {
-                data.forEach(function (element) {
-                    if (element.processName == "HealthStat") {
-                        isHealthy = element.latestHealthStatus;
-                        failureTimeHealth = element.lastFailureTimestamp;
+                'lastFailureTimestamp'
+            ]}).catch(err => next(err));
+        const stallInfo = yield models.CurrentHealth.findOne({
+            where: {
+                processName: "StallStat"
+            },
+            attributes: [
+                'latestHealthStatus',
+                'latestCheckTimestamp',
+                'lastFailureTimestamp'
+            ]}).catch(err => next(err));
 
-                    } else if (element.processName == "StallStat") {
-                        isNotStalled = element.latestHealthStatus;
-                        failureTimeStalled = element.lastFailureTimestamp;
-                        isInc = element.isBlocksValidInc;
-                    }
-                })
-
-
-            }}).catch(function (err) {
-                console.log("getHealthStatus Error:", err);
-            });
         const currentTime = Date.now();
 
-        uptime = Math.min(currentTime - failureTimeStalled, currentTime - failureTimeHealth) / 1000;
-
-        healthStatus = isHealthy && isNotStalled;
+        if (healthInfo && stallInfo){
+            healthStatus = healthInfo.dataValues.latestHealthStatus && stallInfo.dataValues.latestHealthStatus;
+            uptime = currentTime - Math.max(healthInfo.dataValues.lastFailureTimestamp, stallInfo.dataValues.lastFailureTimestamp);
+            isInc = stallInfo.dataValues.isBlocksValidInc;
+        } else {
+            let err = new Error("No health check info");
+            err.status = 404;
+            return next(err);
+        }
 
         res.status(200).json(
             {
                 healthInfo: {
                     uptime: uptime,
                     isHealthy: healthStatus,
-                    isValidBlocksInc: isInc
+                    isValidBlocksInc: isInc || false,
                 }
             }
         )
     } catch (error) {
         return next(new Error('could not get data from database: ' + error));
-    }
+    }})
 
   }
 };
