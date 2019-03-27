@@ -171,7 +171,7 @@ class CreateChain extends Component {
   renderDropzoneInput = (field) => {
     const touchedAndHasErrors = field.meta.touched && field.meta.error
     return (
-      <div className="dropzoneContainer text-center">
+      <div className="dropzoneContainer text-center chain-dropzone">
         <Dropzone
           className="dropzone"
           name={field.name}
@@ -181,7 +181,7 @@ class CreateChain extends Component {
             if (isDragActive) {
               return (<p className="pt-intent-success">Drop to Upload!</p>);
             }
-            return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
+            return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop file here or click to upload'}</p>)
           }}
         </Dropzone>
         {touchedAndHasErrors && <span className="error-text">{field.meta.error}</span>}
@@ -410,7 +410,6 @@ class CreateChain extends Component {
                 <div className="col-sm-3 text-right" />
                 <div className="col-sm-9 smd-pad-4">
                   <Field
-                    style={{ marginLeft: 25 }}
                     name="radio"
                     component="input"
                     type="radio"
