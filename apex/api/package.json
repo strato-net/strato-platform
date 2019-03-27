@@ -3,8 +3,8 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "start": "# npm-run-all -p start-dev",
-    "start:prod": "PORT=3001 NODE_HOST=${NODE_HOST} NODE_ENV=production node ./bin/www --config config-prod.yaml",
+    "start:prod": "npm-run-all -p start:prod:main start:prod:node-health start:prod:stall-check start:prod:db-cleaner",
+    "start:prod:main": "PORT=3001 NODE_HOST=${NODE_HOST} NODE_ENV=production node ./bin/www --config config-prod.yaml",
     "start:prod:node-health": "NODE_ENV=production node daemons/node-health-check.js",
     "start:prod:stall-check": "NODE_ENV=production node daemons/stall-check.js",
     "start:prod:db-cleaner": "NODE_ENV=production node daemons/db-cleaner.js",
@@ -15,6 +15,7 @@
     "node-ping": "# DELAY=5000 RETENTION=1 node node-ping/index.js",
     "migrate": "# sequelize db:migrate",
     "test": "NODE_ENV=development ./run-tests.sh",
+    "test:health": "mocha --config=config-local.yaml test/health.test.js --api-debug",
     "test:app-metadata:local": "mocha --config=config-local.yaml lib/appMetadata/test/appMetadata.test.js --api-debug"
   },
   "dependencies": {
