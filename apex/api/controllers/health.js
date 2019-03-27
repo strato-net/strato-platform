@@ -63,25 +63,26 @@ module.exports = {
             attributes: [
                 'latestHealthStatus',
                 'latestCheckTimestamp',
-                'lastFailureTimestamp'
+                'lastFailureTimestamp',
+                'isBlocksValidInc'
             ]}).catch(err => next(err));
 
         const currentTime = Date.now();
 
         if (healthInfo && stallInfo){
             healthStatus = healthInfo.dataValues.latestHealthStatus && stallInfo.dataValues.latestHealthStatus;
-            uptime = currentTime - Math.max(healthInfo.dataValues.lastFailureTimestamp, stallInfo.dataValues.lastFailureTimestamp);
-            isInc = stallInfo.dataValues.isBlocksValidInc;
+            uptime = (healthStatus) ? currentTime - Math.max(healthInfo.dataValues.lastFailureTimestamp, stallInfo.dataValues.lastFailureTimestamp) : 0;
+            isInc = stallInfo.dataValues.isBlocksValidInc	;
         } else {
-            let err = new Error("No health check info");
-            err.status = 404;
+            let err = new Error("Not Doing Health Check");
+            err.status = 500;
             return next(err);
         }
 
         res.status(200).json(
             {
                 healthInfo: {
-                    uptime: uptime,
+                    uptime: uptime/1000,
                     isHealthy: healthStatus,
                     isValidBlocksInc: isInc || false,
                 }

@@ -30,10 +30,10 @@ async function getHealthStatus() {
 
     if (healthInfo && stallInfo){
         healthStatus = healthInfo.dataValues.latestHealthStatus && stallInfo.dataValues.latestHealthStatus;
-        uptimeDur = currentTime - Math.max(healthInfo.dataValues.lastFailureTimestamp, stallInfo.dataValues.lastFailureTimestamp);
+        uptimeDur = (healthStatus) ? currentTime - Math.max(healthInfo.dataValues.lastFailureTimestamp, stallInfo.dataValues.lastFailureTimestamp) : 0;
     }
     emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
-    emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, uptimeDur);
+    emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, uptimeDur/1000);
 }
 
 getHealthStatus()
@@ -44,7 +44,7 @@ function initialHydrateHealthStatus(socket) {
 }
 
 function initialHydrateUptime(socket) {
-    socket.emit(`PRELOAD_${GET_NODE_UPTIME}`, uptimeDur);
+    socket.emit(`PRELOAD_${GET_NODE_UPTIME}`, uptimeDur/1000);
 }
 
 module.exports = {
