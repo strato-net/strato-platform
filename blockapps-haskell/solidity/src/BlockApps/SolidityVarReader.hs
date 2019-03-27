@@ -22,6 +22,7 @@ module BlockApps.SolidityVarReader (
 
 import           Control.Exception
 import           Control.Monad.Except
+import           Data.Bifunctor                   (bimap)
 import qualified Data.Bimap                       as Bimap
 import           Data.Bits
 import qualified Data.ByteArray                   as ByteArray
@@ -58,25 +59,29 @@ data SolidityDecodingException = EnumOutOfBounds Text Int
 instance Exception SolidityDecodingException
 
 valueToSolidityValue::Value->SolidityValue
-valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
-valueToSolidityValue (SimpleValue (ValueInt _ _ v)) = SolidityValueAsString $ Text.pack $ show v
-valueToSolidityValue (SimpleValue (ValueString s)) = SolidityValueAsString s
-valueToSolidityValue (SimpleValue (ValueAddress (Address addr))) =
-  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSolidityValue (ValueContract (Address addr)) =
-  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSolidityValue (ValueArrayFixed _ values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (ValueArrayDynamic values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (SimpleValue (ValueBytes _ bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
-valueToSolidityValue (ValueEnum _ _ index)              = SolidityValueAsString $ Text.pack $ show index -- SolidityValueAsString $ name `Text.append` "." `Text.append` value
-valueToSolidityValue (ValueStruct namedItems) =
-  SolidityObject $ map (fmap valueToSolidityValue) namedItems
-valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
-  SolidityValueAsString $ Text.pack $ "function ("
-                          ++ intercalate "," (map (formatType . snd) paramTypes)
-                          ++ ") returns ("
-                          ++ intercalate "," (map (formatType . snd) returnTypes)
-                          ++ ")"
+valueToSolidityValue = \case
+  SimpleValue (ValueBool x) -> SolidityBool x
+  SimpleValue (ValueInt _ _ v) -> SolidityValueAsString $ Text.pack $ show v
+  SimpleValue (ValueString s) -> SolidityValueAsString s
+  SimpleValue (ValueAddress (Address addr)) ->
+   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  ValueContract (Address addr) ->
+   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  ValueArrayFixed _ values -> SolidityArray $ map valueToSolidityValue values
+  ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue values
+  SimpleValue (ValueBytes _ bytes) ->
+   SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
+  ValueEnum _ _ index              -> SolidityValueAsString $ Text.pack $ show index
+  ValueStruct namedItems -> SolidityObject $ map (fmap valueToSolidityValue) namedItems
+  ValueMapping m -> SolidityObject . map (bimap simpleValueToText valueToSolidityValue) . Map.toList $ m
+  ValueFunction _ paramTypes returnTypes ->
+    SolidityValueAsString $ Text.pack $ "function ("
+                              ++ intercalate "," (map (formatType . snd) paramTypes)
+                              ++ ") returns ("
+                              ++ intercalate "," (map (formatType . snd) returnTypes)
+                              ++ ")"
+  ValueArraySentinel{} -> error "TODO(tim): ValueArraySentinel"
+
 
 
 word256ToByteString::Word256->ByteString
@@ -538,6 +543,8 @@ encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} ty = \case
   ValueEnum _ _ index -> encodeInt offset byte index
 
   ValueStruct _ -> error "Structs not supported yet"
+  ValueMapping{} -> error "Mappings unsupported in EVM values"
+  ValueArraySentinel{} -> error "ArraySentinel unsupported in EVM values"
 
 
 
