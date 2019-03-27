@@ -200,17 +200,5 @@ pipeline {
         }
       }
     }
-
-    fixed {
-      script {
-        if (env.PLATFORM_BRANCH_NAME == 'develop') {
-          slackSend(
-              channel: '#engineering',
-              color: 'good',
-              message: "Develop branch build *is fixed after it was failing*: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
-          )
-        }
-      }
-    }
   }
 }
