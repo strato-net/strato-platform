@@ -31,6 +31,7 @@ import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import qualified Text.Colors                  as CL
 import           Text.Format
 import           Text.ShortDescription
+import           Text.Tools                   (shorten)
 
 derivePersistField "Transaction"
 
@@ -190,11 +191,11 @@ instance RLPSerializable Transaction where
 
 
 instance ShortDescription Transaction where
-  shortDescription t | isMessageTX t =
+  shortDescription t | isMessageTX t = shorten 90 $ 
     case (M.lookup "funcName" =<< transactionMetadata t, M.lookup "args" =<< transactionMetadata t) of
       (Just n, Just a) -> "calling " ++ format (transactionTo t) ++ "/" ++ T.unpack n ++ T.unpack a
       _ -> "MessageTX to " ++ format (transactionTo t)
-  shortDescription t =
+  shortDescription t = shorten 40 $ 
     case (M.lookup "name" =<< transactionMetadata t, M.lookup "args" =<< transactionMetadata t) of
       (Just n, Just "") -> "Create Contract " ++ T.unpack n
       (Just n, Just a) -> "Create Contract " ++ T.unpack n ++ T.unpack a

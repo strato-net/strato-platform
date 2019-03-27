@@ -79,7 +79,6 @@ import           Blockchain.VMOptions
 
 import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
-import           Blockchain.Output                       (rightPad)
 import           Blockchain.SHA                          (formatSHAWithoutColor)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
@@ -589,7 +588,7 @@ printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash
   multilineLog "printTx/err" $ boringBox
     [ "Adding transaction signed by: " ++ format tAddr
     , "Tx hash:  " ++ format theHash
-    , rightPad 74 ' ' $ "Tx nonce: " ++ show (transactionNonce baseTx)
+    , "Tx nonce: " ++ show (transactionNonce baseTx)
     , CL.red "Transaction failure: " ++ CL.red (format errMsg)
     , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
     ]
@@ -603,7 +602,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Ri
     multilineLog "printTx/ok" $ boringBox
       [ "Adding transaction signed by: " ++ format tAddr
       , "Tx hash:  " ++ format theHash
-      , rightPad 74 ' ' $ "Tx nonce: " ++ show (transactionNonce t)
+      , "Tx nonce: " ++ show (transactionNonce t)
       , shortDescription t ++ " " ++ extra
       , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
       ]

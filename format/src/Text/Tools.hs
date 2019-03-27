@@ -45,3 +45,8 @@ tab (c:rest)    = c:tab rest
 setTitle :: String->IO()
 setTitle value = do
   putStr $ "\ESC]0;" ++ value ++ "\007"
+
+
+shorten :: Int -> String -> String
+shorten maxLen s | length s <= maxLen = s
+shorten maxLen s = take maxLen s ++ "..."
