@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
 module Blockchain.Strato.Model.SHA where
@@ -19,6 +20,7 @@ import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
 import qualified    Data.ByteString.Char8                as S8
 import qualified    Data.ByteString.Lazy                 as BL
+import              Data.Hashable                        (Hashable)
 import qualified    Data.Text                            as T
 import              GHC.Generics
 import              Numeric                              (readHex, showHex)
@@ -33,6 +35,7 @@ import qualified    Text.Colors                          as CL
 import              Text.Format
 
 newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
+                          deriving anyclass (Hashable)
 
 instance NFData SHA
 

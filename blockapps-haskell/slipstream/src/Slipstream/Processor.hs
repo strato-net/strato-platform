@@ -249,6 +249,26 @@ makeFunctionInserts xabi ABIID{..} state Action{..} =
           }
       }
 
+getCachedSolidVMDetails :: IORef Globals -> Action -> Bloc (Maybe (Text, Text))
+getCachedSolidVMDetails g row = liftM2 (<|>)
+  (getSolidVMDetails g $ actionCodeHash row)
+  (runMaybeT $ do
+    let md = actionMetadata row
+    let lookupT k m = MaybeT . return $ Map.lookup k m
+    src <- lookupT "src" md
+    name <- lookupT "name" md
+    detailsMap <- lift $ sourceToContractDetails True src
+    (_, details) <- lookupT name detailsMap
+    let abi = xabiToText $ contractdetailsXabi details
+    setSolidVMDetails g (actionCodeHash row) name abi
+    return (name, abi)
+  )
+
+xabiToText :: Xabi -> Text
+xabiToText = T.replace "\'" "\'\'"
+           . decodeUtf8 . BL.toStrict
+           . JSON.encode
+
 detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
   (runMaybeT $ do
@@ -376,13 +396,19 @@ processTheMessages env conn g messages = do
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs
         BS.ActionSolidVMDiff{} -> do
-          let abiid = ABIID "<placeholder_abi>" "<placeholder_name>" "<placeholder_chain>"
-              cont = error "placeholder/unused contract"
-              details = error "placeholder/unused details"
-          oldState <- readPreviousSolidVMState g addr chainId
-          indexContract <- rowToInsert g abiid row cont oldState
-          (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-          pure . Right $ BatchedInserts indexContract hs fhs
+          mName <- getCachedSolidVMDetails g row
+          case mName of
+            Nothing -> pure . Left $ "No SolidVM details for code hash "
+                            <> (T.pack . show $ actionCodeHash row)
+                            <> " and no 'src' field found in metadata"
+            Just (name, abi) -> do
+              let abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
+                  cont = error "internal error: contract should be unused for solidvm"
+                  details = error "internal error: details should be unused for solidvm"
+              oldState <- readPreviousSolidVMState g addr chainId
+              indexContract <- rowToInsert g abiid row cont oldState
+              (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
+              pure . Right $ BatchedInserts indexContract hs fhs
 
   forM_ (lefts inserts) $ errorM "processTheMessages" . T.unpack
 

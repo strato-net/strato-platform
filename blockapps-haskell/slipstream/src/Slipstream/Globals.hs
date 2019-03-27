@@ -26,15 +26,15 @@ import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
 newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty (LRU.newLRU (Just 1024))
+newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
   recordGlobals g
   writeIORef gref g
 
-addSolidVMDetails :: MonadIO m => IORef Globals -> SHA -> Text -> Text -> m ()
-addSolidVMDetails gref !codeHash !name !abi = do
+setSolidVMDetails :: MonadIO m => IORef Globals -> SHA -> Text -> Text -> m ()
+setSolidVMDetails gref !codeHash !name !abi = do
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{solidVMDetails=HM.insert codeHash (name, abi) solidVMDetails}
 
