@@ -72,7 +72,7 @@ module.exports = {
         if (healthInfo && stallInfo){
             healthStatus = healthInfo.dataValues.latestHealthStatus && stallInfo.dataValues.latestHealthStatus;
             uptime = (healthStatus) ? currentTime - Math.max(healthInfo.dataValues.lastFailureTimestamp, stallInfo.dataValues.lastFailureTimestamp) : 0;
-            isInc = stallInfo.dataValues.isBlocksValidInc	;
+            isInc = stallInfo.dataValues.isBlocksValidInc;
         } else {
             let err = new Error("Not Doing Health Check");
             err.status = 500;
