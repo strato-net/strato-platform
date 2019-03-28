@@ -9,6 +9,7 @@ const stallCheckJs = require('../daemons/stall-check')
 const sampleResponse = require('./testdata/promethusResponse')
 const config = require('../config/app.config');
 const ba = require('blockapps-rest')
+const env = process.env.NODE_ENV || 'development';
 
 const { assert } = ba.common
 
@@ -139,7 +140,7 @@ describe('Tests - Node-level Health Check', function () {
             order: [ [ 'createdAt', 'DESC' ]],
         });
         assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
-        assert.equal(currentStat.dataValues.isBlocksValidInc, true, 'isInc')
+        assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
         const currentTime = Date.now();
         assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < 1000, true, 'Current Timestamp' )
 
@@ -154,7 +155,6 @@ describe('Tests - Node-level Health Check', function () {
     })
 
     it('API endpoints', async function () {
-
         const response = await getNodeDataApex()
         console.log(response)
 
@@ -162,9 +162,10 @@ describe('Tests - Node-level Health Check', function () {
 })
 
 function getNodeDataApex() {
+    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost/prometheus';
     const options = {
         method: 'GET',
-        url: `http://localhost/apex-api/health`,
+        url: `http://${ipaddr}/prometheus/apex-api/health`,
         followRedirects: false,
         timeout: 1000,
         json: true
