@@ -230,20 +230,6 @@ constructFromNothing' (MapIndex n:sp) =
 constructFromNothing' (ArrayIndex n:sp) =
   ValueArrayDynamic . I.singleton n . constructFromNothing' sp
 
--- -- analyze :: TotalStorage -> [(StoragePath, BasicValue)]
--- -- analyze = HM.foldlWithKey' go []
--- --   where go prev field sv = map (first (StoragePath . (Field field:))) (analyze' sv) <> prev
-
--- -- analyze' :: StorableValue -> [([StoragePathPiece], BasicValue)]
--- -- analyze' (BasicValue bv) = [([], bv)]
--- -- analyze' (SMapping sm) = HM.foldlWithKey' go [] sm
--- --   where go prev k sv = map (first (MapIndex k:)) (analyze' sv) <> prev
--- -- analyze' (SStruct ss) = HM.foldlWithKey' go [] ss
--- --   where go prev k sv = map (first (Field k:)) (analyze' sv) <> prev
--- -- analyze' (SArray vs) = I.foldMapWithKey go vs
--- --   where go k sv = map (first (ArrayIndex k:)) $ analyze' sv
--- -- analyze' (SArraySentinel n) = [([Field "length"], BInteger $ fromIntegral n)]
-
 -- synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
 -- synthesize spbvs = do
 --   byFields <- mapM fieldsOnly spbvs
