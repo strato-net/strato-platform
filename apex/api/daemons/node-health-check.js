@@ -7,11 +7,10 @@ const moment = require('moment');
 
 const config = require('../config/app.config');
 const neededJobs = {
-    "slipstream_processor":"slipstream",
-    "p2p_client":"strato-p2p",
-    "bagger_build":"ethereum-vm",
-    "vm_seqevents":"ethereum-vm",
-    "pbft_commit":"strato-sequencer"
+    "slipstream_main":"slipstream",
+    "strato_p2p":"strato-p2p",
+    "vm_main":"ethereum-vm",
+    "seq_main":"strato-sequencer"
 }
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -43,7 +42,7 @@ function queryHealthStatus() {
 }
 
 function getHealthPrometheus() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost/prometheus';
+    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost';
     const options = {
         method: 'GET',
         url: `http://${ipaddr}/prometheus/api/v1/query?query=health_check`,

@@ -58,7 +58,7 @@ function queryHealthStatus() {
 }
 
 async function getVmBlocksValid() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost/prometheus';
+    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost';
     const options = {
         method: 'GET',
         url: `http://${ipaddr}/prometheus/api/v1/query?query=vm_blocks_valid`,
@@ -89,7 +89,7 @@ async function getVmBlocksValid() {
 }
 
 async function getBaggerPending() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost/prometheus';
+    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost';
     const options = {
         method: 'GET',
         url: `http://${ipaddr}/prometheus/api/v1/query?query=vm_bagger_txs`,

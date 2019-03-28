@@ -9,13 +9,12 @@ const stallCheckJs = require('../daemons/stall-check')
 const sampleResponse = require('./testdata/promethusResponse')
 const config = require('../config/app.config');
 const ba = require('blockapps-rest')
-const env = process.env.NODE_ENV || 'development';
 
 const { assert } = ba.common
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-const timeout = 60000;
+const timeout = config.healthCheck.pollFrequency;
 
 describe('Tests - Node-level Health Check', function () {
     this.timeout(timeout);
@@ -30,13 +29,14 @@ describe('Tests - Node-level Health Check', function () {
         await nodeHealthCheckJs.updateCurrentHealth(stat);
         assert.equal(stat, false, "Unhealthy");
         const entriesAdded = await models.HealthStat.findAll({
+            attributes: ['processName', 'HealthStatus'],
             limit: 4,
             order: [ [ 'createdAt', 'DESC' ]],
         });
 
         entriesAdded.forEach((elem) => {
             assert.equal(elem.dataValues.HealthStatus, false, `${elem.dataValues.processName} Status`);
-        })
+         })
         const currentStat = await models.CurrentHealth.findOne({
             where: {
                 processName: "HealthStat",
@@ -44,9 +44,9 @@ describe('Tests - Node-level Health Check', function () {
         });
         currentTime = Date.now();
         assert.equal(currentStat.dataValues.latestHealthStatus, false, `Health Stat`)
-        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < 1000, true, 'Current Timestamp' )
+        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp' )
 
-        assert.equal(Math.abs(currentStat.dataValues.lastFailureTimestamp - currentStat.dataValues.latestCheckTimestamp) < 500, true, 'Last Failure Timestamp' )
+        assert.equal(Math.abs(currentStat.dataValues.lastFailureTimestamp - currentStat.dataValues.latestCheckTimestamp) < config.healthCheck.requestTimeout, true, 'Last Failure Timestamp' )
 
     })
 
@@ -74,7 +74,7 @@ describe('Tests - Node-level Health Check', function () {
         });
         assert.equal(currentStat.dataValues.latestHealthStatus, true, `Current Health`)
         currentTime = Date.now();
-        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < 1000, true, 'Current Timestamp' )
+        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp' )
         assert.equal((currentStat.dataValues.lastFailureTimestamp < currentStat.dataValues.latestCheckTimestamp), true, 'Last Failure Timestamp' )
 
     })
@@ -96,9 +96,9 @@ describe('Tests - Node-level Health Check', function () {
         assert.equal(currentStat.dataValues.latestHealthStatus, false, 'Current Health')
         assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
         const currentTime = Date.now();
-        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < 1000, true, 'Current Timestamp' )
+        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp' )
 
-        assert.equal(Math.abs(currentStat.dataValues.lastFailureTimestamp - currentStat.dataValues.latestCheckTimestamp) < 500, true, 'Last Failure Timestamp' )
+        assert.equal(Math.abs(currentStat.dataValues.lastFailureTimestamp - currentStat.dataValues.latestCheckTimestamp) < config.healthCheck.requestTimeout, true, 'Last Failure Timestamp' )
 
     })
 
@@ -119,7 +119,7 @@ describe('Tests - Node-level Health Check', function () {
         assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
         assert.equal(currentStat.dataValues.isBlocksValidInc, true, 'isInc')
         const currentTime = Date.now();
-        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < 1000, true, 'Current Timestamp' )
+        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp' )
 
         assert.equal((currentStat.dataValues.lastFailureTimestamp < currentStat.dataValues.latestCheckTimestamp), true, 'Last Failure Timestamp' )
 
@@ -142,7 +142,7 @@ describe('Tests - Node-level Health Check', function () {
         assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
         assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
         const currentTime = Date.now();
-        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < 1000, true, 'Current Timestamp' )
+        assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp' )
 
         assert.equal((currentStat.dataValues.lastFailureTimestamp < currentStat.dataValues.latestCheckTimestamp), true, 'Last Failure Timestamp' )
 

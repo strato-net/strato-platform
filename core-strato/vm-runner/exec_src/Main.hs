@@ -10,6 +10,7 @@ import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Handler.Warp
 import           HFlags
 
+import           Blockapps.Crossmon
 import           Blockchain.Output
 import           Blockchain.VMOptions
 import           Executable.EthereumVM
@@ -17,5 +18,6 @@ import           Executable.EVMFlags
 
 main :: IO ()
 main = do
+  initializeHealthChecks "vm_main"
   void $ $initHFlags "Ethereum VM"
   race_ (runLoggingT ethereumVM printLogMsg) (run 8000 metricsApp)

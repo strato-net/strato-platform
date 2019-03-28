@@ -42,12 +42,11 @@ module.exports = {
     }
   },
 
-  healthStatus: function (req, res, next){
-      co(function* (){
+  healthStatus: async function (req, res, next){
     try {
         let healthStatus, uptime, isInc;
 
-        const healthInfo = yield models.CurrentHealth.findOne({
+        const healthInfo = await models.CurrentHealth.findOne({
             where: {
                 processName: "HealthStat"
             },
@@ -56,7 +55,7 @@ module.exports = {
                 'latestCheckTimestamp',
                 'lastFailureTimestamp'
             ]}).catch(err => next(err));
-        const stallInfo = yield models.CurrentHealth.findOne({
+        const stallInfo = await models.CurrentHealth.findOne({
             where: {
                 processName: "StallStat"
             },
@@ -90,7 +89,7 @@ module.exports = {
         )
     } catch (error) {
         return next(new Error('could not get data from database: ' + error));
-    }})
+    }
 
   }
 };
