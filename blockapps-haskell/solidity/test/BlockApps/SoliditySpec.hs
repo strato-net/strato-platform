@@ -89,7 +89,7 @@ spec = do
       putStrLn $ show eVal
       eVal `shouldBe` Right (ValueEnum "Cars" "Toyota" 1)
 
-    it "should convert a standalone enum value" $ do
+    it "should convert a enum value with the enum name prefixed" $ do
       let typeDefs = TypeDefs
                        { enumDefs = Map.fromList [( "Cars"
                                                   , B.fromList [ (0, "Honda")
