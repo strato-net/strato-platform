@@ -8,6 +8,7 @@
     , TemplateHaskell
     , FlexibleContexts
     , GeneralizedNewtypeDeriving
+    , TupleSections
 #-}
 
 module Slipstream.SolidityValue where
@@ -21,6 +22,7 @@ import qualified Data.ByteString.Char8    as BC
 import           Data.Foldable            (toList)
 import           Data.List
 import qualified Data.Map                 as M
+import           Data.Maybe               (fromMaybe, mapMaybe)
 import           Data.Scientific          (floatingOrInteger)
 import           Data.Text (Text)
 import qualified Data.Text as Text
@@ -68,26 +70,33 @@ instance FromJSON SolidityValue where
   parseJSON _ = fail "Failed to parse solidity value"
 
 valueToSolidityValue :: Value -> SolidityValue
-valueToSolidityValue = \case
-  SimpleValue (ValueBool x) -> SolidityBool x
-  SimpleValue (ValueInt _ _ v) ->  SolidityNum $ toInteger v
+valueToSolidityValue = fromMaybe (SolidityValueAsString "wut the fuck") . valueToSolidityValue'
 
-  SimpleValue (ValueString s) -> SolidityValueAsString s
+valueToSolidityValue' :: Value -> Maybe SolidityValue
+valueToSolidityValue' = \case
+  SimpleValue (ValueBool x) -> Just $ SolidityBool x
+  SimpleValue (ValueInt _ _ v) ->  Just $ SolidityNum $ toInteger v
+
+  SimpleValue (ValueString s) -> Just $ SolidityValueAsString s
   SimpleValue (ValueAddress (Address addr)) ->
-   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+   Just $ SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
   ValueContract (Address addr) ->
-   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-  ValueArrayFixed _ values -> SolidityArray $ map valueToSolidityValue values
-  ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue $ unsparse values
-  SimpleValue (ValueBytes _ bytes) -> SolidityValueAsString $ Text.pack $ BC.unpack bytes
-  ValueEnum _ _ index              -> SolidityValueAsString $ Text.pack $ show index
-  -- TODO(tim): What if struct declaration order is needed here?
-  ValueStruct namedItems -> SolidityObject . M.toList $ fmap valueToSolidityValue namedItems
-  ValueFunction _ paramTypes returnTypes ->
+   Just $ SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  SimpleValue (ValueBytes _ bytes) -> Just $ SolidityValueAsString $ Text.pack $ BC.unpack bytes
+  ValueEnum _ _ index              -> Just $ SolidityValueAsString $ Text.pack $ show index
+  ValueFunction _ paramTypes returnTypes -> Just $
    SolidityValueAsString $ Text.pack $ "function ("
                            ++ intercalate "," (map (formatType . snd) paramTypes)
                            ++ ") returns ("
                            ++ intercalate "," (map (formatType . snd) returnTypes)
                            ++ ")"
-  ValueMapping{} -> error "Value mapping"
-  ValueArraySentinel{} -> error "array sentinel"
+
+  ValueArrayFixed _ values -> Just . SolidityArray . mapMaybe valueToSolidityValue' $ values
+  ValueArrayDynamic values -> Just . SolidityArray . mapMaybe valueToSolidityValue' $ unsparse values
+  -- TODO(tim): What if struct declaration order is needed here?
+  ValueStruct namedItems -> Just . SolidityObject . M.toList $ M.mapMaybe valueToSolidityValue' namedItems
+  ValueMapping ms -> Just . SolidityObject $ mapMaybe convertBoth (M.toList ms)
+  ValueArraySentinel{} -> Nothing
+
+ where convertBoth :: (SimpleValue, Value) -> Maybe (Text, SolidityValue)
+       convertBoth (sv, v) = (simpleValueToText sv, ) <$> valueToSolidityValue' v
