@@ -81,8 +81,8 @@ function compareTimeStamp(obj) {
             } else {
                 winston.warn(`Jobs are updated? The following prometheus job is not in the check list required: `, loc);
             }
-            value = formatPromethusTimestamp(elem.value[0]);
-            ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
+
+            ret[name] = true;
         } else {
             winston.info(`Metric format is updated; need to update its handling`);
         }
@@ -93,11 +93,7 @@ function compareTimeStamp(obj) {
         winston.warn(`${checkJobs[elem]} : ${elem} not found in the prometheus response; Not started`);
     })
 
-    if (res.length == 0){
-        winston.warn(`Metrics will only be generated after the initiation of the first transaction`);
-    } else {
-        winston.info('Create entry for latest health status:', ret);
-    }
+    winston.info('Create entry for latest health status:', ret);
 
     return ret;
 }
