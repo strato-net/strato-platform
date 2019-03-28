@@ -36,17 +36,20 @@ import Blockchain.SolidVM.Model
 import SolidVM.Model.Storable
 
 decodeSolidVMValues :: [(HexStorage, HexStorage)] -> [(T.Text, SolidityValue)]
-decodeSolidVMValues = error "TODO(tim): decodeSolidVMValues"
+decodeSolidVMValues hxs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
+  pathValues <- mapM (bimapM hexStorageToPath hexStorageToBasic) hxs
+  totalStorage <- bimap show HM.toList $ synthesize pathValues
+  mapMaybeM (bimapVToS bsToText) totalStorage
 -- decodeSolidVMValues hexs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
 --   pathValues <- mapM (bimapM hexStorageToPath hexStorageToBasic) hexs
 --   totalStorage <- bimap show HM.toList $ synthesize pathValues
 --   mapMaybeM (bimapSToS bsToText) totalStorage
 
--- bimapSToS :: (t1 -> Either String t2) -> (t1, V.Value) -> Either String (Maybe (t2, SolidityValue))
--- bimapSToS f (name', value') = do
---   name <- f name'
---   mValue <- storableToSolidity value'
---   return $ fmap (name,) mValue
+bimapVToS :: (t1 -> Either String t2) -> (t1, V.Value) -> Either String (Maybe (t2, SolidityValue))
+bimapVToS f (name', value') = do
+  name <- f name'
+  mValue <- valueToSolidityValue value'
+  return $ fmap (name,) mValue
 
 
 
@@ -92,6 +95,42 @@ storableToValue = Right . Just
 --           IText t -> ValueBytes Nothing t
 --           IBool b -> ValueBool b
 
+-- Why another time?
+--  - original vToSV can't handle sentinels without a monad
+--  - SolidVM shares a bytes/string typeA and cannot hexencode all strings returned
+--  - Enums don't have numeric values in SolidVM
+valueToSolidityValue :: V.Value -> Either String (Maybe SolidityValue)
+valueToSolidityValue = \case
+  SimpleValue sv -> case sv of
+    ValueBytes _ b -> Just . SolidityValueAsString <$> (first show . decodeUtf8') b
+    ValueBool b -> Right . Just $ SolidityBool b
+    ValueInt _ _ n -> fromShowable n
+    ValueAddress a -> fromShowable a
+    ValueString s -> fromText s
+  ValueEnum _ ev _ -> fromText ev
+  ValueArraySentinel{} -> Right Nothing
+  ValueContract c -> fromShowable c
+  ValueStruct fs -> Just . SolidityObject <$> mapMaybeM (bimapVToS Right) fs
+  ValueMapping kvs -> Just . SolidityObject <$> mapMaybeM (bimapVToS tshowIdx) (M.toList kvs)
+  ValueArrayDynamic ivs -> Just . SolidityArray <$> mapMaybeM valueToSolidityValue (unsparse ivs)
+  ValueArrayFixed{} -> Left "internal error: SolidVM generate state for static arrays"
+  ValueFunction{} -> Left "internal error: SolidVM generating state for functions"
+
+
+  where fromShowable :: (Show a) => a -> Either String (Maybe SolidityValue)
+        fromShowable = Right . Just . SolidityValueAsString . T.pack . show
+
+        fromText :: T.Text -> Either String (Maybe SolidityValue)
+        fromText = Right . Just . SolidityValueAsString
+
+        tshowIdx :: SimpleValue -> Either String T.Text
+        tshowIdx = \case
+          ValueInt _ _ n -> Right . T.pack . show $ n
+          ValueAddress a -> Right . T.pack . show $ a
+          ValueString t -> Right t
+          ValueBytes _ bs -> error $ "bytes index" ++ show bs
+          ValueBool True -> Right "true"
+          ValueBool False -> Right "false"
 
 -- storableToSolidity :: StorableValue -> Either String (Maybe SolidityValue)
 -- storableToSolidity = \case
@@ -188,8 +227,6 @@ applyDelta' :: [StoragePathPiece] -> BasicValue -> V.Value -> Either ReplayFailu
 applyDelta' [] bv (SimpleValue{}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueEnum{}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueContract{}) = Right $ fromBasic bv
--- Field updates are consed to the front, with the expectation that the struct is nubbed later
--- Let's hope that order doesn't matter
 applyDelta' (Field n:sp) bv (ValueStruct ss) = case decodeUtf8' n of
   Left uex -> Left $ UnicodeError uex n
   Right n' -> case findIndex ((== n') . fst) ss of
