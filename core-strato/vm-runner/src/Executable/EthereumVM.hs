@@ -32,7 +32,6 @@ import           Blockchain.Data.TransactionResult
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
 import           Blockchain.EthConf
-import           Blockchain.Format                     (format)
 import           Blockchain.JsonRpcCommand
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
@@ -55,6 +54,8 @@ import           Blockchain.Strato.RedisBlockDB.Models
 import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
 import           Blockchain.Timing
 import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
+
+import           Text.Format                           (format)
 
 ethereumVM :: LoggingT IO ()
 ethereumVM = void . execContextM $ do

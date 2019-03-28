@@ -1,0 +1,13 @@
+name:                format
+version:             0.1.0.0
+author:              jamshid
+maintainer:          j
+build-type:          Simple
+
+library:
+  source-dirs: src
+  dependencies:
+    - base
+    - base16-bytestring
+    - bytestring
+    - nibblestring

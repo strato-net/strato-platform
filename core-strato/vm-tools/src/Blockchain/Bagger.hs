@@ -37,7 +37,6 @@ import qualified Blockchain.Data.TransactionDef     as TD
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
-import           Blockchain.Format
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
 import           Blockchain.Strato.Model.Class
@@ -45,6 +44,8 @@ import           Blockchain.Util
 import qualified Blockchain.Verification            as V
 
 import           Executable.EVMFlags                (flags_maxTxsPerBlock)
+
+import           Text.Format
 
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
     getBaggerState     :: m B.BaggerState

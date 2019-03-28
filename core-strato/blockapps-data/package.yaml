@@ -36,6 +36,7 @@ dependencies:
   - ethereum-rlp
   - fast-ecrecover
   - filepath
+  - format
   - json-stream
   - lens
   - leveldb-haskell

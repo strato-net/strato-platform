@@ -24,9 +24,6 @@ import           Blockchain.ExtWord                        (Word256)
 
 import qualified GHC.Generics                              as GHCG
 
-import qualified Blockchain.Colors                         as CL
-import           Blockchain.Format
-
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA               (SHA (..))
 import           Blockchain.Util
@@ -40,11 +37,20 @@ import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
 
+import qualified Text.Colors                               as CL
+import           Text.Format
+
 data SeqLoopEvent = TimerFire PBFT.RoundNumber
                   | VoteMade PBFT.CandidateReceived
                   | UnseqEvent IngestEvent
                   | WaitTerminated
                   deriving (Eq, Show, GHCG.Generic)
+
+instance Format SeqLoopEvent where
+  format (TimerFire rn) = "TimerFire " ++ format rn
+  format (VoteMade vote) = "VoteMade " ++ show vote
+  format (UnseqEvent ev) = "UnseqEvent " ++ format ev
+  format WaitTerminated = "WaitTerminated"
 
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
@@ -116,12 +122,13 @@ data OutputEvent = OETx Timestamp OutputTx
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
-  format (OETx ts o)       = show ts ++ " " ++ format o
-  format (OEBlock o)       = format o
-  format (OEGenesis o)     = show o
-  format (OEGetChain cids) = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
-  format (OEGetTx shas)    = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format x                 = show x
+  format (OETx ts o)        = show ts ++ " " ++ format o
+  format (OEBlock o)        = format o
+  format (OEGenesis o)      = show o
+  format (OEGetChain cids)  = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (OEGetTx shas)     = "[" ++ (intercalate "," $ map format shas) ++ "]"
+  format (OEBlockstanbul o) = format o
+  format x                  = show x
 
 data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otHash   :: SHA
@@ -344,10 +351,10 @@ instance Format IngestBlock where
              format bd ++
              (if null receipts
               then "        (no transactions)\n"
-              else tab (intercalate "\n    " (format <$> receipts))) ++
+              else tab (show $ length receipts)) ++
              (if null uncles
               then "        (no uncles)"
-              else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
+              else tab (show $ length uncles)))
 
 instance Format OutputBlock where
     format b@OutputBlock { obOrigin              = origin
@@ -361,10 +368,10 @@ instance Format OutputBlock where
              format bd ++
              (if null receipts
               then "        (no transactions)\n"
-              else tab (intercalate "\n    " (format <$> receipts))) ++
+              else tab (show $ length receipts)) ++
              (if null uncles
               then "        (no uncles)"
-              else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
+              else tab (show $ length uncles)))
 
 instance Format OutputTx where
     format OutputTx{ otOrigin = origin
@@ -372,13 +379,13 @@ instance Format OutputTx where
                    , otBaseTx = base
                    } =
            CL.red("OutputTx from address " ++ format signer)
-                ++ tab (" via " ++ format origin ++ "\n" ++ format base)
+                ++ tab (" via " ++ format origin ++ "\n" ++ format (txHash base))
 
 instance Format IngestTx where
     format IngestTx{ itOrigin      = origin
                    , itTransaction = base
                    } =
-           CL.red("IngestTx via " ++ format origin ++ "\n" ++ tab (format base))
+           CL.red("IngestTx via " ++ format origin ++ "\n" ++ tab (format $ txHash base))
 
 -- todo: can we get away with this? seems like there'd be overhead recomputing
 -- todo: otSigner

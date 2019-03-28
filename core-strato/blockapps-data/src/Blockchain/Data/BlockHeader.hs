@@ -12,7 +12,6 @@ import           Data.Time.Clock.POSIX
 import           Data.Word
 import           Numeric
 
-import qualified Blockchain.Colors                  as CL
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
@@ -20,11 +19,13 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
 
 import           Blockchain.Strato.Model.Class
+
+import qualified Text.Colors                        as CL
+import           Text.Format
 
 data BlockHeader =
   BlockHeader {

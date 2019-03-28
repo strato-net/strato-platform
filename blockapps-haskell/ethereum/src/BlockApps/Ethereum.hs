@@ -1,7 +1,9 @@
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLists       #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -30,8 +32,12 @@ module BlockApps.Ethereum
   , stringChainId
     -- * Keccak 256 Hashes
   , Keccak256 (..)
+  , SHA(..)
+  , shaToHex
   , keccak256
   , keccak256lazy
+  , keccak256SHA
+  , shaKeccak256
   , keccak256ByteString
   , byteStringKeccak256
   , keccak256String
@@ -107,6 +113,7 @@ import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 import qualified Data.LargeWord as LW
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.SHA (shaToHex, SHA(..))
 
 
 lastWord64 :: Word256 -> Word64
@@ -227,7 +234,8 @@ deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
 --------------------------------------------------------------------------------
 
 newtype ChainId = ChainId { unChainId :: Word256 }
-  deriving (Eq, Ord, Generic, Bounded, NFData, Binary.Binary)
+  deriving (Eq, Ord, Generic, Bounded)
+  deriving anyclass (NFData, Binary.Binary)
 
 instance Show ChainId where show = chainIdString
 
@@ -313,7 +321,17 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
 --------------------------------------------------------------------------------
 
 newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
-  deriving (Eq,Ord,Show,Generic, NFData)
+  deriving (Eq,Ord,Show,Generic)
+  deriving anyclass (NFData)
+
+keccak256SHA :: Keccak256 -> SHA
+keccak256SHA = SHA . bytesToWord256 . ByteArray.convert . digestKeccak256
+
+shaKeccak256 :: SHA -> Keccak256
+shaKeccak256 (SHA hsh) = Keccak256
+                       . fromMaybe (error $ "internal error: shaKeccak256" ++ show hsh)
+                       . digestFromByteString
+                       $ word256ToBytes hsh
 
 keccak256ByteString :: Keccak256 -> ByteString
 keccak256ByteString = ByteArray.convert . digestKeccak256
@@ -603,7 +621,10 @@ data BlockHeader = BlockHeader
   , blockHeaderChainId          :: Maybe Word256
   } deriving (Eq,Show,Generic)
 
-newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic, NFData)
+newtype Nonce = Nonce Word256
+               deriving (Eq, Show, Generic)
+               deriving newtype (Num, Ord)
+               deriving anyclass (NFData)
 
 instance ToJSON Nonce where
   toJSON (Nonce n) = toJSON $ toInteger n
@@ -631,7 +652,9 @@ instance RLPEncodable Nonce where
 incrNonce :: Nonce -> Nonce
 incrNonce (Nonce n) = Nonce (n+1)
 
-newtype Wei = Wei Word256 deriving (Eq,Show,Generic, NFData)
+newtype Wei = Wei Word256
+  deriving (Eq,Show,Generic)
+  deriving anyclass (NFData)
 
 -- --TODO- this might be unsafe, since it could lead to an overflow.  A Word256 * 10^18 certainly can be much higer than a Word256
 -- eth::Word256->Wei
@@ -660,7 +683,9 @@ instance RLPEncodable Wei where
   rlpEncode (Wei n) = rlpEncode $ toInteger n
   rlpDecode obj = Wei . fromInteger <$> rlpDecode obj
 
-newtype Gas = Gas Integer deriving (Eq,Show,Generic,NFData)
+newtype Gas = Gas Integer
+  deriving (Eq,Show,Generic)
+  deriving anyclass (NFData)
 
 instance Arbitrary Gas where arbitrary = Gas <$> arbitrary
 

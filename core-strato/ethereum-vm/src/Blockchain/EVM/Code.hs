@@ -6,11 +6,12 @@ import qualified Data.IntSet                  as I
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen
 
-import qualified Blockchain.Colors            as CL
 import           Blockchain.Data.Code
 import           Blockchain.EVM.Opcodes
-import           Blockchain.Format
 import           Blockchain.Util
+
+import qualified Text.Colors            as CL
+import           Text.Format
 
 
 getOperationAt::Code->CodePointer->(Operation, CodePointer)

@@ -1,7 +1,7 @@
 module RLP where
 
 import           Blockchain.Data.RLP
-import           Blockchain.Format
+import           Text.Format
 import           Util
 
 doit :: String -> IO ()

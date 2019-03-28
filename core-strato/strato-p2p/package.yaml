@@ -38,6 +38,7 @@ dependencies:
   - ethereum-encryption
   - ethereum-rlp
   - exceptions
+  - format
   - ghc
   - blockapps-haskoin
   - hflags

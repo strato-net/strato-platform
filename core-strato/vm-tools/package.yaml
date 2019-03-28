@@ -27,6 +27,7 @@ dependencies:
   - ethereum-rlp
   - exceptions
   - extra
+  - format
   - hedis
   - hflags
   - lens

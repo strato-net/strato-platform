@@ -31,7 +31,6 @@ import           Text.Printf
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -54,6 +53,8 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
+
+import           Text.Format
 
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
@@ -82,11 +83,11 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   vmEvs <- drainVM
   unless (null vmEvs) $ do
     writeSeqVmEvents vmEvs
-    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
+    $logDebugS "sequencer" . T.pack $ "Wrote " ++ format vmEvs ++ " SeqEvents to VM"
   p2pEvs <- drainP2P
   unless (null p2pEvs) $ do
     writeSeqP2pEvents p2pEvs
-    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
+    $logDebugS "sequencer" . T.pack $ "Wrote " ++ format p2pEvs ++ " SeqEvents to P2P"
   return src'
 
 clearAll :: SequencerM ()
@@ -112,7 +113,7 @@ readEventsInBufferedWindow src = do
   (src'', events) <- src' $$++ takeWhileC (/= WaitTerminated)
                           .| takeC maxEvents
                           .| sinkList
-  $logDebugS "sequencer/events" . T.pack . show $ events
+  $logDebugS "sequencer/events" . T.pack $ format events
   logF . printf "read %d events from fused channels" $ length events
   return (src'', events)
 
@@ -177,7 +178,7 @@ blockstanbulSend' msg = do
         [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
+  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
   let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul
       rewriteBlock b = do
         let msb = getSequencedBlock b
@@ -197,9 +198,9 @@ blockstanbulSend' msg = do
     now <- liftIO getCurrentTime
     when (now < tNext) $
       liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-  $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
+  $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
   mapM_ markForP2P p2pevs
-  $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
+  $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   return vmevs
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()

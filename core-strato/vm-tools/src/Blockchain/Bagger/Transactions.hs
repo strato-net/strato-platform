@@ -13,9 +13,10 @@ import           Blockchain.Data.ExecResults
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
-import           Blockchain.Format
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
+
+import           Text.Format
 
 data TxRunResult = TxRunResult { trrTransaction :: OutputTx
                                , trrResult      :: Either TransactionFailureCause ExecResults

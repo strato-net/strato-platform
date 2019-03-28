@@ -40,6 +40,7 @@ import qualified Blockchain.Sequencer.Kafka as SK
 import           Blockchain.Sequencer.Metrics
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Protocol     as KP
+import           Text.Format
 
 data GregorConfig = GregorConfig
                   { kafkaAddress :: Maybe K.KafkaAddress
@@ -141,7 +142,7 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
   ch <- use gregorUnseq
   atomically . forM_ inEvents $ writeTQueue ch . snd
   hd <- atomically $ tryPeekTQueue ch
-  $logDebugS "gregor/unseqchHead" . T.pack . show $ hd
+  $logDebugS "gregor/unseqchHead" $ maybe "empty" (T.pack . format) hd
   P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length inEvents))
   unless (null inEvents) $ do
     let ofs = maximum . map fst $ inEvents
@@ -153,7 +154,7 @@ seqWriters = forever . timeAction gregorSeqTiming $ do
   p2pq <- use gregorSeqP2P
   events <- atomically $
     fmap Left (blockFlushTQueue vmq) `orElse` fmap Right (blockFlushTQueue p2pq)
-  $logDebugS "gregor/seqWriter" . T.pack . show $ events
+  $logDebugS "gregor/seqWriter" . T.pack . show $ length events
   case events of
     Left vmevs -> do
       P.withLabel gregorLoop "seq_vm_events" P.incCounter
