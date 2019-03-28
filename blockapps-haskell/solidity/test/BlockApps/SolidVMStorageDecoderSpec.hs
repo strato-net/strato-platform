@@ -238,79 +238,74 @@ spec = do
   --             , SolidityValueAsString "5553443200000000000000000000000000000000000000000000000000000000"
   --             , SolidityValueAsString "4f4c440000000000000000000000000000000000000000000000000000000000"])]
 
-  -- describe "Slipstream decoding" $ do
-  --   let int :: Integer -> V.Value
-  --       int = SimpleValue . ValueInt True Nothing
+  describe "Slipstream decoding" $ do
 
-  --       bool :: Bool -> V.Value
-  --       bool = SimpleValue . ValueBool
+    it "can decode an address (with empty cache)" $ do
+      let input = toInputMap [(singleton "owner",  BAddress 0xdeadbeef)]
+          got = decodeCacheValues input []
+      got `shouldBe`
+        [("owner", SimpleValue $ ValueAddress 0xdeadbeef)]
 
-  --       address :: Address -> V.Value
-  --       address = SimpleValue . ValueAddress
+    it "can decode everything (with empty cache)" $ do
+      pendingWith "TODO(tim): Fix struct reordering"
+      let input = toInputMap
+                [ (singleton "addr", BAddress 0xdeadbeef)
+                , (singleton "boolean", BBool True)
+                , (singleton "contract", BContract "X" 0x999)
+                , (singleton "number", BInteger 77714314)
+                , (singleton "str", BString "Hello, World!")
+                , (singleton "enum_val", BEnumVal "E" "C")
+                , (fromList [Field "array_of_nums", ArrayIndex 1], BInteger 20)
+                , (fromList [Field "array_of_nums", ArrayIndex 2], BInteger 40)
+                , (fromList [Field "array_of_nums", ArrayIndex 3], BInteger 77)
+                , (fromList [Field "array_of_nums", Field "length"], BInteger 4)
+                , (fromList [Field "strukt", Field "first_field"], BInteger 887)
+                , (fromList [Field "strukt", Field "second_field"], BString "CLOROX DISINFECTING WIPES")
+                , (fromList [Field "set", MapIndex (INum 22)], BBool True)
+                , (fromList [Field "set", MapIndex (INum 23)], BBool True)
+                , (fromList [Field "set", MapIndex (INum 46)], BBool True)
+                ]
+          got = decodeCacheValues input []
+      sort got `shouldBe` sort
+          [ ("addr", address 0xdeadbeef)
+          , ("array_of_nums", ValueArrayDynamic . I.fromList $
+               zip [1..] [ int 20, int 40, int 77, ValueArraySentinel 4])
+          , ("boolean", bool True)
+          , ("contract", ValueContract 0x999)
+          , ("enum_val", ValueEnum "E" "C" 0x77777)
+          , ("number", int 77714314)
+          , ("strukt", ValueStruct
+              [ ("first_field", int 887)
+              , ("second_field", SimpleValue $ ValueBytes Nothing "CLOROX DISINFECTING WIPES")
+              ])
+          , ("set", ValueMapping $ M.fromList
+              [ (ValueInt True Nothing 22, bool True)
+              , (ValueInt True Nothing 23, bool True)
+              , (ValueInt True Nothing 46, bool True)
+              ])
+          , ("str", SimpleValue $ ValueBytes Nothing "Hello, World!")
+          ]
 
-  --   it "can decode an address (with empty cache)" $ do
-  --     let input = toInputMap [(singleton "owner",  BAddress 0xdeadbeef)]
-  --         got = decodeCacheValues input []
-  --     got `shouldBe`
-  --       [("owner", SimpleValue $ ValueAddress 0xdeadbeef)]
-
-  --   it "can decode everything (with empty cache)" $ do
-  --     let input = toInputMap
-  --               [ (singleton "addr", BAddress 0xdeadbeef)
-  --               , (singleton "boolean", BBool True)
-  --               , (singleton "contract", BContract "X" 0x999)
-  --               , (singleton "number", BInteger 77714314)
-  --               , (singleton "str", BString "Hello, World!")
-  --               , (singleton "enum_val", BEnumVal "E" "C")
-  --               , (fromList [Field "array_of_nums", ArrayIndex 1], BInteger 20)
-  --               , (fromList [Field "array_of_nums", ArrayIndex 2], BInteger 40)
-  --               , (fromList [Field "array_of_nums", ArrayIndex 3], BInteger 77)
-  --               , (fromList [Field "strukt", Field "first_field"], BInteger 887)
-  --               , (fromList [Field "strukt", Field "second_field"], BString "CLOROX DISINFECTING WIPES")
-  --               , (fromList [Field "set", MapIndex (INum 22)], BBool True)
-  --               , (fromList [Field "set", MapIndex (INum 23)], BBool True)
-  --               , (fromList [Field "set", MapIndex (INum 46)], BBool True)
-  --               ]
-  --         got = decodeCacheValues input []
-  --     got `shouldBe` sort
-  --         [ ("addr", address 0xdeadbeef)
-  --         , ("array_of_nums", ValueArrayDynamic [ int 0, int 20, int 40, int 77])
-  --         , ("boolean", bool True)
-  --         , ("contract", ValueContract 0x999)
-  --         , ("enum_val", ValueEnum "E" "C" 0x77777)
-  --         , ("number", int 77714314)
-  --         , ("strukt", ValueStruct
-  --             [ ("first_field", int 887)
-  --             , ("second_field", SimpleValue $ ValueBytes Nothing "CLOROX DISINFECTING WIPES")
-  --             ])
-  --         , ("set", ValueMapping $ M.fromList
-  --             [ (ValueInt True Nothing 22, bool True)
-  --             , (ValueInt True Nothing 23, bool True)
-  --             , (ValueInt True Nothing 46, bool True)
-  --             ])
-  --         , ("str", SimpleValue $ ValueBytes Nothing "Hello, World!")
-  --         ]
-
-  --   it "can deal with array lengths (with empty cache)" $ do
-  --     let Success input' = rawInput
-  --         input = M.fromList $ map (\Storage{storageKV=SolidVMEntry (HexStorage k) (HexStorage v)} -> (k, v)) input'
-  --         bytes = SimpleValue . ValueBytes Nothing
-  --         got = decodeCacheValues input []
-  --     got `shouldBe` [("fields", ValueArrayDynamic
-  --             [ bytes "3032415547323000000000000000000000000000000000000000000000000000"
-  --             , bytes "3731313532383138373337333436393330300000000000000000000000000000"
-  --             , bytes "3339393034313432000000000000000000000000000000000000000000000000"
-  --             , bytes "3330534550313900000000000000000000000000000000000000000000000000"
-  --             , bytes "5900000000000000000000000000000000000000000000000000000000000000"
-  --             , bytes "3530383038313731303039313400000000000000000000000000000000000000"
-  --             , bytes "544b545400000000000000000000000000000000000000000000000000000000"
-  --             , bytes "3538383020202020202020202020203000000000000000000000000000000000"
-  --             , bytes "3433320000000000000000000000000000000000000000000000000000000000"
-  --             , bytes "4745483156325a384d0000000000000000000000000000000000000000000000"
-  --             , bytes "2f00000000000000000000000000000000000000000000000000000000000000"
-  --             , bytes "3431363739343236303536000000000000000000000000000000000000000000"
-  --             , bytes "5553443200000000000000000000000000000000000000000000000000000000"
-  --             , bytes "4f4c440000000000000000000000000000000000000000000000000000000000"])]
+    it "can deal with array lengths (with empty cache)" $ do
+      let Success input' = rawInput
+          input = M.fromList $ map (\Storage{storageKV=SolidVMEntry (HexStorage k) (HexStorage v)} -> (k, v)) input'
+          got = decodeCacheValues input []
+      got `shouldBe` [("fields", ValueArrayDynamic . I.fromList $ zip [0..]
+              [ bytes "3032415547323000000000000000000000000000000000000000000000000000"
+              , bytes "3731313532383138373337333436393330300000000000000000000000000000"
+              , bytes "3339393034313432000000000000000000000000000000000000000000000000"
+              , bytes "3330534550313900000000000000000000000000000000000000000000000000"
+              , bytes "5900000000000000000000000000000000000000000000000000000000000000"
+              , bytes "3530383038313731303039313400000000000000000000000000000000000000"
+              , bytes "544b545400000000000000000000000000000000000000000000000000000000"
+              , bytes "3538383020202020202020202020203000000000000000000000000000000000"
+              , bytes "3433320000000000000000000000000000000000000000000000000000000000"
+              , bytes "4745483156325a384d0000000000000000000000000000000000000000000000"
+              , bytes "2f00000000000000000000000000000000000000000000000000000000000000"
+              , bytes "3431363739343236303536000000000000000000000000000000000000000000"
+              , bytes "5553443200000000000000000000000000000000000000000000000000000000"
+              , bytes "4f4c440000000000000000000000000000000000000000000000000000000000"
+              , ValueArraySentinel 14])]
 
   --   describe "Simple field updates" $ do
   --     it "can update ints" $ do

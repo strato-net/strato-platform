@@ -35,52 +35,52 @@ import BlockApps.Solidity.Value as V
 import Blockchain.SolidVM.Model
 import SolidVM.Model.Storable
 
--- bimapSToS :: (t1 -> Either String t2) -> (t1, StorableValue) -> Either String (Maybe (t2, SolidityValue))
--- bimapSToS f (name', value') = do
---   name <- f name'
---   mValue <- storableToSolidity value'
---   return $ fmap (name,) mValue
-
--- bimapSToV :: (t1 -> Either String t2) -> (t1, StorableValue) -> Either String (Maybe (t2, Value))
--- bimapSToV f (name', value') = do
---   name <- f name'
---   mValue <- storableToValue value'
---   return $ fmap (name,) mValue
-
--- bsToText :: B.ByteString -> Either String T.Text
--- bsToText = first show . decodeUtf8'
-
 decodeSolidVMValues :: [(HexStorage, HexStorage)] -> [(T.Text, SolidityValue)]
-decodeSolidVMValues = error "TODO(decodeSolidVMValues)"
+decodeSolidVMValues = error "TODO(tim): decodeSolidVMValues"
 -- decodeSolidVMValues hexs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
 --   pathValues <- mapM (bimapM hexStorageToPath hexStorageToBasic) hexs
 --   totalStorage <- bimap show HM.toList $ synthesize pathValues
 --   mapMaybeM (bimapSToS bsToText) totalStorage
 
+-- bimapSToS :: (t1 -> Either String t2) -> (t1, V.Value) -> Either String (Maybe (t2, SolidityValue))
+-- bimapSToS f (name', value') = do
+--   name <- f name'
+--   mValue <- storableToSolidity value'
+--   return $ fmap (name,) mValue
+
+
+
 decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
--- decodeCacheValues :: M.Map B.ByteString B.ByteString -> TotalStorage -> (TotalStorage, [(T.Text, Value)])
-decodeCacheValues = error "TODO(decodeCacheValues"
--- decodeCacheValues hxs [] = either (error . printf "SVM.decodeCacheValues: %s" . show) id $ do
---   pathValues <- mapM (bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)) $ M.toList hxs
---   totalStorage <- bimap show HM.toList $ synthesize pathValues
---   mapMaybeM (bimapSToV bsToText) totalStorage
+decodeCacheValues hxs [] = either (error . printf "SVM.decodeCacheValues: %s" . show) id $ do
+  pathValues <- mapM (bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)) $ M.toList hxs
+  totalStorage <- bimap show HM.toList $ synthesize pathValues
+  mapMaybeM (bimapSToV bsToText) totalStorage
+decodeCacheValues _ _ = error "todo: updates"
 
--- decodeCacheValues _ _ = error "todo: updates"
+bsToText :: B.ByteString -> Either String T.Text
+bsToText = first show . decodeUtf8'
 
--- storableToValue :: V.Value -> Either String (Maybe Value)
--- storableToValue = \case
---   BasicValue bv -> case bv of
---     BDefault -> sv $ ValueAddress 0x0 -- Is this the best way?
---     BInteger n -> sv $ ValueInt True Nothing n
---     BString t -> sv $ ValueBytes Nothing t
---     BBool b -> sv $ ValueBool b
---     BAddress a -> sv $ ValueAddress a
---     BContract _ c -> Right . Just $ ValueContract c
---     BEnumVal k n -> Right . Just $ ValueEnum k n 0x77777 -- TODO: SolidVM enums should be numbered
---   SArray ivs -> Just . ValueArrayDynamic <$> mapMaybeM storableToValue (unsparse $ I.toList ivs)
---   SArraySentinel{} -> Right Nothing
---   SMapping kvs -> Just . ValueMapping . M.fromList <$> mapMaybeM (bimapSToV idxToSimple) (HM.toList kvs)
---   SStruct fs -> Just . ValueStruct <$> mapMaybeM (bimapSToV bsToText) (HM.toList fs)
+bimapSToV :: (t1 -> Either String t2) -> (t1, V.Value) -> Either String (Maybe (t2, V.Value))
+bimapSToV f (name', value') = do
+  name <- f name'
+  mValue <- storableToValue value'
+  return $ fmap (name,) mValue
+
+
+storableToValue :: V.Value -> Either String (Maybe V.Value)
+storableToValue = Right . Just
+  -- BasicValue bv -> case bv of
+  --   BDefault -> sv $ ValueAddress 0x0 -- Is this the best way?
+  --   BInteger n -> sv $ ValueInt True Nothing n
+  --   BString t -> sv $ ValueBytes Nothing t
+  --   BBool b -> sv $ ValueBool b
+  --   BAddress a -> sv $ ValueAddress a
+  --   BContract _ c -> Right . Just $ ValueContract c
+  --   BEnumVal k n -> Right . Just $ ValueEnum k n 0x77777 -- TODO: SolidVM enums should be numbered
+  -- SArray ivs -> Just . ValueArrayDynamic <$> mapMaybeM storableToValue (unsparse $ I.toList ivs)
+  -- SArraySentinel{} -> Right Nothing
+  -- SMapping kvs -> Just . ValueMapping . M.fromList <$> mapMaybeM (bimapSToV idxToSimple) (HM.toList kvs)
+  -- SStruct fs -> Just . ValueStruct <$> mapMaybeM (bimapSToV bsToText) (HM.toList fs)
 
 --  where sv :: SimpleValue -> Either String (Maybe Value)
 --        sv = Right . Just . SimpleValue
@@ -174,7 +174,7 @@ fromBasic = \case
   BString bs -> SimpleValue $! valueBytes bs
   BAddress a -> SimpleValue $! ValueAddress a
   BContract _ c -> ValueContract c
-  BEnumVal k n -> ValueEnum k n 0x44444 -- TODO: Keep enum ord in BasicValue
+  BEnumVal k n -> ValueEnum k n 0x77777 -- TODO: Keep enum ord in BasicValue
   BDefault -> SimpleValue $ ValueAddress 0x0
 
 fromIndex :: IndexType -> V.SimpleValue
