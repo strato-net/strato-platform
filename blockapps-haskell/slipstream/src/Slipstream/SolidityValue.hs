@@ -20,6 +20,7 @@ import qualified Data.ByteString          as B
 import qualified Data.ByteString.Char8    as BC
 import           Data.Foldable            (toList)
 import           Data.List
+import qualified Data.Map                 as M
 import           Data.Scientific          (floatingOrInteger)
 import           Data.Text (Text)
 import qualified Data.Text as Text
@@ -80,7 +81,8 @@ valueToSolidityValue = \case
   ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue $ unsparse values
   SimpleValue (ValueBytes _ bytes) -> SolidityValueAsString $ Text.pack $ BC.unpack bytes
   ValueEnum _ _ index              -> SolidityValueAsString $ Text.pack $ show index
-  ValueStruct namedItems -> SolidityObject $ map (fmap valueToSolidityValue) namedItems
+  -- TODO(tim): What if struct declaration order is needed here?
+  ValueStruct namedItems -> SolidityObject . M.toList $ fmap valueToSolidityValue namedItems
   ValueFunction _ paramTypes returnTypes ->
    SolidityValueAsString $ Text.pack $ "function ("
                            ++ intercalate "," (map (formatType . snd) paramTypes)

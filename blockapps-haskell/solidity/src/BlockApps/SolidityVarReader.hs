@@ -17,7 +17,8 @@ module BlockApps.SolidityVarReader (
   encodeValue,
   word256ToByteString,
   byteStringToWord256,
-  valueToSolidityValue
+  valueToSolidityValue,
+  structSort -- for testing
   ) where
 
 import           Control.Exception
@@ -73,7 +74,8 @@ valueToSolidityValue = \case
   SimpleValue (ValueBytes _ bytes) ->
    SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
   ValueEnum _ _ index              -> SolidityValueAsString $ Text.pack $ show index
-  ValueStruct namedItems -> SolidityObject $ map (fmap valueToSolidityValue) namedItems
+  -- TODO(tim): What if declaration order is needed here?
+  ValueStruct namedItems -> SolidityObject . Map.toList $ fmap valueToSolidityValue namedItems
   ValueMapping m -> SolidityObject . map (bimap simpleValueToText valueToSolidityValue) . Map.toList $ m
   ValueFunction _ paramTypes returnTypes ->
     SolidityValueAsString $ Text.pack $ "function ("
@@ -138,7 +140,8 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
               let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
                   n' = fromInteger $ toInteger elementSize * toInteger n
               in [(offset, n')]
-        TypeMapping _ _ -> undefined -- TODO: The only way to get the offset of a mapping is by supplying the key
+        -- TODO: The only way to get the offset of a mapping is by supplying the key
+        TypeMapping _ _ -> error "decodeStorageKey: TypeMapping"
         TypeFunction name _ _ -> error $ "Cannot retrieve "
                                        ++ show (ByteString.unpack name)
                                        ++ ": Functions are not kept in storage"
@@ -286,8 +289,16 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
     case Map.lookup name structDefs of
      Nothing -> throw $ MissingTypeStruct name
      Just theStruct -> case value of
-       ValueStruct kvs -> ValueStruct $ decodeCacheValues' typeDefs' theStruct cache (Storage.alignedByte position) kvs
+       ValueStruct kvs ->
+        let raw_kvs = structSort theStruct $ Map.toList kvs
+        in ValueStruct . Map.fromList $ decodeCacheValues' typeDefs' theStruct cache (Storage.alignedByte position) raw_kvs
        v -> error $ "decodeCacheValue': Expected ValueStruct, but got: " ++ show v
+
+structSort :: Struct -> [(Text, Value)] -> [(Text, Value)]
+structSort (Struct om _)  = sortBy omOrder
+  -- Struct sort should run in O(n * log n * log n) as each comparison takes log n
+  where omOrder :: (Text, Value) -> (Text, Value) -> Ordering
+        omOrder (k1, _) (k2, _) = OMap.findIndex k1 om `compare` OMap.findIndex k2 om
 
 decodeValues
   :: Integer
@@ -427,7 +438,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
   TypeStruct name ->
     case Map.lookup name structDefs of
      Nothing -> throw $ MissingTypeStruct name
-     Just theStruct -> ValueStruct $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
+
+     Just theStruct -> ValueStruct . Map.fromList $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
 
 
 

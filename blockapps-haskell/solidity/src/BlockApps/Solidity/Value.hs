@@ -54,7 +54,7 @@ data Value
   | ValueEnum Text Text Word256
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   | ValueMapping (Map.Map SimpleValue Value)
-  | ValueStruct [(Text, Value)]
+  | ValueStruct (Map.Map Text Value)
   | ValueArraySentinel Int
   deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord)
 
@@ -82,7 +82,7 @@ zeroOf = \case
   ValueContract{} -> ValueContract 0x0
   ValueArrayDynamic{} -> ValueArrayDynamic I.empty
   ValueMapping{} -> ValueMapping Map.empty
-  ValueStruct fs -> ValueStruct $ map (fmap zeroOf) fs
+  ValueStruct fs -> ValueStruct $ fmap zeroOf fs
   ValueArraySentinel len -> ValueArraySentinel len
   ValueArrayFixed{} -> error "default value of sized array"
   ValueFunction{} -> error "default value of function"

@@ -6,6 +6,7 @@ import           Data.Bits                (complement, shiftR, (.&.))
 import           Data.Bool
 import           Data.ByteString          (ByteString)
 import qualified Data.IntMap              as I
+import qualified Data.Map                 as Map
 import           Data.Maybe               (fromMaybe)
 import           Data.Word                (Word8)
 
@@ -92,7 +93,7 @@ isDynamic = \case
   ValueContract{}      -> False
   ValueFunction{}      -> False
   ValueEnum{}          -> False
-  ValueStruct fs       -> any (isDynamic . snd) fs
+  ValueStruct fs       -> any isDynamic $ Map.elems fs
 
 simpleIsDynamic :: SimpleValue -> Bool
 simpleIsDynamic = \case

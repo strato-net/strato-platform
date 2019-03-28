@@ -19,8 +19,6 @@ import Data.Bitraversable
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
-import Data.List (findIndex)
-import Data.List.Index
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, decodeUtf8')
@@ -74,7 +72,7 @@ valueToSolidityValue = \case
   ValueEnum _ ev _ -> fromText ev
   ValueArraySentinel{} -> Right Nothing
   ValueContract c -> fromShowable c
-  ValueStruct fs -> Just . SolidityObject <$> mapMaybeM (bimapValue Right) fs
+  ValueStruct fs -> Just . SolidityObject <$> mapMaybeM (bimapValue Right) (M.toList fs)
   ValueMapping kvs -> Just . SolidityObject <$> mapMaybeM (bimapValue tshowIdx) (M.toList kvs)
   ValueArrayDynamic ivs -> Just . SolidityArray <$> mapMaybeM valueToSolidityValue (unsparse ivs)
   ValueArrayFixed{} -> Left "internal error: SolidVM generate state for static arrays"
@@ -103,7 +101,7 @@ data ReplayFailure = MissingPath StoragePath
                    | MissingStructField B.ByteString
                    | FieldRequiredAtTopLevel
                    | NoPathsProvided
-                   | UnicodeError UnicodeException B.ByteString
+                   | UnicodeError B.ByteString UnicodeException
                    deriving (Show, Eq, Generic, NFData)
 
 replayDelta :: StorageDelta -> TotalStorage -> Either ReplayFailure TotalStorage
@@ -123,17 +121,11 @@ applyDelta' :: [StoragePathPiece] -> BasicValue -> V.Value -> Either ReplayFailu
 applyDelta' [] bv (SimpleValue{}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueEnum{}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueContract{}) = Right $ fromBasic bv
-applyDelta' (Field n:sp) bv (ValueStruct ss) = case decodeUtf8' n of
-  Left uex -> Left $ UnicodeError uex n
-  Right n' -> case findIndex ((== n') . fst) ss of
-    -- todo what the fuck
-    Just idx -> fmap ValueStruct
-              . sequence
-              . modifyAt idx (\p -> do
-                  (t, v) <- p
-                  (t,) <$> applyDelta' sp bv v)
-              . map Right $ ss
-    Nothing -> Right . ValueStruct $ (n', constructFromNothing' sp bv):ss
+applyDelta' (Field n:sp) bv (ValueStruct ss) = do
+  n' <- first (UnicodeError n) $ decodeUtf8' n
+  case M.lookup n' ss of
+    Just v -> ValueStruct . (\x -> M.insert n' x ss) <$> applyDelta' sp bv v
+    Nothing -> Right . ValueStruct $ M.insert n' (constructFromNothing' sp bv) ss
 applyDelta' (MapIndex n:sp) bv (ValueMapping ms) =
   let n' = fromIndex n
   in case M.lookup n' ms of
@@ -157,8 +149,8 @@ constructFromNothing' :: [StoragePathPiece] -> BasicValue -> V.Value
 constructFromNothing' [] = fromBasic
 constructFromNothing' [Field "length"] = \case
   BInteger n -> ValueArraySentinel $ fromIntegral n
-  bv -> ValueStruct [("length", constructFromNothing' [] bv)]
-constructFromNothing' (Field n:sp) = \bv -> ValueStruct [(decodeUtf8 n, constructFromNothing' sp bv)]
+  bv -> ValueStruct . M.singleton "length" $ constructFromNothing' [] bv
+constructFromNothing' (Field n:sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
 constructFromNothing' (MapIndex n:sp) =
   ValueMapping . M.singleton (fromIndex n) . constructFromNothing' sp
 constructFromNothing' (ArrayIndex n:sp) =

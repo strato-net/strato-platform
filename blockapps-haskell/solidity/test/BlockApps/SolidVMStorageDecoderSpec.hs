@@ -71,7 +71,7 @@ spec = do
       got `shouldBe` Right want
 
     it "should be able to insert into a struct" $ do
-      let spine = HM.singleton "struct" . ValueStruct . (\v -> [("name", v)]) . bytes
+      let spine = HM.singleton "struct" . ValueStruct . M.singleton "name" . bytes
           input = spine "iago"
           want  = spine "alladin"
           got = replayDelta [(forceParse ".struct.name", BString "alladin")] input
@@ -88,7 +88,7 @@ spec = do
       let spine = HM.singleton "array" . ValueArrayDynamic
                 . I.singleton 3 . ValueMapping
                 . M.singleton (valueBytes "brimstone") . ValueStruct
-                . (\v -> [("and_fire", v)]) . int
+                . M.singleton "and_fire" . int
           input = spine 0x12345
           want  = spine 700000
           got = replayDelta [(forceParse ".array[3]<\"brimstone\">.and_fire", BInteger 700000)] input
@@ -99,7 +99,7 @@ spec = do
           want = HM.singleton "map" . ValueMapping
                . M.singleton (valueBytes "array") . ValueArrayDynamic
                . I.singleton 9292 . ValueStruct
-               . (\v -> [("array2", v)]) . ValueArrayDynamic
+               . M.singleton "array2" . ValueArrayDynamic
                . I.singleton 14 . bool $ True
           got = replayDelta [(forceParse ".map<\"array\">[9292].array2[14]", BBool True)] input
       got `shouldBe` Right want
@@ -149,7 +149,7 @@ spec = do
                   , (forceParse ".age", BString "Enlightenment")
                   ]
           want = HM.fromList
-            [ ("person", ValueStruct
+            [ ("person", ValueStruct $ M.fromList
                 [ ("age", int 84)
                 , ("height", bytes "170cm")
                 , ("name", bytes "Voltaire")
@@ -274,7 +274,7 @@ spec = do
           , ("contract", ValueContract 0x999)
           , ("enum_val", ValueEnum "E" "C" 0x77777)
           , ("number", int 77714314)
-          , ("strukt", ValueStruct
+          , ("strukt", ValueStruct $ M.fromList
               [ ("first_field", int 887)
               , ("second_field", SimpleValue $ ValueBytes Nothing "CLOROX DISINFECTING WIPES")
               ])
