@@ -6,7 +6,7 @@
 module BlockApps.SolidVMStorageDecoder
   ( decodeSolidVMValues
   , decodeCacheValues
-  , replayDelta -- Testing only
+  , replayDeltas -- Testing only
   , ReplayFailure(..)
   , synthesize -- Testing only
   , TotalStorage
@@ -21,7 +21,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8, decodeUtf8')
+import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
 import Data.Text.Encoding.Error (UnicodeException)
 import GHC.Generics
 import Text.Printf
@@ -45,11 +45,13 @@ bimapValue f (name', value') = do
 
 
 decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
-decodeCacheValues hxs [] = either (error . printf "SVM.decodeCacheValues: %s" . show) id $ do
-  pathValues <- mapM (bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)) $ M.toList hxs
-  totalStorage <- bimap show HM.toList $ synthesize pathValues
-  mapM (firstM bsToText) totalStorage
-decodeCacheValues _ _ = error "todo: updates"
+decodeCacheValues hxs prevState = either (error . printf "SVM.decodeCacheValues: %s" . show) id $ do
+  let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
+  pathValues <- mapM parseM $ M.toList hxs
+  finalState <- bimap show HM.toList $ case prevState of
+    [] -> synthesize pathValues
+    tvs -> replayDeltas pathValues . HM.fromList . map (first encodeUtf8) $ tvs
+  mapM (firstM bsToText) finalState
 
 bsToText :: B.ByteString -> Either String T.Text
 bsToText = first show . decodeUtf8'
@@ -104,15 +106,15 @@ data ReplayFailure = MissingPath StoragePath
                    | UnicodeError B.ByteString UnicodeException
                    deriving (Show, Eq, Generic, NFData)
 
-replayDelta :: StorageDelta -> TotalStorage -> Either ReplayFailure TotalStorage
-replayDelta [] ts = Right ts
-replayDelta ((StoragePath (Field f:sp), bv):rs) ts =
+replayDeltas :: StorageDelta -> TotalStorage -> Either ReplayFailure TotalStorage
+replayDeltas [] ts = Right ts
+replayDeltas ((StoragePath (Field f:sp), bv):rs) ts =
   case HM.lookup f ts of
     Just sv -> do
       ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta (StoragePath sp) bv sv
-      replayDelta rs ts'
-    Nothing -> Left . MissingPath $ singleton f
-replayDelta ((p, _):_) _ = Left $ MissingPath p
+      replayDeltas rs ts'
+    Nothing -> return $ HM.insert f (constructFromNothing' sp bv) ts
+replayDeltas ((p, _):_) _ = Left $ MissingPath p
 
 applyDelta :: StoragePath -> BasicValue -> V.Value -> Either ReplayFailure V.Value
 applyDelta (StoragePath sp) = applyDelta' sp

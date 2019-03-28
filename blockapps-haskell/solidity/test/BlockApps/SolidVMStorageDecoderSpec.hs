@@ -52,36 +52,41 @@ spec = do
     let exStorage = HM.fromList [ ("count", int 99)
                                 , ("name", bytes "iago")]
     it "should be able to do nothing" $ do
-      replayDelta [] exStorage `shouldBe` Right exStorage
+      replayDeltas [] exStorage `shouldBe` Right exStorage
 
     it "should fail to do the impossible" $ do
-      replayDelta [(empty, BInteger 99)] exStorage `shouldBe` Left (MissingPath empty)
-      replayDelta [(forceParse ".no_such_field", BInteger 300)] exStorage
-        `shouldBe` Left (MissingPath $ singleton "no_such_field")
+      replayDeltas [(empty, BInteger 99)] exStorage `shouldBe` Left (MissingPath empty)
+
+    it "should be able to add missing fields" $ do
+      replayDeltas [(forceParse ".no_such_field", BInteger 300)] exStorage
+        `shouldBe` Right (HM.fromList [ ("count", int 99)
+                                      , ("name", bytes "iago")
+                                      , ("no_such_field", int 300)
+                                      ])
 
     it "should be able to increment" $ do
-      replayDelta [(forceParse ".count", BInteger 100)] exStorage `shouldBe`
+      replayDeltas [(forceParse ".count", BInteger 100)] exStorage `shouldBe`
         Right (HM.fromList [("count", int 100), ("name", bytes "iago")])
 
     it "should be able to insert into a map" $ do
       let spine = HM.singleton "hashmap" . ValueMapping . M.fromList
           input = spine []
           want  = spine [(valueInt 30, int 0x234)]
-          got = replayDelta [(forceParse ".hashmap<30>", BInteger 0x234)] input
+          got = replayDeltas [(forceParse ".hashmap<30>", BInteger 0x234)] input
       got `shouldBe` Right want
 
     it "should be able to insert into a struct" $ do
       let spine = HM.singleton "struct" . ValueStruct . M.singleton "name" . bytes
           input = spine "iago"
           want  = spine "alladin"
-          got = replayDelta [(forceParse ".struct.name", BString "alladin")] input
+          got = replayDeltas [(forceParse ".struct.name", BString "alladin")] input
       got `shouldBe` Right want
 
     it "should be able to insert into an array" $ do
       let spine = HM.singleton "array" . ValueArrayDynamic . I.fromList
           input = spine []
           want  = spine [(0, int 0x882)]
-          got = replayDelta [(forceParse ".array[0]", BInteger 0x882)] input
+          got = replayDeltas [(forceParse ".array[0]", BInteger 0x882)] input
       got `shouldBe` Right want
 
     it "should be able to target nested fields" $ do
@@ -91,7 +96,7 @@ spec = do
                 . M.singleton "and_fire" . int
           input = spine 0x12345
           want  = spine 700000
-          got = replayDelta [(forceParse ".array[3]<\"brimstone\">.and_fire", BInteger 700000)] input
+          got = replayDeltas [(forceParse ".array[3]<\"brimstone\">.and_fire", BInteger 700000)] input
       got `shouldBe` Right want
 
     it "should be able to guess the intermediate structure from a path" $ do
@@ -101,7 +106,7 @@ spec = do
                . I.singleton 9292 . ValueStruct
                . M.singleton "array2" . ValueArrayDynamic
                . I.singleton 14 . bool $ True
-          got = replayDelta [(forceParse ".map<\"array\">[9292].array2[14]", BBool True)] input
+          got = replayDeltas [(forceParse ".map<\"array\">[9292].array2[14]", BBool True)] input
       got `shouldBe` Right want
 
     it "should be able to play multiple deltas" $ do
@@ -110,7 +115,7 @@ spec = do
                $ [ (valueInt 4, bool True)
                  , (valueInt 5, bool False)
                  , (valueInt 7, int 43)]
-          got = flip replayDelta input [ (forceParse ".map<4>", BBool True)
+          got = flip replayDeltas input [ (forceParse ".map<4>", BBool True)
                                        , (forceParse ".map<7>", BInteger 43)
                                        , (forceParse ".map<5>", BBool False)]
       got `shouldBe` Right want
@@ -140,7 +145,6 @@ spec = do
       synthesize (reverse input) `shouldBe` Right want
 
     it "can synthesize a complicated contract" $ do
-      pendingWith "TODO(tim): fix the struct ordering problem"
       let input = [ (forceParse ".person.age", BInteger 84)
                   , (forceParse ".person.height", BString "170cm")
                   , (forceParse ".person.name", BString "Voltaire")
@@ -247,7 +251,6 @@ spec = do
         [("owner", SimpleValue $ ValueAddress 0xdeadbeef)]
 
     it "can decode everything (with empty cache)" $ do
-      pendingWith "TODO(tim): Fix struct reordering"
       let input = toInputMap
                 [ (singleton "addr", BAddress 0xdeadbeef)
                 , (singleton "boolean", BBool True)
@@ -307,16 +310,16 @@ spec = do
               , bytes "4f4c440000000000000000000000000000000000000000000000000000000000"
               , ValueArraySentinel 14])]
 
-  --   describe "Simple field updates" $ do
-  --     it "can update ints" $ do
-  --       let input = toInputMap [(singleton "number", BInteger 100)]
-  --           cache = [("number", int 99)]
-  --       decodeCacheValues input cache `shouldBe` [("number", int 100)]
+    describe "Simple field updates" $ do
+      it "can update ints" $ do
+        let input = toInputMap [(singleton "number", BInteger 100)]
+            cache = [("number", int 99)]
+        decodeCacheValues input cache `shouldBe` [("number", int 100)]
 
-  --     it "can update addresses" $ do
-  --       let input = toInputMap [(singleton "address", BAddress 0xddba11)]
-  --           cache = [("address", SimpleValue $ ValueAddress 0x21345)]
-  --       decodeCacheValues input cache `shouldBe` [("address", address 0xddba11)]
+      it "can update addresses" $ do
+        let input = toInputMap [(singleton "address", BAddress 0xddba11)]
+            cache = [("address", address 0x21345)]
+        decodeCacheValues input cache `shouldBe` [("address", address 0xddba11)]
 
 rawInput :: Result [Storage]
 rawInput = fromJSON [aesonQQ|
