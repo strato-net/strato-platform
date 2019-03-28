@@ -6,9 +6,13 @@ module BlockApps.SoliditySpec where
 import Test.Hspec
 import Data.Aeson
 import qualified Data.Aeson as Ae
+import qualified Data.Bimap as B
 import Data.Either
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Map as Map
+import BlockApps.Solidity.Type
+import BlockApps.Solidity.TypeDefs
+import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.SolidityVarReader
 import BlockApps.Strato.Types()
@@ -70,6 +74,34 @@ spec = do
                           "constant" .= Bool False]
           want = fempty {funcStateMutability = Just Payable}
       fromJSON input `shouldBe` Ae.Success want
+
+    it "should convert a standalone enum value" $ do
+      let typeDefs = TypeDefs
+                       { enumDefs = Map.fromList [( "Cars"
+                                                  , B.fromList [ (0, "Honda")
+                                                               , (1, "Toyota")
+                                                               , (2, "Hyundai")
+                                                               ]
+                                                  )]
+                       , structDefs = Map.empty
+                       }
+          eVal = textToValue (Just typeDefs) "Toyota" (TypeEnum "Cars")
+      putStrLn $ show eVal
+      eVal `shouldBe` Right (ValueEnum "Cars" "Toyota" 1)
+
+    it "should convert a standalone enum value" $ do
+      let typeDefs = TypeDefs
+                       { enumDefs = Map.fromList [( "Cars"
+                                                  , B.fromList [ (0, "Honda")
+                                                               , (1, "Toyota")
+                                                               , (2, "Hyundai")
+                                                               ]
+                                                  )]
+                       , structDefs = Map.empty
+                       }
+          eVal = textToValue (Just typeDefs) "Cars.Hyundai" (TypeEnum "Cars")
+      putStrLn $ show eVal
+      eVal `shouldBe` Right (ValueEnum "Cars" "Hyundai" 2)
 
 decodeXabi :: FilePath -> Expectation
 decodeXabi filePath = do
