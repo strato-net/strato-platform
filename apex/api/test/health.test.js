@@ -155,21 +155,6 @@ describe('Tests - Node-level Health Check', function () {
     })
 
     it('API endpoints', async function () {
-        const response = await getNodeDataApex()
-        console.log(response)
 
     })
 })
-
-function getNodeDataApex() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost/prometheus';
-    const options = {
-        method: 'GET',
-        url: `http://${ipaddr}/prometheus/apex-api/health`,
-        followRedirects: false,
-        timeout: 1000,
-        json: true
-    };
-    return rp(options);
-}
-
