@@ -43,6 +43,9 @@ bytes = SimpleValue . valueBytes
 bool :: Bool -> V.Value
 bool = SimpleValue . ValueBool
 
+address :: Address -> V.Value
+address = SimpleValue . ValueAddress
+
 spec :: Spec
 spec = do
   describe "StorageDelta" $ do
@@ -112,60 +115,61 @@ spec = do
                                        , (forceParse ".map<5>", BBool False)]
       got `shouldBe` Right want
 
-  -- describe "Synthesis" $ do
-  --   it "can synthesize nothing" $ do
-  --     synthesize [] `shouldBe` Right HM.empty
+  describe "Synthesis" $ do
+    it "can synthesize nothing" $ do
+      synthesize [] `shouldBe` Right HM.empty
 
-  --   it "can synthesize a number" $ do
-  --     let input = [(forceParse ".age", BInteger 30)]
-  --         want = HM.singleton "age" . BasicValue . BInteger $ 30
-  --     synthesize input `shouldBe` Right want
+    it "can synthesize a number" $ do
+      let input = [(forceParse ".age", BInteger 30)]
+          want = HM.singleton "age" . int $ 30
+      synthesize input `shouldBe` Right want
 
-  --   it "can synthesize a mapping" $ do
-  --     let input = [ (forceParse ".byDepth<20>", BString "river")
-  --                 , (forceParse ".byDepth<4>", BString "stream")
-  --                 , (forceParse ".byDepth<0>", BString "puddle")
-  --                 , (forceParse ".byDepth<100>", BString "bay")
-  --                 ]
-  --         want = HM.singleton "byDepth" . SMapping $ HM.fromList
-  --              [ (INum 20, BasicValue $ BString "river")
-  --              , (INum 4, BasicValue $ BString "stream")
-  --              , (INum 0, BasicValue $ BString "puddle")
-  --              , (INum 100, BasicValue $ BString "bay")
-  --              ]
-  --     synthesize input `shouldBe` Right want
-  --     synthesize (reverse input) `shouldBe` Right want
+    it "can synthesize a mapping" $ do
+      let input = [ (forceParse ".byDepth<20>", BString "river")
+                  , (forceParse ".byDepth<4>", BString "stream")
+                  , (forceParse ".byDepth<0>", BString "puddle")
+                  , (forceParse ".byDepth<100>", BString "bay")
+                  ]
+          want = HM.singleton "byDepth" . ValueMapping $ M.fromList
+               [ (valueInt 20, bytes "river")
+               , (valueInt 4, bytes "stream")
+               , (valueInt 0, bytes "puddle")
+               , (valueInt 100, bytes "bay")
+               ]
+      synthesize input `shouldBe` Right want
+      synthesize (reverse input) `shouldBe` Right want
 
-  --   it "can synthesize a complicated contract" $ do
-  --     let input = [ (forceParse ".person.age", BInteger 84)
-  --                 , (forceParse ".person.height", BString "170cm")
-  --                 , (forceParse ".person.name", BString "Voltaire")
-  --                 , (forceParse ".person.books[0]", BString "Candide")
-  --                 , (forceParse ".person.books[2]", BString "Treatise on tolerance")
-  --                 , (forceParse ".age", BString "Enlightenment")
-  --                 ]
-  --         want = HM.fromList
-  --           [ ("person", SStruct $ HM.fromList
-  --               [ ("age", BasicValue $ BInteger 84)
-  --               , ("height", BasicValue $ BString "170cm")
-  --               , ("name", BasicValue $ BString "Voltaire")
-  --               , ("books", SArray $ I.fromList
-  --                   [ (0, BasicValue $ BString "Candide")
-  --                   , (2, BasicValue $ BString "Treatise on tolerance")
-  --                   ])])
-  --           , ("age", BasicValue $ BString "Enlightenment")
-  --           ]
-  --     synthesize input `shouldBe` Right want
-  --     synthesize (reverse input) `shouldBe` Right want
+    it "can synthesize a complicated contract" $ do
+      pendingWith "TODO(tim): fix the struct ordering problem"
+      let input = [ (forceParse ".person.age", BInteger 84)
+                  , (forceParse ".person.height", BString "170cm")
+                  , (forceParse ".person.name", BString "Voltaire")
+                  , (forceParse ".person.books[0]", BString "Candide")
+                  , (forceParse ".person.books[2]", BString "Treatise on tolerance")
+                  , (forceParse ".age", BString "Enlightenment")
+                  ]
+          want = HM.fromList
+            [ ("person", ValueStruct
+                [ ("age", int 84)
+                , ("height", bytes "170cm")
+                , ("name", bytes "Voltaire")
+                , ("books", ValueArrayDynamic $ I.fromList
+                    [ (0, bytes "Candide")
+                    , (2, bytes "Treatise on tolerance")
+                    ])])
+            , ("age", bytes "Enlightenment")
+            ]
+      synthesize input `shouldBe` Right want
+      synthesize (reverse input) `shouldBe` Right want
 
-  --   it "can synthesize an array with length" $ do
-  --     let input = [ (forceParse ".owners.length", BInteger 2)
-  --                 , (forceParse ".owners[0]", BAddress 0x88)
-  --                 ]
-  --         want = HM.singleton "owners" . SArray $ I.fromList
-  --           [(0, BasicValue $ BAddress 0x88), (2, SArraySentinel 2)]
-  --     synthesize input `shouldBe` Right want
-  --     synthesize (reverse input) `shouldBe` Right want
+    it "can synthesize an array with length" $ do
+      let input = [ (forceParse ".owners.length", BInteger 2)
+                  , (forceParse ".owners[0]", BAddress 0x88)
+                  ]
+          want = HM.singleton "owners" . ValueArrayDynamic $ I.fromList
+            [(0, address 0x88), (2, ValueArraySentinel 2)]
+      synthesize input `shouldBe` Right want
+      synthesize (reverse input) `shouldBe` Right want
 
   -- describe "Bloch decoding" $ do
   --   it "can decode addresses" $ do

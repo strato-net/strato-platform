@@ -10,6 +10,7 @@ module BlockApps.SolidVMStorageDecoder
   , decodeCacheValues
   , replayDelta -- Testing only
   , ReplayFailure(..)
+  , synthesize -- Testing only
   ) where
 
 import Control.DeepSeq
@@ -199,7 +200,7 @@ applyDelta' (Field n:sp) bv (ValueStruct ss) = case decodeUtf8' n of
                   (t, v) <- p
                   (t,) <$> applyDelta' sp bv v)
               . map Right $ ss
-    Nothing -> Right . ValueStruct $ (n', (constructFromNothing' sp bv)):ss
+    Nothing -> Right . ValueStruct $ (n', constructFromNothing' sp bv):ss
 applyDelta' (MapIndex n:sp) bv (ValueMapping ms) =
   let n' = fromIndex n
   in case M.lookup n' ms of
@@ -230,20 +231,19 @@ constructFromNothing' (MapIndex n:sp) =
 constructFromNothing' (ArrayIndex n:sp) =
   ValueArrayDynamic . I.singleton n . constructFromNothing' sp
 
--- synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
--- synthesize spbvs = do
---   byFields <- mapM fieldsOnly spbvs
---   let basicLists = foldr (\(t, p) m -> HM.alter (Just . maybe [p] (p:)) t m) HM.empty byFields
---   sequence $ HM.map synthesize' basicLists
---  where fieldsOnly (StoragePath (Field t:sp), bv) = return (t, (StoragePath sp, bv))
---        fieldsOnly _ = Left FieldRequiredAtTopLevel
+synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
+synthesize spbvs = do
+  byFields <- mapM fieldsOnly spbvs
+  let basicLists = foldr (\(t, p) m -> HM.alter (Just . maybe [p] (p:)) t m) HM.empty byFields
+  sequence $ HM.map synthesize' basicLists
+ where fieldsOnly (StoragePath (Field t:sp), bv) = return (t, (StoragePath sp, bv))
+       fieldsOnly _ = Left FieldRequiredAtTopLevel
 
--- synthesize' :: [(StoragePath, BasicValue)] -> Either ReplayFailure V.Value
--- synthesize' ([]) = Left NoPathsProvided
--- synthesize' ((sp, bv):rest) =
---   let initState = constructFromNothing sp bv
---   in go rest initState
---  where go :: [(StoragePath, BasicValue)] -> V.Value -> Either ReplayFailure V.Value
---        go [] sv' = Right sv'
---        go ((sp',bv'):t) sv' = go t =<< applyDelta sp' bv' sv'
-
+synthesize' :: [(StoragePath, BasicValue)] -> Either ReplayFailure V.Value
+synthesize' ([]) = Left NoPathsProvided
+synthesize' ((sp, bv):rest) =
+  let initState = constructFromNothing sp bv
+  in go rest initState
+ where go :: [(StoragePath, BasicValue)] -> V.Value -> Either ReplayFailure V.Value
+       go [] sv' = Right sv'
+       go ((sp',bv'):t) sv' = go t =<< applyDelta sp' bv' sv'
