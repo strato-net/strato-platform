@@ -35,6 +35,7 @@ dependencies:
   - generic-random
   - hashable
   - http-api-data
+  - ilist
   - lens
   - logging-effect
   - memory

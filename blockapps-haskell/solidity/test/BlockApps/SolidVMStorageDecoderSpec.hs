@@ -10,12 +10,14 @@ import Data.Aeson.QQ
 import Data.Bifunctor
 import qualified Data.ByteString as B
 import Data.List (sort)
+import qualified Data.HashMap.Strict as HM
+import qualified Data.IntMap as I
 import qualified Data.Map as M
 import Test.Hspec
 
 import BlockApps.SolidVMStorageDecoder
 import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Value as SV
+import BlockApps.Solidity.Value as V
 import BlockApps.Strato.Types
 import Blockchain.SolidVM.Model
 import SolidVM.Model.Storable
@@ -32,75 +34,83 @@ unHS (HexStorage hs) = hs
 toInputMap :: [(StoragePath, BasicValue)] -> M.Map B.ByteString B.ByteString
 toInputMap = M.fromList . map (bimap unHS unHS) . map toInput
 
+int :: Integer -> V.Value
+int = SimpleValue . valueInt
+
+bytes :: B.ByteString -> V.Value
+bytes = SimpleValue . valueBytes
+
+bool :: Bool -> V.Value
+bool = SimpleValue . ValueBool
+
 spec :: Spec
 spec = do
-  return ()
-  -- describe "StorageDelta" $ do
-  --   let exStorage = HM.fromList [ ("count", BasicValue $ BInteger 99)
-  --                               , ("name", BasicValue $ BString "iago")]
-  --   it "should be able to do nothing" $ do
-  --     replayDelta [] exStorage `shouldBe` Right exStorage
+  describe "StorageDelta" $ do
+    let exStorage = HM.fromList [ ("count", int 99)
+                                , ("name", bytes "iago")]
+    it "should be able to do nothing" $ do
+      replayDelta [] exStorage `shouldBe` Right exStorage
 
-  --   it "should fail to do the impossible" $ do
-  --     replayDelta [(empty, BInteger 99)] exStorage `shouldBe` Left (MissingPath empty)
-  --     replayDelta [(forceParse ".no_such_field", BInteger 300)] exStorage
-  --       `shouldBe` Left (MissingPath $ singleton "no_such_field")
+    it "should fail to do the impossible" $ do
+      replayDelta [(empty, BInteger 99)] exStorage `shouldBe` Left (MissingPath empty)
+      replayDelta [(forceParse ".no_such_field", BInteger 300)] exStorage
+        `shouldBe` Left (MissingPath $ singleton "no_such_field")
 
-  --   it "should be able to increment" $ do
-  --     replayDelta [(forceParse ".count", BInteger 100)] exStorage `shouldBe`
-  --       Right (HM.fromList [("count", BasicValue $ BInteger 100), ("name", BasicValue $ BString "iago")])
+    it "should be able to increment" $ do
+      replayDelta [(forceParse ".count", BInteger 100)] exStorage `shouldBe`
+        Right (HM.fromList [("count", int 100), ("name", bytes "iago")])
 
-  --   it "should be able to insert into a map" $ do
-  --     let spine = HM.singleton "hashmap" . SMapping . HM.fromList
-  --         input = spine []
-  --         want  = spine [(INum 30, BasicValue $ BInteger 0x234)]
-  --         got = replayDelta [(forceParse ".hashmap<30>", BInteger 0x234)] input
-  --     got `shouldBe` Right want
+    it "should be able to insert into a map" $ do
+      let spine = HM.singleton "hashmap" . ValueMapping . M.fromList
+          input = spine []
+          want  = spine [(valueInt 30, int 0x234)]
+          got = replayDelta [(forceParse ".hashmap<30>", BInteger 0x234)] input
+      got `shouldBe` Right want
 
-  --   it "should be able to insert into a struct" $ do
-  --     let spine = HM.singleton "struct" . SStruct . HM.singleton "name" . BasicValue . BString
-  --         input = spine "iago"
-  --         want  = spine "alladin"
-  --         got = replayDelta [(forceParse ".struct.name", BString "alladin")] input
-  --     got `shouldBe` Right want
+    it "should be able to insert into a struct" $ do
+      let spine = HM.singleton "struct" . ValueStruct . (\v -> [("name", v)]) . bytes
+          input = spine "iago"
+          want  = spine "alladin"
+          got = replayDelta [(forceParse ".struct.name", BString "alladin")] input
+      got `shouldBe` Right want
 
-  --   it "should be able to insert into an array" $ do
-  --     let spine = HM.singleton "array" . SArray . I.fromList
-  --         input = spine []
-  --         want  = spine [(0, BasicValue $ BInteger 0x882)]
-  --         got = replayDelta [(forceParse ".array[0]", BInteger 0x882)] input
-  --     got `shouldBe` Right want
+    it "should be able to insert into an array" $ do
+      let spine = HM.singleton "array" . ValueArrayDynamic . I.fromList
+          input = spine []
+          want  = spine [(0, int 0x882)]
+          got = replayDelta [(forceParse ".array[0]", BInteger 0x882)] input
+      got `shouldBe` Right want
 
-  --   it "should be able to target nested fields" $ do
-  --     let spine = HM.singleton "array" . SArray
-  --               . I.singleton 3 . SMapping
-  --               . HM.singleton (IText "brimstone") . SStruct
-  --               . HM.singleton "and_fire" . BasicValue . BInteger
-  --         input = spine 0x12345
-  --         want  = spine 700000
-  --         got = replayDelta [(forceParse ".array[3]<\"brimstone\">.and_fire", BInteger 700000)] input
-  --     got `shouldBe` Right want
+    it "should be able to target nested fields" $ do
+      let spine = HM.singleton "array" . ValueArrayDynamic
+                . I.singleton 3 . ValueMapping
+                . M.singleton (valueBytes "brimstone") . ValueStruct
+                . (\v -> [("and_fire", v)]) . int
+          input = spine 0x12345
+          want  = spine 700000
+          got = replayDelta [(forceParse ".array[3]<\"brimstone\">.and_fire", BInteger 700000)] input
+      got `shouldBe` Right want
 
-  --   it "should be able to guess the intermediate structure from a path" $ do
-  --     let input = HM.singleton "map" $ SMapping HM.empty
-  --         want = HM.singleton "map" . SMapping
-  --              . HM.singleton (IText "array") . SArray
-  --              . I.singleton 9292 . SStruct
-  --              . HM.singleton "array2" . SArray
-  --              . I.singleton 14 . BasicValue . BBool $ True
-  --         got = replayDelta [(forceParse ".map<\"array\">[9292].array2[14]", BBool True)] input
-  --     got `shouldBe` Right want
+    it "should be able to guess the intermediate structure from a path" $ do
+      let input = HM.singleton "map" $ ValueMapping M.empty
+          want = HM.singleton "map" . ValueMapping
+               . M.singleton (valueBytes "array") . ValueArrayDynamic
+               . I.singleton 9292 . ValueStruct
+               . (\v -> [("array2", v)]) . ValueArrayDynamic
+               . I.singleton 14 . bool $ True
+          got = replayDelta [(forceParse ".map<\"array\">[9292].array2[14]", BBool True)] input
+      got `shouldBe` Right want
 
-  --   it "should be able to play multiple deltas" $ do
-  --     let input = HM.singleton "map" $ SMapping HM.empty
-  --         want = HM.singleton "map" . SMapping . HM.fromList
-  --              $ [ (INum 4, BasicValue $ BBool True)
-  --                , (INum 5, BasicValue $ BBool False)
-  --                , (INum 7, BasicValue $ BInteger 43)]
-  --         got = flip replayDelta input [ (forceParse ".map<4>", BBool True)
-  --                                      , (forceParse ".map<7>", BInteger 43)
-  --                                      , (forceParse ".map<5>", BBool False)]
-  --     got `shouldBe` Right want
+    it "should be able to play multiple deltas" $ do
+      let input = HM.singleton "map" $ ValueMapping M.empty
+          want = HM.singleton "map" . ValueMapping . M.fromList
+               $ [ (valueInt 4, bool True)
+                 , (valueInt 5, bool False)
+                 , (valueInt 7, int 43)]
+          got = flip replayDelta input [ (forceParse ".map<4>", BBool True)
+                                       , (forceParse ".map<7>", BInteger 43)
+                                       , (forceParse ".map<5>", BBool False)]
+      got `shouldBe` Right want
 
   -- describe "Analysis" $ do
   --   it "can analyze nothing" $ do
@@ -288,13 +298,13 @@ spec = do
   --             , SolidityValueAsString "4f4c440000000000000000000000000000000000000000000000000000000000"])]
 
   -- describe "Slipstream decoding" $ do
-  --   let int :: Integer -> SV.Value
+  --   let int :: Integer -> V.Value
   --       int = SimpleValue . ValueInt True Nothing
 
-  --       bool :: Bool -> SV.Value
+  --       bool :: Bool -> V.Value
   --       bool = SimpleValue . ValueBool
 
-  --       address :: Address -> SV.Value
+  --       address :: Address -> V.Value
   --       address = SimpleValue . ValueAddress
 
   --   it "can decode an address (with empty cache)" $ do

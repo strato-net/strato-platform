@@ -8,6 +8,8 @@
 module BlockApps.SolidVMStorageDecoder
   ( decodeSolidVMValues
   , decodeCacheValues
+  , replayDelta -- Testing only
+  , ReplayFailure(..)
   ) where
 
 import Control.DeepSeq
@@ -18,9 +20,12 @@ import Data.Bitraversable
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
+import Data.List (findIndex)
+import Data.List.Index
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8')
+import Data.Text.Encoding (decodeUtf8, decodeUtf8')
+import Data.Text.Encoding.Error (UnicodeException)
 import GHC.Generics
 import Text.Printf
 
@@ -138,65 +143,92 @@ decodeCacheValues = error "TODO(decodeCacheValues"
 
 
 
--- type TotalStorage = HM.HashMap B.ByteString V.Value
+type TotalStorage = HM.HashMap B.ByteString V.Value
 
--- data ReplayFailure = MissingPath StoragePath
---                    | TypeMismatch StoragePath BasicValue V.Value
---                    | MissingStructField B.ByteString
---                    | FieldRequiredAtTopLevel
---                    | NoPathsProvided
---                    deriving (Show, Eq, Generic, NFData)
+data ReplayFailure = MissingPath StoragePath
+                   | TypeMismatch StoragePath BasicValue V.Value
+                   | MissingStructField B.ByteString
+                   | FieldRequiredAtTopLevel
+                   | NoPathsProvided
+                   | UnicodeError UnicodeException B.ByteString
+                   deriving (Show, Eq, Generic, NFData)
 
--- replayDelta :: StorageDelta -> TotalStorage -> Either ReplayFailure TotalStorage
--- replayDelta [] ts = Right ts
--- replayDelta ((StoragePath (Field f:sp), bv):rs) ts =
---   case HM.lookup f ts of
---     Just sv -> do
---       ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta (StoragePath sp) bv sv
---       replayDelta rs ts'
---     Nothing -> Left . MissingPath $ singleton f
--- replayDelta ((p, _):_) _ = Left $ MissingPath p
+replayDelta :: StorageDelta -> TotalStorage -> Either ReplayFailure TotalStorage
+replayDelta [] ts = Right ts
+replayDelta ((StoragePath (Field f:sp), bv):rs) ts =
+  case HM.lookup f ts of
+    Just sv -> do
+      ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta (StoragePath sp) bv sv
+      replayDelta rs ts'
+    Nothing -> Left . MissingPath $ singleton f
+replayDelta ((p, _):_) _ = Left $ MissingPath p
 
--- applyDelta :: StoragePath -> BasicValue -> V.Value -> Either ReplayFailure V.Value
--- applyDelta (StoragePath sp) = applyDelta' sp
+applyDelta :: StoragePath -> BasicValue -> V.Value -> Either ReplayFailure V.Value
+applyDelta (StoragePath sp) = applyDelta' sp
 
--- fromBasic :: BasicValue -> V.Value
--- fromBasic = error "TODO(tim): fromBasic"
+fromBasic :: BasicValue -> V.Value
+fromBasic = \case
+  BBool b -> SimpleValue $ ValueBool b
+  BInteger n -> SimpleValue $! valueInt n
+  BString bs -> SimpleValue $! valueBytes bs
+  BAddress a -> SimpleValue $! ValueAddress a
+  BContract _ c -> ValueContract c
+  BEnumVal k n -> ValueEnum k n 0x44444 -- TODO: Keep enum ord in BasicValue
+  BDefault -> SimpleValue $ ValueAddress 0x0
 
--- applyDelta' :: [StoragePathPiece] -> BasicValue -> V.Value -> Either ReplayFailure V.Value
--- applyDelta' [] bv (SimpleValue{}) = Right $ fromBasic bv
--- applyDelta' [] bv (ValueEnum{}) = Right $ fromBasic bv
--- applyDelta' [] bv (ValueContract{}) = Right $ fromBasic bv
--- applyDelta' (Field n:sp) bv (ValueStruct ss) =
---   case HM.lookup n ss of
---     Just v -> SStruct . (\x -> HM.insert n x ss) <$> applyDelta' sp bv v
---     Nothing -> Right . SStruct $ HM.insert n (constructFromNothing' sp bv) ss
--- applyDelta' (MapIndex n:sp) bv (ValueMapping ms) =
---   case HM.lookup n ms of
---     Just v -> ValueMapping . (\x -> HM.insert n x ms) <$> applyDelta' sp bv v
---     Nothing -> Right . ValueMapping $ HM.insert n (constructFromNothing' sp bv) ms
--- applyDelta' (ArrayIndex n:sp) bv (ValueArrayDynamic vs) =
---   case I.lookup n vs of
---     Just v -> SArray . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
---     Nothing -> Right . ValueArrayDynamic $ I.insert n (constructFromNothing' sp bv) vs
--- applyDelta' (ArrayIndex n:sp) bv sent@(ValueArraySentinel len) =
---   Right . SArray $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
--- applyDelta' [Field "length"] (BInteger n) (ValueArrayDynamic vs) =
---   let n' = fromIntegral n
---   in Right . SArray $ I.insert n' (ValueArraySentinel n') vs
--- applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
+fromIndex :: IndexType -> V.SimpleValue
+fromIndex = \case
+  IBool b -> ValueBool b
+  INum n -> valueInt n
+  IText bs -> valueBytes bs
+  IAddress a -> ValueAddress a
 
--- constructFromNothing :: StoragePath -> BasicValue -> V.Value
--- constructFromNothing (StoragePath p) = constructFromNothing' p
+applyDelta' :: [StoragePathPiece] -> BasicValue -> V.Value -> Either ReplayFailure V.Value
+applyDelta' [] bv (SimpleValue{}) = Right $ fromBasic bv
+applyDelta' [] bv (ValueEnum{}) = Right $ fromBasic bv
+applyDelta' [] bv (ValueContract{}) = Right $ fromBasic bv
+-- Field updates are consed to the front, with the expectation that the struct is nubbed later
+-- Let's hope that order doesn't matter
+applyDelta' (Field n:sp) bv (ValueStruct ss) = case decodeUtf8' n of
+  Left uex -> Left $ UnicodeError uex n
+  Right n' -> case findIndex ((== n') . fst) ss of
+    -- todo what the fuck
+    Just idx -> fmap ValueStruct
+              . sequence
+              . modifyAt idx (\p -> do
+                  (t, v) <- p
+                  (t,) <$> applyDelta' sp bv v)
+              . map Right $ ss
+    Nothing -> Right . ValueStruct $ (n', (constructFromNothing' sp bv)):ss
+applyDelta' (MapIndex n:sp) bv (ValueMapping ms) =
+  let n' = fromIndex n
+  in case M.lookup n' ms of
+    Just v -> ValueMapping . (\x -> M.insert n' x ms) <$> applyDelta' sp bv v
+    Nothing -> Right . ValueMapping $ M.insert n' (constructFromNothing' sp bv) ms
+applyDelta' (ArrayIndex n:sp) bv (ValueArrayDynamic vs) =
+  case I.lookup n vs of
+    Just v -> ValueArrayDynamic . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
+    Nothing -> Right . ValueArrayDynamic $ I.insert n (constructFromNothing' sp bv) vs
+applyDelta' (ArrayIndex n:sp) bv sent@(ValueArraySentinel len) =
+  Right . ValueArrayDynamic $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
+applyDelta' [Field "length"] (BInteger n) (ValueArrayDynamic vs) =
+  let n' = fromIntegral n
+  in Right . ValueArrayDynamic $ I.insert n' (ValueArraySentinel n') vs
+applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 
--- constructFromNothing' :: [StoragePathPiece] -> BasicValue -> V.Value
--- constructFromNothing' [] = fromBasic
--- constructFromNothing' [Field "length"] = \case
---   BInteger n -> SArraySentinel $ fromIntegral n
---   bv -> SStruct . HM.singleton "length" $ constructFromNothing' [] bv
--- constructFromNothing' (Field n:sp) = ValueStruct . HM.singleton n . constructFromNothing' sp
--- constructFromNothing' (MapIndex n:sp) = ValueMapping . HM.singleton n . constructFromNothing' sp
--- constructFromNothing' (ArrayIndex n:sp) = ValueArrayDynamic . I.singleton n . constructFromNothing' sp
+constructFromNothing :: StoragePath -> BasicValue -> V.Value
+constructFromNothing (StoragePath p) = constructFromNothing' p
+
+constructFromNothing' :: [StoragePathPiece] -> BasicValue -> V.Value
+constructFromNothing' [] = fromBasic
+constructFromNothing' [Field "length"] = \case
+  BInteger n -> ValueArraySentinel $ fromIntegral n
+  bv -> ValueStruct [("length", constructFromNothing' [] bv)]
+constructFromNothing' (Field n:sp) = \bv -> ValueStruct [(decodeUtf8 n, constructFromNothing' sp bv)]
+constructFromNothing' (MapIndex n:sp) =
+  ValueMapping . M.singleton (fromIndex n) . constructFromNothing' sp
+constructFromNothing' (ArrayIndex n:sp) =
+  ValueArrayDynamic . I.singleton n . constructFromNothing' sp
 
 -- -- analyze :: TotalStorage -> [(StoragePath, BasicValue)]
 -- -- analyze = HM.foldlWithKey' go []
