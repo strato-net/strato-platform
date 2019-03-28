@@ -67,23 +67,25 @@ instance FromJSON SolidityValue where
   parseJSON _ = fail "Failed to parse solidity value"
 
 valueToSolidityValue :: Value -> SolidityValue
-valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
-valueToSolidityValue (SimpleValue (ValueInt _ _ v)) =  SolidityNum $ toInteger v
+valueToSolidityValue = \case
+  SimpleValue (ValueBool x) -> SolidityBool x
+  SimpleValue (ValueInt _ _ v) ->  SolidityNum $ toInteger v
 
-valueToSolidityValue (SimpleValue (ValueString s)) = SolidityValueAsString s
-valueToSolidityValue (SimpleValue (ValueAddress (Address addr))) =
-  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSolidityValue (ValueContract (Address addr)) =
-  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSolidityValue (ValueArrayFixed _ values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (ValueArrayDynamic values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (SimpleValue (ValueBytes _ bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
-valueToSolidityValue (ValueEnum _ _ index)              = SolidityValueAsString $ Text.pack $ show index
-valueToSolidityValue (ValueStruct namedItems) =
-  SolidityObject $ map (fmap valueToSolidityValue) namedItems
-valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
-  SolidityValueAsString $ Text.pack $ "function ("
-                          ++ intercalate "," (map (formatType . snd) paramTypes)
-                          ++ ") returns ("
-                          ++ intercalate "," (map (formatType . snd) returnTypes)
-                          ++ ")"
+  SimpleValue (ValueString s) -> SolidityValueAsString s
+  SimpleValue (ValueAddress (Address addr)) ->
+   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  ValueContract (Address addr) ->
+   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  ValueArrayFixed _ values -> SolidityArray $ map valueToSolidityValue values
+  ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue $ unsparse values
+  SimpleValue (ValueBytes _ bytes) -> SolidityValueAsString $ Text.pack $ BC.unpack bytes
+  ValueEnum _ _ index              -> SolidityValueAsString $ Text.pack $ show index
+  ValueStruct namedItems -> SolidityObject $ map (fmap valueToSolidityValue) namedItems
+  ValueFunction _ paramTypes returnTypes ->
+   SolidityValueAsString $ Text.pack $ "function ("
+                           ++ intercalate "," (map (formatType . snd) paramTypes)
+                           ++ ") returns ("
+                           ++ intercalate "," (map (formatType . snd) returnTypes)
+                           ++ ")"
+  ValueMapping{} -> error "Value mapping"
+  ValueArraySentinel{} -> error "array sentinel"

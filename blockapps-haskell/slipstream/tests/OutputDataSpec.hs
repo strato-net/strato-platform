@@ -6,6 +6,7 @@
 module OutputDataSpec where
 
 import Conduit
+import qualified Data.IntMap as I
 import qualified Data.Map as M
 import Data.Time
 import Numeric
@@ -38,7 +39,7 @@ spec = do
             transactionHash = hash "<TRANSACTIONHASH>",
             transactionSender = testAdd,
             functionCallData = Nothing,
-            contractData = M.singleton "owners" $ V.ValueArrayDynamic [
+            contractData = M.singleton "owners" . V.ValueArrayDynamic . I.fromList $ zip [0..] [
                 V.ValueStruct [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
@@ -114,7 +115,7 @@ spec = do
              transactionHash = hash "<TRANSACTIONHASH>",
              transactionSender = testAdd,
              functionCallData = Nothing,
-             contractData = M.singleton "owners" $ V.ValueArrayDynamic [
+             contractData = M.singleton "owners" . V.ValueArrayDynamic . I.fromList $ zip [0..] [
                 V.ValueStruct [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
@@ -221,7 +222,7 @@ spec = do
             transactionHash = hash "<TRANSACTIONHASH>",
             transactionSender = testAdd,
             functionCallData = Nothing,
-            contractData = M.singleton "\"owners\"" $ V.ValueArrayDynamic [
+            contractData = M.singleton "\"owners\"" . V.ValueArrayDynamic . I.fromList $ zip [0..] [
                 V.ValueStruct [
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]

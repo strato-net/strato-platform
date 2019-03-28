@@ -30,6 +30,7 @@ import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Base16           as B16
 import qualified Data.ByteString.Char8            as BC
+import qualified Data.IntMap                      as I
 import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
@@ -68,7 +69,7 @@ valueToSolidityValue = \case
   ValueContract (Address addr) ->
    SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
   ValueArrayFixed _ values -> SolidityArray $ map valueToSolidityValue values
-  ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue values
+  ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue $ unsparse values
   SimpleValue (ValueBytes _ bytes) ->
    SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
   ValueEnum _ _ index              -> SolidityValueAsString $ Text.pack $ show index
@@ -249,18 +250,19 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
 
   TypeArrayDynamic ty ->
     case value of
-      ValueArrayDynamic vals -> ValueArrayDynamic theList
+      ValueArrayDynamic vals -> ValueArrayDynamic $ theList
         where
           vlen = length vals
           len = fromMaybe vlen $ fromIntegral <$> cache offset
-          vals' = if len < vlen
-                    then take len vals
-                    else vals ++ replicate (len - vlen) (decodeValue' typeDefs' (const 0) 0 0 False doesntMatter ty)
-                      -- Our cache function is (Just 0), so we don't need to pass in the correct offset
-                      where doesntMatter = Storage.Position 0 0
+          doesntMatter = decodeValue' typeDefs' (const 0) 0 0 False (Storage.Position 0 0) ty -- Is this still necessary?
+          vals' = if len >= vlen
+                    then I.filterWithKey (\k _ -> k <= len) vals
+                    else vals `I.union` I.fromList [(k, doesntMatter) | k <- [vlen..len-1]]
+
           (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-          theList = zipWith (\ofs val -> decodeCacheValue' typeDefs' cache ((arrayPosition (toInteger elementSize) ofs) `Storage.addOffset` startingKey) val ty) [0..] vals'
           startingKey = getArrayStartingKey offset
+          toPosition ofs' = arrayPosition (toInteger elementSize) (fromIntegral ofs') `Storage.addOffset` startingKey
+          theList = I.mapWithKey (\ofs val -> decodeCacheValue' typeDefs' cache (toPosition ofs) val ty) vals'
       v -> error $ "decodeCacheValue': Expected ValueArrayDynamic, but got: " ++ show v
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
@@ -400,7 +402,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
   TypeArrayDynamic ty -> if len
     then SimpleValue $ valueUInt (toInteger $ storage offset)
-    else ValueArrayDynamic theList
+    else ValueArrayDynamic . I.fromList . zip [0..] $ theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
@@ -534,8 +536,8 @@ encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} ty = \case
     TypeArrayDynamic ty' ->
       let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty'
           startingKey = getArrayStartingKey offset
-          f i v = encodeValue' typeDefs' (arrayPosition (toInteger elementSize) i `Storage.addOffset` startingKey) ty' v
-       in (offset, fromIntegral $ length vs) : (join $ zipWith f [0..] vs)
+          f (i, v) = encodeValue' typeDefs' (arrayPosition (toInteger elementSize) (fromIntegral i) `Storage.addOffset` startingKey) ty' v
+       in (offset, fromIntegral $ fst (I.findMax vs) + 1) : concatMap f (I.toList vs)
     _ -> error $ "encodeValue': Expected ValueArrayDynamic to have type TypeArrayDynamic, but got: " ++ show ty
 
   -- ValueMapping _ -> error "Mappings not supported yet" --SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleValue tyk ++ " => " ++ formatValue tyv ++ ")"

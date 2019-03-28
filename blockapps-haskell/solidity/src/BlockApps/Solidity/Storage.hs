@@ -5,6 +5,7 @@ module BlockApps.Solidity.Storage where
 import           Data.Bits                (complement, shiftR, (.&.))
 import           Data.Bool
 import           Data.ByteString          (ByteString)
+import qualified Data.IntMap              as I
 import           Data.Maybe               (fromMaybe)
 import           Data.Word                (Word8)
 
@@ -20,10 +21,10 @@ toStorage = \case
   SimpleValue v -> simpleToStorage v
   ValueArrayDynamic vs -> toStorage (SimpleValue (valueUInt k))
                           `ByteString.append`
-                          toStorage (ValueArrayFixed k vs)
+                          toStorage (ValueArrayFixed k $ unsparse vs)
     where
       k :: Num n => n
-      k = fromIntegral (length vs)
+      k = fromIntegral (I.size vs)
   ValueArrayFixed _ vs ->
     let
       head' = map (\v -> if isDynamic v then Nothing else Just (toStorage v)) vs

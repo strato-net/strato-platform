@@ -13,6 +13,8 @@ import           Data.ByteString         (ByteString)
 import qualified Data.ByteString         as ByteString
 import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Lazy    as ByteString.Lazy
+import           Data.Hashable
+import qualified Data.IntMap             as I
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Map.Strict         as Map
 import           Data.Text               (Text)
@@ -46,7 +48,7 @@ valueBytes = ValueBytes Nothing
 
 data Value
   = SimpleValue SimpleValue
-  | ValueArrayDynamic [Value]
+  | ValueArrayDynamic (I.IntMap Value) -- A sparse representation makes updates more efficient than O(n)
   | ValueArrayFixed Word [Value]
   | ValueContract Address
   | ValueEnum Text Text Word256
@@ -67,7 +69,25 @@ data SimpleValue
   | ValueBytes { bytesSize :: Maybe Integer
                , bytesVal  :: ByteString
                }
-    deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord)
+    deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord, Hashable)
+
+zeroOf :: Value -> Value
+zeroOf = \case
+  SimpleValue sv -> SimpleValue $ case sv of
+    ValueBool{} -> ValueBool False
+    ValueAddress{} -> ValueAddress 0x0
+    ValueString{} -> ValueString ""
+    ValueInt sign size _ -> ValueInt sign size 0
+    ValueBytes size _ -> ValueBytes size ""
+  ValueContract{} -> ValueContract 0x0
+  ValueArrayDynamic{} -> ValueArrayDynamic I.empty
+  ValueMapping{} -> ValueMapping Map.empty
+  ValueStruct fs -> ValueStruct $ map (fmap zeroOf) fs
+  ValueArraySentinel len -> ValueArraySentinel len
+  ValueArrayFixed{} -> error "default value of sized array"
+  ValueFunction{} -> error "default value of function"
+  ValueEnum{} -> error "default value of enum"
+
 
 bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
 bytesToSimpleValue bs = \case
@@ -105,7 +125,7 @@ bytesToValue b = \case
     let
       rb = ByteString.drop 32 b
       valArray = splitBytes rb ty
-    in ValueArrayDynamic <$> sequence valArray
+    in ValueArrayDynamic . I.fromList . zip [0..] <$> sequence valArray
   TypeArrayFixed len ty ->
     let valArray = splitBytes b ty
     in ValueArrayFixed len <$> sequence valArray
@@ -190,12 +210,17 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
               return $
                 (tBytes,headType) : rest
 
+unsparse :: I.IntMap Value -> [Value]
+unsparse = go 0 . I.toList
+ where go _ [] = []
+       go n kvs@((k, v):kvs') | n == k = v:go (n +1) kvs'
+                              | otherwise = zeroOf v:go (n+1) kvs
 
 valueToText :: Value -> Text
 valueToText = \case
   SimpleValue sv -> simpleValueToText sv
   ValueArrayDynamic vals ->
-    "[" <> Text.intercalate "," (map valueToText vals) <> "]"
+    "[" <> Text.intercalate "," (map valueToText $ unsparse vals) <> "]"
   ValueArrayFixed _ vals ->
     "[" <> Text.intercalate "," (map valueToText vals) <> "]"
   ValueMapping m ->
@@ -218,7 +243,7 @@ simpleValueToText sv = case sv of
 textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
 textToValue defs str = \case
   SimpleType ty -> SimpleValue <$> textToSimpleValue str ty
-  TypeArrayDynamic ty -> ValueArrayDynamic <$>
+  TypeArrayDynamic ty -> ValueArrayDynamic . I.fromList . zip [0..] <$>
     traverse (flip (textToValue defs) ty)
       (Text.split (== ',') (Text.dropAround (\ c -> c == '[' || c == ']') str))
   TypeArrayFixed len ty -> ValueArrayFixed len <$>
