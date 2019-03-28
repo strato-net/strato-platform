@@ -228,7 +228,7 @@ textToValue defs str = \case
     Nothing -> Left $ "Enum values cannot be parsed without type definitions" -- TODO(dustin): Pass in TypeDefs
     Just tds -> case Map.lookup name (enumDefs tds) of
       Nothing -> Left $ "Missing enum name in type definitions: " <> name
-      Just eSet -> case Bimap.lookupR str eSet of
+      Just eSet -> case Bimap.lookupR (last $ Text.split (== '.') str) eSet of
         Nothing -> Left $ "Missing value '" <> str <> "' in enum definition for " <> name
         Just i -> Right $ ValueEnum name str $ fromIntegral i
   TypeStruct{}   -> Left "textToValue TODO: TypeStruct not yet implemented"
