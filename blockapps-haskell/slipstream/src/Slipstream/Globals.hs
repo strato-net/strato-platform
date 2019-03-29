@@ -33,12 +33,12 @@ updateGlobals gref g = do
   recordGlobals g
   writeIORef gref g
 
-setSolidVMDetails :: MonadIO m => IORef Globals -> SHA -> Text -> Text -> m ()
-setSolidVMDetails gref !codeHash !name !abi = do
+setSolidVMDetails :: MonadIO m => IORef Globals -> SHA -> Text -> m ()
+setSolidVMDetails gref !codeHash !abi = do
   globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{solidVMDetails=HM.insert codeHash (name, abi) solidVMDetails}
+  updateGlobals gref globals{solidVMDetails=HM.insert codeHash abi solidVMDetails}
 
-getSolidVMDetails :: MonadIO m => IORef Globals -> SHA -> m (Maybe (Text, Text))
+getSolidVMDetails :: MonadIO m => IORef Globals -> SHA -> m (Maybe Text)
 getSolidVMDetails gref codeHash = HM.lookup codeHash . solidVMDetails <$> readIORef gref
 
 setContractCreated :: MonadIO m => IORef Globals -> SHA -> m ()

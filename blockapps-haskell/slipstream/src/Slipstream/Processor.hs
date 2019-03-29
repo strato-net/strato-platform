@@ -9,6 +9,7 @@
     , RecordWildCards
     , ScopedTypeVariables
     , TemplateHaskell
+    , TupleSections
 #-}
 
 module Slipstream.Processor where
@@ -249,20 +250,25 @@ makeFunctionInserts xabi ABIID{..} state Action{..} =
           }
       }
 
+lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
+lookupT k mp = MaybeT . return $ Map.lookup k mp
+
 getCachedSolidVMDetails :: IORef Globals -> Action -> Bloc (Maybe (Text, Text))
 getCachedSolidVMDetails g row = liftM2 (<|>)
-  (getSolidVMDetails g $ actionCodeHash row)
   (runMaybeT $ do
-    let md = actionMetadata row
-    let lookupT k m = MaybeT . return $ Map.lookup k m
+    name <- lookupT "name" md
+    abi <- MaybeT $ getSolidVMDetails g (actionCodeHash row)
+    return (name, abi))
+  (runMaybeT $ do
     src <- lookupT "src" md
     name <- lookupT "name" md
     detailsMap <- lift $ sourceToContractDetails True src
     (_, details) <- lookupT name detailsMap
     let abi = xabiToText $ contractdetailsXabi details
-    setSolidVMDetails g (actionCodeHash row) name abi
+    setSolidVMDetails g (actionCodeHash row) abi
     return (name, abi)
   )
+ where md = actionMetadata row
 
 xabiToText :: Xabi -> Text
 xabiToText = T.replace "\'" "\'\'"
@@ -273,7 +279,6 @@ detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
   (runMaybeT $ do
     let md = actionMetadata row
-    let lookupT k m = MaybeT . return $ Map.lookup k m
     liftIO . infoM "metadata is " $ show md
     liftIO $ infoM "detailsForRow" "Querying src"
     src <- lookupT "src" md

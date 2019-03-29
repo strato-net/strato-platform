@@ -75,10 +75,7 @@ recordGlobals g = liftIO $ do
   rec "function_history_list" (S.size . functionHistoryList)
   rec "no_index_list" (S.size . noIndexList)
   rec "solidvm_details_count" (HM.size . solidVMDetails)
-  rec "solidvm_details_bytes" ( sum
-                              . map (\(t1, t2) -> T.length t1 + T.length t2)
-                              . HM.elems
-                              . solidVMDetails)
+  rec "solidvm_details_bytes" (sum . map T.length . HM.elems . solidVMDetails)
   rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()

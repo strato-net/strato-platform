@@ -20,7 +20,7 @@ data Globals = Globals { createdContracts :: S.Set SHA -- list of contacts with 
                        , historyList :: S.Set SHA
                        , noIndexList :: S.Set SHA
                        , functionHistoryList :: S.Set SHA
-                       , solidVMDetails :: HM.HashMap SHA (Text, Text)
+                       , solidVMDetails :: HM.HashMap SHA Text
                        , contractStates :: LRU (Address, Maybe ChainId) [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

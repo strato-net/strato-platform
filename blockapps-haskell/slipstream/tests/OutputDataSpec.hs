@@ -471,4 +471,4 @@ spec = do
     g <- newGlobals fakeHandle
 
     cs <- runConduit (createInsertIndexTable g input .| sinkList)
-    cs `shouldBe` []
+    cs `shouldNotBe` []
