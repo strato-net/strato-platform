@@ -417,7 +417,11 @@ processTheMessages env conn g messages = do
 
   forM_ (lefts inserts) $ errorM "processTheMessages" . T.unpack
 
-  let insertsByCodeHash = map snd . partitionWith (codehash . indexInsert) $ rights inserts
+  let insertsByCodeHash = map snd
+                        -- SolidVM contracts can have the same codehash and be different:
+                        -- the codehash is just a sourcehash.
+                        . partitionWith (codehash . indexInsert &&& contractName . indexInsert)
+                        $ rights inserts
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn . createInsertIndexTable g $ map indexInsert ins
     outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
