@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-warn-deprecations #-}
 
 --import Control.Monad
 --import Control.Monad.Trans.Class
@@ -29,7 +28,7 @@ main = do
 -}
 
   _  <- LDB.runResourceT $ do
-    sourceList input $$ outputToLDB
+    runConduit $ sourceList input .| outputToLDB
     
   return ()
 

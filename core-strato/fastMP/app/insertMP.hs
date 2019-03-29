@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-warn-deprecations #-}
 
 --import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16

@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-warn-deprecations #-}
 
 module LevelDBTools (
   LevelKV(..),
@@ -18,14 +17,14 @@ data LevelKV = LevelKV ByteString ByteString deriving Show
 formatLevelKV :: LevelKV -> String
 formatLevelKV (LevelKV k v) = format k ++ " " ++ format v
 
-outputToLDB :: Sink LevelKV (ResourceT IO) ()
+outputToLDB :: ConduitT LevelKV Void (ResourceT IO) ()
 outputToLDB = do
   ldb <- LDB.open "abcd2" LDB.defaultOptions{LDB.createIfMissing=True}
   outputKVs ldb
   return ()
 
   where
-    outputKVs :: LDB.DB -> Sink LevelKV (ResourceT IO) ()
+    outputKVs :: LDB.DB -> ConduitT LevelKV Void (ResourceT IO) ()
     outputKVs ldb = do
       value <- await
       case value of

@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS -fno-warn-deprecations #-}
 
 module Main (
   main
@@ -44,7 +43,7 @@ main = do
 --  let input = map (\[x, y] -> KV x $ Right (RLPString . fst . B16.decode $ y)) c
 
 --  doit (input, []) $$ kvToStdout
-  runResourceT $ doit (input, []) $$ outputToLDB
+  runResourceT $ runConduit $ doit (input, []) .| outputToLDB
 
 {-
 kvToStdout :: MonadIO m => Sink LevelKV m ()
@@ -57,7 +56,7 @@ kvToStdout = do
     Nothing -> return ()
 -}
 
-doit :: MonadIO m => ([KV], [(ByteString, PartialNode)]) -> Source m LevelKV
+doit :: MonadIO m => ([KV], [(ByteString, PartialNode)]) -> ConduitT () LevelKV m ()
 doit x = do
   next <- processNext x
   case next of
