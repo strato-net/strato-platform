@@ -22,7 +22,7 @@ import qualified Data.ByteString.Char8    as BC
 import           Data.Foldable            (toList)
 import           Data.List
 import qualified Data.Map                 as M
-import           Data.Maybe               (fromMaybe, mapMaybe)
+import           Data.Maybe               (mapMaybe)
 import           Data.Scientific          (floatingOrInteger)
 import           Data.Text (Text)
 import qualified Data.Text as Text
@@ -70,11 +70,13 @@ instance FromJSON SolidityValue where
   parseJSON _ = fail "Failed to parse solidity value"
 
 valueToSolidityValue :: Value -> SolidityValue
-valueToSolidityValue v = fromMaybe (error $ "sentinel in vtosv: " ++ show v) $ valueToSolidityValue' v --of
-  -- Nothing -> case v of
-  --               ValueArraySentinel n -> SolidityArray . replicate n $ SolidityValueAsString "0"
-  --               _ -> error $ "internal error: unable to convert to solidity value: " ++ show v
-  -- Just sv -> sv
+valueToSolidityValue v = case valueToSolidityValue' v of
+  Just sv -> sv
+  Nothing -> case v of
+      -- This would be better handled by Value synthesis, but it seems difficult
+      -- to distinguish the length of a nested array and an unaggregated sentinel.
+      ValueArraySentinel len -> SolidityArray $ replicate len $ SolidityValueAsString "0"
+      _ -> error $ "internal error: unanticpated problem with value construction: " ++ show v
 
 valueToSolidityValue' :: Value -> Maybe SolidityValue
 valueToSolidityValue' = \case

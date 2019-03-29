@@ -420,7 +420,7 @@ spec = do
     "strukt" = excluded."strukt";|]
 
 
-  it "can handle an empty array" $ do
+  it "can createInserts an empty array" $ do
     let testAdd = Address 0x22222222
         input = [ProcessedContract {
           address = testAdd,
@@ -443,3 +443,32 @@ spec = do
 
     T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
     T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]
+
+  it "can createInsertsIndexTable an empty array" $ do
+    let testAdd = Address 0x22222222
+        input = [ProcessedContract {
+          address = testAdd,
+          codehash = hash "<CODEHASH>",
+          abi = "<ABI>",
+          contractName = "SwissArmy",
+          chain = "<CHAIN>",
+          blockHash = hash "<BLOCKHASH>",
+          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          blockNumber = 146,
+          transactionHash = hash "<TRANSACTIONHASH>",
+          transactionSender = testAdd,
+          functionCallData = Nothing,
+          contractData = M.fromList [ ("isIterable", bool False)
+                                    , ("keyMap", V.ValueMapping $ M.fromList [
+                                          (V.valueBytes "4517546854860", int 1)])
+                                    , ("keys", V.ValueArraySentinel 1)
+                                    , ("owner", V.SimpleValue $ V.ValueAddress
+                                                  0xf5c1df0fd1015bb6ed5c966ad58a0f66af59b130)
+                                    , ("values", V.ValueArrayDynamic . I.singleton 1
+                                                  . V.ValueArraySentinel $ 1)
+                                    ]
+          }]
+    g <- newGlobals fakeHandle
+
+    cs <- runConduit (createInsertIndexTable g input .| sinkList)
+    cs `shouldBe` []

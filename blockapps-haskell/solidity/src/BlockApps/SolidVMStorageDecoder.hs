@@ -51,13 +51,10 @@ decodeCacheValues hxs prevState = either (error . printf "SVM.decodeCacheValues:
   finalState <- bimap show HM.toList $ case prevState of
     [] -> synthesize pathValues
     tvs -> replayDeltas pathValues . HM.fromList . map (first encodeUtf8) $ tvs
-  mapM (firstM bsToText) finalState
+  mapM (bimapM bsToText return) finalState
 
 bsToText :: B.ByteString -> Either String T.Text
 bsToText = first show . decodeUtf8'
-
-firstM :: Monad m => (a1 -> m a2) -> (a1, b) -> m (a2, b)
-firstM f (a1, b) = (,b) <$> f a1
 
 -- Why another time?
 --  - original vToSV can't handle sentinels without introducing a monad

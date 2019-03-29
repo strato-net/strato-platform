@@ -414,8 +414,6 @@ processTheMessages env conn g messages = do
 
   let insertsByCodeHash = map snd . partitionWith (codehash . indexInsert) $ rights inserts
   forM_ insertsByCodeHash $ \ins -> do
-    forM_ (map indexInsert ins) $ \ii -> do
-      infoM "processor insert: " . show $ contractData ii
-      outputData conn $ createInsertIndexTable g [ii]
+    outputData conn . createInsertIndexTable g $ map indexInsert ins
     outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
     outputData conn . createInsertFunctionHistoryTable g $ concatMap functionInserts ins
