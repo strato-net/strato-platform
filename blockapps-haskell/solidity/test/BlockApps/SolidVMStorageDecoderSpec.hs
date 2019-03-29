@@ -120,6 +120,12 @@ spec = do
                                        , (forceParse ".map<5>", BBool False)]
       got `shouldBe` Right want
 
+    it "should be able to override an array sentinel" $ do
+      let spine = HM.singleton "arr" . ValueArrayDynamic . I.singleton 3
+          cache = spine $ ValueArraySentinel 3
+          want = spine $ ValueContract 0x888
+      replayDeltas [(forceParse ".arr[3]", BContract "ok" 0x888)] cache `shouldBe` Right want
+
   describe "Synthesis" $ do
     it "can synthesize nothing" $ do
       synthesize [] `shouldBe` Right HM.empty
