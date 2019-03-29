@@ -52,6 +52,7 @@ fromBasic = \case
   MS.BAddress a -> SAddress a
   MS.BContract n a -> SContract (T.unpack n) (fromIntegral a)
   MS.BEnumVal k v -> SEnumVal (T.unpack k) (T.unpack v)
+  MS.BMappingSentinel -> SMappingSentinel
   MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
 
 findDefault :: BasicType -> Value
@@ -74,6 +75,7 @@ toBasic = \case
   SAddress a -> MS.BAddress a
   SContract n a -> MS.BContract (T.pack n) (fromIntegral a)
   SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
+  SMappingSentinel -> MS.BMappingSentinel
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
 setVar :: AddressedPath-> Value -> SM ()

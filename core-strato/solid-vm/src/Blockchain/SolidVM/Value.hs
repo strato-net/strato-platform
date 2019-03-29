@@ -82,6 +82,7 @@ data Value =
                               -- can be canonicalized
   | SHexDecodeAndTrim -- Hack to implement blockapps-sol's bytes32ToString without
                       -- supporting indexing into bytes32s.
+  | SMappingSentinel
   deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing

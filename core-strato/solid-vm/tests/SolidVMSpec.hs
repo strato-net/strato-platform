@@ -255,23 +255,25 @@ spec = do
     it "should be able to insert into a mapping" . runTest $ do
       runFile "testdata/MappingSet.sol"
       st <- checkStorage
-      st `shouldSatisfy` (== 2) . length
+      st `shouldSatisfy` (== 3) . length
       getAll
-        [ [Field "us", MapIndex (INum 22)]
+        [ [Field "us"]
+        , [Field "us", MapIndex (INum 22)]
         , [Field "us", MapIndex (INum 999999)]
         , [Field "us", MapIndex (INum 10)]
-        ] `shouldReturn` [BInteger 4, BInteger 21, BDefault]
+        ] `shouldReturn` [BMappingSentinel, BInteger 4, BInteger 21, BDefault]
 
     it "should be able to read from a map" . runTest $ do
       runFile "testdata/MappingRead.sol"
       st <- checkStorage
       -- The z assignment doesn't count, as at is set to the empty string
-      st `shouldSatisfy` (== 3) . length
+      st `shouldSatisfy` (== 4) . length
       getAll
-        [ [Field "xs", MapIndex (INum 400)]
+        [ [Field "xs"]
+        , [Field "xs", MapIndex (INum 400)]
         , [Field "y"]
         , [Field "z"]
-        ] `shouldReturn` [BInteger 343, BInteger 343, BInteger 0]
+        ] `shouldReturn` [BMappingSentinel, BInteger 343, BInteger 343, BInteger 0]
 
     it "should be able to set array length" . runTest $ do
       runFile "testdata/Length.sol"
@@ -1464,3 +1466,11 @@ contract qq {
     [BContract "X" x] <- getFields ["x"]
     getSolidStorageKeyVal' x (singleton "i") `shouldReturn` BInteger 0
     getSolidStorageKeyVal' x (singleton "s") `shouldReturn` BString ""
+
+  it "will create a sentinel for mappings" . runTest $ do
+    runBS [r|
+contract qq {
+  mapping(string => uint) assoc;
+}|]
+    getFields ["assoc"] `shouldReturn` [BMappingSentinel]
+

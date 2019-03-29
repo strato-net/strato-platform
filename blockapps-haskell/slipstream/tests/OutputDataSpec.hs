@@ -419,7 +419,6 @@ spec = do
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
 
-
   it "can createInserts an empty array" $ do
     let testAdd = Address 0x22222222
         input = [ProcessedContract {

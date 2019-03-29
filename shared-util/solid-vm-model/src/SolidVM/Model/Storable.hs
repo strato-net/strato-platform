@@ -31,6 +31,9 @@ data BasicValue = BInteger !Integer
                 | BAddress !Address
                 | BEnumVal !T.Text !T.Text
                 | BContract !T.Text !Address
+                  -- The sole purpose of this sentinel is to make slipstream reserve
+                  -- a column for this mapping
+                | BMappingSentinel
                 | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable, Binary)
 
@@ -208,14 +211,16 @@ instance RLPSerializable BasicValue where
     BAddress a -> RLPArray [RLPScalar 3, rlpEncode a]
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
     BEnumVal a b -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b]
-  rlpDecode x@(RLPArray ((RLPScalar t):f:s)) =
+    BMappingSentinel -> RLPArray [RLPScalar 6]
+  rlpDecode x@(RLPArray ((RLPScalar t):s)) =
     case (t, s) of
-      (0, []) -> BInteger $ rlpDecode f
-      (1, []) -> BString $ rlpDecode f
-      (2, []) -> BBool $ rlpDecode f
-      (3, []) -> BAddress $ rlpDecode f
-      (4, [a']) -> BContract (rlpDecode f) (rlpDecode a')
-      (5, [s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
+      (0, [f]) -> BInteger $ rlpDecode f
+      (1, [f]) -> BString $ rlpDecode f
+      (2, [f]) -> BBool $ rlpDecode f
+      (3, [f]) -> BAddress $ rlpDecode f
+      (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
+      (5, [f, s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
+      (6, []) -> BMappingSentinel
       _ -> error $ "invalid type or data length for BasicValue: " ++ show x
   rlpDecode (RLPString "") = BDefault
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x

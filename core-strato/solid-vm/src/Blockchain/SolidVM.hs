@@ -171,7 +171,7 @@ initializeStorage root value = do
        V.imapM_ (\i v -> case v of
         Constant c -> initializeStorage (root `apSnoc` MS.ArrayIndex i) c
         _ -> todo "nonconstant vector init" (root, value)) iv
-     SMap _ im -> if M.null im then return ()
+     SMap _ im -> if M.null im then setVar root SMappingSentinel
                                else todo "initialize map storage " value
      -- References are already initialized
      SReference{} -> return ()
