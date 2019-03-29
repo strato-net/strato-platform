@@ -1438,3 +1438,29 @@ contract qq {
     return msg.sender;
   }
 }|] `shouldReturn` Just (SB.toShort want)
+
+  it "will initialize contracts as such" . runTest $ do
+    runBS [r|
+contract X {}
+
+contract qq {
+  X x;
+}|]
+    getFields ["x"] `shouldReturn` [BContract "X" 0x0]
+
+  it "will initialize fields of indirect constructions" . runTest $ do
+    runBS [r|
+contract X {
+  uint i;
+  string s;
+}
+
+contract qq {
+  X x;
+  constructor() {
+    x = new X();
+  }
+}|]
+    [BContract "X" x] <- getFields ["x"]
+    getSolidStorageKeyVal' x (singleton "i") `shouldReturn` BInteger 0
+    getSolidStorageKeyVal' x (singleton "s") `shouldReturn` BString ""

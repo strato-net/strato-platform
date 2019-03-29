@@ -151,7 +151,8 @@ defaultValue Xabi.Bool = SBool False
 defaultValue (Xabi.Address) = SAddress $ Address 0
 defaultValue (Xabi.String _) = SString ""
 defaultValue (Xabi.Bytes _ _) = SString ""
-defaultValue (Xabi.Label name) = SString $ "Label: " ++ name  --TODO- clearly this is wrong.......  I just need something here to run the program through to the end, this needs to be fixed later
+-- TODO: The label could also be an enum or a struct
+defaultValue (Xabi.Label name) = SContract name 0x0
 defaultValue x = todo "defaultValue" x
 
 

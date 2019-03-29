@@ -807,7 +807,7 @@ expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) arg
   (hsh, cc) <- getCurrentCodeCollection
   incrementNonce creator
   execResults <- create' creator hsh cc contractName' argExps
-  return $ Constant $ SAddress
+  return $ Constant $ SContract contractName' $ fromIntegral
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAddress execResults
 
