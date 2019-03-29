@@ -37,12 +37,12 @@ async function upload(vm) {
 
 async function incr(user, contract, vm) {
   return await co.wrap(rest.callMethod)(
-    user, contract, "incr", {'VM': vm});
+    user, contract, "incr", {}, {'VM': vm});
 }
 
 async function read(user, contract, vm) {
   return await co.wrap(rest.callMethod)(
-    user, contract, "read", {'VM': vm});
+    user, contract, "read", {}, {'VM': vm});
 }
 
 async function state(contract) {
@@ -55,26 +55,6 @@ async function index(contract) {
 }
 
 describe('Solid VM: Contract uploads', async () => {
-  // it ('can upload an EVM counter', async () => {
-  //   const [user, results] = await upload('EVM');
-  //   console.log(`${JSON.stringify(results)}`);
-  // }).timeout(config.timeout);
-
-  // it ('can upload a SolidVM counter', async () => {
-  //   const [user, results] = await upload('SolidVM');
-  //   console.log(`${JSON.stringify(results)}`);
-  // }).timeout(config.timeout);
-
-  // it ('can count upwards on the EVM counter', async () => {
-  //   const [user, contract] = await upload('EVM');
-  //   console.log(`Counting to 5`);
-  //   for (let i = 0; i < 5; i ++) {
-  //     await incr(user, contract, 'EVM');
-  //   }
-  //   console.log(`Checking our work`);
-  //   const results = await read(user, contract, 'EVM');
-  //   console.log(`Results: ${JSON.stringify(results)}`);
-  // }).timeout(config.timeout);
 
   it ('can count upwards on the SolidVM counter', async () => {
     const [user, contract] = await upload('SolidVM');
@@ -83,14 +63,18 @@ describe('Solid VM: Contract uploads', async () => {
     for (let i = 0; i < 5; i++) {
       await incr(user, contract, 'SolidVM');
     }
-    console.log(`Checking our work`);
+
+    console.log('Transacting to read state');
     const gotRead = await read(user, contract, 'SolidVM');
     assert.deepEqual(gotRead, ["5"]);
+
+    console.log('Reading state from bloch');
     const gotState = await state(contract);
-    assert.equal(gotState.count, "5");
+    assert.equal(gotState.count, '5');
+
+    console.log('Reading state from cirrus');
     const gotIndex = await index(contract);
     assert.equal(gotIndex[0].address, contract.address);
-    // TODO: enable the following line
     assert.equal(gotIndex[0].count, 5);
   }).timeout(config.timeout);
 })
