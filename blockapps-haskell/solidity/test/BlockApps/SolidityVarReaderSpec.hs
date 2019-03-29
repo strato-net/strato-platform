@@ -2,6 +2,7 @@
 module BlockApps.SolidityVarReaderSpec where
 
 import Control.Monad
+import qualified Data.IntMap as I
 import qualified Data.Map.Ordered as OM
 import Test.Hspec
 
@@ -39,3 +40,9 @@ spec = do
                       )
                 ]
     forM_ cases $ \(tipe, input, want) -> structSort tipe input `shouldBe` want
+
+  it "should be able to unsparse an array" $ do
+    let int = SimpleValue . valueInt
+    unsparse (I.singleton 0 (ValueArraySentinel 0)) `shouldBe` []
+    unsparse (I.fromList [(1, addr 9), (3, ValueArraySentinel 3)]) `shouldBe` [addr 0, addr 9, addr 0]
+    unsparse (I.singleton 2 (ValueArraySentinel 2)) `shouldBe` [int 0, int 0]

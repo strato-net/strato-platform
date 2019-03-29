@@ -9,6 +9,7 @@ import Conduit
 import qualified Data.ByteString as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
+import qualified Data.Text as T
 import Data.Time
 import Numeric
 import Test.Hspec
@@ -21,6 +22,7 @@ import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
+import Slipstream.SolidityValue
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAddress
@@ -36,6 +38,10 @@ int = V.SimpleValue . V.valueInt
 
 spec :: Spec
 spec = do
+
+  it "should be able to process array sentinels" $ do
+    valueToSolidityValue (V.ValueArrayDynamic $ I.singleton 2 (V.ValueArraySentinel 2))
+      `shouldBe` SolidityArray [SolidityNum 0, SolidityNum 0]
 
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
@@ -386,7 +392,7 @@ spec = do
     '000000000000000000000000000000098eaddede',
     '',
     '00000000000000000000000000000000deadbeef',
-    '["0","20","40","77"]',
+    '["0","20","40","77","0"]',
     'True',
     '0000000000000000000000000000000000000999',
     '564',
@@ -412,3 +418,28 @@ spec = do
     "set" = excluded."set",
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
+
+
+  it "can handle an empty array" $ do
+    let testAdd = Address 0x22222222
+        input = [ProcessedContract {
+          address = testAdd,
+          codehash = hash "<CODEHASH>",
+          abi = "<ABI>",
+          contractName = "SwissArmy",
+          chain = "<CHAIN>",
+          blockHash = hash "<BLOCKHASH>",
+          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          blockNumber = 146,
+          transactionHash = hash "<TRANSACTIONHASH>",
+          transactionSender = testAdd,
+          functionCallData = Nothing,
+          contractData = M.singleton "array_nums" . V.ValueArrayDynamic
+                       . I.singleton 1 $ V.ValueArraySentinel 1
+          }]
+    g <- newGlobals fakeHandle
+
+    [_, swissArmyCreate, swissArmyInsert] <- runConduit (createInserts g input .| sinkList)
+
+    T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
+    T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]

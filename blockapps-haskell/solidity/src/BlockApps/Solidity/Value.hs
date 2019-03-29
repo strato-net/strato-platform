@@ -83,7 +83,7 @@ zeroOf = \case
   ValueArrayDynamic{} -> ValueArrayDynamic I.empty
   ValueMapping{} -> ValueMapping Map.empty
   ValueStruct fs -> ValueStruct $ fmap zeroOf fs
-  ValueArraySentinel len -> ValueArraySentinel len
+  ValueArraySentinel{} -> SimpleValue $ ValueInt True Nothing 0
   ValueArrayFixed{} -> error "default value of sized array"
   ValueFunction{} -> error "default value of function"
   ValueEnum{} -> error "default value of enum"
@@ -211,10 +211,14 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
                 (tBytes,headType) : rest
 
 unsparse :: I.IntMap Value -> [Value]
-unsparse = go 0 . I.toList
- where go _ [] = []
-       go n kvs@((k, v):kvs') | n == k = v:go (n +1) kvs'
-                              | otherwise = zeroOf v:go (n+1) kvs
+unsparse imap =
+  let def = fromMaybe (error "internal error: ValueDynamicArray must be nonempty")
+          $ zeroOf . snd <$> I.lookupMin imap
+      go _ [] = []
+      go n [(_, ValueArraySentinel len)] = replicate (len - n) def
+      go n kvs@((k, v):kvs') | n == k = v:go (n +1) kvs'
+                             | otherwise = def:go (n+1) kvs
+  in go 0 $ I.toList imap
 
 valueToText :: Value -> Text
 valueToText = \case

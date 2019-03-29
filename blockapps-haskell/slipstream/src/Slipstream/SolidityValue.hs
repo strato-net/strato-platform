@@ -70,7 +70,11 @@ instance FromJSON SolidityValue where
   parseJSON _ = fail "Failed to parse solidity value"
 
 valueToSolidityValue :: Value -> SolidityValue
-valueToSolidityValue = fromMaybe (SolidityValueAsString "wut the fuck") . valueToSolidityValue'
+valueToSolidityValue v = fromMaybe (error $ "sentinel in vtosv: " ++ show v) $ valueToSolidityValue' v --of
+  -- Nothing -> case v of
+  --               ValueArraySentinel n -> SolidityArray . replicate n $ SolidityValueAsString "0"
+  --               _ -> error $ "internal error: unable to convert to solidity value: " ++ show v
+  -- Just sv -> sv
 
 valueToSolidityValue' :: Value -> Maybe SolidityValue
 valueToSolidityValue' = \case
