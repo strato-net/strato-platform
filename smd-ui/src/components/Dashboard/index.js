@@ -24,7 +24,9 @@ import {
   BLOCKS_PROPAGATION,
   BLOCKS_DIFFICULTY,
   BLOCKS_FREQUENCY,
-  TRANSACTIONS_TYPE
+  TRANSACTIONS_TYPE,
+  GET_NODE_UPTINE,
+  GET_HEALTH
 } from '../../sockets/rooms'
 
 // TODO: these should be part of a reducer state. Do the same for other global variables.
@@ -56,6 +58,8 @@ class Dashboard extends Component {
     this.props.subscribeRoom(BLOCKS_DIFFICULTY)
     this.props.subscribeRoom(TRANSACTIONS_COUNT)
     this.props.subscribeRoom(TRANSACTIONS_TYPE)
+    this.props.subscribeRoom(GET_HEALTH)
+    this.props.subscribeRoom(GET_NODE_UPTINE)
 
     mixpanelWrapper.track('dashboard_page_load');
   }
@@ -69,6 +73,8 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(BLOCKS_DIFFICULTY)
     this.props.unSubscribeRoom(TRANSACTIONS_COUNT)
     this.props.unSubscribeRoom(TRANSACTIONS_TYPE)
+    this.props.unSubscribeRoom(GET_HEALTH)
+    this.props.unSubscribeRoom(GET_NODE_UPTINE)
   }
 
   render() {

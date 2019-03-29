@@ -13,7 +13,9 @@ import {
   TRANSACTIONS_TYPE,
   GET_PEERS,
   GET_COINBASE,
-  BLOCKS_FREQUENCY
+  BLOCKS_FREQUENCY,
+  GET_NODE_UPTINE,
+  GET_HEALTH
 } from '../../sockets/rooms';
 
 describe('Socket: action', () => {
@@ -64,6 +66,14 @@ describe('Socket: action', () => {
       expect(subscribeRoom(GET_TRANSACTIONS)).toMatchSnapshot();
     });
 
+    test('health', () => {
+      expect(subscribeRoom(GET_HEALTH)).toMatchSnapshot();
+    });
+
+
+    test('uptime', () => {
+      expect(subscribeRoom(GET_NODE_UPTINE)).toMatchSnapshot();
+    });
   })
 
   describe('unsubscribe', () => {
@@ -111,6 +121,17 @@ describe('Socket: action', () => {
     test('transactions', () => {
       expect(unSubscribeRoom(GET_TRANSACTIONS)).toMatchSnapshot();
     });
+
+
+    test('health', () => {
+      expect(unSubscribeRoom(GET_HEALTH)).toMatchSnapshot();
+    });
+
+
+    test('uptime', () => {
+      expect(unSubscribeRoom(GET_NODE_UPTINE)).toMatchSnapshot();
+    });
+
 
   })
 
