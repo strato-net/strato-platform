@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS -fno-warn-deprecations #-}
 
 module Main (
@@ -30,11 +31,16 @@ import LevelDBTools
 debug :: Bool
 debug = True
 
+decodeVal :: ByteString -> ByteString
+decodeVal x =
+  case B16.decode x of
+    (v, "") -> v
+    _ -> error $ "you are trying to decode a value that is not base16 encoded: " ++ show x
 
 main :: IO ()
 main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
-  let input = map (\[x, y] -> KV x $ Right (RLPString . rlpSerialize . RLPString . fst . B16.decode $ y)) c
+  let input = map (\[x, y] -> KV x $ Right (RLPString . rlpSerialize . RLPString . decodeVal $ y)) c
 --  let input = map (\[x, y] -> KV x $ Right (RLPString . fst . B16.decode $ y)) c
 
 --  doit (input, []) $$ kvToStdout
