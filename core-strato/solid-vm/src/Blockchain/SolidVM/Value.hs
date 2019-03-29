@@ -73,9 +73,9 @@ data Value =
   | SBuiltinVariable String
   | SSetterGetter String (Maybe Value)
   | SContractDef String
-  | SContractItem Integer String
-  | SContract String Integer --second param is address
-  | SContractFunction String Integer String -- contractName, address, functionName
+  | SContractItem Address String
+  | SContract String Address
+  | SContractFunction String Address String -- contractName, address, functionName
   | SPush AddressedPath -- The array function
   | SNULL
   | SReference AddressedPath  -- An alias to an existing variable, so that modifications

@@ -199,6 +199,6 @@ showSM (SMap _ m) = do
            ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
            ++ "}"
 showSM (SContract name address) = do
-  return $ "Contract: " ++ name ++ "/" ++ format (Address $ fromInteger address)
+  return $ "Contract: " ++ name ++ "/" ++ format address
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
 showSM x = todo "showSM called for unsupported value: " x

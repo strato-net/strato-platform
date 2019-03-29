@@ -642,7 +642,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
           then do
             -- TODO: Check that this contract actually is a contractName'
             addr <- getCurrentAddress
-            return $ SContractFunction contractName' (toInteger addr) constName
+            return $ SContractFunction contractName' addr constName
           else case constName `M.lookup` _constants cont of
                   Nothing -> unknownConstant "constant member access" (contractName', constName)
                   Just (Xabi.ConstantDecl _ _ constExp) -> do
@@ -661,9 +661,9 @@ expToVar' (Xabi.MemberAccess expr name) = do
           [] -> typeError "cannot use super without a parent contract" (method, ctract)
           ps -> do
             addr <- getCurrentAddress
-            return $ SContractFunction (last ps) (toInteger addr) method
+            return $ SContractFunction (last ps) addr method
 
-      (SAddress (Address a), itemName) -> return $ SContractItem (toInteger a) itemName
+      (SAddress addr, itemName) -> return $ SContractItem addr itemName
 
       (SContract contractName' a, funcName) -> return $ SContractFunction contractName' a funcName
       (SString s, "length") -> return . SInteger . fromIntegral $ length s
@@ -672,7 +672,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
     Variable vref -> do
       val' <- liftIO $ readIORef vref
       case val' of
-        SAddress (Address a) -> return . Constant $ SContractItem (toInteger a) name
+        SAddress addr -> return . Constant $ SContractItem addr name
         SStruct _ theMap -> return
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
@@ -692,8 +692,8 @@ expToVar' (Xabi.MemberAccess expr name) = do
       _ -> do
           val' <- getVar $ StorageItem apt
           case val' of
-            SAddress (Address a) -> return . Constant $ SContractItem (toInteger a) name
-            SContract _ addr -> return . Constant $ SContractItem (toInteger addr) name
+            SAddress addr -> return . Constant $ SContractItem addr name
+            SContract _ addr -> return . Constant $ SContractItem addr name
             SStruct _ theMap -> return
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
@@ -836,19 +836,19 @@ expToVar' (Xabi.FunctionCall e args) = do
     Constant (SContractDef contractName') -> do
       case argVals of
         [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
+          return $ Constant $ SContract contractName' $ Address $ fromInteger address
+        [SAddress address ] ->
           return $ Constant $ SContract contractName' address
-        [SAddress (Address address)] ->
-          return $ Constant $ SContract contractName' $ toInteger address
         [SContract _ addr] ->
           return $ Constant $ SContract contractName' $ addr
         _ -> typeError "contract variable creation" argVals
 
     Constant (SContractItem address itemName) -> do
-      result <- call'' (Address $ fromInteger address) Nothing itemName argVals
+      result <- call'' address Nothing itemName argVals
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SContractFunction name address functionName) -> do
-      result <- call'' (Address $ fromInteger address) (Just name) functionName argVals
+      result <- call'' address (Just name) functionName argVals
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SEnum enumName) -> do
