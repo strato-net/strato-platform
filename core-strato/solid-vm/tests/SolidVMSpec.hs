@@ -14,6 +14,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as SB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
+import Data.Coerce
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -34,6 +35,7 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.SHA
 import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
@@ -1473,4 +1475,27 @@ contract qq {
   mapping(string => uint) assoc;
 }|]
     getFields ["assoc"] `shouldReturn` [BMappingSentinel]
+
+
+  it "can compare contracts to int literals" . runTest $ do
+    runBS [r|
+contract qq {
+  bool eq;
+  bool neq;
+  constructor() public {
+    qq q = qq(0);
+    eq = q == 0x0;
+    neq = q != 0x0;
+  }
+}|]
+    getFields ["eq", "neq"] `shouldReturn` [BBool True, BBool False]
+
+  it "can return a contract" . runTest $ do
+    runCall "self" "()" [r|
+contract qq {
+  function self() public {
+    return qq(this);
+  }
+}|] `shouldReturn` Just (SB.toShort . word256ToBytes $ coerce uploadAddress)
+
 

@@ -94,6 +94,7 @@ instance Eq Value where
   (SString s1) == (SString s2) = s1 == s2
   (SBool b1) == (SBool b2) = b1 == b2
   (SAddress a1) == (SAddress a2) = a1 == a2
+  (SContract c1 a1) == (SContract c2 a2) = c1 == c2 && a1 == a2
   x == y = todo "Value/Eq" (x, y)
 
 instance Ord Value where
@@ -121,6 +122,7 @@ coerceFromInt SInteger{} n = SInteger n
 coerceFromInt SAddress{} n = SAddress $ fromIntegral n
 coerceFromInt SString{} 0 = SString ""
 coerceFromInt SString{} n = SString $ showHex n ""
+coerceFromInt (SContract c _) n = SContract c $ fromIntegral n
 coerceFromInt t x = typeError "invalid literal for type" (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and

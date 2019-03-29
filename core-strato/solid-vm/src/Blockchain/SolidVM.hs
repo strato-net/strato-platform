@@ -1097,6 +1097,7 @@ logVals val1 val2 = when trace . liftIO . putStrLn $ printf
 encodeForReturn :: Value -> SM ByteString
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
 encodeForReturn (SAddress a) = return . word256ToBytes . fromIntegral $ a
+encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
 encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
   return $ word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
