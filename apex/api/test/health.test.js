@@ -6,7 +6,8 @@ const rp = require('request-promise');
 const models = require('../models');
 const nodeHealthCheckJs = require('../daemons/node-health-check')
 const stallCheckJs = require('../daemons/stall-check')
-const sampleResponse = require('./testdata/promethusResponse')
+const sampleResponse = require('./testdata/prometheusFailResponse')
+const sampleResponse2 = require('./testdata/prometheusCorrectResponse')
 const config = require('../config/app.config');
 const ba = require('blockapps-rest')
 
@@ -20,10 +21,8 @@ describe('Tests - Node-level Health Check', function () {
     this.timeout(timeout);
 
     console.log(sampleResponse)
-    it('HealthStat update - FAILURE - Timestamp Comparison', async function () {
+    it('HealthStat update - FAILURE', async function () {
         let testObj = sampleResponse;
-        let currentTime = Date.now() / 1000;
-        testObj.data.result[0].value[0] = currentTime - config.healthCheck.maxResponseRange;
         const res = nodeHealthCheckJs.compareTimeStamp(testObj);
         const stat = await nodeHealthCheckJs.updateHealthStat(res);
         await nodeHealthCheckJs.updateCurrentHealth(stat);
@@ -51,11 +50,7 @@ describe('Tests - Node-level Health Check', function () {
     })
 
     it('HealthStat update - SUCCESS', async function () {
-        let testObj = sampleResponse;
-        let currentTime = Date.now() / 1000;
-        testObj.data.result.forEach((elem) => {
-            elem.value[0] = currentTime;
-        })
+        let testObj = sampleResponse2;
         const res = nodeHealthCheckJs.compareTimeStamp(testObj);
         const stat = await nodeHealthCheckJs.updateHealthStat(res);
         await nodeHealthCheckJs.updateCurrentHealth(stat);
@@ -73,7 +68,7 @@ describe('Tests - Node-level Health Check', function () {
             },
         });
         assert.equal(currentStat.dataValues.latestHealthStatus, true, `Current Health`)
-        currentTime = Date.now();
+        const currentTime = Date.now();
         assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp' )
         assert.equal((currentStat.dataValues.lastFailureTimestamp < currentStat.dataValues.latestCheckTimestamp), true, 'Last Failure Timestamp' )
 
