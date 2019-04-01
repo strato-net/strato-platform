@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 module Slipstream.Globals
   ( module Slipstream.Globals
@@ -27,6 +28,8 @@ import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8)
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Xabi     (ContractDetails(..), Xabi(..))
+import           System.Log.Logger
+import           Text.Format
 import           UnliftIO.IORef
 
 import           Slipstream.Data.Globals
@@ -48,16 +51,23 @@ xabiToText = T.replace "\'" "\'\'"
            . JSON.encode
 
 setSolidVMABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text (Int32, ContractDetails) -> m ()
-setSolidVMABIs gref (SolidVMCode _ !codeHash) detailsMap= do
+setSolidVMABIs gref (SolidVMCode _ !codeHash) detailsMap = do
+  liftIO $ infoM "setSolidVMABIs" $ format codeHash
   globals@Globals{..} <- readIORef gref
-  let !abis = force $ M.map (xabiToText . contractdetailsXabi . snd ) detailsMap
+  let !abis = force $ M.map (xabiToText . contractdetailsXabi . snd) detailsMap
   updateGlobals gref globals{solidVMABIs=HM.insert codeHash abis solidVMABIs}
 setSolidVMABIs _ EVMCode{} _ = error "internal error: setSolidVMDetails for EVMCode"
 
-getSolidVMABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe Text)
+getSolidVMABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (Text, Text))
 getSolidVMABIs gref (SolidVMCode name codeHash) = do
   abis <- solidVMABIs <$> readIORef gref
-  return $ M.lookup (T.pack name) =<< HM.lookup codeHash abis
+  liftIO $ infoM "getSolidVMABIs/abikeys" . format $ HM.keys abis
+  case HM.lookup codeHash abis of
+    Nothing -> return Nothing
+    Just details -> do
+      liftIO $ infoM "getSolidVMABIs/named at" $ show $ M.keys details
+      return $ (T.pack name,) <$> M.lookup (T.pack name) details
+  -- return $ M.lookup (T.pack name) =<< HM.lookup codeHash abis
 getSolidVMABIs _ EVMCode{} = error "internal error: getSolidVMDetails for EVMCode"
 
 setContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()

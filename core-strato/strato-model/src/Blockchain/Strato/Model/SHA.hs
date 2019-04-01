@@ -129,7 +129,11 @@ instance Arbitrary SHA where
         return . SHA . fromIntegral . byteString2Integer $ random256Bit
 
 data CodePtr = EVMCode SHA | SolidVMCode String SHA
-             deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable)
+             deriving (Read, Eq, Ord, Generic, NFData, Hashable)
+
+instance Show CodePtr where
+  show (EVMCode hsh) = "EVMCode " ++ format hsh
+  show (SolidVMCode name hsh) = "SolidVMCode " ++ name ++ " " ++ format hsh
 
 instance Ae.ToJSON CodePtr where
   toJSON (EVMCode hsh) = Ae.object [("kind", Ae.toJSON EVM), ("digest", Ae.toJSON hsh)]

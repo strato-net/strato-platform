@@ -12,7 +12,7 @@
     , TupleSections
 #-}
 
-module Slipstream.Processor where
+module Slipstream.Processor (processTheMessages) where
 
 import Control.Arrow ((&&&))
 import Control.Applicative
@@ -29,15 +29,18 @@ import Data.Either (lefts, rights)
 import Data.Int (Int32)
 import Data.IORef
 import Data.Function
+import Data.List (sortBy)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import Data.Maybe
+import Data.Ord (Down(..))
 import qualified Data.Text as T
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Typed (PGConnection)
 import System.Log.Logger
+-- import Text.Format
 
 import Blockapps.Crossmon
 
@@ -65,11 +68,6 @@ import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.SolidityValue
 
-todoToMap :: BS.ActionDataDiff -> Map.Map Word256 Word256
-todoToMap = \case
-  BS.ActionEVMDiff m -> m
-  BS.ActionSolidVMDiff _ -> Map.empty -- error "TODO(tim): Processing not implemented for SolidVM"
-
 diffNull :: BS.ActionDataDiff -> Bool
 diffNull (BS.ActionEVMDiff m) = Map.null m
 diffNull (BS.ActionSolidVMDiff m) = Map.null m
@@ -84,9 +82,6 @@ data BatchedInserts = BatchedInserts
   , historyInserts  :: [ProcessedContract]
   , functionInserts :: [ProcessedContract]
   }
-
-listHead :: [a] -> [a]
-listHead = maybeToList . listToMaybe
 
 toAction :: BL.ByteString -> Action'
 toAction x =
@@ -111,23 +106,6 @@ hasContract = (/= EVMCode emptyHash) . actionCodeHash
 matters :: Action -> Bool
 matters Action{..} = (actionType == Create) || (not $ diffNull actionStorage)
 
-on2 :: (b -> b -> c) -> ((a -> a -> b), (a -> a -> b)) -> a -> a -> c
-on2 f p = curry ((uncurry f) . ((uncurry (fst p)) &&& (uncurry (snd p))))
-
-isSameCreateAs :: Action -> Action -> Bool
-isSameCreateAs = (&&) `on2` (((&&) `on` ((== Create) . actionType)), ((==) `on` actionCodeHash))
-
-groupSimilarActions :: [Action] -> [[Action]]
-groupSimilarActions as = go as [] []
-  where
-    go [] _ final = final
-    go [x] tmp final = final ++ [tmp ++ [x]]
-    go (x:y:rest) tmp final =
-      let newTmp = tmp ++ [x]
-       in if isSameCreateAs x y
-            then go (y:rest) newTmp final
-            else go (y:rest) [] (final ++ [newTmp])
-
 -- assumes all Actions in the list are for the same (Address, Maybe ChainId) pair
 combineActions :: [Action] -> Action
 combineActions [] = error "cannot combine 0 actions"
@@ -139,9 +117,6 @@ combineActions (x:xs) = foldr merge x xs
 
 splitActions :: [Action] -> [((Address, Maybe ChainId), [Action])]
 splitActions = partitionWith (actionAddress &&& actionTxChainId)
-
-withNothing :: Applicative f => Maybe a -> f (Maybe a) -> f (Maybe a)
-withNothing m f = maybe f (pure . Just) m
 
 functionDetailsFromContract :: Contract -> ByteString -> (Text, ([(Text, Type)],[(Maybe Text, Type)]))
 functionDetailsFromContract contract selector' =
@@ -254,18 +229,21 @@ lookupT k = MaybeT . return . Map.lookup k
 
 getCachedSolidVMDetails :: IORef Globals -> Action -> Bloc (Maybe (Text, Text))
 getCachedSolidVMDetails g row = liftM2 (<|>)
+  (do
+    liftIO $ infoM "getCachedSolidVMDetails/abi search beginning" $ show $ actionCodeHash row
+    gt <- getSolidVMABIs g (actionCodeHash row)
+    liftIO $ infoM "getCachedSolidVMDetails/abi miss" ""
+    return gt)
   (runMaybeT $ do
-    name <- lookupT "name" md
-    abi <- MaybeT $ getSolidVMABIs g (actionCodeHash row)
-    return (name, abi))
-  (runMaybeT $ do
+    liftIO $ infoM "getCachedSolidVMDetails/abi insert beginning" $ show $ actionCodeHash row
     src <- lookupT "src" md
-    name <- lookupT "name" md
+    liftIO $ infoM "getCachedSolidVMDetails/src found" $ show $ (T.length src, actionCodeHash row)
     detailsMap <- lift $ sourceToContractDetails True src
     setSolidVMABIs g (actionCodeHash row) detailsMap
-    (_, details) <- lookupT name detailsMap
-    let abi = xabiToText $ contractdetailsXabi details
-    return (name, abi)
+    liftIO $ infoM "getCachedSolidVMDetails/set" ""
+    gt <- MaybeT $ getSolidVMABIs g (actionCodeHash row)
+    liftIO $ infoM "getCachedSolidVMDetails/get" ""
+    return gt
   )
  where md = actionMetadata row
 
@@ -353,7 +331,8 @@ rowToHistories gref abiid row actions cont details oldState = do
 processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> IO ()
 processTheMessages env conn g messages = do
 
-  let changes = splitActions
+  let changes = sortBy (compare `on` Down . Map.lookup "src" . actionMetadata . snd)
+              . splitActions
               . filter matters
               . filter hasContract
               . join
@@ -400,7 +379,9 @@ processTheMessages env conn g messages = do
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs
         BS.ActionSolidVMDiff{} -> do
+          liftIO $ infoM "getCachedSolidVMDetails/pre" ""
           mName <- getCachedSolidVMDetails g row
+          liftIO $ infoM "getCachedSolidVMDetails/post" ""
           case mName of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
