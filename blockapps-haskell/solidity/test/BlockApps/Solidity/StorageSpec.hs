@@ -98,17 +98,17 @@ spec = do
       it "should convert 1 arg with type uint[]" $ do
         let
           args = ValueArrayFixed 1
-                  [ ValueArrayDynamic $ I.fromList
-                    [ (0, SimpleValue $ valueUInt 1)
-                    , (1, SimpleValue $ valueUInt 2)
-                    , (2, SimpleValue $ valueUInt 3)
-                    , (3, SimpleValue $ valueUInt 4)
-                    , (4, SimpleValue $ valueUInt 4)
-                    , (5, SimpleValue $ valueUInt 5)
-                    , (6, SimpleValue $ valueUInt 66)
-                    , (7, SimpleValue $ valueUInt 75)
-                    , (8, SimpleValue $ valueUInt 754)
-                    , (9, SimpleValue $ valueUInt 98)
+                  [ ValueArrayDynamic $ unsparse
+                    [ SimpleValue $ valueUInt 1
+                    , SimpleValue $ valueUInt 2
+                    , SimpleValue $ valueUInt 3
+                    , SimpleValue $ valueUInt 4
+                    , SimpleValue $ valueUInt 4
+                    , SimpleValue $ valueUInt 5
+                    , SimpleValue $ valueUInt 66
+                    , SimpleValue $ valueUInt 75
+                    , SimpleValue $ valueUInt 754
+                    , SimpleValue $ valueUInt 98
                     ]
                   ]
           (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000042000000000000000000000000000000000000000000000000000000000000004b00000000000000000000000000000000000000000000000000000000000002f20000000000000000000000000000000000000000000000000000000000000062"
@@ -131,11 +131,11 @@ spec = do
                   [ SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
                   , SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
                   , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
-                  , ValueArrayDynamic $ I.fromList
-                      [ (0, SimpleValue . ValueBytes (Just 32) . fst . Base16.decode
-                            $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
-                      , (1, SimpleValue . ValueBytes (Just 32) . fst . Base16.decode
-                            $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
+                  , ValueArrayDynamic $ unsparse
+                      [ SimpleValue . ValueBytes (Just 32) . fst . Base16.decode
+                            $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                      , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode
+                            $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
                       ]
                   , SimpleValue . ValueString $ "Account Data should be able to be as long as you want ideally 12343432442431"
                   ]
