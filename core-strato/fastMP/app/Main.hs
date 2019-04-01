@@ -28,7 +28,7 @@ decodeVal x =
 main :: IO ()
 main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
-  let input = map (\[x, y] -> KV x $ Right (RLPString . rlpSerialize . RLPString . decodeVal $ y)) c
+  let input = map (\[x, y] -> KV x $ Right (RLPString . decodeVal $ y)) c
 --  let input = map (\[x, y] -> KV x $ Right (RLPString . fst . B16.decode $ y)) c
 
 --  doit (input, []) $$ kvToStdout
