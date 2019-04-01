@@ -4,6 +4,8 @@ module FastMP where
   
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Loops
+import Control.Monad.Trans.Resource
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BC
 import Data.Conduit
@@ -21,7 +23,15 @@ import KV
 import LevelDBTools
 
 debug :: Bool
-debug = True
+debug = False
+
+
+
+
+createMPFast :: [KV] -> IO MP.StateRoot
+createMPFast input = do
+  runResourceT $ runConduit $ doit (input, []) `fuseUpstream` outputToLDB
+
 
 {-
 kvToStdout :: MonadIO m => Sink LevelKV m ()
@@ -36,13 +46,29 @@ kvToStdout = do
 
 
 
-doit :: MonadIO m => ([KV], [(ByteString, PartialNode)]) -> ConduitT () LevelKV m ()
+doit :: MonadIO m =>
+        ([KV], [(ByteString, PartialNode)]) -> ConduitT () LevelKV m MP.StateRoot
 doit x = do
-  next <- processNext x
-  case next of
-    ([], []) -> return ()
-    _ -> doit next  
+  let inputIsExhausted ([], [("", _)]) = True
+      inputIsExhausted ([_], []) = True
+      inputIsExhausted ([], []) = True
+      inputIsExhausted _ = False
 
+      getFinalPartialNode ([], [(_, finalPartialNode)]) = partialToNode finalPartialNode
+      getFinalPartialNode ([KV k v], []) = MP.ShortcutNodeData (N.pack $ map c2n $ BC.unpack k) v
+      getFinalPartialNode ([], []) = MP.EmptyNodeData
+      getFinalPartialNode _ = error "internal error: getFinalStateroot was called on a non-final state"
+  
+  finalValue <- iterateUntilM inputIsExhausted processNext x
+
+  let finalNode = getFinalPartialNode finalValue
+
+  finalNodePtr <- nodeData2NodeRef finalNode
+
+  case finalNodePtr of
+    MP.PtrRef sr -> return sr
+    MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
+  
 data NodePtr = NodePtr String deriving Show
 
 data PartialNode =
@@ -62,7 +88,8 @@ partialToNode (PartialNode b v) =
     spreadOut _ [] = error "internal error: spreadOut was given input out of order or out of range"
     
 
-processNext :: MonadIO m => ([KV], [(ByteString, PartialNode)])->ConduitM () LevelKV m ([KV], [(ByteString, PartialNode)])
+processNext :: MonadIO m =>
+               ([KV], [(ByteString, PartialNode)])->ConduitM () LevelKV m ([KV], [(ByteString, PartialNode)])
 
 --Create new Partial Node
 processNext x@((KV k1 v1:second@(KV k2 _):rest), partials) | shouldCreate x = do
@@ -105,24 +132,8 @@ processNext (input, ((prefix, partialNode):partialrest)) = do
     
   return ((KV prefix (Left nodePtr)):input, partialrest)
 
-processNext ([KV key val], []) = do
 
-  let node =
-        case val of
-          Right tempStr -> MP.ShortcutNodeData (N.pack $ map c2n $ BC.unpack key) $ Right tempStr
-          Left x -> MP.ShortcutNodeData (N.pack $ map c2n $ BC.unpack key) $ Left x
-
-  _ <- nodeData2NodeRef node
-
-  when debug $ do
-    nodePtr <- nodeData2NodeRef node
-    liftIO $ putStrLn $ "#### Output Final node(" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
-
-  return ([], [])
-
-processNext ([], []) = error "we don't yet handle the empty trie"
-
-processNext ((_:_:_), []) = error "it should be impossible to arrive here"
+processNext _ = error "it should be impossible to arrive here"
 
 
 

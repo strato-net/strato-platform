@@ -12,6 +12,7 @@ dependencies:
 - format
 - leveldb-haskell
 - merkle-patricia-db
+- monad-loops
 - nibblestring
 - resourcet
 - strato-model
