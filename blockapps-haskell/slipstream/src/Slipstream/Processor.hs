@@ -327,7 +327,8 @@ rowToHistories gref abiid row actions cont details oldState = do
                                   hRow
       pure (hInsert, fInserts)
 
-
+-- Prioritizing with-source actions prevents the issue where updates to contracts
+-- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [Action]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
