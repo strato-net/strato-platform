@@ -495,8 +495,9 @@ getValueType :: AddressedPath -> SM BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
 initializeAction :: Address -> String -> SHA -> SM ()
-initializeAction addr name hsh =
-  action . actionData %= M.insert addr (ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) [])
+initializeAction addr name hsh = do
+  let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
+  action . actionData %= M.insertWith mergeActionData addr newData
 
 markDiffForAction :: Address -> MS.StoragePath -> MS.BasicValue -> SM ()
 markDiffForAction owner key' val' = do

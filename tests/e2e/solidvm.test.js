@@ -35,6 +35,19 @@ contract PartialModify {
 }
 `;
 
+const deployAndModify = `
+${partialModify}
+
+contract Deployer {
+  PartialModify pm;
+
+  constructor() public {
+    pm = new PartialModify();
+    pm.doubleY();
+  }
+}
+`;
+
 async function upload(vm, name, source) {
   const username = 'Solidvm_User_' + util.uid();
   const password = '2345';
@@ -111,5 +124,19 @@ describe('Solid VM: Contract uploads', async () => {
     assert.equal(index2[0].address, contract.address);
     assert.equal(index2[0].x, 83);
     assert.equal(index2[0].y, 144);
+  }).timeout(config.timeout);
+
+  it ('merges concurrent deltas', async () => {
+    const [user, contract] = await upload('SolidVM', 'Deployer', deployAndModify);
+
+    const deployIndex = await co.wrap(rest.waitQuery)(
+      `${contract.name}?address=eq.${contract.address}`, 1);
+    console.log(`Index response is: ${JSON.stringify(deployIndex)}`);
+    const pm = deployIndex[0].pm;
+    const modifyIndex = await co.wrap(rest.waitQuery)(
+      `PartialModify?address=eq.${pm}`, 1);
+    assert.equal(modifyIndex[0].address, pm);
+    assert.equal(modifyIndex[0].y, 144, "has y");
+    assert.equal(modifyIndex[0].x, 83, "has x");
   }).timeout(config.timeout);
 })

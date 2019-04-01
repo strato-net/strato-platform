@@ -7,6 +7,8 @@ module SolidVMSpec where
 
 import Control.Concurrent
 import Control.Concurrent.Async
+import Control.DeepSeq
+import Control.Exception
 import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.IO.Class
@@ -29,10 +31,12 @@ import Text.RawString.QQ
 
 import Blockchain.Data.DataDefs (BlockData(..))
 import Blockchain.Data.ExecResults
+import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
+import Blockchain.Strato.Model.Action
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -74,9 +78,12 @@ runFile :: FilePath -> ContextM ()
 runFile fp = void $ runBS =<< liftIO (B.readFile fp)
 
 runBS :: B.ByteString -> ContextM ()
-runBS = runArgs "()"
+runBS = void . runBS'
 
-runArgs :: T.Text -> B.ByteString -> ContextM ()
+runBS' ::B.ByteString -> ContextM ExecResults
+runBS' = runArgs "()"
+
+runArgs :: T.Text -> B.ByteString -> ContextM ExecResults
 runArgs args bs = do
   let code = Code bs
       isTest = error "TODO: isTest"
@@ -105,8 +112,8 @@ runArgs args bs = do
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
-  void $ SVM.create isTest isHomestead suicides blockData callDepth sender origin
-            value gasPrice availableGas newAddress code txHash chainId metadata
+  SVM.create isTest isHomestead suicides blockData callDepth sender origin
+          value gasPrice availableGas newAddress code txHash chainId metadata
 
 runCall :: T.Text -> T.Text -> B.ByteString -> ContextM (Maybe SB.ShortByteString)
 runCall funcName callArgs bs = erReturnVal <$> do
@@ -743,7 +750,7 @@ contract qq is Parent {
     getFields ["x", "name"] `shouldReturn` [BInteger 2346, BString "Sandman"]
 
   it "will pass arguments to constructors" . runTest $ do
-    runArgs "(0x6662346)" [r|
+    void $ runArgs "(0x6662346)" [r|
 contract qq {
   address target;
   constructor(address _target) public {
@@ -1080,8 +1087,8 @@ contract qq {
     x = _x;
   }
 }|]
-    runArgs "(1234)" qq
-    runArgs "(887324)" qq
+    void $ runArgs "(1234)" qq
+    void $ runArgs "(887324)" qq
     getFields ["x"] `shouldReturn` [BInteger 1234]
     getFields2 ["x"] `shouldReturn` [BInteger 887324]
 
@@ -1101,10 +1108,10 @@ contract qq {
     return num + 1;
   }
 }|]
-    runArgs "(0x0,99)" qq
+    void $ runArgs "(0x0,99)" qq
     getFields ["x", "num"] `shouldReturn` [BContract "qq" 0x0, BInteger 99]
 
-    runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
+    void $ runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
     getFields2 ["x", "num"] `shouldReturn` [BContract "qq" uploadAddress, BInteger 400]
 
     call2 "a" "()" secondAddress `shouldReturn` Nothing
@@ -1498,4 +1505,33 @@ contract qq {
   }
 }|] `shouldReturn` Just (SB.toShort . word256ToBytes $ coerce uploadAddress)
 
+  it "merges actions for concurrent modifications" . runTest $ do
+    xr <- runBS' [r|
+contract Sub {
+  uint x = 20;
+  uint y = 40;
 
+  function doubleY() public {
+    y *= 2;
+  }
+}
+
+contract qq {
+  Sub s;
+
+  constructor() public {
+    s = new Sub();
+    s.doubleY();
+  }
+}|]
+    let diffs = fmap _actionDataStorageDiffs . _actionData <$> erAction xr
+        recursiveAddr = getNewAddress_unsafe uploadAddress 1
+    diffs `shouldBe` Just (M.fromList
+      [ (uploadAddress, ActionSolidVMDiff $ M.singleton ".s"
+            (rlpSerialize $ rlpEncode $ BContract "Sub" recursiveAddr))
+      , (recursiveAddr, ActionSolidVMDiff $ M.fromList
+          [ (".x", rlpSerialize $ rlpEncode $ BInteger 20)
+          , (".y", rlpSerialize $ rlpEncode $ BInteger 80)
+          ]
+        )
+      ])
