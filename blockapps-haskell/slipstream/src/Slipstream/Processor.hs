@@ -226,36 +226,28 @@ makeFunctionInserts xabi ABIID{..} state Action{..} =
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
+-- Note: This could be reshaped to remove the bloch dependency, as
+-- we only care about the ABI from `sourceToContractDetails` and
+-- not the metadata id. Additinally, at some point this must
+-- offload to disk.
 getCachedSolidVMDetails :: IORef Globals -> Action -> Bloc (Maybe (Text, Text))
 getCachedSolidVMDetails g row = liftM2 (<|>)
-  (do
-    liftIO $ infoM "getCachedSolidVMDetails/abi search beginning" $ show $ actionCodeHash row
-    gt <- getSolidVMABIs g (actionCodeHash row)
-    liftIO $ infoM "getCachedSolidVMDetails/abi miss" ""
-    return gt)
+  (getSolidVMABIs g codePtr)
   (runMaybeT $ do
-    liftIO $ infoM "getCachedSolidVMDetails/abi insert beginning" $ show $ actionCodeHash row
+    let md = actionMetadata row
     src <- lookupT "src" md
-    liftIO $ infoM "getCachedSolidVMDetails/src found" $ show $ (T.length src, actionCodeHash row)
     detailsMap <- lift $ sourceToContractDetails True src
-    setSolidVMABIs g (actionCodeHash row) detailsMap
-    liftIO $ infoM "getCachedSolidVMDetails/set" ""
-    gt <- MaybeT $ getSolidVMABIs g (actionCodeHash row)
-    liftIO $ infoM "getCachedSolidVMDetails/get" ""
-    return gt
+    setSolidVMABIs g codePtr detailsMap
+    MaybeT $ getSolidVMABIs g codePtr
   )
- where md = actionMetadata row
+ where codeptr = actionCodeHash row
 
 detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
   (runMaybeT $ do
     let md = actionMetadata row
-    liftIO . infoM "metadata is " $ show md
-    liftIO $ infoM "detailsForRow" "Querying src"
     src <- lookupT "src" md
-    liftIO $ infoM "source found:" (show src)
     name <- lookupT "name" md
-    liftIO $ infoM "name found: " (show name)
     detailsMap <- lift $ sourceToContractDetails True src
     lookupT name detailsMap)
   (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)

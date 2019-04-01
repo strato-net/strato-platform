@@ -2,7 +2,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-{-# OPTIONS_GHC -fno-warn-unused-imports #-} -- TODO(tim): Remove
 module BlockApps.SolidVMStorageDecoderSpec where
 
 import Data.Aeson

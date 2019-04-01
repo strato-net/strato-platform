@@ -52,22 +52,19 @@ xabiToText = T.replace "\'" "\'\'"
 
 setSolidVMABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text (Int32, ContractDetails) -> m ()
 setSolidVMABIs gref (SolidVMCode _ !codeHash) detailsMap = do
-  liftIO $ infoM "setSolidVMABIs" $ format codeHash
   globals@Globals{..} <- readIORef gref
   let !abis = force $ M.map (xabiToText . contractdetailsXabi . snd) detailsMap
   updateGlobals gref globals{solidVMABIs=HM.insert codeHash abis solidVMABIs}
 setSolidVMABIs _ EVMCode{} _ = error "internal error: setSolidVMDetails for EVMCode"
 
 getSolidVMABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (Text, Text))
-getSolidVMABIs gref (SolidVMCode name codeHash) = do
+getSolidVMABIs gref (SolidVMCode name' codeHash) = do
   abis <- solidVMABIs <$> readIORef gref
-  liftIO $ infoM "getSolidVMABIs/abikeys" . format $ HM.keys abis
   case HM.lookup codeHash abis of
     Nothing -> return Nothing
     Just details -> do
-      liftIO $ infoM "getSolidVMABIs/named at" $ show $ M.keys details
-      return $ (T.pack name,) <$> M.lookup (T.pack name) details
-  -- return $ M.lookup (T.pack name) =<< HM.lookup codeHash abis
+      let name = T.pack name'
+      return $ (name,) <$> M.lookup name details
 getSolidVMABIs _ EVMCode{} = error "internal error: getSolidVMDetails for EVMCode"
 
 setContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()

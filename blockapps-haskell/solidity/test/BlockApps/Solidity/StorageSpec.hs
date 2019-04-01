@@ -98,7 +98,7 @@ spec = do
       it "should convert 1 arg with type uint[]" $ do
         let
           args = ValueArrayFixed 1
-                  [ ValueArrayDynamic $ unsparse
+                  [ ValueArrayDynamic $ tosparse
                     [ SimpleValue $ valueUInt 1
                     , SimpleValue $ valueUInt 2
                     , SimpleValue $ valueUInt 3
@@ -131,7 +131,7 @@ spec = do
                   [ SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
                   , SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
                   , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
-                  , ValueArrayDynamic $ unsparse
+                  , ValueArrayDynamic $ tosparse
                       [ SimpleValue . ValueBytes (Just 32) . fst . Base16.decode
                             $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
                       , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode
