@@ -305,7 +305,7 @@ spec = do
       let Success input' = rawInput
           input = M.fromList $ map (\Storage{storageKV=SolidVMEntry (HexStorage k) (HexStorage v)} -> (k, v)) input'
           got = decodeCacheValues input []
-      got `shouldBe` [("fields", ValueArrayDynamic . I.fromList $ zip [0..]
+      got `shouldBe` [("fields", ValueArrayDynamic $ tosparse
               [ bytes "3032415547323000000000000000000000000000000000000000000000000000"
               , bytes "3731313532383138373337333436393330300000000000000000000000000000"
               , bytes "3339393034313432000000000000000000000000000000000000000000000000"

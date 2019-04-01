@@ -413,7 +413,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
   TypeArrayDynamic ty -> if len
     then SimpleValue $ valueUInt (toInteger $ storage offset)
-    else ValueArrayDynamic . I.fromList . zip [0..] $ theList
+    else ValueArrayDynamic $ tosparse theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s

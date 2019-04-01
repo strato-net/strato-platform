@@ -125,7 +125,7 @@ bytesToValue b = \case
     let
       rb = ByteString.drop 32 b
       valArray = splitBytes rb ty
-    in ValueArrayDynamic . I.fromList . zip [0..] <$> sequence valArray
+    in ValueArrayDynamic . tosparse <$> sequence valArray
   TypeArrayFixed len ty ->
     let valArray = splitBytes b ty
     in ValueArrayFixed len <$> sequence valArray
@@ -220,6 +220,9 @@ unsparse imap =
                              | otherwise = def:go (n+1) kvs
   in go 0 $ I.toList imap
 
+tosparse :: [Value] -> I.IntMap Value
+tosparse = I.fromList . zip [0..]
+
 valueToText :: Value -> Text
 valueToText = \case
   SimpleValue sv -> simpleValueToText sv
@@ -247,7 +250,7 @@ simpleValueToText sv = case sv of
 textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
 textToValue defs str = \case
   SimpleType ty -> SimpleValue <$> textToSimpleValue str ty
-  TypeArrayDynamic ty -> ValueArrayDynamic . I.fromList . zip [0..] <$>
+  TypeArrayDynamic ty -> ValueArrayDynamic . tosparse <$>
     traverse (flip (textToValue defs) ty)
       (Text.split (== ',') (Text.dropAround (\ c -> c == '[' || c == ']') str))
   TypeArrayFixed len ty -> ValueArrayFixed len <$>

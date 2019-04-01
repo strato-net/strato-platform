@@ -58,7 +58,7 @@ spec = do
             transactionHash = hash "<TRANSACTIONHASH>",
             transactionSender = testAdd,
             functionCallData = Nothing,
-            contractData = M.singleton "owners" . V.ValueArrayDynamic . I.fromList $ zip [0..] [
+            contractData = M.singleton "owners" . V.ValueArrayDynamic $ tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
@@ -134,7 +134,7 @@ spec = do
              transactionHash = hash "<TRANSACTIONHASH>",
              transactionSender = testAdd,
              functionCallData = Nothing,
-             contractData = M.singleton "owners" . V.ValueArrayDynamic . I.fromList $ zip [0..] [
+             contractData = M.singleton "owners" . V.ValueArrayDynamic $ tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
@@ -241,7 +241,7 @@ spec = do
             transactionHash = hash "<TRANSACTIONHASH>",
             transactionSender = testAdd,
             functionCallData = Nothing,
-            contractData = M.singleton "\"owners\"" . V.ValueArrayDynamic . I.fromList $ zip [0..] [
+            contractData = M.singleton "\"owners\"" . V.ValueArrayDynamic $ tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]

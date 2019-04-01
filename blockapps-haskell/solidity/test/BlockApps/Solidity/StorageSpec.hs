@@ -24,9 +24,9 @@ spec = do
           let
             args = ValueArrayFixed 4
                     [ SimpleValue (valueUInt256 291)
-                    , ValueArrayDynamic $ I.fromList
-                                           [ (0, SimpleValue (ValueInt False (Just 4) 1110))
-                                           , (1, SimpleValue (ValueInt False (Just 4) 1929))
+                    , ValueArrayDynamic $ tosparse
+                                           [ SimpleValue (ValueInt False (Just 4) 1110)
+                                           , SimpleValue (ValueInt False (Just 4) 1929)
                                            ]
                     , SimpleValue (ValueBytes (Just 10) "1234567890")
                     , SimpleValue (valueBytes "Hello, world!")

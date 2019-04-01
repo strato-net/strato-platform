@@ -12,7 +12,6 @@ module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Monad.Except
 import           Crypto.Random.Entropy
-import qualified Data.IntMap                       as I
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe, isJust)
@@ -44,7 +43,7 @@ replaceMembers :: Struct
                -> Map.Map Text Text
 replaceMembers Struct{..} addrs m =
   let tag = "__members__"
-      members = valueToText $ ValueArrayDynamic . I.fromList . zip [0..] $ map (SimpleValue . ValueAddress) addrs
+      members = valueToText $ ValueArrayDynamic . tosparse $ map (SimpleValue . ValueAddress) addrs
       m' = Map.alter (const $ Just members) tag m
    in case OMap.lookup tag fields of
         Nothing -> m'
