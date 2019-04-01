@@ -40,7 +40,6 @@ import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Typed (PGConnection)
 import System.Log.Logger
--- import Text.Format
 
 import Blockapps.Crossmon
 
@@ -328,10 +327,14 @@ rowToHistories gref abiid row actions cont details oldState = do
                                   hRow
       pure (hInsert, fInserts)
 
+
+withSourceFirst :: (a, [Action]) -> Down Bool
+withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
+
 processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> IO ()
 processTheMessages env conn g messages = do
 
-  let changes = sortBy (compare `on` Down . Map.lookup "src" . actionMetadata . snd)
+  let changes = sortBy (compare `on` withSourceFirst)
               . splitActions
               . filter matters
               . filter hasContract
