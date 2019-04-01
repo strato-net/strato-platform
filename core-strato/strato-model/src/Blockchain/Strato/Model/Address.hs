@@ -18,13 +18,6 @@ import           Data.Maybe                           (fromMaybe)
 import           Numeric
 import           Test.QuickCheck                      (Arbitrary(..))
 
-import           Blockchain.Data.RLP
-import qualified Blockchain.Strato.Model.Colors       as CL
-import           Blockchain.Strato.Model.Format
-import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
-import           Blockchain.Strato.Model.Util
-
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
@@ -41,11 +34,17 @@ import           Text.Read                            (readMaybe)
 
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
--- import           Text.PrettyPrint.ANSI.Leijen         hiding ((<$>))
 import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
 import           Text.Printf
 import           Web.PathPieces
 import           Web.HttpApiData
+
+import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
+import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
+import           Blockchain.Strato.Model.Util
+import qualified Text.Colors       as CL
+import           Text.Format
 
 import           GHC.Generics
 
@@ -108,6 +107,9 @@ instance AS.FromJSON Address where
           drop0x ('0':'X':cs) = cs
           drop0x cs = cs
   parseJSON x = typeMismatch "Address" x
+
+instance FromJSONKey Address where
+  fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
 instance Lei.Pretty Address where
   pretty = Lei.text . CL.yellow . formatAddress

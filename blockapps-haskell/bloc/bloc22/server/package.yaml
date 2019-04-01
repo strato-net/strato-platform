@@ -31,6 +31,7 @@ dependencies:
   - contravariant
   - cryptonite
   - directory
+  - extra
   - filepath
   - bytestring
   - base16-bytestring
@@ -72,6 +73,7 @@ dependencies:
   - servant-swagger
   - servant-swagger-ui
   - stm
+  - strato-model
   - swagger2
   - text
   - temporary

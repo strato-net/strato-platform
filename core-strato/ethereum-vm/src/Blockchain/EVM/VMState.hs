@@ -31,9 +31,9 @@ import           Blockchain.Data.Log
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.Strato.Model.Class
 import           Blockchain.VMContext
+import           Text.Format
 
 type Gas = Int
 

@@ -13,9 +13,10 @@ import           Blockchain.Data.DataDefs
 import qualified Blockchain.Sequencer.Event as SE
 import           Blockchain.SHA
 
-import qualified Blockchain.Colors          as CL
-import           Blockchain.Format
 import           Blockchain.Util            (tab)
+
+import qualified Text.Colors                as CL
+import           Text.Format
 
 class Show t => OrderValidateable t where
     getBlockHash   :: t -> SHA

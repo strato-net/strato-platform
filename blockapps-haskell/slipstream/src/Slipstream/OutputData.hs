@@ -1,6 +1,7 @@
 {-# LANGUAGE
     FlexibleContexts
   , OverloadedStrings
+  , QuasiQuotes
   , RecordWildCards
 #-}
 
@@ -25,6 +26,7 @@ import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Query
 import           Network
 import           System.Log.Logger
+import           Text.RawString.QQ
 import           UnliftIO.IORef
 
 import           BlockApps.Ethereum
@@ -45,7 +47,7 @@ typeText (SolidityBool _) = "bool"
 typeText _ = "jsonb"
 
 csv :: [Text] -> Text
-csv = T.intercalate ", "
+csv = T.intercalate ",\n    "
 
 wrap :: Text -> Text -> Text -> Text
 wrap b e x = T.concat [b, x, e]
@@ -85,18 +87,18 @@ escapeDoubleQuotes = T.replace "\"" "\\\""
 escapeQuotes :: Text -> Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
-tableColumns :: [(Text, SolidityValue)] -> Text
-tableColumns = csv . map go
+tableColumns :: [(Text, SolidityValue)] -> [Text]
+tableColumns = map go
   where go (x,y) = let z = wrapDoubleQuotes $ escapeQuotes x
-                    in T.concat [z, " ", typeText y]
+                   in T.concat [z, " ", typeText y]
 
 tableUpsert :: [Text] -> Text
 tableUpsert = csv . map go
   where go x = let y = wrapDoubleQuotes $ escapeQuotes x
                 in wrap1 y " = excluded."
 
-dbConnect :: PGDatabase
-dbConnect =  PGDatabase
+cirrusInfo :: PGDatabase
+cirrusInfo = PGDatabase
   { pgDBHost = flags_pghost :: HostName
   , pgDBPort = PortNumber . fromIntegral $ flags_pgport
   , pgDBUser = BC.pack flags_pguser :: B.ByteString
@@ -245,31 +247,29 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 insertContractTableQuery :: ProcessedContract -> Text
 insertContractTableQuery ProcessedContract{..} =
   let conVals = wrapAndEscape . map escapeQuotes $
-        [ T.pack $ keccak256String codehash
+        [ T.pack $ shaToHex codehash
         , contractName
         , abi
         , chain
         ]
    in T.concat
-        [ "insert into contract (\"codeHash\", contract, abi, \"chainId\") values "
+        [ "INSERT INTO contract (\"codeHash\", contract, abi, \"chainId\")\n  VALUES "
         , conVals
-        , " ON CONFLICT DO NOTHING;"
+        , "\n  ON CONFLICT DO NOTHING;"
         ]
 
 createIndexTableQuery :: ProcessedContract -> Text
 createIndexTableQuery contract =
   let tableName = escapeQuotes $ contractName contract
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
-      comma = if null list then "" else ", "
    in T.concat
-        [ "create table if not exists "
-        , wrapDoubleQuotes tableName
-        , " (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text"
-        , comma
-        , tableColumns list
-        , ", CONSTRAINT "
+        [ "CREATE TABLE IF NOT EXISTS " , wrapDoubleQuotes tableName , " ("
+        , csv $ ["address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+               "block_number text", "transaction_hash text", "transaction_sender text",
+               "transaction_function_name text"] ++ tableColumns list
+        , ",\n  CONSTRAINT "
         , wrapDoubleQuotes (tableName <> "_pkey")
-        , " PRIMARY KEY (address, \"chainId\") );"
+        , "\n  PRIMARY KEY (address, \"chainId\") );"
         ]
 
 createHistoryTableQuery :: ProcessedContract -> Text
@@ -278,13 +278,11 @@ createHistoryTableQuery contract =
       toHistory = (<>) "history@"
       historyName = toHistory tableName
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
-      comma = if null list then "" else ", "
    in T.concat
-        [ "create table if not exists "
-        , wrapDoubleQuotes historyName
-        , " (address text, \"chainId\" text, block_hash text, block_timestamp text, block_number text, transaction_hash text, transaction_sender text, transaction_function_name text"
-        , comma
-        , tableColumns list
+        [ "CREATE TABLE IF NOT EXISTS ", wrapDoubleQuotes historyName, " ("
+        , csv $ ["address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+                 "block_number text", "transaction_hash text", "transaction_sender text",
+                 "transaction_function_name text"] ++ tableColumns list
         , ");"
         ]
 
@@ -293,15 +291,14 @@ insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
 insertIndexTableQuery contracts@(x:_) =
   let tableName = escapeQuotes $ contractName x
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
-      comma = if null list then "" else ", "
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
-                 , T.pack . keccak256String . blockHash
+                 , T.pack . shaToHex . blockHash
                  , tshow . blockTimestamp
                  , tshow . blockNumber
-                 , T.pack . keccak256String . transactionHash
+                 , T.pack . shaToHex . transactionHash
                  , tshow . transactionSender
                  ]
       tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
@@ -310,17 +307,23 @@ insertIndexTableQuery contracts@(x:_) =
          in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
       inserts = csv vals
    in T.concat
-        [ "insert into "
+        [ "INSERT INTO "
         , wrapDoubleQuotes tableName
         , " "
         , keySt
-        , " values "
+        , "\n  VALUES "
         , inserts
-        , " on conflict (address, \"chainId\") do update set address = excluded.address, \"chainId\" = excluded.\"chainId\", "
-        , "block_hash = excluded.block_hash, block_timestamp = excluded.block_timestamp, block_number = excluded.block_number, "
-        , "transaction_hash = excluded.transaction_hash, transaction_sender = excluded.transaction_sender, "
-        , "transaction_function_name = excluded.transaction_function_name"
-        , comma
+        , [r|
+  ON CONFLICT (address, "chainId") DO UPDATE SET
+    address = excluded.address,
+    "chainId" = excluded."chainId",
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    transaction_function_name = excluded.transaction_function_name|]
+        , if null list then "" else ",\n    "
         , tableUpsert $ map fst list
         , ";"
         ]
@@ -336,10 +339,10 @@ insertHistoryTableQuery contracts@(x:_) =
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
-                 , T.pack . keccak256String . blockHash
+                 , T.pack . shaToHex . blockHash
                  , tshow . blockTimestamp
                  , tshow . blockNumber
-                 , T.pack . keccak256String . transactionHash
+                 , T.pack . shaToHex . transactionHash
                  , tshow . transactionSender
                  ]
       tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
@@ -347,11 +350,12 @@ insertHistoryTableQuery contracts@(x:_) =
         let rowList = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData row
          in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
       inserts = csv vals
-   in T.intercalate " " $
-        [ "insert into"
+   in T.concat $
+        [ "INSERT INTO "
         , wrapDoubleQuotes historyName
+        , " "
         , keySt
-        , "values"
+        , "\n  VALUES "
         , inserts
         , ";"
         ]

@@ -14,10 +14,12 @@ import           Control.Concurrent
 import           Control.Concurrent.Async.Lifted
 import           Control.Arrow
 import           Control.Exception.Lifted          (catch)
-import           Control.Lens                      ((<?=), at, use)
+import           Control.Lens                      ((<?=), at, use, uses, (+=))
 import           Control.Lens.TH
+import           Control.Lens.Tuple                (_1, _2)
 import           Control.Monad
 import           Control.Monad.Except
+import           Control.Monad.Extra
 import           Control.Monad.Log
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Lazy    (StateT(..), runStateT)
@@ -38,6 +40,7 @@ import qualified Data.Map.Ordered                  as OMap
 import           Data.Maybe
 import           Data.RLP
 import           Data.Set                          (isSubsetOf)
+import qualified Data.Set                          as S
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
@@ -247,7 +250,7 @@ postUsersContractEVM' :: ContractParameters -> Signer -> Bloc BlocTransactionRes
 postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
   --TODO: check what happens with mismatching args
-  idsAndDetails <- compileContract src
+  idsAndDetails <- sourceToContractDetails True src
   logWith logNotice ("constructor arguments: " <> Text.pack (show args))
   (cName,(cmId,ContractDetails{..})) <-
     case contract of
@@ -286,24 +289,23 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
 postUsersContractSolidVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
-  --I had to temporarily replace the compileContract call to get the metadata needed for the transaction results call later on.
-  --At best we should remove the need for the metadata completely, at worst, we should remove the compile and just generate the metadata.  To get the interpreter working, I am just putting this all back in now, and will notate which lines we should eventually remove again
-  idsAndDetails <- getMetadataNoCompile src      --remove
-  (cName,(cmId,ContractDetails{..})) <-     --remove
-    case contract of                        --remove
-     Nothing ->                             --remove
-       case Map.toList idsAndDetails of     --remove
+  --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
+  idsAndDetails <- sourceToContractDetails False src
+  (cName,(cmId,ContractDetails{..})) <-
+    case contract of
+     Nothing ->
+       case Map.toList idsAndDetails of
          [] -> throwError $ UserError "You need to supply at least one contract in the source" --remove
-         [x] -> return x                    --remove
+         [x] -> return x
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
-     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)              --remove
+     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   logWith logNotice ("constructor arguments: " <> Text.pack (show args))
 
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   (_, argsAsSource) <- constructArgValuesAndSource (fmap (fmap argValueToText) args) xabiArgs
 
   let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource)]
-  
+
   tx <- signAndPrepare sign fromAddr metadata' $
     TransactionHeader
       Nothing
@@ -315,13 +317,13 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
       chainId
   logWith logNotice ("tx is: " <> Text.pack (show tx))
   hash <- blocStrato $ postTx tx
-  void . blocModify $ \conn -> runInsertMany conn hashNameTable [  --remove
-    ( Nothing                                                      --remove
-    , constant hash                                                --remove
-    , constant cmId                                                --remove
-    , constant (1 :: Int32)                                        --remove
-    , constant contractdetailsName                                 --remove
-    )]                                                             --remove
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+    ( Nothing
+    , constant hash
+    , constant cmId
+    , constant (1 :: Int32)
+    , constant contractdetailsName
+    )]
   getBlocTransactionResult' chainId [hash] resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
@@ -356,7 +358,7 @@ postUsersUploadList' ContractListParameters{..} sign = do
               at name <?= (b, src, cmId', x)
           let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
           argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          let metadata' = Just $ fromMaybe Map.empty md `Map.union`Map.fromList [("src",src),("name",name)]
+          let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
           tx <- lift . signAndPrepare sign fromAddr metadata' $
               TransactionHeader
                 Nothing
@@ -455,11 +457,23 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
   if null txs
     then return []
     else do
-      let mc = head txs
-      params <- getAccountTxParams fromAddr chainId $ methodcallTxParams mc
-      txsCmIdsFuncNames <- fmap fst . forStateT Map.empty (zip txs [0..]) $
-        \ (MethodCall{..},nonceIncr) -> do
-          mtuple <- use $ at methodcallContractName
+      let noncesInUse = S.fromList . mapMaybe (txparamsNonce <=< methodcallTxParams) $ txs
+      nonce <- if S.size noncesInUse == length txs
+                  then return . Nonce . error $ "internal error: unused nonce when already specified" ++ show txs
+                  else getAccountNonce fromAddr chainId
+      txsCmIdsFuncNames <- fmap fst . forStateT (Map.empty, nonce) txs $
+        \(MethodCall{..}) -> do
+          let params' = fromMaybe emptyTxParams methodcallTxParams
+          newNonce <- case txparamsNonce params' of
+            Nothing -> do
+              whileM $ do
+                inUse <- uses _2 (`S.member` noncesInUse)
+                when inUse $ _2 += 1
+                return inUse
+              use _2
+            Just v -> return v
+          let params = params'{txparamsNonce = Just newNonce }
+          mtuple <- use $ _1 . at methodcallContractName
           (mapKey, xabi) <- case mtuple of
             Just (cmId, x) -> return (cmId, x)
             Nothing -> do
@@ -467,7 +481,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
                 (_,_,_,_,_,_,cmId,x'') <- getContractsContractLatestQuery methodcallContractName -< ()
                 returnA -< (cmId,x'')
               x <- lift $ deserializeXabi x'
-              at methodcallContractName <?= (mapKey', x)
+              _1 . at methodcallContractName <?= (mapKey', x)
           contract' <- case xAbiToContract xabi of
             Left err -> throwError . AnError $ Text.pack err
             Right c -> return c
@@ -491,7 +505,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
               params
               (Wei (fromIntegral $ unStrung methodcallValue))
               (sel <> argsBin)
-              nonceIncr
+              0 -- Nonce specified directly in params
               chainId
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
@@ -561,7 +575,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
 
     let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
         xabiArgs = maybe Map.empty funcArgs . Map.lookup funcName $ xabiFuncs xabi
-        
+
     sel <-
       case maybeFunc of
        Just (_, TypeFunction selector _ _) -> return selector
@@ -572,7 +586,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
           Map.insert "funcName" funcName
           $ Map.insert "args" argsAsSource
           $ fromMaybe Map.empty metadata
-   
+
     tx <- signAndPrepare sign fromAddr (Just metadataWithCallInfo) $
       TransactionHeader
         (Just contractAddr)
@@ -799,7 +813,7 @@ getArgValues argsMap argNamesTypes = do
         throwError (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
-  
+
 constructArgValues :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc ByteString
 constructArgValues args argNamesTypes = do
     case args of
@@ -820,31 +834,31 @@ constructArgValuesAndSource args argNamesTypes = do
           else throwError (UserError "no arguments provided to function.")
       Just argsMap -> do
         vals <- getArgValues argsMap argNamesTypes
-        --TODO- valueToText returns type "Maybe Text", but as far as I can tell from reading the code, "Nothing" is not a possible return value....  I can't imagine why it ever would be.  We should either figure out what was intended, or change the return value of `valueToText` to "Text"
-        --For now, I'll just treat a nothing as an internal developer error, and crash the program.
-        let valsAsText = fromMaybe (error $ "Internal error: args can not be represented as source code: " ++ show vals) $ sequence $ map valueToText vals
+        let valsAsText = map valueToText vals
         return $
           (
             toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
-            "(" <> Text.intercalate ", " valsAsText <> ")"
+            "(" <> Text.intercalate "," valsAsText <> ")"
           )
 
 getAccountTxParams :: Address -> Maybe ChainId -> Maybe TxParams -> Bloc TxParams
-getAccountTxParams addr chainId = \case
-  Nothing -> getAcctNonce >>= \n -> return emptyTxParams{txparamsNonce = Just n}
-  Just params@TxParams{..} ->
-    case txparamsNonce of
-      Just _ -> return params
-      Nothing -> getAcctNonce >>= \n -> return params{txparamsNonce = Just n}
-  where
-    getAcctNonce = do
-      let params = accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
-      accts <- blocStrato $ getAccountsFilter params
-      logWith logNotice $ "getAccountNonce req: " <> Text.pack (show params)
-      logWith logNotice $ "getAccountNonce resp: " <> Text.pack (show accts)
-      case listToMaybe accts of
-        Nothing   -> throwError . UserError $ "User does not have a balance"
-        Just acct -> return $ accountNonce acct
+getAccountTxParams addr chainId mTxParams = do
+  let params = fromMaybe emptyTxParams mTxParams
+  case txparamsNonce params of
+    Nothing -> do
+      n <- getAccountNonce addr chainId
+      return params{txparamsNonce = Just n}
+    Just{} -> return params
+
+getAccountNonce :: Address -> Maybe ChainId -> Bloc Nonce
+getAccountNonce addr chainId = do
+  let params = accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
+  accts <- blocStrato $ getAccountsFilter params
+  logWith logNotice $ "getAccountNonce req: " <> Text.pack (show params)
+  logWith logNotice $ "getAccountNonce resp: " <> Text.pack (show accts)
+  case listToMaybe accts of
+    Nothing   -> throwError . UserError $ "User does not have a balance"
+    Just acct -> return $ accountNonce acct
 
 getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
 getAccountSecKey userName password addr = do

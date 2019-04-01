@@ -3,9 +3,11 @@
 module SolidVM.Model.Storable where
 
 import           Control.DeepSeq
+import           Control.Exception
 import qualified Data.Aeson as Ae
 import           Data.Attoparsec.ByteString as Atto
 import           Data.Attoparsec.ByteString.Char8 (scientific)
+import           Data.Binary
 import           Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
@@ -17,13 +19,13 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import           Data.Scientific (isInteger, toBoundedInteger)
 import qualified Data.Text as T
-import           Data.Word
 import           Foreign.Ptr
 import           Foreign.Storable
 import           GHC.Generics
 import           System.IO.Unsafe
 
 import           Blockchain.Data.RLP
+import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Address
 
 
@@ -34,7 +36,7 @@ data BasicValue = BInteger !Integer
                 | BEnumVal !T.Text !T.Text
                 | BContract !T.Text !Address
                 | BDefault -- Indicates a not present value
-                deriving (Show, Eq, Generic, NFData, Hashable)
+                deriving (Show, Eq, Generic, NFData, Hashable, Binary)
 
 data IndexType = INum Integer
                | IText B.ByteString
@@ -46,6 +48,7 @@ data StorableValue = BasicValue BasicValue
                    | SStruct (HM.HashMap B.ByteString StorableValue)
                    | SArray (I.IntMap StorableValue)
                    | SMapping (HM.HashMap IndexType StorableValue)
+                   | SArraySentinel Int
                    deriving (Eq, Show, Generic, NFData)
 
 data StoragePathPiece = Field B.ByteString
@@ -53,7 +56,29 @@ data StoragePathPiece = Field B.ByteString
                       | ArrayIndex Int
                       deriving (Eq, Show, Generic, NFData, Hashable)
 
-type StoragePath = [StoragePathPiece]
+newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Show, Generic, NFData, Hashable)
+
+empty :: StoragePath
+empty = StoragePath []
+
+singleton :: B.ByteString -> StoragePath
+singleton bs = StoragePath [Field bs]
+
+getField :: StoragePath -> B.ByteString
+getField (StoragePath (Field f:_)) = f
+getField path = error "StoragePath must begin with field" path
+
+snoc :: StoragePath -> StoragePathPiece -> StoragePath
+snoc (StoragePath p) piece = StoragePath $ p ++ [piece]
+
+toList :: StoragePath -> [StoragePathPiece]
+toList (StoragePath p) = p
+
+fromList :: [StoragePathPiece] -> StoragePath
+fromList = StoragePath
+
+size :: StoragePath -> Int
+size (StoragePath p) = length p
 
 type StorageDelta = [(StoragePath, BasicValue)]
 
@@ -71,7 +96,7 @@ parseInt = do
     Nothing -> fail "int overflow"
     Just i -> return i
 
-pathParser :: Parser StoragePath
+pathParser :: Parser [StoragePathPiece]
 pathParser = do
   ch <- fmap w82c <$> peekWord8
   case ch of
@@ -87,14 +112,14 @@ c2w8 = fromIntegral . ord
 w82c :: Word8 -> Char
 w82c = chr . fromIntegral
 
-parseArrayIndex :: Parser StoragePath
+parseArrayIndex :: Parser [StoragePathPiece]
 parseArrayIndex = do
   skip (== c2w8 '[')
   idx <- parseInt
   skip (== c2w8 ']')
   (ArrayIndex idx:) <$> pathParser
 
-parseMapIndex :: Parser StoragePath
+parseMapIndex :: Parser [StoragePathPiece]
 parseMapIndex = do
   skip (== c2w8 '<')
   nextChar <- peekWord8'
@@ -117,14 +142,14 @@ parseMapIndex = do
   skip (== c2w8 '>')
   (MapIndex idx:) <$> pathParser
 
-parseField :: Parser StoragePath
+parseField :: Parser [StoragePathPiece]
 parseField = do
   skip (== c2w8 '.')
   n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
   (Field n:) <$> pathParser
 
 parsePath :: B.ByteString-> Either String StoragePath
-parsePath = parseOnly pathParser
+parsePath = fmap StoragePath . parseOnly pathParser
 
 escapeKey :: B.ByteString -> B.ByteString
 escapeKey srcBS = unsafePerformIO $ do
@@ -175,7 +200,7 @@ unescapeKey srcBS = unsafePerformIO $ do
       copyAndUnescape 0 0
 
 unparsePath :: StoragePath -> B.ByteString
-unparsePath = B.concat . concatMap go
+unparsePath (StoragePath ps) = B.concat . concatMap go $ ps
   where go :: StoragePathPiece -> [B.ByteString]
         go (Field p) = [".", p]
         go (ArrayIndex n) = ["[", C8.pack $ show n, "]"]
@@ -188,7 +213,7 @@ unparsePath = B.concat . concatMap go
 type TotalStorage = HM.HashMap B.ByteString StorableValue
 
 data ReplayFailure = MissingPath StoragePath
-                   | TypeMismatch
+                   | TypeMismatch StoragePath BasicValue StorableValue
                    | MissingStructField B.ByteString
                    | FieldRequiredAtTopLevel
                    | NoPathsProvided
@@ -196,35 +221,49 @@ data ReplayFailure = MissingPath StoragePath
 
 replayDelta :: StorageDelta -> TotalStorage -> Either ReplayFailure TotalStorage
 replayDelta [] ts = Right ts
-replayDelta ((Field f:sp, bv):rs) ts =
+replayDelta ((StoragePath (Field f:sp), bv):rs) ts =
   case HM.lookup f ts of
     Just sv -> do
-      ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta sp bv sv
+      ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta (StoragePath sp) bv sv
       replayDelta rs ts'
-    Nothing -> Left . MissingPath $ [Field f]
+    Nothing -> Left . MissingPath $ singleton f
 replayDelta ((p, _):_) _ = Left $ MissingPath p
 
 applyDelta :: StoragePath -> BasicValue -> StorableValue -> Either ReplayFailure StorableValue
-applyDelta [] bv (BasicValue _) = Right $ BasicValue bv
-applyDelta (Field n:sp) bv (SStruct ss) =
+applyDelta (StoragePath sp) = applyDelta' sp
+
+applyDelta' :: [StoragePathPiece] -> BasicValue -> StorableValue -> Either ReplayFailure StorableValue
+applyDelta' [] bv (BasicValue _) = Right $ BasicValue bv
+applyDelta' (Field n:sp) bv (SStruct ss) =
   case HM.lookup n ss of
-    Just v -> SStruct . (\x -> HM.insert n x ss) <$> applyDelta sp bv v
-    Nothing -> Right . SStruct $ HM.insert n (constructFromNothing sp bv) ss
-applyDelta (MapIndex n:sp) bv (SMapping ms) =
+    Just v -> SStruct . (\x -> HM.insert n x ss) <$> applyDelta' sp bv v
+    Nothing -> Right . SStruct $ HM.insert n (constructFromNothing' sp bv) ss
+applyDelta' (MapIndex n:sp) bv (SMapping ms) =
   case HM.lookup n ms of
-    Just v -> SMapping . (\x -> HM.insert n x ms) <$> applyDelta sp bv v
-    Nothing -> Right . SMapping $ HM.insert n (constructFromNothing sp bv) ms
-applyDelta (ArrayIndex n:sp) bv (SArray vs) =
+    Just v -> SMapping . (\x -> HM.insert n x ms) <$> applyDelta' sp bv v
+    Nothing -> Right . SMapping $ HM.insert n (constructFromNothing' sp bv) ms
+applyDelta' (ArrayIndex n:sp) bv (SArray vs) =
   case I.lookup n vs of
-    Just v -> SArray . (\x -> I.insert n x vs) <$> applyDelta sp bv v
-    Nothing -> Right . SArray $ I.insert n (constructFromNothing sp bv) vs
-applyDelta _ _ _ = Left TypeMismatch
+    Just v -> SArray . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
+    Nothing -> Right . SArray $ I.insert n (constructFromNothing' sp bv) vs
+applyDelta' (ArrayIndex n:sp) bv sent@(SArraySentinel len) =
+  Right . SArray $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
+applyDelta' [Field "length"] (BInteger n) (SArray vs) =
+  let n' = fromIntegral n
+  in Right . SArray $ I.insert n' (SArraySentinel n') vs
+applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 
 constructFromNothing :: StoragePath -> BasicValue -> StorableValue
-constructFromNothing [] = BasicValue
-constructFromNothing (Field n:sp) = SStruct . HM.singleton n . constructFromNothing sp
-constructFromNothing (MapIndex n:sp) = SMapping . HM.singleton n . constructFromNothing sp
-constructFromNothing (ArrayIndex n:sp) = SArray . I.singleton n . constructFromNothing sp
+constructFromNothing (StoragePath p) = constructFromNothing' p
+
+constructFromNothing' :: [StoragePathPiece] -> BasicValue -> StorableValue
+constructFromNothing' [] = BasicValue
+constructFromNothing' [Field "length"] = \case
+  BInteger n -> SArraySentinel $ fromIntegral n
+  bv -> SStruct . HM.singleton "length" $ constructFromNothing' [] bv
+constructFromNothing' (Field n:sp) = SStruct . HM.singleton n . constructFromNothing' sp
+constructFromNothing' (MapIndex n:sp) = SMapping . HM.singleton n . constructFromNothing' sp
+constructFromNothing' (ArrayIndex n:sp) = SArray . I.singleton n . constructFromNothing' sp
 
 instance RLPSerializable BasicValue where
   rlpEncode = \case
@@ -256,9 +295,9 @@ instance Ae.FromJSON StorableValue where
 
 analyze :: TotalStorage -> [(StoragePath, BasicValue)]
 analyze = HM.foldlWithKey' go []
-  where go prev field sv = map (first (Field field:)) (analyze' sv) <> prev
+  where go prev field sv = map (first (StoragePath . (Field field:))) (analyze' sv) <> prev
 
-analyze' :: StorableValue -> [(StoragePath, BasicValue)]
+analyze' :: StorableValue -> [([StoragePathPiece], BasicValue)]
 analyze' (BasicValue bv) = [([], bv)]
 analyze' (SMapping sm) = HM.foldlWithKey' go [] sm
   where go prev k sv = map (first (MapIndex k:)) (analyze' sv) <> prev
@@ -266,20 +305,39 @@ analyze' (SStruct ss) = HM.foldlWithKey' go [] ss
   where go prev k sv = map (first (Field k:)) (analyze' sv) <> prev
 analyze' (SArray vs) = I.foldMapWithKey go vs
   where go k sv = map (first (ArrayIndex k:)) $ analyze' sv
+analyze' (SArraySentinel n) = [([Field "length"], BInteger $ fromIntegral n)]
 
 synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
 synthesize spbvs = do
   byFields <- mapM fieldsOnly spbvs
   let basicLists = foldr (\(t, p) m -> HM.alter (Just . maybe [p] (p:)) t m) HM.empty byFields
   sequence $ HM.map synthesize' basicLists
- where fieldsOnly (Field t:sp, bv) = return (t, (sp, bv))
+ where fieldsOnly (StoragePath (Field t:sp), bv) = return (t, (StoragePath sp, bv))
        fieldsOnly _ = Left FieldRequiredAtTopLevel
 
 synthesize' :: [(StoragePath, BasicValue)] -> Either ReplayFailure StorableValue
-synthesize' [] = Left NoPathsProvided
+synthesize' ([]) = Left NoPathsProvided
 synthesize' ((sp, bv):rest) =
   let initState = constructFromNothing sp bv
   in go rest initState
  where go :: [(StoragePath, BasicValue)] -> StorableValue -> Either ReplayFailure StorableValue
        go [] sv' = Right sv'
        go ((sp',bv'):t) sv' = go t =<< applyDelta sp' bv' sv'
+
+
+pathToHexStorage :: StoragePath -> HexStorage
+pathToHexStorage = HexStorage . unparsePath
+
+basicToHexStorage :: BasicValue -> HexStorage
+basicToHexStorage = HexStorage . rlpSerialize . rlpEncode
+
+hexStorageToPath :: HexStorage -> Either String StoragePath
+hexStorageToPath (HexStorage hs) = parsePath hs
+
+hexStorageToBasic :: HexStorage -> Either String BasicValue
+hexStorageToBasic (HexStorage hs) = unsafeDupablePerformIO . handle handler
+                                  . evaluate . force
+                                  . Right . rlpDecode . rlpDeserialize $ hs
+
+  where handler :: SomeException -> IO (Either String BasicValue)
+        handler = return . Left . show

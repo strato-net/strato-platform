@@ -52,8 +52,8 @@ import           Handler.UUIDInfo
 
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Format
 import qualified Network.Haskoin.Crypto as HK
+import           Text.Format
 
 mkYesodDispatch "App" resourcesApp
 

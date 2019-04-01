@@ -108,9 +108,17 @@ until curl localhost:8000 &> /dev/null; do
 done
 echo "Bloc is up - running slipstream now..."
 
-runBackgroundProcess /usr/bin/slipstream --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --database="$postgres_slipstream_db"  --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" \
-           --kafkahost="$kafkaHost" --kafkaport="$kafkaPort" --debug="${SLIPSTREAM_DEBUG:-false}" &>> logs/slipstream
+SLIPSTREAM_CMD="/usr/bin/slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
+  --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
+  --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
+  --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --debug=${SLIPSTREAM_DEBUG:-false}"
+
+if [ ${SLIPSTREAM_OPTIONAL:-true} = true ]; then
+  $SLIPSTREAM_CMD &>> logs/slipstream &
+else
+  runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
+fi
+
 
 set +x
 if [ "${PROCESS_MONITORING}" = true ] ; then
@@ -120,7 +128,8 @@ if [ "${PROCESS_MONITORING}" = true ] ; then
     for monitored_pid in "${!MONITORED_PIDS[@]}"; do
       # if process with pid does not exist
       if ! (ps -p ${monitored_pid} > /dev/null); then
-        echo "Process ${MONITORED_PIDS[${monitored_pid}]} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+        DEAD_PROCESS=${MONITORED_PIDS[${monitored_pid}]}
+        echo "Process ${DEAD_PROCESS} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
         # Kill all the rest of monitored processes
         for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
           if ps -p ${pid_to_kill} > /dev/null; then
@@ -129,6 +138,11 @@ if [ "${PROCESS_MONITORING}" = true ] ; then
             echo "done"
           fi
         done
+        FILE_NAME="/logs/$(echo ${DEAD_PROCESS} | cut -d ' ' -f 1)"
+        echo "Tail of logs for crashed process:"
+        echo "+tail -n 20 ${FILE_NAME}"
+        tail -n 20 $FILE_NAME
+        echo "End of logs."
         echo "CONTAINER IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /logs/ in the container"
         # Keep container running idle
         tail -f /dev/null

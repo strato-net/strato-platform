@@ -25,8 +25,8 @@ import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Test.QuickCheck
 
 import Blockchain.Data.ArbitraryInstances()
-import Blockchain.Strato.Model.Format
 import Blockchain.Strato.Model.Address
+import Text.Format
 
 -- API
 

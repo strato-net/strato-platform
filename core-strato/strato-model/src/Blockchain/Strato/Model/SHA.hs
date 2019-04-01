@@ -15,6 +15,7 @@ import              Data.Binary.Get
 import              Data.Binary.Put
 import              Data.ByteArray                       (convert)
 import qualified    Data.ByteString                      as B
+import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
 import qualified    Data.ByteString.Char8                as S8
 import qualified    Data.ByteString.Lazy                 as BL
@@ -23,12 +24,13 @@ import              GHC.Generics
 import              Numeric                              (readHex, showHex)
 import              Web.HttpApiData
 import              Web.PathPieces
+import              Test.QuickCheck
 
 import              FastKeccak256
 import              Blockchain.Data.RLP
-import qualified    Blockchain.Strato.Model.Colors       as CL
 import              Blockchain.Strato.Model.ExtendedWord
-import              Blockchain.Strato.Model.Format
+import qualified    Text.Colors                          as CL
+import              Text.Format
 
 newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
 
@@ -113,6 +115,11 @@ instance FromHttpApiData SHA where
         where unmaybe = \case
                 Nothing -> Left "couldn't parse SHA"
                 Just x  -> Right x
+
+instance Arbitrary SHA where
+    arbitrary = do
+        random256Bit <- fastRandBs 32
+        return . SHA . fromIntegral . byteString2Integer $ random256Bit
 
 data CodePtr = EVMCode SHA | SolidVMCode String SHA
              deriving (Show, Read, Eq, Ord, Generic, NFData, Ae.ToJSON, Ae.FromJSON)

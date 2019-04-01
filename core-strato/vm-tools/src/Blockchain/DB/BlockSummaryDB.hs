@@ -16,8 +16,9 @@ import qualified Database.LevelDB             as LDB
 
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.RLP
-import           Blockchain.Format
 import           Blockchain.SHA
+
+import           Text.Format
 
 type BlockSummaryDB = LDB.DB
 

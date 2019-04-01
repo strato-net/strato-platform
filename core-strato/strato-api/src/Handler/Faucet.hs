@@ -4,6 +4,7 @@
 module Handler.Faucet where
 
 import qualified Control.Monad                  as CM
+import qualified Data.ByteString                as BS
 import qualified Data.Text                      as T
 import qualified Database.Esqueleto             as E
 import qualified Network.Haskoin.Crypto         as H
@@ -20,14 +21,13 @@ import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.Format
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util                (getCurrentMicrotime)
 import           Handler.Common
 import           Handler.Filters
 import           Import
 
-import qualified Data.ByteString      as BS
+import           Text.Format
 
 zoomForApp :: ReaderT App IO a -> HandlerFor App a
 zoomForApp f = do

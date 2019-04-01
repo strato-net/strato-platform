@@ -22,14 +22,15 @@ import           GHC.Generics
 
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
-import qualified Blockchain.Colors            as CL
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.Data.RLP
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
+import qualified Text.Colors                  as CL
+import           Text.Format
+import           Text.ShortDescription
 
 derivePersistField "Transaction"
 
@@ -186,6 +187,11 @@ instance RLPSerializable Transaction where
       _ -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show r
       where
         r = partialRLPEncode t
+
+
+instance ShortDescription Transaction where
+  shortDescription = format
+
 
 
 --partialRLP(De|En)code are used for the signing algorithm

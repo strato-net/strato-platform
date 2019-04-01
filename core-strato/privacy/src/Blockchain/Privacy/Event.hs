@@ -27,7 +27,6 @@ module Blockchain.Privacy.Event
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.Privacy.Monad
 import           Blockchain.Privacy.Metrics
 import           Blockchain.SHA
@@ -46,6 +45,7 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           Data.Traversable
 import           Prometheus
+import           Text.Format
 
 logFF :: MonadLogger m => Text -> String -> m ()
 logFF str = $logInfoS str . T.pack

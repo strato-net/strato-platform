@@ -15,6 +15,9 @@ main = hspec spec
 forceParse :: B.ByteString -> StoragePath
 forceParse = either error id . parsePath
 
+toAns :: [StoragePathPiece] -> Either a StoragePath
+toAns = Right . fromList
+
 spec :: Spec
 spec = do
   describe "ByteString escaping" $ do
@@ -31,18 +34,18 @@ spec = do
 
   describe "StoragePath" $ do
     it "should be able to unambiguously parse a path" $ do
-      parsePath "" `shouldBe` Right []
-      parsePath "[3]" `shouldBe` Right [ArrayIndex 3]
-      parsePath "<773472>" `shouldBe` Right [MapIndex (INum 773472)]
-      parsePath "<\"xor\">" `shouldBe` Right [MapIndex (IText "xor")]
-      parsePath "<\"\">" `shouldBe` Right [MapIndex (IText "")]
-      parsePath ".extra" `shouldBe` Right [Field "extra"]
-      parsePath ".hashmap" `shouldBe` Right [Field "hashmap"]
-      parsePath ".hashmap<30>" `shouldBe` Right [Field "hashmap", MapIndex (INum 30)]
-      parsePath ".hashmap<true>" `shouldBe` Right [Field "hashmap", MapIndex (IBool True)]
-      parsePath ".hashmap<false>" `shouldBe` Right [Field "hashmap", MapIndex (IBool False)]
+      parsePath "" `shouldBe` toAns []
+      parsePath "[3]" `shouldBe` toAns [ArrayIndex 3]
+      parsePath "<773472>" `shouldBe` toAns [MapIndex (INum 773472)]
+      parsePath "<\"xor\">" `shouldBe` toAns [MapIndex (IText "xor")]
+      parsePath "<\"\">" `shouldBe` toAns [MapIndex (IText "")]
+      parsePath ".extra" `shouldBe` toAns [Field "extra"]
+      parsePath ".hashmap" `shouldBe` toAns [Field "hashmap"]
+      parsePath ".hashmap<30>" `shouldBe` toAns [Field "hashmap", MapIndex (INum 30)]
+      parsePath ".hashmap<true>" `shouldBe` toAns [Field "hashmap", MapIndex (IBool True)]
+      parsePath ".hashmap<false>" `shouldBe` toAns [Field "hashmap", MapIndex (IBool False)]
       parsePath ".hashmap<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c>" `shouldBe`
-        Right [Field "hashmap", MapIndex (IAddress 0xca35b7d915458ef540ade6068dfe2f44e8fa733c)]
+        toAns [Field "hashmap", MapIndex (IAddress 0xca35b7d915458ef540ade6068dfe2f44e8fa733c)]
 
     it "should fail on badly formed paths" $ do
       let checkFail = (`shouldSatisfy` isLeft) . parsePath
@@ -55,40 +58,42 @@ spec = do
       checkFail ".hashmap<a:8888>"
 
     it "should be able to unparse a path" $ do
-      unparsePath [] `shouldBe` ""
-      unparsePath [ArrayIndex 3] `shouldBe` "[3]"
-      unparsePath [MapIndex (INum 773472)] `shouldBe` "<773472>"
-      unparsePath [MapIndex (IText "xor")] `shouldBe` "<\"xor\">"
-      unparsePath [MapIndex (IText "")] `shouldBe` "<\"\">"
-      unparsePath [Field "extra"] `shouldBe` ".extra"
-      unparsePath [MapIndex (IBool True)] `shouldBe` "<true>"
-      unparsePath [MapIndex (IBool False)] `shouldBe` "<false>"
-      unparsePath [MapIndex (IAddress 1024)] `shouldBe`
+      let unparse = unparsePath . fromList
+      unparse [] `shouldBe` ""
+      unparse [ArrayIndex 3] `shouldBe` "[3]"
+      unparse [MapIndex (INum 773472)] `shouldBe` "<773472>"
+      unparse [MapIndex (IText "xor")] `shouldBe` "<\"xor\">"
+      unparse [MapIndex (IText "")] `shouldBe` "<\"\">"
+      unparse [Field "extra"] `shouldBe` ".extra"
+      unparse [MapIndex (IBool True)] `shouldBe` "<true>"
+      unparse [MapIndex (IBool False)] `shouldBe` "<false>"
+      unparse [MapIndex (IAddress 1024)] `shouldBe`
         "<a:0000000000000000000000000000000000000400>"
 
     it "should allow unbounded map indices" $ do
       parsePath (B.concat ["<1", B.replicate 100 0x30, ">"])
-        `shouldBe` Right [MapIndex (INum (product (replicate 100 10)))]
+        `shouldBe` toAns [MapIndex (INum (product (replicate 100 10)))]
 
     it "should not allow unbounded array indices" $ do
       parsePath (B.concat ["[1", B.replicate 100 0x30, "]"])
         `shouldSatisfy` isLeft
 
     it "should unescape paths" $ do
-      parsePath "<\"quoth:\\\"\">" `shouldBe`
-        Right [MapIndex (IText "quoth:\"")]
+      parsePath "<\"quoth:\\\"\">" `shouldBe` toAns [MapIndex (IText "quoth:\"")]
 
     it "should escape quotes in map indices" $ do
-      unparsePath [MapIndex (IText "dan\"ger")]`shouldBe` "<\"dan\\\"ger\">"
+      unparsePath (StoragePath [MapIndex (IText "dan\"ger")])`shouldBe` "<\"dan\\\"ger\">"
 
   describe "StorageDelta" $ do
-    let exStorage = HM.fromList [("count", BasicValue $ BInteger 99), ("name", BasicValue $ BString "iago")]
+    let exStorage = HM.fromList [ ("count", BasicValue $ BInteger 99)
+                                , ("name", BasicValue $ BString "iago")]
     it "should be able to do nothing" $ do
       replayDelta [] exStorage `shouldBe` Right exStorage
 
     it "should fail to do the impossible" $ do
-      replayDelta [([], BInteger 99)] exStorage `shouldBe` Left (MissingPath [])
-      replayDelta [(forceParse ".no_such_field", BInteger 300)] exStorage `shouldBe` Left (MissingPath [Field "no_such_field"])
+      replayDelta [(empty, BInteger 99)] exStorage `shouldBe` Left (MissingPath empty)
+      replayDelta [(forceParse ".no_such_field", BInteger 300)] exStorage
+        `shouldBe` Left (MissingPath $ singleton "no_such_field")
 
     it "should be able to increment" $ do
       replayDelta [(forceParse ".count", BInteger 100)] exStorage `shouldBe`
@@ -230,6 +235,7 @@ spec = do
                , (INum 100, BasicValue $ BString "bay")
                ]
       synthesize input `shouldBe` Right want
+      synthesize (reverse input) `shouldBe` Right want
 
     it "can synthesize a complicated contract" $ do
       let input = [ (forceParse ".person.age", BInteger 84)
@@ -251,6 +257,16 @@ spec = do
             , ("age", BasicValue $ BString "Enlightenment")
             ]
       synthesize input `shouldBe` Right want
+      synthesize (reverse input) `shouldBe` Right want
+
+    it "can synthesize an array with length" $ do
+      let input = [ (forceParse ".owners.length", BInteger 2)
+                  , (forceParse ".owners[0]", BAddress 0x88)
+                  ]
+          want = HM.singleton "owners" . SArray $ I.fromList
+            [(0, BasicValue $ BAddress 0x88), (2, SArraySentinel 2)]
+      synthesize input `shouldBe` Right want
+      synthesize (reverse input) `shouldBe` Right want
 
   describe "BasicValue RLP encoding" $ do
     it "should be reversible" $ do

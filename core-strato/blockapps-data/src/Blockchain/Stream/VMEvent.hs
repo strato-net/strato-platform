@@ -23,7 +23,7 @@ module Blockchain.Stream.VMEvent (
 ) where
 
 import           Conduit
-
+import           Control.Monad.State
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
 
@@ -34,13 +34,12 @@ import           Network.Kafka.Protocol      hiding (Key)
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.RLP
 import           Blockchain.EthConf
-import           Blockchain.Format
 import           Blockchain.KafkaTopics
 import           Blockchain.MilenaTools
 import           Blockchain.Stream.Raw
+import           Text.Format
 
 
-import           Control.Monad.State
 
 import qualified Data.Binary                 as Binary
 

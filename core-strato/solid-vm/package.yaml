@@ -24,17 +24,21 @@ dependencies:
   - blockapps-datadefs
   - blockapps-mpdbs
   - ethereum-rlp
+  - base16-bytestring
   - blockapps-util
   - bytestring
   - containers
   - cryptonite
   - deepseq
   - extra
+  - format
   - generic-random
+  - hashable
   - lens
   - memory
   - merkle-patricia-db
   - parsec
+  - prometheus-client
   - QuickCheck
   - quickcheck-instances
   - resourcet
@@ -91,7 +95,9 @@ library:
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
     - SolidVM.Solidity.Parse.UnParser
+    - SolidVM.Solidity.Parse.Declarations
     - SolidVM.Solidity.Xabi.Statement
+    - CodeCollection
   ghc-options: -Wall -O2
 
 executables:
@@ -109,6 +115,7 @@ tests:
     source-dirs: tests/
     main: Main.hs
     dependencies:
+      - async
       - base16-bytestring
       - hflags
       - hspec
@@ -117,3 +124,12 @@ tests:
       - monad-logger
       - raw-strings-qq
       - solid-vm
+
+benchmarks:
+    codebench:
+      source-dirs: bench/
+      main: CodeBench.hs
+      dependencies:
+        - criterion
+        - file-embed
+        - solid-vm

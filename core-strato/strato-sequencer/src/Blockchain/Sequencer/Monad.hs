@@ -65,6 +65,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
 import           System.Directory                          (createDirectoryIfMissing)
+import           Text.Format
 
 import qualified Database.LevelDB                          as LDB
 
@@ -258,7 +259,7 @@ fuseChannels = do
   votes <- asks blockstanbulBeneficiary
   timers <- asks blockstanbulTimeouts
   loop <- use loopTimeout
-  let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . show))
+  let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift) <$> mergeSources
                [ sourceTQueue unseq .| mapC UnseqEvent
                , sourceTMChan votes .| mapC VoteMade

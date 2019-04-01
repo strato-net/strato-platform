@@ -14,12 +14,15 @@ dependencies:
   - binary
   - blockapps-haskoin
   - bytestring
+  - bytestring-arbitrary
   - containers
   - cpu
   - cryptonite
   - deepseq
+  - derive
   - ethereum-rlp
   - fast-keccak256
+  - format
   - hashable
   - http-api-data
   - integer-gmp
@@ -28,6 +31,7 @@ dependencies:
   - nibblestring
   - path-pieces
   - primitive
+  - swagger2
   - text
   - time
   - unordered-containers

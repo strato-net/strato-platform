@@ -10,20 +10,21 @@ module Blockchain.Data.AddressStateDB (
   blankAddressState
 ) where
 
-import qualified Blockchain.Colors                  as CL
 
-import           Blockchain.Data.RLP
-import qualified Blockchain.Database.MerklePatricia as MP
-import           Blockchain.ExtWord
-import           Blockchain.Format
-import           Blockchain.SHA
-import           Blockchain.Util
 import           Data.Maybe                         (maybeToList)
 
 import           Control.DeepSeq
 import           GHC.Generics
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
+
+import           Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.ExtWord
+import           Blockchain.SHA
+import           Blockchain.Util
+import qualified Text.Colors                      as CL
+import           Text.Format
 
 data AddressState =
   AddressState{

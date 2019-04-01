@@ -44,7 +44,7 @@ replaceMembers :: Struct
 replaceMembers Struct{..} addrs m =
   let tag = "__members__"
       members = valueToText $ ValueArrayDynamic $ map (SimpleValue . ValueAddress) addrs
-      m' = Map.alter (const members) tag m
+      m' = Map.alter (const $ Just members) tag m
    in case OMap.lookup tag fields of
         Nothing -> m'
         Just (Left _, _) -> m
@@ -58,7 +58,7 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
   idsAndDetails <- if (Text.null src)
                      then return Map.empty
-                     else compileContract src
+                     else sourceToContractDetails True src
   mContract <- case Map.toList idsAndDetails of
             [] -> return Nothing
             [(_, x)] -> return $ Just x

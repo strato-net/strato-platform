@@ -58,10 +58,17 @@ function upload(req, res, next) {
       Body: req.file.buffer,
     };
 
-
+    let uploadedFile;
+    
     try {
-      const uploadedFile = yield uploader.upload(params);
-
+      uploadedFile = yield uploader.upload(params);
+    } catch (error) {
+      let err = new Error(`AWS S3 upload file to bucket error: ${JSON.stringify(error)}`);
+      err.status = RestStatus.INTERNAL_SERVER_ERROR;
+      return next(err);
+    }
+    
+    try {
       const args = {
         _uri: uploadedFile.Location,
         _host: provider,
@@ -171,7 +178,7 @@ function attest(req, res, next) {
 
     try {
       const result = yield externalStorage.getExternalStorage(contractAddress);
-      const account = yield ax.get(process.env.VAULT_HOST, `/strato/v2.3/key`, userCredentials);
+      const account = yield ax.get(process.env.vaultWrapperHttpHost, `/strato/v2.3/key`, userCredentials);
       if (result.signers.indexOf(account.address) > -1) {
         let err = new Error('You already signed this transaction');
         err.status = RestStatus.BAD_REQUEST;

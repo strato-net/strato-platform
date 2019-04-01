@@ -31,66 +31,66 @@ updateGlobals gref g = do
   recordGlobals g
   writeIORef gref g
 
-setContractCreated :: MonadIO m => IORef Globals -> Keccak256 -> m ()
+setContractCreated :: MonadIO m => IORef Globals -> SHA -> m ()
 setContractCreated globalsIORef codeHash = do
   globals@Globals{..} <- readIORef globalsIORef
   updateGlobals globalsIORef globals{createdContracts=Set.insert codeHash createdContracts}
 
-isContractCreated :: MonadIO m => IORef Globals -> Keccak256 -> m Bool
+isContractCreated :: MonadIO m => IORef Globals -> SHA -> m Bool
 isContractCreated globalsIORef codeHash = do
   Globals{..} <- readIORef globalsIORef
   return $ codeHash `Set.member` createdContracts
 
-isHistoric :: MonadIO m => IORef Globals -> Keccak256 -> m Bool
+isHistoric :: MonadIO m => IORef Globals -> SHA -> m Bool
 isHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
   return $ name `Set.member` historyList
 
-isFunctionHistoric :: MonadIO m => IORef Globals -> Keccak256 -> m Bool
+isFunctionHistoric :: MonadIO m => IORef Globals -> SHA -> m Bool
 isFunctionHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
   return $ name `Set.member` functionHistoryList
 
-getHistoryList :: MonadIO m => IORef Globals -> m (Set Keccak256)
+getHistoryList :: MonadIO m => IORef Globals -> m (Set SHA)
 getHistoryList = fmap historyList . readIORef
 
-getFunctionHistoryList :: MonadIO m => IORef Globals -> m (Set Keccak256)
+getFunctionHistoryList :: MonadIO m => IORef Globals -> m (Set SHA)
 getFunctionHistoryList = fmap functionHistoryList . readIORef
 
-addToHistoryList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
+addToHistoryList :: MonadIO m => IORef Globals -> SHA -> m ()
 addToHistoryList g k = do
   globals@Globals{..} <- readIORef g
   updateGlobals g globals{historyList=Set.insert k historyList}
 
-removeFromHistoryList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
+removeFromHistoryList :: MonadIO m => IORef Globals -> SHA -> m ()
 removeFromHistoryList g k = do
   globals@Globals{..} <- readIORef g
   updateGlobals g globals{historyList=Set.delete k historyList}
 
-shouldIndex :: MonadIO m => IORef Globals -> Keccak256 -> m Bool
+shouldIndex :: MonadIO m => IORef Globals -> SHA -> m Bool
 shouldIndex globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
   return . not $ name `Set.member` noIndexList
 
-getNoIndexList :: MonadIO m => IORef Globals -> m (Set Keccak256)
+getNoIndexList :: MonadIO m => IORef Globals -> m (Set SHA)
 getNoIndexList = fmap noIndexList . readIORef
 
-addToNoIndexList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
+addToNoIndexList :: MonadIO m => IORef Globals -> SHA -> m ()
 addToNoIndexList g k = do
   globals@Globals{..} <- readIORef g
   updateGlobals g globals{noIndexList=Set.insert k noIndexList}
 
-removeFromNoIndexList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
+removeFromNoIndexList :: MonadIO m => IORef Globals -> SHA -> m ()
 removeFromNoIndexList g k = do
   globals@Globals{..} <- readIORef g
   updateGlobals g globals{noIndexList=Set.delete k noIndexList}
 
-addToFunctionHistoryList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
+addToFunctionHistoryList :: MonadIO m => IORef Globals -> SHA -> m ()
 addToFunctionHistoryList g k = do
   globals@Globals{..} <- readIORef g
   updateGlobals g globals{functionHistoryList=Set.insert k functionHistoryList}
 
-removeFromFunctionHistoryList :: MonadIO m => IORef Globals -> Keccak256 -> m ()
+removeFromFunctionHistoryList :: MonadIO m => IORef Globals -> SHA -> m ()
 removeFromFunctionHistoryList g k = do
   globals@Globals{..} <- readIORef g
   updateGlobals g globals{functionHistoryList=Set.delete k functionHistoryList}

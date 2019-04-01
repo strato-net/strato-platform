@@ -124,7 +124,7 @@ expression =
     [binary "||"],
     [Postfix (do { reservedOp "?"; e1 <- expression; reservedOp ":"; e2 <- expression; return (\e -> Ternary e e1 e2)})]
   ]
-  (tuple <|> primaryExpression)
+  (tuple <|> array <|> primaryExpression)
 
 binary :: String -> Operator String u Identity Expression
 binary x = Infix (do { reservedOp x; return (Binary x)}) AssocLeft
@@ -147,6 +147,11 @@ tuple = do
   case exps of
     [exp'] -> return exp'
     _ -> return $ TupleExpression exps
+
+array :: SolidityParser Expression
+array = do
+  exps <- brackets $ commaSep1 expression
+  return $ ArrayExpression exps
 
 
 {-

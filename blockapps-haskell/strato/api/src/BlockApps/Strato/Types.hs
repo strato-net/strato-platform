@@ -33,6 +33,7 @@ module BlockApps.Strato.Types
   , Difficulty (..)
   , TxCount (..)
   , Storage (..)
+  , StorageKV (..)
   , AbiBin (..)
   , exampleTxResult
   , ChainInfo (..)
@@ -44,9 +45,11 @@ module BlockApps.Strato.Types
 
 import           Control.Applicative
 import           Control.Lens                 (mapped, (&), (.~), (?~))
+import           Control.Monad
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
+import           Data.Aeson.Types
 import qualified Data.Binary                  as Binary
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.Map.Strict              (Map)
@@ -72,6 +75,7 @@ import           Test.QuickCheck.Instances    ()
 import           Text.Read
 -- TODO: Unify Bloch and Strato transactions
 import           BlockApps.Ethereum           hiding (Transaction(..), transactionFrom)
+import           Blockchain.SolidVM.Model
 import           BlockApps.Strato.TypeLits
 
 instance (ToHttpApiData a) => ToHttpApiData [a] where
@@ -155,7 +159,6 @@ instance ToSchema Account where
 
 instance ToSchema Difficulty
 instance ToSchema TxCount
-instance ToSchema Storage
 instance ToSchema Word160 where
   declareNamedSchema = const . pure $ named "Word160" binarySchema
 -- add min max
@@ -376,18 +379,42 @@ instance FromJSON TxCount where
 instance ToJSON TxCount where
   toJSON (TxCount n) = object [ "transactionCount" .= n ]
 
+data StorageKV = EVMEntry (Hex Word256) (Hex Word256)
+               | SolidVMEntry HexStorage HexStorage
+               deriving (Eq, Show, Generic, ToSchema)
+
+instance Arbitrary StorageKV where
+  arbitrary = liftM2 EVMEntry arbitrary arbitrary
+
 data Storage = Storage
   { storageAddress :: Address
-  , storageKey     :: Hex Word256
-  , storageValue   :: Hex Word256
+  , storageKV      :: StorageKV
   , storageChainId :: Maybe ChainId
-  } deriving (Eq, Show, Generic)
+  , storageKind    :: CodeKind
+  } deriving (Eq, Show, Generic, ToSchema)
 
 instance FromJSON Storage where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON (Object o) = do
+    addr <- o .: "address"
+    chain <- o .:? "chain_id"
+    codeKind <- o .:? "kind" .!= EVM
+    kv <- case codeKind of
+      EVM -> liftM2 EVMEntry (o .: "key") (o .: "value")
+      SolidVM -> liftM2 SolidVMEntry (o .: "key") (o .: "value")
+    return $ Storage addr kv chain codeKind
+  parseJSON x = typeMismatch "Storage" x
 
 instance ToJSON Storage where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON Storage{..} =
+    let (t, k, v) =
+          case storageKV of
+              EVMEntry k' v' -> ("kind" .= EVM, "key" .= k', "value" .= v')
+              SolidVMEntry k' v' -> ("kind" .= SolidVM, "key" .= k', "value" .= v')
+        a = "address" .= storageAddress
+        c_id = case storageChainId of
+                  Nothing -> []
+                  Just c_id' -> ["chain_id" .= c_id']
+    in object $ a:t:k:v:c_id
 
 data AbiBin = AbiBin
   { abi        :: Text

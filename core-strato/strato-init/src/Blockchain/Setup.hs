@@ -36,7 +36,6 @@ import           System.Entropy
 import           System.FilePath
 
 import           Blockchain.APIFiles
-import qualified Blockchain.Colors                  as CL
 import           Blockchain.Constants
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
@@ -56,6 +55,8 @@ import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery
+
+import qualified Text.Colors                        as CL
 
 import           HFlags
 
@@ -467,7 +468,7 @@ oneTimeSetup genesisBlockName = do
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
          void . flip runLoggingT printLogMsg $ flip runReaderT (SetupDBs smpdb hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
-           addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
+           void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of
              (False, False) -> initializeGenesisBlock NoBackup genesisBlockName decodedFaucets

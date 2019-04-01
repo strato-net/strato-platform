@@ -17,6 +17,7 @@ import           Data.Map.Ordered                   (OMap)
 import qualified Data.Map.Ordered                   as OMap
 import qualified Data.Text                          as T
 import           Data.Time.Clock
+import qualified Data.Set                           as S
 import           Numeric                            (readHex)
 
 import           Blockapps.Crossmon
@@ -36,7 +37,6 @@ import qualified Blockchain.Data.TransactionDef     as TD
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
-import           Blockchain.Format
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
 import           Blockchain.Strato.Model.Class
@@ -44,6 +44,8 @@ import           Blockchain.Util
 import qualified Blockchain.Verification            as V
 
 import           Executable.EVMFlags                (flags_maxTxsPerBlock)
+
+import           Text.Format
 
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
     getBaggerState     :: m B.BaggerState
@@ -103,7 +105,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                            , B.privateHashes         = pHashes OMap.\\ hashMap
                                            , B.startTimestamp        = time
                                            }
-        putBaggerState $ state { B.miningCache = newMiningCache }
+        putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
         setStateDBStateRoot thisStateRoot
         demoteUnexecutables
         promoteExecutables
@@ -116,7 +118,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
         let cache       = B.miningCache state
         let lastExec    = B.lastExecutedTxs cache
         let lastExecLen = length lastExec
-        let lastExecGuardLen = length [t | t  <- lastExec, otHash (trrTransaction t) `M.member` seen']
+        let lastExecGuardLen = length [t | t  <- lastExec, otHash (trrTransaction t) `S.member` seen']
         let noCachedTxsCulled = lastExecLen == lastExecGuardLen
         if noCachedTxsCulled then do
             $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
@@ -331,7 +333,7 @@ demoteUnexecutables = do
 
 wasSeen :: MonadBagger m => OutputTx -> m Bool
 wasSeen OutputTx{otHash=sha} = do
-    ret <- (M.member sha) . B.seen <$> getBaggerState
+    ret <- (S.member sha) . B.seen <$> getBaggerState
     -- $logDebugS "Bagger.wasSeen" . T.pack $ "wasSeen " ++ (show sha) ++ " = " ++ (show ret)
     return ret
 

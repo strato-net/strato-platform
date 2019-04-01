@@ -53,7 +53,7 @@ pipeline {
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=$(</host)
-          NODE_HOST=${NODE_HOST} genesis=smokeTest loglevel=6 ./strato.sh -m 1 --single
+          NODE_HOST=${NODE_HOST} genesis=smokeTest loglevel=6 SLIPSTREAM_OPTIONAL=false ./strato.sh -m 1 --single
           docker ps
           # Few quick tests
           check_bloc() {
@@ -156,6 +156,7 @@ pipeline {
               npm run test:truchainz
               npm run test:multicontract
               npm run test:solidvm
+              npm run test:uploadOrder
               popd
               pushd strato-worktree/core-strato/strato-init
               ./check_genesis_ingestion.sh
@@ -195,18 +196,6 @@ pipeline {
               channel: '#engineering',
               color: 'danger',
               message: "Develop branch build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
-          )
-        }
-      }
-    }
-
-    fixed {
-      script {
-        if (env.PLATFORM_BRANCH_NAME == 'develop') {
-          slackSend(
-              channel: '#engineering',
-              color: 'good',
-              message: "Develop branch build *is fixed after it was failing*: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
           )
         }
       }

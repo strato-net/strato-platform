@@ -13,7 +13,6 @@ import           Data.ByteString         (ByteString)
 import qualified Data.ByteString         as ByteString
 import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Lazy    as ByteString.Lazy
-import           Data.List               (intersperse)
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Map.Strict         as Map
 import           Data.Text               (Text)
@@ -191,20 +190,20 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
                 (tBytes,headType) : rest
 
 
-valueToText :: Value -> Maybe Text
+valueToText :: Value -> Text
 valueToText = \case
   SimpleValue sv -> simpleValueToText sv
   ValueArrayDynamic vals ->
-    Text.concat . intersperse ("," ::Text) <$> sequence (valueToText <$> vals)
+    "[" <> Text.intercalate "," (map valueToText vals) <> "]"
   ValueArrayFixed _ vals ->
-    Text.concat . intersperse ("," ::Text) <$> sequence (valueToText <$> vals)
-  ValueContract addr -> Just . Text.pack $ addressString addr
+    "[" <> Text.intercalate "," (map valueToText vals) <> "]"
+  ValueContract addr -> Text.pack $ addressString addr
   ValueEnum{}        -> undefined -- TODO
   ValueFunction{}    -> undefined -- TODO
   ValueStruct{}      -> undefined
 
-simpleValueToText :: SimpleValue -> Maybe Text
-simpleValueToText sv = Just $ case sv of
+simpleValueToText :: SimpleValue -> Text
+simpleValueToText sv = case sv of
   ValueBool tf -> if tf then "true" else "false"
   ValueAddress addr -> Text.pack $ "0x" ++ addressString addr
   ValueString tx -> Text.pack $ show tx
@@ -229,9 +228,11 @@ textToValue defs str = \case
     Nothing -> Left $ "Enum values cannot be parsed without type definitions" -- TODO(dustin): Pass in TypeDefs
     Just tds -> case Map.lookup name (enumDefs tds) of
       Nothing -> Left $ "Missing enum name in type definitions: " <> name
-      Just eSet -> case Bimap.lookupR str eSet of
-        Nothing -> Left $ "Missing value '" <> str <> "' in enum definition for " <> name
-        Just i -> Right $ ValueEnum name str $ fromIntegral i
+      Just eSet ->
+        let str' = last $ Text.split (== '.') str
+         in case Bimap.lookupR str' eSet of
+              Nothing -> Left $ "Missing value '" <> str <> "' in enum definition for " <> name
+              Just i -> Right $ ValueEnum name str' $ fromIntegral i
   TypeStruct{}   -> Left "textToValue TODO: TypeStruct not yet implemented"
 
 textToSimpleValue :: Text -> SimpleType -> Either Text SimpleValue

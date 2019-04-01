@@ -4,12 +4,12 @@ import * as enviorment from "../../env";
 describe('Lib: checkS3Credentials', () => {
 
   test('when mode is public', () => {
-    enviorment.env.S3_CREDENTIALS = false;
+    enviorment.env.EXT_STORAGE_ENABLED = 'false';
     expect(isS3Available()).toMatchSnapshot();
   });
 
   test('when mode is enterprise', () => {
-    enviorment.env.S3_CREDENTIALS = true;
+    enviorment.env.EXT_STORAGE_ENABLED = 'true';
     expect(isS3Available()).toMatchSnapshot();
   });
 });
