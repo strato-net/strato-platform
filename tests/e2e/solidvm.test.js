@@ -12,7 +12,7 @@ const strato = ba.common.api.strato;
 const util = ba.common.util;
 
 const counter = `
-contract qq {
+contract Counter {
     uint count;
 
     function incr() public {
@@ -24,15 +24,25 @@ contract qq {
 }
 `;
 
+const partialModify = `
+contract PartialModify {
+  uint x = 83;
+  uint y = 72;
 
-async function upload(vm) {
+  function doubleY() public {
+    y *= 2;
+  }
+}
+`;
+
+async function upload(vm, name, source) {
   const username = 'Solidvm_User_' + util.uid();
   const password = '2345';
   const user = await co.wrap(rest.createUser)(username, password);
   await co.wrap(rest.fill)(user, true);
-  console.log(`User ${user.name}@${user.address} uploading a Counter to the ${vm}`);
+  console.log(`User ${user.name}@${user.address} uploading a ${name} to the ${vm}`);
   return [user, await co.wrap(rest.uploadContractString)(
-    user, 'qq', counter, {}, {'VM': vm})];
+    user, name, source, {}, {'VM': vm})];
 }
 
 async function incr(user, contract, vm) {
@@ -45,20 +55,24 @@ async function read(user, contract, vm) {
     user, contract, "read", {}, {'VM': vm});
 }
 
+async function doubleY(user, contract, vm) {
+  return await co.wrap(rest.callMethod)(
+    user, contract, "doubleY", {}, {'VM': vm})
+}
+
 async function state(contract) {
   return await co.wrap(rest.getState)(contract);
 }
 
 async function index(contract) {
-  console.log(`Contract is ${JSON.stringify(contract)}`);
   return await co.wrap(rest.query)(`${contract.name}?address=eq.${contract.address}`);
 }
 
 describe('Solid VM: Contract uploads', async () => {
 
   it ('can count upwards on the SolidVM counter', async () => {
-    const [user, contract] = await upload('SolidVM');
-    console.log(`Contrcat is : ${JSON.stringify(contract)}`);
+    const [user, contract] = await upload('SolidVM', 'Counter', counter);
+    console.log(`Contract is : ${JSON.stringify(contract)}`);
     console.log(`Counting to 5`);
     for (let i = 0; i < 5; i++) {
       await incr(user, contract, 'SolidVM');
@@ -76,5 +90,26 @@ describe('Solid VM: Contract uploads', async () => {
     const gotIndex = await index(contract);
     assert.equal(gotIndex[0].address, contract.address);
     assert.equal(gotIndex[0].count, 5);
+  }).timeout(config.timeout);
+
+  it ('does not drop columns', async () => {
+    const [user, contract] = await upload('SolidVM', 'PartialModify', partialModify);
+    console.log(`Contract is ${JSON.stringify(contract)}`);
+
+
+    const index1 = await co.wrap(rest.waitQuery)(
+      `${contract.name}?address=eq.${contract.address}`, 1);
+    console.log(`First index response is: ${JSON.stringify(index1)}`);
+    assert.equal(index1[0].address, contract.address);
+    assert.equal(index1[0].x, 83);
+    assert.equal(index1[0].y, 72);
+
+    await doubleY(user, contract, 'SolidVM');
+
+    const index2 = await co.wrap(rest.waitQuery)(
+      `${contract.name}?address=eq.${contract.address}&y=eq.144`, 1);
+    assert.equal(index2[0].address, contract.address);
+    assert.equal(index2[0].x, 83);
+    assert.equal(index2[0].y, 144);
   }).timeout(config.timeout);
 })
