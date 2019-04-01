@@ -25,7 +25,6 @@ import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import           Data.Traversable                          (for)
-import           Debug.Trace
 import           Prometheus                                as P
 import           Text.Printf
 
@@ -123,16 +122,11 @@ checkForVotes crs = do
   blockstanbulSend . map translate $ crs
   where translate :: CandidateReceived -> InEvent
         translate br =
-          let extsign = traceShowId
-                      . RL.rlpDecode
-                      . traceShowId
+          let extsign = RL.rlpDecode
                       . RL.rlpDeserialize
                       . fst
-                      . traceShowId
                       . B16.decode
-                      . traceShowId
                       . pack
-                      . traceShowId
                       . API.signature $ br
               bauth = MsgAuth { sender = API.sender br, signature = extsign}
           in NewBeneficiary bauth (API.recipient br, API.votingdir br, API.nonce br)

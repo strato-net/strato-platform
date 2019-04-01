@@ -8,7 +8,6 @@ import           Data.ByteString.Base16              as B16
 import           Data.Either.Extra
 import           Data.Foldable (foldlM)
 import           Data.Maybe
-import           Debug.Trace
 import qualified Network.Haskoin.Crypto     as HK
 import           Servant.Client
 import           System.Console.GetOpt
@@ -102,19 +101,14 @@ main = do
   let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
       pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
       sender = prvKey2Address pkey
-  print sender
-  print (fromOptRight (optRecipient opt), not (optRemove opt), fromOptRight (optNonce opt))
+  putStrLn $ "Sender: " ++ show sender
   esign <- signBenfInfo pkey (fromOptRight (optRecipient opt), not (optRemove opt), fromOptRight (optNonce opt))
-  print esign
-  let esignStr = traceShowId
-               . C8.unpack
-               . traceShowId
+  putStrLn $ "esign: " ++ show esign
+  let esignStr = C8.unpack
                . B16.encode
-               . traceShowId
                . rlpSerialize
-               . traceShowId
                . rlpEncode $ esign
-  print esignStr
+  putStrLn $ "esignStr: " ++ show esignStr
   let vote = API.CandidateReceived{API.sender=sender
                                  , API.signature=esignStr
                                  , API.recipient= fromOptRight (optRecipient opt)
