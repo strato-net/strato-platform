@@ -16,10 +16,19 @@ dependencies:
 - resourcet
 - strato-model
 
+library:
+  source-dirs:         src
+  ghc-options:
+  - -threaded
+  - -rtsopts
+  - -with-rtsopts=-N
+
+
 executables:
   fastMP-exe:
     main:                Main.hs
     source-dirs:         app
+    dependencies:	 fastMP
     ghc-options:
     - -threaded
     - -rtsopts
@@ -28,6 +37,7 @@ executables:
   insertMP:
     main:                insertMP.hs
     source-dirs:         app
+    dependencies:	 fastMP
     ghc-options:
     - -threaded
     - -rtsopts
@@ -36,6 +46,7 @@ executables:
   insertLDB:
     main:                insertLDB.hs
     source-dirs:         app
+    dependencies:	 fastMP
     ghc-options:
     - -threaded
     - -rtsopts
