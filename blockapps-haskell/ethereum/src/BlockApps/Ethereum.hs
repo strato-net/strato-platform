@@ -32,6 +32,7 @@ module BlockApps.Ethereum
   , stringChainId
     -- * Keccak 256 Hashes
   , Keccak256 (..)
+  , CodePtr(..)
   , SHA(..)
   , shaToHex
   , keccak256
@@ -113,7 +114,7 @@ import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 import qualified Data.LargeWord as LW
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.SHA (shaToHex, SHA(..))
+import           Blockchain.Strato.Model.SHA (CodePtr(..), shaToHex, SHA(..))
 
 
 lastWord64 :: Word256 -> Word64

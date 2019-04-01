@@ -247,7 +247,9 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 insertContractTableQuery :: ProcessedContract -> Text
 insertContractTableQuery ProcessedContract{..} =
   let conVals = wrapAndEscape . map escapeQuotes $
-        [ T.pack $ shaToHex codehash
+        [ T.pack $ shaToHex (case codehash of
+                                EVMCode hsh -> hsh
+                                SolidVMCode _ hsh -> hsh)
         , contractName
         , abi
         , chain

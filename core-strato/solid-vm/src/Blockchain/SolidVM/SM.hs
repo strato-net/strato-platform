@@ -494,9 +494,9 @@ getXabiValueType (AddressedPath loc path) = do
 getValueType :: AddressedPath -> SM BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeAction :: Address -> SHA -> SM ()
-initializeAction addr hsh =
-  action . actionData %= M.insert addr (ActionData hsh SolidVM (ActionSolidVMDiff M.empty) [])
+initializeAction :: Address -> String -> SHA -> SM ()
+initializeAction addr name hsh =
+  action . actionData %= M.insert addr (ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) [])
 
 markDiffForAction :: Address -> MS.StoragePath -> MS.BasicValue -> SM ()
 markDiffForAction owner key' val' = do

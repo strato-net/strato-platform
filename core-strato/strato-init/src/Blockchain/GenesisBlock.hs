@@ -203,7 +203,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             , A._actionTransactionSender = Ad.Address 0
             , A._actionData = Map.singleton a $
                                 A.ActionData
-                                  ch
+                                  (EVMCode ch)
                                   EVM
                                   (case storage d of
                                     EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m

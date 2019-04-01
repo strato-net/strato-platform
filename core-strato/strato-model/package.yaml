@@ -55,6 +55,7 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
+      - aeson-qq
       - strato-model
       - hspec
       - QuickCheck

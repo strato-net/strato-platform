@@ -28,7 +28,6 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts, rights)
 import Data.Int (Int32)
 import Data.IORef
-import Data.Foldable (for_)
 import Data.Function
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
@@ -56,7 +55,7 @@ import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import qualified Blockchain.Strato.Model.Action as BS
-import Blockchain.Strato.Model.SHA (hash)
+import Blockchain.Strato.Model.SHA (codePtrToSHA, hash)
 
 
 import Slipstream.Data.Action
@@ -107,7 +106,7 @@ emptyHash :: SHA
 emptyHash = hash B.empty
 
 hasContract::Action->Bool
-hasContract = (/= emptyHash) . actionCodeHash
+hasContract = (/= EVMCode emptyHash) . actionCodeHash
 
 matters :: Action -> Bool
 matters Action{..} = (actionType == Create) || (not $ diffNull actionStorage)
@@ -251,29 +250,24 @@ makeFunctionInserts xabi ABIID{..} state Action{..} =
       }
 
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
-lookupT k mp = MaybeT . return $ Map.lookup k mp
+lookupT k = MaybeT . return . Map.lookup k
 
 getCachedSolidVMDetails :: IORef Globals -> Action -> Bloc (Maybe (Text, Text))
 getCachedSolidVMDetails g row = liftM2 (<|>)
   (runMaybeT $ do
     name <- lookupT "name" md
-    abi <- MaybeT $ getSolidVMDetails g (actionCodeHash row)
+    abi <- MaybeT $ getSolidVMABIs g (actionCodeHash row)
     return (name, abi))
   (runMaybeT $ do
     src <- lookupT "src" md
     name <- lookupT "name" md
     detailsMap <- lift $ sourceToContractDetails True src
+    setSolidVMABIs g (actionCodeHash row) detailsMap
     (_, details) <- lookupT name detailsMap
     let abi = xabiToText $ contractdetailsXabi details
-    setSolidVMDetails g (actionCodeHash row) abi
     return (name, abi)
   )
  where md = actionMetadata row
-
-xabiToText :: Xabi -> Text
-xabiToText = T.replace "\'" "\'\'"
-           . decodeUtf8 . BL.toStrict
-           . JSON.encode
 
 detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
@@ -287,13 +281,18 @@ detailsForRow row = liftM2 (<|>)
     liftIO $ infoM "name found: " (show name)
     detailsMap <- lift $ sourceToContractDetails True src
     lookupT name detailsMap)
-  (getContractDetailsByCodeHash . shaKeccak256 $ actionCodeHash row)
+  (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)
 
 adjustGlobals :: IORef Globals -> Action -> ContractDetails -> Bloc ()
 adjustGlobals gref row details = do
-  let go m (k,f) = for_ (Map.lookup k $ actionMetadata row) $ \v -> do
-                let contracts = filter (not . T.null) $ T.splitOn "," v
-                forM_ contracts $ \c -> for_ (fmap (keccak256SHA . contractdetailsCodeHash . snd) $ Map.lookup c m) $ f gref
+  let go m (k,f) = runMaybeT $ do
+        v <- lookupT k $ actionMetadata row
+        let contracts = filter (not . T.null) $ T.splitOn "," v
+        forM_ contracts $ \c -> do
+          (_, details') <- lookupT c m
+          let codePtr = EVMCode . keccak256SHA . contractdetailsCodeHash $ details'
+          lift $ f gref codePtr
+
   -- won't actually recompile the contract
   detailsMap <- sourceToContractDetails True $ contractdetailsSrc details
   mapM_ (go detailsMap) $ [("history", addToHistoryList)
@@ -309,7 +308,7 @@ ensureContractInstance cmId row = do
   let addr = actionAddress row
       chainId = actionTxChainId row
   (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
-    contractInstancesByCodeHash (shaKeccak256 $ actionCodeHash row) addr chainId
+    contractInstancesByCodeHash (shaKeccak256 . codePtrToSHA $ actionCodeHash row) addr chainId
   when (isNothing mInstance) . void $
     insertContractInstance cmId addr chainId
 

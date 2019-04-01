@@ -117,7 +117,7 @@ create' :: Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM
 create' creator ch cc contractName' argExps = do
   newAddress <- getNewAddress creator
 
-  initializeAction newAddress ch
+  initializeAction newAddress contractName' ch
 
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
@@ -290,8 +290,8 @@ logFunctionCall args address contract functionName f = do
 call'' :: Address -> Maybe String -> String -> [Value] -> SM (Maybe Value)
 call'' address mContract functionName args = do
   (contract', hsh, cc) <- getCodeAndCollection address
-  initializeAction address hsh
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
+  initializeAction address (_contractName contract) hsh
   logFunctionCall args address contract functionName $
     case M.lookup functionName $ contract^.functions of
       Just theFunction -> do
