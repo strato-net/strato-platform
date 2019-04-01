@@ -4,7 +4,6 @@ module BlockApps.Solidity.StorageSpec where
 
 import qualified Data.ByteString.Base16 as Base16
 import Data.Maybe (isJust, fromJust)
-import qualified Data.IntMap as I
 import Test.Hspec
 
 import BlockApps.Ethereum
