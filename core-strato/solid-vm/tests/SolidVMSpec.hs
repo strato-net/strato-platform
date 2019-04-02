@@ -1569,3 +1569,20 @@ contract qq {
     getFields ["is_a", "is_b", "is_c", "is_d"] `shouldReturn`
       map BBool [False, True, False, False]
 
+  it "can return textual bytes32" . runTest $ do
+    runCall "txt" "()" [r|
+contract qq {
+  function txt() public returns (bytes32) {
+    bytes32 ret = "Ticket ID already exists";
+    return ret;
+  }
+}|] `shouldReturn` Just "Ticket ID already exists\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+
+  it "can return numeric bytes32" . runTest $ do
+    runCall "num" "()" [r|
+contract qq {
+  function num() public returns (bytes32) {
+    bytes32 ret = 0x5469636b657420494420616c7265616479206578697374730000000000000000;
+    return ret;
+  }
+}|] `shouldReturn` Just "Ticket ID already exists\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"

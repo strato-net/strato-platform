@@ -1091,8 +1091,11 @@ encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
 encodeForReturn (SAddress a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
-encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
-  return $ word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
+encodeForReturn (SString s) =
+  -- TODO: Wings expects all return values as bytes32 and never string.
+  -- This will have to be changed when wings drops bytes32 usage, or to support
+  -- string returning applications as well.
+  return $ stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
   where stringBytes = BC.pack s
 encodeForReturn (STuple items) = B.concat <$> forM (V.toList items) (encodeForReturn <=< getVar)
 encodeForReturn x = todo "encodeForReturn type case" x
