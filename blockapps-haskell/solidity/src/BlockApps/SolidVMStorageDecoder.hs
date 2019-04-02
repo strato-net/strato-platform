@@ -181,7 +181,8 @@ fromBasic = \case
   BString bs -> SimpleValue $! valueBytes bs
   BAddress a -> SimpleValue $! ValueAddress a
   BContract _ c -> ValueContract c
-  BEnumVal k n -> ValueEnum k n 0x77777 -- TODO: Keep enum ord in BasicValue
+  BEnumVal tipe name num -> ValueEnum tipe name (fromIntegral num)
+
   BMappingSentinel -> ValueMapping M.empty
   BDefault -> SimpleValue $ ValueAddress 0x0
 

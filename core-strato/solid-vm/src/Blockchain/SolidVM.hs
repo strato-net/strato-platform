@@ -625,7 +625,14 @@ expToVar' (Xabi.MemberAccess expr name) = do
 
   case var of
     Constant c -> Constant <$> case (c, name) of
-      (SEnum enumName, _) -> return $ SEnumVal enumName name
+      (SEnum enumName, _) -> do
+        contract' <- getCurrentContract
+        let maybeEnumValues = M.lookup enumName $ contract' ^. enums
+            enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
+            num = maybe (missingType "Enum nonexistent member" (enumName, name))
+                        fromIntegral
+                        (name `elemIndex` enumVals)
+        return $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (SAddress . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (SAddress . Env.origin) <$> getEnv
       (SStruct _ theMap, fieldName) ->
@@ -857,7 +864,7 @@ expToVar' (Xabi.FunctionCall e args) = do
           c <- getCurrentContract
           let theEnum = fromMaybe (missingType "enum constructor" enumName)
                       $ M.lookup enumName $ c^.enums
-          return $ Constant $ SEnumVal enumName $ theEnum !! fromInteger i
+          return $ Constant $ SEnumVal enumName (theEnum !! fromInteger i) (fromInteger i)
         _ -> typeError "called enum constructor with improper args" argVals
 
     Constant (SPush apt) -> do
@@ -922,15 +929,7 @@ callBuiltin "string" [SString s] _ = return $ SString s
 callBuiltin "string" vs _ = typeError "string cast" vs
 callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte"  vs _ = typeError "byte cast" vs
-callBuiltin "uint" [SEnumVal enumName enumVal] _ = do
-  contract' <- getCurrentContract
-  let maybeEnumVals = M.lookup enumName $ contract'^.enums
-      enumVals = fromMaybe (missingType "callBuiltin enum castBuilt" enumName) maybeEnumVals
-  return
-    $ SInteger
-    $ toInteger
-    $ fromMaybe (missingType "call builtin enum cast" (enumVal, enumName))
-    $ enumVal `elemIndex` enumVals
+callBuiltin "uint" [SEnumVal _ _ enumNum] _ = return . SInteger $ fromIntegral enumNum
 callBuiltin "uint" [SInteger n] _ = return $ SInteger n
 callBuiltin "uint" [SString hex] _ =
   case B16.decode (BC.pack hex) of

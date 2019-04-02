@@ -9,9 +9,10 @@ import qualified Data.ByteString as B
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
+import qualified Data.Text as T
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
-import qualified Data.Text as T
+import           Data.Word
 import           Numeric
 import           Text.Printf
 
@@ -62,7 +63,7 @@ data Value =
   | SBool Bool
   | SAddress Address
   | SEnum String
-  | SEnumVal String String
+  | SEnumVal String String Word32
   | SStructDef String
   | SStruct String (Map String Variable)
   | STuple (Vector Variable)
@@ -139,7 +140,7 @@ valEquals lhs rhs = case (lhs, rhs) of
   (_, SInteger i) -> coerceFromInt lhs i == lhs
   (SString s1, SString s2) -> s1 == s2
   (SAddress v1, SAddress v2) -> v1 == v2
-  (SEnumVal e1 v1, SEnumVal e2 v2) -> (e1 == e2) && (v1 == v2)
+  (SEnumVal e1 v1 n1, SEnumVal e2 v2 n2) -> (e1 == e2) && (v1 == v2) && (n1 == n2)
   (SBuiltinVariable v1, SBuiltinVariable v2) ->
     todo "comparison of builtin vars requires evaluation: " (v1, v2)
   _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)

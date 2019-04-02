@@ -1535,3 +1535,11 @@ contract qq {
           ]
         )
       ])
+
+  it "stores enum numbers" . runTest $ do
+    runBS [r|
+contract qq {
+    enum E {A, B, C, D}
+    E c = E.C;
+}|]
+    getFields ["c"] `shouldReturn` [BEnumVal "E" "C" 2]

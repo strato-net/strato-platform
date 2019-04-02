@@ -29,7 +29,7 @@ data BasicValue = BInteger !Integer
                 | BString !B.ByteString
                 | BBool !Bool
                 | BAddress !Address
-                | BEnumVal !T.Text !T.Text
+                | BEnumVal !T.Text !T.Text !Word32
                 | BContract !T.Text !Address
                   -- The sole purpose of this sentinel is to make slipstream reserve
                   -- a column for this mapping
@@ -210,7 +210,7 @@ instance RLPSerializable BasicValue where
     BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
     BAddress a -> RLPArray [RLPScalar 3, rlpEncode a]
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
-    BEnumVal a b -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b]
+    BEnumVal a b c -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b, rlpEncode c]
     BMappingSentinel -> RLPArray [RLPScalar 6]
   rlpDecode x@(RLPArray ((RLPScalar t):s)) =
     case (t, s) of
@@ -219,7 +219,7 @@ instance RLPSerializable BasicValue where
       (2, [f]) -> BBool $ rlpDecode f
       (3, [f]) -> BAddress $ rlpDecode f
       (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
-      (5, [f, s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
+      (5, [f, s', c']) -> BEnumVal (rlpDecode f) (rlpDecode s') (rlpDecode c')
       (6, []) -> BMappingSentinel
       _ -> error $ "invalid type or data length for BasicValue: " ++ show x
   rlpDecode (RLPString "") = BDefault

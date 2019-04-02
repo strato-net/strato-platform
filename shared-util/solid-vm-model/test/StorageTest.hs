@@ -86,7 +86,7 @@ spec = do
                      , BBool True
                      , BAddress 0x23421421421341232341bbbb
                      , BContract "Wings!" 0xdeadbeef
-                     , BEnumVal "type" "num"
+                     , BEnumVal "type" "num" 4
                      ]
       forM_ examples $ \bv ->  rlpDecode (rlpEncode bv) `shouldBe` bv
 

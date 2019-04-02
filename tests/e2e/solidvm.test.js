@@ -48,6 +48,12 @@ contract Deployer {
 }
 `;
 
+const enumContract = `contract EnumContract {
+  enum E {A, B, C, D}
+  E e = E.C;
+}
+`;
+
 async function upload(vm, name, source) {
   const username = 'Solidvm_User_' + util.uid();
   const password = '2345';
@@ -138,5 +144,15 @@ describe('Solid VM: Contract uploads', async () => {
     assert.equal(modifyIndex[0].address, pm);
     assert.equal(modifyIndex[0].y, 144, "has y");
     assert.equal(modifyIndex[0].x, 83, "has x");
+  }).timeout(config.timeout);
+
+  it ('Indexes enums numerically', async () => {
+    const [user, contract] = await upload('SolidVM', 'EnumContract', enumContract);
+
+    const index = await co.wrap(rest.waitQuery)(
+      `${contract.name}?address=eq.${contract.address}`, 1);
+    console.log(`Index returned: ${JSON.stringify(index, null, 2)}`);
+    assert.equal(index[0].address, contract.address);
+    assert.equal(index[0].e, 2);
   }).timeout(config.timeout);
 })
