@@ -4,19 +4,15 @@ module Main (
   main
   ) where
 
---import Crypto.Hash.Keccak
 import qualified Data.ByteString.Base16 as B16
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BC
---import Data.List
 
 import Blockchain.Data.RLP
-
-import Text.Format
-
 import KV
-
 import FastMP
+import ReverseOrderedKVs
+import Text.Format
 
 decodeVal :: ByteString -> ByteString
 decodeVal x =
@@ -29,7 +25,7 @@ main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
   let input = map (\[x, y] -> KV x $ Right (RLPString . decodeVal $ y)) c
 
-  output <- createMPFast input
+  output <- createMPFast $ iPromiseTheseKVsAreOrdered input
 
   putStrLn $ "final stateroot: " ++ format output
 

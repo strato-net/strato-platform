@@ -21,6 +21,7 @@ import Blockchain.Strato.Model.SHA (keccak256)
 
 import KV
 import LevelDBTools
+import ReverseOrderedKVs
 
 debug :: Bool
 debug = False
@@ -28,9 +29,9 @@ debug = False
 
 
 
-createMPFast :: [KV] -> IO MP.StateRoot
-createMPFast input = do
-  runResourceT $ runConduit $ doit (input, []) `fuseUpstream` outputToLDB
+createMPFast :: ReverseOrderedKVs -> IO MP.StateRoot
+createMPFast rOrderedKVs = do
+  runResourceT $ runConduit $ doit (getTheKVs rOrderedKVs, []) `fuseUpstream` outputToLDB
 
 
 {-

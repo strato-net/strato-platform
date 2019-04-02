@@ -18,7 +18,10 @@ data NodePtr = NodePtr String deriving Show
 
 --data Node = KVNode String Value deriving Show
 
-data KV = KV BC.ByteString (Either MP.NodeRef MP.Val) deriving Show
+data KV = KV {
+  theKey :: BC.ByteString,
+  theValue :: Either MP.NodeRef MP.Val
+  } deriving Show
 
 data Value = StringValue String | NodePtrValue MP.NodeRef deriving Show
 
