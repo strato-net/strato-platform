@@ -36,8 +36,8 @@ function queryHealthStatus() {
             await updateCurrentHealth(overallStatus);
             return resolve();
         } catch (error) {
-        winston.warn(`Error ${error.message ? error.message : ''} occurred while querying health status`);
-    }
+            winston.warn(`Error ${error.message ? error.message : ''} occurred while querying health status`);
+        }
     }).timeout(config.healthCheck.requestTimeout - 80);
 }
 
@@ -101,7 +101,11 @@ function compareTimeStamp(obj) {
 async function updateHealthStat(healthStatus) {
     let overallStat = true;
     let currentTime = Date.now();
+    let failedTask = [];
     Object.keys(healthStatus).forEach(async(keyProcess) => {
+        if (!healthStatus[keyProcess]){
+            failedTask.push(keyProcess);
+        }
         overallStat = healthStatus[keyProcess] && overallStat;
         await models.HealthStat.create({
             processName: keyProcess,
@@ -109,27 +113,29 @@ async function updateHealthStat(healthStatus) {
             timestamp: currentTime
         });
     });
-    return overallStat;
+    return [overallStat,failedTask];
 }
 
 async function updateCurrentHealth(overallStat) {
     let currentTime = Date.now();
     await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
-                latestHealthStatus: overallStat,
-                latestCheckTimestamp: currentTime,
-                lastFailureTimestamp: currentTime  // default first time marked as failure
-            }}).then(([stat, created]) => {
-                if (!created){
-                    stat.update(
-                        {latestCheckTimestamp: currentTime,
-                            latestHealthStatus: overallStat,
-                            lastFailureTimestamp: overallStat ? stat.lastFailureTimestamp : currentTime
-                        }, {where: {processName: 'HealthStat'}})
-                    stat;
-                }
-            }).catch(err => {
-                    winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
-                });
+            latestHealthStatus: overallStat[0],
+            latestCheckTimestamp: currentTime,
+            additionalInfo: overallStat[1].toString(),
+            lastFailureTimestamp: currentTime  // default first time marked as failure
+        }}).then(([stat, created]) => {
+        if (!created){
+            stat.update(
+                {latestCheckTimestamp: currentTime,
+                    latestHealthStatus: overallStat[0],
+                    additionalInfo: overallStat[1].toString(),
+                    lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
+                }, {where: {processName: 'HealthStat'}})
+            stat;
+        }
+    }).catch(err => {
+        winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
+    });
 }
 
 function formatPromethusTimestamp(timestamp) {

@@ -10,6 +10,7 @@ module.exports = function(sequelize, DataTypes) {
         lastFailureTimestamp : {
             type: DataTypes.DATE, //'TIMESTAMP',
             allowNull: false},
+        additionalInfo: {type: DataTypes.STRING, allowNull: true},
         isBlocksValidInc: {type: DataTypes.BOOLEAN, allowNull: true}
     });
     CurrentHealth.prototype.toJson = function() {
@@ -19,6 +20,7 @@ module.exports = function(sequelize, DataTypes) {
             latestHealthStatus: this.latestHealthStatus,
             latestCheckTimestamp: this.latestCheckTimestamp,
             lastFailureTimestamp: this.lastFailureTimestamp,
+            additionalInfo: this.lastFailureTimestamp,
             isBlocksValidInc: this.isBlocksValidInc
         };
     };
