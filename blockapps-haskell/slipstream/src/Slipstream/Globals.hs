@@ -28,8 +28,6 @@ import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8)
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Xabi     (ContractDetails(..), Xabi(..))
-import           System.Log.Logger
-import           Text.Format
 import           UnliftIO.IORef
 
 import           Slipstream.Data.Globals

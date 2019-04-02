@@ -240,7 +240,7 @@ getCachedSolidVMDetails g row = liftM2 (<|>)
     setSolidVMABIs g codePtr detailsMap
     MaybeT $ getSolidVMABIs g codePtr
   )
- where codeptr = actionCodeHash row
+ where codePtr = actionCodeHash row
 
 detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
