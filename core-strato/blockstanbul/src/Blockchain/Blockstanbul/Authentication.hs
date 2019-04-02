@@ -13,7 +13,7 @@ import Data.Binary
 import Data.List (intercalate)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Data.Maybe (fromJust, mapMaybe)
+import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import MonadUtils (liftIO1)
 import Test.QuickCheck
@@ -166,7 +166,7 @@ replayHistoricBlock realValidators seqNo blk = do
     Left $ "unknown signers: " ++ unexplained
   unless (3 * S.size signers > 2 * S.size realValidators) $
     Left $ printf "not enough commit seals (have %d out of %d)" (S.size signers) (S.size realValidators)
-  Right (fromIntegral $ seqNo + 1, fromJust mProp)
+  Right (fromIntegral $ seqNo + 1, prop)
 
 isHistoricBlock :: Block -> Bool
 isHistoricBlock = (> 32) . B.length . view extraLens
