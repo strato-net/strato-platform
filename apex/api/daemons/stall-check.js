@@ -1,3 +1,5 @@
+const {ConnectionError} = require("sequelize");
+
 const winston = require('winston-color');
 const models = require('../models');
 const Promise = require('bluebird');
@@ -50,6 +52,10 @@ function queryHealthStatus() {
                 // if (error instanceof TypeError){
                 //     winston.info(`Cannot detect installing state at the first check`)
                 // } else {
+                if (error instanceof ConnectionError){
+                    winston.warn(`Error ${error.message ? error.message : ''} occurred while querying stalling status`);
+                    setTimeout(queryHealthStatus, 3000);
+                }
                     winston.warn(`Error ${error.message ? error.message : ''} occurred while querying stalling status`);
                // }
                 return resolve();
