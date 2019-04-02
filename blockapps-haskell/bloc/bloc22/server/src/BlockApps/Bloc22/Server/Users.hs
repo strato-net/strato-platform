@@ -14,7 +14,7 @@ import           Control.Concurrent
 import           Control.Concurrent.Async.Lifted
 import           Control.Arrow
 import           Control.Exception.Lifted          (catch)
-import           Control.Lens                      ((<?=), at, use, uses, (+=))
+import           Control.Lens                      ((<?=), at, use, uses, (+=), (<<+=))
 import           Control.Lens.TH
 import           Control.Lens.Tuple                (_1, _2)
 import           Control.Monad
@@ -470,8 +470,9 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
                 inUse <- uses _2 (`S.member` noncesInUse)
                 when inUse $ _2 += 1
                 return inUse
-              use _2
+              _2 <<+= 1
             Just v -> return v
+
           let params = params'{txparamsNonce = Just newNonce }
           mtuple <- use $ _1 . at methodcallContractName
           (mapKey, xabi) <- case mtuple of
