@@ -10,12 +10,13 @@ import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BC
 import Data.Conduit
 import qualified Data.NibbleString as N
+import qualified Database.LevelDB as LDB
 
 import Blockchain.Data.RLP
 import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
+import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
-import qualified Blockchain.Database.MerklePatricia.StateRoot as MP
 
 import Blockchain.Strato.Model.SHA (keccak256)
 
@@ -29,9 +30,22 @@ debug = False
 
 
 
-createMPFast :: ReverseOrderedKVs -> IO MP.StateRoot
-createMPFast rOrderedKVs = do
-  runResourceT $ runConduit $ doit (getTheKVs rOrderedKVs, []) `fuseUpstream` outputToLDB
+createMPFast :: LDB.DB -> ReverseOrderedKVs -> IO MP.StateRoot
+createMPFast db rOrderedKVs = do
+  nd <- createMPFast_NodeData db rOrderedKVs
+
+  let mpdb = MP.MPDB{MP.ldb = db, MP.stateRoot = MP.emptyTriePtr}
+
+  nr <- MP.nodeData2NodeRef mpdb nd
+
+  case nr of
+    MP.PtrRef sr -> return sr
+    MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
+
+
+createMPFast_NodeData :: LDB.DB -> ReverseOrderedKVs -> IO MP.NodeData
+createMPFast_NodeData db rOrderedKVs = do
+  runResourceT $ runConduit $ doit (getTheKVs rOrderedKVs, []) `fuseUpstream` outputToLDB db
 
 
 {-
@@ -48,7 +62,7 @@ kvToStdout = do
 
 
 doit :: MonadIO m =>
-        ([KV], [(ByteString, PartialNode)]) -> ConduitT () LevelKV m MP.StateRoot
+        ([KV], [(ByteString, PartialNode)]) -> ConduitT () LevelKV m MP.NodeData
 doit x = do
   let inputIsExhausted ([], [("", _)]) = True
       inputIsExhausted ([_], []) = True
@@ -62,13 +76,7 @@ doit x = do
   
   finalValue <- iterateUntilM inputIsExhausted processNext x
 
-  let finalNode = getFinalPartialNode finalValue
-
-  finalNodePtr <- nodeData2NodeRef finalNode
-
-  case finalNodePtr of
-    MP.PtrRef sr -> return sr
-    MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
+  return $ getFinalPartialNode finalValue
   
 data NodePtr = NodePtr String deriving Show
 

@@ -17,10 +17,9 @@ data LevelKV = LevelKV ByteString ByteString deriving Show
 formatLevelKV :: LevelKV -> String
 formatLevelKV (LevelKV k v) = format k ++ " " ++ format v
 
-outputToLDB :: ConduitT LevelKV Void (ResourceT IO) ()
-outputToLDB = do
-  ldb <- LDB.open "abcd2" LDB.defaultOptions{LDB.createIfMissing=True}
-  outputKVs ldb
+outputToLDB :: LDB.DB -> ConduitT LevelKV Void (ResourceT IO) ()
+outputToLDB db = do
+  outputKVs db
   return ()
 
   where

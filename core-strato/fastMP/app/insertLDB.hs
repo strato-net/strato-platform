@@ -28,7 +28,8 @@ main = do
 -}
 
   _  <- LDB.runResourceT $ do
-    runConduit $ sourceList input .| outputToLDB
+    db <- LDB.open "abcd2" LDB.defaultOptions{LDB.createIfMissing=True}
+    runConduit $ sourceList input .| outputToLDB db
     
   return ()
 

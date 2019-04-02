@@ -30,6 +30,8 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import qualified Data.NibbleString                           as N
 
+import BatchMerge
+
 class MonadResource m => HasRawStorageDB m where
   getRawStorageTxDB     :: m (DB.DB, M.Map (Address, B.ByteString) B.ByteString)
   putRawStorageTxMap    :: M.Map (Address, B.ByteString) B.ByteString -> m ()
@@ -118,7 +120,10 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
   
   forM_ (map fst allInserts) hashDBPut
   
-  mpdb' <- putManyKeyValSlow mpdb allInserts
+  mpdb' <-
+    if False
+    then putManyKeyVal mpdb allInserts
+    else putManyKeyValSlow mpdb allInserts
 
   mpdb'' <- deleteManyKeyVal mpdb' deleteKeys
 

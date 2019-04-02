@@ -19,7 +19,8 @@ module Blockchain.Database.MerklePatricia.Internal (
   keyToSafeKey,
   getCommonPrefix,
   replace,
-  prependToKey
+  prependToKey,
+  nodeData2NodeRef
   ) where
 
 

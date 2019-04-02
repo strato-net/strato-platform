@@ -4,9 +4,12 @@ module Main (
   main
   ) where
 
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Base16 as B16
-import Data.ByteString.Char8 (ByteString)
+import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BC
+import qualified Database.LevelDB as LDB
 
 import Blockchain.Data.RLP
 import KV
@@ -25,9 +28,9 @@ main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
   let input = map (\[x, y] -> KV x $ Right (RLPString . decodeVal $ y)) c
 
-  output <- createMPFast $ iPromiseTheseKVsAreOrdered input
+  output <- 
+    runResourceT $ do
+      ldb <- LDB.open "abcd2" LDB.defaultOptions{LDB.createIfMissing=True}
+      liftIO $ createMPFast ldb $ iPromiseTheseKVsAreOrdered input
 
   putStrLn $ "final stateroot: " ++ format output
-
-
-
