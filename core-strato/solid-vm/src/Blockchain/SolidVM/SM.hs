@@ -271,7 +271,7 @@ getVariableOfName name = do
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
         Xabi.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
-        return $ coerceType constType $ case constInitialVal of
+        return $ coerceType ctract constType $ case constInitialVal of
                                             Xabi.NumberLiteral x _ -> SInteger x
                                             x -> todo "constant initial val" x
 

@@ -323,11 +323,6 @@ spec = do
         ]
 
     it "can create a struct" . runTest $ do
-      runFile "testdata/Struct.sol"
-      getAll [ [Field "x", Field "a"]
-             , [Field "x", Field "b"]] `shouldReturn` [BInteger 900, BString "ok"]
-
-    it "can inline create a struct" . runTest $ do
       runBS [r|
 contract qq {
   struct X {
@@ -339,10 +334,11 @@ contract qq {
     x.a = 900;
     x.b = "ok";
   }
-}
-|]
+}|]
+
       getAll [ [Field "x", Field "a"]
              , [Field "x", Field "b"]] `shouldReturn` [BInteger 900, BString "ok"]
+
     it "can directy initialize a struct" . runTest $ do
       runBS [r|
 contract qq {
@@ -1364,7 +1360,7 @@ contract qq {
   it "can return early" . runTest $ do
     runBS [r|
 contract qq {
-  unit x;
+  uint x;
   constructor() {
     x = 343;
     return;
@@ -1543,3 +1539,33 @@ contract qq {
     E c = E.C;
 }|]
     getFields ["c"] `shouldReturn` [BEnumVal "E" "C" 2]
+
+  it "can cast ints to enums" . runTest $ do
+    runCall "f" "(1)" [r|
+contract qq {
+  enum E {A, B, C, D}
+  E e;
+  function f(E _e) {
+    e = _e;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["e"] `shouldReturn` [BEnumVal "E" "B" 1]
+
+  it "can compare ints to enums" . runTest $ do
+    runCall "f" "(1)" [r|
+contract qq {
+  enum E {A, B, C, D}
+  bool is_a;
+  bool is_b;
+  bool is_c;
+  bool is_d;
+  function f(E _e) {
+    is_a = _e == E.A;
+    is_b = _e == E.B;
+    is_c = _e == E.C;
+    is_d = _e == E.D;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["is_a", "is_b", "is_c", "is_d"] `shouldReturn`
+      map BBool [False, True, False, False]
+

@@ -131,13 +131,13 @@ create' creator ch cc contractName' argExps = do
   addCallInfo newAddress contract' ch cc M.empty
 
   forM_ (M.toList $ contract'^.storageDefs) $ \(n, (Xabi.VariableDecl theType _ maybeExpression)) -> do
-    let def = defaultValue theType
+    let def = defaultValue contract' theType
     initialValue <-
       case maybeExpression of
         Just e -> do
           val <- getVar =<< expToVar e
           case val of
-            SInteger i -> return $ coerceFromInt def i
+            SInteger i -> return $ coerceFromInt contract' def i
             _ -> return val
         Nothing -> return def
     initializeStorage (AddressedPath (Right newAddress) . MS.singleton $ BC.pack n) initialValue
@@ -356,9 +356,11 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
         setVar (p1 `apSnoc` idx) rhs'
     _ -> do
       !value <- getVar v2
+      ctract <- getCurrentContract
       when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p1, value)
       logAssigningVariable value
-      setVar p1 value
+      -- liftIO $ putStrLn $ "coercion at: " ++ show (p1, t1, value, coerceType t1 value)
+      setVar p1 $ coerceType ctract t1 value
   return Nothing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
@@ -388,14 +390,9 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
 
       Nothing ->
         case varNames of
-           [Just name] ->
-              case theType of
-                Xabi.Label l -> do
-                  t' <- getTypeOfName l
-                  case t' of
-                    StructTypo fs ->  SStruct name <$> initializeStruct fs
-                    _ -> todo "initialized type in variable definition" t'
-                _ -> return $ defaultValue theType
+           [Just _] -> do
+              ctract <- getCurrentContract
+              return $ defaultValue ctract theType
            _ -> internalError "no single name for variable definition" varNames
   when trace $ do
     valueString <- showSM value
@@ -414,13 +411,6 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
     _ -> typeError "VariableDefinition expected a tuple" value
 
   return Nothing
-    where
-      initializeStruct :: [(T.Text, Xabi.FieldType)] -> SM (M.Map String Variable)
-      initializeStruct = mapM initializeField . M.mapKeys T.unpack . M.fromList
-
-      initializeField :: Xabi.FieldType -> SM Variable
-      initializeField = fmap Variable . liftIO . newIORef . defaultValue . Xabi.fieldTypeType
-
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
   conditionResult <- getBool =<< expToVar condition
@@ -731,14 +721,16 @@ expToVar' (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Bi
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
+  ctract <- getCurrentContract
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  return . Constant . SBool . not $ val1 `valEquals` val2
+  return . Constant . SBool . not $ valEquals ctract val1 val2
 
 expToVar' (Xabi.Binary "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
+  ctract <- getCurrentContract
   logVals val1 val2
-  return . Constant . SBool $ val1 `valEquals` val2
+  return . Constant . SBool $ valEquals ctract val1 val2
 
 expToVar' (Xabi.Binary "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -803,10 +795,11 @@ expToVar' (Xabi.Ternary condition expr1 expr2) = do
   expToVar $ if c then expr1 else expr2
 
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array {Xabi.entry=t})) args) = do
+  ctract <- getCurrentContract
   case args of
     [(Nothing, a)] -> do
       len <- getInt =<< expToVar a
-      return . Constant . SArray t . V.replicate (fromIntegral len) . Constant $ defaultValue t
+      return . Constant . SArray t . V.replicate (fromIntegral len) . Constant $ defaultValue ctract t
     _ -> arityMismatch "new array" 1 (length args)
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
   creator <- getCurrentAddress
@@ -1002,7 +995,7 @@ runTheConstructors address hsh cc contractName' argExps = do
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
   argVals <- for argExps $ \arg -> getVar =<< expToVar arg
-  let zipped = zipWith (\(t, n) v -> (n, (t, coerceType t v))) argTypeNames argVals
+  let zipped = zipWith (\(t, n) v -> (n, (t, coerceType contract' t v))) argTypeNames argVals
   addCallInfo address contract' hsh cc . fmap (fmap Constant) $ M.fromList zipped
   mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
@@ -1043,7 +1036,7 @@ call' :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> [Value] ->
 call' address' contract' hsh cc theFunction argVals = do
   --
   let returnMeta = map (\(n, Xabi.IndexedType _ t) -> (T.unpack n, t)) .  M.toList $ Xabi.funcVals theFunction
-      returns = map (\(n, t) -> (n, (t, defaultValue t))) returnMeta
+      returns = map (\(n, t) -> (n, (t, defaultValue contract' t))) returnMeta
       argMeta = map fst . sortWith snd
               . map (\(n, Xabi.IndexedType i t) -> ((T.unpack n, t), i))
               . M.toList $ Xabi.funcArgs theFunction
