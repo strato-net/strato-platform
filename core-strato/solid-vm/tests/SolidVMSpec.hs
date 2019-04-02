@@ -1586,3 +1586,24 @@ contract qq {
     return ret;
   }
 }|] `shouldReturn` Just "Ticket ID already exists\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+
+  it "can accept string arguments" . runTest $ do
+    runCall "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
+contract qq {
+  string st;
+  function set(string _st) public {
+    st = _st;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["st"] `shouldReturn` [BString "deadbeef00000000000000000000000000000000000000000000000000000000"]
+
+  it "can accept bytes32 arguments" . runTest $ do
+    pendingWith "bytes32 argument parsing"
+    runCall "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
+contract qq {
+  bytes32 bs;
+  function set(bytes32 _bs) public {
+    bs = _bs;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["bs"] `shouldReturn` [BString "\xde\xad\xbe\xef"]
