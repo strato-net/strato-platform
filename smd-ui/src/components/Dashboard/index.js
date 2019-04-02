@@ -98,7 +98,7 @@ class Dashboard extends Component {
           <div className="col-sm-3">
             <NumberCard
               number={sec2Date(uptime)}
-              description="Network Health"
+              description="Node Health"
               mode={health ? 'success':'warning' }
               iconClass={health ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />

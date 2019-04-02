@@ -1,4 +1,7 @@
 export function sec2Date(sec){
+    if (sec == 0){
+        return "Just Started";
+    }
     let seconds = sec;
     const days = Math.floor(seconds / (3600*24));
     seconds  -= days*3600*24;
