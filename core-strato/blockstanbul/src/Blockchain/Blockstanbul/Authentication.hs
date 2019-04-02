@@ -158,10 +158,9 @@ replayHistoricBlock realValidators seqNo blk = do
     Left $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
   unless (realValidators == S.fromList _validatorList) $
     Left "mismatched validators"
-  case mProp of
-    Nothing -> Left "invalid proposer seal"
-    Just prop -> unless (prop `S.member` realValidators) $
-      Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
+  prop <- maybe (Left "invalid proposer seal") Right mProp
+  unless (prop `S.member` realValidators) $
+    Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
   unless (signers `S.isSubsetOf` realValidators) $ do
     let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signers S.\\ realValidators
     Left $ "unknown signers: " ++ unexplained
