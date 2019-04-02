@@ -8,7 +8,6 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { endTour } from '../Tour/tour.actions';
 // import { callAfterTour } from '../Tour/tour.helpers';
 // import Tour from '../Tour';
-
 import Tour from '../Tour';
 
 import BarGraph from '../BarGraph';
@@ -28,6 +27,7 @@ import {
   GET_NODE_UPTINE,
   GET_HEALTH
 } from '../../sockets/rooms'
+import {sec2Date} from "../../lib/formatSeconds";
 
 // TODO: these should be part of a reducer state. Do the same for other global variables.
 const tourSteps = [
@@ -83,6 +83,8 @@ class Dashboard extends Component {
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
     const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
+    const uptime = this.props.dashboard.uptime;
+    const health = this.props.dashboard.healthStatus;
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
@@ -95,10 +97,10 @@ class Dashboard extends Component {
         <div className="row">
           <div className="col-sm-3">
             <NumberCard
-              number="HEALTH"
-              description="Network"
-              mode={this.props.node.coinbase.length === 0 ? 'warning' : 'success'}
-              iconClass={this.props.node.coinbase.length === 0 ? 'fa-exclamation-circle' : 'fa-check-circle'}
+              number={sec2Date(uptime)}
+              description="Network Health"
+              mode={health ? 'warning' : 'success'}
+              iconClass={health ? 'fa-exclamation-circle' : 'fa-check-circle'}
             />
           </div>
           <div className="col-sm-3">
