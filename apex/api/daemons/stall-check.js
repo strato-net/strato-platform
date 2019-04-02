@@ -37,7 +37,7 @@ function queryHealthStatus() {
             })
 
             const lastV = (lastBlocksValid) ? lastBlocksValid.dataValues.blockCount : blocksValid;
-            const lastP = (lastBlocksPending) ? lastBlocksPending.dataValues.blockCount : blocksValid;
+            const lastP = (lastBlocksPending) ? lastBlocksPending.dataValues.blockCount : blocksPending;
 
             await updateStallStat(blocksValid, blocksPending);
             const overallStat = await getCurrentHealth(lastV, lastP, blocksValid);
@@ -58,7 +58,7 @@ function queryHealthStatus() {
 }
 
 async function getVmBlocksValid() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost/prometheus';
+    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost';
     const options = {
         method: 'GET',
         url: `http://${ipaddr}/prometheus/api/v1/query?query=vm_blocks_valid`,
@@ -89,7 +89,7 @@ async function getVmBlocksValid() {
 }
 
 async function getBaggerPending() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost/prometheus';
+    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost';
     const options = {
         method: 'GET',
         url: `http://${ipaddr}/prometheus/api/v1/query?query=vm_bagger_txs`,
@@ -104,7 +104,11 @@ async function getBaggerPending() {
     };
 
     const response = await rp(options);
+    if (response.data.result.length == 0) {
 
+        winston.warn(`Metrics will only be generated after the initiation of the first transaction`);
+        return 0;
+    }
     try {
         const blockCount = response.data.result[0].value[1];   //to confirm if pending is at index 0 always
         return blockCount;

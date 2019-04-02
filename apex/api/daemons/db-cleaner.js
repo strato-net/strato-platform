@@ -6,11 +6,10 @@ const moment = require('moment');
 cleanOnce();
 setInterval(cleanOnce, config.healthCheck.cleanFrequency);
 
-function cleanOnce() {
-    return new Promise(async (resolve) => {
+async function cleanOnce() {
         winston.info('Cleaning HealthStats Data');
-        const mDate = moment().subtract(config.healthCheck.retention, "hours");
-        models.HealthStat.destroy({
+        const mDate = moment().subtract(config.healthCheck.retention_hours, "hours");
+        await models.HealthStat.destroy({
             where:{
                 createdAt: {
                     $lt: mDate
@@ -18,14 +17,12 @@ function cleanOnce() {
             }
         }).then(destroyedCount => {
             winston.info(`CLEANUP - HealthStat: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
-            return resolve();
         }).catch(err => {
         winston.error('CLEANUP - HealthStat: Failed with error: ' + err.message);
-        return resolve();
         })
 
         winston.info('Cleaning StallStats Data');
-        models.StallStat.destroy({
+        await models.StallStat.destroy({
             where:{
                 createdAt: {
                     $lt: mDate
@@ -33,12 +30,10 @@ function cleanOnce() {
             }
         }).then(destroyedCount => {
             winston.info(`CLEANUP - StallStats: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
-            return resolve();
         }).catch(err => {
         winston.error('CLEANUP - StallStats: Failed with error: ' + err.message);
-        return resolve();
         })
-    })
+
 }
 
 

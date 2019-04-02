@@ -7,11 +7,10 @@ const moment = require('moment');
 
 const config = require('../config/app.config');
 const neededJobs = {
-    "slipstream_processor":"slipstream",
-    "p2p_client":"strato-p2p",
-    "bagger_build":"ethereum-vm",
-    "vm_seqevents":"ethereum-vm",
-    "pbft_commit":"strato-sequencer"
+    "slipstream_main":"slipstream",
+    "strato_p2p":"strato-p2p",
+    "vm_main":"ethereum-vm",
+    "seq_main":"strato-sequencer"
 }
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -43,7 +42,7 @@ function queryHealthStatus() {
 }
 
 function getHealthPrometheus() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost/prometheus';
+    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost';
     const options = {
         method: 'GET',
         url: `http://${ipaddr}/prometheus/api/v1/query?query=health_check`,
@@ -82,8 +81,8 @@ function compareTimeStamp(obj) {
             } else {
                 winston.warn(`Jobs are updated? The following prometheus job is not in the check list required: `, loc);
             }
-            value = formatPromethusTimestamp(elem.value[0]);
-            ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
+
+            ret[name] = true;
         } else {
             winston.info(`Metric format is updated; need to update its handling`);
         }
@@ -94,11 +93,7 @@ function compareTimeStamp(obj) {
         winston.warn(`${checkJobs[elem]} : ${elem} not found in the prometheus response; Not started`);
     })
 
-    if (res.length == 0){
-        winston.warn(`Metrics will only be generated after the initiation of the first transaction`);
-    } else {
-        winston.info('Create entry for latest health status:', ret);
-    }
+    winston.info('Create entry for latest health status:', ret);
 
     return ret;
 }

@@ -1,3 +1,4 @@
+
 {
   "status": "success",
   "data": {
@@ -8,10 +9,10 @@
           "__name__": "health_check",
           "instance": "bloc:10777",
           "job": "slipstream",
-          "location": "slipstream_processor"
+          "location": "slipstream_main"
         },
         "value": [
-          1553203528.057,
+          1553824884.792,
           "1"
         ]
       },
@@ -20,10 +21,10 @@
           "__name__": "health_check",
           "instance": "strato:10248",
           "job": "strato-p2p",
-          "location": "p2p_client"
+          "location": "strato_p2p"
         },
         "value": [
-          1553203528.057,
+          1553824884.792,
           "1"
         ]
       },
@@ -32,22 +33,10 @@
           "__name__": "health_check",
           "instance": "strato:8000",
           "job": "ethereum-vm",
-          "location": "bagger_build"
+          "location": "vm_main"
         },
         "value": [
-          1553203528.057,
-          "1"
-        ]
-      },
-      {
-        "metric": {
-          "__name__": "health_check",
-          "instance": "strato:8000",
-          "job": "ethereum-vm",
-          "location": "vm_seqevents"
-        },
-        "value": [
-          1553203528.057,
+          1553824884.792,
           "1"
         ]
       },
@@ -56,10 +45,10 @@
           "__name__": "health_check",
           "instance": "strato:8050",
           "job": "strato-sequencer",
-          "location": "pbft_commit"
+          "location": "seq_main"
         },
         "value": [
-          1553203528.057,
+          1553824884.792,
           "1"
         ]
       }
