@@ -49,7 +49,7 @@ createMPFast_NodeData db rOrderedKVs = do
 
 
 {-
-kvToStdout :: MonadIO m => Sink LevelKV m ()
+kvToStdout :: MonadIO m => ConduitT LevelKV Void m ()
 kvToStdout = do
   input <- await
   case input of
@@ -58,7 +58,6 @@ kvToStdout = do
       kvToStdout
     Nothing -> return ()
 -}
-
 
 
 doit :: MonadIO m =>
