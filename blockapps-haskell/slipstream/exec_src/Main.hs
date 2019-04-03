@@ -66,7 +66,7 @@ createBlocEnv = do
                  , urlVaultWrapper = vaultwrapperUrl
                  , httpManager = mgr
                  , dbPool = pool
-                 , logLevel = Error
+                 , logLevel = if flags_debug then Debug else Notice
                  , deployMode = Public
                  , stateFetchLimit = 0
                  }

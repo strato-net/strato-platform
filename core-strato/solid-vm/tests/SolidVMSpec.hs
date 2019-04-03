@@ -1598,7 +1598,7 @@ contract qq {
     getFields ["st"] `shouldReturn` [BString "deadbeef00000000000000000000000000000000000000000000000000000000"]
 
   it "can accept bytes32 arguments" . runTest $ do
-    pendingWith "bytes32 argument parsing"
+    liftIO $ pendingWith "bytes32 argument parsing"
     runCall "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
 contract qq {
   bytes32 bs;

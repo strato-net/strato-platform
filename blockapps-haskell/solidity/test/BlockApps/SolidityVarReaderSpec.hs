@@ -4,14 +4,18 @@ module BlockApps.SolidityVarReaderSpec where
 import Control.Monad
 import qualified Data.IntMap as I
 import qualified Data.Map.Ordered as OM
+import qualified Data.Map.Strict as M
 import Test.Hspec
 
 import BlockApps.Ethereum
 import BlockApps.Solidity.Struct
 import qualified Data.Text as T
+import BlockApps.Storage
+import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
+import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
-import BlockApps.SolidityVarReader (structSort)
+import BlockApps.SolidityVarReader (decodeCacheValues, structSort)
 
 addr :: Address -> Value
 addr = SimpleValue . ValueAddress
@@ -46,3 +50,26 @@ spec = do
     unsparse (I.singleton 0 (ValueArraySentinel 0)) `shouldBe` []
     unsparse (I.fromList [(1, addr 9), (3, ValueArraySentinel 3)]) `shouldBe` [addr 0, addr 9, addr 0]
     unsparse (I.singleton 2 (ValueArraySentinel 2)) `shouldBe` [int 0, int 0]
+
+  it "should be able to decode arrays of strings" $ do
+    let spine = ValueArrayDynamic . tosparse . map (SimpleValue . ValueString)
+        oldState = [("xs", spine [])]
+        wantState = [("xs", spine ["first", "second", "third"])]
+        listType = TypeArrayDynamic (SimpleType TypeString)
+        contract = Contract (Struct (OM.singleton ("xs", (Right $ Position 0 0, listType))) 32)
+                            (TypeDefs M.empty M.empty)
+        storageMap = M.fromList
+          [ ( 0x0000000000000000000000000000000000000000000000000000000000000000
+            , 0x0000000000000000000000000000000000000000000000000000000000000003
+            )
+          , ( 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
+            , 0x666972737400000000000000000000000000000000000000000000000000000a
+            )
+          , ( 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e564
+            , 0x7365636f6e64000000000000000000000000000000000000000000000000000c
+            )
+          , ( 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e565
+            , 0x746869726400000000000000000000000000000000000000000000000000000a
+            )
+          ]
+    decodeCacheValues contract (flip M.lookup storageMap) oldState `shouldBe` wantState

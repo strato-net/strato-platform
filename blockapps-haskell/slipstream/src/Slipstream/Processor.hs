@@ -80,7 +80,7 @@ data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
   , functionInserts :: [ProcessedContract]
-  }
+  } deriving (Show)
 
 toAction :: BL.ByteString -> Action'
 toAction x =
@@ -348,7 +348,7 @@ processTheMessages env conn g messages = do
       mapM_ recordAction actions
       recordCombinedAction row
       liftIO . infoM "processTheMessages" . T.unpack . formatAction $ row
-      liftIO . infoM "the diff is" . show . actionStorage $ row
+      liftIO . debugM "the diff is" . show . actionStorage $ row
 
       case actionStorage row of
         BS.ActionEVMDiff{} -> do
@@ -375,9 +375,7 @@ processTheMessages env conn g messages = do
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs
         BS.ActionSolidVMDiff{} -> do
-          liftIO $ infoM "getCachedSolidVMDetails/pre" ""
           mName <- getCachedSolidVMDetails g row
-          liftIO $ infoM "getCachedSolidVMDetails/post" ""
           case mName of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
@@ -398,6 +396,7 @@ processTheMessages env conn g messages = do
                         -- the codehash is just a sourcehash.
                         . partitionWith (codehash . indexInsert &&& contractName . indexInsert)
                         $ rights inserts
+  forM_ (rights inserts) $ debugM "processTheMessages/toInsert" . show
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn . createInsertIndexTable g $ map indexInsert ins
     outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins

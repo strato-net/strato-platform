@@ -155,6 +155,7 @@ pipeline {
               npm install
               npm run test:truchainz
               npm run test:multicontract
+              npm run test:slipstream
               npm run test:solidvm
               npm run test:uploadOrder
               popd

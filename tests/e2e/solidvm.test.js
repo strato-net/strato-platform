@@ -8,7 +8,6 @@ const config = ba.common.config;
 config.apiDebug = true
 console.log(`Config is ${JSON.stringify(config)}`);
 const rest = ba.rest6;
-const strato = ba.common.api.strato;
 const util = ba.common.util;
 
 const counter = `

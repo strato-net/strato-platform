@@ -253,15 +253,15 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
 
   TypeArrayDynamic ty ->
     case value of
-      ValueArrayDynamic vals -> ValueArrayDynamic $ theList
+      ValueArrayDynamic vals -> ValueArrayDynamic theList
         where
           vlen = length vals
           len = fromMaybe vlen $ fromIntegral <$> cache offset
-          doesntMatter = decodeValue' typeDefs' (const 0) 0 0 False (Storage.Position 0 0) ty -- Is this still necessary?
-          vals' = if len >= vlen
-                    then I.filterWithKey (\k _ -> k <= len) vals
-                    else vals `I.union` I.fromList [(k, doesntMatter) | k <- [vlen..len-1]]
-
+          doesntMatter = decodeValue' typeDefs' (const 0) 0 0 False (Storage.Position 0 0) ty
+          -- The value backs provide a default value for every key, so that `mapWithKey` will be called
+          -- for each offset.
+          valueBacks = I.fromList [(k, doesntMatter) | k <- [0..len -1]]
+          vals' = I.filterWithKey (\k _ -> k < len) vals `I.union` valueBacks
           (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
           startingKey = getArrayStartingKey offset
           toPosition ofs' = arrayPosition (toInteger elementSize) (fromIntegral ofs') `Storage.addOffset` startingKey
