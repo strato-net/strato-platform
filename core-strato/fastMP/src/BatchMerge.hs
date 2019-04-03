@@ -38,12 +38,24 @@ putRawStorageKeyValDB mpdb (key, val) = do
 
 putManyKeyVal_nodeData :: MonadIO m=>
                           MP.MPDB -> MP.NodeData -> [(MP.Key, MP.Val)] -> m MP.StateRoot
-putManyKeyVal_nodeData mpdb (MP.FullNodeData _ _) listOfInserts = do
-  _ <- error "putManyKeyVal_nodeData: undefined fullnode"
+putManyKeyVal_nodeData mpdb (n@(MP.FullNodeData _ _)) listOfInserts = do
+  _ <- error $ "putManyKeyVal_nodeData: undefined fullnode: " ++ show listOfInserts ++ "\n" ++ show n
   undefined mpdb listOfInserts
-putManyKeyVal_nodeData mpdb (MP.ShortcutNodeData _ _) listOfInserts = do
-  _ <- error "putManyKeyVal_nodeData: undefined shortnode"
+
+
+
+  
+putManyKeyVal_nodeData mpdb (MP.ShortcutNodeData k (Right v)) listOfInserts = do
+   liftIO $ createMPFast (MP.ldb mpdb) $ orderTheKVs $ map (uncurry createKV) $  (k, v):listOfInserts
+
+
+putManyKeyVal_nodeData mpdb (n@(MP.ShortcutNodeData _ _)) listOfInserts = do
+  _ <- error $ "putManyKeyVal_nodeData(value is left): undefined shortnode: " ++ show listOfInserts ++ "\n" ++ show n
   undefined mpdb listOfInserts
+
+  
+
+  
 putManyKeyVal_nodeData mpdb MP.EmptyNodeData listOfInserts = do
   liftIO $ createMPFast (MP.ldb mpdb) $ orderTheKVs $ map (uncurry createKV) listOfInserts
 
