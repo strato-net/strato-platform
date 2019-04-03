@@ -27,12 +27,14 @@ describe('Tests - Node-level Health Check', function () {
         const stat = await nodeHealthCheckJs.updateHealthStat(res);
         await nodeHealthCheckJs.updateCurrentHealth(stat);
         assert.equal(stat[0], false, "Unhealthy");
-        assert.equal(stat[1].sort(), Object.values(nodeHealthCheckJs.neededJobs).sort(), 'Errored Processes')
-        const entriesAdded = await models.HealthStat.findAll({
-            attributes: ['processName', 'HealthStatus'],
-            limit: 4,
-            order: [ [ 'createdAt', 'DESC' ]],
-        });
+        assert.equal(stat[1].sort().toString(), Object.values(nodeHealthCheckJs.neededJobs).sort().toString(), 'Errored Processes')
+        let entriesAdded;
+        for (let i = 0; i < 2; i++) {
+            entriesAdded = await models.HealthStat.findAll({
+                attributes: ['processName', 'HealthStatus'],
+                limit: 4,
+                order: [ [ 'createdAt', 'DESC' ]],
+        })};
 
         entriesAdded.forEach((elem) => {
             assert.equal(elem.dataValues.HealthStatus, false, `${elem.dataValues.processName} Status`);
@@ -56,7 +58,7 @@ describe('Tests - Node-level Health Check', function () {
         const stat = await nodeHealthCheckJs.updateHealthStat(res);
         await nodeHealthCheckJs.updateCurrentHealth(stat);
         assert.equal(stat[0], true, "Healthy");
-        assert.equal(stat[1], [], "Errored Processes")
+        assert.equal(stat[1].concat().toString(), [].toString(), "Errored Processes")
         let entriesAdded;
         for (let i = 0; i < 2; i++) {
             entriesAdded = await models.HealthStat.findAll({
@@ -86,12 +88,13 @@ describe('Tests - Node-level Health Check', function () {
         const checkRes = await stallCheckJs.getCurrentHealth(lastP, lastV, thisV);
         assert.equal(checkRes[0], false, "Unhealthy");
         await stallCheckJs.updateCurrentHealth(checkRes);
-        const currentStat = await models.CurrentHealth.findOne({
-            where: {
-                processName: "StallStat",
-            },
-            order: [ [ 'createdAt', 'DESC' ]],
-        });
+        let currentStat;
+        for (let i = 0; i < 3; i++) {
+            currentStat = await models.CurrentHealth.findOne({
+                where: {
+                    processName: "StallStat",
+                },
+        })};
         assert.equal(currentStat.dataValues.latestHealthStatus, false, 'Current Health')
         assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
         const currentTime = Date.now();
@@ -110,12 +113,11 @@ describe('Tests - Node-level Health Check', function () {
         assert.equal(checkRes[0], true, "Healthy");
         await stallCheckJs.updateCurrentHealth(checkRes);
         let currentStat;
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 3; i++) {
             currentStat = await models.CurrentHealth.findOne({
                 where: {
                     processName: "StallStat",
                 },
-                order: [ [ 'createdAt', 'DESC' ]],
             })};
 
         assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
@@ -136,12 +138,11 @@ describe('Tests - Node-level Health Check', function () {
         assert.equal(checkRes[0], true, "Healthy");
         await stallCheckJs.updateCurrentHealth(checkRes);
         let currentStat;
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 3; i++) {
             currentStat = await models.CurrentHealth.findOne({
                 where: {
                     processName: "StallStat",
                 },
-                order: [ [ 'createdAt', 'DESC' ]],
             })};
         assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
         assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')

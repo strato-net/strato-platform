@@ -145,7 +145,6 @@ async function updateCurrentHealth(overallStat){
                      isBlocksValidInc: overallStat[1],
                      lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
                     }, {where: {processName: 'StallStat'}})
-                stat.reload();
         }}).catch(err => {
         winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
     });
