@@ -127,7 +127,7 @@ async function getCurrentHealth(lastP, lastV, thisV){
     // The only unmatch case: lastPendingBlock is nonzero but there is no increment in blocksValid (See spec - uptime sheet)
     const overallStat = lastP > 0 && thisV == lastV ? false : true;
     const blocksValidInc = thisV > lastV || false;
-    return [overallStat, blocksValidInc]
+    return [overallStat, blocksValidInc, lastP > 0]
 }
 
 async function updateCurrentHealth(overallStat){
@@ -136,14 +136,16 @@ async function updateCurrentHealth(overallStat){
             latestHealthStatus: overallStat[0],
             latestCheckTimestamp: currentTime,
             lastFailureTimestamp: currentTime,   //default first time marked as failure
-            isBlocksValidInc: overallStat[1]
+            isBlocksValidInc: overallStat[1],
+            isLastPending: false
         }}).then(([stat, created]) => {
             if (!created){
                 stat.update(
                     {latestCheckTimestamp: currentTime,
                      latestHealthStatus: overallStat[0],
                      isBlocksValidInc: overallStat[1],
-                     lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
+                     lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime,
+                     isLastPending:    overallStat[2]
                     }, {where: {processName: 'StallStat'}})
         }}).catch(err => {
         winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);

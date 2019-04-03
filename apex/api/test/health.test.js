@@ -97,6 +97,7 @@ describe('Tests - Node-level Health Check', function () {
         })};
         assert.equal(currentStat.dataValues.latestHealthStatus, false, 'Current Health')
         assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
+        assert.equal(currentStat.dataValues.isLastPending, true, 'isPending')
         const currentTime = Date.now();
         assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp' )
 
@@ -122,6 +123,7 @@ describe('Tests - Node-level Health Check', function () {
 
         assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
         assert.equal(currentStat.dataValues.isBlocksValidInc, true, 'isInc')
+        assert.equal(currentStat.dataValues.isLastPending, true, 'isPending')
         const currentTime = Date.now();
         assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp' )
 
@@ -146,6 +148,7 @@ describe('Tests - Node-level Health Check', function () {
             })};
         assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
         assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
+        assert.equal(currentStat.dataValues.isLastPending, false, 'isPending')
         const currentTime = Date.now();
         assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp' )
 
