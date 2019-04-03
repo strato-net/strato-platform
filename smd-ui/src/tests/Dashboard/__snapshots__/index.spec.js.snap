@@ -220,10 +220,10 @@ ShallowWrapper {
             className="col-sm-3"
           >
             <withRouter(Connect(NumberCard))
-              description="Network"
-              iconClass="fa-check-circle"
-              mode="success"
-              number="HEALTH"
+              description="Node Health"
+              iconClass="fa-exclamation-circle"
+              mode="warning"
+              number="NaN:NaN:NaN:NaN"
             />
           </div>
           <div
@@ -577,10 +577,10 @@ ShallowWrapper {
               className="col-sm-3"
             >
               <withRouter(Connect(NumberCard))
-                description="Network"
-                iconClass="fa-check-circle"
-                mode="success"
-                number="HEALTH"
+                description="Node Health"
+                iconClass="fa-exclamation-circle"
+                mode="warning"
+                number="NaN:NaN:NaN:NaN"
               />
             </div>,
             <div
@@ -638,10 +638,10 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NumberCard))
-                description="Network"
-                iconClass="fa-check-circle"
-                mode="success"
-                number="HEALTH"
+                description="Node Health"
+                iconClass="fa-exclamation-circle"
+                mode="warning"
+                number="NaN:NaN:NaN:NaN"
               />,
               "className": "col-sm-3",
             },
@@ -651,10 +651,10 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "function",
               "props": Object {
-                "description": "Network",
-                "iconClass": "fa-check-circle",
-                "mode": "success",
-                "number": "HEALTH",
+                "description": "Node Health",
+                "iconClass": "fa-exclamation-circle",
+                "mode": "warning",
+                "number": "NaN:NaN:NaN:NaN",
               },
               "ref": null,
               "rendered": null,
@@ -1611,10 +1611,10 @@ ShallowWrapper {
               className="col-sm-3"
             >
               <withRouter(Connect(NumberCard))
-                description="Network"
-                iconClass="fa-check-circle"
-                mode="success"
-                number="HEALTH"
+                description="Node Health"
+                iconClass="fa-exclamation-circle"
+                mode="warning"
+                number="NaN:NaN:NaN:NaN"
               />
             </div>
             <div
@@ -1968,10 +1968,10 @@ ShallowWrapper {
                 className="col-sm-3"
               >
                 <withRouter(Connect(NumberCard))
-                  description="Network"
-                  iconClass="fa-check-circle"
-                  mode="success"
-                  number="HEALTH"
+                  description="Node Health"
+                  iconClass="fa-exclamation-circle"
+                  mode="warning"
+                  number="NaN:NaN:NaN:NaN"
                 />
               </div>,
               <div
@@ -2029,10 +2029,10 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NumberCard))
-                  description="Network"
-                  iconClass="fa-check-circle"
-                  mode="success"
-                  number="HEALTH"
+                  description="Node Health"
+                  iconClass="fa-exclamation-circle"
+                  mode="warning"
+                  number="NaN:NaN:NaN:NaN"
                 />,
                 "className": "col-sm-3",
               },
@@ -2042,10 +2042,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "function",
                 "props": Object {
-                  "description": "Network",
-                  "iconClass": "fa-check-circle",
-                  "mode": "success",
-                  "number": "HEALTH",
+                  "description": "Node Health",
+                  "iconClass": "fa-exclamation-circle",
+                  "mode": "warning",
+                  "number": "NaN:NaN:NaN:NaN",
                 },
                 "ref": null,
                 "rendered": null,
@@ -3340,10 +3340,10 @@ ShallowWrapper {
             className="col-sm-3"
           >
             <withRouter(Connect(NumberCard))
-              description="Network"
-              iconClass="fa-check-circle"
-              mode="success"
-              number="HEALTH"
+              description="Node Health"
+              iconClass="fa-exclamation-circle"
+              mode="warning"
+              number="NaN:NaN:NaN:NaN"
             />
           </div>
           <div
@@ -3697,10 +3697,10 @@ ShallowWrapper {
               className="col-sm-3"
             >
               <withRouter(Connect(NumberCard))
-                description="Network"
-                iconClass="fa-check-circle"
-                mode="success"
-                number="HEALTH"
+                description="Node Health"
+                iconClass="fa-exclamation-circle"
+                mode="warning"
+                number="NaN:NaN:NaN:NaN"
               />
             </div>,
             <div
@@ -3758,10 +3758,10 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NumberCard))
-                description="Network"
-                iconClass="fa-check-circle"
-                mode="success"
-                number="HEALTH"
+                description="Node Health"
+                iconClass="fa-exclamation-circle"
+                mode="warning"
+                number="NaN:NaN:NaN:NaN"
               />,
               "className": "col-sm-3",
             },
@@ -3771,10 +3771,10 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "function",
               "props": Object {
-                "description": "Network",
-                "iconClass": "fa-check-circle",
-                "mode": "success",
-                "number": "HEALTH",
+                "description": "Node Health",
+                "iconClass": "fa-exclamation-circle",
+                "mode": "warning",
+                "number": "NaN:NaN:NaN:NaN",
               },
               "ref": null,
               "rendered": null,
@@ -4731,10 +4731,10 @@ ShallowWrapper {
               className="col-sm-3"
             >
               <withRouter(Connect(NumberCard))
-                description="Network"
-                iconClass="fa-check-circle"
-                mode="success"
-                number="HEALTH"
+                description="Node Health"
+                iconClass="fa-exclamation-circle"
+                mode="warning"
+                number="NaN:NaN:NaN:NaN"
               />
             </div>
             <div
@@ -5088,10 +5088,10 @@ ShallowWrapper {
                 className="col-sm-3"
               >
                 <withRouter(Connect(NumberCard))
-                  description="Network"
-                  iconClass="fa-check-circle"
-                  mode="success"
-                  number="HEALTH"
+                  description="Node Health"
+                  iconClass="fa-exclamation-circle"
+                  mode="warning"
+                  number="NaN:NaN:NaN:NaN"
                 />
               </div>,
               <div
@@ -5149,10 +5149,10 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NumberCard))
-                  description="Network"
-                  iconClass="fa-check-circle"
-                  mode="success"
-                  number="HEALTH"
+                  description="Node Health"
+                  iconClass="fa-exclamation-circle"
+                  mode="warning"
+                  number="NaN:NaN:NaN:NaN"
                 />,
                 "className": "col-sm-3",
               },
@@ -5162,10 +5162,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "function",
                 "props": Object {
-                  "description": "Network",
-                  "iconClass": "fa-check-circle",
-                  "mode": "success",
-                  "number": "HEALTH",
+                  "description": "Node Health",
+                  "iconClass": "fa-exclamation-circle",
+                  "mode": "warning",
+                  "number": "NaN:NaN:NaN:NaN",
                 },
                 "ref": null,
                 "rendered": null,
@@ -6162,10 +6162,10 @@ ShallowWrapper {
             className="col-sm-3"
           >
             <withRouter(Connect(NumberCard))
-              description="Network"
+              description="Node Health"
               iconClass="fa-exclamation-circle"
               mode="warning"
-              number="HEALTH"
+              number="NaN:NaN:NaN:NaN"
             />
           </div>
           <div
@@ -6370,10 +6370,10 @@ ShallowWrapper {
               className="col-sm-3"
             >
               <withRouter(Connect(NumberCard))
-                description="Network"
+                description="Node Health"
                 iconClass="fa-exclamation-circle"
                 mode="warning"
-                number="HEALTH"
+                number="NaN:NaN:NaN:NaN"
               />
             </div>,
             <div
@@ -6431,10 +6431,10 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NumberCard))
-                description="Network"
+                description="Node Health"
                 iconClass="fa-exclamation-circle"
                 mode="warning"
-                number="HEALTH"
+                number="NaN:NaN:NaN:NaN"
               />,
               "className": "col-sm-3",
             },
@@ -6444,10 +6444,10 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "function",
               "props": Object {
-                "description": "Network",
+                "description": "Node Health",
                 "iconClass": "fa-exclamation-circle",
                 "mode": "warning",
-                "number": "HEALTH",
+                "number": "NaN:NaN:NaN:NaN",
               },
               "ref": null,
               "rendered": null,
@@ -6967,10 +6967,10 @@ ShallowWrapper {
               className="col-sm-3"
             >
               <withRouter(Connect(NumberCard))
-                description="Network"
+                description="Node Health"
                 iconClass="fa-exclamation-circle"
                 mode="warning"
-                number="HEALTH"
+                number="NaN:NaN:NaN:NaN"
               />
             </div>
             <div
@@ -7175,10 +7175,10 @@ ShallowWrapper {
                 className="col-sm-3"
               >
                 <withRouter(Connect(NumberCard))
-                  description="Network"
+                  description="Node Health"
                   iconClass="fa-exclamation-circle"
                   mode="warning"
-                  number="HEALTH"
+                  number="NaN:NaN:NaN:NaN"
                 />
               </div>,
               <div
@@ -7236,10 +7236,10 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NumberCard))
-                  description="Network"
+                  description="Node Health"
                   iconClass="fa-exclamation-circle"
                   mode="warning"
-                  number="HEALTH"
+                  number="NaN:NaN:NaN:NaN"
                 />,
                 "className": "col-sm-3",
               },
@@ -7249,10 +7249,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "function",
                 "props": Object {
-                  "description": "Network",
+                  "description": "Node Health",
                   "iconClass": "fa-exclamation-circle",
                   "mode": "warning",
-                  "number": "HEALTH",
+                  "number": "NaN:NaN:NaN:NaN",
                 },
                 "ref": null,
                 "rendered": null,
