@@ -145,5 +145,6 @@ function formatPromethusTimestamp(timestamp) {
 module.exports = {
     updateCurrentHealth,
     updateHealthStat,
-    compareTimeStamp
+    compareTimeStamp,
+    neededJobs
 }
