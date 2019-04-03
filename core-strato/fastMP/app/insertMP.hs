@@ -15,7 +15,7 @@ import KV
 insertKV :: LDB.MonadResource m => MP.MPDB -> KV -> m MP.MPDB
 insertKV mpdb (KV key (Right val)) = do
   --liftIO $ putStrLn $ "key=" ++ show (N.pack $ map c2n key) ++ ", val=" ++ show val
-  MP.unsafePutKeyVal mpdb (N.pack $ map c2n $ BC.unpack key) val
+  MP.unsafePutKeyVal mpdb (N.pack key) val
 insertKV _ (KV _ val) = error $ "insertKV called with val = " ++ show val
 
 insertKVs :: LDB.MonadResource m => MP.MPDB -> [KV] -> m MP.MPDB
@@ -28,7 +28,7 @@ insertKVs mpdb (x:rest) = do
 main :: IO ()
 main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
-  let input = map (\[x, y] -> KV x $ Right (RLPString . fst . B16.decode $ y)) c
+  let input = map (\[x, y] -> KV (map c2n $ BC.unpack x) $ Right (RLPString . fst . B16.decode $ y)) c
 
   mpdb'  <- LDB.runResourceT $ do
     ldb <- LDB.open "abcd" LDB.defaultOptions{LDB.createIfMissing=True}

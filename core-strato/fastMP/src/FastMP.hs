@@ -6,9 +6,9 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Loops
 import Control.Monad.Trans.Resource
-import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BC
 import Data.Conduit
+import Data.List
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as LDB
 
@@ -61,15 +61,16 @@ kvToStdout = do
 
 
 doit :: MonadIO m =>
-        ([KV], [(ByteString, PartialNode)]) -> ConduitT () LevelKV m MP.NodeData
+        ([KV], [([N.Nibble], PartialNode)]) -> ConduitT () LevelKV m MP.NodeData
 doit x = do
-  let inputIsExhausted ([], [("", _)]) = True
+  let inputIsExhausted :: ([KV], [([N.Nibble], PartialNode)]) -> Bool
+      inputIsExhausted ([], [([], _)]) = True
       inputIsExhausted ([_], []) = True
       inputIsExhausted ([], []) = True
       inputIsExhausted _ = False
 
       getFinalPartialNode ([], [(_, finalPartialNode)]) = partialToNode finalPartialNode
-      getFinalPartialNode ([KV k v], []) = MP.ShortcutNodeData (N.pack $ map c2n $ BC.unpack k) v
+      getFinalPartialNode ([KV k v], []) = MP.ShortcutNodeData (N.pack k) v
       getFinalPartialNode ([], []) = MP.EmptyNodeData
       getFinalPartialNode _ = error "internal error: getFinalStateroot was called on a non-final state"
   
@@ -97,7 +98,7 @@ partialToNode (PartialNode b v) =
     
 
 processNext :: MonadIO m =>
-               ([KV], [(ByteString, PartialNode)])->ConduitM () LevelKV m ([KV], [(ByteString, PartialNode)])
+               ([KV], [([N.Nibble], PartialNode)])->ConduitM () LevelKV m ([KV], [([N.Nibble], PartialNode)])
 
 --Create new Partial Node
 processNext x@((KV k1 v1:second@(KV k2 _):rest), partials) | shouldCreate x = do
@@ -114,18 +115,18 @@ processNext x@((KV k1 v1:second@(KV k2 _):rest), partials) | shouldCreate x = do
   return (second:rest, (prefix, partialNode):partials)
 
   where
-    shouldCreate :: ([KV], [(ByteString, PartialNode)]) -> Bool
+    shouldCreate :: ([KV], [([N.Nibble], PartialNode)]) -> Bool
     shouldCreate (_, []) = True
     shouldCreate (_, ((partialPrefix, _):_)) =
-      let inPrefixLength = BC.length $ fst $ splitPrefix k1 k2
-          partialPrefixLength = BC.length $ fst $ splitPrefix k1 partialPrefix
+      let inPrefixLength = length $ fst $ splitPrefix k1 k2
+          partialPrefixLength = length $ fst $ splitPrefix k1 partialPrefix
       in inPrefixLength > partialPrefixLength
 
 --Add to Partial Node
 processNext ((KV k1 v1:rest), ((partialPrefix, thePartialNode):partialRest)) |
-  partialPrefix `BC.isPrefixOf` k1 = do
+  partialPrefix `isPrefixOf` k1 = do
 
-  modifiedPartialNode <- addToPartial thePartialNode (KV (BC.drop (BC.length partialPrefix) k1) v1)
+  modifiedPartialNode <- addToPartial thePartialNode (KV (drop (length partialPrefix) k1) v1)
   return (rest, (partialPrefix, modifiedPartialNode):partialRest)
     
 
@@ -176,22 +177,22 @@ putNodeData nd = do
 
 
 addToPartial :: MonadIO m => PartialNode -> KV -> ConduitM () LevelKV m PartialNode
-addToPartial partialNode (KV x (Right val)) | BC.null x =
+addToPartial partialNode (KV [] (Right val)) =
   return $ partialNode{value = Just val}
-addToPartial partialNode (KV x (Left nodePtr)) | BC.length x == 1 = do
-  return $ partialNode{branches = (c2n $ BC.head x, nodePtr):branches partialNode}
-addToPartial partialNode (KV x val) | BC.length x >= 1 = do
-  let node = MP.ShortcutNodeData (N.pack $ map c2n $ BC.unpack $ BC.tail x) val
+addToPartial partialNode (KV [x] (Left nodePtr)) = do
+  return $ partialNode{branches = (x, nodePtr):branches partialNode}
+addToPartial partialNode (KV x@(_:rest) val) = do
+  let node = MP.ShortcutNodeData (N.pack rest) val
   nodePtr <- nodeData2NodeRef node
   when debug $
     liftIO $ putStrLn $ "####addToPartial (" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
 
   
-  return $ partialNode{branches = (c2n $ BC.head x, nodePtr):branches partialNode}
-addToPartial _ (KV x (Left _)) | BC.null x =
+  return $ partialNode{branches = (head x, nodePtr):branches partialNode}
+addToPartial _ (KV [] (Left _)) =
   error "addToPartial should never be called with a NodePtrValue for the default value"
 
-addToPartial x y = error $ "It should be impossible to get to the default case of addToPartial, but somehow it happened with: " ++ show x ++ ", " ++ show y
+--addToPartial x y = error $ "It should be impossible to get to the default case of addToPartial, but somehow it happened with: " ++ show x ++ ", " ++ show y
 
 {-
 splitPrefix :: String->String->(String, (String, String))
@@ -201,10 +202,10 @@ splitPrefix (x1:xrest) (y1:yrest) | x1 == y1 =
 splitPrefix x y = ("", (x, y))
 -}
 
-splitPrefix :: ByteString->ByteString->(ByteString, (ByteString, ByteString))
+splitPrefix :: [N.Nibble]->[N.Nibble]->([N.Nibble], ([N.Nibble], [N.Nibble]))
 splitPrefix first second =
-  let prefixLength = length $ takeWhile (==True) $ BC.zipWith (==) first second
-  in (BC.take prefixLength first, (BC.drop prefixLength first, BC.drop prefixLength second))
+  let prefixLength = length $ takeWhile (==True) $ zipWith (==) first second
+  in (take prefixLength first, (drop prefixLength first, drop prefixLength second))
 
 {-
 formatState :: ([KV], [(String, PartialNode)]) -> String

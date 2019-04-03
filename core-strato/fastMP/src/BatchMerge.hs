@@ -5,7 +5,6 @@ module BatchMerge (
 
 import           Control.Monad.IO.Class
 --import           Control.Monad.Loops
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.NibbleString as N
 
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -61,5 +60,4 @@ putManyKeyVal_nodeData mpdb MP.EmptyNodeData listOfInserts = do
 
 
 createKV :: MP.Key -> MP.Val -> KV
-createKV (N.EvenNibbleString k) v = KV (B16.encode k) $ Right v
-createKV _ _ = error "createKV only supports even nibblestrings at the moment"
+createKV k v = KV (N.unpack k) $ Right v

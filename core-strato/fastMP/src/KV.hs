@@ -6,8 +6,6 @@ module KV (
   ) where
 
 
---import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.NibbleString as N
 
 --import Blockchain.Data.RLP
@@ -19,7 +17,7 @@ data NodePtr = NodePtr String deriving Show
 --data Node = KVNode String Value deriving Show
 
 data KV = KV {
-  theKey :: BC.ByteString,
+  theKey :: [N.Nibble],
   theValue :: Either MP.NodeRef MP.Val
   } deriving Show
 
@@ -33,9 +31,9 @@ data Value = StringValue String | NodePtrValue MP.NodeRef deriving Show
 
 
 formatKV :: KV -> String
-formatKV (KV key (Right v)) = BC.unpack key ++ " " ++ show v
-formatKV (KV key (Left (MP.PtrRef np))) = BC.unpack key ++ " node:(" ++ show np ++ ")"
-formatKV (KV key (Left (MP.SmallRef np))) = BC.unpack key ++ " small:(" ++ show np ++ ")"
+formatKV (KV key (Right v)) = map n2c key ++ " " ++ show v
+formatKV (KV key (Left (MP.PtrRef np))) = map n2c key ++ " node:(" ++ show np ++ ")"
+formatKV (KV key (Left (MP.SmallRef np))) = map n2c key ++ " small:(" ++ show np ++ ")"
 
 
 
@@ -57,3 +55,22 @@ c2n 'd' = 0xd
 c2n 'e' = 0xe
 c2n 'f' = 0xf
 c2n x = error $ "Non-nibble character in call to c2n: " ++ show x
+
+n2c :: N.Nibble -> Char
+n2c 0 = '0'
+n2c 1 = '1'
+n2c 2 = '2'
+n2c 3 = '3'
+n2c 4 = '4'
+n2c 5 = '5'
+n2c 6 = '6'
+n2c 7 = '7'
+n2c 8 = '8'
+n2c 9 = '9'
+n2c 0xa = 'a'
+n2c 0xb = 'b'
+n2c 0xc = 'c'
+n2c 0xd = 'd'
+n2c 0xe = 'e'
+n2c 0xf = 'f'
+n2c x = error $ "Non-nibble character in call to n2c: " ++ show x
