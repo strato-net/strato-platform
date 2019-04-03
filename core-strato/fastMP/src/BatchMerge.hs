@@ -21,7 +21,7 @@ putManyKeyVal mpdb listOfInserts = do
   let listOfInserts' = map (\(k, v) -> (MP.keyToSafeKey k, v)) listOfInserts
   nd <- MP.getNodeData mpdb (MP.PtrRef $ MP.stateRoot mpdb)
 
-  sr <- putManyKeyVal_nodeData mpdb nd listOfInserts'
+  sr <- putManyKeyVal_nodeData mpdb nd $ orderTheKVs $ map (uncurry createKV) listOfInserts'
 
   return mpdb{MP.stateRoot=sr}
   
@@ -36,7 +36,7 @@ putRawStorageKeyValDB mpdb (key, val) = do
 -}
 
 putManyKeyVal_nodeData :: MonadIO m=>
-                          MP.MPDB -> MP.NodeData -> [(MP.Key, MP.Val)] -> m MP.StateRoot
+                          MP.MPDB -> MP.NodeData -> ReverseOrderedKVs -> m MP.StateRoot
 putManyKeyVal_nodeData mpdb (n@(MP.FullNodeData _ _)) listOfInserts = do
   _ <- error $ "putManyKeyVal_nodeData: undefined fullnode: " ++ show listOfInserts ++ "\n" ++ show n
   undefined mpdb listOfInserts
@@ -45,7 +45,7 @@ putManyKeyVal_nodeData mpdb (n@(MP.FullNodeData _ _)) listOfInserts = do
 
   
 putManyKeyVal_nodeData mpdb (MP.ShortcutNodeData k (Right v)) listOfInserts = do
-   liftIO $ createMPFast (MP.ldb mpdb) $ orderTheKVs $ map (uncurry createKV) $  (k, v):listOfInserts
+   liftIO $ createMPFast (MP.ldb mpdb) $ insertKV_ignoreIfExists listOfInserts $ KV (N.unpack k) $ Right v
 
 
 putManyKeyVal_nodeData mpdb (n@(MP.ShortcutNodeData _ _)) listOfInserts = do
@@ -56,8 +56,19 @@ putManyKeyVal_nodeData mpdb (n@(MP.ShortcutNodeData _ _)) listOfInserts = do
 
   
 putManyKeyVal_nodeData mpdb MP.EmptyNodeData listOfInserts = do
-  liftIO $ createMPFast (MP.ldb mpdb) $ orderTheKVs $ map (uncurry createKV) listOfInserts
+  liftIO $ createMPFast (MP.ldb mpdb) listOfInserts
 
 
 createKV :: MP.Key -> MP.Val -> KV
 createKV k v = KV (N.unpack k) $ Right v
+
+insertKV_ignoreIfExists :: ReverseOrderedKVs -> KV -> ReverseOrderedKVs
+insertKV_ignoreIfExists reverseOrderedKVs newKV =
+  let kvs = getTheKVs reverseOrderedKVs
+      insertAtCorrectPlace :: KV -> [KV] -> [KV]
+      insertAtCorrectPlace (KV kNew _) (KV k v:rest) | kNew == k  = KV k v:rest --ignore if already there
+      insertAtCorrectPlace (KV kNew vNew) (KV k v:rest) | kNew > k  = KV kNew vNew:KV k v:rest
+      insertAtCorrectPlace (KV kNew vNew) (KV k v:rest)  =
+        KV k v:insertAtCorrectPlace (KV kNew vNew) rest
+      insertAtCorrectPlace kv []  = [kv]
+  in iPromiseTheseKVsAreOrdered $ insertAtCorrectPlace newKV kvs
