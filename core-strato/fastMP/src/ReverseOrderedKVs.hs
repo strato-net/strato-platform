@@ -11,7 +11,7 @@ import Data.List
 
 import KV
 
-newtype ReverseOrderedKVs = ReverseOrderedKVs [KV]
+newtype ReverseOrderedKVs = ReverseOrderedKVs [KV] deriving (Show)
 
 
 orderTheKVs :: [KV] -> ReverseOrderedKVs
