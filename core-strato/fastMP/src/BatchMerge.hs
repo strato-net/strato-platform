@@ -5,7 +5,7 @@ module BatchMerge (
 
 import           Control.Monad
 import           Control.Monad.IO.Class
---import           Control.Monad.Loops
+import           Control.Monad.Loops
 import           Data.Maybe
 import qualified Data.NibbleString as N
 
@@ -31,18 +31,6 @@ putManyKeyVal mpdb listOfInserts = do
   case nr of
     MP.PtrRef sr -> return mpdb{MP.stateRoot=sr}
     MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
-  
-  
-{-  
-  concatM (map (flip putRawStorageKeyValDB) listOfInserts) mpdb
-
-putRawStorageKeyValDB :: MonadIO m =>
-                         MP.MPDB -> (MP.Key, MP.Val) -> m MP.MPDB
-putRawStorageKeyValDB mpdb (key, val) = do
-  MP.putKeyVal mpdb key val
--}
-
-
 
 
 splitKeysByPrefix :: [Maybe N.Nibble] -> [KV] -> [[KV]]
@@ -83,9 +71,21 @@ putManyKeyVal_nodeData mpdb (MP.ShortcutNodeData k (Right v)) listOfInserts = do
    liftIO $ createMPFast_NodeData (MP.ldb mpdb) $ insertKV_ignoreIfExists listOfInserts $ KV (N.unpack k) $ Right v
 
 
-putManyKeyVal_nodeData mpdb (n@(MP.ShortcutNodeData _ _)) listOfInserts = do
-  _ <- error $ "putManyKeyVal_nodeData(value is left): undefined shortnode: " ++ show listOfInserts ++ "\n" ++ show n
-  undefined mpdb listOfInserts
+putManyKeyVal_nodeData mpdb (nd@(MP.ShortcutNodeData _ (Left _))) listOfInserts = do
+  --OK, this case should be extrememly rare (since keys are always randomized by a hash function anyway).
+  --This is both theoretically obvious, and seems to be empirically true in the times I have
+  --already run things (this case hasn't been triggered yet).
+  --Also, filling in this case properly will be a bit tricky....  new keys could have the same
+  --prefix given in the ShortcutNodeData, or part of it, or none at all.  All three of these will
+  --involve very different results.
+  --Since this is difficult and rare, I am going to just default to slow one-by-one inserts for
+  --now....
+
+  
+  concatM (map (\(KV k (Right v)) -> MP.putKV_NodeData mpdb (N.pack k) v) $ getTheKVs listOfInserts) nd
+
+
+
 
   
 

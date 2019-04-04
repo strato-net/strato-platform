@@ -16,6 +16,7 @@ module Blockchain.Database.MerklePatricia.Internal (
   unsafeDeleteKey,
   getNodeData,
   putNodeData,
+  putKV_NodeData,
   keyToSafeKey,
   getCommonPrefix,
   replace,
