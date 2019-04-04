@@ -54,6 +54,19 @@ async function set(user, contract, xs) {
   return await co.wrap(rest.callList)(user, txs);
 }
 
+async function setNoNonces(user, contract, xs) {
+  const txs = xs.map(x => {
+    return {
+      contractName: contract.name,
+      contractAddress: contract.address,
+      methodName: 'set',
+      value: 0,
+      args: {'_x': x}
+    }});
+  console.log(`Txs: ${JSON.stringify(txs, null, 2)}`);
+  return await co.wrap(rest.callList)(user, txs);
+}
+
 async function get(user, contract) {
   return await co.wrap(rest.callMethod)(user, contract, "get");
 }
@@ -62,10 +75,19 @@ describe('Nonce upload orders', async () => {
 
   it ('will respect the nonce provided on each tx', async () => {
     const [user, contract] = await upload();
-    console.log(`Setting 4, then setting 300`);
+    console.log(`Setting 300, then 4`);
     await set(user, contract, [4, 300]);
     console.log(`Checking our work`);
     const results = await get(user, contract);
     assert.deepEqual(results, ["300", "4"]);
+  }).timeout(config.timeout);
+
+  it ("won't collide nonces when none are provided", async () => {
+    const [user, contract] = await upload();
+    console.log(`Setting 4, then 300`);
+    await setNoNonces(user, contract, [4, 300]);
+    console.log(`Checking our work`);
+    const results = await get(user, contract);
+    assert.deepEqual(results, ["4", "300"]);
   }).timeout(config.timeout);
 })
