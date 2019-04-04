@@ -137,7 +137,7 @@ async function updateCurrentHealth(overallStat){
             latestCheckTimestamp: currentTime,
             lastFailureTimestamp: currentTime,   //default first time marked as failure
             isBlocksValidInc: overallStat[1],
-            isLastPending: false
+            isLastPending: overallStat[2]
         }}).then(([stat, created]) => {
             if (!created){
                 stat.update(
