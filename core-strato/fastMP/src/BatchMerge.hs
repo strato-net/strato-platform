@@ -3,8 +3,10 @@ module BatchMerge (
   putManyKeyVal
   ) where
 
+import           Control.Monad
 import           Control.Monad.IO.Class
 --import           Control.Monad.Loops
+import           Data.Maybe
 import qualified Data.NibbleString as N
 
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -19,11 +21,16 @@ putManyKeyVal :: MonadIO m=>
                  MP.MPDB -> [(MP.Key, MP.Val)] -> m MP.MPDB
 putManyKeyVal mpdb listOfInserts = do
   let listOfInserts' = map (\(k, v) -> (MP.keyToSafeKey k, v)) listOfInserts
+
   nd <- MP.getNodeData mpdb (MP.PtrRef $ MP.stateRoot mpdb)
 
-  sr <- putManyKeyVal_nodeData mpdb nd $ orderTheKVs $ map (uncurry createKV) listOfInserts'
+  finalNd <- putManyKeyVal_nodeData mpdb nd $ orderTheKVs $ map (uncurry createKV) listOfInserts'
 
-  return mpdb{MP.stateRoot=sr}
+  nr <- MP.nodeData2NodeRef mpdb finalNd
+
+  case nr of
+    MP.PtrRef sr -> return mpdb{MP.stateRoot=sr}
+    MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
   
   
 {-  
@@ -35,17 +42,45 @@ putRawStorageKeyValDB mpdb (key, val) = do
   MP.putKeyVal mpdb key val
 -}
 
+
+
+
+splitKeysByPrefix :: [Maybe N.Nibble] -> [KV] -> [[KV]]
+splitKeysByPrefix [] [] = []
+splitKeysByPrefix [] _ = error "in call to splitKeysByPrefix, keys are out of order"
+splitKeysByPrefix (firstChar:remainingPrefix) kvs =
+  let (matched, remaining) = span ((== firstChar) . listToMaybe . theKey) kvs
+  in case firstChar of
+       Just _ -> map (\(KV k v) -> (KV (tail k) v)) matched:splitKeysByPrefix remainingPrefix remaining
+       Nothing -> matched:splitKeysByPrefix remainingPrefix remaining
+
 putManyKeyVal_nodeData :: MonadIO m=>
-                          MP.MPDB -> MP.NodeData -> ReverseOrderedKVs -> m MP.StateRoot
-putManyKeyVal_nodeData mpdb (n@(MP.FullNodeData _ _)) listOfInserts = do
-  _ <- error $ "putManyKeyVal_nodeData: undefined fullnode: " ++ show listOfInserts ++ "\n" ++ show n
-  undefined mpdb listOfInserts
+                          MP.MPDB -> MP.NodeData -> ReverseOrderedKVs -> m MP.NodeData
+putManyKeyVal_nodeData mpdb (MP.FullNodeData choices val) listOfInserts = do
+  let kvsSplitByFirstNibble = splitKeysByPrefix (map Just [15,14..0] ++ [Nothing]) $ getTheKVs listOfInserts
+  
+  choices' <-
+    forM (zip kvsSplitByFirstNibble $ reverse choices) $ \(newVals, oldVal) -> do
+      if null newVals
+        then return oldVal
+        else do
+          oldNd <- MP.getNodeData mpdb oldVal
+          nd <- putManyKeyVal_nodeData mpdb oldNd $ iPromiseTheseKVsAreOrdered newVals
+          MP.nodeData2NodeRef mpdb nd
+
+  let val' =
+        case last kvsSplitByFirstNibble of
+          [] -> val
+          [KV _ (Right x)] -> Just x
+          x -> error $ "internal error: forbidden pattern match in call to putManyKeyVal_nodeData: " ++ show x
+              
+  return $ MP.FullNodeData (reverse choices') val'
 
 
 
   
 putManyKeyVal_nodeData mpdb (MP.ShortcutNodeData k (Right v)) listOfInserts = do
-   liftIO $ createMPFast (MP.ldb mpdb) $ insertKV_ignoreIfExists listOfInserts $ KV (N.unpack k) $ Right v
+   liftIO $ createMPFast_NodeData (MP.ldb mpdb) $ insertKV_ignoreIfExists listOfInserts $ KV (N.unpack k) $ Right v
 
 
 putManyKeyVal_nodeData mpdb (n@(MP.ShortcutNodeData _ _)) listOfInserts = do
@@ -56,7 +91,7 @@ putManyKeyVal_nodeData mpdb (n@(MP.ShortcutNodeData _ _)) listOfInserts = do
 
   
 putManyKeyVal_nodeData mpdb MP.EmptyNodeData listOfInserts = do
-  liftIO $ createMPFast (MP.ldb mpdb) listOfInserts
+  liftIO $ createMPFast_NodeData (MP.ldb mpdb) listOfInserts
 
 
 createKV :: MP.Key -> MP.Val -> KV
