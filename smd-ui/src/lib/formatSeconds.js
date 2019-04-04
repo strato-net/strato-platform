@@ -1,6 +1,6 @@
 export function sec2Date(sec){
     if (sec == 0){
-        return "Just Started";
+        return "Unhealthy";
     }
     let seconds = sec;
     const days = Math.floor(seconds / (3600*24));
@@ -9,7 +9,6 @@ export function sec2Date(sec){
     seconds  -= hrs*3600;
     const mnts = Math.floor(seconds / 60);
     seconds  -= mnts*60;
-    const div = ":";
-    const ret = days + div+ hrs + div + mnts + div + Math.floor(seconds);
+    const ret = (days > 0 ? days + "d " : "") + (hrs > 0 ? hrs + "h " : "") + (mnts > 0 ? mnts + "m " : "")  + Math.floor(seconds) + "s";
     return ret;
 }
