@@ -21,7 +21,7 @@ module.exports = function(sequelize, DataTypes) {
             latestHealthStatus: this.latestHealthStatus,
             latestCheckTimestamp: this.latestCheckTimestamp,
             lastFailureTimestamp: this.lastFailureTimestamp,
-            additionalInfo: this.lastFailureTimestamp,
+            additionalInfo: this.additionalInfo,
             isBlocksValidInc: this.isBlocksValidInc,
             isLastPending: this.isLastPending
         };

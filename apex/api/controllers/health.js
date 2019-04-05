@@ -1,6 +1,5 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
-const co = require('co');
 
 module.exports = {
   ping: function (req, res) {

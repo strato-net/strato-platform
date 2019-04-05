@@ -1,8 +1,6 @@
 /* jshint esnext: true */
 require('co-mocha')
-const winston = require('winston-color');
 const env = process.env.NODE_ENV || 'development';
-const rp = require('request-promise');
 const models = require('../models');
 const nodeHealthCheckJs = require('../daemons/node-health-check')
 const stallCheckJs = require('../daemons/stall-check')
@@ -20,7 +18,6 @@ const timeout = config.healthCheck.pollFrequency;
 describe('Tests - Node-level Health Check', function () {
     this.timeout(timeout);
 
-    console.log(sampleResponse)
     it('HealthStat update - FAILURE', async function () {
         let testObj = sampleResponse;
         const res = nodeHealthCheckJs.compareTimeStamp(testObj);
