@@ -334,8 +334,9 @@ callWrapper from to mContract functionName argExps = do
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
-runStatements :: [Xabi.Statement] -> SM (Maybe Value)
-runStatements [] = return Nothing
+
+runStatements :: [Xabi.Statement] -> SM StatementControl
+runStatements [] = return BlockEnd
 runStatements (s:rest) = do
   when trace $
     if True
@@ -343,11 +344,14 @@ runStatements (s:rest) = do
     else liftIO $ putStrLn $ C.green $ "statement> " ++ show s
   ret <- runStatement s
   case ret of
-    Nothing -> runStatements rest
-    v -> return v
+    rv@ReturnVal{} -> return rv
+    BlockEnd -> return BlockEnd
+    Ongoing -> runStatements rest
+    ContinueLoop -> return ContinueLoop
+    BreakLoop -> return BreakLoop
 
 
-runStatement :: Xabi.Statement -> SM (Maybe Value)
+runStatement :: Xabi.Statement -> SM StatementControl
 --runStatement x | trace (C.green $ "statement> " ++ unparseStatement x) $ False = undefined
 --runStatement x | trace (C.green $ "statement> " ++ show x) $ False = undefined
 --TODO- variable assignment is an expression, but I am going to just treat it like a
@@ -362,7 +366,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
   logAssigningVariable $ SInteger v
 
   setVar path $ SInteger $ v + 1
-  return Nothing
+  return Ongoing
 
 
 
@@ -390,10 +394,10 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
       logAssigningVariable value
       -- liftIO $ putStrLn $ "coercion at: " ++ show (p1, t1, value, coerceType t1 value)
       setVar p1 $ coerceType ctract t1 value
-  return Nothing
+  return Ongoing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
-  return Nothing -- just throw away the return value
+  return Ongoing
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames maybeExpression)) = do
   let theType = fromMaybe (todo "type inference not implemented" s) maybeType
@@ -439,7 +443,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
 
     _ -> typeError "VariableDefinition expected a tuple" value
 
-  return Nothing
+  return Ongoing
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
   conditionResult <- getBool =<< expToVar condition
@@ -447,14 +451,14 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
     then runStatements code'
     else case maybeElseCode of
       Just elseCode -> runStatements elseCode
-      Nothing -> return Nothing
+      Nothing -> return Ongoing
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
   _ <-
     case maybeInitStatement of
       Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement
-      _ -> return Nothing
+      _ -> return Ongoing
 
   let conditionExp =
         case maybeConditionExp of
@@ -476,19 +480,25 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
 
 runStatement (Xabi.Return maybeExpression) = do
   case maybeExpression of
-    Just e -> fmap Just $ getVar =<< expToVar e
-    Nothing -> return $ Just SNULL
+    Just e -> fmap ReturnVal $ getVar =<< expToVar e
+    Nothing -> return $ ReturnVal SNULL
 
 runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   var <- expToVar $ Xabi.Variable $ T.unpack src;
   path <- expToPath $ Xabi.Variable $ T.unpack dst;
   -- TODO(tim): should this hex encode src and pad?
   setVar path =<< getString var
-  return Nothing
+  return Ongoing
+
+runStatement Xabi.Continue = return ContinueLoop
+
+runStatement Xabi.Break = return BreakLoop
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
 
-while :: SM Bool -> SM (Maybe Value) -> SM (Maybe Value)
+data StatementControl = ReturnVal Value | BlockEnd | Ongoing | ContinueLoop | BreakLoop deriving (Show, Eq)
+
+while :: SM Bool -> SM StatementControl -> SM StatementControl
 while condition code = do
   c <- condition
   when trace $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
@@ -496,9 +506,15 @@ while condition code = do
     then do
       result <- code
       case result of
-        Nothing -> while condition code
-        _ -> return result
-    else return Nothing
+        ReturnVal v -> return $ ReturnVal v
+        -- This isn't exactly right. Maybe it should be `blockend` and instead we have Return SNULL
+        BlockEnd -> while condition code
+        Ongoing -> while condition code
+        ContinueLoop -> while condition code
+        BreakLoop -> return $ Ongoing
+        -- Nothing -> while condition code
+        -- _ -> return result
+    else return Ongoing
 
 getIndexType :: AddressedPath -> SM IndexType
 getIndexType (AddressedPath addr p) = do
@@ -1100,9 +1116,9 @@ runTheCall address' contract' hsh cc theFunction argVals = do
           [x] -> return $ Just x
           _ -> todo "multiple named return values" rs
   val' <- case val of
-             Nothing -> findNamedReturns
-             Just SNULL -> findNamedReturns
-             Just{} -> return val
+             ReturnVal SNULL -> findNamedReturns
+             ReturnVal v -> return $ Just v
+             _ -> findNamedReturns
   popCallInfo
 
   return val'

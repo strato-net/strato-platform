@@ -803,12 +803,11 @@ contract qq {
 }|]
 
   it "can continue" . runTest $ do
-    liftIO $ pendingWith "implement continue"
     runBS [r|
 contract qq {
   uint i;
   constructor() public {
-    for (uint j = 0; j < 100; j++) {
+    for (uint j = 0; j < 4; j++) {
       if (j % 2 == 0) {
         continue;
       }
@@ -816,23 +815,36 @@ contract qq {
     }
   }
 }|]
-    getFields ["i"] `shouldReturn` [BInteger 50]
+    getFields ["i"] `shouldReturn` [BInteger 2]
 
   it "can break" . runTest $ do
-    liftIO $ pendingWith "implement break"
     runBS [r|
 contract qq {
-  uint i;
+  uint i = 25;
   constructor() public {
     for (uint j = 0; j < 100; j++) {
-      if (j % 7 == 4) {
+      if (j == 4) {
         break;
       }
       i++;
     }
   }
 }|]
-    getFields ["i"] `shouldReturn` [BInteger 3]
+
+    getFields ["i"] `shouldReturn` [BInteger 29]
+
+  it "can return from a loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    for (uint j = 0; j < 5; j++) {
+      i++;
+      return;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 1]
 
 
   it "can call functions on local contracts" . runTest $ do
