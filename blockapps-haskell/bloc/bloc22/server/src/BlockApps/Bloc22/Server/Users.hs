@@ -1,6 +1,7 @@
 {-# LANGUAGE Arrows              #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -14,15 +15,13 @@ import           Control.Concurrent
 import           Control.Concurrent.Async.Lifted
 import           Control.Arrow
 import           Control.Exception.Lifted          (catch)
-import           Control.Lens                      ((<?=), at, use, uses, (+=), (<<+=))
-import           Control.Lens.TH
-import           Control.Lens.Tuple                (_1, _2)
+import           Control.Lens                      hiding (from, ix)
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Extra
 import           Control.Monad.Log
 import           Control.Monad.Reader
-import           Control.Monad.Trans.State.Lazy    (StateT(..), runStateT)
+import           Control.Monad.Trans.State.Lazy
 import           Crypto.Secp256k1
 import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
@@ -449,29 +448,35 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
                (resolve || postmethodlistrequestResolve)
   postUsersContractMethodList' bflp (return . signTransaction sk)
 
+genNonces :: (Show a, Monad m) => m Nonce -> Lens' a (Maybe TxParams) -> [a] -> m [a]
+genNonces n l as = do
+  let noncesInUse = foldl' (\b -> maybe b (`S.insert` b) . (txparamsNonce <=< view l)) S.empty as
+  nonce <- if S.size noncesInUse == length as
+            then return . Nonce . error $ "internal error: unused nonce when already specified " ++ show as
+            else n
+  return . fst . runIdentity . forStateT nonce as $ \a -> do
+    let params' = fromMaybe emptyTxParams (a ^. l)
+    newNonce <- case txparamsNonce params' of
+      Just v -> return v
+      Nothing -> do
+        whileM $ do
+          inUse <- gets (`S.member` noncesInUse)
+          when inUse $ modify (+1)
+          return inUse
+        v <- get
+        modify (+1)
+        return v
+    pure $ (l .~ Just params'{txparamsNonce = Just newNonce }) a
+
 postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersContractMethodList' FunctionListParameters{..} sign = do
   if null txs
     then return []
     else do
-      let noncesInUse = S.fromList . mapMaybe (txparamsNonce <=< methodcallTxParams) $ txs
-      nonce <- if S.size noncesInUse == length txs
-                  then return . Nonce . error $ "internal error: unused nonce when already specified" ++ show txs
-                  else getAccountNonce fromAddr chainId
-      txsCmIdsFuncNames <- fmap fst . forStateT (Map.empty, nonce) txs $
+      txsWithParams <- genNonces (getAccountNonce fromAddr chainId) methodcallTxParams txs
+      txsCmIdsFuncNames <- fmap fst . forStateT Map.empty txsWithParams $
         \(MethodCall{..}) -> do
-          let params' = fromMaybe emptyTxParams methodcallTxParams
-          newNonce <- case txparamsNonce params' of
-            Nothing -> do
-              whileM $ do
-                inUse <- uses _2 (`S.member` noncesInUse)
-                when inUse $ _2 += 1
-                return inUse
-              _2 <<+= 1
-            Just v -> return v
-
-          let params = params'{txparamsNonce = Just newNonce }
-          mtuple <- use $ _1 . at methodcallContractName
+          mtuple <- use $ at methodcallContractName
           (mapKey, xabi) <- case mtuple of
             Just (cmId, x) -> return (cmId, x)
             Nothing -> do
@@ -479,7 +484,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
                 (_,_,_,_,_,_,cmId,x'') <- getContractsContractLatestQuery methodcallContractName -< ()
                 returnA -< (cmId,x'')
               x <- lift $ deserializeXabi x'
-              _1 . at methodcallContractName <?= (mapKey', x)
+              at methodcallContractName <?= (mapKey', x)
           contract' <- case xAbiToContract xabi of
             Left err -> throwError . AnError $ Text.pack err
             Right c -> return c
@@ -500,7 +505,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
             TransactionHeader
               (Just methodcallContractAddress)
               fromAddr
-              params
+              (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
               (sel <> argsBin)
               0 -- Nonce specified directly in params

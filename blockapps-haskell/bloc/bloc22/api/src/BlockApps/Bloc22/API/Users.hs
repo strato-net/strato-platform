@@ -8,12 +8,14 @@
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeOperators              #-}
 
 module BlockApps.Bloc22.API.Users where
 
 import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
+import           Control.Lens.TH
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
 import qualified Data.ByteString.Lazy               as ByteString.Lazy
@@ -803,7 +805,7 @@ methodErroredExample =
   where
      exMethodCall :: MethodCall
      exMethodCall = MethodCall
-       { methodcallTxParams = Nothing
+       { _methodcallTxParams = Nothing
        , methodcallValue = Strung 1000000000
        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
        , methodcallMethodName = "getHoroscope"
@@ -853,7 +855,7 @@ instance ToSchema PostMethodListRequest where
         }
       exMethodCall :: MethodCall
       exMethodCall = MethodCall
-        { methodcallTxParams = Nothing
+        { _methodcallTxParams = Nothing
         , methodcallValue = Strung 1000000000
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
@@ -868,9 +870,10 @@ data MethodCall = MethodCall
   , methodcallMethodName      :: Text
   , methodcallArgs            :: Map Text ArgValue
   , methodcallValue           :: Strung Natural
-  , methodcallTxParams        :: Maybe TxParams
+  , _methodcallTxParams       :: Maybe TxParams
   , methodcallMetadata        :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
+makeLenses ''MethodCall
 
 instance Arbitrary MethodCall where arbitrary = GR.genericArbitrary GR.uniform
 
@@ -888,7 +891,7 @@ instance ToSchema MethodCall where
     where
       ex ::MethodCall
       ex = MethodCall
-        { methodcallTxParams = Nothing
+        { _methodcallTxParams = Nothing
         , methodcallValue = Strung 1000000000
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"

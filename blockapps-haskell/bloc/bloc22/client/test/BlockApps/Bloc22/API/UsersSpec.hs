@@ -189,7 +189,7 @@ spec = do
               , methodcallMethodName = "get"
               , methodcallArgs = Map.empty
               , methodcallValue = Strung 0
-              , methodcallTxParams = testTxParams
+              , _methodcallTxParams = testTxParams
               , methodcallMetadata = Nothing
               }
           }
