@@ -12,8 +12,9 @@ contract NonceOrder {
     uint a = 0;
     uint b = 0;
 
-    constructor(uint _x) {
-      a = _x;
+    constructor(uint _a, uint _b) {
+      a = _a;
+      b = _b;
     }
 
     function set(uint _x) public {
@@ -43,7 +44,7 @@ async function createNewUser(fill) {
 
 async function upload() {
   const user = await createNewUser(true);
-  const args = {_x: 0};
+  const args = {_a: 0, _b: 0};
   console.log(`User ${user.name}@${user.address} uploading a NonceOrder`);
   return [user, await co.wrap(rest.uploadContractString)(user, 'NonceOrder', nonceOrder, args)];
 }
@@ -74,8 +75,7 @@ async function sendNoNonces(user, address, xs) {
   return await co.wrap(rest.sendList)(user, txs);
 }
 
-async function create(user, contract, xs) {
-  let { nonce } = await co.wrap(rest.getNonce)(user);
+async function create(user, nonce, contract, xs) {
   nonce += xs.length;
   // Set nonces in reverse list order
   const txs = xs.map(x => {
@@ -85,7 +85,7 @@ async function create(user, contract, xs) {
       contractName: contract,
       value: 0,
       txParams: { nonce },
-      args: {_x: x}
+      args: {_a: x, _b: nonce}
     }});
   console.log(`Txs: ${JSON.stringify(txs, null, 2)}`);
   return await co.wrap(rest.uploadContractList)(user, txs);
@@ -96,7 +96,7 @@ async function createNoNonces(user, contract, xs) {
     return {
       contractName: contract,
       value: 0,
-      args: {_x: x}
+      args: {_a: x, _b: x}
     }});
   console.log(`Txs: ${JSON.stringify(txs, null, 2)}`);
   return await co.wrap(rest.uploadContractList)(user, txs);
@@ -158,28 +158,6 @@ describe('Nonce upload orders', async () => {
     assert.deepEqual(result, new BigNumber(304));
   }).timeout(config.timeout);
 
-  it ('will respect the nonce provided on each contract tx', async () => {
-    const user = await createNewUser(true);
-    console.log(`Setting 300, then 4`);
-    const contracts = await create(user, 'NonceOrder', [4, 300]);
-    console.log(`Checking our work`);
-    let results = await get(user, contracts[0]);
-    assert.deepEqual(results, ["4", "0"]);
-    results = await get(user, contracts[1]);
-    assert.deepEqual(results, ["300", "0"]);
-  }).timeout(config.timeout);
-
-  it ("won't collide nonces when none are provided for contract txs", async () => {
-    const user = await createNewUser(true);
-    console.log(`Setting 4, then 300`);
-    const contracts = await createNoNonces(user, 'NonceOrder', [4, 300]);
-    console.log(`Checking our work`);
-    let results = await get(user, contracts[0]);
-    assert.deepEqual(results, ["4", "0"]);
-    results = await get(user, contracts[1]);
-    assert.deepEqual(results, ["300", "0"]);
-  }).timeout(config.timeout);
-
   it ('will respect the nonce provided on each method tx', async () => {
     const [user, contract] = await upload();
     console.log(`Setting 300, then 4`);
@@ -196,5 +174,28 @@ describe('Nonce upload orders', async () => {
     console.log(`Checking our work`);
     const results = await get(user, contract);
     assert.deepEqual(results, ["4", "300"]);
+  }).timeout(config.timeout);
+
+  it ('will respect the nonce provided on each contract tx', async () => {
+    const user = await createNewUser(true);
+    console.log(`Setting 300, then 4`);
+    const { nonce } = await co.wrap(rest.getNonce)(user);
+    const contracts = await create(user, nonce, 'NonceOrder', [4, 300]);
+    console.log(`Checking our work`);
+    let results = await get(user, contracts[0]);
+    assert.deepEqual(results, ["4", `${nonce+1}`]);
+    results = await get(user, contracts[1]);
+    assert.deepEqual(results, ["300", `${nonce}`]);
+  }).timeout(config.timeout);
+
+  it ("won't collide nonces when none are provided for contract txs", async () => {
+    const user = await createNewUser(true);
+    console.log(`Setting 4, then 300`);
+    const contracts = await createNoNonces(user, 'NonceOrder', [4, 300]);
+    console.log(`Checking our work`);
+    let results = await get(user, contracts[0]);
+    assert.deepEqual(results, ["4", "4"]);
+    results = await get(user, contracts[1]);
+    assert.deepEqual(results, ["300", "300"]);
   }).timeout(config.timeout);
 })
