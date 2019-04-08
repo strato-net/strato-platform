@@ -447,11 +447,9 @@ genNonces n l as = do
       Nothing -> do
         whileM $ do
           inUse <- gets (`S.member` noncesInUse)
-          when inUse $ modify (+1)
+          when inUse $ id += 1
           return inUse
-        v <- get
-        modify (+1)
-        return v
+        id <<+= 1
     return $ (l .~ Just params'{txparamsNonce = Just newNonce }) a
 
 postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
