@@ -115,6 +115,9 @@ spec = withApp $ do
       it "returns last block" $ do
         get $ BlkLastR 10
         statusIs 200
+      it "returns empty list of chain info" $ do
+        get ChainR
+        statusIs 200
 
     describe "Account endpoints" $ do
       it "First account" $ do
