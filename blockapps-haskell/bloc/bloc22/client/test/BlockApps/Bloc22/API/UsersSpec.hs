@@ -118,7 +118,7 @@ spec = do
           [ UploadListContract
             { uploadlistcontractContractName = simpleStorageContractName
             , uploadlistcontractArgs = Map.empty
-            , uploadlistcontractTxParams = testTxParams
+            , _uploadlistcontractTxParams = testTxParams
             , uploadlistcontractValue = Nothing
             , uploadlistcontractMetadata = Nothing
             }
@@ -163,7 +163,7 @@ spec = do
               SendTransaction
               { sendtransactionToAddress = toUserAddress
               , sendtransactionValue = Strung 100
-              , sendtransactionTxParams = testTxParams
+              , _sendtransactionTxParams = testTxParams
               , sendtransactionMetadata = Nothing
               }
           }

@@ -77,7 +77,6 @@ data TransactionHeader = TransactionHeader
   , transactionheaderTxParams :: TxParams
   , transactionheaderValue    :: Wei
   , transactionheaderCode     :: ByteString
-  , transactionheaderNonceInc :: Int
   , transactionheaderChainId  :: Maybe ChainId
   }
 
@@ -210,7 +209,6 @@ postUsersSend' TransferParameters{..} sign = do
         params
         (Wei (fromIntegral $ unStrung value))
         ByteString.empty
-        0
         chainId
     hash <- blocStrato $ postTx tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
@@ -269,7 +267,6 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
       (bin <> argsBin)
-      0
       chainId
   logWith logNotice ("tx is: " <> Text.pack (show tx))
   hash <- blocStrato $ postTx tx
@@ -309,7 +306,6 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
       (BC.pack $ Text.unpack src)
-      0
       chainId
   logWith logNotice ("tx is: " <> Text.pack (show tx))
   hash <- blocStrato $ postTx tx
@@ -334,50 +330,45 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
 
 postUsersUploadList' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadList' ContractListParameters{..} sign = do
-  if (null contracts)
-    then return []
-    else do
-      let UploadListContract _ _ mtp _ _ = head contracts
-      params <- getAccountTxParams fromAddr chainId mtp
-      (namesCmIdsTxs,_) <- forStateT Map.empty (zip contracts [0..]) $
-        \(UploadListContract name args _ value md,nonceIncr) -> do
-          mtuple <- use $ at name
-          (bin, src, cmId, xabi) <- case mtuple of
-            Just (b, src, cmId', x) -> return (b, src, cmId', x)
-            Nothing -> do
-              (b16,src,(cmId' :: Int32),x') <- lift $ blocQuery1 "postUsersUploadList'" $ proc () -> do
-                (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-                returnA -< (bin16,src,cmId',x'')
-              let (b, leftOver) = Base16.decode b16
-              unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-              x <- lift $ deserializeXabi x'
-              at name <?= (b, src, cmId', x)
-          let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
-          argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
-          let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
-          tx <- lift . signAndPrepare sign fromAddr metadata' $
-              TransactionHeader
-                Nothing
-                fromAddr
-                params
-                (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-                (bin <> argsBin)
-                nonceIncr
-                chainId
-          return ((name,cmId),tx)
-      let
-        txs = map snd namesCmIdsTxs
-      hashes <- blocStrato (postTxList txs)
-      void . blocModify $ \conn -> runInsertMany conn hashNameTable
-        [( Nothing
-        , constant hash
-        , constant cmId
-        , constant (1 :: Int32)
-        , constant name
-        )
-        | (hash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
-        ]
-      getBatchBlocTransactionResult' chainId hashes resolve
+  txsWithParams <- genNonces (getAccountNonce fromAddr chainId) uploadlistcontractTxParams contracts
+  namesCmIdsTxs <- fmap fst . forStateT Map.empty txsWithParams $
+    \(UploadListContract name args params value md) -> do
+      mtuple <- use $ at name
+      (bin, src, cmId, xabi) <- case mtuple of
+        Just (b, src, cmId', x) -> return (b, src, cmId', x)
+        Nothing -> do
+          (b16,src,(cmId' :: Int32),x') <- lift $ blocQuery1 "postUsersUploadList'" $ proc () -> do
+            (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
+            returnA -< (bin16,src,cmId',x'')
+          let (b, leftOver) = Base16.decode b16
+          unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+          x <- lift $ deserializeXabi x'
+          at name <?= (b, src, cmId', x)
+      let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
+      argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
+      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
+      tx <- lift . signAndPrepare sign fromAddr metadata' $
+          TransactionHeader
+            Nothing
+            fromAddr
+            (fromMaybe emptyTxParams params)
+            (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+            (bin <> argsBin)
+            chainId
+      return ((name,cmId),tx)
+  let
+    txs = map snd namesCmIdsTxs
+  hashes <- blocStrato (postTxList txs)
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable
+    [( Nothing
+    , constant hash
+    , constant cmId
+    , constant (1 :: Int32)
+    , constant name
+    )
+    | (hash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
+    ]
+  getBatchBlocTransactionResult' chainId hashes resolve
 
 postUsersSendList :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendListRequest -> Bloc [BlocTransactionResult]
 postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve' txs) = do
@@ -391,34 +382,29 @@ postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve'
 
 postUsersSendList' :: TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersSendList' TransferListParameters{..} sign = do
-  if null txs
-    then return []
-    else do
-      let SendTransaction _ _ mtp _ = head txs
-      params <- getAccountTxParams fromAddr chainId mtp
-      txs' <- zipWithM
-        (\(SendTransaction toAddr (Strung value) _ md) i -> do
-            let header = TransactionHeader
-                  (Just toAddr)
-                  fromAddr
-                  params
-                  (Wei $ fromIntegral value)
-                  (ByteString.empty)
-                  i
-                  chainId
-            signAndPrepare sign fromAddr md header
-        ) txs [0..]
-      hashes <- blocStrato $ postTxList txs'
-      void . blocModify $ \conn -> runInsertMany conn hashNameTable
-        [( Nothing
-        , constant hash
-        , constant (0 :: Int32)
-        , constant (0 :: Int32)
-        , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
-        )
-        | (tx,hash) <- zip txs' hashes
-        ]
-      getBatchBlocTransactionResult' chainId hashes resolve
+  txsWithParams <- genNonces (getAccountNonce fromAddr chainId) sendtransactionTxParams txs
+  txs' <- mapM
+    (\(SendTransaction toAddr (Strung value) params md) -> do
+        let header = TransactionHeader
+              (Just toAddr)
+              fromAddr
+              (fromMaybe emptyTxParams params)
+              (Wei $ fromIntegral value)
+              (ByteString.empty)
+              chainId
+        signAndPrepare sign fromAddr md header
+    ) txsWithParams
+  hashes <- blocStrato $ postTxList txs'
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable
+    [( Nothing
+    , constant hash
+    , constant (0 :: Int32)
+    , constant (0 :: Int32)
+    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
+    )
+    | (tx,hash) <- zip txs' hashes
+    ]
+  getBatchBlocTransactionResult' chainId hashes resolve
 
 ensureMostRecentSuccessfulTx
   :: [TransactionResult]
@@ -508,7 +494,6 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
               (sel <> argsBin)
-              0 -- Nonce specified directly in params
               chainId
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
@@ -597,7 +582,6 @@ postUsersContractMethod' FunctionParameters{..} sign = do
         params
         (Wei (maybe 0 (fromIntegral . unStrung) value))
         ((sel::ByteString) <> (argsBin::ByteString))
-        0
         chainId
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
@@ -885,10 +869,9 @@ getAccountSecKey userName password addr = do
     Just sk -> return sk
 
 prepareUnsignedTx :: TransactionHeader -> UnsignedTransaction
-prepareUnsignedTx TransactionHeader{..} =
-  let Nonce nonce = fromMaybe (Nonce 0) (txparamsNonce transactionheaderTxParams)
-  in UnsignedTransaction
-  { unsignedTransactionNonce = Nonce (nonce + fromIntegral transactionheaderNonceInc)
+prepareUnsignedTx TransactionHeader{..} = UnsignedTransaction
+  { unsignedTransactionNonce =
+      fromMaybe (Nonce 0) (txparamsNonce transactionheaderTxParams)
   , unsignedTransactionGasPrice =
       fromMaybe (Wei 1) (txparamsGasPrice transactionheaderTxParams)
   , unsignedTransactionGasLimit =

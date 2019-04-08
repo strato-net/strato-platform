@@ -431,7 +431,7 @@ instance ToSchema UploadListRequest where
       exContract1 = UploadListContract
         { uploadlistcontractContractName = "AccountsContract"
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
-        , uploadlistcontractTxParams = Nothing
+        , _uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
         , uploadlistcontractMetadata = Nothing
         }
@@ -441,10 +441,11 @@ instance ToSchema UploadListRequest where
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
   , uploadlistcontractArgs         :: Map Text ArgValue
-  , uploadlistcontractTxParams     :: Maybe TxParams
+  , _uploadlistcontractTxParams    :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
   , uploadlistcontractMetadata     :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
+makeLenses ''UploadListContract
 
 instance Arbitrary UploadListContract where arbitrary = GR.genericArbitrary GR.uniform
 
@@ -463,7 +464,7 @@ instance ToSchema UploadListContract where
       ex = UploadListContract
         { uploadlistcontractContractName = "SampleContract"
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
-        , uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
+        , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing
         , uploadlistcontractMetadata = Nothing
         }
@@ -642,7 +643,7 @@ instance ToSchema PostSendListRequest where
       sendEx = SendTransaction
         { sendtransactionToAddress = Address 0xdeadbeef
         , sendtransactionValue = Strung 1000000000000000
-        , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
+        , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
@@ -650,9 +651,10 @@ instance ToSchema PostSendListRequest where
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue     :: Strung Natural
-  , sendtransactionTxParams  :: Maybe TxParams
+  , _sendtransactionTxParams :: Maybe TxParams
   , sendtransactionMetadata  :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
+makeLenses ''SendTransaction
 
 instance Arbitrary SendTransaction where arbitrary = GR.genericArbitrary GR.uniform
 
@@ -700,7 +702,7 @@ instance ToSchema SendTransaction where
       ex = SendTransaction
         { sendtransactionToAddress = Address 0xdeadbeef
         , sendtransactionValue = Strung 100000000000000
-        , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
+        , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
