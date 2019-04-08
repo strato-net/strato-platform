@@ -11,6 +11,7 @@
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Monad.Except
+import           Control.Monad.Log
 import           Crypto.Random.Entropy
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
@@ -32,6 +33,7 @@ import           BlockApps.Strato.Client           as Strato
 import           BlockApps.Strato.TypeLits
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.Bloc22.Database.Queries
+import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
 governanceAddress :: Address
@@ -102,10 +104,21 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
         )
         Nothing
   chainId <- blocStrato $ Strato.postChain chainInfo
+  waitForChainInfo chainId
   when (isJust mContract) $ do
     let Just (cmId, _) = mContract
     void $ insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
+
+waitForChainInfo :: ChainId -> Bloc ()
+waitForChainInfo chainId = waitFor "failed to retrieve chain info" go
+  where go :: Bloc Bool
+        go = do
+          infos <- getChainInfo [chainId]
+          logWith logNotice $ "waitForChainInfo req: " <> Text.pack (show chainId)
+          logWith logNotice $ "waitForChainInfo resp: " <> Text.pack (show infos)
+          return . not $ null infos
+
 
 getChainInfo :: [ChainId] -> Bloc [ChainIdChainOutput]
 getChainInfo chainIds = do

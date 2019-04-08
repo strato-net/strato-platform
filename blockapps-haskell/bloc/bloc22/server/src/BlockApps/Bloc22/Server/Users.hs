@@ -158,17 +158,14 @@ postUsersKeyStore username (PostUsersKeyStoreRequest password keystore) = do
             "keystore could not be inserted: " <> Text.pack (show s)
 
 waitForBalance :: Address -> Bloc ()
-waitForBalance addr = go 20
-  where go :: Int -> Bloc ()
-        go ms = do
-          when (ms > 30000) . throwError $ CouldNotFind "no user account found"
+waitForBalance addr = waitFor "no user account found" go
+  where go :: Bloc Bool
+        go = do
           let params = accountsFilterParams{qaAddress = Just addr}
           accts <- blocStrato $ getAccountsFilter params
           logWith logNotice $ "waitForBalance req: " <> Text.pack (show params)
           logWith logNotice $ "waitForBalance resp: " <> Text.pack (show accts)
-          when (null accts || accountBalance (head accts) == Strung 0) $ do
-            liftIO . threadDelay $ ms * 1000
-            go $ 2 * ms
+          return $ not (null accts || accountBalance (head accts) == Strung 0)
 
 postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
