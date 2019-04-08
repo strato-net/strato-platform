@@ -11,6 +11,7 @@ module Blockchain.SolidVM
 
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
+import           Control.Monad.Extra (whenJust)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bits
@@ -453,29 +454,22 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
       Just elseCode -> runStatements elseCode
       Nothing -> return Ongoing
 
+runStatement (Xabi.WhileStatement conditionExp code) = do
+  let condition = getBool =<< expToVar conditionExp
+  while condition $ runStatements code
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
-  _ <-
-    case maybeInitStatement of
-      Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement
-      _ -> return Ongoing
+  whenJust maybeInitStatement $ \initStatement ->
+      void $ runStatement $ Xabi.SimpleStatement initStatement
 
-  let conditionExp =
-        case maybeConditionExp of
-          Just x -> x
-          Nothing -> Xabi.BoolLiteral True
-
-  let loopExp =
-        case maybeLoopExp of
-          Just x -> x
-          Nothing -> todo "loop expressions" loopExp
-
-  let condition = getBool =<< expToVar conditionExp
+  let conditionExp = fromMaybe (Xabi.BoolLiteral True) maybeConditionExp
+      condition = getBool =<< expToVar conditionExp
 
   while condition $ do
       when trace $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
-      _ <- getVar =<< expToVar loopExp
+      whenJust maybeLoopExp $ \loopExp ->
+        void $ expToVar loopExp
       return result
 
 runStatement (Xabi.Return maybeExpression) = do

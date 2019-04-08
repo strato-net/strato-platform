@@ -1735,3 +1735,30 @@ contract qq {
   }
 }|]
     getFields ["a"] `shouldReturn` [BAddress 74]
+
+  it "can have a for loop with no fields" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    for (;;) {
+      i += 3;
+      if (i % 5 == 0) {
+        break;
+      }
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 15]
+
+  it "can have a while loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    while (i < 8) {
+      i++;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 8]
