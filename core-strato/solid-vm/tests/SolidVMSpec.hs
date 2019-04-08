@@ -808,12 +808,32 @@ contract qq {
 contract qq {
   uint i;
   constructor() public {
-    for (i = 0; i < 100; i++) {
-      continue;
+    for (uint j = 0; j < 100; j++) {
+      if (j % 2 == 0) {
+        continue;
+      }
+      i++;
     }
   }
 }|]
-    getFields ["i"] `shouldReturn` [BInteger 100]
+    getFields ["i"] `shouldReturn` [BInteger 50]
+
+  it "can break" . runTest $ do
+    liftIO $ pendingWith "implement break"
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    for (uint j = 0; j < 100; j++) {
+      if (j % 7 == 4) {
+        break;
+      }
+      i++;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 3]
+
 
   it "can call functions on local contracts" . runTest $ do
     runBS [r|
