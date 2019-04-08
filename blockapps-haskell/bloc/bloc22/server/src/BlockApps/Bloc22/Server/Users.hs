@@ -436,7 +436,7 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
 
 genNonces :: (Show a, Monad m) => m Nonce -> Lens' a (Maybe TxParams) -> [a] -> m [a]
 genNonces n l as = do
-  let noncesInUse = foldl' (\b -> maybe b (`S.insert` b) . (txparamsNonce <=< view l)) S.empty as
+  let noncesInUse = S.fromList $ mapMaybe (txparamsNonce <=< view l) as
   nonce <- if S.size noncesInUse == length as
             then return . Nonce . error $ "internal error: unused nonce when already specified " ++ show as
             else n
@@ -452,7 +452,7 @@ genNonces n l as = do
         v <- get
         modify (+1)
         return v
-    pure $ (l .~ Just params'{txparamsNonce = Just newNonce }) a
+    return $ (l .~ Just params'{txparamsNonce = Just newNonce }) a
 
 postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersContractMethodList' FunctionListParameters{..} sign = do
