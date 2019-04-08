@@ -2,6 +2,7 @@
 module SolidVM.Solidity.Parse.Statement where
 
 import           Control.Monad
+import           Data.Foldable (asum)
 import           Data.Functor.Identity
 import qualified Data.Text as T
 import           Text.Parsec
@@ -213,7 +214,16 @@ numberUnit = do
 
 
 parseArgs :: SolidityParser [Expression]
-parseArgs = parens $ commaSep expression
+parseArgs = parens $ commaSep literal
+
+literal :: SolidityParser Expression
+literal = asum
+        [ liftM2 NumberLiteral natural (optionMaybe numberUnit)
+        , StringLiteral <$> stringLiteral
+        , reserved "false" >> return (BoolLiteral False)
+        , reserved "true" >> return (BoolLiteral True)
+        , ArrayExpression <$> brackets (commaSep1 literal)
+        ]
 
 inlineAssembly :: SolidityParser Statement
 inlineAssembly = fmap AssemblyStatement . braces $ do

@@ -7,6 +7,8 @@ module Blockchain.SolidVM.Value where
 import           Control.Monad
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Base16 as B16
 import           Data.Foldable (asum)
 import           Data.IORef
 import           Data.Map (Map)
@@ -143,6 +145,12 @@ coerceFromInt _ t x = typeError "invalid literal for type" (t, x)
 coerceType :: Contract -> Xabi.Type -> Value -> Value
 coerceType ct xt = \case
     SInteger i -> coerceFromInt ct (defaultValue ct xt) i
+    SString s -> case xt of
+      Xabi.String{} -> SString s
+      Xabi.Bytes{} -> case B16.decode (BC.pack s) of
+                        (bs, "") -> SString . BC.unpack $ B.takeWhile (/=0) bs
+                        _ -> SString s
+      _ -> typeError "string literal must be string or bytes" (xt, s)
     v -> v
 
 

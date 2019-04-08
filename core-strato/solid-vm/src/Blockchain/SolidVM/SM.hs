@@ -27,6 +27,7 @@ module Blockchain.SolidVM.SM (
   getXabiType,
   getXabiValueType,
   getValueType,
+  pushSender,
   initializeAction,
   markDiffForAction
   ) where
@@ -195,6 +196,20 @@ runSM maybeCode env f = do
   return value
 
 
+-- When calling a remote contract, the new `msg.sender` is the contract
+-- that the call is initiated from.
+pushSender :: Address -> SM a -> SM a
+pushSender newSender mv = do
+  state0 <- get
+  let oldSender = Env.sender $ env state0
+  put $ state0{env=(env state0){Env.sender = newSender}}
+  ret <- mv
+  state1 <- get
+  put $ state1{env=(env state1){Env.sender = oldSender}}
+  return $ ret
+
+
+
 startingAction :: Maybe ByteString -> Env.Environment -> Action
 startingAction maybeCode env' = Action
   { _actionBlockHash          = blockHeaderHash $ Env.blockHeader env'
@@ -253,7 +268,7 @@ getVariableOfName name = do
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "byte", "string", "keccak256"
+      maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "byte", "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"]) $

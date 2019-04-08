@@ -24,7 +24,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith)
+import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, shouldThrow, anyErrorCall)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -1189,6 +1189,7 @@ contract qq {
       [BString "5816f723b08edfdb4148b98e7be9d2e8000bab79b78e4e1615865eb92b1d7068"]
 
   it "can convert bytes32toString" . runTest $ do
+    liftIO $ pendingWith "I'm not sure if this is correct"
     runBS [r|
 contract Util {
   function bytes32ToString(bytes32 x) constant returns (string) {
@@ -1598,7 +1599,6 @@ contract qq {
     getFields ["st"] `shouldReturn` [BString "deadbeef00000000000000000000000000000000000000000000000000000000"]
 
   it "can accept bytes32 arguments" . runTest $ do
-    liftIO $ pendingWith "bytes32 argument parsing"
     runCall "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
 contract qq {
   bytes32 bs;
@@ -1607,3 +1607,99 @@ contract qq {
   }
 }|] `shouldReturn` Nothing
     getFields ["bs"] `shouldReturn` [BString "\xde\xad\xbe\xef"]
+
+  it "should not compute remote arguments" $ runTest (do
+    runCall "set" "(3 + block.timestamp)" [r|
+contract qq {
+  uint n;
+  function set(uint _n) public {
+    n = _n;
+  }
+}|]) `shouldThrow` anyErrorCall -- TODO: This should be a Left instead of a throw
+
+  it "can call boolean arguments" . runTest $ do
+    runCall "set" "(true,false)" [r|
+contract qq {
+  bool a;
+  bool b;
+  function set(bool _a, bool _b) public {
+    a = _a;
+    b = _b;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["a", "b"] `shouldReturn` [BBool True, BBool False]
+
+  it "sets the origin correctly" . runTest $ do
+    runBS [r|
+contract X {
+  function trampoline() returns (address) {
+    return tx.origin;
+  }
+}
+
+contract qq {
+  address resolved_origin;
+  constructor() {
+    X x = new X();
+    resolved_origin = x.trampoline();
+  }
+}|]
+    getFields ["resolved_origin"] `shouldReturn` [BAddress origin]
+
+  it "sets the sender correctly" . runTest $ do
+    runBS [r|
+contract X {
+    function remoteSender() public returns (address) {
+        return msg.sender;
+    }
+}
+
+contract qq {
+    address public direct_set;
+    address public local_call;
+    address public remote_call;
+
+    function localSender() public returns (address) {
+        return msg.sender;
+    }
+    constructor() payable public {
+        direct_set = msg.sender;
+        local_call = localSender();
+        X x = new X();
+        remote_call = x.remoteSender();
+    }
+}|]
+    getFields ["direct_set", "local_call", "remote_call"] `shouldReturn`
+      [BAddress sender, BAddress sender, BAddress uploadAddress]
+
+  it "can set owner from management contract" . runTest $ do
+    runBS [r|
+contract X {
+  address public owner;
+  constructor() public {
+    owner = msg.sender;
+  }
+}
+
+contract qq {
+  X x;
+  constructor() public {
+    x = new X();
+  }
+}|]
+    let recursiveAddr = getNewAddress_unsafe uploadAddress 1
+    -- qq should become the `owner` in X
+    getFields ["x"] `shouldReturn` [BContract "X" recursiveAddr]
+    getSolidStorageKeyVal' recursiveAddr (MS.singleton "owner") `shouldReturn`
+      BAddress uploadAddress
+
+
+  it "can cast from address" . runTest $ do
+    runBS [r|
+contract qq {
+  address a;
+  constructor() public {
+    a = address(74);
+  }
+}|]
+    getFields ["a"] `shouldReturn` [BAddress 74]
