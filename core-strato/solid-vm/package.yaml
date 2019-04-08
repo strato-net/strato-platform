@@ -103,12 +103,18 @@ library:
 executables:
   parse-solidvm:
     source-dirs: exec_src
+    other-modules: []
     main: Parse.hs
     dependencies:
       - solid-vm
     ghc-options: -Wall -O2 -threaded -rtsopts
 
-
+  exprs-needed:
+    source-dirs: exec_src
+    other-modules: []
+    main: ExprsNeeded.hs
+    dependencies:
+      - solid-vm
 
 tests:
   solid-vm-spec:
