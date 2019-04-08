@@ -45,7 +45,7 @@ replaceMembers :: Struct
                -> Map.Map Text Text
 replaceMembers Struct{..} addrs m =
   let tag = "__members__"
-      members = valueToText $ ValueArrayDynamic $ map (SimpleValue . ValueAddress) addrs
+      members = valueToText $ ValueArrayDynamic . tosparse $ map (SimpleValue . ValueAddress) addrs
       m' = Map.alter (const $ Just members) tag m
    in case OMap.lookup tag fields of
         Nothing -> m'

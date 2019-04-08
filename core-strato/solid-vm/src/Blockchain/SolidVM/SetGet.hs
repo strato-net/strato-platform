@@ -15,7 +15,7 @@ import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import           Data.Word (Word8)
+import           Data.Word (Word8, Word32)
 import           Text.Printf
 
 import           Blockchain.Data.Address
@@ -34,7 +34,9 @@ import           Text.Format
 putSolid :: Either LocalVar Address -> MS.StoragePath -> MS.BasicValue -> SM ()
 putSolid loc key val = case loc of
                           Left LocalVar -> setLocal key val
-                          Right addr -> putSolidStorageKeyVal' addr key val
+                          Right addr -> do
+                            markDiffForAction addr key val
+                            putSolidStorageKeyVal' addr key val
 
 {-# INLINE getSolid #-}
 getSolid :: Either LocalVar Address -> MS.StoragePath -> SM MS.BasicValue
@@ -49,7 +51,8 @@ fromBasic = \case
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a
   MS.BContract n a -> SContract (T.unpack n) (fromIntegral a)
-  MS.BEnumVal k v -> SEnumVal (T.unpack k) (T.unpack v)
+  MS.BEnumVal k v num -> SEnumVal (T.unpack k) (T.unpack v) num
+  MS.BMappingSentinel -> SMappingSentinel
   MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
 
 findDefault :: BasicType -> Value
@@ -59,7 +62,7 @@ findDefault = \case
   TBool -> SBool False
   TAddress -> SAddress 0x0
   TContract n -> SContract n 0x0
-  TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n)
+  TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n) 0x0
   TStruct n fs -> todo "findDefault/struct" (n, fs)
   TComplex -> todo "finddefault/complex" TComplex
   Todo msg -> todo "findDefault/todo" msg
@@ -71,7 +74,8 @@ toBasic = \case
   SBool b -> MS.BBool b
   SAddress a -> MS.BAddress a
   SContract n a -> MS.BContract (T.pack n) (fromIntegral a)
-  SEnumVal k t -> MS.BEnumVal (T.pack k) (T.pack t)
+  SEnumVal k t num -> MS.BEnumVal (T.pack k) (T.pack t) num
+  SMappingSentinel -> MS.BMappingSentinel
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
 setVar :: AddressedPath-> Value -> SM ()
@@ -167,7 +171,8 @@ showSM SNULL = return "NULL"
 showSM (SInteger v) = return $ show v
 showSM (SString v) = return $ show v
 showSM (SBool v) = return $ show v
-showSM (SEnumVal enumName valName) = return $ enumName ++ "." ++ valName
+showSM (SEnumVal enumName valName num) = return
+    $ printf "%s.%s (= %x)" enumName valName num
 showSM (SAddress a) = return $ format a
 showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
@@ -197,6 +202,6 @@ showSM (SMap _ m) = do
            ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
            ++ "}"
 showSM (SContract name address) = do
-  return $ "Contract: " ++ name ++ "/" ++ format (Address $ fromInteger address)
+  return $ "Contract: " ++ name ++ "/" ++ format address
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
 showSM x = todo "showSM called for unsupported value: " x

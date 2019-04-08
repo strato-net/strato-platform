@@ -9,7 +9,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
-import           Control.Lens hiding (assign)
+import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
@@ -47,8 +47,6 @@ import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
-import           Blockchain.SolidVM.Model
-import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Blockchain.SolidVM.SM
@@ -59,7 +57,7 @@ import           Text.Tools
 import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
-import           SolidVM.Solidity.Parse.UnParser (unparseStatement)
+import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 import qualified SolidVM.Solidity.Xabi as Xabi
 import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
@@ -119,7 +117,7 @@ create' :: Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM
 create' creator ch cc contractName' argExps = do
   newAddress <- getNewAddress creator
 
-  action . actionData %= M.insert newAddress (ActionData (SHA 0) SolidVM (ActionEVMDiff M.empty) [])
+  initializeAction newAddress contractName' ch
 
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
@@ -133,20 +131,20 @@ create' creator ch cc contractName' argExps = do
   addCallInfo newAddress contract' ch cc M.empty
 
   forM_ (M.toList $ contract'^.storageDefs) $ \(n, (Xabi.VariableDecl theType _ maybeExpression)) -> do
-    let def = defaultValue theType
+    let def = defaultValue contract' theType
     initialValue <-
       case maybeExpression of
         Just e -> do
           val <- getVar =<< expToVar e
           case val of
-            SInteger i -> return $ coerceFromInt def i
+            SInteger i -> return $ coerceFromInt contract' def i
             _ -> return val
         Nothing -> return def
     initializeStorage (AddressedPath (Right newAddress) . MS.singleton $ BC.pack n) initialValue
   popCallInfo
 
   -- Run the constructor
-  runTheConstructors newAddress ch cc contractName' argExps
+  runTheConstructors creator newAddress ch cc contractName' argExps
 
   when trace $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
@@ -173,7 +171,7 @@ initializeStorage root value = do
        V.imapM_ (\i v -> case v of
         Constant c -> initializeStorage (root `apSnoc` MS.ArrayIndex i) c
         _ -> todo "nonconstant vector init" (root, value)) iv
-     SMap _ im -> if M.null im then return ()
+     SMap _ im -> if M.null im then setVar root SMappingSentinel
                                else todo "initialize map storage " value
      -- References are already initialized
      SReference{} -> return ()
@@ -208,7 +206,9 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       maybeArgString = M.lookup "args" =<< metadata
       argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
       maybeArgs = runParser parseArgs "" "" argString
-      args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
+      args = either (\e -> error $ printf "args can not be parsed: %s\nfull args: %s" (show e) argString)
+                    (map (Nothing,))
+                    maybeArgs
       env' = Env.Environment {
         Env.blockHeader = blockData,
         Env.sender = sender',
@@ -218,8 +218,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         Env.metadata=metadata
         }
   (encodedReturnValue, sstate) <- runSM Nothing env' $ do
-           argValues <- forM args $ \arg -> getVar =<< expToVar arg
-           maybeRet <- call'' codeAddress Nothing funcName argValues
+           maybeRet <- callWrapper sender' codeAddress Nothing funcName args
            sstate <- get
            case maybeRet of
              Just x -> fmap (\v -> (Just v, sstate)) $ encodeForReturn x
@@ -269,10 +268,10 @@ getCodeAndCollection address' = do
 
     return (contract', ch, cc)
 
-logFunctionCall :: [Value] -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
+logFunctionCall :: [(Maybe String, Xabi.Expression)] -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
 logFunctionCall args address contract functionName f = do
   when trace $ do
-    argStrings <- forM args showSM
+    let argStrings = map (unparseExpression . snd) args
     liftIO $ putStrLn $ box ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
 
   result <- f
@@ -289,20 +288,49 @@ logFunctionCall args address contract functionName f = do
   return result
 
 
-call'' :: Address -> Maybe String -> String -> [Value] -> SM (Maybe Value)
-call'' address mContract functionName args = do
-  (contract', hsh, cc) <- getCodeAndCollection address
+argsToVals :: Contract -> Xabi.Func -> [(Maybe String, Xabi.Expression)] -> SM [Value]
+argsToVals ctract fn = mapM (uncurry eval) . zipWith typeForName orderedTypes
+  where typeForName :: Xabi.Type -> (Maybe String, Xabi.Expression) -> (Xabi.Type, Xabi.Expression)
+        typeForName t (Nothing, ex) = (t, ex)
+        typeForName _ (Just name, _) = todo "argToVals/named arguments" name
+
+        orderedTypes :: [Xabi.Type]
+        orderedTypes = map Xabi.indexedTypeType
+                     . sortOn Xabi.indexedTypeIndex
+                     . M.elems $ Xabi.funcArgs fn
+
+        eval :: Xabi.Type -> Xabi.Expression -> SM Value
+        eval t x = case x of
+           Xabi.NumberLiteral n Nothing -> return . coerceType ctract t $ SInteger n
+           Xabi.NumberLiteral n (Just nu) -> todo "Number literal with units" (n, nu)
+           Xabi.BoolLiteral b -> return . coerceType ctract t $ SBool b
+           Xabi.StringLiteral s -> return . coerceType ctract t $ SString s
+           Xabi.ArrayExpression as -> case t of
+              Xabi.Array{Xabi.entry=t'} ->
+                SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
+              _ -> typeError "array literal for non array" (t, x)
+           -- This is something of a hack, where if an incoming value is not one
+           -- of the accepted literals, assume that this is not the context of
+           -- evaluating external arguments.
+           _ -> getVar =<< expToVar x
+
+
+callWrapper :: Address -> Address -> Maybe String -> String -> [(Maybe String, Xabi.Expression)] -> SM (Maybe Value)
+callWrapper from to mContract functionName argExps = do
+  (contract', hsh, cc) <- getCodeAndCollection to
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
-  logFunctionCall args address contract functionName $
+  initializeAction to (_contractName contract) hsh
+  logFunctionCall argExps to contract functionName $
     case M.lookup functionName $ contract^.functions of
       Just theFunction -> do
-        call' address contract hsh cc theFunction args
+        args <- argsToVals contract' theFunction argExps
+        (if from == to then id else pushSender from) $ runTheCall to contract hsh cc theFunction args
       _ -> do --Maybe the function is actually a getter
         case M.lookup functionName $ contract^.storageDefs of
           Just _ -> do
             --TODO- this should only exist if the storage variable is declared
             -- "public", right now I just ignore this and allow anything to be called as a getter
-            fmap Just $ getVar $ StorageItem $ AddressedPath (Right address) . MS.singleton $ BC.pack functionName
+            fmap Just $ getVar $ StorageItem $ AddressedPath (Right to) . MS.singleton $ BC.pack functionName
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
@@ -357,9 +385,11 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
         setVar (p1 `apSnoc` idx) rhs'
     _ -> do
       !value <- getVar v2
+      ctract <- getCurrentContract
       when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p1, value)
       logAssigningVariable value
-      setVar p1 value
+      -- liftIO $ putStrLn $ "coercion at: " ++ show (p1, t1, value, coerceType t1 value)
+      setVar p1 $ coerceType ctract t1 value
   return Nothing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
@@ -389,14 +419,9 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
 
       Nothing ->
         case varNames of
-           [Just name] ->
-              case theType of
-                Xabi.Label l -> do
-                  t' <- getTypeOfName l
-                  case t' of
-                    StructTypo fs ->  SStruct name <$> initializeStruct fs
-                    _ -> todo "initialized type in variable definition" t'
-                _ -> return $ defaultValue theType
+           [Just _] -> do
+              ctract <- getCurrentContract
+              return $ defaultValue ctract theType
            _ -> internalError "no single name for variable definition" varNames
   when trace $ do
     valueString <- showSM value
@@ -415,13 +440,6 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
     _ -> typeError "VariableDefinition expected a tuple" value
 
   return Nothing
-    where
-      initializeStruct :: [(T.Text, Xabi.FieldType)] -> SM (M.Map String Variable)
-      initializeStruct = mapM initializeField . M.mapKeys T.unpack . M.fromList
-
-      initializeField :: Xabi.FieldType -> SM Variable
-      initializeField = fmap Variable . liftIO . newIORef . defaultValue . Xabi.fieldTypeType
-
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
   conditionResult <- getBool =<< expToVar condition
@@ -626,7 +644,14 @@ expToVar' (Xabi.MemberAccess expr name) = do
 
   case var of
     Constant c -> Constant <$> case (c, name) of
-      (SEnum enumName, _) -> return $ SEnumVal enumName name
+      (SEnum enumName, _) -> do
+        contract' <- getCurrentContract
+        let maybeEnumValues = M.lookup enumName $ contract' ^. enums
+            enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
+            num = maybe (missingType "Enum nonexistent member" (enumName, name))
+                        fromIntegral
+                        (name `elemIndex` enumVals)
+        return $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (SAddress . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (SAddress . Env.origin) <$> getEnv
       (SStruct _ theMap, fieldName) ->
@@ -643,7 +668,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
           then do
             -- TODO: Check that this contract actually is a contractName'
             addr <- getCurrentAddress
-            return $ SContractFunction contractName' (toInteger addr) constName
+            return $ SContractFunction contractName' addr constName
           else case constName `M.lookup` _constants cont of
                   Nothing -> unknownConstant "constant member access" (contractName', constName)
                   Just (Xabi.ConstantDecl _ _ constExp) -> do
@@ -662,9 +687,9 @@ expToVar' (Xabi.MemberAccess expr name) = do
           [] -> typeError "cannot use super without a parent contract" (method, ctract)
           ps -> do
             addr <- getCurrentAddress
-            return $ SContractFunction (last ps) (toInteger addr) method
+            return $ SContractFunction (last ps) addr method
 
-      (SAddress (Address a), itemName) -> return $ SContractItem (toInteger a) itemName
+      (SAddress addr, itemName) -> return $ SContractItem addr itemName
 
       (SContract contractName' a, funcName) -> return $ SContractFunction contractName' a funcName
       (SString s, "length") -> return . SInteger . fromIntegral $ length s
@@ -673,7 +698,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
     Variable vref -> do
       val' <- liftIO $ readIORef vref
       case val' of
-        SAddress (Address a) -> return . Constant $ SContractItem (toInteger a) name
+        SAddress addr -> return . Constant $ SContractItem addr name
         SStruct _ theMap -> return
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
@@ -693,8 +718,8 @@ expToVar' (Xabi.MemberAccess expr name) = do
       _ -> do
           val' <- getVar $ StorageItem apt
           case val' of
-            SAddress (Address a) -> return . Constant $ SContractItem (toInteger a) name
-            SContract _ addr -> return . Constant $ SContractItem (toInteger addr) name
+            SAddress addr -> return . Constant $ SContractItem addr name
+            SContract _ addr -> return . Constant $ SContractItem addr name
             SStruct _ theMap -> return
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
@@ -725,14 +750,16 @@ expToVar' (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Bi
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
+  ctract <- getCurrentContract
   when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  return . Constant . SBool . not $ val1 `valEquals` val2
+  return . Constant . SBool . not $ valEquals ctract val1 val2
 
 expToVar' (Xabi.Binary "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
+  ctract <- getCurrentContract
   logVals val1 val2
-  return . Constant . SBool $ val1 `valEquals` val2
+  return . Constant . SBool $ valEquals ctract val1 val2
 
 expToVar' (Xabi.Binary "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -797,10 +824,11 @@ expToVar' (Xabi.Ternary condition expr1 expr2) = do
   expToVar $ if c then expr1 else expr2
 
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array {Xabi.entry=t})) args) = do
+  ctract <- getCurrentContract
   case args of
     [(Nothing, a)] -> do
       len <- getInt =<< expToVar a
-      return . Constant . SArray t . V.replicate (fromIntegral len) . Constant $ defaultValue t
+      return . Constant . SArray t . V.replicate (fromIntegral len) . Constant $ defaultValue ctract t
     _ -> arityMismatch "new array" 1 (length args)
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
   creator <- getCurrentAddress
@@ -808,7 +836,7 @@ expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) arg
   (hsh, cc) <- getCurrentCodeCollection
   incrementNonce creator
   execResults <- create' creator hsh cc contractName' argExps
-  return $ Constant $ SAddress
+  return $ Constant $ SContract contractName' $ fromIntegral
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAddress execResults
 
@@ -822,7 +850,7 @@ expToVar' (Xabi.FunctionCall e args) = do
       address <- getCurrentAddress
       (hsh, cc) <- getCurrentCodeCollection
 
-      res <- call' address contract' hsh cc name argVals
+      res <- runTheCall address contract' hsh cc name argVals
       case res of
         Just v -> return $ Constant $ v
         Nothing -> return $ Constant SNULL
@@ -837,19 +865,21 @@ expToVar' (Xabi.FunctionCall e args) = do
     Constant (SContractDef contractName') -> do
       case argVals of
         [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
+          return $ Constant $ SContract contractName' $ Address $ fromInteger address
+        [SAddress address ] ->
           return $ Constant $ SContract contractName' address
-        [SAddress (Address address)] ->
-          return $ Constant $ SContract contractName' $ toInteger address
         [SContract _ addr] ->
           return $ Constant $ SContract contractName' $ addr
         _ -> typeError "contract variable creation" argVals
 
     Constant (SContractItem address itemName) -> do
-      result <- call'' (Address $ fromInteger address) Nothing itemName argVals
+      from <- getCurrentAddress
+      result <- callWrapper from address Nothing itemName args
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SContractFunction name address functionName) -> do
-      result <- call'' (Address $ fromInteger address) (Just name) functionName argVals
+      from <- getCurrentAddress
+      result <- callWrapper from address (Just name) functionName args
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SEnum enumName) -> do
@@ -858,7 +888,7 @@ expToVar' (Xabi.FunctionCall e args) = do
           c <- getCurrentContract
           let theEnum = fromMaybe (missingType "enum constructor" enumName)
                       $ M.lookup enumName $ c^.enums
-          return $ Constant $ SEnumVal enumName $ theEnum !! fromInteger i
+          return $ Constant $ SEnumVal enumName (theEnum !! fromInteger i) (fromInteger i)
         _ -> typeError "called enum constructor with improper args" argVals
 
     Constant (SPush apt) -> do
@@ -875,15 +905,16 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant SHexDecodeAndTrim ->
         case argVals of
-          [SString s] ->
-            case B16.decode (BC.pack s) of
-              (b32, "") -> return . Constant . SString . BC.unpack . B.takeWhile (/= 0) $ b32
-              -- TODO(tim): This is a hack, to deal with the assymmetry created
-              -- between bytes32 literals (that need no conversion)
-              -- and bytes32 external arguments (that need decoding and trimming). It
-              -- would be cleaner to decode arguments in `call`, using `id`
-              -- on strings and `B16.decode` on bytes32
-              _ -> return . Constant $ SString s
+          [s@SString{}] -> return $ Constant s
+          -- [SString s] -> return . Constant . SString $
+          --   case B16.decode (BC.pack s) of
+          --     (b32, "") -> BC.unpack . B.takeWhile (/= 0) $ b32
+          --     -- TODO(tim): This is a hack, to deal with the assymmetry created
+          --     -- between bytes32 literals (that need no conversion)
+          --     -- and bytes32 external arguments (that need decoding and trimming). It
+          --     -- would be cleaner to decode arguments in `call`, using `id`
+          --     -- on strings and `B16.decode` on bytes32
+          --     _ -> s
           _ -> typeError "bytes32ToString with incorrect arguments" argVals
 
     -- It would be nice to reinterpret two element paths as a function.
@@ -921,17 +952,12 @@ binopAssign oper lhs rhs = do
 callBuiltin :: String -> [Value] -> Maybe Value -> SM Value
 callBuiltin "string" [SString s] _ = return $ SString s
 callBuiltin "string" vs _ = typeError "string cast" vs
+callBuiltin "address" [SInteger a] _ = return . SAddress $ fromIntegral a
+callBuiltin "address" [a@SAddress{}] _ = return a
+callBuiltin "address" [SContract _ a] _ = return $ SAddress a
 callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte"  vs _ = typeError "byte cast" vs
-callBuiltin "uint" [SEnumVal enumName enumVal] _ = do
-  contract' <- getCurrentContract
-  let maybeEnumVals = M.lookup enumName $ contract'^.enums
-      enumVals = fromMaybe (missingType "callBuiltin enum castBuilt" enumName) maybeEnumVals
-  return
-    $ SInteger
-    $ toInteger
-    $ fromMaybe (missingType "call builtin enum cast" (enumVal, enumName))
-    $ enumVal `elemIndex` enumVals
+callBuiltin "uint" [SEnumVal _ _ enumNum] _ = return . SInteger $ fromIntegral enumNum
 callBuiltin "uint" [SInteger n] _ = return $ SInteger n
 callBuiltin "uint" [SString hex] _ =
   case B16.decode (BC.pack hex) of
@@ -991,8 +1017,8 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM ()
-runTheConstructors address hsh cc contractName' argExps = do
+runTheConstructors :: Address -> Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM ()
+runTheConstructors from to hsh cc contractName' argExps = do
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.contracts . at contractName'
@@ -1003,15 +1029,21 @@ runTheConstructors address hsh cc contractName' argExps = do
   when trace $ liftIO $ putStrLn $ box
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
-  argVals <- for argExps $ \arg -> getVar =<< expToVar arg
-  let zipped = zipWith (\(t, n) v -> (n, (t, coerceType t v))) argTypeNames argVals
-  addCallInfo address contract' hsh cc . fmap (fmap Constant) $ M.fromList zipped
+  argVals <- case argExps of
+                  [] -> return []
+                  _ -> argsToVals contract'
+                                  (fromMaybe (error "arguments provided for missing constructor")
+                                        $ _constructor contract')
+                                  $ map (Nothing,) argExps
+
+  let zipped = zipWith (\(t, n) v -> (n, (t, coerceType contract' t v))) argTypeNames argVals
+  addCallInfo to contract' hsh cc . fmap (fmap Constant) $ M.fromList zipped
   mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = fromMaybe []
                $ M.lookup parent =<< (fmap Xabi.funcConstructorCalls $ contract'^.constructor)
-    runTheConstructors address hsh cc parent args
+    runTheConstructors from to hsh cc parent args
 
   _ <-
     case contract'^.constructor of
@@ -1019,7 +1051,7 @@ runTheConstructors address hsh cc contractName' argExps = do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
         let Just commands = Xabi.funcContents theFunction
-        _ <- runStatements commands
+        _ <- pushSender from $ runStatements commands
         return ()
 
       Nothing -> return ()
@@ -1041,11 +1073,11 @@ addLocalVariable theType name value = do
           {callStack = currentSlice{localVariables=M.insert name (theType, newVariable) $ localVariables currentSlice}:rest}
 
 
-call' :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
-call' address' contract' hsh cc theFunction argVals = do
+runTheCall :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
+runTheCall address' contract' hsh cc theFunction argVals = do
   --
   let returnMeta = map (\(n, Xabi.IndexedType _ t) -> (T.unpack n, t)) .  M.toList $ Xabi.funcVals theFunction
-      returns = map (\(n, t) -> (n, (t, defaultValue t))) returnMeta
+      returns = map (\(n, t) -> (n, (t, defaultValue contract' t))) returnMeta
       argMeta = map fst . sortWith snd
               . map (\(n, Xabi.IndexedType i t) -> ((T.unpack n, t), i))
               . M.toList $ Xabi.funcArgs theFunction
@@ -1058,7 +1090,6 @@ call' address' contract' hsh cc theFunction argVals = do
   addCallInfo address' contract' hsh cc $ M.fromList [(n, (t, Constant v)) | (n, (t, v)) <- locals]
   forM_ locals $ \(n, (_, v)) -> do
     initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
-
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands
   let findNamedReturns = do
@@ -1098,9 +1129,13 @@ logVals val1 val2 = when trace . liftIO . putStrLn $ printf
 encodeForReturn :: Value -> SM ByteString
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
 encodeForReturn (SAddress a) = return . word256ToBytes . fromIntegral $ a
+encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
-encodeForReturn (SString s) = -- TODO- this is a sloppy first partial attempt, I need to call the appropriate library call to encode properly
-  return $ word256ToBytes 0x20 `B.append` word256ToBytes (fromIntegral $ length s) `B.append` stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
+encodeForReturn (SString s) =
+  -- TODO: Wings expects all return values as bytes32 and never string.
+  -- This will have to be changed when wings drops bytes32 usage, or to support
+  -- string returning applications as well.
+  return $ stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
   where stringBytes = BC.pack s
 encodeForReturn (STuple items) = B.concat <$> forM (V.toList items) (encodeForReturn <=< getVar)
 encodeForReturn x = todo "encodeForReturn type case" x

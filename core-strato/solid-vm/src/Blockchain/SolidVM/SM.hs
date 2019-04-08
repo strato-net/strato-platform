@@ -26,7 +26,10 @@ module Blockchain.SolidVM.SM (
   getTypeOfName,
   getXabiType,
   getXabiValueType,
-  getValueType
+  getValueType,
+  pushSender,
+  initializeAction,
+  markDiffForAction
   ) where
 
 import           Control.Applicative ((<|>))
@@ -48,6 +51,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
@@ -192,6 +196,20 @@ runSM maybeCode env f = do
   return value
 
 
+-- When calling a remote contract, the new `msg.sender` is the contract
+-- that the call is initiated from.
+pushSender :: Address -> SM a -> SM a
+pushSender newSender mv = do
+  state0 <- get
+  let oldSender = Env.sender $ env state0
+  put $ state0{env=(env state0){Env.sender = newSender}}
+  ret <- mv
+  state1 <- get
+  put $ state1{env=(env state1){Env.sender = oldSender}}
+  return $ ret
+
+
+
 startingAction :: Maybe ByteString -> Env.Environment -> Action
 startingAction maybeCode env' = Action
   { _actionBlockHash          = blockHeaderHash $ Env.blockHeader env'
@@ -250,7 +268,7 @@ getVariableOfName name = do
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "byte", "string", "keccak256"
+      maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "byte", "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"]) $
@@ -268,7 +286,7 @@ getVariableOfName name = do
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
         Xabi.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
-        return $ coerceType constType $ case constInitialVal of
+        return $ coerceType ctract constType $ case constInitialVal of
                                             Xabi.NumberLiteral x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
@@ -490,3 +508,17 @@ getXabiValueType (AddressedPath loc path) = do
 
 getValueType :: AddressedPath -> SM BasicType
 getValueType p = hintFromType =<< getXabiValueType p
+
+initializeAction :: Address -> String -> SHA -> SM ()
+initializeAction addr name hsh = do
+  let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
+  action . actionData %= M.insertWith mergeActionData addr newData
+
+markDiffForAction :: Address -> MS.StoragePath -> MS.BasicValue -> SM ()
+markDiffForAction owner key' val' = do
+  let key = MS.unparsePath key'
+      val = rlpSerialize $ rlpEncode val'
+      ins = \case
+              ActionSolidVMDiff m -> ActionSolidVMDiff $ M.insert key val m
+              _ -> error "SolidVM Diff executing in EVM"
+  (action . actionData . at owner . mapped . actionDataStorageDiffs) %= ins

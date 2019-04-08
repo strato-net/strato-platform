@@ -74,7 +74,7 @@ instance FromJSON CallData where
   parseJSON o = error $ "parseJSON CallData: Expected object, got: " ++ show o
 
 data ActionData = ActionData
-  { _codeHash     :: SHA
+  { _codeHash     :: CodePtr
   , _codeKind     :: CodeKind
   , _storageDiffs :: BS.ActionDataDiff
   , _callData     :: [CallData]
@@ -144,7 +144,7 @@ data Action = Action
   , actionTxChainId      :: Maybe ChainId
   , actionTxSender       :: Address
   , actionAddress        :: Address
-  , actionCodeHash       :: SHA
+  , actionCodeHash       :: CodePtr
   , actionStorage        :: BS.ActionDataDiff
   , actionType           :: CallType
   , actionCallData       :: [CallData]

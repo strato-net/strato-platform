@@ -4,19 +4,15 @@ module SolidVM.Model.Storable where
 
 import           Control.DeepSeq
 import           Control.Exception
-import qualified Data.Aeson as Ae
 import           Data.Attoparsec.ByteString as Atto
 import           Data.Attoparsec.ByteString.Char8 (scientific)
 import           Data.Binary
-import           Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Char8 as C8
 import           Data.Char
 import           Data.Hashable
-import qualified Data.HashMap.Strict as HM
-import qualified Data.IntMap as I
 import           Data.Scientific (isInteger, toBoundedInteger)
 import qualified Data.Text as T
 import           Foreign.Ptr
@@ -33,8 +29,11 @@ data BasicValue = BInteger !Integer
                 | BString !B.ByteString
                 | BBool !Bool
                 | BAddress !Address
-                | BEnumVal !T.Text !T.Text
+                | BEnumVal !T.Text !T.Text !Word32
                 | BContract !T.Text !Address
+                  -- The sole purpose of this sentinel is to make slipstream reserve
+                  -- a column for this mapping
+                | BMappingSentinel
                 | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable, Binary)
 
@@ -43,13 +42,6 @@ data IndexType = INum Integer
                | IBool Bool
                | IAddress Address
                deriving (Eq, Show, Ord, Generic, Hashable, NFData)
-
-data StorableValue = BasicValue BasicValue
-                   | SStruct (HM.HashMap B.ByteString StorableValue)
-                   | SArray (I.IntMap StorableValue)
-                   | SMapping (HM.HashMap IndexType StorableValue)
-                   | SArraySentinel Int
-                   deriving (Eq, Show, Generic, NFData)
 
 data StoragePathPiece = Field B.ByteString
                       | MapIndex IndexType
@@ -210,61 +202,6 @@ unparsePath (StoragePath ps) = B.concat . concatMap go $ ps
         go (MapIndex (IBool False)) = ["<false>"]
         go (MapIndex (IAddress a)) = ["<a:", addressToHex a, ">"]
 
-type TotalStorage = HM.HashMap B.ByteString StorableValue
-
-data ReplayFailure = MissingPath StoragePath
-                   | TypeMismatch StoragePath BasicValue StorableValue
-                   | MissingStructField B.ByteString
-                   | FieldRequiredAtTopLevel
-                   | NoPathsProvided
-                   deriving (Show, Eq, Generic, NFData)
-
-replayDelta :: StorageDelta -> TotalStorage -> Either ReplayFailure TotalStorage
-replayDelta [] ts = Right ts
-replayDelta ((StoragePath (Field f:sp), bv):rs) ts =
-  case HM.lookup f ts of
-    Just sv -> do
-      ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta (StoragePath sp) bv sv
-      replayDelta rs ts'
-    Nothing -> Left . MissingPath $ singleton f
-replayDelta ((p, _):_) _ = Left $ MissingPath p
-
-applyDelta :: StoragePath -> BasicValue -> StorableValue -> Either ReplayFailure StorableValue
-applyDelta (StoragePath sp) = applyDelta' sp
-
-applyDelta' :: [StoragePathPiece] -> BasicValue -> StorableValue -> Either ReplayFailure StorableValue
-applyDelta' [] bv (BasicValue _) = Right $ BasicValue bv
-applyDelta' (Field n:sp) bv (SStruct ss) =
-  case HM.lookup n ss of
-    Just v -> SStruct . (\x -> HM.insert n x ss) <$> applyDelta' sp bv v
-    Nothing -> Right . SStruct $ HM.insert n (constructFromNothing' sp bv) ss
-applyDelta' (MapIndex n:sp) bv (SMapping ms) =
-  case HM.lookup n ms of
-    Just v -> SMapping . (\x -> HM.insert n x ms) <$> applyDelta' sp bv v
-    Nothing -> Right . SMapping $ HM.insert n (constructFromNothing' sp bv) ms
-applyDelta' (ArrayIndex n:sp) bv (SArray vs) =
-  case I.lookup n vs of
-    Just v -> SArray . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
-    Nothing -> Right . SArray $ I.insert n (constructFromNothing' sp bv) vs
-applyDelta' (ArrayIndex n:sp) bv sent@(SArraySentinel len) =
-  Right . SArray $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
-applyDelta' [Field "length"] (BInteger n) (SArray vs) =
-  let n' = fromIntegral n
-  in Right . SArray $ I.insert n' (SArraySentinel n') vs
-applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
-
-constructFromNothing :: StoragePath -> BasicValue -> StorableValue
-constructFromNothing (StoragePath p) = constructFromNothing' p
-
-constructFromNothing' :: [StoragePathPiece] -> BasicValue -> StorableValue
-constructFromNothing' [] = BasicValue
-constructFromNothing' [Field "length"] = \case
-  BInteger n -> SArraySentinel $ fromIntegral n
-  bv -> SStruct . HM.singleton "length" $ constructFromNothing' [] bv
-constructFromNothing' (Field n:sp) = SStruct . HM.singleton n . constructFromNothing' sp
-constructFromNothing' (MapIndex n:sp) = SMapping . HM.singleton n . constructFromNothing' sp
-constructFromNothing' (ArrayIndex n:sp) = SArray . I.singleton n . constructFromNothing' sp
-
 instance RLPSerializable BasicValue where
   rlpEncode = \case
     BDefault -> RLPString ""
@@ -273,57 +210,20 @@ instance RLPSerializable BasicValue where
     BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
     BAddress a -> RLPArray [RLPScalar 3, rlpEncode a]
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
-    BEnumVal a b -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b]
-  rlpDecode x@(RLPArray ((RLPScalar t):f:s)) =
+    BEnumVal a b c -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b, rlpEncode c]
+    BMappingSentinel -> RLPArray [RLPScalar 6]
+  rlpDecode x@(RLPArray ((RLPScalar t):s)) =
     case (t, s) of
-      (0, []) -> BInteger $ rlpDecode f
-      (1, []) -> BString $ rlpDecode f
-      (2, []) -> BBool $ rlpDecode f
-      (3, []) -> BAddress $ rlpDecode f
-      (4, [a']) -> BContract (rlpDecode f) (rlpDecode a')
-      (5, [s']) -> BEnumVal (rlpDecode f) (rlpDecode s')
+      (0, [f]) -> BInteger $ rlpDecode f
+      (1, [f]) -> BString $ rlpDecode f
+      (2, [f]) -> BBool $ rlpDecode f
+      (3, [f]) -> BAddress $ rlpDecode f
+      (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
+      (5, [f, s', c']) -> BEnumVal (rlpDecode f) (rlpDecode s') (rlpDecode c')
+      (6, []) -> BMappingSentinel
       _ -> error $ "invalid type or data length for BasicValue: " ++ show x
   rlpDecode (RLPString "") = BDefault
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x
-
-
-instance Ae.ToJSON StorableValue where
-  toJSON = error "TODO(tim): StorableValue toJSON"
-
-instance Ae.FromJSON StorableValue where
-  parseJSON = error "TODO(tim): StorableValue fromJSON"
-
-analyze :: TotalStorage -> [(StoragePath, BasicValue)]
-analyze = HM.foldlWithKey' go []
-  where go prev field sv = map (first (StoragePath . (Field field:))) (analyze' sv) <> prev
-
-analyze' :: StorableValue -> [([StoragePathPiece], BasicValue)]
-analyze' (BasicValue bv) = [([], bv)]
-analyze' (SMapping sm) = HM.foldlWithKey' go [] sm
-  where go prev k sv = map (first (MapIndex k:)) (analyze' sv) <> prev
-analyze' (SStruct ss) = HM.foldlWithKey' go [] ss
-  where go prev k sv = map (first (Field k:)) (analyze' sv) <> prev
-analyze' (SArray vs) = I.foldMapWithKey go vs
-  where go k sv = map (first (ArrayIndex k:)) $ analyze' sv
-analyze' (SArraySentinel n) = [([Field "length"], BInteger $ fromIntegral n)]
-
-synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
-synthesize spbvs = do
-  byFields <- mapM fieldsOnly spbvs
-  let basicLists = foldr (\(t, p) m -> HM.alter (Just . maybe [p] (p:)) t m) HM.empty byFields
-  sequence $ HM.map synthesize' basicLists
- where fieldsOnly (StoragePath (Field t:sp), bv) = return (t, (StoragePath sp, bv))
-       fieldsOnly _ = Left FieldRequiredAtTopLevel
-
-synthesize' :: [(StoragePath, BasicValue)] -> Either ReplayFailure StorableValue
-synthesize' ([]) = Left NoPathsProvided
-synthesize' ((sp, bv):rest) =
-  let initState = constructFromNothing sp bv
-  in go rest initState
- where go :: [(StoragePath, BasicValue)] -> StorableValue -> Either ReplayFailure StorableValue
-       go [] sv' = Right sv'
-       go ((sp',bv'):t) sv' = go t =<< applyDelta sp' bv' sv'
-
 
 pathToHexStorage :: StoragePath -> HexStorage
 pathToHexStorage = HexStorage . unparsePath

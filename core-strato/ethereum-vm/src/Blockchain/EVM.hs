@@ -1111,14 +1111,14 @@ create' :: VMM Code
 create' = do
 
   owner <- getEnvVar envOwner
-  action . actionData %= M.insert owner (ActionData (SHA 0) EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert owner (ActionData (EVMCode $ SHA 0) EVM (ActionEVMDiff M.empty) [])
 
   runCodeFromStart
 
   vmState <- lift get
 
   let codeBytes = fromMaybe B.empty $ returnVal vmState
-  (action . actionData . at owner . mapped . actionDataCodeHash) .= hash codeBytes
+  action . actionData . at owner . mapped . actionDataCodeHash .= EVMCode (hash codeBytes)
   when flags_debug $ lift $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes
 
   -- this used to say "not enough ether, but im pretty sure it meant gas -io
@@ -1219,7 +1219,7 @@ call' noValueTransfer = do
   let ch = case cp of
         EVMCode x -> x
         _ -> error "internal error- the EVM was called for non-evm code"
-  action . actionData %= M.insert receiveAddress (ActionData ch EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert receiveAddress (ActionData (EVMCode ch) EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do

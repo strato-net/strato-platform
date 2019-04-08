@@ -29,7 +29,7 @@ import           System.Log.Logger
 import           Text.RawString.QQ
 import           UnliftIO.IORef
 
-import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.SHA
 
 import Slipstream.Events
 import Slipstream.Globals
@@ -247,7 +247,7 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 insertContractTableQuery :: ProcessedContract -> Text
 insertContractTableQuery ProcessedContract{..} =
   let conVals = wrapAndEscape . map escapeQuotes $
-        [ T.pack $ shaToHex codehash
+        [ T.pack $ shaToHex $ codePtrToSHA codehash
         , contractName
         , abi
         , chain
