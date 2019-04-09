@@ -60,7 +60,6 @@ dependencies:
   - format
   - hjsmin                        >= 0.1
   - mime-mail
-  - monad-logger                  >= 0.3
   - mtl
   - persistent                    >= 2.0
   - persistent-postgresql         >= 2.1.1

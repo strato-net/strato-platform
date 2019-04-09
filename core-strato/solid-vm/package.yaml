@@ -72,7 +72,6 @@ dependencies:
 #  - integer-gmp
 #  - lens
 #  - merkle-patricia-db
-#  - monad-logger
 #  - mtl
 #  - primitive
 #  - resourcet
@@ -121,7 +120,6 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - HUnit
-      - monad-logger
       - raw-strings-qq
       - solid-vm
 

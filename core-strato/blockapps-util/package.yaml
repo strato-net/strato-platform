@@ -25,7 +25,6 @@ library:
     - lens
     - lifted-base
     - monad-control
-    - monad-logger
     - mtl
     - network
     - path-pieces

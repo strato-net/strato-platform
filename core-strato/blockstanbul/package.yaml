@@ -33,7 +33,6 @@ dependencies:
   - strato-model
   - text
   - transformers
-  - monad-logger
   - wai-extra
   - wai-middleware-prometheus
   - wai

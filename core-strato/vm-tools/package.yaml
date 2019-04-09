@@ -33,7 +33,6 @@ dependencies:
   - lens
   - leveldb-haskell
   - merkle-patricia-db
-  - monad-logger
   - mtl
   - ordered-containers
   - persistent-postgresql
