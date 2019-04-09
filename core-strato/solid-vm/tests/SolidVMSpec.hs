@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
 module SolidVMSpec where
@@ -24,7 +25,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, shouldThrow, anyErrorCall)
+import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -43,8 +44,14 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.SHA
 import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
+import Blockchain.SolidVM.Exception
 import Executable.EVMFlags() -- for HFlags
 import SolidVM.Model.Storable as MS
+
+
+anyTODO :: Selector SolidException
+anyTODO (TODO{}) = True
+anyTODO _ = False
 
 sender :: Address
 sender = 0xdeadbeef
@@ -1762,3 +1769,6 @@ contract qq {
   }
 }|]
     getFields ["i"] `shouldReturn` [BInteger 8]
+
+  it "rejects modifiers" $ (runTest $ runBS [r| contract qq { modifier m() { _; } }|])
+    `shouldThrow` anyTODO

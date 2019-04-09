@@ -110,7 +110,6 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
 
   (hsh, cc) <- codeCollectionFromSource initCode
 
-
   runSM (Just initCode) env' $ do
     create' sender' hsh cc contractName' args
 

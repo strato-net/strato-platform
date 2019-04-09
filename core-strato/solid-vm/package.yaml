@@ -37,6 +37,7 @@ dependencies:
   - lens
   - memory
   - merkle-patricia-db
+  - monad-control
   - parsec
   - prometheus-client
   - QuickCheck
@@ -50,6 +51,7 @@ dependencies:
   - text
   - time
   - transformers
+  - transformers-base
   - unordered-containers
   - vector
   - vm-tools
@@ -91,6 +93,7 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.SolidVM
+    - Blockchain.SolidVM.Exception
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
@@ -126,6 +129,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - lifted-base
       - HUnit
       - monad-logger
       - raw-strings-qq

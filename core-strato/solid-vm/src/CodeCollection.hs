@@ -51,7 +51,7 @@ emptyCodeCollection =
 
 
 xabiToContract :: String -> [String] -> Xabi -> Contract
-xabiToContract contractName' parents' xabi =
+xabiToContract contractName' parents' xabi = validateXabi xabi `seq`
   Contract {
   _contractName = contractName',
   _parents = parents',
@@ -67,8 +67,11 @@ xabiToContract contractName' parents' xabi =
         _ -> error "multiple constructors in contract" --TODO- figure out if this is allowed in Solidity
   }
 
-
-
+validateXabi :: Xabi -> ()
+validateXabi Xabi{xabiModifiers=mx} =
+  case M.size mx of
+      0 -> ()
+      _ -> todo "modifiers not supported by solidvm" mx
 
 
 applyInheritance :: CodeCollection -> CodeCollection

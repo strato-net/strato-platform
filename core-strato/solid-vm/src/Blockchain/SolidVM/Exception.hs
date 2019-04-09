@@ -1,5 +1,5 @@
 module Blockchain.SolidVM.Exception
-  ( SolidException
+  ( SolidException(..)
   , typeError
   , todo
   , checkArity
