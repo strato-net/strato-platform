@@ -9,6 +9,6 @@ export function sec2Date(sec){
     seconds  -= hrs*3600;
     const mnts = Math.floor(seconds / 60);
     seconds  -= mnts*60;
-    const ret = (days > 0 ? days + "d " : "") + (hrs > 0 ? hrs + "h " : "") + (mnts > 0 ? mnts + "m " : "")  + Math.floor(seconds) + "s";
+    const ret = `Uptime ${(days > 0 ? days + "d " : "")} ${hrs}:${mnts}:${Math.floor(seconds)}`
     return ret;
 }
