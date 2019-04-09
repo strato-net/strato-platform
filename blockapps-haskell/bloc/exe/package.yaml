@@ -13,7 +13,6 @@ dependencies:
   - blockapps-strato-api
   - blockapps-strato-client
   - common-log
-  - logging-effect
   - hflags
   - http-client
   - http-types

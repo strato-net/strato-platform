@@ -47,7 +47,6 @@ dependencies:
   - lens
   - lifted-async
   - lifted-base
-  - logging-effect
   - memory
   - monad-control
   - monad-loops
