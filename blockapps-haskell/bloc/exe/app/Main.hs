@@ -9,7 +9,6 @@
 module Main where
 
 import           Control.Monad
-import           Control.Monad.Log                  (Severity(..))
 import           Database.PostgreSQL.Simple
 import           Data.Pool
 import           HFlags
@@ -33,6 +32,7 @@ import qualified BlockApps.Bloc22.Database.Create as Bloc22
 import qualified BlockApps.Bloc22.Database.Migration as Bloc22
 import qualified BlockApps.Bloc22.Monad as Bloc22
 import qualified BlockApps.Bloc22.Server as Bloc22
+import           BlockApps.Logging (LogLevel(..), flags_minLogLevel)
 
 import           Options
 
@@ -70,7 +70,7 @@ main = do
   stratoUrl <- parseBaseUrl flags_stratourl
   vaultWrapperUrl <- parseBaseUrl flags_vaultwrapperurl
   let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
-  let blocEnv = Bloc22.BlocEnv stratoUrl vaultWrapperUrl mgr pool22 (toEnum flags_loglevel) mode flags_stateFetchLimit
+  let blocEnv = Bloc22.BlocEnv stratoUrl vaultWrapperUrl mgr pool22 mode flags_stateFetchLimit
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   void $ Bloc22.runBlocToIO blocEnv Bloc22.runBlocMigrations
   run flags_port (appBloc blocEnv)
@@ -87,7 +87,7 @@ serveErrorsPlain app req respond = app req $ \resp -> respond $
 
 appBloc :: Bloc22.BlocEnv -> Application
 appBloc env22 =
-  (if Bloc22.logLevel env22 >= Informational then logStdoutDev else logStdout)
+  (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
   . serveErrorsPlain
   . cors (const $ Just policy)
   . provideOptions (Proxy @ Bloc22.BlocAPI)

@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 
 module BlockApps.Bloc22.Server.Contracts where
@@ -10,7 +11,6 @@ module BlockApps.Bloc22.Server.Contracts where
 import           ClassyPrelude                   ((<>))
 import           Control.Arrow
 import           Control.Monad.Except
-import           Control.Monad.Log
 import           Control.Monad.Reader.Class      (asks)
 import           Data.Foldable
 import           Data.Int
@@ -30,8 +30,8 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
---import           BlockApps.Cirrus.Client
 import           BlockApps.Ethereum
+import           BlockApps.Logging
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser (parseXabi)
 import           BlockApps.Solidity.Xabi
@@ -159,8 +159,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
                  ofs cnt mLength [name]
           solVals = map (fmap valueToSolidityValue) vals
       in return solVals
-
-  logWith logNotice $ Text.unlines
+  $logDebugS "getContractsState/storage" $ Text.unlines
     [ "Storage:"
     , Text.pack $ unlines $ map (("  " ++) . show . storageKV) $ storage'
     , "End of storage"
@@ -269,7 +268,7 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
       storage k = fromMaybe 0 $ Map.lookup k storageMap
       ret = valueToSolidityValue <$> decodeMapValue fetchLimit (typeDefs contract') (mainStruct contract') storage mappingName keyName
 
-  logWith logNotice $ Text.unlines
+  $logDebugS "getContractsStateMapping/storage" $ Text.unlines
     [ "Storage:"
     , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
     , "End of storage"
@@ -304,7 +303,7 @@ postContractsXabi PostXabiRequest{..} =
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwError . UserError .
-            ("contract compilation for xabi failed: " <>) . Text.pack $msg
+            ("contract compilation for xabi failed: " <>) $ Text.pack msg
         Right xs -> return . PostXabiResponse $ xs
 
 

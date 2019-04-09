@@ -8,6 +8,7 @@ dependencies:
   - global-lock
   - hflags
   - monad-logger
+  - template-haskell
   - text
   - time
 

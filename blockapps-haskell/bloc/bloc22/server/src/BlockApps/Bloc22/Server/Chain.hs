@@ -5,13 +5,13 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Monad.Except
-import           Control.Monad.Log
 import           Crypto.Random.Entropy
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
@@ -22,6 +22,7 @@ import qualified Data.Text                         as Text
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Ethereum
+import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
@@ -115,8 +116,8 @@ waitForChainInfo chainId = waitFor "failed to retrieve chain info" go
   where go :: Bloc Bool
         go = do
           infos <- getChainInfo [chainId]
-          logWith logNotice $ "waitForChainInfo req: " <> Text.pack (show chainId)
-          logWith logNotice $ "waitForChainInfo resp: " <> Text.pack (show infos)
+          $logInfoLS "waitForChainInfo/req" chainId
+          $logInfoLS "waitForChainInfo/resp" infos
           return . not $ null infos
 
 

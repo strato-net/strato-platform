@@ -11,8 +11,6 @@
 
 import Control.Concurrent
 import Control.Monad
-import Control.Monad.Log (Severity(..))
-import Control.Monad.Logger
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
@@ -39,6 +37,7 @@ import Text.Printf
 import Text.RawString.QQ
 
 import BlockApps.Bloc22.Monad (BlocEnv(..), DeployMode(..))
+import BlockApps.Logging (runNoLoggingT) -- For HFlags
 import Slipstream.MessageConsumer
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage
@@ -66,7 +65,6 @@ createBlocEnv = do
                  , urlVaultWrapper = vaultwrapperUrl
                  , httpManager = mgr
                  , dbPool = pool
-                 , logLevel = if flags_debug then Debug else Notice
                  , deployMode = Public
                  , stateFetchLimit = 0
                  }

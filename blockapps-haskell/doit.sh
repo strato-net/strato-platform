@@ -11,9 +11,14 @@ stratoRoot=http://${stratoHost}/eth/v1.2
 vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
 
 isPublic=false
- if [ "${SMD_MODE}" == public ]; then
-   isPublic=true
- fi
+if [ "${SMD_MODE}" == public ]; then
+ isPublic=true
+fi
+
+blocMinLogLevel=LevelInfo
+if [ "${BLOC_DEBUG:-false}" == true ] ; then
+   blocMinLogLevel=LevelDebug
+fi
 
 echo "Environment variables:
 slipstream:
@@ -40,7 +45,7 @@ vaultWrapperHost="${vaultWrapperHost}"
 --pgport=\$postgres_port="${postgres_port}"
 --pguser=\$postgres_user="${postgres_user}"
 --password=\$postgres_password="${postgres_password}"
---loglevel=\$loglevel="${loglevel:-4}"
+--minLogLevel=\$minLogLevel="${blocMinLogLevel}"
 "
 
 locale-gen "en_US.UTF-8"
@@ -100,7 +105,7 @@ runBackgroundProcess /usr/bin/logserver "--directory=${PWD}/logs" --uri_root=/lo
 runBackgroundProcess /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1
 
 runBackgroundProcess /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --loglevel="${loglevel:-4}" +RTS -N1 &>> logs/bloc
+           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" +RTS -N1 &>> logs/bloc
 
 until curl localhost:8000 &> /dev/null; do
   echo "Slipstream is waiting for bloc to come up..."

@@ -73,7 +73,7 @@ services:
     - strato
     - vault-wrapper
     environment:
-    - loglevel=${loglevel}
+    - BLOC_DEBUG=${BLOC_DEBUG}
     - kafkaHost=kafka
     - kafkaPort=9092
     - postgres_host=postgres

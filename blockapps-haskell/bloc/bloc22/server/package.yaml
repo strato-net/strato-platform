@@ -27,6 +27,7 @@ dependencies:
   - blockapps-vault-wrapper-client
   - classy-prelude
   - clock
+  - common-log
   - containers
   - contravariant
   - cryptonite
