@@ -28,6 +28,7 @@ dependencies:
 - blockapps-ethereum
 - bytestring
 - byteable
+- common-log
 - conduit
 - containers
 - cryptonite
@@ -37,7 +38,6 @@ dependencies:
 - http-client
 - lens
 - lifted-base
-- logging-effect
 - memory
 - monad-control >=1.0 && <1.1
 - mtl

@@ -106,6 +106,7 @@ services:
     - postgres_port=5432
     - postgres_user=postgres
     - postgres_vault_wrapper_db=oauth
+    - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
