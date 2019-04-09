@@ -11,7 +11,6 @@ module Blockchain.Setup (
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.Aeson                         as Ae
@@ -402,7 +401,7 @@ oneTimeSetup genesisBlockName = do
 
       let query = T.pack $ "CREATE DATABASE " ++ show db' ++ ";"
 
-      runNoLoggingT $ withPostgresqlConn pgConn' (runReaderT (rawExecute query []) :: SqlWriteBackend -> NoLoggingT IO ())
+      runNoLoggingT $ withPostgresqlConn pgConn' (runReaderT (rawExecute query []) :: SqlWriteBackend -> LoggingT IO ())
 
       {- CONFIG: create kafka topics -}
 
@@ -420,7 +419,7 @@ oneTimeSetup genesisBlockName = do
      {- CONFIG: define tables and indices -}
      {- connStr implicitly defined by ethconf.yaml above, & unsafePerformIO -}
 
-      flip runLoggingT printLogMsg $ withPostgresqlConn connStr $ runReaderT $ do
+      runLoggingT $ withPostgresqlConn connStr $ runReaderT $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
          liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show connStr
 
@@ -467,7 +466,7 @@ oneTimeSetup genesisBlockName = do
 
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
-         void . flip runLoggingT printLogMsg $ flip runReaderT (SetupDBs smpdb hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
+         void . runLoggingT $ flip runReaderT (SetupDBs smpdb hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
            void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of

@@ -5,7 +5,6 @@
 module Main where
 
 import           Control.Monad
-import           Control.Monad.Logger
 import           Data.Aeson
 import qualified Data.ByteString                as B
 import qualified Data.Map                       as M
@@ -36,6 +35,6 @@ main = do
     case fromJSON <$> eitherDecodeStrict theFile::Either String (Result TD.Tests) of
         Right val ->
           case val of
-            Success tests -> flip runLoggingT printLogMsg $ runTestContextM $ runTests (M.toList tests)
+            Success tests -> runLoggingT $ runTestContextM $ runTests (M.toList tests)
             x             -> error $ "hit Failure for " ++ show x
         Left err -> error $ "unable to decode json: " ++ show err

@@ -15,6 +15,7 @@ library:
     - binary
     - blockapps-milena
     - bytestring
+    - common-log
     - containers
     - cryptohash
     - ethereum-rlp

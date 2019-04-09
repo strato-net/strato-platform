@@ -79,7 +79,6 @@ import           Blockchain.VMOptions
 
 import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
-import           Blockchain.Output                       (rightPad)
 import           Blockchain.SHA                          (formatSHAWithoutColor)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
@@ -593,7 +592,7 @@ printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash
     let tNonce = transactionNonce baseTx
     logWithBox "printTx/err" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
                                 , "Tx hash:  " ++ format theHash
-                                , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                                , printf "%-74s" $ "Tx nonce: " ++ show tNonce
                                 , CL.red "Transaction failure: " ++ CL.red (format errMsg)
                                 , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
                                 ]
@@ -605,7 +604,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Ri
           else "Create Contract "  ++ fromMaybe "<failed>                                " (fmap (show . pretty) $ erNewContractAddress results) ++ "                  "
     logWithBox "printTx/ok" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
                                , "Tx hash:  " ++ format theHash
-                               , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                               , printf "%-74s" $ "Tx nonce: " ++ show tNonce
                                , txPretty
                                , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
                                ]
