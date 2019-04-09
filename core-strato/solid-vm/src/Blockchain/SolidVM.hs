@@ -91,15 +91,7 @@ create :: Bool
 create _ _ _ _ _ _ _ _ _ _ _ pc@(PrecompiledCode _) _ _ _ = internalError "call precompiled code" pc
 create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId' metadata = do
   recordCreate
-
-  let maybeContractName = M.lookup "name" =<< metadata
-      contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
-
-  let maybeArgString = M.lookup "args" =<< metadata
-      argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
-      maybeArgs = runParser parseArgs "" "" argString
-      args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
-      env' = Env.Environment {
+  let env' = Env.Environment {
         Env.blockHeader = blockData,
         Env.sender = sender',
         Env.origin = origin',
@@ -107,10 +99,16 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
         Env.chainId=chainId',
         Env.metadata=metadata
       }
+  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' $ do
+    let maybeContractName = M.lookup "name" =<< metadata
+        contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
 
-  (hsh, cc) <- codeCollectionFromSource initCode
+    let maybeArgString = M.lookup "args" =<< metadata
+        argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
+        maybeArgs = runParser parseArgs "" "" argString
+        args = either (parseError "create arguments") id maybeArgs
 
-  runSM (Just initCode) env' $ do
+    (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' hsh cc contractName' args
 
 create' :: Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
@@ -201,15 +199,7 @@ call :: Bool
 call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
   recordCall
 
-  let maybeFuncName = M.lookup "funcName" =<< metadata
-      funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
-      maybeArgString = M.lookup "args" =<< metadata
-      argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
-      maybeArgs = runParser parseArgs "" "" argString
-      args = either (\e -> error $ printf "args can not be parsed: %s\nfull args: %s" (show e) argString)
-                    (map (Nothing,))
-                    maybeArgs
-      env' = Env.Environment {
+  let env' = Env.Environment {
         Env.blockHeader = blockData,
         Env.sender = sender',
         Env.origin = origin',
@@ -217,25 +207,30 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         Env.chainId=chainId',
         Env.metadata=metadata
         }
-  (encodedReturnValue, sstate) <- runSM Nothing env' $ do
-           maybeRet <- callWrapper sender' codeAddress Nothing funcName args
-           sstate <- get
-           case maybeRet of
-             Just x -> fmap (\v -> (Just v, sstate)) $ encodeForReturn x
-             Nothing -> return (Nothing, sstate)
-
-  return ExecResults {
-    erRemainingTxGas = 0, --Just use up all the allocated gas for now....
-    erRefund = 0,
-    erReturnVal = fmap BSS.toShort encodedReturnValue,
-    erTrace = [],
-    erLogs = [],
-    erNewContractAddress = Nothing,
-    erSuicideList = S.empty,
-    erAction = Just $ sstate ^. action,
-    erException = Nothing
-    }
-
+  fmap (either solidvmErrorResults id) . runSM Nothing env' $ do
+    let maybeFuncName = M.lookup "funcName" =<< metadata
+        funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
+        maybeArgString = M.lookup "args" =<< metadata
+        argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
+        maybeArgs = runParser parseArgs "" "" argString
+        args = either (parseError "call arguments") (map (Nothing,)) maybeArgs
+    (encodedReturnValue, sstate) <- do
+       maybeRet <- callWrapper sender' codeAddress Nothing funcName args
+       sstate <- get
+       case maybeRet of
+         Just x -> fmap (\v -> (Just v, sstate)) $ encodeForReturn x
+         Nothing -> return (Nothing, sstate)
+    return $ ExecResults {
+      erRemainingTxGas = 0, --Just use up all the allocated gas for now....
+      erRefund = 0,
+      erReturnVal = fmap BSS.toShort encodedReturnValue,
+      erTrace = [],
+      erLogs = [],
+      erNewContractAddress = Nothing,
+      erSuicideList = S.empty,
+      erAction = Just $ sstate ^. action,
+      erException = Nothing
+      }
 
 
 getCodeAndCollection :: Address -> SM (Contract, SHA, CodeCollection)

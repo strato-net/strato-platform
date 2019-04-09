@@ -48,10 +48,21 @@ import Blockchain.SolidVM.Exception
 import Executable.EVMFlags() -- for HFlags
 import SolidVM.Model.Storable as MS
 
+-- The newtype distinguishes uncaught SolidExceptions and
+-- those that are returned in ExecResults
+newtype HandledException = HE SolidException deriving (Show, Exception)
 
-anyTODO :: Selector SolidException
-anyTODO (TODO{}) = True
+anyTODO :: Selector HandledException
+anyTODO (HE TODO{}) = True
 anyTODO _ = False
+
+anyParseError :: Selector HandledException
+anyParseError (HE ParseError{}) = True
+anyParseError _ = False
+
+anyUnknownFunc :: Selector HandledException
+anyUnknownFunc (HE UnknownFunction{}) = True
+anyUnknownFunc _ = False
 
 sender :: Address
 sender = 0xdeadbeef
@@ -90,6 +101,11 @@ runBS = void . runBS'
 runBS' ::B.ByteString -> ContextM ExecResults
 runBS' = runArgs "()"
 
+rethrowEx :: ExecResults -> ContextM ()
+rethrowEx ExecResults{erException=Just ex} = either (liftIO . throwIO . HE) (void . return) ex
+rethrowEx _ = return ()
+
+
 runArgs :: T.Text -> B.ByteString -> ContextM ExecResults
 runArgs args bs = do
   let code = Code bs
@@ -119,11 +135,14 @@ runArgs args bs = do
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
-  SVM.create isTest isHomestead suicides blockData callDepth sender origin
+  er <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
           value gasPrice availableGas newAddress code txHash chainId metadata
+  rethrowEx er
+  return er
+
 
 runCall :: T.Text -> T.Text -> B.ByteString -> ContextM (Maybe SB.ShortByteString)
-runCall funcName callArgs bs = erReturnVal <$> do
+runCall funcName callArgs bs = do
   let code = Code bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -154,13 +173,16 @@ runCall funcName callArgs bs = erReturnVal <$> do
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
-  void $ SVM.create isTest isHomestead suicides blockData callDepth sender origin
+  er1 <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
     value gasPrice availableGas newAddress code txHash chainId createMetadata
-  SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
+  rethrowEx er1
+  er2 <- SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
     uploadAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+  rethrowEx er2
+  return $ erReturnVal er2
 
 call2 :: T.Text -> T.Text -> Address -> ContextM (Maybe SB.ShortByteString)
-call2 funcName callArgs contractAddress = erReturnVal <$> do
+call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -189,8 +211,10 @@ call2 funcName callArgs contractAddress = erReturnVal <$> do
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
-  SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
+  er <- SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
     contractAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+  rethrowEx er
+  return $ erReturnVal er
 
 
 
@@ -1654,7 +1678,7 @@ contract qq {
   function set(uint _n) public {
     n = _n;
   }
-}|]) `shouldThrow` anyErrorCall -- TODO: This should be a Left instead of a throw
+}|]) `shouldThrow` anyParseError
 
   it "can call boolean arguments" . runTest $ do
     runCall "set" "(true,false)" [r|
@@ -1772,3 +1796,14 @@ contract qq {
 
   it "rejects modifiers" $ (runTest $ runBS [r| contract qq { modifier m() { _; } }|])
     `shouldThrow` anyTODO
+
+  it "catches parse errors" $ (runTest $ runBS [r| contract { |]) `shouldThrow` anyParseError
+
+  it "catches arg parse errors" $ (runTest $ do
+    runCall "f" "(" [r|
+contract qq {
+  function f() public {}
+}|]) `shouldThrow` anyParseError
+
+  it "catches missing function errors" $
+    (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc

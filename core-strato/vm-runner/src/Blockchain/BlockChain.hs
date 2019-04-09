@@ -421,7 +421,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             addressState' <- lift $ getAddressState tAddr
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
             return $
-              errorExecResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
+              evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
 
 runCodeForTransaction :: Bool
                       -> Bool
@@ -440,7 +440,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
           Nothing -> EVM.create --EVM is the default
           Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
             \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
-                         return $ errorExecResults (toInteger ag) (UnsupportedVM vmName)
+                         return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
   --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
   addressState <- getAddressState tAddr

@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
@@ -33,6 +34,7 @@ module Blockchain.SolidVM.SM (
   ) where
 
 import           Control.Applicative ((<|>))
+import           Control.Exception
 import           Control.Lens
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
@@ -120,7 +122,7 @@ data SState =
     addressStateBlockDBMap :: M.Map Address AddressStateModification,
     storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
     storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString,
-    _action                 :: Action
+    _action                :: Action
   }
 
 makeLenses ''SState
@@ -165,7 +167,7 @@ instance HasHashDB SM where
 instance HasCodeDB SM where
   getCodeDB = codeDB <$> get
 
-runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM a
+runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
 runSM maybeCode env f = do
   vmcontext <- get
 
@@ -183,17 +185,24 @@ runSM maybeCode env f = do
         _action = startingAction maybeCode env
         }
 
-  (value, sstateAfter) <- liftIO $ runResourceT $ runStateT f startingState
-
-  vmcontext' <- get
-  put vmcontext'{
-    contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
-    contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
-    contextStorageTxMap = storageTxMap sstateAfter,
-    contextStorageBlockMap = storageBlockMap sstateAfter
-    }
-  setStateDBStateRoot $ MP.stateRoot $ stateDB sstateAfter
-  return value
+  eValState <- liftIO . try $ runResourceT $ runStateT f startingState
+  case eValState of
+    -- InternalError should *never* happen.
+    -- TODO should also not happen, but since this is a work in progress they
+    -- are a fact of life and should be fixed on demand.
+    -- The rest should always be a user error and handled safely
+    Left ie@InternalError{} -> throw ie
+    Left se -> return $ Left se
+    Right (value, sstateAfter) -> do
+      vmcontext' <- get
+      put vmcontext'{
+        contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
+        contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
+        contextStorageTxMap = storageTxMap sstateAfter,
+        contextStorageBlockMap = storageBlockMap sstateAfter
+        }
+      setStateDBStateRoot $ MP.stateRoot $ stateDB sstateAfter
+      return $ Right value
 
 
 -- When calling a remote contract, the new `msg.sender` is the contract
