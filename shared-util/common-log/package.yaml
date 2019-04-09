@@ -1,0 +1,14 @@
+name: common-log
+
+library:
+  source-dirs: src
+  dependencies:
+    - base
+    - bytestring
+    - fast-logger
+    - format
+    - global-lock
+    - hflags
+    - monad-logger
+    - text
+    - time
