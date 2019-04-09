@@ -49,16 +49,6 @@ commonLog loc logSource level msg = do
     lock $ formatLogOutput timestamp myTID loc logSource level msg
     hFlush stdout
 
-
-leftPad :: Int -> String -> String
-leftPad n xs = replicate (max 0 (n - length xs)) ' ' ++ xs
-
-rightPad :: Int -> String -> String
-rightPad n xs = xs ++ replicate (max 0 (n - length xs)) ' '
-
-tRightPad :: Int -> Text.Text -> Text.Text
-tRightPad n xs = xs <> Text.replicate (max 0 (n - Text.length xs)) (Text.singleton ' ')
-
 formatLogOutput :: PrintfType r
                 => UTCTime
                 -> ThreadId
@@ -68,14 +58,14 @@ formatLogOutput :: PrintfType r
                 -> ML.LogStr
                 -> r
 formatLogOutput timestamp tid loc logSource level msg =
-  printf "[%s] %s%s | %s | %s | %s" timestamp mLoc level tid (tRightPad 35 logSource) msg
-   where mLoc = if (level == ML.LevelDebug || level == ML.LevelWarn) then printf "%s | " loc else ""
+  printf "[%-30s] %s%5s | %-14s | %-35s | %s" timestamp mLoc level tid logSource msg
+   where mLoc = if (level == ML.LevelDebug || level == ML.LevelWarn) then printf "%50s | " loc else ""
 
 instance PrintfArg UTCTime where
-  formatArg = formatString . rightPad 30 . show
+  formatArg = formatString . show
 
 instance PrintfArg ML.LogLevel where
-  formatArg = formatString . leftPad 5 . (\case
+  formatArg = formatString . (\case
     ML.LevelDebug -> "DEBUG"
     ML.LevelInfo -> "INFO"
     ML.LevelWarn -> "WARN"
@@ -83,10 +73,10 @@ instance PrintfArg ML.LogLevel where
     ML.LevelOther o -> Text.unpack o)
 
 instance PrintfArg ThreadId where
-  formatArg = formatString . rightPad 14 . show
+  formatArg = formatString . show
 
 instance PrintfArg ML.Loc where
-  formatArg = formatString . (\ML.Loc{..} -> leftPad 50 $ printf "%s:%d" loc_filename (fst loc_start))
+  formatArg = formatString . (\ML.Loc{..} -> printf "%s:%d" loc_filename (fst loc_start) :: String)
 
 instance PrintfArg ML.LogStr where
   formatArg = formatString . BC.unpack . fromLogStr
