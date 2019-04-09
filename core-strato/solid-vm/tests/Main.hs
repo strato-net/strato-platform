@@ -10,7 +10,6 @@ import qualified Spec
 
 predicate :: Path -> Bool
 predicate (_, _) = True
-
 predicate _ = False
 
 main :: IO ()

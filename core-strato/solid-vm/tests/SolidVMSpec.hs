@@ -46,6 +46,7 @@ import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
 import Executable.EVMFlags() -- for HFlags
+import Blockchain.VMOptions() -- for HFlags
 import SolidVM.Model.Storable as MS
 
 -- The newtype distinguishes uncaught SolidExceptions and
