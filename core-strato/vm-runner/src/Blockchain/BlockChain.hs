@@ -23,7 +23,7 @@ module Blockchain.BlockChain
 import           Control.Arrow                           ((&&&))
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except

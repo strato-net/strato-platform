@@ -5,7 +5,7 @@
 module Blockchain.Strato.Indexer.P2PIndexer where
 
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Data.Text                          as T
 import           Network.Kafka
 import           Blockchain.MilenaTools

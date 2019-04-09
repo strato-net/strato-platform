@@ -8,6 +8,7 @@ dependencies:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
+  - blockapps-util
   - bytestring
   - containers
   - conduit

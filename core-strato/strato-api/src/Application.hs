@@ -9,7 +9,7 @@ module Application
 
 
 import           Control.Monad.Except
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Data.Binary                          as BN
 import qualified Data.ByteString.Lazy                 as BL
 import qualified Data.ByteString.Base64               as B64
@@ -79,13 +79,13 @@ makeFoundation appSettings appFaucetKey = do
 --        logFunc = messageLoggerSource tempFoundation appLogger
 
     -- Create the database connection pool
-    pool <-  myLogger $ myPool
+    pool <- runNoLoggingT $ myPool
         (pgConnStr  $ appDatabaseConf appSettings)
         (pgPoolSize $ appDatabaseConf appSettings)
 
     -- Perform database migration using our application's logging settings.
     --runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
-    _ <- myLogger (runSqlPool (runMigrationSilent migrateAll) pool) --runMigration
+    _ <- runNoLoggingT (runSqlPool (runMigrationSilent migrateAll) pool) --runMigration
 
     -- Return the foundation
     return $ mkFoundation pool
@@ -102,9 +102,6 @@ makeLogware foundation =
                             else FromSocket)
         , destination = Logger $ loggerSet $ appLogger foundation
         }
-
-myLogger :: NoLoggingT m a -> m a
-myLogger = runNoLoggingT --runStdoutLoggingT
 
 noPool :: PG.Connection -> IO ()
 noPool = const $ return ()

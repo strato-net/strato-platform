@@ -13,7 +13,7 @@ import Control.Lens hiding (view)
 import qualified Control.Lens as L
 import Control.Monad hiding (sequence)
 import Control.Monad.IO.Class
-import Control.Monad.Logger
+import Blockchain.Output
 import Control.Monad.Trans.State
 import Crypto.Random.Entropy
 import qualified Data.ByteString as BS

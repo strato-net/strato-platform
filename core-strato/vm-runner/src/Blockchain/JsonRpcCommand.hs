@@ -7,7 +7,7 @@ module Blockchain.JsonRpcCommand (
 import           Prelude                         hiding (id)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Data.Binary
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Char8           as BC

@@ -32,7 +32,7 @@ import           Control.Concurrent                        (forkIO, threadDelay)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource

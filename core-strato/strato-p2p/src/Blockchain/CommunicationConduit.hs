@@ -11,7 +11,7 @@ module Blockchain.CommunicationConduit
     , mkEthP2PEventConduit
     ) where
 
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Crypto.Types.PubKey.ECC

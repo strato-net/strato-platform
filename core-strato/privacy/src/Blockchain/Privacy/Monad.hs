@@ -14,7 +14,7 @@ import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
 import           Control.Lens
 import           Control.Monad                 (join, void)
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import           Data.Function                 (on)

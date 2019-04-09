@@ -6,7 +6,7 @@
 
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import           Database.Persist.Postgresql  hiding (get)

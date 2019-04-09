@@ -17,7 +17,7 @@ import           Conduit
 import           Control.Monad
 import           Control.Monad.Trans.Identity
 import           Control.Monad.Trans.State
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
 import           Data.Streaming.Network                (appCloseConnection)

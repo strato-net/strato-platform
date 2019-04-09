@@ -4,7 +4,7 @@ module Handler.JsonSpec (spec) where
 
 import           TestImport
 
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Network.Wai.Test
 import qualified Test.HUnit                 as HUnit
 import           Test.QuickCheck.Arbitrary

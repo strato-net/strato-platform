@@ -10,7 +10,7 @@ import Control.Concurrent.Async
 import Control.DeepSeq
 import Control.Exception
 import Control.Monad
-import Control.Monad.Logger
+import Blockchain.Output
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as SB

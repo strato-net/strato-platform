@@ -10,7 +10,7 @@ module Blockchain.SeqEventNotify (
 
 import           Conduit
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Data.Text                  as T
 import qualified Network.Kafka              as K
 import qualified Blockchain.MilenaTools     as K

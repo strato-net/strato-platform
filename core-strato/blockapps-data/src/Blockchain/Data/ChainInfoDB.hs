@@ -10,7 +10,7 @@ module Blockchain.Data.ChainInfoDB where
 
 import           Control.Arrow                      ((&&&))
 import           Control.Monad                      (when)
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import           Data.Foldable                      (traverse_)
 import qualified Data.Map                           as M        (fromList, toList)
