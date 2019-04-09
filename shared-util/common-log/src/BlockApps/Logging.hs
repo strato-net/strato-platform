@@ -8,6 +8,7 @@ module BlockApps.Logging
  ( LoggingT
  , runLoggingT
  , runNoLoggingT
+ , formatLogOutput -- For testing
  ) where
 
 import           Control.Concurrent     (ThreadId, myThreadId)
@@ -58,15 +59,16 @@ rightPad n xs = xs ++ replicate (max 0 (n - length xs)) ' '
 tRightPad :: Int -> Text.Text -> Text.Text
 tRightPad n xs = xs <> Text.replicate (max 0 (n - Text.length xs)) (Text.singleton ' ')
 
-formatLogOutput :: UTCTime
+formatLogOutput :: PrintfType r
+                => UTCTime
                 -> ThreadId
                 -> ML.Loc
                 -> ML.LogSource
                 -> ML.LogLevel
                 -> ML.LogStr
-                -> IO ()
+                -> r
 formatLogOutput timestamp tid loc logSource level msg =
-  printf "[%s] %s %s | %s | %s | %s" timestamp level mLoc tid (tRightPad 35 logSource) msg
+  printf "[%s] %s%s | %s | %s | %s" timestamp mLoc level tid (tRightPad 35 logSource) msg
    where mLoc = if (level == ML.LevelDebug || level == ML.LevelWarn) then printf "%s | " loc else ""
 
 instance PrintfArg UTCTime where
