@@ -129,11 +129,10 @@ attemptBond prv sock _ = do
                    (time+50)
 
 udpHandshakeServer :: ( HasSQLDB m
-                      , MonadResource m
                       , MonadCatch m
                       , MonadThrow m
                       , MonadLogger m
-                      , MonadUnliftIO m -- TODO(tim): Remove
+                      , MonadUnliftIO m
                       )
                    => H.PrvKey
                    -> Socket
@@ -166,7 +165,6 @@ udpHandshakeServer prv sock _ = do
       return (packet, validOtherPubKey, otherPort)
 
 handleValidPacket :: ( HasSQLDB m
-                     , MonadResource m
                      , MonadCatch m
                      , MonadThrow m
                      , MonadLogger m

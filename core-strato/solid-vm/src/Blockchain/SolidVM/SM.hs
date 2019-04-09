@@ -37,7 +37,6 @@ import           Control.Applicative ((<|>))
 import           Control.Exception
 import           Control.Lens
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
@@ -127,7 +126,7 @@ data SState =
 
 makeLenses ''SState
 
-type SM = StateT SState (ResourceT IO)
+type SM = StateT SState IO
 
 instance HasMemAddressStateDB SM where
   getAddressStateTxDBMap = addressStateTxDBMap <$> get
@@ -185,7 +184,7 @@ runSM maybeCode env f = do
         _action = startingAction maybeCode env
         }
 
-  eValState <- liftIO . try $ runResourceT $ runStateT f startingState
+  eValState <- liftIO . try $ runStateT f startingState
   case eValState of
     -- InternalError should *never* happen.
     -- TODO should also not happen, but since this is a work in progress they

@@ -15,7 +15,7 @@ module Blockchain.DB.CodeDB (
 
 
 
-import           Control.Monad.Trans.Resource
+import           Control.Monad.IO.Class
 import           Data.Binary
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Lazy               as BL
@@ -28,7 +28,7 @@ import           Blockchain.SolidVM.Model
 
 type CodeDB = DB.DB
 
-class MonadResource m => HasCodeDB m where
+class MonadIO m => HasCodeDB m where
   getCodeDB :: m CodeDB
 
 toWord8 :: CodeKind -> Word8
@@ -37,13 +37,13 @@ toWord8 = fromIntegral . fromEnum
 fromWord8 :: Word8 -> CodeKind
 fromWord8 = toEnum . fromIntegral
 
-addCode :: (HasCodeDB m, MonadResource m) => CodeKind -> B.ByteString -> m SHA
+addCode :: HasCodeDB m => CodeKind -> B.ByteString -> m SHA
 addCode = codeDBPut . toWord8
 
-getCode :: (HasCodeDB m, MonadResource m) => SHA -> m (Maybe (CodeKind, B.ByteString))
+getCode :: HasCodeDB m => SHA -> m (Maybe (CodeKind, B.ByteString))
 getCode theHash = codeDBGet (BL.toStrict $ encode $ sha2StateRoot theHash)
 
-getEVMCode :: (HasCodeDB m, MonadResource m) => SHA -> m B.ByteString
+getEVMCode :: HasCodeDB m => SHA -> m B.ByteString
 getEVMCode hsh = maybe "" snd <$> getCode hsh
 
 getCodeKind :: HasCodeDB m => SHA -> m CodeKind

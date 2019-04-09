@@ -6,7 +6,6 @@ module Blockchain.JsonRpcCommand (
 
 import           Prelude                         hiding (id)
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
 import           Control.Monad.Logger
 import           Data.Binary
 import qualified Data.ByteString                 as B
@@ -43,8 +42,7 @@ produceResponse id theData = do
         Right _ -> return ()
 
 
-runJsonRpcCommand :: ( MonadResource m
-                     , MonadLogger (t m)
+runJsonRpcCommand :: ( MonadLogger (t m)
                      , WrapsSQLDB t m
                      , HasStateDB (t m)
                      , HasHashDB (t m)

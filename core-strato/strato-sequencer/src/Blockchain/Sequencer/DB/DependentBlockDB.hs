@@ -6,8 +6,8 @@ module Blockchain.Sequencer.DB.DependentBlockDB where
 import           Control.Monad                (join)
 import           Data.Binary
 
+import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Resource
 
 import qualified Data.ByteString.Lazy         as B
 import qualified Database.LevelDB             as LDB
@@ -27,7 +27,7 @@ instance Binary DependentBlockEntry where
 
 data EmissionReadiness = NotReadyToEmit | ReadyToEmit { totalDifficulty :: Integer }
 
-class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
+class (MonadLogger m, MonadIO m) => HasDependentBlockDB m where
     getDependentBlockDB :: m DependentBlockDB
     getWriteOptions     :: m LDB.WriteOptions
     getReadOptions      :: m LDB.ReadOptions

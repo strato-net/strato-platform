@@ -15,7 +15,7 @@ import qualified Blockchain.BackupBlocks
 import qualified Blockchain.DB.SQLDB          as SQLDB
 import           Blockchain.EthConf
 
-instance (MonadUnliftIO m, MonadResource m) => SQLDB.HasSQLDB (ReaderT SQLDB.SQLDB m) where
+instance MonadUnliftIO m => SQLDB.HasSQLDB (ReaderT SQLDB.SQLDB m) where
   getSQLDB = ask
 
 main :: IO ()

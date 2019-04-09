@@ -31,7 +31,7 @@ bigTest=
     ("00000000000000000000000000000002ffffffffffffffff0000000000000003", "84548123a8")
   ]
 
-addAllKVs::RLPSerializable obj=>MonadResource m=>MPDB->[(N.NibbleString, obj)]->m MPDB
+addAllKVs::RLPSerializable obj=>MonadIO m=>MPDB->[(N.NibbleString, obj)]->m MPDB
 addAllKVs x [] = return x
 addAllKVs mpdb (x:rest) = do
   mpdb' <- unsafePutKeyVal mpdb (fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)

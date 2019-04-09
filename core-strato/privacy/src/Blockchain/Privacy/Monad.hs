@@ -14,8 +14,8 @@ import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
 import           Control.Lens
 import           Control.Monad                 (join, void)
+import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import           Data.Function                 (on)
 import           Data.Maybe                    (fromJust)
@@ -72,7 +72,7 @@ makeLenses ''ChainIdEntry
 chainIdEntry :: ChainInfo -> ChainIdEntry
 chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
 
-class (BlockLike h t b, MonadResource m, MonadLogger m) => HasPrivateHashDB h t b m | m -> h t b where
+class (BlockLike h t b, MonadIO m, MonadLogger m) => HasPrivateHashDB h t b m | m -> h t b where
   getChainId               :: ChainInfo -> m SHA
   generateInitialChainHash :: ChainInfo -> m SHA
   generateChainHashes      :: t -> m [SHA]
