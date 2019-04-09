@@ -8,6 +8,7 @@ module BlockApps.Logging
  ( LoggingT
  , runLoggingT
  , runNoLoggingT
+ , module Control.Monad.Logger
  , formatLogOutput -- For testing
  ) where
 
@@ -24,9 +25,10 @@ import           Text.Printf
 import           Data.Time
 import           HFlags
 
+import Control.Monad.Logger hiding (LoggingT, runLoggingT, runNoLoggingT)
 import qualified Control.Monad.Logger as ML
 
-defineEQFlag "minLogLevel" [| ML.LevelInfo :: ML.LogLevel |] "MINLOGLEVEL"  "Minimum log level to display"
+defineEQFlag "minLogLevel" [| ML.LevelInfo :: LogLevel |] "MINLOGLEVEL"  "Minimum log level to display"
 
 type LoggingT = ML.LoggingT
 
@@ -38,10 +40,10 @@ runNoLoggingT = flip ML.runLoggingT devNull
 
 -------------------------------------------------
 
-devNull :: ML.Loc -> ML.LogSource -> ML.LogLevel -> ML.LogStr -> IO ()
+devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
 
-commonLog :: ML.Loc -> ML.LogSource -> ML.LogLevel -> ML.LogStr -> IO ()
+commonLog :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 commonLog loc logSource level msg = do
   when (level >= flags_minLogLevel) $ do
     myTID <- myThreadId
@@ -52,31 +54,31 @@ commonLog loc logSource level msg = do
 formatLogOutput :: PrintfType r
                 => UTCTime
                 -> ThreadId
-                -> ML.Loc
-                -> ML.LogSource
-                -> ML.LogLevel
-                -> ML.LogStr
+                -> Loc
+                -> LogSource
+                -> LogLevel
+                -> LogStr
                 -> r
 formatLogOutput timestamp tid loc logSource level msg =
   printf "[%-30s] %s%5s | %-14s | %-35s | %s" timestamp mLoc level tid logSource msg
-   where mLoc = if (level == ML.LevelDebug || level == ML.LevelWarn) then printf "%50s | " loc else ""
+   where mLoc = if (level == LevelDebug || level == LevelWarn) then printf "%50s | " loc else ""
 
 instance PrintfArg UTCTime where
   formatArg = formatString . show
 
-instance PrintfArg ML.LogLevel where
+instance PrintfArg LogLevel where
   formatArg = formatString . (\case
-    ML.LevelDebug -> "DEBUG"
-    ML.LevelInfo -> "INFO"
-    ML.LevelWarn -> "WARN"
-    ML.LevelError -> "ERROR"
-    ML.LevelOther o -> Text.unpack o)
+    LevelDebug -> "DEBUG"
+    LevelInfo -> "INFO"
+    LevelWarn -> "WARN"
+    LevelError -> "ERROR"
+    LevelOther o -> Text.unpack o)
 
 instance PrintfArg ThreadId where
   formatArg = formatString . show
 
-instance PrintfArg ML.Loc where
-  formatArg = formatString . (\ML.Loc{..} -> printf "%s:%d" loc_filename (fst loc_start) :: String)
+instance PrintfArg Loc where
+  formatArg = formatString . (\Loc{..} -> printf "%s:%d" loc_filename (fst loc_start) :: String)
 
-instance PrintfArg ML.LogStr where
+instance PrintfArg LogStr where
   formatArg = formatString . BC.unpack . fromLogStr
