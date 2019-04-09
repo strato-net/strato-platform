@@ -36,10 +36,10 @@ import qualified Network.Haskoin.Crypto as HK
 testContext :: BlockstanbulContext
 testContext = newContext (View 20 18) [] [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
-runTest :: StateT BlockstanbulContext (NoLoggingT IO) () -> IO ()
+runTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
 runTest = runAuthTest . (disableAuth >>)
 
-runAuthTest :: StateT BlockstanbulContext (NoLoggingT IO) () -> IO ()
+runAuthTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
 runAuthTest = runNoLoggingT . flip evalStateT testContext
 
 instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) where
@@ -481,7 +481,7 @@ spec = parallel $ do
 
     describe "Authentication" $ do
       let resendLock :: Block -> HK.PrvKey -> HK.PrvKey
-                     -> StateT BlockstanbulContext (NoLoggingT IO) (Block, [OutEvent])
+                     -> StateT BlockstanbulContext (LoggingT IO) (Block, [OutEvent])
           resendLock blk theirPK pk = do
             v <- use view
             me <- selfAddr
