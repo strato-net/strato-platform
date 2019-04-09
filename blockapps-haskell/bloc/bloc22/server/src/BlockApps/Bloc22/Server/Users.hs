@@ -337,13 +337,22 @@ postUsersUploadList' ContractListParameters{..} sign = do
       (bin, src, cmId, xabi) <- case mtuple of
         Just (b, src, cmId', x) -> return (b, src, cmId', x)
         Nothing -> do
-          (b16,src,(cmId' :: Int32),x') <- lift $ blocQuery1 "postUsersUploadList'" $ proc () -> do
+          mContract <- lift . blocQueryMaybe $ proc () -> do
             (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
             returnA -< (bin16,src,cmId',x'')
-          let (b, leftOver) = Base16.decode b16
-          unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-          x <- lift $ deserializeXabi x'
-          at name <?= (b, src, cmId', x)
+          case mContract of
+            Nothing -> throwError . UserError $ Text.concat
+              [ "Upload List: When deploying multiple contract creation transactions, "
+              , "the contracts' source code must be uploaded via the /compile route "
+              , "ahead of time. Please try uploading the contracts' source code via "
+              , "the /compile route, and try again. If you continue to receive this "
+              , "error message, please contact your administrator."
+              ]
+            Just (b16,src,(cmId' :: Int32),x') -> do
+              let (b, leftOver) = Base16.decode b16
+              unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+              x <- lift $ deserializeXabi x'
+              at name <?= (b, src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
