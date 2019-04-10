@@ -88,7 +88,7 @@ spec = do
       let bs = trim (isJust ist) bs'
           iex = ExtraData bs ist
       in do
-        bs `shouldSatisfy` (== 32) . B.length
+        bs `shouldSatisfy` (<= 32) . B.length
         cookRawExtra (uncookRawExtra iex) `shouldBe` iex
 
     it "by default only populates vanity" $ do
