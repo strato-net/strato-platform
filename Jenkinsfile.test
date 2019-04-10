@@ -174,7 +174,7 @@ pipeline {
       dir ('strato-getting-started') {
         sh 'rm -rf strato_logs*'
         sh './fetchlogs --as-dir'
-        archiveArtifacts artifacts: 'strato_logs/*', fingerprint: true
+        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
       }
     }
 
