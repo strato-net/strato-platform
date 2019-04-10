@@ -31,9 +31,9 @@ $(info )
 
 all: build_all docker-compose
 
-build_all: bloc strato apex docs dappstore nginx postgrest prometheus smd vault-wrapper
+build_all: bloc strato apex dappstore nginx postgrest prometheus smd vault-wrapper
 
-.PHONY: bloc strato apex docs dappstore nginx postgrest prometheus smd vault-wrapper
+.PHONY: bloc strato apex dappstore nginx postgrest prometheus smd vault-wrapper
 
 apex:
 	@echo Now building apex...
@@ -42,10 +42,6 @@ apex:
 bloc: build_buildbase build_deploybase
 	@echo Now building bloc...
 	BASIL_DOCKER_TAG=${REPO_URL}bloc:${VERSION} make --directory=blockapps-haskell/
-
-docs:
-	@echo Now building docs...
-	BASIL_DOCKER_TAG=${REPO_URL}docs:${VERSION} make --directory=blockapps-swagger/
 
 dappstore:
 	@echo Now building dappstore...
