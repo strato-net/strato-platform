@@ -10,7 +10,7 @@ module Executable.EthereumVM (
 import           Control.Lens                          ((.=), (||=), use)
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.State.Lazy        (gets)
 import qualified Data.Text                             as T
 import qualified Data.Map.Ordered                      as O

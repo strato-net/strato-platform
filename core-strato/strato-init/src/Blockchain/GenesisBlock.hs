@@ -11,7 +11,7 @@ module Blockchain.GenesisBlock (
 
 
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Base16                       as B16

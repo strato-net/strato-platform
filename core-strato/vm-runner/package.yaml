@@ -30,7 +30,6 @@ dependencies:
   - hflags
   - lens
   - merkle-patricia-db
-  - monad-logger
   - mtl
   - ordered-containers
   - prometheus-client

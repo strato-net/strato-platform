@@ -2,7 +2,6 @@
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
 import ClassyPrelude (atomically, newTMChan, fromMaybe)
-import Control.Monad.Logger
 import qualified Data.ByteString.Char8 as C8
 
 import Blockchain.Constants
@@ -65,7 +64,7 @@ bootstrapSequencer Block{blockBlockData = bd,
             , maxEventsPerIter = 65
             , maxUsPerIter = 20000
             }
-      flip runLoggingT printLogMsg . runSequencerM dummySequencerCfg Nothing $ do
+      runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty
   initKafka :: CablePackage -> IO ()
   initKafka pkg = do

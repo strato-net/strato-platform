@@ -33,7 +33,6 @@ dependencies:
 - leveldb-haskell
 - merkle-patricia-db
 - monad-control
-- monad-logger
 - persistent-sqlite
 - prometheus-client
 - resourcet

@@ -7,7 +7,7 @@ module Blockchain.Display (
   ) where
 
 
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Data.Text                   as T
 
 

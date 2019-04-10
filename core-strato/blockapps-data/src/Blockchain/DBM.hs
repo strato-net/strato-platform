@@ -12,7 +12,7 @@ module Blockchain.DBM (
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Resource
 
-import           Control.Monad.Logger         (runNoLoggingT)
+import           Blockchain.Output            (runNoLoggingT)
 import qualified Database.Persist.Postgresql  as SQL
 
 import           Blockchain.DB.SQLDB

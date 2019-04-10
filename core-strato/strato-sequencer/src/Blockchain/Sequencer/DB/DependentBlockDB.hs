@@ -6,7 +6,7 @@ module Blockchain.Sequencer.DB.DependentBlockDB where
 import           Control.Monad                (join)
 import           Data.Binary
 
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 
 import qualified Data.ByteString.Lazy         as B

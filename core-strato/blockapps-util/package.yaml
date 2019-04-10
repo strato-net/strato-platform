@@ -15,6 +15,7 @@ library:
     - binary
     - blockapps-milena
     - bytestring
+    - common-log
     - containers
     - cryptohash
     - ethereum-rlp
@@ -24,7 +25,6 @@ library:
     - lens
     - lifted-base
     - monad-control
-    - monad-logger
     - mtl
     - network
     - path-pieces

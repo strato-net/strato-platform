@@ -29,7 +29,6 @@ dependencies:
   - leveldb-haskell
   - merkle-patricia-db
   - blockapps-milena
-  - monad-logger
   - monad-loops
   - nibblestring
   - persistent-postgresql

@@ -12,7 +12,7 @@ import           Control.Concurrent.MVar
 import           Control.Monad
 import           Control.Monad.IO.Class             (liftIO)
 import           Control.Monad.Trans.Class          (lift)
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Data.ByteString.Char8              as S8
 import           Data.List                          hiding (group)
 import qualified Data.Text                          as T

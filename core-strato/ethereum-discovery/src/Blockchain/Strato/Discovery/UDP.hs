@@ -25,7 +25,7 @@ import qualified Network.Socket.ByteString             as NB
 import           Control.Error                         (fmapL, note)
 import           Control.Exception
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Crypto.Types.PubKey.ECC
 import           Data.Binary
 import           Data.Bits
