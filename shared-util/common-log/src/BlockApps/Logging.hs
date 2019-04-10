@@ -67,7 +67,7 @@ formatLogOutput :: PrintfType r
                 -> LogStr
                 -> r
 formatLogOutput timestamp tid loc logSource level msg =
-  printf "[%-30s] %s%5s | %-14s | %-35s | %s" timestamp mLoc level tid logSource msg
+  printf "[%-30s] %s%5s | %-14s | %-35s | %s\n" timestamp mLoc level tid logSource msg
    where mLoc = if (level == LevelDebug || level == LevelWarn) then printf "%50s | " loc else ""
 
 instance PrintfArg UTCTime where
