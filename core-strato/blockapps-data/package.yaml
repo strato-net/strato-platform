@@ -43,7 +43,6 @@ dependencies:
   - lifted-base
   - merkle-patricia-db
   - monad-control
-  - monad-logger
   - mtl
   - network
   - nibblestring

@@ -6,7 +6,6 @@ module Blockchain.JsonRpcCommand (
 
 import           Prelude                         hiding (id)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import           Data.Binary
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Char8           as BC
@@ -27,6 +26,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
 import           Blockchain.KafkaTopics
+import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 
 -- TODO: Add private chain functionality to JSON RPC commands

@@ -12,7 +12,7 @@ dependencies:
   - blockapps-bloc22-server
   - blockapps-strato-api
   - blockapps-strato-client
-  - logging-effect
+  - common-log
   - hflags
   - http-client
   - http-types

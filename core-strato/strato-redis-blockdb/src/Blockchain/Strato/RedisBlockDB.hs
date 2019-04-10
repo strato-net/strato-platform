@@ -40,7 +40,6 @@ import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Control.Arrow                         ((&&&), second)
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
-import           Control.Monad.Logger
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
 import qualified Data.Map.Strict                       as M
@@ -58,7 +57,7 @@ zipMapM :: (Traversable t, Monad m)
 zipMapM f = mapM (\x -> (,) x <$> f x)
 
 liftLog :: LoggingT m a -> m a
-liftLog = flip runLoggingT printLogMsg
+liftLog = runLoggingT
 
 class (Monad m) => HasRedisBlockDB m where
     getRedisBlockDB :: m Connection

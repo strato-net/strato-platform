@@ -15,7 +15,6 @@ import           Blockchain.Strato.Model.Class
 import           Control.Lens
 import           Control.Monad                 (join, void)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import           Control.Monad.Trans.State
 import           Data.Function                 (on)
 import           Data.Maybe                    (fromJust)
@@ -23,6 +22,8 @@ import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
 import           Data.Traversable              (for)
+
+import           Blockchain.Output
 
 data CircularBuffer a = CircularBuffer
   { _capacity :: Int

@@ -42,7 +42,6 @@ dependencies:
   - leveldb-haskell
   - memory
   - merkle-patricia-db
-  - monad-logger
   - mtl
   - persistent-postgresql
   - resourcet

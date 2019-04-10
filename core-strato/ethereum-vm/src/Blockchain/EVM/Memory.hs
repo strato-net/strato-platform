@@ -19,7 +19,7 @@ module Blockchain.EVM.Memory (
   ) where
 
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State    hiding (state)

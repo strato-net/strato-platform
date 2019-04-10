@@ -7,7 +7,7 @@ module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
 import Control.Lens
-import Control.Monad.Logger
+import Blockchain.Output
 import Data.Binary
 import Data.DeriveTH
 import Data.Text

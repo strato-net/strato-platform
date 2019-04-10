@@ -11,7 +11,7 @@ import Control.Concurrent.Async
 import Control.DeepSeq
 import Control.Exception
 import Control.Monad
-import Control.Monad.Logger
+import Blockchain.Output
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as SB
@@ -88,7 +88,7 @@ devNull _ _ _ _ = return ()
 runTest :: ContextM a -> IO ()
 runTest f = do
   let timeout = 5000000
-  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM f) devNull
+  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM f)
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
     Right{} -> return ()

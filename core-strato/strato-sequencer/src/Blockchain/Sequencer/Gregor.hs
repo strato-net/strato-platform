@@ -25,7 +25,6 @@ import           Control.Concurrent.Async.Lifted (race_)
 import           Control.Concurrent.STM (orElse, flushTQueue)
 import           Control.Lens               hiding (op)
 import           Control.Monad.State
-import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
 import qualified Data.Text as T
 import qualified Prometheus as P
@@ -74,7 +73,7 @@ convert GregorConfig{..} =
                    }
 
 runGregorM :: GregorConfig -> GregorM a -> IO a
-runGregorM cfg = flip runLoggingT printLogMsg
+runGregorM cfg = runLoggingT
                . runResourceT
                . flip evalStateT (convert cfg)
 

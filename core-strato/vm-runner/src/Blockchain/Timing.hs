@@ -5,7 +5,7 @@ module Blockchain.Timing where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Data.Text                               as T
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX

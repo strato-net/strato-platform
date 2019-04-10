@@ -4,15 +4,14 @@
 module Blockchain.Sequencer.DB.DependentBlockDB where
 
 import           Control.Monad                (join)
-import           Data.Binary
-
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Data.Binary
 
 import qualified Data.ByteString.Lazy         as B
 import qualified Database.LevelDB             as LDB
 import qualified GHC.Generics                 as GHCG
 
+import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 

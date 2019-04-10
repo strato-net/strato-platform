@@ -27,6 +27,7 @@ dependencies:
   - blockapps-vault-wrapper-client
   - classy-prelude
   - clock
+  - common-log
   - containers
   - contravariant
   - cryptonite
@@ -46,7 +47,6 @@ dependencies:
   - lens
   - lifted-async
   - lifted-base
-  - logging-effect
   - memory
   - monad-control
   - monad-loops

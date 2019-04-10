@@ -5,7 +5,7 @@
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Reader
 import           Data.Binary                                 hiding (get)
 import qualified Data.ByteString.Base16                      as B16

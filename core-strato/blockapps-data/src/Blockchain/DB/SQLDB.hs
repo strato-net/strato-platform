@@ -16,7 +16,7 @@ module Blockchain.DB.SQLDB (
 
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger         (MonadLogger, runNoLoggingT)
+import           Blockchain.Output            (MonadLogger, runNoLoggingT)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Identity
 import           Control.Monad.Trans.Reader

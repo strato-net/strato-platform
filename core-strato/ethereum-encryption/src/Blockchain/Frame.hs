@@ -15,7 +15,7 @@ import              Blockchain.Error
 import              Blockchain.EthEncryptionException
 import              Control.Exception.Lifted
 import              Control.Monad
-import              Control.Monad.Logger
+import              Blockchain.Output
 import "cipher-aes" Crypto.Cipher.AES
 import "cryptonite" Crypto.Hash                       (Context, hashUpdate, hashFinalize)
 import              Crypto.Hash.Algorithms            (Keccak_256)

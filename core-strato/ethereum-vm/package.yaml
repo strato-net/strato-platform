@@ -36,7 +36,6 @@ dependencies:
   - integer-gmp
   - lens
   - merkle-patricia-db
-  - monad-logger
   - mtl
   - primitive
   - resourcet

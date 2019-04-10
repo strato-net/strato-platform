@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           HFlags
 import           System.Directory
 
