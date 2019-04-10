@@ -171,10 +171,12 @@ pipeline {
 
   post {
     always {
-      sh 'rm -rf logs'
-      sh 'mkdir logs'
-      sh './log_artifact.sh logs'
-      archiveArtifacts artifacts: 'logs/*', fingerprint: true
+      dir ('strato-getting-started') {
+        sh 'rm -rf strato_logs*'
+        sh './strato --fetch-logs'
+        archiveArtifacts artifacts: 'strato_logs/*', fingerprint: true
+        archiveArtifacts artifacts: 'strato_logs.zip', fingerprint: true
+      }
     }
 
     success {
