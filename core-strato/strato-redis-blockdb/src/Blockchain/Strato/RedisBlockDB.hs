@@ -40,7 +40,6 @@ import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Control.Arrow                         ((&&&), second)
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
--- import           Blockchain.Output
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
 import qualified Data.Map.Strict                       as M
