@@ -5,6 +5,7 @@ module Blockchain.VMOptions (
   flags_testnet,
   flags_debug,
   flags_trace,
+  flags_svmTrace,
   flags_altGenBlock,
   flags_createTransactionResults,
   flags_sqlDiff,
@@ -36,4 +37,5 @@ defineFlag "queryBlocks" (10000::Int) "Number of blocks to query from SQL to pro
 defineFlag "miningVerification" True "Flag to turn mining verification or/off"
 defineFlag "transactionRootVerification" False "Flag to turn transaction root verification or/off"
 defineFlag "startingBlock" (-1::Integer) "block in kafka to start running the VM on"
+defineFlag "svmTrace" (True::Bool) "Whether to have verbose logging in SolidVM"
 defineEQFlag "miner" [| Instant :: MinerType |] "MINER" "What mining algorithm"

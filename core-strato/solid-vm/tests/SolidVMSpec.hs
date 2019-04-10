@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
 module SolidVMSpec where
@@ -24,7 +25,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, shouldThrow, anyErrorCall)
+import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -43,8 +44,26 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.SHA
 import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
+import Blockchain.SolidVM.Exception
 import Executable.EVMFlags() -- for HFlags
+import Blockchain.VMOptions() -- for HFlags
 import SolidVM.Model.Storable as MS
+
+-- The newtype distinguishes uncaught SolidExceptions and
+-- those that are returned in ExecResults
+newtype HandledException = HE SolidException deriving (Show, Exception)
+
+anyTODO :: Selector HandledException
+anyTODO (HE TODO{}) = True
+anyTODO _ = False
+
+anyParseError :: Selector HandledException
+anyParseError (HE ParseError{}) = True
+anyParseError _ = False
+
+anyUnknownFunc :: Selector HandledException
+anyUnknownFunc (HE UnknownFunction{}) = True
+anyUnknownFunc _ = False
 
 sender :: Address
 sender = 0xdeadbeef
@@ -83,6 +102,11 @@ runBS = void . runBS'
 runBS' ::B.ByteString -> ContextM ExecResults
 runBS' = runArgs "()"
 
+rethrowEx :: ExecResults -> ContextM ()
+rethrowEx ExecResults{erException=Just ex} = either (liftIO . throwIO . HE) (void . return) ex
+rethrowEx _ = return ()
+
+
 runArgs :: T.Text -> B.ByteString -> ContextM ExecResults
 runArgs args bs = do
   let code = Code bs
@@ -112,11 +136,14 @@ runArgs args bs = do
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
-  SVM.create isTest isHomestead suicides blockData callDepth sender origin
+  er <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
           value gasPrice availableGas newAddress code txHash chainId metadata
+  rethrowEx er
+  return er
+
 
 runCall :: T.Text -> T.Text -> B.ByteString -> ContextM (Maybe SB.ShortByteString)
-runCall funcName callArgs bs = erReturnVal <$> do
+runCall funcName callArgs bs = do
   let code = Code bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -147,13 +174,16 @@ runCall funcName callArgs bs = erReturnVal <$> do
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
-  void $ SVM.create isTest isHomestead suicides blockData callDepth sender origin
+  er1 <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
     value gasPrice availableGas newAddress code txHash chainId createMetadata
-  SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
+  rethrowEx er1
+  er2 <- SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
     uploadAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+  rethrowEx er2
+  return $ erReturnVal er2
 
 call2 :: T.Text -> T.Text -> Address -> ContextM (Maybe SB.ShortByteString)
-call2 funcName callArgs contractAddress = erReturnVal <$> do
+call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -182,8 +212,10 @@ call2 funcName callArgs contractAddress = erReturnVal <$> do
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
-  SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
+  er <- SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
     contractAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+  rethrowEx er
+  return $ erReturnVal er
 
 
 
@@ -803,12 +835,11 @@ contract qq {
 }|]
 
   it "can continue" . runTest $ do
-    liftIO $ pendingWith "implement continue"
     runBS [r|
 contract qq {
   uint i;
   constructor() public {
-    for (uint j = 0; j < 100; j++) {
+    for (uint j = 0; j < 4; j++) {
       if (j % 2 == 0) {
         continue;
       }
@@ -816,23 +847,36 @@ contract qq {
     }
   }
 }|]
-    getFields ["i"] `shouldReturn` [BInteger 50]
+    getFields ["i"] `shouldReturn` [BInteger 2]
 
   it "can break" . runTest $ do
-    liftIO $ pendingWith "implement break"
     runBS [r|
 contract qq {
-  uint i;
+  uint i = 25;
   constructor() public {
     for (uint j = 0; j < 100; j++) {
-      if (j % 7 == 4) {
+      if (j == 4) {
         break;
       }
       i++;
     }
   }
 }|]
-    getFields ["i"] `shouldReturn` [BInteger 3]
+
+    getFields ["i"] `shouldReturn` [BInteger 29]
+
+  it "can return from a loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    for (uint j = 0; j < 5; j++) {
+      i++;
+      return;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 1]
 
 
   it "can call functions on local contracts" . runTest $ do
@@ -1635,7 +1679,7 @@ contract qq {
   function set(uint _n) public {
     n = _n;
   }
-}|]) `shouldThrow` anyErrorCall -- TODO: This should be a Left instead of a throw
+}|]) `shouldThrow` anyParseError
 
   it "can call boolean arguments" . runTest $ do
     runCall "set" "(true,false)" [r|
@@ -1723,3 +1767,44 @@ contract qq {
   }
 }|]
     getFields ["a"] `shouldReturn` [BAddress 74]
+
+  it "can have a for loop with no fields" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    for (;;) {
+      i += 3;
+      if (i % 5 == 0) {
+        break;
+      }
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 15]
+
+  it "can have a while loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    while (i < 8) {
+      i++;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 8]
+
+  it "rejects modifiers" $ (runTest $ runBS [r| contract qq { modifier m() { _; } }|])
+    `shouldThrow` anyTODO
+
+  it "catches parse errors" $ (runTest $ runBS [r| contract { |]) `shouldThrow` anyParseError
+
+  it "catches arg parse errors" $ (runTest $ do
+    runCall "f" "(" [r|
+contract qq {
+  function f() public {}
+}|]) `shouldThrow` anyParseError
+
+  it "catches missing function errors" $
+    (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc

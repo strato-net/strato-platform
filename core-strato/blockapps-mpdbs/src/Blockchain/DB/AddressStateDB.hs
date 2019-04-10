@@ -42,7 +42,6 @@ import qualified Data.ByteString.Char8                       as BC
 import           Data.Maybe
 
 import           Control.Monad                               (liftM)
-import           Control.Monad.Trans.Resource
 
 import qualified Data.NibbleString                           as N
 
@@ -60,24 +59,24 @@ getAddressState address = do
         where b = blankAddressState
       Just s -> return $ (rlpDecode . rlpDeserialize . rlpDecode) s
 
-getAllAddressStates::(HasHashDB m, HasStateDB m, MonadResource m) => m [(Address, AddressState)]
+getAllAddressStates::(HasHashDB m, HasStateDB m) => m [(Address, AddressState)]
 getAllAddressStates = do
   sdb <- getStateDB
   mapM convert =<<  MP.unsafeGetAllKeyVals sdb
   where
-    convert :: (HasHashDB m, MonadResource m) => (N.NibbleString, RLPObject) -> m (Address, AddressState)
+    convert :: (HasHashDB m) => (N.NibbleString, RLPObject) -> m (Address, AddressState)
     convert (k, v) = do
       k' <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString k))) $ getAddressFromHash k
       return (k', rlpDecode . rlpDeserialize . rlpDecode $ v)
 
-getAddressFromHash::(HasHashDB m, MonadResource m)=>N.NibbleString -> m (Maybe Address)
+getAddressFromHash::(HasHashDB m)=>N.NibbleString -> m (Maybe Address)
 getAddressFromHash =
   liftM (fmap addressFromNibbleString) . hashDBGet
 
-getStorageKeyFromHash::(HasHashDB m, MonadResource m)=>N.NibbleString -> m (Maybe Word256)
+getStorageKeyFromHash::(HasHashDB m)=>N.NibbleString -> m (Maybe Word256)
 getStorageKeyFromHash  = fmap (fmap bytesToWord256) . getRawStorageKeyFromHash
 
-getRawStorageKeyFromHash :: (HasHashDB m, MonadResource m)=> N.NibbleString -> m (Maybe B.ByteString)
+getRawStorageKeyFromHash :: (HasHashDB m)=> N.NibbleString -> m (Maybe B.ByteString)
 getRawStorageKeyFromHash = fmap (fmap nibbleString2ByteString) . hashDBGet
 
 putAddressState :: (HasStateDB m, HasHashDB m) => Address -> AddressState -> m ()

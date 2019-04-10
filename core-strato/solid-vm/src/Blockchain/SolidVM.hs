@@ -11,6 +11,7 @@ module Blockchain.SolidVM
 
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
+import           Control.Monad.Extra (whenJust)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bits
@@ -49,6 +50,7 @@ import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
+import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
 import qualified Text.Colors                          as C
 import           Text.Format
@@ -65,9 +67,8 @@ import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           CodeCollection
 
-
-trace :: Bool
-trace = True
+onTraced :: Monad m => m () -> m ()
+onTraced = when flags_svmTrace
 
 create :: Bool
        -> Bool
@@ -90,15 +91,7 @@ create :: Bool
 create _ _ _ _ _ _ _ _ _ _ _ pc@(PrecompiledCode _) _ _ _ = internalError "call precompiled code" pc
 create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId' metadata = do
   recordCreate
-
-  let maybeContractName = M.lookup "name" =<< metadata
-      contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
-
-  let maybeArgString = M.lookup "args" =<< metadata
-      argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
-      maybeArgs = runParser parseArgs "" "" argString
-      args = either (error . (++ ("\nfull args: " ++ show argString)) . ("args can not be parsed: " ++) . show) id maybeArgs
-      env' = Env.Environment {
+  let env' = Env.Environment {
         Env.blockHeader = blockData,
         Env.sender = sender',
         Env.origin = origin',
@@ -106,11 +99,16 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
         Env.chainId=chainId',
         Env.metadata=metadata
       }
+  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' $ do
+    let maybeContractName = M.lookup "name" =<< metadata
+        !contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
 
-  (hsh, cc) <- codeCollectionFromSource initCode
+    let maybeArgString = M.lookup "args" =<< metadata
+        argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
+        maybeArgs = runParser parseArgs "" "" argString
+        !args = either (parseError "create arguments") id maybeArgs
 
-
-  runSM (Just initCode) env' $ do
+    (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' hsh cc contractName' args
 
 create' :: Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
@@ -122,7 +120,7 @@ create' creator ch cc contractName' argExps = do
   newAddressState <- getAddressState newAddress
   putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
 
-  when trace $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
+  onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
   let contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. contracts . at contractName')
 
@@ -146,7 +144,7 @@ create' creator ch cc contractName' argExps = do
   -- Run the constructor
   runTheConstructors creator newAddress ch cc contractName' argExps
 
-  when trace $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
+  onTraced $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
   sstate <- get
 
@@ -201,15 +199,7 @@ call :: Bool
 call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
   recordCall
 
-  let maybeFuncName = M.lookup "funcName" =<< metadata
-      funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
-      maybeArgString = M.lookup "args" =<< metadata
-      argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
-      maybeArgs = runParser parseArgs "" "" argString
-      args = either (\e -> error $ printf "args can not be parsed: %s\nfull args: %s" (show e) argString)
-                    (map (Nothing,))
-                    maybeArgs
-      env' = Env.Environment {
+  let env' = Env.Environment {
         Env.blockHeader = blockData,
         Env.sender = sender',
         Env.origin = origin',
@@ -217,25 +207,26 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         Env.chainId=chainId',
         Env.metadata=metadata
         }
-  (encodedReturnValue, sstate) <- runSM Nothing env' $ do
-           maybeRet <- callWrapper sender' codeAddress Nothing funcName args
-           sstate <- get
-           case maybeRet of
-             Just x -> fmap (\v -> (Just v, sstate)) $ encodeForReturn x
-             Nothing -> return (Nothing, sstate)
-
-  return ExecResults {
-    erRemainingTxGas = 0, --Just use up all the allocated gas for now....
-    erRefund = 0,
-    erReturnVal = fmap BSS.toShort encodedReturnValue,
-    erTrace = [],
-    erLogs = [],
-    erNewContractAddress = Nothing,
-    erSuicideList = S.empty,
-    erAction = Just $ sstate ^. action,
-    erException = Nothing
-    }
-
+  fmap (either solidvmErrorResults id) . runSM Nothing env' $ do
+    let maybeFuncName = M.lookup "funcName" =<< metadata
+        !funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
+        maybeArgString = M.lookup "args" =<< metadata
+        argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
+        maybeArgs = runParser parseArgs "" "" argString
+        !args = either (parseError "call arguments") (map (Nothing,)) maybeArgs
+    returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
+    finalAct <- use action
+    return $ ExecResults {
+      erRemainingTxGas = 0, --Just use up all the allocated gas for now....
+      erRefund = 0,
+      erReturnVal = BSS.toShort <$> returnVal,
+      erTrace = [],
+      erLogs = [],
+      erNewContractAddress = Nothing,
+      erSuicideList = S.empty,
+      erAction = Just $ finalAct,
+      erException = Nothing
+      }
 
 
 getCodeAndCollection :: Address -> SM (Contract, SHA, CodeCollection)
@@ -246,8 +237,8 @@ getCodeAndCollection address' = do
           (current:_) -> Just $ currentAddress current
           _ -> Nothing
 
-  when trace $ liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  when trace $ liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
+  onTraced $ liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+  onTraced $ liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
     then do
     c' <- getCurrentContract
@@ -270,13 +261,13 @@ getCodeAndCollection address' = do
 
 logFunctionCall :: [(Maybe String, Xabi.Expression)] -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
 logFunctionCall args address contract functionName f = do
-  when trace $ do
+  onTraced $ do
     let argStrings = map (unparseExpression . snd) args
     liftIO $ putStrLn $ box ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
 
   result <- f
 
-  when trace $ do
+  onTraced $ do
     resultString <-
       case result of
         Nothing -> return ""
@@ -334,20 +325,22 @@ callWrapper from to mContract functionName argExps = do
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
-runStatements :: [Xabi.Statement] -> SM (Maybe Value)
-runStatements [] = return Nothing
+
+runStatements :: [Xabi.Statement] -> SM StatementControl
+runStatements [] = return BlockEnd
 runStatements (s:rest) = do
-  when trace $
-    if True
-    then liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
-    else liftIO $ putStrLn $ C.green $ "statement> " ++ show s
+  onTraced $
+    liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
   ret <- runStatement s
   case ret of
-    Nothing -> runStatements rest
-    v -> return v
+    rv@ReturnVal{} -> return rv
+    BlockEnd -> return BlockEnd
+    Ongoing -> runStatements rest
+    ContinueLoop -> return ContinueLoop
+    BreakLoop -> return BreakLoop
 
 
-runStatement :: Xabi.Statement -> SM (Maybe Value)
+runStatement :: Xabi.Statement -> SM StatementControl
 --runStatement x | trace (C.green $ "statement> " ++ unparseStatement x) $ False = undefined
 --runStatement x | trace (C.green $ "statement> " ++ show x) $ False = undefined
 --TODO- variable assignment is an expression, but I am going to just treat it like a
@@ -362,7 +355,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
   logAssigningVariable $ SInteger v
 
   setVar path $ SInteger $ v + 1
-  return Nothing
+  return Ongoing
 
 
 
@@ -373,7 +366,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
   case t1 of
     -- Arrays are deep copied when the target is storage
     Xabi.Array{} -> do
-      when trace $ liftIO $ putStrLn $ "Array copy to " ++ show p1
+      onTraced $ liftIO $ putStrLn $ "Array copy to " ++ show p1
       let p2 = case v2 of
                   StorageItem p2' -> p2'
                   _ -> todo "unhandled array copy" v2
@@ -386,14 +379,14 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
     _ -> do
       !value <- getVar v2
       ctract <- getCurrentContract
-      when trace $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p1, value)
+      onTraced $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p1, value)
       logAssigningVariable value
       -- liftIO $ putStrLn $ "coercion at: " ++ show (p1, t1, value, coerceType t1 value)
       setVar p1 $ coerceType ctract t1 value
-  return Nothing
+  return Ongoing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
-  return Nothing -- just throw away the return value
+  return Ongoing
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames maybeExpression)) = do
   let theType = fromMaybe (todo "type inference not implemented" s) maybeType
@@ -423,7 +416,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
               ctract <- getCurrentContract
               return $ defaultValue ctract theType
            _ -> internalError "no single name for variable definition" varNames
-  when trace $ do
+  onTraced $ do
     valueString <- showSM value
     liftIO $ putStrLn $ "             creating and setting variables: (" ++ intercalate ", " (map (fromMaybe "") varNames) ++ ")"
     liftIO $ putStrLn $ "             to: " ++ valueString
@@ -439,7 +432,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
 
     _ -> typeError "VariableDefinition expected a tuple" value
 
-  return Nothing
+  return Ongoing
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
   conditionResult <- getBool =<< expToVar condition
@@ -447,58 +440,63 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
     then runStatements code'
     else case maybeElseCode of
       Just elseCode -> runStatements elseCode
-      Nothing -> return Nothing
+      Nothing -> return Ongoing
 
+runStatement (Xabi.WhileStatement conditionExp code) = do
+  let condition = getBool =<< expToVar conditionExp
+  while condition $ runStatements code
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
-  _ <-
-    case maybeInitStatement of
-      Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement
-      _ -> return Nothing
+  whenJust maybeInitStatement $ \initStatement ->
+      void $ runStatement $ Xabi.SimpleStatement initStatement
 
-  let conditionExp =
-        case maybeConditionExp of
-          Just x -> x
-          Nothing -> Xabi.BoolLiteral True
-
-  let loopExp =
-        case maybeLoopExp of
-          Just x -> x
-          Nothing -> todo "loop expressions" loopExp
-
-  let condition = getBool =<< expToVar conditionExp
+  let conditionExp = fromMaybe (Xabi.BoolLiteral True) maybeConditionExp
+      condition = getBool =<< expToVar conditionExp
 
   while condition $ do
-      when trace $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      onTraced $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
-      _ <- getVar =<< expToVar loopExp
+      whenJust maybeLoopExp $ \loopExp ->
+        void $ expToVar loopExp
       return result
 
 runStatement (Xabi.Return maybeExpression) = do
   case maybeExpression of
-    Just e -> fmap Just $ getVar =<< expToVar e
-    Nothing -> return $ Just SNULL
+    Just e -> fmap ReturnVal $ getVar =<< expToVar e
+    Nothing -> return $ ReturnVal SNULL
 
 runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   var <- expToVar $ Xabi.Variable $ T.unpack src;
   path <- expToPath $ Xabi.Variable $ T.unpack dst;
   -- TODO(tim): should this hex encode src and pad?
   setVar path =<< getString var
-  return Nothing
+  return Ongoing
+
+runStatement Xabi.Continue = return ContinueLoop
+
+runStatement Xabi.Break = return BreakLoop
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
 
-while :: SM Bool -> SM (Maybe Value) -> SM (Maybe Value)
+data StatementControl = ReturnVal Value | BlockEnd | Ongoing | ContinueLoop | BreakLoop deriving (Show, Eq)
+
+while :: SM Bool -> SM StatementControl -> SM StatementControl
 while condition code = do
   c <- condition
-  when trace $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+  onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
   if c
     then do
       result <- code
       case result of
-        Nothing -> while condition code
-        _ -> return result
-    else return Nothing
+        ReturnVal v -> return $ ReturnVal v
+        -- This isn't exactly right. Maybe it should be `blockend` and instead we have Return SNULL
+        BlockEnd -> while condition code
+        Ongoing -> while condition code
+        ContinueLoop -> while condition code
+        BreakLoop -> return $ Ongoing
+        -- Nothing -> while condition code
+        -- _ -> return result
+    else return Ongoing
 
 getIndexType :: AddressedPath -> SM IndexType
 getIndexType (AddressedPath addr p) = do
@@ -751,7 +749,7 @@ expToVar' (Xabi.Binary "!=" expr1 expr2) = do --TODO- generalize all of these Bi
 
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
-  when trace $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
+  onTraced $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
   return . Constant . SBool . not $ valEquals ctract val1 val2
 
 expToVar' (Xabi.Binary "==" expr1 expr2) = do
@@ -1026,7 +1024,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       argTypeNames = map fst $ sortWith snd $
         [ ((t, T.unpack n), i) |
           (n, Xabi.IndexedType{Xabi.indexedTypeType=t, Xabi.indexedTypeIndex=i}) <- argPairs]
-  when trace $ liftIO $ putStrLn $ box
+  onTraced $ liftIO $ putStrLn $ box
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
   argVals <- case argExps of
@@ -1084,8 +1082,8 @@ runTheCall address' contract' hsh cc theFunction argVals = do
       args = zipWith (\(n, t) v -> (n, (t, v))) argMeta argVals
       locals = args ++ returns
 
-  when trace $ liftIO $ putStrLn $ "            args: " ++ show (map fst args)
-  when trace $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
+  onTraced $ liftIO $ putStrLn $ "            args: " ++ show (map fst args)
+  onTraced $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
   addCallInfo address' contract' hsh cc $ M.fromList [(n, (t, Constant v)) | (n, (t, v)) <- locals]
   forM_ locals $ \(n, (_, v)) -> do
@@ -1100,9 +1098,9 @@ runTheCall address' contract' hsh cc theFunction argVals = do
           [x] -> return $ Just x
           _ -> todo "multiple named return values" rs
   val' <- case val of
-             Nothing -> findNamedReturns
-             Just SNULL -> findNamedReturns
-             Just{} -> return val
+             ReturnVal SNULL -> findNamedReturns
+             ReturnVal v -> return $ Just v
+             _ -> findNamedReturns
   popCallInfo
 
   return val'
@@ -1118,10 +1116,10 @@ runTheCall address' contract' hsh cc theFunction argVals = do
 logAssigningVariable :: Value -> SM ()
 logAssigningVariable v = do
   valueString <- showSM v
-  when trace $ liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
+  onTraced $ liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
 
 logVals :: (Show a, Show b) => a -> b -> SM ()
-logVals val1 val2 = when trace . liftIO . putStrLn $ printf
+logVals val1 val2 = onTraced . liftIO . putStrLn $ printf
   "            %%%% val1 = %s\n\
   \            %%%% val2 = %s" (show val1) (show val2)
 

@@ -63,6 +63,7 @@ library:
     - Blockchain.DB.ModifyStateDB
     - Blockchain.VMContext
     - Blockchain.VMOptions
+    - Blockchain.VM.SolidException
     - Blockchain.VM.VMException
     - Blockchain.VMMetrics
     - Executable.EVMFlags

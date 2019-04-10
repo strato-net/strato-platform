@@ -135,7 +135,7 @@ parseHex theString =
    [(value, "")] -> value
    _ -> error $ "parseHex: error parsing string: " ++ theString
 
-initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
+initializeCodeDB :: HasCodeDB m => [CodeInfo] -> m ()
 initializeCodeDB = mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin))
 
 chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
@@ -190,8 +190,7 @@ genesisInfoToGenesisBlock gi gn as = do
         blockBlockUncles         = []
     })
 
-initializeChainDBs :: ( MonadResource m
-                      , HasCodeDB (t m)
+initializeChainDBs :: ( HasCodeDB (t m)
                       , HasHashDB (t m)
                       , Mem.HasMemAddressStateDB (t m)
                       , RBDB.HasRedisBlockDB (t m)

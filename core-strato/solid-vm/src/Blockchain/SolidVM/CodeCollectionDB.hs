@@ -28,7 +28,7 @@ unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 compileSource :: B.ByteString -> CodeCollection
 compileSource initCode =
   let maybeFile = runParser solidityFile "" "" $ BC.unpack initCode
-      file = either (error . show) id maybeFile
+      file = either (parseError "compileSource") id maybeFile
 
       namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
                        | NamedXabi name (xabi, parents') <- unsourceUnits file]
