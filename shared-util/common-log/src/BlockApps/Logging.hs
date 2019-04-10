@@ -5,10 +5,15 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module BlockApps.Logging
- ( LoggingT
+ ( flags_minLogLevel
+ , LoggingT
  , runLoggingT
  , runNoLoggingT
  , module Control.Monad.Logger
+ , logDebugLS
+ , logInfoLS
+ , logWarnLS
+ , logErrorLS
  , formatLogOutput -- For testing
  ) where
 
@@ -16,6 +21,8 @@ import           Control.Concurrent     (ThreadId, myThreadId)
 import           Control.Monad
 import qualified Data.ByteString.Char8  as BC
 import qualified Data.Text              as Text
+import           Language.Haskell.TH
+import           Language.Haskell.TH.Syntax
 import           System.GlobalLock
 import           System.IO
 import           System.Log.FastLogger  (fromLogStr)
@@ -60,7 +67,7 @@ formatLogOutput :: PrintfType r
                 -> LogStr
                 -> r
 formatLogOutput timestamp tid loc logSource level msg =
-  printf "[%-30s] %s%5s | %-14s | %-35s | %s" timestamp mLoc level tid logSource msg
+  printf "[%-30s] %s%5s | %-14s | %-35s | %s\n" timestamp mLoc level tid logSource msg
    where mLoc = if (level == LevelDebug || level == LevelWarn) then printf "%50s | " loc else ""
 
 instance PrintfArg UTCTime where
@@ -82,3 +89,15 @@ instance PrintfArg Loc where
 
 instance PrintfArg LogStr where
   formatArg = formatString . BC.unpack . fromLogStr
+
+logDebugLS :: Q Exp
+logDebugLS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelDebug (show b)|]
+
+logInfoLS :: Q Exp
+logInfoLS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelInfo (show b)|]
+
+logWarnLS :: Q Exp
+logWarnLS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelWarn (show b)|]
+
+logErrorLS :: Q Exp
+logErrorLS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelError (show b)|]

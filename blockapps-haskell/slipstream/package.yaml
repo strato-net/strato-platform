@@ -33,6 +33,7 @@ dependencies:
   - bloomfilter
   - bytestring
   - classy-prelude
+  - common-log
   - conduit
   - conduit-combinators
   - containers
@@ -45,7 +46,6 @@ dependencies:
   - hslogger
   - http-client
   - lens
-  - logging-effect
   - lrucache
   - milena
   - MissingH

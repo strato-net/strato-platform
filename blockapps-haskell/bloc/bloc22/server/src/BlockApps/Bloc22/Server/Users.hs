@@ -19,7 +19,6 @@ import           Control.Lens                      hiding (from, ix)
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Extra
-import           Control.Monad.Log
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Lazy
 import           Crypto.Secp256k1
@@ -56,6 +55,7 @@ import           BlockApps.Bloc22.Monad
 import qualified BlockApps.Bloc22.Monad            as M
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
+import           BlockApps.Logging
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract()
 import qualified BlockApps.Solidity.Contract       as C
@@ -161,13 +161,13 @@ waitForBalance addr = waitFor "no user account found" go
         go = do
           let params = accountsFilterParams{qaAddress = Just addr}
           accts <- blocStrato $ getAccountsFilter params
-          logWith logNotice $ "waitForBalance req: " <> Text.pack (show params)
-          logWith logNotice $ "waitForBalance resp: " <> Text.pack (show accts)
+          $logInfoLS "waitForBalance/req" params
+          $logInfoLS "waitForBalance/resp" accts
           return $ not (null accts || accountBalance (head accts) == Strung 0)
 
 postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
-  when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
+  when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
   hashes <- blocStrato $ postFaucet addr
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
@@ -179,8 +179,8 @@ postUsersFill _ addr resolve = blocTransaction $ do
   result <- getBlocTransactionResult' Nothing hashes resolve
   when (resolve && Success == blocTransactionStatus result) $ do
     waitForBalance addr
-  logWith logNotice $ "postUsersFill: resolve = " <> Text.pack (show resolve)
-  logWith logNotice $ "postUsersFill: result = " <> Text.pack (show result)
+  $logInfoLS "postUsersFill/resolve" resolve
+  $logInfoLS "postUsersFill/result" result
   when (Failure == blocTransactionStatus result) $
     throwError $ UnavailableError "faucet transaction failed; please try again"
   return result
@@ -245,7 +245,7 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   idsAndDetails <- sourceToContractDetails True src
-  logWith logNotice ("constructor arguments: " <> Text.pack (show args))
+  $logInfoLS "postUsersContractEVM'/args" args
   (cName,(cmId,ContractDetails{..})) <-
     case contract of
      Nothing ->
@@ -268,7 +268,7 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
       (Wei (fromIntegral (maybe 0 unStrung value)))
       (bin <> argsBin)
       chainId
-  logWith logNotice ("tx is: " <> Text.pack (show tx))
+  $logInfoLS "postUsersContractEVM'/tx" tx
   hash <- blocStrato $ postTx tx
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
@@ -292,7 +292,7 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
          [x] -> return x
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
      Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
-  logWith logNotice ("constructor arguments: " <> Text.pack (show args))
+  $logInfoLS "postUsersContractSolidVM'/args" args
 
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   (_, argsAsSource) <- constructArgValuesAndSource (fmap (fmap argValueToText) args) xabiArgs
@@ -307,7 +307,7 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
       (Wei (fromIntegral (maybe 0 unStrung value)))
       (BC.pack $ Text.unpack src)
       chainId
-  logWith logNotice ("tx is: " <> Text.pack (show tx))
+  $logInfoLS "postUsersContractSolidVM'/tx" tx
   hash <- blocStrato $ postTx tx
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
@@ -505,7 +505,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
       let txs' = [tx | (tx,_,_) <- txsCmIdsFuncNames]
-      mapM_ (logWith logNotice . (<>) "txs are: " . Text.pack . show) txs'
+      mapM_ ($logInfoLS "postUsersContractMethodList'/txs") txs'
       hashes <- blocStrato $ postTxList txs'
       void . blocModify $ \conn -> runInsertMany conn hashNameTable
         [( Nothing
@@ -590,7 +590,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
         (Wei (maybe 0 (fromIntegral . unStrung) value))
         ((sel::ByteString) <> (argsBin::ByteString))
         chainId
-    logWith logNotice ("tx is: " <> Text.pack (show tx))
+    $logInfoLS "postUsersContractMethod'" tx
     hash <- blocStrato $ postTx tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
       ( Nothing
@@ -614,7 +614,7 @@ getBlocTransactionResult' chainId hashes@(txh:_) resolve =
     then do
       promises <- forM hashes $ \h -> async (getBlocTransactionResult h chainId True)
       results <- mapM wait promises
-      logWith logNotice $ "Transaction results: " <> Text.pack (show results)
+      $logInfoLS "getBlockTransactionResult'/results" results
       case filter ((== Success) . blocTransactionStatus) results of
         (winner:_) -> return winner
         [] -> return $ head results
@@ -655,8 +655,7 @@ recurseTRDs chainId resolve hashes = go 0 (toPending hashes)
           if num >= 600
             then return pending'
             else do
-              logWith logNotice . Text.pack $
-                "Polling BlocTransactionStatus for transaction hashes: " ++ (show $ map trdHash pending')
+              $logInfoLS "recurseTRDs/pending'" $ map trdHash pending'
               void . liftIO $ threadDelay 100000
               go (num + 1) pending'
       return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
@@ -848,8 +847,8 @@ getAccountNonce :: Address -> Maybe ChainId -> Bloc Nonce
 getAccountNonce addr chainId = do
   let params = accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
   accts <- blocStrato $ getAccountsFilter params
-  logWith logNotice $ "getAccountNonce req: " <> Text.pack (show params)
-  logWith logNotice $ "getAccountNonce resp: " <> Text.pack (show accts)
+  $logInfoLS "getAccountNonce/req" params
+  $logInfoLS "getAccountNonce/resp" accts
   case listToMaybe accts of
     Nothing   -> throwError . UserError $ "User does not have a balance"
     Just acct -> return $ accountNonce acct

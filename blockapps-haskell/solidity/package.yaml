@@ -36,7 +36,6 @@ dependencies:
   - hashable
   - http-api-data
   - lens
-  - logging-effect
   - memory
   - mtl
   - ordered-containers
