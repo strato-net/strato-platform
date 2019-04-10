@@ -2,7 +2,6 @@
 module ColdStorageSpec where
 
 import ClassyPrelude
-import Control.Monad.Logger
 import Control.Monad.Trans.Resource
 import Database.Persist.Sqlite
 import qualified Prelude as P()
@@ -10,6 +9,7 @@ import Test.Hspec (Spec, describe, it)
 import Test.Hspec.Expectations.Lifted
 
 import BlockApps.Ethereum
+import BlockApps.Logging
 import BlockApps.Solidity.Value
 import Slipstream.GlobalsColdStorage
 
