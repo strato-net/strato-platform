@@ -120,3 +120,6 @@ data CodePtr = EVMCode SHA | SolidVMCode String SHA
 instance Format CodePtr where
   format (EVMCode ch) = format ch
   format (SolidVMCode n ch) = "<" ++ n ++ ", " ++ format ch ++ ">"
+
+blockstanbulMixHash :: SHA
+blockstanbulMixHash = SHA 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
