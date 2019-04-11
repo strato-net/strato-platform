@@ -169,11 +169,16 @@ unparseStatement (AssemblyStatement (MloadAdd32 dst src)) = printf "assembly { %
 unparseStatement x = error $ "missing case in call to unparseStatement: " ++ show x
 
 unparseSimpleStatement :: SimpleStatement -> String
-unparseSimpleStatement (VariableDefinition maybeType names maybeVal) =
+unparseSimpleStatement (VariableDefinition maybeType maybeLoc names maybeVal) =
   let typeString =
         case maybeType of
           Nothing -> "var"
           Just theType -> unparseVarType theType
+      locString =
+        case maybeLoc of
+          Nothing -> " "
+          Just Memory -> " memory "
+          Just Storage -> " storage "
       nameString =
         case names of
           [Just n] -> n
@@ -183,7 +188,7 @@ unparseSimpleStatement (VariableDefinition maybeType names maybeVal) =
           Nothing -> ""
           Just e -> " = " ++ unparseExpression e
   in
-    typeString ++ " " ++ nameString ++ assignmentString
+    typeString ++ locString ++ nameString ++ assignmentString
 unparseSimpleStatement (ExpressionStatement e) = unparseExpression e
 
 -- TODO- deal with parenthesis properly....  this is a bit difficult to do

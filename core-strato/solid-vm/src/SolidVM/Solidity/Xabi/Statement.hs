@@ -21,8 +21,10 @@ data Statement =
   | SimpleStatement SimpleStatement
   deriving (Show, Read, Eq, Generic, NFData, Binary)
 
+data Location = Memory | Storage deriving (Show, Read, Eq, Generic, NFData, Binary)
+
 data SimpleStatement =
-  VariableDefinition (Maybe Type) [Maybe String] (Maybe Expression) -- Nothing type indicates "var" keyword
+  VariableDefinition (Maybe Type) (Maybe Location) [Maybe String] (Maybe Expression) -- Nothing type indicates "var" keyword
   | ExpressionStatement Expression deriving (Show, Read, Eq, Generic, NFData, Binary)
 
 -- Currently, the only supported inline assembly is:

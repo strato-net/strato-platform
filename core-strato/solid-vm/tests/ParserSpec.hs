@@ -41,6 +41,8 @@ spec = do
                                        (Just $ Variable "a"))
                                      (Just $ Variable "b"))
                                    (Just $ Variable "c"))
+                , ("int(8824)", FunctionCall (Variable "int") [(Nothing, NumberLiteral 8824 Nothing)])
+                , ("int32(8824)", FunctionCall (Variable "int32") [(Nothing, NumberLiteral 8824 Nothing)])
                 ]
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want
@@ -65,11 +67,8 @@ spec = do
         scases = [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus $ Variable "x")
                  , ("assembly { dst := mload(add(src, 32)) }",
                       AssemblyStatement $ MloadAdd32 "dst" "src")
-                 , ("x = int(87234);", SimpleStatement $
-                      VariableDefinition Nothing [Just "x"] $ Just $
-                      FunctionCall (Variable "int") [(Nothing, NumberLiteral 87324 Nothing)])
-                 , ("Nom storage nom = ns[10]", SimpleStatement $
-                      VariableDefinition (Just $ Label "Nom") [Just "nom"] $ Just $
+                 , ("Nom storage nom = ns[10];", SimpleStatement $
+                      VariableDefinition (Just $ Label "Nom") (Just Storage) [Just "nom"] $ Just $
                       IndexAccess (Variable "ns") (Just $ NumberLiteral 10 Nothing))
                  ]
     forM_ scases $ \(input, want) -> do

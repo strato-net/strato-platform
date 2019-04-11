@@ -238,7 +238,7 @@ spec :: Spec
 spec = do
   describe "Ballot" $ do
     it "can be created" . runTest $ do
-      liftIO $ pendingWith "storage vs memory, struct kwargs"
+      liftIO $ pendingWith "struct kwargs"
       runFile "testdata/Ballot.sol"
 
   describe "Create" $ do
@@ -1824,7 +1824,6 @@ contract qq {
     getFields ["z"] `shouldReturn` [BInteger 123456]
 
   it "can create storage references to structs" . runTest $ do
-    liftIO $ pendingWith "TODO: storage in vardef"
     runBS [r|
 contract qq {
   struct Nom {
@@ -1835,11 +1834,35 @@ contract qq {
 
   constructor() public {
     noms.push(Nom("239847", 7777));
-    Nom storage n = noms[0]
+    Nom storage n = noms[0];
     n.nomType = 13;
   }
 }|]
     getAll [ [Field "noms", Field "length"]
            , [Field "noms", ArrayIndex 0, Field "id" ]
            , [Field "noms", ArrayIndex 0, Field "nomType" ]
-           ] `shouldReturn` [BInteger 0, BString "239847", BInteger 13]
+           ] `shouldReturn` [BInteger 1, BString "239847", BInteger 13]
+
+  it "can create memory copies of structs" . runTest $ do
+    liftIO $ pendingWith "memory copies"
+    runBS [r|
+contract qq {
+  struct Nom {
+    string id;
+    uint nomType;
+  }
+  Nom[] noms;
+  uint newType;
+
+  constructor() public {
+    noms.push(Nom("ok", 41));
+    Nom memory n = noms[0];
+    n.nomType = 92;
+    newType = n.nomType;
+  }
+}|]
+    getAll [ [Field "noms", Field "length"]
+           , [Field "noms", ArrayIndex 0, Field "id"]
+           , [Field "noms", ArrayIndex 0, Field "nomType"]
+           , [Field "newType"]
+           ] `shouldReturn` [BInteger 1, BString "ok", BInteger 41, BInteger 92]

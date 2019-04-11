@@ -389,7 +389,8 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
-runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames maybeExpression)) = do
+runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType _ varNames maybeExpression)) = do
+  -- todo: use maybeLoc to determine whether to store this locally or create a reference
   let theType = fromMaybe (todo "type inference not implemented" s) maybeType
   value <-
     case maybeExpression of
@@ -943,6 +944,15 @@ binopAssign oper lhs rhs = do
   setVar path next
   return $ Constant next
 
+intBuiltin :: [Value] -> Value
+intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
+intBuiltin [SInteger n] = SInteger n
+intBuiltin [SString hex] =
+  case B16.decode (BC.pack hex) of
+    (l, "") -> SInteger . fromIntegral . bytesToWord256 $ l
+    _ -> typeError "numeric cast - not a hex string" hex
+intBuiltin args = typeError "numeric cast - invalid args" args
+
 callBuiltin :: String -> [Value] -> Maybe Value -> SM Value
 callBuiltin "string" [SString s] _ = return $ SString s
 callBuiltin "string" vs _ = typeError "string cast" vs
@@ -951,14 +961,8 @@ callBuiltin "address" [a@SAddress{}] _ = return a
 callBuiltin "address" [SContract _ a] _ = return $ SAddress a
 callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte"  vs _ = typeError "byte cast" vs
-callBuiltin "uint" [SEnumVal _ _ enumNum] _ = return . SInteger $ fromIntegral enumNum
-callBuiltin "uint" [SInteger n] _ = return $ SInteger n
-callBuiltin "uint" [SString hex] _ =
-  case B16.decode (BC.pack hex) of
-    (l, "") -> return . SInteger . fromIntegral . bytesToWord256 $ l
-    _ -> typeError "uint cast - not a hex string" hex
-
-callBuiltin "uint" args _ = typeError "uint cast" args
+callBuiltin "uint" args _ = return $ intBuiltin args
+callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
 callBuiltin "keccak256" [SString buf] Nothing = do

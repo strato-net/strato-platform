@@ -83,10 +83,12 @@ forStatement = do
 variableDefinitionStatement :: SolidityParser SimpleStatement
 variableDefinitionStatement = do
   theType <- ((reserved "var" >> return Nothing) <|> Just <$> simpleTypeExpression)
-  _ <- optional $ reserved "memory"
+  mLoc <- optionMaybe $ asum [ reserved "memory" >> return Memory
+                             , reserved "storage" >> return Storage
+                             ]
   names <- fmap ((:[]) . Just) identifier <|> parens (commaSep2 $ optionMaybe identifier)
   expr <- optionMaybe (reservedOp "=" >> expression)
-  return $ VariableDefinition theType names expr
+  return $ VariableDefinition theType mLoc names expr
 
 --TODO- someday we need to clean up this parser to avoid using any "try"s
 commaSep2 :: SolidityParser a -> SolidityParser [a]
@@ -195,6 +197,7 @@ primaryExpression = do
   <|> (reserved "block" >> return (Variable "block"))
   <|> (reserved "tx" >> return (Variable "tx"))
   <|> (reserved "uint" >> return (Variable "uint"))
+  <|> (reserved "int" >> return (Variable "int"))
   <|> (reserved "byte" >> return (Variable "byte"))
   <|> (reserved "bytes" >> return (Variable "bytes"))
   <|> (reserved "string" >> return (Variable "string"))
