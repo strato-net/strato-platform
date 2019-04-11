@@ -11,7 +11,7 @@ module Slipstream.Events where
 import           Data.Map                 (Map)
 import           Data.Text                (Text)
 import qualified BlockApps.Solidity.Value as V
-import           BlockApps.Ethereum (Address, SHA)
+import           BlockApps.Ethereum (Address, CodePtr, SHA)
 import           Data.Time
 import           Slipstream.SolidityValue
 
@@ -27,7 +27,7 @@ data FunctionCallData = FunctionCallData
 
 data ProcessedContract = ProcessedContract
   { address           :: Address
-  , codehash          :: SHA
+  , codehash          :: CodePtr
   , abi               :: Text
   , contractName      :: Text
   , chain             :: Text

@@ -1,10 +1,8 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# OPTIONS -fno-warn-unused-imports #-} -- #justHFlagsThingz
 
 import           Control.Monad
-import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Handler.Warp
@@ -12,12 +10,12 @@ import           HFlags
 
 import           Blockapps.Crossmon
 import           Blockchain.Output
-import           Blockchain.VMOptions
+import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
-import           Executable.EVMFlags
+import           Executable.EVMFlags() -- HFlags
 
 main :: IO ()
 main = do
   initializeHealthChecks "vm_main"
   void $ $initHFlags "Ethereum VM"
-  race_ (runLoggingT ethereumVM printLogMsg) (run 8000 metricsApp)
+  race_ (runLoggingT ethereumVM) (run 8000 metricsApp)

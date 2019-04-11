@@ -20,7 +20,7 @@ import           Control.Lens                       ((%=), (.=), at, mapped)
 import           Control.Monad
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
@@ -41,6 +41,7 @@ import qualified Data.Text                          as T
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
+import           UnliftIO.Exception (throwIO)
 
 
 
@@ -1021,7 +1022,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
           when flags_debug $ $logDebugS "runVMM/Left" "VM has finished running"
           return execResults{
                    erLogs=[],
-                   erException = Just e,
+                   erException = Just (Right e),
                    erRefund=0, -- even if e == RevertException, since the full state reverts, all refunds go to 0.
                    erRemainingTxGas =
                        if e == RevertException
@@ -1094,7 +1095,7 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
       then runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas create'
       else do
         execResults <- vmStateToExecResults vmState
-        return execResults{erException=Just InsufficientFunds}
+        return execResults{erException=Just $ Right InsufficientFunds}
   case erException execResults of
     Just e -> do
       --if there was an error, addressStates were reverted, so the receiveAddress still should
@@ -1111,14 +1112,14 @@ create' :: VMM Code
 create' = do
 
   owner <- getEnvVar envOwner
-  action . actionData %= M.insert owner (ActionData (SHA 0) EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert owner (ActionData (EVMCode $ SHA 0) EVM (ActionEVMDiff M.empty) [])
 
   runCodeFromStart
 
   vmState <- lift get
 
   let codeBytes = fromMaybe B.empty $ returnVal vmState
-  (action . actionData . at owner . mapped . actionDataCodeHash) .= hash codeBytes
+  action . actionData . at owner . mapped . actionDataCodeHash .= EVMCode (hash codeBytes)
   when flags_debug $ lift $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes
 
   -- this used to say "not enough ether, but im pretty sure it meant gas -io
@@ -1219,7 +1220,7 @@ call' noValueTransfer = do
   let ch = case cp of
         EVMCode x -> x
         _ -> error "internal error- the EVM was called for non-evm code"
-  action . actionData %= M.insert receiveAddress (ActionData ch EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert receiveAddress (ActionData (EVMCode ch) EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
@@ -1367,15 +1368,18 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
           useGas $ negate $ fromIntegral $ erRemainingTxGas execResults
           addToRefund $ fromIntegral $ erRefund execResults
           return (1, erReturnVal execResults)
-        Just RevertException -> do
+        Just (Right RevertException) -> do
           useGas $ negate $ fromIntegral $ erRemainingTxGas execResults
           when flags_debug $
             lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Reverting, retval: " ++ show (erReturnVal execResults)
           addToRefund $ fromIntegral $ erRefund execResults
           return (0, erReturnVal execResults)
-        Just e -> do
+        Just (Right e)  -> do
           when flags_debug $ lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ CL.red $ show e
           return (0, Nothing)
+        Just (Left se) -> do
+          -- Should not have a SolidException from executing the EVM
+          throwIO se
 
 
 

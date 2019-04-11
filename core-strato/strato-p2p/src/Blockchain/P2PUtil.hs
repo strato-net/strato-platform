@@ -13,7 +13,7 @@ import qualified Network.Socket                  as S
 import           Blockchain.Strato.Discovery.UDP
 import           Control.Arrow                   ((>>>))
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Data.ByteString.Char8           as BC
 import           Data.IP                         (IPv4)
 import           Network.DNS.Lookup

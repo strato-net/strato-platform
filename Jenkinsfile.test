@@ -53,7 +53,7 @@ pipeline {
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=$(</host)
-          NODE_HOST=${NODE_HOST} genesis=smokeTest loglevel=6 SLIPSTREAM_OPTIONAL=false ./strato.sh -m 1 --single
+          NODE_HOST=${NODE_HOST} genesis=smokeTest BLOC_DEBUG=true SLIPSTREAM_OPTIONAL=false ./strato.sh -m 1 --single
           docker ps
           # Few quick tests
           check_bloc() {
@@ -155,6 +155,7 @@ pipeline {
               npm install
               npm run test:truchainz
               npm run test:multicontract
+              npm run test:slipstream
               npm run test:solidvm
               npm run test:uploadOrder
               popd
@@ -170,10 +171,11 @@ pipeline {
 
   post {
     always {
-      sh 'rm -rf logs'
-      sh 'mkdir logs'
-      sh './log_artifact.sh logs'
-      archiveArtifacts artifacts: 'logs/*', fingerprint: true
+      dir ('strato-getting-started') {
+        sh 'rm -rf strato_logs*'
+        sh './fetchlogs --as-dir'
+        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
+      }
     }
 
     success {

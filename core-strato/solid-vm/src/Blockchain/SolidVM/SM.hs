@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
@@ -26,13 +27,16 @@ module Blockchain.SolidVM.SM (
   getTypeOfName,
   getXabiType,
   getXabiValueType,
-  getValueType
+  getValueType,
+  pushSender,
+  initializeAction,
+  markDiffForAction
   ) where
 
 import           Control.Applicative ((<|>))
+import           Control.Exception
 import           Control.Lens
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
@@ -48,6 +52,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
@@ -116,12 +121,12 @@ data SState =
     addressStateBlockDBMap :: M.Map Address AddressStateModification,
     storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
     storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString,
-    _action                 :: Action
+    _action                :: Action
   }
 
 makeLenses ''SState
 
-type SM = StateT SState (ResourceT IO)
+type SM = StateT SState IO
 
 instance HasMemAddressStateDB SM where
   getAddressStateTxDBMap = addressStateTxDBMap <$> get
@@ -161,7 +166,7 @@ instance HasHashDB SM where
 instance HasCodeDB SM where
   getCodeDB = codeDB <$> get
 
-runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM a
+runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
 runSM maybeCode env f = do
   vmcontext <- get
 
@@ -179,17 +184,38 @@ runSM maybeCode env f = do
         _action = startingAction maybeCode env
         }
 
-  (value, sstateAfter) <- liftIO $ runResourceT $ runStateT f startingState
+  eValState <- liftIO . try $ runStateT f startingState
+  case eValState of
+    -- InternalError should *never* happen.
+    -- TODO should also not happen, but since this is a work in progress they
+    -- are a fact of life and should be fixed on demand.
+    -- The rest should always be a user error and handled safely
+    Left ie@InternalError{} -> throw ie
+    Left se -> return $ Left se
+    Right (value, sstateAfter) -> do
+      vmcontext' <- get
+      put vmcontext'{
+        contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
+        contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
+        contextStorageTxMap = storageTxMap sstateAfter,
+        contextStorageBlockMap = storageBlockMap sstateAfter
+        }
+      setStateDBStateRoot $ MP.stateRoot $ stateDB sstateAfter
+      return $ Right value
 
-  vmcontext' <- get
-  put vmcontext'{
-    contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
-    contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
-    contextStorageTxMap = storageTxMap sstateAfter,
-    contextStorageBlockMap = storageBlockMap sstateAfter
-    }
-  setStateDBStateRoot $ MP.stateRoot $ stateDB sstateAfter
-  return value
+
+-- When calling a remote contract, the new `msg.sender` is the contract
+-- that the call is initiated from.
+pushSender :: Address -> SM a -> SM a
+pushSender newSender mv = do
+  state0 <- get
+  let oldSender = Env.sender $ env state0
+  put $ state0{env=(env state0){Env.sender = newSender}}
+  ret <- mv
+  state1 <- get
+  put $ state1{env=(env state1){Env.sender = oldSender}}
+  return $ ret
+
 
 
 startingAction :: Maybe ByteString -> Env.Environment -> Action
@@ -250,7 +276,7 @@ getVariableOfName name = do
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction = toMaybe (name `elem` ["uint", "byte", "string", "keccak256"
+      maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "byte", "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"]) $
@@ -268,7 +294,7 @@ getVariableOfName name = do
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
         Xabi.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
-        return $ coerceType constType $ case constInitialVal of
+        return $ coerceType ctract constType $ case constInitialVal of
                                             Xabi.NumberLiteral x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
@@ -490,3 +516,17 @@ getXabiValueType (AddressedPath loc path) = do
 
 getValueType :: AddressedPath -> SM BasicType
 getValueType p = hintFromType =<< getXabiValueType p
+
+initializeAction :: Address -> String -> SHA -> SM ()
+initializeAction addr name hsh = do
+  let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
+  action . actionData %= M.insertWith mergeActionData addr newData
+
+markDiffForAction :: Address -> MS.StoragePath -> MS.BasicValue -> SM ()
+markDiffForAction owner key' val' = do
+  let key = MS.unparsePath key'
+      val = rlpSerialize $ rlpEncode val'
+      ins = \case
+              ActionSolidVMDiff m -> ActionSolidVMDiff $ M.insert key val m
+              _ -> error "SolidVM Diff executing in EVM"
+  (action . actionData . at owner . mapped . actionDataStorageDiffs) %= ins

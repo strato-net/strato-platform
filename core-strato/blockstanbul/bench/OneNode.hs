@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-import Control.Monad.Logger
+import Blockchain.Output
 import Control.Monad.Trans.State.Lazy
 
 import Blockchain.Blockstanbul

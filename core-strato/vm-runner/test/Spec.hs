@@ -10,7 +10,6 @@ import           Test.Hspec
 import           HFlags
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
@@ -30,7 +29,7 @@ import           Blockchain.Data.ExecResults
 import           Blockchain.EVM
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.Opcodes
-import           Blockchain.Output    (printLogMsg)
+import           Blockchain.Output
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
@@ -53,7 +52,7 @@ spec :: Spec
 spec = do
   describe "monad transformer over map tests" $ do
     it "stateT get its puts for a map" $ do
-      (execResults,_) <- flip runLoggingT printLogMsg $ runTestContextM $ do
+      (execResults,_) <- runLoggingT $ runTestContextM $ do
         let
           isRunningTests = False
           isHomestead = False

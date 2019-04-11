@@ -10,7 +10,6 @@ module Blockchain.DB.RawStorageDB (
  ) where
 
 import           Control.Monad.State
-import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                             as B
 import qualified Data.Map                                    as M
 import qualified Database.LevelDB                            as DB
@@ -25,7 +24,7 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import qualified Data.NibbleString                           as N
 
-class MonadResource m => HasRawStorageDB m where
+class MonadIO m => HasRawStorageDB m where
   getRawStorageTxDB     :: m (DB.DB, M.Map (Address, B.ByteString) B.ByteString)
   putRawStorageTxMap    :: M.Map (Address, B.ByteString) B.ByteString -> m ()
   getRawStorageBlockDB  :: m (DB.DB, M.Map (Address, B.ByteString) B.ByteString)

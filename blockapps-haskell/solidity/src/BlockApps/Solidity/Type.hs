@@ -34,7 +34,7 @@ data Type
   | TypeStruct Text
   | TypeEnum Text
   | TypeContract Text
-  deriving (Eq, Show, Generic, NFData, Binary)
+  deriving (Eq, Show, Generic, NFData, Binary, Ord)
 
 data SimpleType
   = TypeBool
@@ -45,7 +45,7 @@ data SimpleType
             }
   | TypeBytes { bytesSize :: Maybe Integer
               }
-  deriving (Eq, Show, Generic, NFData, Binary)
+  deriving (Eq, Show, Generic, NFData, Binary, Ord)
 
 getTypeByteLength :: Type -> Maybe Int
 getTypeByteLength = \case

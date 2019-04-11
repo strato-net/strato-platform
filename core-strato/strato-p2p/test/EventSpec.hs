@@ -5,7 +5,6 @@ module EventSpec where
 
 import ClassyPrelude (atomically)
 import Conduit
-import Control.Monad.Logger
 import Control.Monad.Trans.Reader
 import Data.Conduit.TMChan
 import Database.Persist.Sql
@@ -79,7 +78,7 @@ runTestPeer mv = do
   (ch, cfg, ctx) <- testContext
   let pool = configSQLDB cfg
   liftSqlPersistMPool migrateAll pool
-  runLoggingT (runContextM (cfg, ctx) (mv ch)) printLogMsg
+  runNoLoggingT (runContextM (cfg, ctx) (mv ch))
 
 spec :: Spec
 spec = do

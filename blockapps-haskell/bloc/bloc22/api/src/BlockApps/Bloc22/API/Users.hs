@@ -8,12 +8,14 @@
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeOperators              #-}
 
 module BlockApps.Bloc22.API.Users where
 
 import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
+import           Control.Lens.TH
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
 import qualified Data.ByteString.Lazy               as ByteString.Lazy
@@ -429,7 +431,7 @@ instance ToSchema UploadListRequest where
       exContract1 = UploadListContract
         { uploadlistcontractContractName = "AccountsContract"
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
-        , uploadlistcontractTxParams = Nothing
+        , _uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
         , uploadlistcontractMetadata = Nothing
         }
@@ -439,10 +441,11 @@ instance ToSchema UploadListRequest where
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
   , uploadlistcontractArgs         :: Map Text ArgValue
-  , uploadlistcontractTxParams     :: Maybe TxParams
+  , _uploadlistcontractTxParams    :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
   , uploadlistcontractMetadata     :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
+makeLenses ''UploadListContract
 
 instance Arbitrary UploadListContract where arbitrary = GR.genericArbitrary GR.uniform
 
@@ -461,7 +464,7 @@ instance ToSchema UploadListContract where
       ex = UploadListContract
         { uploadlistcontractContractName = "SampleContract"
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
-        , uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
+        , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing
         , uploadlistcontractMetadata = Nothing
         }
@@ -640,7 +643,7 @@ instance ToSchema PostSendListRequest where
       sendEx = SendTransaction
         { sendtransactionToAddress = Address 0xdeadbeef
         , sendtransactionValue = Strung 1000000000000000
-        , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
+        , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
@@ -648,9 +651,10 @@ instance ToSchema PostSendListRequest where
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue     :: Strung Natural
-  , sendtransactionTxParams  :: Maybe TxParams
+  , _sendtransactionTxParams :: Maybe TxParams
   , sendtransactionMetadata  :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
+makeLenses ''SendTransaction
 
 instance Arbitrary SendTransaction where arbitrary = GR.genericArbitrary GR.uniform
 
@@ -698,7 +702,7 @@ instance ToSchema SendTransaction where
       ex = SendTransaction
         { sendtransactionToAddress = Address 0xdeadbeef
         , sendtransactionValue = Strung 100000000000000
-        , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
+        , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
@@ -803,7 +807,7 @@ methodErroredExample =
   where
      exMethodCall :: MethodCall
      exMethodCall = MethodCall
-       { methodcallTxParams = Nothing
+       { _methodcallTxParams = Nothing
        , methodcallValue = Strung 1000000000
        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
        , methodcallMethodName = "getHoroscope"
@@ -853,7 +857,7 @@ instance ToSchema PostMethodListRequest where
         }
       exMethodCall :: MethodCall
       exMethodCall = MethodCall
-        { methodcallTxParams = Nothing
+        { _methodcallTxParams = Nothing
         , methodcallValue = Strung 1000000000
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
@@ -868,9 +872,10 @@ data MethodCall = MethodCall
   , methodcallMethodName      :: Text
   , methodcallArgs            :: Map Text ArgValue
   , methodcallValue           :: Strung Natural
-  , methodcallTxParams        :: Maybe TxParams
+  , _methodcallTxParams       :: Maybe TxParams
   , methodcallMetadata        :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
+makeLenses ''MethodCall
 
 instance Arbitrary MethodCall where arbitrary = GR.genericArbitrary GR.uniform
 
@@ -888,7 +893,7 @@ instance ToSchema MethodCall where
     where
       ex ::MethodCall
       ex = MethodCall
-        { methodcallTxParams = Nothing
+        { _methodcallTxParams = Nothing
         , methodcallValue = Strung 1000000000
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"

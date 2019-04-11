@@ -7,7 +7,7 @@ module Blockchain.Verifier (
   ) where
 
 import           Control.Monad
-import           Control.Monad.Trans.Resource
+import           Control.Monad.IO.Class
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
@@ -70,7 +70,7 @@ checkParentChildValidity isHomestead OutputBlock{obBlockData=c} parentBSum = do
 verifier::Miner
 verifier = (if (flags_miner == Normal) then normalMiner else if(flags_miner == Instant) then instantMiner else shaMiner)
 
-addAllKVs::RLPSerializable obj=>MonadResource m=>MP.MPDB->[(Integer, obj)]->m MP.MPDB
+addAllKVs::RLPSerializable obj=>MonadIO m=>MP.MPDB->[(Integer, obj)]->m MP.MPDB
 addAllKVs x [] = return x
 addAllKVs mpdb (x:rest) = do
   mpdb' <- MP.unsafePutKeyVal mpdb (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
@@ -80,14 +80,14 @@ verifyTransactionRoot'::OutputBlock -> (Bool,MP.StateRoot)
 verifyTransactionRoot' OutputBlock{obBlockData=bd,obReceiptTransactions=txs} =
     let tVal = transactionsVerificationValue (otBaseTx <$> txs) in (blockDataTransactionsRoot bd == tVal, tVal)
 
-verifyTransactionRoot::(MonadResource m, HasStateDB m)=>OutputBlock->m (Bool,MP.StateRoot)
+verifyTransactionRoot::HasStateDB m=>OutputBlock->m (Bool,MP.StateRoot)
 verifyTransactionRoot OutputBlock{obBlockData=bd,obReceiptTransactions=txs} = do
   mpdb <- getStateDB
 
   MP.MPDB{MP.stateRoot=sr} <- addAllKVs mpdb{MP.stateRoot=MP.emptyTriePtr} $ zip [0..] $ (otBaseTx <$> txs)
   return (blockDataTransactionsRoot bd == sr, sr)
 
-verifyOmmersRoot::(MonadResource m, HasStateDB m)=>OutputBlock->m Bool
+verifyOmmersRoot::HasStateDB m=>OutputBlock->m Bool
 verifyOmmersRoot OutputBlock{obBlockData=bd, obBlockUncles=bu} = return $ blockDataUnclesHash bd == hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
 
 checkValidity :: Monad m => Bool -> BlockSummary -> OutputBlock -> ContextM (m ())

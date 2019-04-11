@@ -26,7 +26,6 @@ dependencies:
   - extra
   - mtl
   - resourcet
-  - monad-logger
   - text
   - strato-genesis
   - leveldb-haskell

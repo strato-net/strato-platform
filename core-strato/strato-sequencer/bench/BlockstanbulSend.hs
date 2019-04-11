@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 import ClassyPrelude (atomically)
 import Control.Concurrent.STM.TMChan
-import Control.Monad.Logger
+import Blockchain.Output
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans.Resource

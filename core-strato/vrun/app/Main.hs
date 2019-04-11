@@ -7,11 +7,10 @@ module Main where
 
 import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Lazy                        as BL
-import qualified Data.ByteString.Char8                       as BC
 import           Data.Maybe
 import           Data.Time.Clock.POSIX
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Except
 import           HFlags
 import           Network.Haskoin.Crypto                      (withSource)
@@ -33,7 +32,6 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.VMContext
 import           Blockchain.VMOptions       ()
 import           Executable.EVMFlags        ()
-import           System.Log.FastLogger  (fromLogStr)
 
 main :: IO ()
 main = do
@@ -79,7 +77,7 @@ main = do
 
   let signedTransaction = txToOutputTx signedTransaction'
 
-  (result, _) <- flip runLoggingT vrunLogger $ runTestContextM $ do
+  (result, _) <- runLoggingT $ runTestContextM $ do
     MP.initializeBlank =<< getStateDB
     setStateDBStateRoot MP.emptyTriePtr
 
@@ -99,9 +97,6 @@ main = do
     Right r -> putStrLn $ "vrun: " ++ show r
   BL.putStr =<< exportMetricsAsText
 
-
-vrunLogger :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
-vrunLogger _ _ _ s = putStrLn $ BC.unpack $ fromLogStr s
 
 txToOutputTx :: Transaction -> OutputTx
 txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct

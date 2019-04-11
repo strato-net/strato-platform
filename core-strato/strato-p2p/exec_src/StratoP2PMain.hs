@@ -1,7 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings     #-}
 import           Control.Concurrent.Async.Lifted.Safe
-import           Control.Monad.Logger
 import           HFlags
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
@@ -18,6 +17,6 @@ main = do
   _ <- $initHFlags "Strato P2P"
   race_
     (run 10248 metricsApp)
-    (flip runLoggingT printLogMsg $
+    (runLoggingT $
       race_ stratoP2PClient
             stratoP2PServer)
