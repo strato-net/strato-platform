@@ -10,6 +10,7 @@ import Text.Parsec
 import Text.RawString.QQ
 
 import SolidVM.Solidity.Xabi.Statement
+import SolidVM.Solidity.Xabi.Type
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.Statement
 import SolidVM.Solidity.Parse.UnParser
@@ -64,6 +65,12 @@ spec = do
         scases = [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus $ Variable "x")
                  , ("assembly { dst := mload(add(src, 32)) }",
                       AssemblyStatement $ MloadAdd32 "dst" "src")
+                 , ("x = int(87234);", SimpleStatement $
+                      VariableDefinition Nothing [Just "x"] $ Just $
+                      FunctionCall (Variable "int") [(Nothing, NumberLiteral 87324 Nothing)])
+                 , ("Nom storage nom = ns[10]", SimpleStatement $
+                      VariableDefinition (Just $ Label "Nom") [Just "nom"] $ Just $
+                      IndexAccess (Variable "ns") (Just $ NumberLiteral 10 Nothing))
                  ]
     forM_ scases $ \(input, want) -> do
         it ("can parse " ++ input) $ parseStatement input `shouldBe` Right want

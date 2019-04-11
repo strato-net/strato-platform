@@ -1812,3 +1812,34 @@ contract qq {
 
   it "catches missing function errors" $
     (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc
+
+  it "can cast to int" . runTest $ do
+    runBS [r|
+contract qq {
+  int z;
+  constructor() public {
+    z = int(123456);
+  }
+}|]
+    getFields ["z"] `shouldReturn` [BInteger 123456]
+
+  it "can create storage references to structs" . runTest $ do
+    liftIO $ pendingWith "TODO: storage in vardef"
+    runBS [r|
+contract qq {
+  struct Nom {
+    string id;
+    uint nomType;
+  }
+  Nom[] noms;
+
+  constructor() public {
+    noms.push(Nom("239847", 7777));
+    Nom storage n = noms[0]
+    n.nomType = 13;
+  }
+}|]
+    getAll [ [Field "noms", Field "length"]
+           , [Field "noms", ArrayIndex 0, Field "id" ]
+           , [Field "noms", ArrayIndex 0, Field "nomType" ]
+           ] `shouldReturn` [BInteger 0, BString "239847", BInteger 13]
