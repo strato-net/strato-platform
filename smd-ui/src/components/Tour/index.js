@@ -6,6 +6,7 @@ import { stopAllToursFromAutostarting, endTour } from './tour.actions';
 import { withRouter } from 'react-router';
 
 const Tour = ({ name, callback, run, steps, ref, autoStart, endTour, stopAllToursFromAutostarting, finalStepSelector, nextPage = null, history }) => {
+  console.log("---------------------run ", run)
   return (
     <Joyride
       steps={steps}
@@ -42,7 +43,10 @@ const Tour = ({ name, callback, run, steps, ref, autoStart, endTour, stopAllTour
 
 export function mapStateToProps(state, ownProps) {
   return {
-    run: state.tour[ownProps.name].run && state.tour.all.run,
+    // INFO: https://blockapps.atlassian.net/browse/STRATO-1395 (it is remove or disabled)
+    // It is better to disabled this. If needed in future just uncomment below line and remove run: false,
+    // run: state.tour[ownProps.name].run && state.tour.all.run,
+    run: false,
     autoStart: state.tour[ownProps.name].autoStart && state.tour.all.autoStart,
   }
 }
