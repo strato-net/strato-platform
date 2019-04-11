@@ -205,12 +205,7 @@ createIndexTable globalsIORef contract = do
       contractAlreadyCreated = hashVal `Set.member` createdContracts globals
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
-  $logDebugLS "createIndexTable" $
-    T.intercalate " " [ "In createIndexTable,"
-                      , tshow hashVal
-                      , "contractAlreadyCreated ="
-                      , tshow contractAlreadyCreated
-                      ]
+  $logDebugLS "createIndexTable/contractAlreadyCreated" (hashVal, contractAlreadyCreated)
   unless contractAlreadyCreated $ do
     incNumTables
     yield $ insertContractTableQuery contract

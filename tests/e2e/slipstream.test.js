@@ -42,4 +42,24 @@ contract StringArray {
 
   }).timeout(config.timeout);
 
+  const newContract = `
+contract X {
+  uint public z = 7624;
+}
+
+contract Y {
+  X x;
+  constructor() public {
+    x = new X();
+  }
+}
+`;
+  it("can index contracts recursively constructed", async () => {
+    const [user, contract] = await upload("Y", newContract);
+    const indexY = await co.wrap(rest.waitQuery)("Y", 1);
+    assert.equal(indexY.length, 1, JSON.stringify(indexY, null, 2));
+    const indexX = await co.wrap(rest.waitQuery)("X", 1);
+    console.log(`indexX returned ${JSON.stringify(indexX, null, 2)}`);
+    assert.equal(indexX[0].z, "7624", "z");
+  }).timeout(config.timeout);
 });
