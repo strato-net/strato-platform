@@ -16,6 +16,7 @@ import Test.Hspec
 import Text.RawString.QQ
 
 import BlockApps.Ethereum --(Keccak256, Address)
+import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.SHA (hash)
 import Slipstream.Events
@@ -65,7 +66,7 @@ spec = do
             }]
 
       g <- newGlobals fakeHandle
-      [contractInsert, vehicleCreate, vehicleInsert] <- runConduit (createInserts g input .| sinkList)
+      [contractInsert, vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g input .| sinkList
 
       contractInsert `shouldBe`
           [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
@@ -142,7 +143,7 @@ spec = do
       g <- newGlobals fakeHandle
       addToHistoryList g cHash
       [contractInsert, vehicleCreate, historyCreate, vehicleInsert, historyInsert]
-        <- runConduit (createInserts g input .| sinkList)
+        <- runLoggingT . runConduit $ createInserts g input .| sinkList
 
       contractInsert `shouldBe`
           [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
@@ -248,7 +249,8 @@ spec = do
             }]
 
       g <- newGlobals fakeHandle
-      [contractInsert, vehicleCreate, vehicleInsert] <- runConduit (createInserts g input .| sinkList)
+      [contractInsert, vehicleCreate, vehicleInsert] <-
+          runLoggingT . runConduit $ createInserts g input .| sinkList
 
       contractInsert `shouldBe`
           [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
@@ -337,7 +339,8 @@ spec = do
           }]
 
     g <- newGlobals fakeHandle
-    [contractInsert, swissArmyCreate, swissArmyInsert] <- runConduit (createInserts g input .| sinkList)
+    [contractInsert, swissArmyCreate, swissArmyInsert] <-
+        runLoggingT . runConduit $ createInserts g input .| sinkList
 
     contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
   VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
@@ -438,7 +441,8 @@ spec = do
           }]
     g <- newGlobals fakeHandle
 
-    [_, swissArmyCreate, swissArmyInsert] <- runConduit (createInserts g input .| sinkList)
+    [_, swissArmyCreate, swissArmyInsert] <-
+        runLoggingT . runConduit $ createInserts g input .| sinkList
 
     T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
     T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]
@@ -469,5 +473,5 @@ spec = do
           }]
     g <- newGlobals fakeHandle
 
-    cs <- runConduit (createInsertIndexTable g input .| sinkList)
+    cs <- runLoggingT . runConduit $ createInsertIndexTable g input .| sinkList
     cs `shouldNotBe` []

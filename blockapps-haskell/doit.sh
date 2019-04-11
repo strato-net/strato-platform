@@ -20,6 +20,11 @@ if [ "${BLOC_DEBUG:-false}" == true ] ; then
    blocMinLogLevel=LevelDebug
 fi
 
+slipMinLogLevel=LevelInfo
+if [ "${SLIPSTREAM_DEBUG:-false}" == true ] ; then
+  slipMinLogLevel=LevelDebug
+fi
+
 echo "Environment variables:
 slipstream:
 --pghost=\$postgres_host="${postgres_host}"
@@ -31,7 +36,7 @@ slipstream:
 --vaultwrapperurl=\$vaultWrapperRoot="${vaultWrapperRoot}"
 --kafkahost=\$kafkaHost"${kafkaHost}"
 --kafkaport=${kafkaPort}
---debug="${SLIPSTREAM_DEBUG:-false}"
+--minLogLevel="${slipMinLogLevel}"
 
 strato-server:
 no vars/flags set
@@ -116,7 +121,7 @@ echo "Bloc is up - running slipstream now..."
 SLIPSTREAM_CMD="/usr/bin/slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
   --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
   --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
-  --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --debug=${SLIPSTREAM_DEBUG:-false}"
+  --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel}"
 
 if [ ${SLIPSTREAM_OPTIONAL:-true} = true ]; then
   $SLIPSTREAM_CMD &>> logs/slipstream &

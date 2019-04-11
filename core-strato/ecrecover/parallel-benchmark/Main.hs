@@ -6,6 +6,7 @@ import qualified Control.Parallel.Strategies       as B
 import           Criterion.Main
 
 
+main :: IO ()
 main =
   defaultMain [bytes, integer]
   where
