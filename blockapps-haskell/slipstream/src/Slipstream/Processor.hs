@@ -12,7 +12,10 @@
     , TupleSections
 #-}
 
-module Slipstream.Processor (processTheMessages) where
+module Slipstream.Processor
+  ( processTheMessages
+  , parseActions -- For testing
+  ) where
 
 import Control.Arrow ((&&&))
 import Control.Applicative
@@ -29,7 +32,7 @@ import Data.Either (lefts, rights)
 import Data.Int (Int32)
 import Data.IORef
 import Data.Function
-import Data.List (sortBy)
+import Data.List (sortOn)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
@@ -244,13 +247,13 @@ getCachedSolidVMDetails g row = liftM2 (<|>)
 
 detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
+  (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
     name <- lookupT "name" md
     detailsMap <- lift $ sourceToContractDetails True src
     lookupT name detailsMap)
-  (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)
 
 adjustGlobals :: IORef Globals -> Action -> ContractDetails -> Bloc ()
 adjustGlobals gref row details = do
@@ -324,15 +327,17 @@ rowToHistories gref abiid row actions cont details oldState = do
 withSourceFirst :: (a, [Action]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
+parseActions :: [B.ByteString] -> [((Address, Maybe ChainId), [Action])]
+parseActions = sortOn withSourceFirst
+             . splitActions
+             . filter matters
+             . filter hasContract
+             . concatMap (flatten . toAction . BL.fromStrict)
+
 processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> LoggingT IO ()
 processTheMessages env conn g messages = do
 
-  let changes = sortBy (compare `on` withSourceFirst)
-              . splitActions
-              . filter matters
-              . filter hasContract
-              . join
-              $ map (flatten . toAction . BL.fromStrict) messages
+  let changes = parseActions messages
 
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
@@ -365,7 +370,6 @@ processTheMessages env conn g messages = do
                     , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
                     }
                   cont = either error id . xAbiToContract $ contractdetailsXabi details
-
               adjustGlobals g row details
 
               ensureContractInstance cmId row
