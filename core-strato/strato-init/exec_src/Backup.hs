@@ -5,7 +5,7 @@
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Reader
 import           Data.Binary                                 hiding (get)
 import qualified Data.ByteString.Base16                      as B16
@@ -36,7 +36,7 @@ data DBs =
     sqlDB   :: SQLDB
     }
 
-instance (LDB.MonadResource m, MonadUnliftIO m) => HasSQLDB (ReaderT DBs m) where
+instance MonadUnliftIO m => HasSQLDB (ReaderT DBs m) where
   getSQLDB = asks sqlDB
 
 main :: IO ()
@@ -86,7 +86,7 @@ main = do
 -}
 
 
-dumpAllHashes :: LDB.MonadResource m=>LDB.Iterator->m ()
+dumpAllHashes :: MonadIO m=>LDB.Iterator->m ()
 dumpAllHashes i = do
   Just val <- LDB.iterValue i
   liftIO $ putStrLn $ "h" ++ BC.unpack (B16.encode val)
@@ -97,7 +97,7 @@ dumpAllHashes i = do
     else return ()
 
 
-handleAddressStateValue :: LDB.MonadResource m=>DBs->RLPObject->m ()
+handleAddressStateValue :: MonadIO m=>DBs->RLPObject->m ()
 handleAddressStateValue dbs (RLPString o) = do
   let addressState = rlpDecode $ rlpDeserialize o
   --liftIO $ putStrLn $ "Value: " ++ show addressState
@@ -105,10 +105,10 @@ handleAddressStateValue dbs (RLPString o) = do
 handleAddressStateValue _ x =
       error $ "unexpected value in call to dumpNodeData: " ++ show x
 
-handleWordValue :: LDB.MonadResource m=>DBs->RLPObject->m ()
+handleWordValue :: MonadIO m=>DBs->RLPObject->m ()
 handleWordValue _ _ = return ()
 
-dumpAddressState :: LDB.MonadResource m=>DBs->AddressState->m ()
+dumpAddressState :: MonadIO m=>DBs->AddressState->m ()
 dumpAddressState dbs AddressState{addressStateContractRoot=sr, addressStateCodeHash=c} = do
   when (sr /= emptyTriePtr) $ dumpNodeRef dbs handleWordValue $ PtrRef sr
   dumpCode dbs $
@@ -116,7 +116,7 @@ dumpAddressState dbs AddressState{addressStateContractRoot=sr, addressStateCodeH
       EVMCode c' -> c'
       SolidVMCode _ c' -> c'
 
-dumpCode :: LDB.MonadResource m=>DBs->SHA->m ()
+dumpCode :: MonadIO m=>DBs->SHA->m ()
 --dumpCode _ codeHash | codeHash == hash "" = do
 --  liftIO $ putStrLn "<blank code>"
 dumpCode DBs{codeDB=codeDB'} codeHash = do
@@ -125,7 +125,7 @@ dumpCode DBs{codeDB=codeDB'} codeHash = do
 
 -------------
 
-dumpNodeData :: LDB.MonadResource m=>DBs->(DBs->RLPObject->m ())->NodeData->m ()
+dumpNodeData :: MonadIO m=>DBs->(DBs->RLPObject->m ())->NodeData->m ()
 dumpNodeData _ _ nd@EmptyNodeData = do
   liftIO $ putStrLn $ BC.unpack (B16.encode $ rlpSerialize $ rlpEncode nd)
 dumpNodeData dbs handleValue nd@FullNodeData {choices=ch, nodeVal = maybeV} = do
@@ -141,7 +141,7 @@ dumpNodeData dbs handleValue nd@ShortcutNodeData {nextVal=nv} = do
    Right v -> handleValue dbs v
 
 
-dumpNodeRef :: LDB.MonadResource m=>DBs->(DBs->RLPObject->m ())->NodeRef->m ()
+dumpNodeRef :: MonadIO m=>DBs->(DBs->RLPObject->m ())->NodeRef->m ()
 dumpNodeRef dbs handleValue (PtrRef sr) = do
   nodeData <- getNodeData (stateDB dbs) $ PtrRef sr
   dumpNodeData dbs handleValue nodeData

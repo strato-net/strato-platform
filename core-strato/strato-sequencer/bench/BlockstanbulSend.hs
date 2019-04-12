@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 import ClassyPrelude (atomically)
 import Control.Concurrent.STM.TMChan
-import Control.Monad.Logger
+import Blockchain.Output
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans.Resource
@@ -22,7 +22,7 @@ noLog _ _ _ _ = return ()
 
 runFakeSequencerM :: SequencerConfig -> SequencerContext -> SequencerM a -> IO a
 runFakeSequencerM cfg ctx mv =
-    flip runLoggingT noLog
+    runNoLoggingT
   . runResourceT
   . flip runReaderT cfg
   $ evalStateT mv ctx

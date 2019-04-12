@@ -12,6 +12,8 @@ import Control.Concurrent     (threadDelay)
 import Control.Exception.Lifted
 import Control.Lens
 import Control.Monad.Reader
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Except
 import Control.Retry
 import Data.Aeson hiding (Error)
 import qualified Data.ByteString as B
@@ -25,9 +27,9 @@ import GHC.Generics
 import Network.Kafka
 import Network.Kafka.Consumer
 import qualified Network.Kafka.Protocol as K hiding (Message)
-import System.Log.Logger
 
 import BlockApps.Bloc22.Monad (BlocEnv)
+import BlockApps.Logging
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.Options
@@ -50,6 +52,11 @@ defaultKafkaConfig = KafkaConf {
 
 instance FromJSON KafkaConf
 instance ToJSON KafkaConf
+
+type SlipKafka = StateT KafkaState (ExceptT KafkaClientError (LoggingT IO))
+
+runKafka :: KafkaState -> SlipKafka a -> LoggingT IO (Either KafkaClientError a)
+runKafka s k = runExceptT $ evalStateT k s
 
 makeKafkaState :: KafkaClientId -> KafkaAddress -> K.MaxBytes -> KafkaState
 makeKafkaState cid addy maxBytes =
@@ -74,7 +81,7 @@ mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
 lookupTopic :: K.TopicName
 lookupTopic = fromString "statediff"
 
-getTheMessages :: Kafka k => K.Offset -> k [B.ByteString]
+getTheMessages :: K.Offset -> SlipKafka [B.ByteString]
 getTheMessages offset = do
   let extract :: K.FetchResponse -> Either String [B.ByteString]
       extract fr =
@@ -82,10 +89,10 @@ getTheMessages offset = do
         in case find (/= K.NoError) errorStatuses of
           Just e -> Left . show $ e
           Nothing -> Right . map tamPayload . fetchMessages $ fr
-      shouldRetry :: (MonadIO m) => RetryStatus -> Either String [B.ByteString] -> m Bool
+      shouldRetry :: (MonadLogger m) => RetryStatus -> Either String [B.ByteString] -> m Bool
       shouldRetry _ = \case
                          Left e -> do
-                           liftIO . criticalM "getTheMessages/kafka_response" . show $ e
+                           $logErrorLS "getTheMessages/kafka_response" e
                            return True
                          Right _ -> return False
       policy :: RetryPolicy
@@ -95,20 +102,20 @@ getTheMessages offset = do
               Left e -> error $ "getTheMessages: " ++ e
               Right bs -> bs
 
-getAndProcessMessages :: Kafka a => BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> a ()
+getAndProcessMessages :: BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
 getAndProcessMessages env conn cache offset errorCounter = do
   eMessages <- try $ getTheMessages offset
   case eMessages of
     Left e -> do
       liftIO $ threadDelay 1000000
-      liftIO . errorM "getTheMessages: " . show $ (e :: KafkaClientError)
+      $logErrorLS "getTheMessages" (e :: KafkaClientError)
       if (errorCounter > exceptionMaxCount )
            then error $ "Slipstream reached exceptionMaxCount."
            else getAndProcessMessages env conn cache offset (errorCounter + 1)
     Right messages -> do
       recordKafkaMessages messages
       forceGlobalEval cache
-      liftIO $ processTheMessages env conn cache messages
+      lift . lift $ processTheMessages env conn cache messages
       when (null messages) $
         liftIO $ threadDelay 1000000
       getAndProcessMessages env conn cache (offset + fromIntegral (length messages)) errorCounter

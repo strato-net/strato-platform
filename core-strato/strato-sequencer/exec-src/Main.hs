@@ -4,7 +4,6 @@
 module Main where
 
 import           Control.Monad
-import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
@@ -94,7 +93,7 @@ main = do
         , cablePackage = pkg
         }
   race_ (runTheGregor gregorCfg)
-      . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer) printLogMsg)
+      . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))
       . run flags_blockstanbul_port
       . prometheus def
       . createWebServer $ chv

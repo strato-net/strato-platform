@@ -11,9 +11,8 @@ module Blockchain.GenesisBlock (
 
 
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
 import qualified Data.ByteString.Lazy.Char8                   as BLC
@@ -111,8 +110,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 
-initializeGenesisBlock :: ( MonadResource m
-                          , HasCodeDB m
+initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
                           , Mem.HasMemAddressStateDB m
                           , RBDB.HasRedisBlockDB m
@@ -203,7 +201,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             , A._actionTransactionSender = Ad.Address 0
             , A._actionData = Map.singleton a $
                                 A.ActionData
-                                  ch
+                                  (EVMCode ch)
                                   EVM
                                   (case storage d of
                                     EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m

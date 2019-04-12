@@ -8,7 +8,7 @@ module Blockchain.DB.HashDB (
   ) where
 
 import           Control.DeepSeq
-import           Control.Monad.Trans.Resource
+import           Control.Monad.IO.Class
 import           Data.Default
 import qualified Database.LevelDB                            as DB
 
@@ -21,7 +21,7 @@ type HashDB = DB.DB
 instance NFData HashDB where
   rnf a = a `seq` ()
 
-class MonadResource m => HasHashDB m where
+class MonadIO m => HasHashDB m where
   getHashDB :: m HashDB
 
 hashDBPut::HasHashDB m => N.NibbleString->m ()

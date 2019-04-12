@@ -12,7 +12,7 @@ module Executable.StratoAdit (
 
 import           Control.Monad
 import           Control.Monad.Except
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.State
 import qualified Data.Text                      as T
 import           Network.Kafka

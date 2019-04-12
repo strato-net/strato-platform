@@ -9,7 +9,7 @@ module Blockchain.Bagger where
 import           Control.Arrow                      ((&&&))
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.State.Lazy           (get, put, lift)
 import           Control.Monad.Trans.Except
 import qualified Data.Map                           as M

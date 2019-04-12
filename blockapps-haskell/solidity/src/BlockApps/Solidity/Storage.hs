@@ -5,6 +5,8 @@ module BlockApps.Solidity.Storage where
 import           Data.Bits                (complement, shiftR, (.&.))
 import           Data.Bool
 import           Data.ByteString          (ByteString)
+import qualified Data.IntMap              as I
+import qualified Data.Map                 as Map
 import           Data.Maybe               (fromMaybe)
 import           Data.Word                (Word8)
 
@@ -20,10 +22,10 @@ toStorage = \case
   SimpleValue v -> simpleToStorage v
   ValueArrayDynamic vs -> toStorage (SimpleValue (valueUInt k))
                           `ByteString.append`
-                          toStorage (ValueArrayFixed k vs)
+                          toStorage (ValueArrayFixed k $ unsparse vs)
     where
       k :: Num n => n
-      k = fromIntegral (length vs)
+      k = fromIntegral (I.size vs)
   ValueArrayFixed _ vs ->
     let
       head' = map (\v -> if isDynamic v then Nothing else Just (toStorage v)) vs
@@ -46,6 +48,8 @@ toStorage = \case
   ValueFunction{} -> error "toStorage for ValueFunction not yet defined"
   ValueEnum{}     -> error "toStorage for ValueEnum not yet defined"
   ValueStruct{}   -> error "toStorage for ValueStruct not yet defined"
+  ValueMapping{} -> error "toStorage for ValueMapping not yet defined"
+  ValueArraySentinel{} -> error "toStorage for ValueArraySentinel not yet defined"
 
 simpleToStorage :: SimpleValue -> ByteString
 simpleToStorage =  \case
@@ -82,13 +86,14 @@ simpleToStorage =  \case
 isDynamic :: Value -> Bool
 isDynamic = \case
   ValueArrayDynamic{}  -> True
-  -- ValueMapping{} -> True
+  ValueMapping{} -> True
+  ValueArraySentinel{} -> True
   ValueArrayFixed _ vs -> any isDynamic vs
   SimpleValue v        -> simpleIsDynamic v
   ValueContract{}      -> False
   ValueFunction{}      -> False
   ValueEnum{}          -> False
-  ValueStruct fs       -> any (isDynamic . snd) fs
+  ValueStruct fs       -> any isDynamic $ Map.elems fs
 
 simpleIsDynamic :: SimpleValue -> Bool
 simpleIsDynamic = \case

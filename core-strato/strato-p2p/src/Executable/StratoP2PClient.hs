@@ -18,7 +18,6 @@ import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Crypto.PubKey.ECC.DH
@@ -40,7 +39,7 @@ import           Blockchain.EthConf                    hiding (genesisHash, port
 import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Options
-import           Blockchain.Output                     (printLogMsg)
+import           Blockchain.Output
 import           Blockchain.P2PRPC
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
@@ -147,7 +146,7 @@ stratoP2PClient = do
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> void . forkIO . flip runLoggingT printLogMsg $ do
+            Just _  -> void . forkIO . runLoggingT $ do
               result <- try $ runPeerInList p osch oscp
               liftIO (SSem.signal sem)
               handleRunPeerResult p result

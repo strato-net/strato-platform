@@ -113,7 +113,7 @@ parseDiffSolidVM (Object obs) = fmap (ActionSolidVMDiff . M.fromList)
 parseDiffSolidVM x = typeMismatch "ActionSolidVMDiff" x
 
 data ActionData = ActionData
-  { _actionDataCodeHash     :: SHA
+  { _actionDataCodeHash     :: CodePtr
   , _actionDataCodeKind     :: CodeKind
   , _actionDataStorageDiffs :: ActionDataDiff
   , _actionDataCallData     :: [CallData]

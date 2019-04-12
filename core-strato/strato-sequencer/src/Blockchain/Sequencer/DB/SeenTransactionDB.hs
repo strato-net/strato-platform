@@ -4,7 +4,7 @@ module Blockchain.Sequencer.DB.SeenTransactionDB where
 
 import           Blockchain.SHA
 import           Blockchain.Sequencer.DB.Witnessable
-import           Control.Monad.Trans.Resource
+import           Control.Monad.IO.Class
 
 import qualified Data.Sequence                as Q
 import qualified Data.Set                     as S
@@ -23,7 +23,7 @@ mkSeenTxDB dbSize = SeenTransactionDB { size       = dbSize
                                       , seen       = S.empty
                                       }
 
-class (MonadResource m) => HasSeenTransactionDB m where
+class (MonadIO m) => HasSeenTransactionDB m where
     getSeenTransactionDB :: m SeenTransactionDB
     putSeenTransactionDB :: SeenTransactionDB -> m ()
     {-# MINIMAL getSeenTransactionDB, putSeenTransactionDB #-}

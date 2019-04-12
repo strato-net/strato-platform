@@ -381,7 +381,7 @@ callMethodListLocal method cAddr contractName args config@TestConfig{..} =
             , methodcallMethodName = method
             , methodcallArgs = args
             , methodcallValue = Strung 0
-            , methodcallTxParams = testTxParams
+            , _methodcallTxParams = testTxParams
             , methodcallMetadata = Nothing
             }
         }

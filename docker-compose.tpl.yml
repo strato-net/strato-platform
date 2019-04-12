@@ -73,7 +73,7 @@ services:
     - strato
     - vault-wrapper
     environment:
-    - loglevel=${loglevel}
+    - BLOC_DEBUG=${BLOC_DEBUG}
     - kafkaHost=kafka
     - kafkaPort=9092
     - postgres_host=postgres
@@ -106,6 +106,7 @@ services:
     - postgres_port=5432
     - postgres_user=postgres
     - postgres_vault_wrapper_db=oauth
+    - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
@@ -221,8 +222,7 @@ services:
   docs:
     environment:
     - API_URL=/strato-api/eth/v1.2/swagger.json
-    build: .
-    image: ${DOCS_IMAGE:-<REPO_URL>docs:<VERSION>}
+    image: swaggerapi/swagger-ui
     restart: always
   zookeeper:
     image: wurstmeister/zookeeper:3.4.6

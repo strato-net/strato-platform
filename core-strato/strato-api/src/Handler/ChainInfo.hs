@@ -64,12 +64,9 @@ getChainR :: HandlerFor App Value
 getChainR = do
   chainIds <- lookupGetParams "chainid"
   addHeader "Access-Control-Allow-Origin" "*"
-  cInfos <- case chainIds of
+  returnJson =<< case chainIds of
       [] -> getChainInfos []
       [cid] -> if (T.unpack cid == "all")
                    then getChainInfos []
                    else getChainInfos [fromHexText cid]
       cids -> getChainInfos $ fmap fromHexText cids
-  case cInfos of
-      [] -> notFound
-      cis -> returnJson cis

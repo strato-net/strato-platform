@@ -11,9 +11,19 @@ stratoRoot=http://${stratoHost}/eth/v1.2
 vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
 
 isPublic=false
- if [ "${SMD_MODE}" == public ]; then
-   isPublic=true
- fi
+if [ "${SMD_MODE}" == public ]; then
+ isPublic=true
+fi
+
+blocMinLogLevel=LevelInfo
+if [ "${BLOC_DEBUG:-false}" == true ] ; then
+   blocMinLogLevel=LevelDebug
+fi
+
+slipMinLogLevel=LevelInfo
+if [ "${SLIPSTREAM_DEBUG:-false}" == true ] ; then
+  slipMinLogLevel=LevelDebug
+fi
 
 echo "Environment variables:
 slipstream:
@@ -26,7 +36,7 @@ slipstream:
 --vaultwrapperurl=\$vaultWrapperRoot="${vaultWrapperRoot}"
 --kafkahost=\$kafkaHost"${kafkaHost}"
 --kafkaport=${kafkaPort}
---debug="${SLIPSTREAM_DEBUG:-false}"
+--minLogLevel="${slipMinLogLevel}"
 
 strato-server:
 no vars/flags set
@@ -40,7 +50,7 @@ vaultWrapperHost="${vaultWrapperHost}"
 --pgport=\$postgres_port="${postgres_port}"
 --pguser=\$postgres_user="${postgres_user}"
 --password=\$postgres_password="${postgres_password}"
---loglevel=\$loglevel="${loglevel:-4}"
+--minLogLevel=\$minLogLevel="${blocMinLogLevel}"
 "
 
 locale-gen "en_US.UTF-8"
@@ -100,7 +110,7 @@ runBackgroundProcess /usr/bin/logserver "--directory=${PWD}/logs" --uri_root=/lo
 runBackgroundProcess /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1
 
 runBackgroundProcess /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --loglevel="${loglevel:-4}" +RTS -N1 &>> logs/bloc
+           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" +RTS -N1 &>> logs/bloc
 
 until curl localhost:8000 &> /dev/null; do
   echo "Slipstream is waiting for bloc to come up..."
@@ -111,7 +121,7 @@ echo "Bloc is up - running slipstream now..."
 SLIPSTREAM_CMD="/usr/bin/slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
   --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
   --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
-  --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --debug=${SLIPSTREAM_DEBUG:-false}"
+  --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel}"
 
 if [ ${SLIPSTREAM_OPTIONAL:-true} = true ]; then
   $SLIPSTREAM_CMD &>> logs/slipstream &

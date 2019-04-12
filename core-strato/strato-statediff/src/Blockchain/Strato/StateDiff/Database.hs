@@ -27,7 +27,6 @@ import           Blockchain.SolidVM.Model
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (for_)
 import qualified Data.Map                                    as Map
@@ -37,14 +36,13 @@ import           Blockchain.Strato.StateDiff
 
 type SqlDbM m = SQL.SqlPersistT m
 
-sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m)=>
+sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m)=>
            Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m ()
 sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
   commitSqlDiffs stateDiffs
 
-commitSqlDiffs :: (HasSQLDB m, MonadResource m)=>
-                  StateDiff -> m ()
+commitSqlDiffs :: HasSQLDB m => StateDiff -> m ()
 commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
@@ -95,15 +93,14 @@ getField def field =
     Just (Value x) -> x
     Nothing        -> def
 
-deleteAccount :: MonadResource m =>
-                 Maybe Word256 -> Address -> SQL.SqlPersistT m ()
+deleteAccount :: MonadIO m => Maybe Word256 -> Address -> SQL.SqlPersistT m ()
 deleteAccount chainId address = do
   mAddrID <- getAddressStateSQL chainId address
   for_ mAddrID $ \addrID -> do
     SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
     SQL.delete addrID
 
-updateAccount :: MonadResource m =>
+updateAccount :: MonadIO m =>
                  Maybe Word256 -> Integer -> Address -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
 updateAccount chainId blockNumber address diff = do
   mAddrID <- getAddressStateSQL chainId address
@@ -135,7 +132,7 @@ updateAccount chainId blockNumber address diff = do
     takeIncremental Delete{}         = 0
     takeIncremental Update{newValue} = newValue
 
-commitStorage :: MonadResource m =>
+commitStorage :: MonadIO m =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()
 commitStorage addrID key = \case
   Create{newValue} ->
@@ -147,7 +144,7 @@ commitStorage addrID key = \case
     storageID <- getStorageKeySQL addrID (word256ToHexStorage key) "update"
     SQL.update storageID [ StorageValue =. (word256ToHexStorage newValue) ]
 
-commitSolidStorage :: MonadResource m =>
+commitSolidStorage :: MonadIO m =>
                       SQL.Key AddressStateRef -> BS.ByteString -> Diff BS.ByteString 'Incremental -> SqlDbM m ()
 commitSolidStorage addrID key = \case
   Create{newValue} ->
@@ -159,7 +156,7 @@ commitSolidStorage addrID key = \case
     storageID <- getStorageKeySQL addrID (HexStorage key) "update"
     SQL.update storageID [ StorageValue =. HexStorage newValue ]
 
-getAddressStateSQL :: MonadResource m
+getAddressStateSQL :: MonadIO m
                    => Maybe Word256
                    -> Address
                    -> SqlDbM m (Maybe (SQL.Key AddressStateRef))
@@ -168,7 +165,7 @@ getAddressStateSQL chainId addr' = do
               [ AddressStateRefAddress SQL.==. addr' , AddressStateRefChainId SQL.==. chainId ] [ LimitTo 1 ]
   return $ listToMaybe addrIDs
 
-getStorageKeySQL :: MonadResource m
+getStorageKeySQL :: MonadIO m
                  => SQL.Key AddressStateRef
                  -> HexStorage
                  -> String

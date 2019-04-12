@@ -8,7 +8,7 @@ module Blockchain.Blockstanbul.EventLoop where
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
-import Control.Monad.Logger
+import Blockchain.Output
 import Control.Monad.State.Class
 import qualified Data.Map.Strict as M
 import Data.Maybe

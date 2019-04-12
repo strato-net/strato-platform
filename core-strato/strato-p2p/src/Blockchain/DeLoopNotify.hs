@@ -11,7 +11,7 @@ module Blockchain.DeLoopNotify (
 import           Conduit
 import           Control.Concurrent   (threadDelay)
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Data.ByteString      (ByteString)
 import qualified Data.Text            as T
 

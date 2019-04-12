@@ -9,9 +9,13 @@
     , RecordWildCards
     , ScopedTypeVariables
     , TemplateHaskell
+    , TupleSections
 #-}
 
-module Slipstream.Processor where
+module Slipstream.Processor
+  ( processTheMessages
+  , parseActions -- For testing
+  ) where
 
 import Control.Arrow ((&&&))
 import Control.Applicative
@@ -27,17 +31,17 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts, rights)
 import Data.Int (Int32)
 import Data.IORef
-import Data.Foldable (for_)
 import Data.Function
+import Data.List (sortOn)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import Data.Maybe
+import Data.Ord (Down(..))
 import qualified Data.Text as T
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Typed (PGConnection)
-import System.Log.Logger
 
 import Blockapps.Crossmon
 
@@ -45,6 +49,7 @@ import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
 import BlockApps.Ethereum
+import BlockApps.Logging
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Struct
@@ -52,9 +57,10 @@ import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
+import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import qualified Blockchain.Strato.Model.Action as BS
-import Blockchain.Strato.Model.SHA (hash)
+import Blockchain.Strato.Model.SHA (codePtrToSHA, hash)
 
 
 import Slipstream.Data.Action
@@ -63,11 +69,6 @@ import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.SolidityValue
-
-todoToMap :: BS.ActionDataDiff -> Map.Map Word256 Word256
-todoToMap = \case
-  BS.ActionEVMDiff m -> m
-  BS.ActionSolidVMDiff _ -> Map.empty -- error "TODO(tim): Processing not implemented for SolidVM"
 
 diffNull :: BS.ActionDataDiff -> Bool
 diffNull (BS.ActionEVMDiff m) = Map.null m
@@ -82,10 +83,7 @@ data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
   , functionInserts :: [ProcessedContract]
-  }
-
-listHead :: [a] -> [a]
-listHead = maybeToList . listToMaybe
+  } deriving (Show)
 
 toAction :: BL.ByteString -> Action'
 toAction x =
@@ -93,9 +91,9 @@ toAction x =
   Left e -> error $ show e
   Right y -> y
 
-enterBloc2 :: BlocEnv -> Bloc x -> IO x
+enterBloc2 :: BlocEnv -> Bloc x -> LoggingT IO x
 enterBloc2 env x = do
-  ret <- runBlocToIO env x
+  ret <- liftIO $ runBlocToIO env x
 
   case ret of
    Left e -> error $ show e
@@ -105,27 +103,10 @@ emptyHash :: SHA
 emptyHash = hash B.empty
 
 hasContract::Action->Bool
-hasContract = (/= emptyHash) . actionCodeHash
+hasContract = (/= EVMCode emptyHash) . actionCodeHash
 
 matters :: Action -> Bool
 matters Action{..} = (actionType == Create) || (not $ diffNull actionStorage)
-
-on2 :: (b -> b -> c) -> ((a -> a -> b), (a -> a -> b)) -> a -> a -> c
-on2 f p = curry ((uncurry f) . ((uncurry (fst p)) &&& (uncurry (snd p))))
-
-isSameCreateAs :: Action -> Action -> Bool
-isSameCreateAs = (&&) `on2` (((&&) `on` ((== Create) . actionType)), ((==) `on` actionCodeHash))
-
-groupSimilarActions :: [Action] -> [[Action]]
-groupSimilarActions as = go as [] []
-  where
-    go [] _ final = final
-    go [x] tmp final = final ++ [tmp ++ [x]]
-    go (x:y:rest) tmp final =
-      let newTmp = tmp ++ [x]
-       in if isSameCreateAs x y
-            then go (y:rest) newTmp final
-            else go (y:rest) [] (final ++ [newTmp])
 
 -- assumes all Actions in the list are for the same (Address, Maybe ChainId) pair
 combineActions :: [Action] -> Action
@@ -138,9 +119,6 @@ combineActions (x:xs) = foldr merge x xs
 
 splitActions :: [Action] -> [((Address, Maybe ChainId), [Action])]
 splitActions = partitionWith (actionAddress &&& actionTxChainId)
-
-withNothing :: Applicative f => Maybe a -> f (Maybe a) -> f (Maybe a)
-withNothing m f = maybe f (pure . Just) m
 
 functionDetailsFromContract :: Contract -> ByteString -> (Text, ([(Text, Type)],[(Maybe Text, Type)]))
 functionDetailsFromContract contract selector' =
@@ -248,22 +226,45 @@ makeFunctionInserts xabi ABIID{..} state Action{..} =
           }
       }
 
-detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
-detailsForRow row = liftM2 (<|>)
+lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
+lookupT k = MaybeT . return . Map.lookup k
+
+-- Note: This could be reshaped to remove the bloch dependency, as
+-- we only care about the ABI from `sourceToContractDetails` and
+-- not the metadata id. Additinally, at some point this must
+-- offload to disk.
+getCachedSolidVMDetails :: IORef Globals -> Action -> Bloc (Maybe (Text, Text))
+getCachedSolidVMDetails g row = liftM2 (<|>)
+  (getSolidVMABIs g codePtr)
   (runMaybeT $ do
     let md = actionMetadata row
-    let lookupT k m = MaybeT . return $ Map.lookup k m
+    src <- lookupT "src" md
+    detailsMap <- lift $ sourceToContractDetails True src
+    setSolidVMABIs g codePtr detailsMap
+    MaybeT $ getSolidVMABIs g codePtr
+  )
+ where codePtr = actionCodeHash row
+
+detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
+detailsForRow row = liftM2 (<|>)
+  (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)
+  (runMaybeT $ do
+    let md = actionMetadata row
     src <- lookupT "src" md
     name <- lookupT "name" md
     detailsMap <- lift $ sourceToContractDetails True src
     lookupT name detailsMap)
-  (getContractDetailsByCodeHash . shaKeccak256 $ actionCodeHash row)
 
 adjustGlobals :: IORef Globals -> Action -> ContractDetails -> Bloc ()
 adjustGlobals gref row details = do
-  let go m (k,f) = for_ (Map.lookup k $ actionMetadata row) $ \v -> do
-                let contracts = filter (not . T.null) $ T.splitOn "," v
-                forM_ contracts $ \c -> for_ (fmap (keccak256SHA . contractdetailsCodeHash . snd) $ Map.lookup c m) $ f gref
+  let go m (k,f) = runMaybeT $ do
+        v <- lookupT k $ actionMetadata row
+        let contracts = filter (not . T.null) $ T.splitOn "," v
+        forM_ contracts $ \c -> do
+          (_, details') <- lookupT c m
+          let codePtr = EVMCode . keccak256SHA . contractdetailsCodeHash $ details'
+          lift $ f gref codePtr
+
   -- won't actually recompile the contract
   detailsMap <- sourceToContractDetails True $ contractdetailsSrc details
   mapM_ (go detailsMap) $ [("history", addToHistoryList)
@@ -279,25 +280,24 @@ ensureContractInstance cmId row = do
   let addr = actionAddress row
       chainId = actionTxChainId row
   (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
-    contractInstancesByCodeHash (shaKeccak256 $ actionCodeHash row) addr chainId
+    contractInstancesByCodeHash (shaKeccak256 . codePtrToSHA $ actionCodeHash row) addr chainId
   when (isNothing mInstance) . void $
     insertContractInstance cmId addr chainId
 
-readPreviousState :: IORef Globals -> Address -> Maybe ChainId -> Contract -> Bloc [(Text, Value)]
-readPreviousState gref addr chainId cont = do
+readPreviousEVMState :: IORef Globals -> Address -> Maybe ChainId -> Contract -> Bloc [(Text, Value)]
+readPreviousEVMState gref addr chainId cont = do
   let default' = SVR.decodeValues 0 (typeDefs cont) (mainStruct cont) (const 0) 0
   fromMaybe default' <$> getContractState gref addr chainId
+
+readPreviousSolidVMState :: IORef Globals -> Address -> Maybe ChainId -> Bloc [(Text, Value)]
+readPreviousSolidVMState gref addr chainId = fromMaybe [] <$> getContractState gref addr chainId
 
 
 rowToInsert :: IORef Globals -> ABIID -> Action -> Contract -> [(Text, Value)] -> Bloc ProcessedContract
 rowToInsert gref abiid row cont oldState = do
-  let cache = flip Map.lookup . todoToMap $ actionStorage row
-      newState = SVR.decodeCacheValues
-                  (typeDefs cont)
-                  (mainStruct cont)
-                  cache
-                  0
-                  oldState
+  let newState = case actionStorage row of
+                    BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
+                    BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
   setContractState gref (actionAddress row) (actionTxChainId row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
@@ -307,12 +307,9 @@ rowToHistories gref abiid row actions cont details oldState = do
   second join . unzip <$> if not hist
     then pure []
     else accumStateT oldState actions $ \hRow -> do
-      let hCache = flip Map.lookup . todoToMap $ actionStorage hRow
-      modify $ SVR.decodeCacheValues
-               (typeDefs cont)
-               (mainStruct cont)
-               hCache
-               0
+      modify $ case actionStorage hRow of
+                  BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
+                  BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp
       newMap <- gets Map.fromList
       let hInsert = processedContract abiid newMap hRow
       functionHist <- isFunctionHistoric gref $ actionCodeHash hRow
@@ -325,57 +322,86 @@ rowToHistories gref abiid row actions cont details oldState = do
                                   hRow
       pure (hInsert, fInserts)
 
-processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> IO ()
+-- Prioritizing with-source actions prevents the issue where updates to contracts
+-- at different addresses are lost because the schema has not been seen yet.
+withSourceFirst :: (a, [Action]) -> Down Bool
+withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
+
+parseActions :: [B.ByteString] -> [((Address, Maybe ChainId), [Action])]
+parseActions = sortOn withSourceFirst
+             . splitActions
+             . filter matters
+             . filter hasContract
+             . concatMap (flatten . toAction . BL.fromStrict)
+
+processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> LoggingT IO ()
 processTheMessages env conn g messages = do
 
-  let changes = splitActions
-              . filter matters
-              . filter hasContract
-              . join
-              $ map (flatten . toAction . BL.fromStrict) messages
+  let changes = parseActions messages
 
   unless (null messages) $
-    debugM "processTheMessages" . unlines . map show $ messages
+    $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
 
   case length messages of
    0 -> return ()
-   1 -> infoM "processTheMessages" "1 message has arrived"
-   n -> infoM "processTheMessages" $ show n ++ " messages have arrived"
+   1 -> $logInfoS "processTheMessages" "1 message has arrived"
+   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
 
   inserts <- enterBloc2 env $ do
     forM changes $ \((addr,chainId),actions) -> do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
-      liftIO . infoM "processTheMessages" . T.unpack . formatAction $ row
+      $logInfoS "processTheMessages" $ formatAction row
+      $logDebugLS "the diff is " $ actionStorage row
 
-      mDetails <- detailsForRow row
-      case mDetails of
-        Nothing -> pure . Left $ "No details found for code hash "
-                        <> (T.pack . show $ actionCodeHash row)
-                        <> " and no 'src' field found in actionMetadata"
-        Just (cmId, details) -> do
-          let abiid = ABIID
-                { aiAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict
-                        . JSON.encode $ contractdetailsXabi details
-                , aiName = T.replace "\"" "" $ contractdetailsName details
-                , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
-                }
-              cont = either error id . xAbiToContract $ contractdetailsXabi details
+      case actionStorage row of
+        BS.ActionEVMDiff{} -> do
+          mDetails <- detailsForRow row
+          case mDetails of
+            Nothing -> pure . Left $ "No details found for code hash "
+                            <> (T.pack . show $ actionCodeHash row)
+                            <> " and no 'src' field found in actionMetadata"
+            Just (cmId, details) -> do
+              let abiid = ABIID
+                    { aiAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict
+                            . JSON.encode $ contractdetailsXabi details
+                    , aiName = T.replace "\"" "" $ contractdetailsName details
+                    , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
+                    }
+                  cont = either error id . xAbiToContract $ contractdetailsXabi details
+              adjustGlobals g row details
 
-          adjustGlobals g row details
+              ensureContractInstance cmId row
 
-          ensureContractInstance cmId row
+              oldState <- readPreviousEVMState g addr chainId cont
+              indexContract <- rowToInsert g abiid row cont oldState
+              (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
+              pure . Right $ BatchedInserts indexContract hs fhs
+        BS.ActionSolidVMDiff{} -> do
+          mName <- getCachedSolidVMDetails g row
+          case mName of
+            Nothing -> pure . Left $ "No SolidVM details for code hash "
+                            <> (T.pack . show $ actionCodeHash row)
+                            <> " and no 'src' field found in metadata"
+            Just (name, abi) -> do
+              let abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
+                  cont = error "internal error: contract should be unused for solidvm"
+                  details = error "internal error: details should be unused for solidvm"
+              oldState <- readPreviousSolidVMState g addr chainId
+              indexContract <- rowToInsert g abiid row cont oldState
+              (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
+              pure . Right $ BatchedInserts indexContract hs fhs
 
-          oldState <- readPreviousState g addr chainId cont
-          indexContract <- rowToInsert g abiid row cont oldState
-          (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-          pure . Right $ BatchedInserts indexContract hs fhs
+  forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
-  forM_ (lefts inserts) $ errorM "processTheMessages" . T.unpack
-
-  let insertsByCodeHash = map snd . partitionWith (codehash . indexInsert) $ rights inserts
+  let insertsByCodeHash = map snd
+                        -- SolidVM contracts can have the same codehash and be different:
+                        -- the codehash is just a sourcehash.
+                        . partitionWith (codehash . indexInsert &&& contractName . indexInsert)
+                        $ rights inserts
+  forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn . createInsertIndexTable g $ map indexInsert ins
-    outputData conn . createInsertHistoryTable g . join $ map historyInserts ins
-    outputData conn . createInsertFunctionHistoryTable g . join $ map functionInserts ins
+    outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
+    outputData conn . createInsertFunctionHistoryTable g $ concatMap functionInserts ins
