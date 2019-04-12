@@ -309,11 +309,16 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         $logInfoS "blockstanbul/voting" . T.pack $
                  "pending votes: " ++ show pending
         editedBlk <- if null pending
-              then return blk
+              then do
+                $logDebugS "blockstanbul/voting" "No votes pending"
+                return blk
               else do
                  let ((bnf,nonc),newPending) = M.deleteFindMin pending
                  pendingvotes .= newPending
-                 return $ editBeneficiary blk bnf nonc
+                 let nb = editBeneficiary blk bnf nonc
+                 $logInfoS "blockstanbul/voting" . T.pack
+                    . printf "Casting vote for %s" . show . blockDataCoinbase $ blockBlockData nb
+                 return nb
         pending' <- use pendingvotes
         $logInfoS "blockstanbul/voting" . T.pack $
            "pending votes after editBeneficiary" ++ show pending'

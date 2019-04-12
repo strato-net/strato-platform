@@ -38,7 +38,7 @@ testBlock =
       blockDataTimestamp = posixSecondsToUTCTime 0,
       blockDataExtraData = "",
       blockDataNonce = 0,
-      blockDataMixHash = SHA 0x0
+      blockDataMixHash = blockstanbulMixHash
     },
     blockReceiptTransactions = [],
     blockBlockUncles = []
