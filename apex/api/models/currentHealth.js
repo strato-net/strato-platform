@@ -26,8 +26,5 @@ module.exports = function(sequelize, DataTypes) {
             isLastPending: this.isLastPending
         };
     };
-    CurrentHealth.associate = function(models) {
-        CurrentHealth.hasMany(models.HealthStat);
-    };
     return CurrentHealth;
 };

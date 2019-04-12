@@ -14,13 +14,5 @@ module.exports = function(sequelize, DataTypes) {
             timestamp: this.timestamp
         };
     };
-    StallStat.associate = function(models) {
-        StallStat.belongsTo(models.CurrentHealth, {
-            onDelete: "CASCADE",
-            foreignKey: {
-                allowNull: true
-            }
-        })
-    };
     return StallStat;
 };

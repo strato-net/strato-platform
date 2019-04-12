@@ -24,17 +24,11 @@ function queryHealthStatus() {
             const blocksPending = await getBaggerPending();
 
             const lastBlocksValid = await models.StallStat.findOne({
-                where: {
-                    blockType: "Valid",
-                },
-                attributes: ['blockCount'],
+                where: {blockType: 'Valid'},
                 order: [ [ 'createdAt', 'DESC' ]],
             });
             const lastBlocksPending = await models.StallStat.findOne({
-                where: {
-                    blockType: "Pending",
-                },
-                attributes: ['blockCount'],
+                where: {blockType: 'Pending'},
                 order: [ [ 'createdAt', 'DESC' ]],
             })
 
@@ -42,7 +36,7 @@ function queryHealthStatus() {
             const lastP = (lastBlocksPending) ? lastBlocksPending.dataValues.blockCount : blocksPending;
 
             await updateStallStat(blocksValid, blocksPending);
-            const overallStat = await getCurrentHealth(lastV, lastP, blocksValid);
+            const overallStat = await getCurrentHealth(lastP, lastV, blocksValid);
 
             await updateCurrentHealth(overallStat);
 
@@ -125,9 +119,9 @@ async function getBaggerPending() {
 
 async function getCurrentHealth(lastP, lastV, thisV){
     // The only unmatch case: lastPendingBlock is nonzero but there is no increment in blocksValid (See spec - uptime sheet)
-    const overallStat = lastP > 0 && thisV == lastV ? false : true;
-    const blocksValidInc = thisV > lastV || false;
-    return [overallStat, blocksValidInc, lastP > 0]
+    const overallStat = !(lastP > 0 && thisV == lastV);
+    const blocksValidInc = thisV > lastV;
+    return [overallStat, blocksValidInc, (lastP > 0)]
 }
 
 async function updateCurrentHealth(overallStat){
@@ -165,7 +159,6 @@ async function updateStallStat(blocksValid, blocksPending){
         blockCount: blocksPending,
         timestamp: currentTime
     });
-
 }
 
 module.exports = {
