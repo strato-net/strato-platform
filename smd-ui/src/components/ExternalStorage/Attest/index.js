@@ -151,8 +151,6 @@ class Attest extends Component {
   };
 
   renderAttestForm() {
-    let isPublicMode = isModePublic();
-
     return (
       <div className="pt-dialog-body upload-form">
 
