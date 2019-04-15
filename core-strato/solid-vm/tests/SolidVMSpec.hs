@@ -1865,3 +1865,17 @@ contract qq {
            , [Field "noms", ArrayIndex 0, Field "nomType"]
            , [Field "newType"]
            ] `shouldReturn` [BInteger 1, BString "ok", BInteger 41, BInteger 92]
+
+  it "can multiply return" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  string y;
+  function f() public returns (uint, string) {
+    return (24, "hello");
+  }
+  constructor() public {
+    (x, y) = f();
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 24, BString "hello"]

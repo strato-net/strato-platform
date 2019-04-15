@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -10,6 +11,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
+import Debug.Trace
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
@@ -223,7 +225,10 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
       erRefund = 0,
-      erReturnVal = BSS.toShort <$> returnVal,
+      erReturnVal = case returnVal of
+                      [] -> Nothing
+                      [x] -> Just $ BSS.toShort x
+                      _ -> todo "erReturnVal" returnVal,
       erTrace = [],
       erLogs = [],
       erNewContractAddress = Nothing,
@@ -264,7 +269,7 @@ getCodeAndCollection address' = do
 
     return (contract', ch, cc)
 
-logFunctionCall :: [(Maybe String, Xabi.Expression)] -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
+logFunctionCall :: [(Maybe String, Xabi.Expression)] -> Address -> Contract -> String -> SM [Value] -> SM [Value]
 logFunctionCall args address contract functionName f = do
   onTraced $ do
     let argStrings = map (unparseExpression . snd) args
@@ -275,8 +280,9 @@ logFunctionCall args address contract functionName f = do
   onTraced $ do
     resultString <-
       case result of
-        Nothing -> return ""
-        Just v -> showSM v
+        [] -> return ""
+        [v] -> showSM v
+        _ -> todo "logFunctionCall" (functionName, result)
 
     liftIO $ putStrLn $ box ["returning from " ++ functionName ++ ":", resultString]
 
@@ -311,7 +317,7 @@ argsToVals ctract fn = mapM (uncurry eval) . zipWith typeForName orderedTypes
            _ -> getVar =<< expToVar x
 
 
-callWrapper :: Address -> Address -> Maybe String -> String -> [(Maybe String, Xabi.Expression)] -> SM (Maybe Value)
+callWrapper :: Address -> Address -> Maybe String -> String -> [(Maybe String, Xabi.Expression)] -> SM [Value]
 callWrapper from to mContract functionName argExps = do
   (contract', hsh, cc) <- getCodeAndCollection to
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
@@ -326,7 +332,7 @@ callWrapper from to mContract functionName argExps = do
           Just _ -> do
             --TODO- this should only exist if the storage variable is declared
             -- "public", right now I just ignore this and allow anything to be called as a getter
-            fmap Just $ getVar $ StorageItem $ AddressedPath (Right to) . MS.singleton $ BC.pack functionName
+            fmap (:[])$ getVar $ StorageItem $ AddressedPath (Right to) . MS.singleton $ BC.pack functionName
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
@@ -361,23 +367,14 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
-  p1 <- expToPath e1
+  traceShowM ("expr/eq"::String, e1)
   v2 <- expToVar e2
-  t1 <- getXabiValueType p1
-  case t1 of
-    -- Arrays are deep copied when the target is storage
-    Xabi.Array{} -> do
-      onTraced $ liftIO $ putStrLn $ "Array copy to " ++ show p1
-      let p2 = case v2 of
-                  StorageItem p2' -> p2'
-                  _ -> todo "unhandled array copy" v2
-      len <- getInt . StorageItem $ p2 `apSnoc` MS.Field "length"
-      setVar (p1 `apSnoc` MS.Field "length") $ SInteger len
-      forM_ [0..len-1] $ \i -> do
-        let idx = MS.ArrayIndex $ fromIntegral i
-        rhs' <- getVar . StorageItem $ p2 `apSnoc` idx
-        setVar (p1 `apSnoc` idx) rhs'
+  case e1 of
+    Xabi.TupleExpression es -> do
+      ps <- mapM expToPath es
+      mapM_ (assignVal True v2) $ zip [0..] ps
     _ -> do
+<<<<<<< HEAD
       !value <- getVar v2
       ctract <- getCurrentContract
       onTraced $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p1, value)
@@ -385,6 +382,36 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
       -- liftIO $ putStrLn $ "coercion at: " ++ show (p1, t1, value, coerceType t1 value)
       setVar p1 $ coerceType ctract t1 value
   return Nothing
+=======
+      p <- expToPath e1
+      assignVal False v2 (0, p)
+  return Ongoing
+ where assignVal :: Bool -> Variable -> (Int, AddressedPath) -> SM ()
+       assignVal isTuple var (k, p) = do
+          ty <- getXabiValueType p
+          case ty of
+            Xabi.Array{} -> do
+              onTraced $ liftIO $ putStrLn $ "Array copy to " ++ show p
+              let p2 = case var of
+                          StorageItem p2' -> p2'
+                          _ -> todo "unhandled array copy" var
+              len <- getInt . StorageItem $ p2 `apSnoc` MS.Field "length"
+              setVar (p `apSnoc` MS.Field "length") $ SInteger len
+              forM_ [0..len-1] $ \i -> do
+                let idx = MS.ArrayIndex $ fromIntegral i
+                rhs' <- getVar . StorageItem $ p2 `apSnoc` idx
+                setVar (p `apSnoc` idx) rhs'
+            _ -> do
+              !value <- getVar var
+              ctract <- getCurrentContract
+              value' <- case (isTuple, value) of
+                (True, STuple vs) -> getVar =<< V.indexM vs k
+                (True, _) -> typeError "assigning nontuple to tuple" (p, value)
+                (False, _) -> return value
+              onTraced $ liftIO $ putStrLn $ "Variable to set is: " ++ show (p, value')
+              logAssigningVariable value'
+              setVar p $ coerceType ctract ty value'
+>>>>>>> 2f1d3549e... Return tuples
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
@@ -848,8 +875,9 @@ expToVar' (Xabi.FunctionCall e args) = do
 
       res <- runTheCall address contract' hsh cc name argVals
       case res of
-        Just v -> return $ Constant $ v
-        Nothing -> return $ Constant SNULL
+        [] -> return $ Constant SNULL
+        [v] -> return $ Constant $ v
+        _ -> todo "expToVar'/FunctionCall" res
 
     Constant (SStructDef structName) -> do
       contract' <- getCurrentContract
@@ -871,12 +899,18 @@ expToVar' (Xabi.FunctionCall e args) = do
     Constant (SContractItem address itemName) -> do
       from <- getCurrentAddress
       result <- callWrapper from address Nothing itemName args
-      return . Constant . fromMaybe SNULL $ result
+      return . Constant $ case result of
+        [] -> SNULL
+        [v] -> v
+        _ -> todo "SContractItem" (itemName, result)
 
     Constant (SContractFunction name address functionName) -> do
       from <- getCurrentAddress
       result <- callWrapper from address (Just name) functionName args
-      return . Constant . fromMaybe SNULL $ result
+      return . Constant $ case result of
+        [] -> SNULL
+        [v] -> v
+        _ -> todo "SContractFunction" (name, result)
 
     Constant (SEnum enumName) -> do
       case argVals of
@@ -1072,7 +1106,7 @@ addLocalVariable theType name value = do
           {callStack = currentSlice{localVariables=M.insert name (theType, newVariable) $ localVariables currentSlice}:rest}
 
 
-runTheCall :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
+runTheCall :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> [Value] -> SM [Value]
 runTheCall address' contract' hsh cc theFunction argVals = do
   --
   let returnMeta = map (\(n, Xabi.IndexedType _ t) -> (T.unpack n, t)) .  M.toList $ Xabi.funcVals theFunction
@@ -1095,8 +1129,8 @@ runTheCall address' contract' hsh cc theFunction argVals = do
         let paths = map (AddressedPath (Left LocalVar) . MS.singleton . BC.pack . fst) returns
         rs <- mapM (getVar . StorageItem) paths
         case rs of
-          [] -> return Nothing
-          [x] -> return $ Just x
+          [] -> return []
+          [x] -> return [x]
           _ -> todo "multiple named return values" rs
   val' <- case val of
              Nothing -> findNamedReturns
