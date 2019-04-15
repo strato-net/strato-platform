@@ -59,6 +59,7 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
+import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
@@ -66,6 +67,7 @@ import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
+import           Blockchain.VMOptions
 
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
@@ -190,8 +192,14 @@ runSM maybeCode env f = do
     -- TODO should also not happen, but since this is a work in progress they
     -- are a fact of life and should be fixed on demand.
     -- The rest should always be a user error and handled safely
-    Left ie@InternalError{} -> throw ie
-    Left se -> return $ Left se
+    Left ie@InternalError{} -> do
+      $logErrorLS "runSM/internalError" ie
+      throw ie
+    Left se -> do
+      $logErrorLS "runSM/error" se
+      if flags_svmDev
+        then throw se
+        else return $ Left se
     Right (value, sstateAfter) -> do
       vmcontext' <- get
       put vmcontext'{
