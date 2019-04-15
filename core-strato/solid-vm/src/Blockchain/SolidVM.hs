@@ -105,7 +105,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
         !contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
 
     let maybeArgString = M.lookup "args" =<< metadata
-        argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
+        argString = maybe "()" T.unpack maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "create arguments") id maybeArgs
 
