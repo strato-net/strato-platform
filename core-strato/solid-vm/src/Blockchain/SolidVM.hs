@@ -389,11 +389,17 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
-runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType _ varNames maybeExpression)) = do
+runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType maybeLoc varNames maybeExpression)) = do
   -- todo: use maybeLoc to determine whether to store this locally or create a reference
   let theType = fromMaybe (todo "type inference not implemented" s) maybeType
   value <-
     case maybeExpression of
+      Nothing ->
+        case varNames of
+           [Just _] -> do
+              ctract <- getCurrentContract
+              return $ defaultValue ctract theType
+           _ -> internalError "no single name for variable definition" varNames
       Just e -> do
         rhs <- expToVar e
 
@@ -407,17 +413,12 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType _ varNam
           (_, Xabi.Array{}) -> getValue
           (_, Xabi.Label name) -> do
             ty <- getTypeOfName name
-            case ty of
-              StructTypo{} -> getRef
+            case (maybeLoc, ty) of
+              (Just Xabi.Memory, _) -> getValue
+              (_, StructTypo{}) -> getRef
               _ -> getValue
           _ -> getValue
 
-      Nothing ->
-        case varNames of
-           [Just _] -> do
-              ctract <- getCurrentContract
-              return $ defaultValue ctract theType
-           _ -> internalError "no single name for variable definition" varNames
   onTraced $ do
     valueString <- showSM value
     liftIO $ putStrLn $ "             creating and setting variables: (" ++ intercalate ", " (map (fromMaybe "") varNames) ++ ")"
