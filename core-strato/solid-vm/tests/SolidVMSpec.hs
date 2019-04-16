@@ -96,6 +96,9 @@ runTest f = do
 runFile :: FilePath -> ContextM ()
 runFile fp = void $ runBS =<< liftIO (B.readFile fp)
 
+runFileArgs :: FilePath -> T.Text -> ContextM ()
+runFileArgs fp args = void $ runArgs args =<< liftIO (B.readFile fp)
+
 runBS :: B.ByteString -> ContextM ()
 runBS = void . runBS'
 
@@ -1906,3 +1909,18 @@ contract qq is Rest {
 }
 |]
     getFields ["sum"] `shouldReturn` [BInteger 400]
+
+  it "does stuff after an if" . runTest $ do
+    liftIO $ pendingWith "loop control fix"
+    runBS [r|
+contract qq {
+  uint x = 40;
+  constructor() public {
+    x++;
+    if (true) {
+    } else {
+    }
+    x++;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 42]
