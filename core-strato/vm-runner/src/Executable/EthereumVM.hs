@@ -12,6 +12,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.State.Lazy        (gets)
+import           Data.List
 import qualified Data.Text                             as T
 import qualified Data.Map.Ordered                      as O
 import qualified Data.Map                              as M
@@ -77,6 +78,8 @@ ethereumVM = void . execContextM $ do
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- loopTimeit "waiting for new events " $ getUnprocessedKafkaEvents cpOffset
 
+        logEventSummaries seqEvents
+        
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
@@ -84,7 +87,7 @@ ethereumVM = void . execContextM $ do
 
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
-
+        
         let txPairs = [(ts,t) | OETx ts t <- seqEvents]
             allTxs = map (uncurry OETx) txPairs
             blocks = [b | OEBlock b <- seqEvents]
@@ -250,7 +253,6 @@ getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
     ret <- K.withKafkaViolently (readSeqVmEvents offset)
-    $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret) ++ " unprocessed blocks/txs"
     return ret
 
 shouldProcessNewTransactions :: ContextM Bool -- todo: probably shouldn't do it by number, but tdiff.
@@ -272,3 +274,33 @@ shouldProcessNewTransactions =
     else do
         $logInfoS "shouldProcessNewTransactions" "flags_useSyncMode == false, will process all new TXs"
         return True
+
+
+
+
+
+logEventSummaries :: [OutputEvent] -> ContextM ()
+logEventSummaries events = do
+  let names = map getNames events
+      numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
+
+  $logInfoS "getUnprocessedKafkaEvents" . T.pack $
+    "Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"
+
+  where
+    getNames :: OutputEvent -> String
+    getNames (OETx _ _) = "TX"
+    getNames (OEBlock _) = "Block"
+    getNames (OEGenesis _) = "GenesisBlock"
+    getNames (OEJsonRpcCommand _) = "JsonRpcCommand"
+
+    getNames (OEGetChain _) = "GetChain"
+    getNames (OEGetTx _) = "GetTx"
+    getNames (OEBlockstanbul _) = "Blockstanbul"
+    getNames OECreateBlockCommand = "CreateBlockCommand"
+    getNames (OEAskForBlocks _ _ _) = "AskForBlocks"
+    getNames (OEPushBlocks _ _ _) = "PushBlocks"
+
+    numberIt :: Int -> String -> String
+    numberIt 1 x = "1 " ++ x
+    numberIt i x = show i ++ " " ++ x ++ "s"
