@@ -97,6 +97,7 @@ extra-deps:
 - logging-effect-1.3.3
 - bloomfilter-2.0.1.0
 - servant-aeson-specs-0.6.2.0
+- strings-1.1
 
 resolver: lts-12.4 #also duplicated in docker section below
 compiler-check: newer-minor

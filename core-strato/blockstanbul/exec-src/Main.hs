@@ -5,17 +5,17 @@ module Main where
 import qualified Data.ByteString.Char8      as C8
 import qualified Data.ByteString.Base64     as B64
 import           Data.ByteString.Base16              as B16
+import           Data.Strings (strToLower)
 import           Data.Either.Extra
 import           Data.Foldable (foldlM)
 import           Data.Maybe
 import qualified Network.Haskoin.Crypto     as HK
-import           Servant.Client
+import           Network.Curl
 import           System.Console.GetOpt
 import           System.Environment
-import           System.Exit
+--import           System.Exit
 
 import           Blockchain.Blockstanbul.Authentication
-import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Data.RLP
 
@@ -109,16 +109,16 @@ main = do
                . rlpSerialize
                . rlpEncode $ esign
   putStrLn $ "esignStr: " ++ show esignStr
-  let vote = API.CandidateReceived{API.sender=sender
-                                 , API.signature=esignStr
-                                 , API.recipient= fromOptRight (optRecipient opt)
-                                 , API.votingdir= not (optRemove opt)
-                                 , API.nonce= fromOptRight (optNonce opt)}
-  let urlAuth = concat [fromOptRight (optUsername opt) ++ ":",
+  let fieldPairs = concat ["signature:"++esignStr,
+               " sender:"++ show sender,
+               " votingdir:"++ strToLower (show ( not ( optRemove (opt)))),
+               " recipient:"++show ( fromOptRight (optRecipient opt)),
+               " nonce:"++show ( fromOptRight ( optNonce opt))
+              ]
+  putStrLn $ "fields: " ++ show fieldPairs
+  let url = concat [fromOptRight (optUsername opt) ++ ":",
        fromOptRight (optPassword opt) ++ "@",
-       fromOptRight (optNode opt)]
-      url = BaseUrl Http urlAuth 80 "/blockstanbul"
-  resultUploadVote <- API.uploadVote url vote
-  case resultUploadVote of
-    Left str -> die str
-    Right () -> exitSuccess
+       fromOptRight (optNode opt) ++ "/blockstanbul/vote"]
+  putStrLn $ "URLString: " ++ url
+  --curlPost url [fieldPairs]
+  curlMultiPost url [] [(HttpPost "" (Just "application/json") (ContentString fieldPairs) [] Nothing)]
