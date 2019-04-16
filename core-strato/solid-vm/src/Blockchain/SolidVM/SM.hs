@@ -216,7 +216,9 @@ runSM maybeCode env f = do
     Left se -> do
       $logErrorLS "runSM/error" se
       if flags_svmDev
-        then throw se
+        then do
+          $logErrorLS "runSM/error_code" maybeCode
+          throw se
         else return $ Left se
     Right (value, sstateAfter) -> do
       vmcontext' <- get

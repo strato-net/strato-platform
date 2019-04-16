@@ -1879,3 +1879,30 @@ contract qq {
   }
 }|]
     getFields ["x", "y"] `shouldReturn` [BInteger 24, BString "hello"]
+
+  it "can set local vars" . runTest $ do
+    runBS [r|
+contract Rest {
+  enum Status {
+    OK,
+    NOT_FOUND
+  }
+}
+
+contract qq is Rest {
+  uint sum;
+  struct Permit {
+    uint p;
+  }
+  function f() public returns (uint, uint) {
+    Permit memory perm;
+    perm.p = 400;
+    return (uint(Status.OK), perm.p);
+  }
+  constructor() public {
+    var (a, b) = f();
+    sum = a + b;
+  }
+}
+|]
+    getFields ["sum"] `shouldReturn` [BInteger 400]
