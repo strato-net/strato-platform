@@ -21,9 +21,11 @@ dependencies:
   - data-default
   - deepseq
   - ethereum-rlp
+  - fastMP
   - format
   - leveldb-haskell
   - merkle-patricia-db
+  - monad-loops
   - mtl
   - nibblestring
   - resourcet
