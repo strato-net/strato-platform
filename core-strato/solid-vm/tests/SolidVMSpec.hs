@@ -1363,7 +1363,6 @@ contract qq is A, B {
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xb)
 
   it "selects the correct super when parents are missing methods" . runTest $ do
-    liftIO $ pendingWith "TODO: ADL in MRO"
     runCall "value" "()" [r|
 contract A {
   function value() public returns (uint) {
@@ -1378,7 +1377,6 @@ contract qq is A, B {
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xa)
 
   it "can determine super instance by function name" . runTest $ do
-    liftIO $ pendingWith "MRO by ADL"
     runBS [r|
 contract A {
   function a() public pure returns (uint) { return 0xaaaa;}

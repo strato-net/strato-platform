@@ -687,12 +687,13 @@ expToVar' (Xabi.MemberAccess expr name) = do
 
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract
-        case _parents ctract of
-          -- TODO: Is this the correct MRO, or should it scan all ancestors for a match?
+        (_, cc) <- getCurrentCodeCollection
+        let parents' = getParents cc ctract
+        case filter (elem method . M.keys .  _functions) parents' of
           [] -> typeError "cannot use super without a parent contract" (method, ctract)
           ps -> do
             addr <- getCurrentAddress
-            return $ SContractFunction (last ps) addr method
+            return $ SContractFunction (_contractName $ last ps) addr method
 
       (SAddress addr, itemName) -> return $ SContractItem addr itemName
 
