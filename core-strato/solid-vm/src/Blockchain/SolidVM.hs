@@ -368,7 +368,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
     _ -> do
       p <- expToPath e1
       assignVal False v2 (0, p)
-  return Ongoing
+  return Nothing
  where assignVal :: Bool -> Variable -> (Int, AddressedPath) -> SM ()
        assignVal isTuple var (k, p) = do
           ty <- getXabiValueType p
