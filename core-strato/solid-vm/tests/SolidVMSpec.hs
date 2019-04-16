@@ -1769,6 +1769,7 @@ contract qq {
     getFields ["a"] `shouldReturn` [BAddress 74]
 
   it "can have a for loop with no fields" . runTest $ do
+    liftIO $ pendingWith "re-fix loops"
     runBS [r|
 contract qq {
   uint i;
@@ -1784,6 +1785,7 @@ contract qq {
     getFields ["i"] `shouldReturn` [BInteger 15]
 
   it "can have a while loop" . runTest $ do
+    liftIO $ pendingWith "re-fix loops"
     runBS [r|
 contract qq {
   uint i;
