@@ -60,7 +60,8 @@ whileStatement = do
   reserved "while"
   e <- parens expression
   s <- fmap (:[]) statement <|> statements
-  return $ WhileStatement e s
+  elseStatement <- optionMaybe (reserved "else" >> (fmap (:[]) statement <|> statements))
+  return $ IfStatement e s elseStatement
 
 forStatement :: SolidityParser Statement
 forStatement = do
