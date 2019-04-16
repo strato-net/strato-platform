@@ -1922,3 +1922,14 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 42]
+
+  it "can parse a singleton tuple" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    var (z) = 247;
+    x = z;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 247]

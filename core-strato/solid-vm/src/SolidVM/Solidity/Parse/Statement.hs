@@ -86,16 +86,9 @@ variableDefinitionStatement = do
   mLoc <- optionMaybe $ asum [ reserved "memory" >> return Memory
                              , reserved "storage" >> return Storage
                              ]
-  names <- fmap ((:[]) . Just) identifier <|> parens (commaSep2 $ optionMaybe identifier)
+  names <- fmap ((:[]) . Just) identifier <|> parens (commaSep1 $ optionMaybe identifier)
   expr <- optionMaybe (reservedOp "=" >> expression)
   return $ VariableDefinition theType mLoc names expr
-
---TODO- someday we need to clean up this parser to avoid using any "try"s
-commaSep2 :: SolidityParser a -> SolidityParser [a]
-commaSep2 x = do
-  first <- try $ x <* comma
-  rest <- commaSep1 x
-  return $ first:rest
 
 expression :: SolidityParser Expression
 expression =
