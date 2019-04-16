@@ -164,6 +164,25 @@ pipeline {
               ./check_genesis_ingestion.sh
               popd
             '''
+          },
+          'SolidVM Wings tests': {
+            withCredentials([
+              usernamePassword( credentialsId: 'blockapps-cd-github'
+                              , passwordVariable: 'GITHUB_TOKEN'
+                              , usernameVariable: 'USR')
+            ]) {
+              echo 'Running wings tests'
+              sh 'rm -rf wings'
+              sh "git clone https://${USR}:${GITHUB_TOKEN}@github.com/blockapps/wings.git -b develop --recurse-submodules"
+              dir('wings/wings-server') {
+                sh 'npm install'
+                sh 'npm install git://github.com/blockapps/blockapps-rest#v6.4.1'
+                sh 'sed -i s/super/FSM/g dapp/ticket/contracts/TicketFSM.sol'
+                sh 'sed -i /this.timeout.config.timeout.20./d dapp/transaction/test/transactionManager.test.js'
+                sh """sed -i "1s/^/VM: 'SolidVM'\\n/" config/localhost.config.yaml"""
+                sh 'npm run test'
+              }
+            }
           }
         )
       }
