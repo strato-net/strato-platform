@@ -60,7 +60,7 @@ describe('Chains: reducer', () => {
       expect(reducer(initialState, action)).toMatchSnapshot();
     });
 
-    // FETCH_CHAINS_FAILED
+    // FETCH_CHAINS_IDS_FAILURE
     test('failure', () => {
       const initialState = {
         chains: {},
