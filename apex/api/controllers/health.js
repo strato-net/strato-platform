@@ -43,7 +43,7 @@ module.exports = {
 
   healthStatus: async function (req, res, next){
     try {
-        let healthStatus, uptime, isInc, isPending;
+        let healthStatus, stallStatus, uptime, isInc, isPending;
 
         const healthInfo = await models.CurrentHealth.findOne({
             where: {
@@ -69,8 +69,9 @@ module.exports = {
         const currentTime = Date.now();
 
         if (healthInfo && stallInfo){
-            healthStatus = healthInfo.dataValues.latestHealthStatus && stallInfo.dataValues.latestHealthStatus;
-            uptime = (healthStatus) ? currentTime - Math.max(healthInfo.dataValues.lastFailureTimestamp, stallInfo.dataValues.lastFailureTimestamp) : 0;
+            healthStatus = healthInfo.dataValues.latestHealthStatus;
+            stallStatus = stallInfo.dataValues.latestHealthStatus;
+            uptime = (healthStatus) ? currentTime - healthInfo.dataValues.lastFailureTimestamp : 0;
             isInc = stallInfo.dataValues.isBlocksValidInc;
             isPending = stallInfo.dataValues.isLastPending;
         } else {
@@ -84,6 +85,7 @@ module.exports = {
                 healthInfo: {
                     uptime: uptime/1000,
                     isHealthy: healthStatus,
+                    isNotStalled: stallStatus,
                     isValidBlocksInc: isInc || false,
                     isLastPending: isPending
                 }
