@@ -22,7 +22,7 @@ noLog _ _ _ _ = return ()
 
 runFakeSequencerM :: SequencerConfig -> SequencerContext -> SequencerM a -> IO a
 runFakeSequencerM cfg ctx mv =
-    flip runLoggingT noLog
+    runNoLoggingT
   . runResourceT
   . flip runReaderT cfg
   $ evalStateT mv ctx

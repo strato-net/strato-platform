@@ -1,15 +1,16 @@
 {-# LANGUAGE
-    FlexibleContexts
+    ConstraintKinds
+  , FlexibleContexts
   , OverloadedStrings
   , QuasiQuotes
   , RecordWildCards
+  , TemplateHaskell
 #-}
 
 module Slipstream.OutputData where
 
 import           BlockApps.Solidity.Value
 import           Conduit
-import           Control.Exception
 import           Control.Monad
 import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
@@ -25,10 +26,11 @@ import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Query
 import           Network
-import           System.Log.Logger
 import           Text.RawString.QQ
 import           UnliftIO.IORef
+import           UnliftIO.Exception              (handle, SomeException)
 
+import           BlockApps.Logging
 import           Blockchain.Strato.Model.SHA
 
 import Slipstream.Events
@@ -36,6 +38,8 @@ import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.SolidityValue
+
+type OutputM m = (MonadUnliftIO m, MonadLogger m)
 
 tshow :: Show a => a -> Text
 tshow = T.pack . show
@@ -105,13 +109,13 @@ cirrusInfo = PGDatabase
   , pgDBPass = BC.pack flags_password :: B.ByteString
   , pgDBName = BC.pack flags_database :: B.ByteString
   , pgDBDebug = False
-  , pgDBLogMessage = infoM "pglog" . show . PGError
+  , pgDBLogMessage = runLoggingT . $logInfoLS "pglog" . PGError
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbInsert :: MonadIO m => PGConnection -> Text -> m ()
-dbInsert conn insrt = liftIO
-                    . handle handlePostgresError
+dbInsert :: OutputM m => PGConnection -> Text -> m ()
+dbInsert conn insrt = handle handlePostgresError
+                    . liftIO
                     . void
                     . pgQuery conn
                     . rawPGSimpleQuery $! encodeUtf8 insrt
@@ -120,15 +124,15 @@ isFunction :: Value -> Bool
 isFunction ValueFunction{} = False
 isFunction _ = True
 
-handlePostgresError :: (MonadIO m) => SomeException -> m ()
-handlePostgresError = liftIO . errorM "handlePGError" . show
+handlePostgresError :: OutputM m => SomeException -> m ()
+handlePostgresError = $logErrorLS "handlePGError"
 
-outputData :: ( MonadIO m)
+outputData :: OutputM m
            => PGConnection
            -> ConduitM () Text m ()
            -> m ()
 outputData conn c = runConduit $ c
-                              .| iterMC (liftIO . debugM "outputData" . T.unpack)
+                              .| iterMC ($logDebugS "outputData")
                               .| mapM_C (dbInsert conn)
 
 baseColumns :: [Text]
@@ -144,7 +148,7 @@ baseColumns = [ "address"
 baseTableColumns :: [Text]
 baseTableColumns = baseColumns ++ ["transaction_function_name"]
 
-createInserts :: (MonadIO m)
+createInserts :: OutputM m
               => IORef Globals
               -> [ProcessedContract]
               -> ConduitM () Text m ()
@@ -157,7 +161,7 @@ createInserts globalsIORef contracts = do
     insertHistoryTable globalsIORef contracts
 
 createInsertIndexTable
-  :: (MonadIO m)
+  :: OutputM m
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
@@ -168,7 +172,7 @@ createInsertIndexTable g cs = do
     insertIndexTable g cs
 
 createInsertHistoryTable
-  :: (MonadIO m)
+  :: OutputM m
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
@@ -179,7 +183,7 @@ createInsertHistoryTable g cs = do
     insertHistoryTable g cs
 
 createInsertFunctionHistoryTable
-  :: (MonadIO m)
+  :: OutputM m
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
@@ -191,7 +195,7 @@ createInsertFunctionHistoryTable _ cs = do
     -- insertFunctionHistoryTable g cs
     pure ()
 
-createIndexTable :: (MonadIO m)
+createIndexTable :: OutputM m
                  => IORef Globals
                  -> ProcessedContract
                  -> ConduitM () Text m ()
@@ -201,19 +205,14 @@ createIndexTable globalsIORef contract = do
       contractAlreadyCreated = hashVal `Set.member` createdContracts globals
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
-  liftIO . debugM "createIndexTable" . show $
-    T.intercalate " " [ "In createIndexTable,"
-                      , tshow hashVal
-                      , "contractAlreadyCreated ="
-                      , tshow contractAlreadyCreated
-                      ]
+  $logDebugLS "createIndexTable/contractAlreadyCreated" (hashVal, contractAlreadyCreated)
   unless contractAlreadyCreated $ do
     incNumTables
     yield $ insertContractTableQuery contract
     yield $ createIndexTableQuery contract
     setContractCreated globalsIORef hashVal
 
-createHistoryTable :: (MonadIO m)
+createHistoryTable :: OutputM m
                    => IORef Globals
                    -> ProcessedContract
                    -> ConduitM () Text m ()
@@ -224,7 +223,7 @@ createHistoryTable globalsIORef contract = do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract
 
-insertIndexTable :: (MonadIO m)
+insertIndexTable :: OutputM m
                  => IORef Globals
                  -> [ProcessedContract]
                  -> ConduitM () Text m ()
@@ -234,7 +233,7 @@ insertIndexTable globalsIORef contracts@(x:_) = do
   index <- shouldIndex globalsIORef hashVal
   when index . yield $ insertIndexTableQuery contracts
 
-insertHistoryTable :: (MonadIO m)
+insertHistoryTable :: OutputM m
                    => IORef Globals
                    -> [ProcessedContract]
                    -> ConduitM () Text m ()

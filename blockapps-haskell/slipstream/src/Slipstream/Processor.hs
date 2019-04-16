@@ -12,7 +12,10 @@
     , TupleSections
 #-}
 
-module Slipstream.Processor (processTheMessages) where
+module Slipstream.Processor
+  ( processTheMessages
+  , parseActions -- For testing
+  ) where
 
 import Control.Arrow ((&&&))
 import Control.Applicative
@@ -29,7 +32,7 @@ import Data.Either (lefts, rights)
 import Data.Int (Int32)
 import Data.IORef
 import Data.Function
-import Data.List (sortBy)
+import Data.List (sortOn)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
@@ -39,7 +42,6 @@ import qualified Data.Text as T
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Typed (PGConnection)
-import System.Log.Logger
 
 import Blockapps.Crossmon
 
@@ -47,6 +49,7 @@ import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
 import BlockApps.Ethereum
+import BlockApps.Logging
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Struct
@@ -88,9 +91,9 @@ toAction x =
   Left e -> error $ show e
   Right y -> y
 
-enterBloc2 :: BlocEnv -> Bloc x -> IO x
+enterBloc2 :: BlocEnv -> Bloc x -> LoggingT IO x
 enterBloc2 env x = do
-  ret <- runBlocToIO env x
+  ret <- liftIO $ runBlocToIO env x
 
   case ret of
    Left e -> error $ show e
@@ -244,13 +247,13 @@ getCachedSolidVMDetails g row = liftM2 (<|>)
 
 detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
+  (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
     name <- lookupT "name" md
     detailsMap <- lift $ sourceToContractDetails True src
     lookupT name detailsMap)
-  (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)
 
 adjustGlobals :: IORef Globals -> Action -> ContractDetails -> Bloc ()
 adjustGlobals gref row details = do
@@ -324,31 +327,33 @@ rowToHistories gref abiid row actions cont details oldState = do
 withSourceFirst :: (a, [Action]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
-processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> IO ()
+parseActions :: [B.ByteString] -> [((Address, Maybe ChainId), [Action])]
+parseActions = sortOn withSourceFirst
+             . splitActions
+             . filter matters
+             . filter hasContract
+             . concatMap (flatten . toAction . BL.fromStrict)
+
+processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> LoggingT IO ()
 processTheMessages env conn g messages = do
 
-  let changes = sortBy (compare `on` withSourceFirst)
-              . splitActions
-              . filter matters
-              . filter hasContract
-              . join
-              $ map (flatten . toAction . BL.fromStrict) messages
+  let changes = parseActions messages
 
   unless (null messages) $
-    debugM "processTheMessages" . unlines . map show $ messages
+    $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
 
   case length messages of
    0 -> return ()
-   1 -> infoM "processTheMessages" "1 message has arrived"
-   n -> infoM "processTheMessages" $ show n ++ " messages have arrived"
+   1 -> $logInfoS "processTheMessages" "1 message has arrived"
+   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
 
   inserts <- enterBloc2 env $ do
     forM changes $ \((addr,chainId),actions) -> do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
-      liftIO . infoM "processTheMessages" . T.unpack . formatAction $ row
-      liftIO . debugM "the diff is" . show . actionStorage $ row
+      $logInfoS "processTheMessages" $ formatAction row
+      $logDebugLS "the diff is " $ actionStorage row
 
       case actionStorage row of
         BS.ActionEVMDiff{} -> do
@@ -365,7 +370,6 @@ processTheMessages env conn g messages = do
                     , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
                     }
                   cont = either error id . xAbiToContract $ contractdetailsXabi details
-
               adjustGlobals g row details
 
               ensureContractInstance cmId row
@@ -389,14 +393,14 @@ processTheMessages env conn g messages = do
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs
 
-  forM_ (lefts inserts) $ errorM "processTheMessages" . T.unpack
+  forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
   let insertsByCodeHash = map snd
                         -- SolidVM contracts can have the same codehash and be different:
                         -- the codehash is just a sourcehash.
                         . partitionWith (codehash . indexInsert &&& contractName . indexInsert)
                         $ rights inserts
-  forM_ (rights inserts) $ debugM "processTheMessages/toInsert" . show
+  forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn . createInsertIndexTable g $ map indexInsert ins
     outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins

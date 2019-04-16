@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 module Strato.Strato23.Monad where
@@ -13,7 +14,6 @@ import           Control.Exception.Lifted        hiding (Handler, handle)
 import           Data.Pool                       (Pool, withResource)
 import           Control.Monad.Base
 import           Control.Monad.Except
-import           Control.Monad.Log               hiding (Handler)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import           Data.Foldable
@@ -28,10 +28,12 @@ import           Network.HTTP.Client
 import           Opaleye
 import           Servant
 
+import           BlockApps.Logging
+
 newtype VaultM x = VaultM
   { runVaultM ::
       ReaderT VaultWrapperEnv
-        ( LoggingT (WithSeverity (WithCallStack (WithTimestamp Text)))
+        ( LoggingT
           ( ExceptT VaultWrapperError IO )
         ) x
   } deriving
@@ -41,16 +43,17 @@ newtype VaultM x = VaultM
   , MonadIO
   , MonadBase IO
   , MonadReader VaultWrapperEnv
-  , MonadLog (WithSeverity (WithCallStack (WithTimestamp Text)))
+  , MonadLogger
   )
 
 
 instance MonadError VaultWrapperError VaultM where
   throwError err@(RuntimeError _) = do
-    logWith logError (Text.pack $ show err ++ "\n  callstack missing for runtime errors")
+    $logErrorS "throwError/RuntimeError" . Text.pack
+        $ show err ++ "\n  callstack missing for runtime errors"
     VaultM $ throwError err
   throwError err = do
-    logWith logError (Text.pack (show err))
+    $logErrorLS "throwError" err
     VaultM $ throwError err
   catchError m handle = do
     VaultM $ catchError (runVaultM m) (runVaultM . handle)
@@ -73,9 +76,8 @@ prettyCallStack' cs =
 
 vaultWrapperError :: HasCallStack => VaultWrapperError -> VaultM y
 vaultWrapperError err = do
-    logWithCallStack ?callStack logError (Text.pack (show err ++ "\n" ++ prettyCallStack' ?callStack))
+    logErrorCS callStack . Text.pack $ show err ++ "\n" ++ prettyCallStack' ?callStack
     VaultM $ throwError err
-
 
 
 instance MonadBaseControl IO VaultM where
@@ -86,7 +88,6 @@ instance MonadBaseControl IO VaultM where
 data VaultWrapperEnv = VaultWrapperEnv
   { httpManager  :: Manager
   , dbPool       :: Pool Connection
-  , logLevel     :: Severity
   }
 
 data VaultWrapperError
@@ -100,25 +101,12 @@ data VaultWrapperError
   deriving Show
 
 --------------------------------------------------------------------------------
-boxIt :: String -> String
-boxIt string =
-  replicate (len+4) '=' ++ "\n"
-  ++ unlines (map (\x -> "| " ++ x ++ " |") theLines)
-  ++ replicate (len+4) '='
-  where
-    len = Prelude.maximum $ map length theLines
-    theLines = lines string
-
-filterPrintLog :: MonadIO m => Severity -> WithSeverity (WithCallStack (WithTimestamp Text)) -> m ()
-filterPrintLog minSeverity x | msgSeverity x >= minSeverity = return ()
-filterPrintLog _ x =
-  liftIO . print $ x
 
 enterVaultWrapper :: VaultWrapperEnv -> VaultM x -> Handler x
 enterVaultWrapper env x
   = Handler
   $ withExceptT reThrowError
-  $ flip runLoggingT (filterPrintLog $ logLevel env)
+  $ runLoggingT
   $ flip runReaderT env $ runVaultM
   $ convertRuntimeErrors x
   where
@@ -169,22 +157,12 @@ formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"
 formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
 
-logWithCallStack
-  :: CallStack
-  -> (WithCallStack (WithTimestamp x) -> VaultM ()) -> x -> VaultM ()
-logWithCallStack stack logFn x = logFn . WithCallStack stack =<< timestamp x
-
-logWith
-  :: HasCallStack
-  => (WithCallStack (WithTimestamp x) -> VaultM ()) -> x -> VaultM ()
-logWith = logWithCallStack callStack
-
 vaultQuery
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
   => Query x
   -> VaultM [y]
 vaultQuery q = do
-  traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
+  traverse_ (logInfoCS callStack . Text.pack) (showSql q)
   pool <- asks dbPool
   withResource pool $ (\conn -> liftIO $ runQuery conn q)
 
@@ -208,13 +186,13 @@ vaultQuery1 q = vaultQuery q >>= \case
 
 vaultModify :: HasCallStack => (Connection -> IO x) -> VaultM x
 vaultModify modify = do
-  logWithCallStack callStack logNotice "Updating the database"
+  logInfoCS callStack "Updating the database"
   pool <- asks dbPool
   withResource pool $ (\conn -> liftIO $ modify conn)
 
 vaultModify1 :: HasCallStack => (Connection -> IO [x]) -> VaultM x
 vaultModify1 modify = do
-  logWithCallStack callStack logNotice "Updating the database"
+  logInfoCS callStack "Updating the database"
   results <- vaultModify modify
   case results of
     []    -> throwError $ DBError "No result, expected one row"
