@@ -32,7 +32,7 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Lens                          hiding (Context)
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.Text                             as T
@@ -85,7 +85,7 @@ instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
 instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
     getRedisBlockDB = contextRedisBlockDB <$> get
 
-instance (MonadResource m, MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
+instance (MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
   getSQLDB = asks configSQLDB
 
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
@@ -132,15 +132,13 @@ clearActionTimestamp = do
     cxt <- get
     put cxt{actionTimestamp=Nothing}
 
-runContextM :: (MonadIO m, MonadUnliftIO m)
+runContextM :: MonadUnliftIO m
             => (r, s)
             -> StateT s (ReaderT r (ResourceT m)) a
             -> m ()
 runContextM (r, s) = void . runResourceT . flip runReaderT r . flip runStateT s
 
-initContext :: ( MonadResource m
-               , MonadIO m
-               , MonadLogger m
+initContext :: ( MonadLogger m
                , MonadUnliftIO m
                )
             => Int -> m (Config, Context)
@@ -161,9 +159,7 @@ initContext maxHeaders = do
                  })
 
 
-getPeerByIP :: ( WrapsSQLDB t m
-               , MonadResource m
-               )
+getPeerByIP :: WrapsSQLDB t m
             => String
             -> (t m) (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = runWithSQL $ do

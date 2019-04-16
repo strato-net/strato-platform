@@ -26,7 +26,6 @@ dependencies:
   - exceptions
   - format
   - lifted-base
-  - monad-logger
   - mtl
   - network
   - network-uri

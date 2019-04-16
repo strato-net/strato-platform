@@ -5,13 +5,13 @@ module Blockchain.DB.StateDB (
   getStateRoot
   ) where
 
-import           Control.Monad.Trans.Resource
+import           Control.Monad.IO.Class
 
 import qualified Blockchain.Database.MerklePatricia as MP
 
 type StateDB = MP.MPDB
 
-class MonadResource m => HasStateDB m where
+class MonadIO m => HasStateDB m where
   getStateDB :: m MP.MPDB
   setStateDBStateRoot :: MP.StateRoot -> m ()
 

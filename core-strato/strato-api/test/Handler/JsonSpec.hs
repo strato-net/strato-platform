@@ -4,7 +4,7 @@ module Handler.JsonSpec (spec) where
 
 import           TestImport
 
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Network.Wai.Test
 import qualified Test.HUnit                 as HUnit
 import           Test.QuickCheck.Arbitrary
@@ -114,6 +114,9 @@ spec = withApp $ do
         statusIs 200
       it "returns last block" $ do
         get $ BlkLastR 10
+        statusIs 200
+      it "returns empty list of chain info" $ do
+        get ChainR
         statusIs 200
 
     describe "Account endpoints" $ do

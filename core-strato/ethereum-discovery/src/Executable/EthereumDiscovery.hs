@@ -7,7 +7,7 @@ module Executable.EthereumDiscovery (
 
 import           UnliftIO.Exception
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Base16                  as B16
 import           Data.Maybe

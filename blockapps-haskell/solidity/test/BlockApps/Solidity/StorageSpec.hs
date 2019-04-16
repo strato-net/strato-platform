@@ -23,9 +23,10 @@ spec = do
           let
             args = ValueArrayFixed 4
                     [ SimpleValue (valueUInt256 291)
-                    , ValueArrayDynamic [ SimpleValue (ValueInt False (Just 4) 1110)
-                                        , SimpleValue (ValueInt False (Just 4) 1929)
-                                        ]
+                    , ValueArrayDynamic $ tosparse
+                                           [ SimpleValue (ValueInt False (Just 4) 1110)
+                                           , SimpleValue (ValueInt False (Just 4) 1929)
+                                           ]
                     , SimpleValue (ValueBytes (Just 10) "1234567890")
                     , SimpleValue (valueBytes "Hello, world!")
                     ]
@@ -96,7 +97,7 @@ spec = do
       it "should convert 1 arg with type uint[]" $ do
         let
           args = ValueArrayFixed 1
-                  [ ValueArrayDynamic
+                  [ ValueArrayDynamic $ tosparse
                     [ SimpleValue $ valueUInt 1
                     , SimpleValue $ valueUInt 2
                     , SimpleValue $ valueUInt 3
@@ -129,9 +130,11 @@ spec = do
                   [ SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
                   , SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
                   , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
-                  , ValueArrayDynamic
-                      [ SimpleValue . ValueBytes (Just 32) . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
-                      , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , ValueArrayDynamic $ tosparse
+                      [ SimpleValue . ValueBytes (Just 32) . fst . Base16.decode
+                            $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                      , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode
+                            $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
                       ]
                   , SimpleValue . ValueString $ "Account Data should be able to be as long as you want ideally 12343432442431"
                   ]

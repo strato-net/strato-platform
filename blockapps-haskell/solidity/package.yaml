@@ -33,9 +33,9 @@ dependencies:
   - deepseq
   - extra
   - generic-random
+  - hashable
   - http-api-data
   - lens
-  - logging-effect
   - memory
   - mtl
   - ordered-containers

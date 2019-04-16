@@ -50,9 +50,10 @@ packages:
 - core-strato/blockstanbul/
 - core-strato/privacy/
 - core-strato/fastMP/
+- shared-util/common-log/
 - shared-util/cross-monitoring/
+- shared-util/format
 - shared-util/solid-vm-model/
-- format
 - clockwork
 - logserver
 - location:

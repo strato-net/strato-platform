@@ -7,7 +7,7 @@ module Blockchain.Strato.Indexer.TxrIndexer where
 
 import           Control.Exception
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.IO.Class             (liftIO)
 import           Control.Monad.Trans.Class          (lift)
 import           Control.Exception                  (catch, SomeException)

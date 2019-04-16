@@ -13,7 +13,7 @@ module Blockchain.Event (
 import           Control.Arrow                         ((&&&))
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Conduit

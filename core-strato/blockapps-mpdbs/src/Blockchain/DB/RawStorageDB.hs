@@ -12,7 +12,6 @@ module Blockchain.DB.RawStorageDB (
 
 import           Control.Monad.Loops
 import           Control.Monad.State
-import           Control.Monad.Trans.Resource
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString                             as B
 import           Data.List
@@ -32,7 +31,7 @@ import qualified Data.NibbleString                           as N
 
 import BatchMerge
 
-class MonadResource m => HasRawStorageDB m where
+class MonadIO m => HasRawStorageDB m where
   getRawStorageTxDB     :: m (DB.DB, M.Map (Address, B.ByteString) B.ByteString)
   putRawStorageTxMap    :: M.Map (Address, B.ByteString) B.ByteString -> m ()
   getRawStorageBlockDB  :: m (DB.DB, M.Map (Address, B.ByteString) B.ByteString)

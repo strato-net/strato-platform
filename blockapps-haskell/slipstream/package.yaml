@@ -33,6 +33,7 @@ dependencies:
   - bloomfilter
   - bytestring
   - classy-prelude
+  - common-log
   - conduit
   - conduit-combinators
   - containers
@@ -40,16 +41,14 @@ dependencies:
   - data-default
   - deepseq
   - extra
+  - format
   - hflags
-  - hslogger
   - http-client
   - lens
-  - logging-effect
   - lrucache
   - milena
   - MissingH
   - monad-control
-  - monad-logger
   - mtl
   - network
   - ordered-containers

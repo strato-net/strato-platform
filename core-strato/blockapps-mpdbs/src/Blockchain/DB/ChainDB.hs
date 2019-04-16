@@ -11,7 +11,7 @@ module Blockchain.DB.ChainDB (
   ) where
 
 import           Control.Monad                        (join, when)
-import           Control.Monad.Trans.Resource
+import           Control.Monad.IO.Class
 
 import           Data.Maybe                           (isNothing)
 import qualified Data.NibbleString                    as N
@@ -101,10 +101,10 @@ getLDB = MP.ldb <$> getStateDB
 word256ToMPKey :: Word256 -> N.NibbleString
 word256ToMPKey = N.EvenNibbleString . word256ToBytes
 
-getkv :: (RLPSerializable a, MonadResource m) => MP.MPDB -> N.NibbleString -> m (Maybe a)
+getkv :: (RLPSerializable a, MonadIO m) => MP.MPDB -> N.NibbleString -> m (Maybe a)
 getkv db = fmap (fmap rlpDecode) . MP.getKeyVal db
 
-putkv :: (RLPSerializable a, MonadResource m) => MP.MPDB -> N.NibbleString -> a -> m MP.StateRoot
+putkv :: (RLPSerializable a, MonadIO m) => MP.MPDB -> N.NibbleString -> a -> m MP.StateRoot
 putkv db k = (fmap MP.stateRoot) . MP.putKeyVal db k . rlpEncode
 
 bootstrapChainDB :: (HasStateDB m, HasChainDB m) => SHA -> m ()

@@ -27,7 +27,6 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
 import           Control.Monad                               (when)
-import           Control.Monad.Trans.Resource
 
 import qualified Data.ByteString                             as B
 import           Data.Function
@@ -161,7 +160,7 @@ instance Detailed StorageDiff where
   incrementalToEventual (EVMDiff m) = EVMDiff $ Map.map incrementalToEventual m
   incrementalToEventual (SolidVMDiff m) = SolidVMDiff $ Map.map incrementalToEventual m
 
-chainDiff :: (HasStateDB m, HasChainDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
+chainDiff :: (HasStateDB m, HasChainDB m, HasCodeDB m, HasHashDB m) =>
              Integer -> SHA -> SHA -> m [StateDiff]
 chainDiff blockNumber oldBlockHash newBlockHash = do
   mChainRoots <- (,) <$> getChainRoot oldBlockHash <*> getChainRoot newBlockHash
@@ -191,7 +190,7 @@ chainDiff blockNumber oldBlockHash newBlockHash = do
       sd <- stateDiff (Just chainId) blockNumber newBlockHash sr1 sr2
       go (sd:sds) rest
 
-stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
+stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m) =>
              Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   db <- getStateDB
@@ -222,7 +221,7 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
       updateDiff <- accountUpdate k v1 v2
       coll c d (updateDiff : u) rest
 
-accountEnd :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
+accountEnd :: (HasHashDB m, HasCodeDB m, HasStateDB m) =>
               [N.Nibble] -> Val -> m (Address, AccountDiff 'Eventual)
 accountEnd k v = do
   address <- lookupAddress k
@@ -230,7 +229,7 @@ accountEnd k v = do
   accountDiff <- eventualAccountState addrState
   return (address, accountDiff)
 
-accountUpdate :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
+accountUpdate :: (HasHashDB m, HasCodeDB m, HasStateDB m) =>
                  [N.Nibble] -> Val -> Val -> m (Address, AccountDiff 'Incremental)
 accountUpdate k vOld vNew = do
   address <- lookupAddress k
@@ -239,7 +238,7 @@ accountUpdate k vOld vNew = do
   accountDiff <- incrementalAccountState oldAddrState newAddrState
   return (address, accountDiff)
 
-eventualAccountState :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
+eventualAccountState :: (HasHashDB m, HasCodeDB m, HasStateDB m) =>
                         AddressState -> m (AccountDiff 'Eventual)
 eventualAccountState
   AddressState{
@@ -262,7 +261,7 @@ eventualAccountState
       }
 
 
-incrementalAccountState :: (HasHashDB m, HasStateDB m, HasCodeDB m, MonadResource m) =>
+incrementalAccountState :: (HasHashDB m, HasStateDB m, HasCodeDB m) =>
                            AddressState -> AddressState -> m (AccountDiff 'Incremental)
 incrementalAccountState oldState newState = do
   let codeKind = case addressStateCodeHash newState of
@@ -283,7 +282,7 @@ incrementalAccountState oldState newState = do
     diff :: (Eq a) => a -> a -> Maybe (Diff a 'Incremental)
     diff x y = if x == y then Nothing else Just Update{oldValue = x, newValue = y}
 
-eventualStorage :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
+eventualStorage :: (HasHashDB m, HasCodeDB m, HasStateDB m) =>
                    CodeKind -> StateRoot -> m (StorageDiff 'Eventual)
 eventualStorage kind storageRoot = do
   db <- getStateDB
@@ -296,7 +295,7 @@ eventualStorage kind storageRoot = do
       EVM -> fmap EVMDiff . decodeAll
       SolidVM -> fmap SolidVMDiff . decodeAll) allStorageKV
 
-incrementalStorage :: (HasHashDB m, HasStateDB m, HasCodeDB m, MonadResource m) =>
+incrementalStorage :: (HasHashDB m, HasStateDB m, HasCodeDB m) =>
                       CodeKind -> StateRoot -> StateRoot -> m (StorageDiff 'Incremental)
 incrementalStorage kind oldRoot newRoot = do
   db <- getStateDB
@@ -331,10 +330,10 @@ decodeStorageKV k v = do
   let val = decodeMPDBValue v
   return (key, val)
 
-lookupAddress :: (HasCodeDB m, HasHashDB m, MonadResource m) => [N.Nibble] -> m Address
+lookupAddress :: (HasCodeDB m, HasHashDB m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (HasHashDB m, HasCodeDB m, MonadResource m) => CodePtr -> m (CodeKind, ByteString)
+lookupCode :: (HasHashDB m, HasCodeDB m) => CodePtr -> m (CodeKind, ByteString)
 lookupCode (EVMCode ch) = lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = lookupInMPDB "contract code" getCode ch
 
@@ -344,4 +343,3 @@ lookupInMPDB name f k = do
   v <- f k
   return $ flip fromMaybe v $
     error $ "MPDB key does not reference any known " ++ name ++ ": " ++ format k
-

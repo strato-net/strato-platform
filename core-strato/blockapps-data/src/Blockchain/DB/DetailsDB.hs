@@ -5,7 +5,6 @@ module Blockchain.DB.DetailsDB (
   getBestBlock
   ) where
 
-import           Control.Monad.Trans.Resource
 import           Data.Maybe
 import qualified Database.Esqueleto       as E
 
@@ -40,8 +39,7 @@ getGenesisBlockHash = do
     []  -> error "Ethereum DBs are blank, you need to set them up by running 'ethereum-setup'"
     _   -> error "getGenesisBlockHash called, but there are multiple genesis blocks!  This is an error."
 
-getBestBlock::(MonadResource m, HasSQLDB m)=>
-              m BlockDataRef
+getBestBlock::HasSQLDB m=> m BlockDataRef
 getBestBlock = do
   bestBlockHash <- getBestBlockHash
   bestBlock <- getBlock bestBlockHash

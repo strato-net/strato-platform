@@ -23,7 +23,7 @@ module Blockchain.BlockChain
 import           Control.Arrow                           ((&&&))
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
@@ -79,7 +79,6 @@ import           Blockchain.VMOptions
 
 import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
-import           Blockchain.Output                       (rightPad)
 import           Blockchain.SHA                          (formatSHAWithoutColor)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
@@ -421,7 +420,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             addressState' <- lift $ getAddressState tAddr
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
             return $
-              errorExecResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
+              evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
 
 runCodeForTransaction :: Bool
                       -> Bool
@@ -440,7 +439,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
           Nothing -> EVM.create --EVM is the default
           Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
             \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
-                         return $ errorExecResults (toInteger ag) (UnsupportedVM vmName)
+                         return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
   --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
   addressState <- getAddressState tAddr
@@ -593,7 +592,7 @@ printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash
     let tNonce = transactionNonce baseTx
     logWithBox "printTx/err" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
                                 , "Tx hash:  " ++ format theHash
-                                , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                                , printf "%-74s" $ "Tx nonce: " ++ show tNonce
                                 , CL.red "Transaction failure: " ++ CL.red (format errMsg)
                                 , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
                                 ]
@@ -605,7 +604,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Ri
           else "Create Contract "  ++ fromMaybe "<failed>                                " (fmap (show . pretty) $ erNewContractAddress results) ++ "                  "
     logWithBox "printTx/ok" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
                                , "Tx hash:  " ++ format theHash
-                               , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                               , printf "%-74s" $ "Tx nonce: " ++ show tNonce
                                , txPretty
                                , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
                                ]
