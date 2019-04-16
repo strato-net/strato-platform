@@ -9,7 +9,7 @@ const Tour = ({ name, callback, run, steps, ref, autoStart, endTour, stopAllTour
   return (
     <Joyride
       steps={steps}
-      run={run}
+      run={false} // if needed in future just pass *run* variable
       locale={{ last: 'Continue', next: 'Continue', back: 'Back', skip: 'Skip', close: 'Close' }}
       type='continuous' // As opposed to 'single'
       debug={false}
