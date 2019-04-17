@@ -2,6 +2,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
+import           Control.Exception
+import           Control.Monad
 import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
 import qualified Data.ByteString.Base64     as B64
@@ -24,21 +26,21 @@ import           Blockchain.Data.RLP
 
 data Options = Options
   { optRemove    :: Bool
-  , optRecipient :: Either IOError Address
-  , optNode      :: Either IOError String
-  , optNonce     :: Either IOError Int
-  , optUsername  :: Either IOError String
-  , optPassword  :: Either IOError String
+  , optRecipient :: Address
+  , optNode      :: String
+  , optNonce     :: Int
+  , optUsername  :: String
+  , optPassword  :: String
   } deriving Show
 
 defaultOptions :: Options
 defaultOptions  = Options
   { optRemove    = False
-  , optRecipient = Left (userError ("Give me a recipient address."))
-  , optNode      = Left (userError ("Give me a node."))
-  , optNonce     = Left (userError ("Give me a non-negative int for your nonce."))
-  , optUsername  = Left (userError ("Give me the username of the node."))
-  , optPassword  = Left (userError ("Give me the password of the node."))
+  , optRecipient = throw $ userError "Give me a recipient address."
+  , optNode      = throw $ userError "Give me a node."
+  , optNonce     = throw $ userError "Give me a non-negative int for your nonce."
+  , optUsername  = throw $ userError "Give me the username of the node."
+  , optPassword  = throw $ userError "Give me the password of the node."
   }
 
 options :: [OptDescr (Options -> IO Options)]
@@ -47,9 +49,9 @@ options =
       (ReqArg
        (\ nc opts -> do
             let nonc = read nc :: Int
-            if (nonc >= 0)
-               then return $ opts { optNonce = Right nonc }
-               else ioError $ fromLeft (userError "") (optNonce opts)
+            unless (nonc >= 0) $
+              ioError . userError $ printf "nonnegative nonce required: %d" (show nonc)
+            return opts{optNonce=nonc}
        ) "Int")
      "REQUIRED; Should be greater than previous value."
   , Option ['r'] ["recipient"]
@@ -57,13 +59,13 @@ options =
        (\ rp opts -> do
            let strAddr = stringAddress rp
            case strAddr of
-             Just eRecipient -> return opts { optRecipient = Right eRecipient }
-             Nothing -> ioError $ fromLeft (userError "") (optRecipient opts)
+             Just eRecipient -> return opts { optRecipient = eRecipient }
+             Nothing -> ioError . userError . printf "invalid address: %s" $ show strAddr
        ) "Address")
     "REQUIRED; The beneficiary address."
   , Option ['d'] ["node"]
       (ReqArg
-       (\ nd opts -> return opts { optNode  = Right nd }
+       (\ nd opts -> return opts { optNode=nd }
        ) "Node IP Address")
     "REQUIRED; The node server IP address."
   , Option ['e'] ["remove"]
@@ -72,12 +74,12 @@ options =
       "The voting direction"
   , Option ['u'] ["username"]
       (ReqArg
-       (\ username opts -> return opts { optUsername = Right username}
+       (\ username opts -> return opts { optUsername = username}
        ) "Node Username")
     "REQUIRED; The strato username of the running pbft node."
   , Option ['p'] ["password"]
       (ReqArg
-       (\ pw opts -> return opts { optPassword = Right pw}
+       (\ pw opts -> return opts { optPassword = pw}
        ) "Node password")
       "REQUIRED; The strato password of the running pbft node."
    ]
@@ -93,10 +95,6 @@ parseArgs = do
     ([], _, errs) -> ioError (userError (concat errs ++ helpMessage))
     (opts, _, _) -> foldlM (flip id) defaultOptions opts
 
-fromOptRight :: Either IOError a -> a
-fromOptRight (Right x) = x
-fromOptRight (Left err) = error ("Input error: " ++ (show err) ++ "\n" ++ helpMessage)
-
 main :: IO()
 main = do
   opt <- parseArgs
@@ -104,10 +102,10 @@ main = do
   let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
       pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
       iSender = prvKey2Address pkey
-      iRecipient = fromOptRight $ optRecipient opt
+      iRecipient = optRecipient opt
       iVotingdir = optRemove opt
-      iNonce = fromOptRight $ optNonce opt
-      iHost = fromOptRight $ optNode opt
+      iNonce = optNonce opt
+      iHost = optNode opt
   putStrLn $ "Sender: " ++ show iSender
   esign <- signBenfInfo pkey (iRecipient, not iVotingdir, iNonce)
   putStrLn $ "Signature: " ++ show esign
@@ -131,8 +129,8 @@ main = do
   putStrLn $ "url: " ++ url
   let req' = postRequestWithBody url "application/json" body
       auth = AuthBasic (error "realm unused")
-                       (fromOptRight (optUsername opt))
-                       (fromOptRight (optPassword opt))
+                       (optUsername opt)
+                       (optPassword opt)
                        (error "uri unused")
       authStr = withAuthority auth req'
       req = setHeaders req' [mkHeader HdrAuthorization authStr]
