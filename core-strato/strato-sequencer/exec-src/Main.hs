@@ -16,6 +16,7 @@ import           HFlags
 import           Safe
 import           System.Environment
 
+import           Blockapps.Crossmon
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
@@ -34,6 +35,7 @@ import           Flags
 
 main :: IO ()
 main = do
+  initializeHealthChecks "seq_main"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer validators: " ++ show flags_validators

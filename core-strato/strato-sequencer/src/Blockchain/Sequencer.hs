@@ -53,7 +53,6 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
-
 import           Text.Format
 
 logFF :: MonadLogger m => T.Text -> String -> m ()
