@@ -30,7 +30,7 @@ async function getHealthStatus() {
 
     if (healthInfo && stallInfo){
         healthStatus = healthInfo.dataValues.latestHealthStatus && stallInfo.dataValues.latestHealthStatus;
-        uptimeDur = (healthStatus) ? currentTime - Math.max(healthInfo.dataValues.lastFailureTimestamp, stallInfo.dataValues.lastFailureTimestamp) : 0;
+        uptimeDur = (healthStatus) ? currentTime - healthInfo.dataValues.lastFailureTimestamp : 0;
     }
     emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
     emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, uptimeDur/1000);
