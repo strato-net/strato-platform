@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
@@ -97,17 +98,13 @@ parseArgs = do
 
 main :: IO()
 main = do
-  opt <- parseArgs
+  Options{..} <- parseArgs
   skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
   let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
       pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
-      iSender = prvKey2Address pkey
-      iRecipient = optRecipient opt
-      iVotingdir = optRemove opt
-      iNonce = optNonce opt
-      iHost = optNode opt
-  putStrLn $ "Sender: " ++ show iSender
-  esign <- signBenfInfo pkey (iRecipient, not iVotingdir, iNonce)
+      optSender = prvKey2Address pkey
+  putStrLn $ "Sender: " ++ show optSender
+  esign <- signBenfInfo pkey (optRecipient, not optRemove, optNonce)
   putStrLn $ "Signature: " ++ show esign
   let esignStr = C8.unpack
                . B16.encode
@@ -115,22 +112,22 @@ main = do
                . rlpEncode $ esign
   putStrLn $ "esignStr: " ++ show esignStr
   let payload = CandidateReceived
-              { sender = iSender
+              { sender = optSender
               , signature = esignStr
-              , recipient = iRecipient
-              , votingdir = iVotingdir
-              , nonce = iNonce
+              , recipient = optRecipient
+              , votingdir = not optRemove
+              , nonce = optNonce
               }
       body = C8.unpack $ BL.toStrict $ Ae.encode payload
   putStrLn $ "struct: " ++ show payload
 
   putStrLn $ "body: " ++ body
-  let url = printf "http://%s/blockstanbul/vote" iHost
+  let url = printf "http://%s/blockstanbul/vote" optNode
   putStrLn $ "url: " ++ url
   let req' = postRequestWithBody url "application/json" body
       auth = AuthBasic (error "realm unused")
-                       (optUsername opt)
-                       (optPassword opt)
+                       optUsername
+                       optPassword
                        (error "uri unused")
       authStr = withAuthority auth req'
       req = setHeaders req' [mkHeader HdrAuthorization authStr]
