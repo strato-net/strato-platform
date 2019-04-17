@@ -2,22 +2,23 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
+import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
 import qualified Data.ByteString.Base64     as B64
-import           Data.ByteString.Base16              as B16
-import           Data.Strings (strToLower)
+import           Data.ByteString.Base16     as B16
+import qualified Data.ByteString.Lazy       as BL
 import           Data.Either.Extra
 import           Data.Foldable (foldlM)
 import           Data.Maybe
 import qualified Network.Haskoin.Crypto     as HK
 import           Network.HTTP
 import           Network.HTTP.Auth
-import           Control.Monad
 import           System.Console.GetOpt
 import           System.Environment
---import           System.Exit
+import           Text.Printf
 
 import           Blockchain.Blockstanbul.Authentication
+import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Data.RLP
 
@@ -71,7 +72,7 @@ options =
       "The voting direction"
   , Option ['u'] ["username"]
       (ReqArg
-       (\ user opts -> return opts { optUsername = Right user}
+       (\ username opts -> return opts { optUsername = Right username}
        ) "Node Username")
     "REQUIRED; The strato username of the running pbft node."
   , Option ['p'] ["password"]
@@ -102,25 +103,37 @@ main = do
   skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
   let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
       pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
-      sender = prvKey2Address pkey
-  putStrLn $ "Sender: " ++ show sender
-  esign <- signBenfInfo pkey (fromOptRight (optRecipient opt), not (optRemove opt), fromOptRight (optNonce opt))
-  putStrLn $ "esign: " ++ show esign
+      iSender = prvKey2Address pkey
+      iRecipient = fromOptRight $ optRecipient opt
+      iVotingdir = optRemove opt
+      iNonce = fromOptRight $ optNonce opt
+      iHost = fromOptRight $ optNode opt
+  putStrLn $ "Sender: " ++ show iSender
+  esign <- signBenfInfo pkey (iRecipient, not iVotingdir, iNonce)
+  putStrLn $ "Signature: " ++ show esign
   let esignStr = C8.unpack
                . B16.encode
                . rlpSerialize
                . rlpEncode $ esign
   putStrLn $ "esignStr: " ++ show esignStr
-  let fieldPairs = concat ["signature:"++esignStr,
-               " sender:"++ show sender,
-               " votingdir:"++ strToLower (show ( not ( optRemove (opt)))),
-               " recipient:"++show ( fromOptRight (optRecipient opt)),
-               " nonce:"++show ( fromOptRight ( optNonce opt))
-              ]
-  putStrLn $ "fields: " ++ show fieldPairs
-  let url = concat [fromOptRight (optUsername opt) ++ ":",
-       fromOptRight (optPassword opt) ++ "@",
-       fromOptRight (optNode opt) ++ "/blockstanbul/vote"]
-  putStrLn $ "URLString: " ++ url
-  let req = postRequestWithBody url "application/json" fieldPairs
-  void $ simpleHTTP req
+  let payload = CandidateReceived
+              { sender = iSender
+              , signature = esignStr
+              , recipient = iRecipient
+              , votingdir = iVotingdir
+              , nonce = iNonce
+              }
+      body = C8.unpack $ BL.toStrict $ Ae.encode payload
+  putStrLn $ "struct: " ++ show payload
+
+  putStrLn $ "body: " ++ body
+  let url = printf "http://%s/blockstanbul/vote" iHost
+  putStrLn $ "url: " ++ url
+  let req' = postRequestWithBody url "application/json" body
+      auth = AuthBasic (error "realm unused")
+                       (fromOptRight (optUsername opt))
+                       (fromOptRight (optPassword opt))
+                       (error "uri unused")
+      authStr = withAuthority auth req'
+      req = setHeaders req' [mkHeader HdrAuthorization authStr]
+  print =<< simpleHTTP req
