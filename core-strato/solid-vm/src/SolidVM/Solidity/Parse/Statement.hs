@@ -86,7 +86,7 @@ variableDefinitionStatement = do
   mLoc <- optionMaybe $ asum [ reserved "memory" >> return Memory
                              , reserved "storage" >> return Storage
                              ]
-  names <- fmap ((:[]) . Just) identifier <|> parens (commaSep1 $ optionMaybe identifier)
+  names <- fmap ((:[]) . Just) identifier <|> parens (commaSep1 $ optionMaybe $ identifier)
   expr <- optionMaybe (reservedOp "=" >> expression)
   return $ VariableDefinition theType mLoc names expr
 
@@ -139,9 +139,9 @@ memberName = do
 
 tuple :: SolidityParser Expression -- includes the case of a 1-tuple, ie- parens...  but just returns as a simple expression
 tuple = do
-  exps <- parens $ commaSep1 expression
+  exps <- parens $ commaSep1 $ optionMaybe expression
   case exps of
-    [exp'] -> return exp'
+    [Just exp'] -> return exp'
     _ -> return $ TupleExpression exps
 
 array :: SolidityParser Expression

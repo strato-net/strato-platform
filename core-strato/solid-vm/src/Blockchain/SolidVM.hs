@@ -11,7 +11,6 @@ module Blockchain.SolidVM
     , create
     ) where
 
-import Debug.Trace
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
@@ -359,18 +358,18 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1 e2))) = do
-  traceShowM ("expr/eq"::String, e1)
   v2 <- expToVar e2
   case e1 of
     Xabi.TupleExpression es -> do
-      ps <- mapM expToPath es
+      ps <- mapM (mapM expToPath) es
       mapM_ (assignVal True v2) $ zip [0..] ps
     _ -> do
       p <- expToPath e1
-      assignVal False v2 (0, p)
+      assignVal False v2 (0, Just p)
   return Nothing
- where assignVal :: Bool -> Variable -> (Int, AddressedPath) -> SM ()
-       assignVal isTuple var (k, p) = do
+ where assignVal :: Bool -> Variable -> (Int, Maybe AddressedPath) -> SM ()
+       assignVal _ _ (_, Nothing) = return ()
+       assignVal isTuple var (k, Just p) = do
           ty <- getXabiValueType p
           case ty of
             Xabi.Array{} -> do
@@ -817,7 +816,8 @@ expToVar' (Xabi.Binary "||" expr1 expr2) = do
   return $ Constant $ SBool $ b1 || b2
 
 expToVar' (Xabi.TupleExpression exps) = do
-  vars <- for exps expToVar
+  -- Or should STuple be a Vector of Maybe?
+  vars <- for exps $ maybe (return $ Constant SNULL) expToVar
   return $ Constant $ STuple $ V.fromList vars
 
 expToVar' (Xabi.ArrayExpression exps) = do

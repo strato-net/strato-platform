@@ -51,7 +51,7 @@ data Expression =
   | BoolLiteral Bool
   | NumberLiteral Integer (Maybe NumberUnit)
   | StringLiteral String
-  | TupleExpression [Expression]
+  | TupleExpression [Maybe Expression]
   | ArrayExpression [Expression]
   | Variable String deriving (Show, Read, Eq, Generic, NFData, Binary)
 

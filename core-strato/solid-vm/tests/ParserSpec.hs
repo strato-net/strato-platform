@@ -70,6 +70,15 @@ spec = do
                  , ("Nom storage nom = ns[10];", SimpleStatement $
                       VariableDefinition (Just $ Label "Nom") (Just Storage) [Just "nom"] $ Just $
                       IndexAccess (Variable "ns") (Just $ NumberLiteral 10 Nothing))
+                 , ("var (x, y) = (7, 3);", SimpleStatement $
+                      VariableDefinition Nothing Nothing [Just "x", Just "y"] $ Just $
+                      TupleExpression $ map (\n -> Just (NumberLiteral n Nothing)) [7, 3])
+                 , ("(z, w) = (q, r);", SimpleStatement $ ExpressionStatement
+                      $ Binary "=" (TupleExpression $ map (Just . Variable) ["z", "w"])
+                                   (TupleExpression $ map (Just . Variable) ["q", "r"]))
+                 , ("(z, ) = (q, r);", SimpleStatement $ ExpressionStatement
+                      $ Binary "=" (TupleExpression $ [Just $ Variable "z", Nothing])
+                                   (TupleExpression $ map (Just . Variable) ["q", "r"]))
                  ]
     forM_ scases $ \(input, want) -> do
         it ("can parse " ++ input) $ parseStatement input `shouldBe` Right want

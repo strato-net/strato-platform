@@ -204,7 +204,7 @@ unparseExpression (NumberLiteral x Nothing) = show x
 unparseExpression (BoolLiteral False) = "false"
 unparseExpression (BoolLiteral True) = "true"
 unparseExpression (StringLiteral s) = show s
-unparseExpression (TupleExpression vals) = "(" ++ List.intercalate ", " (map unparseExpression vals) ++ ")"
+unparseExpression (TupleExpression vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
 unparseExpression (IndexAccess e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
 unparseExpression (FunctionCall e args) =
   let

@@ -150,7 +150,7 @@ expressionCrawler = \case
   Xabi.NumberLiteral{} -> ["NumberLiteral"]
   Xabi.StringLiteral{} -> ["StringLiteral"]
   Xabi.TupleExpression subexprs -> "TupleExpression" : do
-    expr <- subexprs
+    expr <- catMaybes subexprs
     expressionCrawler expr
   Xabi.ArrayExpression subexprs -> "ArrayExpression" : do
     expr <- subexprs

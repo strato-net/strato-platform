@@ -1933,3 +1933,14 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 247]
+
+  it "doesn't need var for variables in scope" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  uint y;
+  constructor() public {
+    (x, y) = (10, 20);
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 10, BInteger 20]
