@@ -91,6 +91,7 @@ debugShowCtx = do
   debugLog "showctx/committed" committed show
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
+  debugLog "showctx/admins" authSenders show
 
 newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
 newContext v as senderlist pk =
@@ -156,15 +157,19 @@ isAuthorized iev = do
       NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
         -- Check nonce for replay attack
         slist <- use authSenders
-        let nonceAuth = M.member addr slist && Just nonc > M.lookup addr slist
-            verifiedSender = verifyBenfInfo (benf,dir,nonc) sign
-        if nonceAuth && Just addr == verifiedSender
-          then do
-            authSenders %= M.insert addr nonc
-            return True
-          else do
-            warn "Rejecting NewBeneficiary; nonce or signature incorrect"
-            return False
+        let ifAuthMember = M.member addr slist
+            nonceAuth = Just nonc > M.lookup addr slist
+            signAuth = Just addr == verifyBenfInfo (benf,dir,nonc) sign
+        unless  ifAuthMember $
+          warn $ "Rejecting NewBeneficiary; Sender is not approved " ++ show addr
+              ++ " is not a authorized sender" ++ show slist
+        unless nonceAuth $
+          warn $ "Rejecting NewBeneficiary; Nonce is incorrect " ++ show nonc
+        unless signAuth $
+          warn $ "Rejecting NewBeneficiary; bad seal, address: " ++ show addr ++ " Seal: "
+              ++ show sign ++ " info: " ++ show (benf, dir, nonc) ++ " address decoded: "
+              ++ show (fromJust (verifyBenfInfo (benf,dir,nonc) sign))
+        return $ ifAuthMember && nonceAuth && signAuth
       -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
       -- but with incorrect extraData.
       IMsg _ (Preprepare _ pp) -> do
@@ -228,7 +233,11 @@ nextRound nt = do
   val <- uses validators S.toList
   vot <- use voted
   validators .= S.fromList (updateValidator val vot)
-
+  $logInfoS "blockstanbul/voting" . T.pack $
+                 "nextRound: voted map" ++ show vot
+  valNew <- use validators
+  $logInfoS "blockstanbul/voting" . T.pack $
+                 "nextRound: validators updated" ++ show valNew
   case nt of
     Sequence s -> view . sequence .= s
     Round r -> do
@@ -265,11 +274,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   authz <- lift $ isAuthorized ev
   v <- use view
   when authz $ case ev of
-    NewBeneficiary _ (benf,decision,_)  -> do
-      pendingvotes %= M.insert benf decision
+    NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
+      pendingvotes %= M.insert benf dir
+      authSenders %= M.insert addr nonc
     PreviousBlock blk -> do
-      -- TODO(tim): This needs to be fixed for validator voting, as the current list
-      -- may have diverged from the validators at the time of commit
       realValidators <- use validators
       seqNo <- use $ view . sequence
       let eNextSeqNo = replayHistoricBlock realValidators seqNo blk
@@ -278,9 +286,15 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       case eNextSeqNo of
         Left err -> $logWarnS "blockstanbul" . T.pack
                     . printf "Rejecting historical block #%d: %s" blockNo $ err
-        Right _ -> do
-          -- TODO(tim): Does it have a vote to record?
+        Right (_, props) -> do
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
+          case extractBeneficiary blk of
+            Nothing -> return ()
+            Just (bnf, vot) -> do
+              val <- uses voted $M.lookup bnf
+              let unwrapVal = fromMaybe M.empty val
+              let nval = M.insert props vot unwrapVal
+              voted %= M.insert bnf nval
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
@@ -292,12 +306,22 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         vs <- use validators
         --extract from pending list and vote
         pending <- use pendingvotes
+        $logInfoS "blockstanbul/voting" . T.pack $
+                 "pending votes: " ++ show pending
         editedBlk <- if null pending
-              then return blk
+              then do
+                $logDebugS "blockstanbul/voting" "No votes pending"
+                return blk
               else do
                  let ((bnf,nonc),newPending) = M.deleteFindMin pending
                  pendingvotes .= newPending
-                 return $ editBeneficiary blk bnf nonc
+                 let nb = editBeneficiary blk bnf nonc
+                 $logInfoS "blockstanbul/voting" . T.pack
+                    . printf "Casting vote for %s" . show . blockDataCoinbase $ blockBlockData nb
+                 return nb
+        pending' <- use pendingvotes
+        $logInfoS "blockstanbul/voting" . T.pack $
+           "pending votes after editBeneficiary" ++ show pending'
         let blockWithVs = addValidators vs editedBlk
         pseal <- proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
@@ -355,9 +379,14 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                     Just (bnef,vot) -> do
                       -- insert the vote into map
                       val <- uses voted $M.lookup bnef
+                      $logInfoS "blockstanbul/voting" . T.pack $
+                        "extractBeneficiary" ++ show val
                       let unwrapVal = fromMaybe M.empty val
                       let nval = M.insert pr vot unwrapVal
                       voted %= M.insert bnef nval
+                      voted' <- use voted
+                      $logInfoS "blockstanbul/voting" . T.pack $
+                        "insert into voted map:" ++ show voted'
                   yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di

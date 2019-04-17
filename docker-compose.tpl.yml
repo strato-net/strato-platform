@@ -153,6 +153,7 @@ services:
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
     - useSyncMode=${useSyncMode}
+    - blockstanbulAdmins=${blockstanbulAdmins:-}
     - validators=${validators}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - zkHost=zookeeper

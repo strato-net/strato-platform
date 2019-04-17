@@ -95,7 +95,8 @@ import           Text.Format
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
-    getBaggerState = contextBaggerState <$> State.get
+    isBlockstanbul = State.gets contextHasBlockstanbul
+    getBaggerState = State.gets contextBaggerState
     putBaggerState s = do
         ctx <- State.get
         State.put $ ctx { contextBaggerState = s }
@@ -265,7 +266,14 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     -- If there are no transactions in th
     -- TODO: this should be handled more officially,
     -- e.g. adding a chainId to the block
-    let skipCheck = (not $ null otxs) && (isNothing . listToMaybe $ filter (isNothing . txChainId) otxs)
+    let skipCheck = (not $ null otxs)
+                 && (isNothing . listToMaybe $ filter (isNothing . txChainId) otxs)
+                 -- TODO: Move vote setting into Bagger.
+                 -- Currently when a PBFT vote is set in the sequencer, the rewarded
+                 -- coinbases will change and the stateroot mismatches. If bagger
+                 -- sets the coinbase to the recipient of the vote, the initial stateroot
+                 -- it calculates will match the final one when the block is committed.
+                 || (blockDataMixHash bd == blockstanbulMixHash && blockDataCoinbase bd /= 0x0)
     unless skipCheck $ do
       when (blockDataStateRoot (obBlockData b) /= MP.stateRoot db) $ do
         $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
