@@ -50,6 +50,7 @@ executables:
     dependencies:
       - blockstanbul
       - base16-bytestring
+      - base64-bytestring
       - hflags
       - extra
 

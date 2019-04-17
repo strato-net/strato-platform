@@ -1,9 +1,9 @@
 export const FETCH_CHAINS_REQUEST = 'FETCH_CHAINS_REQUEST';
 export const FETCH_CHAINS_SUCCESS = 'FETCH_CHAINS_SUCCESS';
-export const FETCH_CHAINS_FAILED = 'FETCH_CHAINS_FAILED';
+export const FETCH_CHAINS_FAILURE = 'FETCH_CHAINS_FAILURE';
 export const FETCH_CHAIN_IDS_REQUEST = 'FETCH_CHAIN_IDS_REQUEST';
 export const FETCH_CHAINS_IDS_SUCCESS = 'FETCH_CHAINS_IDS_SUCCESS';
-export const FETCH_CHAINS_IDS_FAILED = 'FETCH_CHAINS_IDS_FAILED';
+export const FETCH_CHAINS_IDS_FAILURE = 'FETCH_CHAINS_IDS_FAILURE';
 export const CHANGE_CHAIN_FILTER = 'CHANGE_CHAIN_FILTER';
 export const FETCH_CHAIN_DETAIL_REQUEST = 'FETCH_CHAIN_DETAIL_REQUEST';
 export const FETCH_CHAIN_DETAIL_SUCCESS = 'FETCH_CHAIN_DETAIL_SUCCESS';
@@ -28,7 +28,7 @@ export const fetchChainsSuccess = function (chainLabelIds) {
 
 export const fetchChainsFailure = function (error) {
   return {
-    type: FETCH_CHAINS_FAILED,
+    type: FETCH_CHAINS_FAILURE,
     error: error,
   }
 };
@@ -94,7 +94,7 @@ export const fetchChainIdsSuccess = function (chain) {
 
 export const fetchChainIdsFailure = function (error) {
   return {
-    type: FETCH_CHAINS_IDS_FAILED,
+    type: FETCH_CHAINS_IDS_FAILURE,
     error
   }
 };

@@ -64,8 +64,10 @@ main = do
                 putStrLn . ("NODEKEY address: " ++) . formatAddress $ selfAddress
                 when (null validators) . ioError . userError
                     $ "must specify --validators with --blockstanbul"
-                unless (selfAddress `elem` validators) . ioError . userError
-                    $ "NODEKEY must correspond to an address within --validators"
+                unless (flags_blockstanbul_skip_check || selfAddress `elem` validators) . ioError . userError
+                    $ "NODEKEY must correspond to an address within --validators.\
+                      \ If adding a node to an existing network, supply --blockstanbul_skip_check\
+                      \ (set `blockstanbulSkipCheck=true` if using strato-getting-started)"
                 unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError
                     $ "--blockstanbul_block_period_ms must be nonnegative"
                 unless (flags_blockstanbul_round_period_s > 0) . ioError . userError

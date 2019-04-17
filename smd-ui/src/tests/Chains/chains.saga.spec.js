@@ -5,7 +5,21 @@ import {
   takeEvery
 } from 'redux-saga/effects';
 import { expectSaga } from 'redux-saga-test-plan';
-import { FETCH_CHAINS_REQUEST, FETCH_CHAIN_IDS_REQUEST, FETCH_CHAIN_DETAIL_REQUEST, fetchChainsSuccess, fetchChainsFailure, fetchChainIdsSuccess, fetchChainIdsFailure, fetchChainDetailSuccess, fetchChainDetailFailure, FETCH_CHAINS_SUCCESS, FETCH_CHAINS_FAILED, FETCH_CHAIN_DETAIL_SUCCESS, FETCH_CHAIN_DETAIL_FAILURE } from '../../components/Chains/chains.actions';
+import {
+  FETCH_CHAINS_REQUEST,
+  FETCH_CHAIN_IDS_REQUEST,
+  FETCH_CHAIN_DETAIL_REQUEST,
+  fetchChainsSuccess,
+  fetchChainsFailure,
+  fetchChainIdsSuccess,
+  fetchChainIdsFailure,
+  fetchChainDetailSuccess,
+  fetchChainDetailFailure,
+  FETCH_CHAINS_SUCCESS,
+  FETCH_CHAIN_DETAIL_SUCCESS,
+  FETCH_CHAIN_DETAIL_FAILURE,
+  FETCH_CHAINS_FAILURE
+} from '../../components/Chains/chains.actions';
 import watchFetchChains, {
   getChains,
   getChainDetail,
@@ -50,7 +64,7 @@ describe('Chains: saga', () => {
       test('failure', (done) => {
         fetch.mockReject('error');
         expectSaga(getChains)
-          .call.fn(getChainsApi).put.like({ action: { type: FETCH_CHAINS_FAILED } })
+          .call.fn(getChainsApi).put.like({ action: { type: FETCH_CHAINS_FAILURE } })
           .run().then((result) => { done() });
       });
 

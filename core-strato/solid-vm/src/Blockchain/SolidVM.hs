@@ -11,7 +11,6 @@ module Blockchain.SolidVM
 
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
-import           Control.Monad.Extra (whenJust)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bits
@@ -325,22 +324,18 @@ callWrapper from to mContract functionName argExps = do
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
-
-runStatements :: [Xabi.Statement] -> SM StatementControl
-runStatements [] = return BlockEnd
+runStatements :: [Xabi.Statement] -> SM (Maybe Value)
+runStatements [] = return Nothing
 runStatements (s:rest) = do
   onTraced $
     liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
   ret <- runStatement s
   case ret of
-    rv@ReturnVal{} -> return rv
-    BlockEnd -> return BlockEnd
-    Ongoing -> runStatements rest
-    ContinueLoop -> return ContinueLoop
-    BreakLoop -> return BreakLoop
+    Nothing -> runStatements rest
+    v -> return v
 
 
-runStatement :: Xabi.Statement -> SM StatementControl
+runStatement :: Xabi.Statement -> SM (Maybe Value)
 --runStatement x | trace (C.green $ "statement> " ++ unparseStatement x) $ False = undefined
 --runStatement x | trace (C.green $ "statement> " ++ show x) $ False = undefined
 --TODO- variable assignment is an expression, but I am going to just treat it like a
@@ -355,7 +350,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
   logAssigningVariable $ SInteger v
 
   setVar path $ SInteger $ v + 1
-  return Ongoing
+  return Nothing
 
 
 
@@ -383,10 +378,10 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
       logAssigningVariable value
       -- liftIO $ putStrLn $ "coercion at: " ++ show (p1, t1, value, coerceType t1 value)
       setVar p1 $ coerceType ctract t1 value
-  return Ongoing
+  return Nothing
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
-  return Ongoing
+  return Nothing -- just throw away the return value
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames maybeExpression)) = do
   let theType = fromMaybe (todo "type inference not implemented" s) maybeType
@@ -432,7 +427,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
 
     _ -> typeError "VariableDefinition expected a tuple" value
 
-  return Ongoing
+  return Nothing
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
   conditionResult <- getBool =<< expToVar condition
@@ -440,47 +435,48 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
     then runStatements code'
     else case maybeElseCode of
       Just elseCode -> runStatements elseCode
-      Nothing -> return Ongoing
+      Nothing -> return Nothing
 
-runStatement (Xabi.WhileStatement conditionExp code) = do
-  let condition = getBool =<< expToVar conditionExp
-  while condition $ runStatements code
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
-  whenJust maybeInitStatement $ \initStatement ->
-      void $ runStatement $ Xabi.SimpleStatement initStatement
+  _ <-
+    case maybeInitStatement of
+      Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement
+      _ -> return Nothing
 
-  let conditionExp = fromMaybe (Xabi.BoolLiteral True) maybeConditionExp
-      condition = getBool =<< expToVar conditionExp
+  let conditionExp =
+        case maybeConditionExp of
+          Just x -> x
+          Nothing -> Xabi.BoolLiteral True
+
+  let loopExp =
+        case maybeLoopExp of
+          Just x -> x
+          Nothing -> todo "loop expressions" loopExp
+
+  let condition = getBool =<< expToVar conditionExp
 
   while condition $ do
       onTraced $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
-      whenJust maybeLoopExp $ \loopExp ->
-        void $ expToVar loopExp
+      _ <- getVar =<< expToVar loopExp
       return result
 
 runStatement (Xabi.Return maybeExpression) = do
   case maybeExpression of
-    Just e -> fmap ReturnVal $ getVar =<< expToVar e
-    Nothing -> return $ ReturnVal SNULL
+    Just e -> fmap Just $ getVar =<< expToVar e
+    Nothing -> return $ Just SNULL
 
 runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   var <- expToVar $ Xabi.Variable $ T.unpack src;
   path <- expToPath $ Xabi.Variable $ T.unpack dst;
   -- TODO(tim): should this hex encode src and pad?
   setVar path =<< getString var
-  return Ongoing
-
-runStatement Xabi.Continue = return ContinueLoop
-
-runStatement Xabi.Break = return BreakLoop
+  return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
 
-data StatementControl = ReturnVal Value | BlockEnd | Ongoing | ContinueLoop | BreakLoop deriving (Show, Eq)
-
-while :: SM Bool -> SM StatementControl -> SM StatementControl
+while :: SM Bool -> SM (Maybe Value) -> SM (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
@@ -488,15 +484,9 @@ while condition code = do
     then do
       result <- code
       case result of
-        ReturnVal v -> return $ ReturnVal v
-        -- This isn't exactly right. Maybe it should be `blockend` and instead we have Return SNULL
-        BlockEnd -> while condition code
-        Ongoing -> while condition code
-        ContinueLoop -> while condition code
-        BreakLoop -> return $ Ongoing
-        -- Nothing -> while condition code
-        -- _ -> return result
-    else return Ongoing
+        Nothing -> while condition code
+        _ -> return result
+    else return Nothing
 
 getIndexType :: AddressedPath -> SM IndexType
 getIndexType (AddressedPath addr p) = do
@@ -1098,9 +1088,9 @@ runTheCall address' contract' hsh cc theFunction argVals = do
           [x] -> return $ Just x
           _ -> todo "multiple named return values" rs
   val' <- case val of
-             ReturnVal SNULL -> findNamedReturns
-             ReturnVal v -> return $ Just v
-             _ -> findNamedReturns
+             Nothing -> findNamedReturns
+             Just SNULL -> findNamedReturns
+             Just{} -> return val
   popCallInfo
 
   return val'
