@@ -122,6 +122,7 @@ services:
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
     - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
+    - blockstanbulSkipCheck=${blockstanbulSkipCheck}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - connectionTimeout=${connectionTimeout}
