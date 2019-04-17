@@ -90,10 +90,14 @@ function newnode {
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
   echo ${blockstanbulAdmins}
+  if [ -n "${blockstanbulSkipCheck}" ]; then
+    scFlag="--blockstanbul_skip_check=${blockstanbulSkipCheck}"
+  fi
 
   NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
-    "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${baFlag}"\
-    --minLogLevel=$seqMinLogLevel +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+    "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
+    "${baFlag}" "${scFlag}" --minLogLevel=$seqMinLogLevel \
+    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
