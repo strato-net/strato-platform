@@ -10,7 +10,9 @@ import           Data.Either.Extra
 import           Data.Foldable (foldlM)
 import           Data.Maybe
 import qualified Network.Haskoin.Crypto     as HK
-import           Network.Curl
+import           Network.HTTP
+import           Network.HTTP.Auth
+import           Control.Monad
 import           System.Console.GetOpt
 import           System.Environment
 --import           System.Exit
@@ -120,5 +122,5 @@ main = do
        fromOptRight (optPassword opt) ++ "@",
        fromOptRight (optNode opt) ++ "/blockstanbul/vote"]
   putStrLn $ "URLString: " ++ url
-  --curlPost url [fieldPairs]
-  curlMultiPost url [] [(HttpPost "" (Just "application/json") (ContentString fieldPairs) [] Nothing)]
+  let req = postRequestWithBody url "application/json" fieldPairs
+  void $ simpleHTTP req
