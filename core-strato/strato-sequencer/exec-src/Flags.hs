@@ -1,9 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Flags where
 
 import           Blockchain.Constants
 import           Blockchain.Sequencer.Constants
+import           Blockchain.Strato.Model.Address
 import           HFlags
+import qualified Data.Text as T
+import           Prometheus
 
 -- core flags
 defineFlag "q:txdedupwindow" (2000 :: Int) "Transaction window to deduplicate any given Tx (i.e., after N transactions have passed, a previously seen Tx can be reemitted)"
@@ -34,3 +38,34 @@ defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
 
 defineFlag "seq_max_events_per_iter" (20 :: Int) "How many elements to wait for in each sequencer iteration"
 defineFlag "seq_max_us_per_iter" (50000 :: Int) "How many μs to spend waiting for elements"
+
+
+flags :: Vector (T.Text, T.Text) Counter
+flags = unsafeRegister
+      . vector ("flag_name", "flag_value")
+      $ counter $ Info "sequencer_flags" "A pseudo counter recording flags defined for this process"
+
+
+exportFlagsAsMetrics :: IO ()
+exportFlagsAsMetrics = do
+  let set :: String -> String -> IO ()
+      set name val = withLabel flags (T.pack name, T.pack val) incCounter
+  set "txdedupwindow" $ show flags_txdedupwindow
+  set "depblockdbpath" flags_depblockdbpath
+  set "depblockdbcachesize" $ show flags_depblockcachesize
+  set "syncwrites" $ show flags_syncwrites
+  set "kafkaclientid" $ show flags_kafkaclientid
+  set "kafkaaddress" flags_kafkaaddress
+  set "blockstanbul" $ show flags_blockstanbul
+  set "validators" flags_validators
+  set "blockstanbul_block_period_ms" $ show flags_blockstanbul_block_period_ms
+  set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
+  set "blockstanbul_port" $ show flags_blockstanbul_port
+  set "blockstanbul_admins" flags_blockstanbul_admins
+  set "blockstanbul_skip_check" $ show flags_blockstanbul_skip_check
+  set "seq_debug_mode" $ show flags_seq_debug_mode
+  set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter
+  set "seq_max_us_per_iter" $ show flags_seq_max_us_per_iter
+
+addSelfAsMetric :: Address -> IO ()
+addSelfAsMetric addr = withLabel flags ("nodekey_address", T.pack $ show addr) incCounter
