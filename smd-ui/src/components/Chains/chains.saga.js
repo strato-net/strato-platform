@@ -16,6 +16,7 @@ import {
   FETCH_CHAIN_IDS_REQUEST
 } from './chains.actions';
 import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 
 const chainUrl = env.STRATO_URL + "/chain";
 const chainUrl2 = env.BLOC_URL + "/chain";
@@ -30,8 +31,9 @@ export function getChainsApi() {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
-      return response.json()
+      return response
     })
     .catch(function (error) {
       throw error;
@@ -48,6 +50,7 @@ export function getChainDetailApi(chainid) {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })

@@ -10,6 +10,7 @@ import {
 } from './sendTokens.actions';
 
 import { env } from '../../../../env';
+import { handleErrors } from '../../../../lib/handleErrors';
 
 const url = env.BLOC_URL + "/users/:user/:address/send?resolve&:chainid"
 
@@ -26,6 +27,7 @@ export function sendTokensAPICall(from, fromAddress, toAddress, value, password,
       body: JSON.stringify({ value, password, toAddress })
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })

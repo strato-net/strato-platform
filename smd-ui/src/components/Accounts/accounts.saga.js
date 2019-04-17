@@ -30,6 +30,7 @@ import {
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
 import { delay } from 'redux-saga';
+import { handleErrors } from '../../lib/handleErrors';
 
 const accountDataUrl = env.STRATO_URL + "/account?address=:address&:chainid";
 const addressUrl = env.BLOC_URL + '/users/:user';
@@ -46,6 +47,7 @@ export function getAccountsApi() {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })
@@ -65,6 +67,7 @@ export function getUserAddressesApi(username) {
       },
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })
@@ -85,6 +88,7 @@ export function getAccountDetailApi(address, chainId) {
       },
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })
@@ -105,6 +109,7 @@ export function postFaucet(username, address) {
       }
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return;
     })

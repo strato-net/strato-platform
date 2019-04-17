@@ -12,6 +12,7 @@ import {
   launchAppFailure
 } from './applications.actions';
 import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 
 const applicationsUrl = env.CIRRUS_URL + '/AppMetadata';
 
@@ -25,6 +26,7 @@ export function getApplications() {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })
@@ -44,6 +46,7 @@ export function launchApp(url) {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response;
     })
