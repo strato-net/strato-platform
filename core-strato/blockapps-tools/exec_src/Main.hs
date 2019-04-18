@@ -23,6 +23,7 @@ import           InsertTX
 import           Psql
 import           Raw
 import           RawMP
+import           ChainMP
 import           RLP
 import           State
 
@@ -37,6 +38,7 @@ data Options = State{root::String, db::String}
              | Hash{hash::String, db::String}
              | Code{hash::String, db::String}
              | RawMP{stateRoot::String, filename::String}
+             | ChainMP{stateRoot::String, filename::String}
              | FRawMP{stateRoot::String, filename::String}
              | Raw{filename::String}
              | RLP{filename::String}
@@ -119,6 +121,13 @@ rlpOptions =
 rawMPOptions::Annotate Ann
 rawMPOptions =
   record RawMP{stateRoot=undefined, filename=undefined} [
+    stateRoot := def += typ "USERAGENT" += argPos 1,
+    filename := def += typ "DBSTRING" += argPos 0
+    ]
+
+chainMPOptions::Annotate Ann
+chainMPOptions =
+  record ChainMP{stateRoot=undefined, filename=undefined} [
     stateRoot := def += typ "USERAGENT" += argPos 1,
     filename := def += typ "DBSTRING" += argPos 0
     ]
@@ -216,6 +225,7 @@ options = modes_ [blockGoOptions
                 , insertTXOptions
                 , psqlOptions
                 , rawMPOptions
+                , chainMPOptions
                 , rawOptions
                 , redisOptions
                 , rlpOptions
@@ -241,6 +251,7 @@ run Code{..}                   = Code.doit db hash
 run Raw{..}                    = Raw.doit filename
 run RLP{..}                    = RLP.doit filename
 run RawMP{..}                  = RawMP.doit filename (MP.StateRoot . fst . B16.decode $ BC.pack stateRoot)
+run ChainMP{..}                = ChainMP.doit filename (MP.StateRoot . fst . B16.decode $ BC.pack stateRoot)
 run FRawMP{..}                 = FRawMP.doit filename (MP.StateRoot . fst . B16.decode $ BC.pack stateRoot)
 run DumpKafkaSequencer{..}     = dumpKafkaSequencer (fromIntegral startingBlock)
 run DumpKafkaSequencerVM{..}   = dumpKafkaSequencerVM (fromIntegral startingBlock)
