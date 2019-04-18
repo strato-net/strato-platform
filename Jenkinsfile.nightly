@@ -58,8 +58,8 @@ pipeline {
           }
           check_bloc
           echo "Restarting docker containers to simulate computer restart..."
-          docker-compose -p strato stop
-          docker-compose -p strato start
+          docker-compose -p strato --log-level ERROR stop
+          docker-compose -p strato --log-level ERROR start
           check_bloc
         '''
       }
@@ -78,7 +78,7 @@ pipeline {
                 set -x
                 docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                 cd strato-worktree
-                docker-compose -f docker-compose.push.yml push
+                docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
               '''
             }
           },
