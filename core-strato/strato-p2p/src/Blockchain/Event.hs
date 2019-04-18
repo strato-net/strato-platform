@@ -228,12 +228,23 @@ handleEvents peer = awaitForever $ \case
       yield (BlockBodies []) -- todo parity bans peers when they do this. should we?
     MsgEvt (GetBlockBodies shas) -> do
       stampActionTimestamp
-      getUntilMissing shas [] >>=  yield . BlockBodies . Prelude.reverse . fmap toBody
-        where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m) => [SHA] -> [Block] -> m [Block]
-              getUntilMissing []     bodies = return bodies
-              getUntilMissing (h:hs) bodies = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
-                  Nothing   -> return bodies
-                  Just body -> getUntilMissing hs (body:bodies)
+      getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
+          yield . BlockBodies . Prelude.reverse $ map toBody bodies
+          ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
+          unless (null ptxs) . yield $ Transactions ptxs)
+        where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m)
+                              => [SHA] -> [Block] -> [SHA] -> m ([Block],[SHA])
+              getUntilMissing []     bodies pshas = return (bodies, pshas)
+              getUntilMissing (h:hs) bodies pshas = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
+                  Nothing   -> return (bodies, pshas)
+                  Just body -> do
+                    cIdTxsMap <- RBDB.withRedisBlockDB $ RBDB.getChainTxsInBlock h
+                    let kvs = M.assocs cIdTxsMap
+                    mems <- RBDB.withRedisBlockDB . mapM (RBDB.getChainMembers . fst) $ kvs
+                    let trMems = zip kvs mems
+                        pshas' = concat . map (snd . fst) $
+                                  filter ((checkPeerIsMember peer) . snd) trMems
+                    getUntilMissing hs (body:bodies) (pshas ++ pshas')
 
               toBody :: Block -> ([Transaction], [BlockHeader])
               toBody = (blockTransactions &&& fmap morphBlockHeader . blockUncleHeaders)
