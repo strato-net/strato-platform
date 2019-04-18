@@ -9,6 +9,7 @@ import {
   fetchContractsFailure
 } from './contracts.actions';
 import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 
 
 const contractsUrl = env.BLOC_URL + "/contracts";
@@ -27,6 +28,7 @@ export function getContracts(chainId) {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })

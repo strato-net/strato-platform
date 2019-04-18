@@ -9,6 +9,7 @@ import {
   verifyTempPasswordFailure
 } from './verifyAccount.actions';
 import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 
 const verify = env.APEX_URL + '/verify-temporary-password';
 
@@ -20,7 +21,9 @@ export function verifyTempPasswordRequest(tempPassword, email) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ tempPassword: tempPassword, email })
-  }).then(function (response) {
+  })
+  .then(handleErrors)
+  .then(function (response) {
     return response.json();
   }).catch(function (error) {
     throw error;

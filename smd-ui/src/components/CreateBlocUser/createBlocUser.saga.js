@@ -14,6 +14,7 @@ import {
 } from '../Accounts/accounts.actions';
 
 import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 
 const url = env.BLOC_URL + "/users/:user"
 
@@ -29,6 +30,7 @@ export function createBlocUserApiCall(username, password) {
       body: JSON.stringify(password)
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response;
     })
