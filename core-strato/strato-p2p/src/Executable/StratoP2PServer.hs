@@ -16,6 +16,7 @@ import           Blockchain.RLPx
 import           Conduit
 import           Control.Monad
 import           Control.Monad.Trans.Identity
+import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import           Control.Monad.Logger
 import           Crypto.PubKey.ECC.DH
@@ -23,15 +24,16 @@ import           Data.Conduit.Network
 import           Data.Streaming.Network                (appCloseConnection)
 import qualified Data.Text                             as T
 import qualified Database.Persist.Types                as SQL
-import           UnliftIO.Exception
+import           UnliftIO
 
 import           Blockchain.ECIES
 import           Blockchain.EthConf
 import           Blockchain.Options
 import           Blockchain.P2PUtil
 import           Blockchain.Strato.Discovery.Data.Peer
+import qualified Text.Colors                           as C
 
-runEthServer :: (MonadResource m, MonadIO m, MonadLogger m, MonadUnliftIO m)
+runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
              => PrivateNumber
              -> Int
              -> m ()
@@ -40,8 +42,10 @@ runEthServer myPriv listenPort = do
   let myPubkey = calculatePublic theCurve myPriv
   void . runContextM ctx $ do
     initState <- get
-    lift . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
+    lift . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> runResourceT $ do
       let theSockAddr = sockAddrToIP (appSockAddr app)
+      ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow theSockAddr
+      void $ register ender
       runIdentityT (getPeerByIP theSockAddr) >>= \case
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ show theSockAddr ++ ". rejecting violently."
@@ -75,4 +79,4 @@ stratoP2PServer = do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
 
-  void . runResourceT $ runEthServer myPriv flags_listen
+  void $ runEthServer myPriv flags_listen
