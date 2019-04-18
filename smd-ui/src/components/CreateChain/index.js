@@ -76,8 +76,8 @@ class CreateChain extends Component {
               console.log(arg); console.log(v);
               if (v.initialValue !== null) {
                 args[arg] = v.initialValue;
-              } else if ( v.type !== 'Mapping'
-                       && v.type !== 'Struct') {
+              } else if (v.type !== 'Mapping'
+                && v.type !== 'Struct') {
                 args[arg] = values[arg];
               }
             })
@@ -171,7 +171,7 @@ class CreateChain extends Component {
   renderDropzoneInput = (field) => {
     const touchedAndHasErrors = field.meta.touched && field.meta.error
     return (
-      <div className="dropzoneContainer text-center chain-dropzone">
+      <div className="dropzoneContainer text-center">
         <Dropzone
           className="dropzone"
           name={field.name}
@@ -201,10 +201,10 @@ class CreateChain extends Component {
     let reader = new FileReader();
     const self = this;
     reader.onload = function (event) {
-    const fileName = file.name.substring(0, file.name.indexOf('.'));
-    const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
-    mixpanelWrapper.track("create_contract_file_upload");
-    self.updateGovernanceContract(fileName, fileContents);
+      const fileName = file.name.substring(0, file.name.indexOf('.'));
+      const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
+      mixpanelWrapper.track("create_contract_file_upload");
+      self.updateGovernanceContract(fileName, fileContents);
     };
     reader.readAsText(file);
   }
@@ -212,9 +212,9 @@ class CreateChain extends Component {
   updateGovernanceContract = (fileName, fileContents) => {
     this.setState({ governanceContract: fileContents })
     this.props.compileChainContract(
-        fileName,
-        fileContents,
-        false
+      fileName,
+      fileContents,
+      false
     );
   }
 
@@ -228,22 +228,22 @@ class CreateChain extends Component {
       if (contract && Object.keys(contract['vars']).length) {
         return Object.getOwnPropertyNames(contract['vars']).map((arg, i) => {
           const v = contract.vars[arg];
-          if ( v.initialValue
+          if (v.initialValue
             || v.type === 'Mapping'
             || v.type === 'Struct') {
-             return null;
+            return null;
           } else {
             count++;
             return (<tr key={'arg' + i}>
               <td style={{ paddingTop: '10px' }}>{arg}</td>
               <td>
-              <Field
+                <Field
                   name={arg}
                   component="input"
                   type="text"
                   placeholder={v.type}
                   className="pt-input"
-              />
+                />
               </td>
             </tr>);
           }
@@ -313,9 +313,6 @@ class CreateChain extends Component {
                     Contract
                   </label>
                 </div>
-              </div>
-              <div className="row">
-                <div className="col-sm-3 text-right" />
                 <div className="col-sm-9 smd-pad-4">
                   <Field
                     name="radio"
@@ -329,7 +326,7 @@ class CreateChain extends Component {
                         this.setState((prevState) => {
                           return {
                             form: { contractSelected: 'AutoApprove' }
-                           };
+                          };
                         });
                         this.updateGovernanceContract('AutoApprove', autoApprove);
                       }
@@ -352,7 +349,7 @@ class CreateChain extends Component {
                         this.setState((prevState) => {
                           return {
                             form: { contractSelected: 'TwoIn' }
-                           };
+                          };
                         });
                         this.updateGovernanceContract('TwoIn', twoIn);
                       }
@@ -375,7 +372,7 @@ class CreateChain extends Component {
                         this.setState((prevState) => {
                           return {
                             form: { contractSelected: 'MajorityRules' }
-                           };
+                          };
                         });
                         this.updateGovernanceContract('MajorityRules', majorityRules);
                       }
@@ -398,7 +395,7 @@ class CreateChain extends Component {
                         this.setState((prevState) => {
                           return {
                             form: { contractSelected: 'AdminOnly' }
-                           };
+                          };
                         });
                         this.updateGovernanceContract('AdminOnly', adminOnly);
                       }
@@ -421,19 +418,26 @@ class CreateChain extends Component {
                         this.setState((prevState) => {
                           return {
                             form: { contractSelected: 'Governance' },
-                           };
+                          };
                         });
                         this.handleContractFile(this.state.droppedFileName);
                       }
                     }
-                  />
-                  <Field
-                    id="input-b"
-                    name="contract"
-                    component={this.renderDropzoneInput}
-                    dir="auto"
-                    title="Contract Source"
-                  />
+                  /> Upload file
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right" />
+                <div className="col-sm-9 smd-pad-4">
+                  {this.state.form.contractSelected === 'Governance' &&
+                    <Field
+                      id="input-b"
+                      name="contract"
+                      component={this.renderDropzoneInput}
+                      dir="auto"
+                      title="Contract Source"
+                    />
+                  }
                 </div>
               </div>
 
