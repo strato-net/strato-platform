@@ -342,7 +342,7 @@ queuePendingVote :: Address -> Bool -> ContextM ()
 queuePendingVote a r = do
   let nonce = case r of
         True -> maxBound
-        False -> minBound
+        False -> 0
   let newVote = (a, nonce)
   $logInfoLS "queuePendingVote" newVote
   ctx <- get
