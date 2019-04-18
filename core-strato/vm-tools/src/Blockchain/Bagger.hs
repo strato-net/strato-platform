@@ -134,13 +134,13 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
                     existingStateDbStateRoot <- getStateRoot
                     isPBFT <- isBlockstanbul
-                    (coinbaseAddr,_) <- peekPendingVote
+                    (coinbaseAddr, nonce) <- peekPendingVote
                     let lastSR          = B.lastExecutedStateRoot cache
                     let lastSHA         = B.bestBlockSHA cache
                     let lastHead        = B.bestBlockHeader cache
                     let promoted        = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
                     let time            = B.startTimestamp cache
-                    let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr
+                    let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr nonce
                     let remGas          = B.remainingGas cache
                     $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
@@ -387,7 +387,7 @@ buildFromMiningCache = do
     $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
     state <- getBaggerState
     isPBFT <- isBlockstanbul
-    (coinbaseAddr, _) <- peekPendingVote
+    (coinbaseAddr, nonce) <- peekPendingVote
     let cache        = B.miningCache state
     let uncles       = []
     let parentHash   = B.bestBlockSHA cache
@@ -399,7 +399,7 @@ buildFromMiningCache = do
     let parentTS     = DD.blockDataTimestamp parentHeader
     let time         = B.startTimestamp cache
     let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
-    let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr
+    let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
     recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
     return OutputBlock { obOrigin = TO.Quarry
@@ -420,8 +420,9 @@ buildNextBlockHeader :: DD.BlockData
                      -> UTCTime
                      -> Bool
                      -> Address
+                     -> Word64
                      -> DD.BlockData
-buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr =
+buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce =
     let parentDiff = DD.blockDataDifficulty parentHeader
         parentNum  = DD.blockDataNumber parentHeader
         parentTS   = DD.blockDataTimestamp parentHeader
@@ -441,7 +442,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataTimestamp        = time
                         , DD.blockDataExtraData        = ""
                         , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else SHA 0x0
-                        , DD.blockDataNonce            = 5
+                        , DD.blockDataNonce            = nonce
                         }
 
 buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData

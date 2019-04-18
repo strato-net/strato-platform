@@ -9,8 +9,8 @@ import Data.List as L
 editBeneficiary :: Block -> Address -> Bool ->  Block
 editBeneficiary ppl bnf nonc = ppl {blockBlockData = bdata}
                    where noncw = case nonc of
-                                           True -> 0xffffffffffffffff
-                                           False -> 0x0000000000000000
+                                           True -> maxBound
+                                           False -> minBound
                          bdata = (blockBlockData ppl) {blockDataCoinbase = bnf,
                                                        blockDataNonce = noncw
                                                      }

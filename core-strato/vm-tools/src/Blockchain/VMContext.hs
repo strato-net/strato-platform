@@ -341,8 +341,8 @@ putContextBestBlockInfo new = do
 queuePendingVote :: Address -> Bool -> ContextM ()
 queuePendingVote a r = do
   let nonce = case r of
-        True -> 0xffffffffffffffff
-        False -> 0x0000000000000000
+        True -> maxBound
+        False -> minBound
   let newVote = (a, nonce)
   $logInfoLS "queuePendingVote" newVote
   ctx <- get
