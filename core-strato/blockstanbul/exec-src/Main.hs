@@ -130,8 +130,6 @@ main = do
                        optPassword
                        (error "uri unused")
       authStr = withAuthority auth req'
-      req = setHeaders req' [mkHeader HdrContentType "application/json"
-                            , mkHeader HdrContentLength . show $ length body
-                            , mkHeader HdrAuthorization authStr]
+      req = insertHeaders [mkHeader HdrAuthorization authStr] req'
   putStrLn $ "request: " ++ show req
   print =<< simpleHTTP req
