@@ -53,7 +53,6 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
-
 import           Text.Format
 
 logFF :: MonadLogger m => T.Text -> String -> m ()
@@ -126,7 +125,9 @@ checkForVotes crs = do
           let extsign = RL.rlpDecode
                       . RL.rlpDeserialize
                       . fst
-                      . B16.decode $ pack (API.signature br)
+                      . B16.decode
+                      . pack
+                      . API.signature $ br
               bauth = MsgAuth { sender = API.sender br, signature = extsign}
           in NewBeneficiary bauth (API.recipient br, API.votingdir br, API.nonce br)
 

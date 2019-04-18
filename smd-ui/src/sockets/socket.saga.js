@@ -18,7 +18,9 @@ import {
   TRANSACTIONS_COUNT,
   TRANSACTIONS_TYPE,
   GET_PEERS,
-  GET_COINBASE
+  GET_COINBASE,
+  GET_HEALTH,
+  GET_NODE_UPTINE
 } from './rooms';
 import {
   updateBlockNumber,
@@ -34,7 +36,11 @@ import {
   preloadBlockPropagation,
   updateBlockPropagation,
   preloadTransactionType,
-  updateTransactionType
+  updateTransactionType,
+  preloadHealth,
+  updateHealth,
+  preloadNodeUptime,
+  updateNodeUptime
 } from '../components/Dashboard/dashboard.action';
 import {
   updateCoinbase,
@@ -72,6 +78,8 @@ export function subscribe() {
     registerActions(emit, TRANSACTIONS_TYPE, preloadTransactionType, updateTransactionType)
     registerActions(emit, GET_PEERS, preloadPeers, updatePeers)
     registerActions(emit, GET_COINBASE, preloadCoinbase, updateCoinbase)
+    registerActions(emit, GET_HEALTH, preloadHealth, updateHealth)
+    registerActions(emit, GET_NODE_UPTINE, preloadNodeUptime, updateNodeUptime)
 
     socket.on('disconnect', e => {
       // TODO: handle

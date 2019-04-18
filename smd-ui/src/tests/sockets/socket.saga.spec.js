@@ -104,6 +104,18 @@ mockServer.on('connection', server => {
     }, 1000);
   })
 
+  server.on('SUBSCRIBE/GET_HEALTH', (data) => {
+    setTimeout(() => {
+      server.emit('PRELOAD_HEALTH', false)
+    }, 1000);
+  })
+
+  server.on('SUBSCRIBE/GET_NODE_UPTIME', (data) => {
+    setTimeout(() => {
+      server.emit('PRELOAD_NODE_UPTIME', 0)
+    }, 1000);
+  })
+
 });
 
 const channel = () => { }
@@ -237,6 +249,24 @@ describe('Socket: saga', () => {
       setTimeout(() => {
         socket.emit('SUBSCRIBE/BLOCKS_FREQUENCY')
         socket.on('PRELOAD_BLOCKS_FREQUENCY', (blocksFrequency) => {
+          done()
+        })
+      }, 1000);
+    });
+
+    test('health', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/GET_HEALTH')
+        socket.on('PRELOAD_HEALTH', (health) => {
+          done()
+        })
+      }, 1000);
+    });
+
+    test('node uptime', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/GET_NODE_UPTIME')
+        socket.on('PRELOAD_NODE_UPTIME', (uptime) => {
           done()
         })
       }, 1000);

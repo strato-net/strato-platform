@@ -16,6 +16,7 @@ import           HFlags
 import           Safe
 import           System.Environment
 
+import           Blockapps.Crossmon
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
@@ -34,7 +35,9 @@ import           Flags
 
 main :: IO ()
 main = do
+  initializeHealthChecks "seq_main"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
+  exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer validators: " ++ show flags_validators
   putStrLn $ "strato-sequencer authorized beneficiary senders" ++ show flags_blockstanbul_admins
@@ -60,10 +63,13 @@ main = do
                     pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                     selfAddress = prvKey2Address pkey
                 putStrLn . ("NODEKEY address: " ++) . formatAddress $ selfAddress
+                addSelfAsMetric selfAddress
                 when (null validators) . ioError . userError
                     $ "must specify --validators with --blockstanbul"
-                unless (selfAddress `elem` validators) . ioError . userError
-                    $ "NODEKEY must correspond to an address within --validators"
+                unless (flags_blockstanbul_skip_check || selfAddress `elem` validators) . ioError . userError
+                    $ "NODEKEY must correspond to an address within --validators.\
+                      \ If adding a node to an existing network, supply --blockstanbul_skip_check\
+                      \ (set `blockstanbulSkipCheck=true` if using strato-getting-started)"
                 unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError
                     $ "--blockstanbul_block_period_ms must be nonnegative"
                 unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
