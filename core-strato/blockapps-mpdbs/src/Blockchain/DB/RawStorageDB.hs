@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Blockchain.DB.RawStorageDB (
   HasRawStorageDB(..),
   putRawStorageKeyVal',
@@ -9,8 +10,12 @@ module Blockchain.DB.RawStorageDB (
   flushMemRawStorageDB
  ) where
 
+import           Control.Monad.Loops
 import           Control.Monad.State
+import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString                             as B
+import           Data.List
+import           Data.Map                                    (Map)
 import qualified Data.Map                                    as M
 import qualified Database.LevelDB                            as DB
 
@@ -23,6 +28,8 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import qualified Data.NibbleString                           as N
+
+import BatchMerge
 
 class MonadIO m => HasRawStorageDB m where
   getRawStorageTxDB     :: m (DB.DB, M.Map (Address, B.ByteString) B.ByteString)
@@ -73,9 +80,17 @@ flushMemRawStorageDB :: FullRawStorage m => m ()
 flushMemRawStorageDB = do
   flushRawStorageTxDBToBlockDB
   theMap <- fmap snd getRawStorageBlockDB
-  forM_ (M.toList theMap) $ \((address, key), val) ->
-     putRawStorageKeyValDB address key val
+
+  let changesByAddress :: Map Address [(ByteString, ByteString)]
+      changesByAddress = M.fromListWith (++)  $ map (\((a, k), v) -> (a, [(k, v)])) $ M.toList theMap
+
+  forM_ (M.toList changesByAddress) $ \(a, changes) ->
+    putAllRawStorageKeyValForAddress a changes
+
   putRawStorageBlockMap M.empty
+
+
+
 
 
 --The following are the DB versions of the functions
@@ -88,25 +103,51 @@ flushMemRawStorageDB = do
 blankVal :: B.ByteString
 blankVal = rlpSerialize $ RLPString ""
 
-putRawStorageKeyValDB :: FullRawStorage m => Address -> B.ByteString -> B.ByteString -> m ()
-putRawStorageKeyValDB owner key val =
-  if val == blankVal
-    then do --when val=0, we actually delete the key from the database
-      addressState <- getAddressState owner
-      db <- fmap fst getRawStorageBlockDB
-      let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
-      newContractRoot <- fmap MP.stateRoot
-                       $ MP.deleteKey mpdb (N.EvenNibbleString key)
-      putAddressState owner addressState{addressStateContractRoot=newContractRoot}
-    else do
-      hashDBPut storageKeyNibbles
-      addressState <- getAddressState owner
-      db <- fmap fst getRawStorageBlockDB
-      let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
-      newContractRoot <- fmap MP.stateRoot
-                       $ MP.putKeyVal mpdb storageKeyNibbles (rlpEncode val)
-      putAddressState owner addressState{addressStateContractRoot=newContractRoot}
- where storageKeyNibbles = N.EvenNibbleString key
+
+putAllRawStorageKeyValForAddress :: FullRawStorage m =>
+                                    Address -> [(B.ByteString, B.ByteString)] -> m ()
+putAllRawStorageKeyValForAddress owner rawChanges = do
+  let changes :: [(MP.Key, MP.Val)]
+      changes = map (\(k, v) -> (N.EvenNibbleString k, rlpEncode v)) rawChanges
+      blankValRLP = rlpEncode blankVal
+      (allDeletes, allInserts) = partition ((== blankValRLP) . snd) changes
+      deleteKeys = map fst allDeletes
+  
+  addressState <- getAddressState owner
+  db <- fmap fst getRawStorageBlockDB
+  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
+  
+  forM_ (map fst allInserts) hashDBPut
+  
+  mpdb' <-
+    if False
+    then putManyKeyVal mpdb allInserts
+    else putManyKeyValSlow mpdb allInserts
+
+  mpdb'' <- deleteManyKeyVal mpdb' deleteKeys
+
+  putAddressState owner addressState{addressStateContractRoot=MP.stateRoot mpdb''}
+
+
+deleteManyKeyVal :: MonadIO m=>
+                    MP.MPDB -> [MP.Key] -> m MP.MPDB
+deleteManyKeyVal mpdb listOfDeletes = do
+  concatM (map (flip deleteRawStorageKeyValDB) listOfDeletes) mpdb
+
+putManyKeyValSlow :: MonadIO m=>
+                     MP.MPDB -> [(MP.Key, MP.Val)] -> m MP.MPDB
+putManyKeyValSlow mpdb listOfInserts = do
+  concatM (map (flip putRawStorageKeyValDB) listOfInserts) mpdb
+  
+putRawStorageKeyValDB :: MonadIO m =>
+                         MP.MPDB -> (MP.Key, MP.Val) -> m MP.MPDB
+putRawStorageKeyValDB mpdb (key, val) = do
+  MP.putKeyVal mpdb key val
+
+deleteRawStorageKeyValDB :: MonadIO m =>
+                            MP.MPDB -> MP.Key -> m MP.MPDB
+deleteRawStorageKeyValDB mpdb key =
+  MP.deleteKey mpdb key
 
 getRawStorageKeyValDB :: FullRawStorage m => Address -> B.ByteString -> m B.ByteString
 getRawStorageKeyValDB owner key = do

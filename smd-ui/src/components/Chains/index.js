@@ -13,6 +13,7 @@ import Tour from '../Tour';
 import CreateChain from '../CreateChain';
 import Chain from '../Chain';
 import './chains.css';
+import HexText from '../HexText';
 
 const tourSteps = [
   {
@@ -89,7 +90,7 @@ class Chains extends Component {
                 this.setState({ selected: uniqueKey });
                 this.onUserClick(label, chainIds, index);
               }}>
-                {label}
+                <HexText value={label} classes="large smd-pad-4 chain-width" />
               </div>
             </div>
           </div>

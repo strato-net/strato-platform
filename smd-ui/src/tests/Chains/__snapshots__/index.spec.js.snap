@@ -30,147 +30,147 @@ exports[`Chains: index filter chain 1`] = `
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 9
+                <HexText value=\\"airline cartel 9\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 1
+                <HexText value=\\"airline cartel 1\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 2
+                <HexText value=\\"airline cartel 2\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 3
+                <HexText value=\\"airline cartel 3\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 4
+                <HexText value=\\"airline cartel 4\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 5
+                <HexText value=\\"airline cartel 5\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 6
+                <HexText value=\\"airline cartel 6\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 7
+                <HexText value=\\"airline cartel 7\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 10
+                <HexText value=\\"airline cartel 10\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 11
+                <HexText value=\\"airline cartel 11\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 12
+                <HexText value=\\"airline cartel 12\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 13
+                <HexText value=\\"airline cartel 13\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 14
+                <HexText value=\\"airline cartel 14\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 89
+                <HexText value=\\"airline cartel 89\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 200
+                <HexText value=\\"airline cartel 200\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 822
+                <HexText value=\\"airline cartel 822\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 52
+                <HexText value=\\"airline cartel 52\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 900
+                <HexText value=\\"airline cartel 900\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 1000
+                <HexText value=\\"airline cartel 1000\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 9000
+                <HexText value=\\"airline cartel 9000\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 2000
+                <HexText value=\\"airline cartel 2000\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
@@ -367,7 +367,7 @@ exports[`Chains: index render component with empty values 1`] = `
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                length
+                <HexText value=\\"length\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
@@ -411,147 +411,147 @@ exports[`Chains: index render component with values 1`] = `
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 9
+                <HexText value=\\"airline cartel 9\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 1
+                <HexText value=\\"airline cartel 1\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 2
+                <HexText value=\\"airline cartel 2\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 3
+                <HexText value=\\"airline cartel 3\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 4
+                <HexText value=\\"airline cartel 4\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 5
+                <HexText value=\\"airline cartel 5\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 6
+                <HexText value=\\"airline cartel 6\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 7
+                <HexText value=\\"airline cartel 7\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 10
+                <HexText value=\\"airline cartel 10\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 11
+                <HexText value=\\"airline cartel 11\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 12
+                <HexText value=\\"airline cartel 12\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 13
+                <HexText value=\\"airline cartel 13\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 14
+                <HexText value=\\"airline cartel 14\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 89
+                <HexText value=\\"airline cartel 89\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 200
+                <HexText value=\\"airline cartel 200\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 822
+                <HexText value=\\"airline cartel 822\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 52
+                <HexText value=\\"airline cartel 52\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 900
+                <HexText value=\\"airline cartel 900\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 1000
+                <HexText value=\\"airline cartel 1000\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 9000
+                <HexText value=\\"airline cartel 9000\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>
           <div className=\\"smd-margin-8\\">
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
-                airline cartel 2000
+                <HexText value=\\"airline cartel 2000\\" classes=\\"large smd-pad-4 chain-width\\" />
               </div>
             </div>
           </div>

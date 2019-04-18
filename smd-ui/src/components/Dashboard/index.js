@@ -8,7 +8,6 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { endTour } from '../Tour/tour.actions';
 // import { callAfterTour } from '../Tour/tour.helpers';
 // import Tour from '../Tour';
-
 import Tour from '../Tour';
 
 import BarGraph from '../BarGraph';
@@ -24,8 +23,11 @@ import {
   BLOCKS_PROPAGATION,
   BLOCKS_DIFFICULTY,
   BLOCKS_FREQUENCY,
-  TRANSACTIONS_TYPE
+  TRANSACTIONS_TYPE,
+  GET_NODE_UPTINE,
+  GET_HEALTH
 } from '../../sockets/rooms'
+import {sec2Date} from "../../lib/formatSeconds";
 
 // TODO: these should be part of a reducer state. Do the same for other global variables.
 const tourSteps = [
@@ -56,6 +58,8 @@ class Dashboard extends Component {
     this.props.subscribeRoom(BLOCKS_DIFFICULTY)
     this.props.subscribeRoom(TRANSACTIONS_COUNT)
     this.props.subscribeRoom(TRANSACTIONS_TYPE)
+    this.props.subscribeRoom(GET_HEALTH)
+    this.props.subscribeRoom(GET_NODE_UPTINE)
 
     mixpanelWrapper.track('dashboard_page_load');
   }
@@ -69,6 +73,8 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(BLOCKS_DIFFICULTY)
     this.props.unSubscribeRoom(TRANSACTIONS_COUNT)
     this.props.unSubscribeRoom(TRANSACTIONS_TYPE)
+    this.props.unSubscribeRoom(GET_HEALTH)
+    this.props.unSubscribeRoom(GET_NODE_UPTINE)
   }
 
   render() {
@@ -77,6 +83,8 @@ class Dashboard extends Component {
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
     const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
+    const uptime = this.props.dashboard.uptime;
+    const health = this.props.dashboard.healthStatus;
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
@@ -89,10 +97,10 @@ class Dashboard extends Component {
         <div className="row">
           <div className="col-sm-3">
             <NumberCard
-              number="HEALTH"
-              description="Network"
-              mode={this.props.node.coinbase.length === 0 ? 'warning' : 'success'}
-              iconClass={this.props.node.coinbase.length === 0 ? 'fa-exclamation-circle' : 'fa-check-circle'}
+              number={health ? 'HEALTHY':'UNHEALTHY'}
+              description= {sec2Date(uptime)}
+              mode={health ? 'success':'warning' }
+              iconClass={health ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />
           </div>
           <div className="col-sm-3">

@@ -59,6 +59,8 @@ router.get('/bloc/file/list', fileController.list)
 
 router.get('/status', healthHandler.nodeStatus);
 
+router.get('/health', healthHandler.healthStatus);
+
 router.get('/_ping', healthHandler.ping);
 
 router.get('/_track', trackHandler._track);

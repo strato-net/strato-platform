@@ -166,8 +166,6 @@ class UploadForm extends Component {
   };
 
   render() {
-    let isPublicMode = isModePublic();
-
     return (
       <div>
         <form>

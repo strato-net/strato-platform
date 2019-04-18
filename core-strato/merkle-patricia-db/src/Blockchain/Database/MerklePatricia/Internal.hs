@@ -16,10 +16,12 @@ module Blockchain.Database.MerklePatricia.Internal (
   unsafeDeleteKey,
   getNodeData,
   putNodeData,
+  putKV_NodeData,
   keyToSafeKey,
   getCommonPrefix,
   replace,
-  prependToKey
+  prependToKey,
+  nodeData2NodeRef
   ) where
 
 
