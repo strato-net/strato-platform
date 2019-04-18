@@ -5,6 +5,10 @@ module Blockchain.Metrics ( recordEvent
                           , recordMessage
                           , recordGossipRNG
                           , recordGossipFinal
+                          , addCanary
+                          , killCanary
+                          , countFork
+                          , uncountFork
                           ) where
 
 import Control.Monad.IO.Class
@@ -88,3 +92,27 @@ recordGossipFinal :: (MonadIO m) => Bool -> m Bool
 recordGossipFinal dec = liftIO $ do
   withLabel gossipDecisions (if dec then "approve_final" else "reject_final") incCounter
   return $! dec
+
+{-# NOINLINE canaryCount #-}
+canaryCount :: Gauge
+canaryCount = unsafeRegister
+            . gauge
+            $ Info "p2p_canary_count" "Rough approximation of the number of kafka threads running"
+
+addCanary :: MonadIO m => m ()
+addCanary = liftIO $ incGauge canaryCount
+
+killCanary :: MonadIO m => m ()
+killCanary = liftIO $ decGauge canaryCount
+
+{-# NOINLINE forkCount #-}
+forkCount :: Gauge
+forkCount = unsafeRegister
+          . gauge
+          $ Info "p2p_fork_count" "Number of forks executed by mkEthP2PSource"
+
+countFork :: MonadIO m => m ()
+countFork = liftIO $ incGauge forkCount
+
+uncountFork :: MonadIO m => m ()
+uncountFork = liftIO $ decGauge forkCount

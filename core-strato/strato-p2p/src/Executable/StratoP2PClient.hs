@@ -56,6 +56,8 @@ runPeer :: (MonadIO m, MonadLogger m, MonadThrow m, MonadUnliftIO m)
         -> CommPort      -- otherServiceCommPort
         -> m ()
 runPeer peer myPriv _ _ = runResourceT $ do
+  ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
+  void $ register ender
   ctx <- initContext flags_maxReturnedHeaders
   runContextM ctx $ do
     let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
