@@ -122,7 +122,13 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
                 -- will erase the gap with PreviousBlocks.
               | GapFound {have :: Integer, require :: Integer, peer :: Address}
               | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
+              -- A PendingVote should be authenticated by blockstanbul, but applied
+              -- by a Bagger monad. This is so that the stateroot is computed after
+              -- the coinbase is modified to hold the vote.
+              | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool}
+
               deriving (Eq, Show, Generic)
+
 
 instance Format OutEvent where
   format (OMsg (MsgAuth s _) msg) = "OMsg " ++ format msg ++ " " ++ format s
@@ -131,6 +137,7 @@ instance Format OutEvent where
   format (ResetTimer rn) = "ResetTimer " ++ format rn
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
+  format (PendingVote reci dir) = "PendingVote " ++ show (reci, dir)
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -160,6 +167,7 @@ outShortLog loc oev = $logInfoS loc . pack $
     ResetTimer rn -> CL.blue "RESET_TIMER " ++ show rn
     GapFound h r p -> CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
+    PendingVote r d -> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ if d then "AUTH" else "DROP"
 
 instance NFData OutEvent
 

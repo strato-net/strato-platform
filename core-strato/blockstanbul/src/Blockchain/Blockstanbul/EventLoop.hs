@@ -275,8 +275,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   v <- use view
   when authz $ case ev of
     NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
-      pendingvotes %= M.insert benf dir
       authSenders %= M.insert addr nonc
+      yield $ PendingVote benf dir
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
@@ -525,3 +525,4 @@ recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCount
     ResetTimer{} -> inc "reset_timer"
     GapFound{} -> inc "gap_found"
     LeadFound{} -> inc "lead_found"
+    PendingVote{} -> inc" pending_vote"

@@ -24,6 +24,9 @@ module Blockchain.VMContext
     , getContextBestBlockInfo
     , putContextBestBlockInfo
     , contextBlockRequested
+    , queuePendingVote
+    , peekPendingVote
+    , clearPendingVote
     ) where
 
 
@@ -40,6 +43,7 @@ import qualified Data.ByteString                    as B
 import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
 import qualified Data.Sequence                      as Q
+import           Data.Word
 import qualified Data.Text                          as T
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Postgresql        as PSQL
@@ -330,3 +334,24 @@ putContextBestBlockInfo :: ContextBestBlockInfo -> ContextM ()
 putContextBestBlockInfo new = do
     ctx <- get
     put ctx { contextBestBlockInfo = new }
+
+queuePendingVote :: Address -> Bool -> ContextM ()
+queuePendingVote a r = do
+  $logInfoLS "queuePendingVote" (a, r)
+
+-- (Coinbase, Nonce) to be applied on a constructed block
+-- When no pending votes are available, supplies the default coinbase (0x0)
+peekPendingVote :: ContextM (Address, Word64)
+peekPendingVote = do
+  let ret = (0, 0)
+  $logInfoLS "peekPendingVote" ret
+  return ret
+
+-- If the Block was sent out by us and contains our vote,
+-- mark the vote as committed and remove it from the queue.
+-- TODO: Whats a good signal for "our" block? Examining the extradata
+-- works, but requires ContextM to know what our validator address is.
+clearPendingVote :: Block -> ContextM ()
+clearPendingVote b = do
+  let bd = blockBlockData b
+  $logInfoLS "clearPendingVote" (blockDataCoinbase bd, blockDataNonce bd)

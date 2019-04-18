@@ -365,6 +365,7 @@ handleEvents peer = awaitForever $ \case
           yield outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
+      OEVoteToMake{} -> $logErrorS "handleEvents/OEVoteToMake" "absurd"
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp

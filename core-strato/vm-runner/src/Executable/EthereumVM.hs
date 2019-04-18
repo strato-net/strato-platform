@@ -82,6 +82,7 @@ ethereumVM = void . execContextM $ do
 
         insertNewChains seqEvents
 
+        mapM_ (uncurry queuePendingVote) [(r, d) | OEVoteToMake r d <- seqEvents]
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
