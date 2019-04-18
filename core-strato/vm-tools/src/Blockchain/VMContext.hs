@@ -114,6 +114,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextLogDBQueue             :: [LogDB]
                        , contextHasBlockstanbul        :: Bool
                        , _contextBlockRequested        :: Bool
+                       , contextCoinbaseQueue          :: [(Address,Word64)]
                        } deriving (Generic, NFData)
 makeLenses ''Context
 
@@ -259,7 +260,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      redisPool
                      Q.empty []
                      False
-                     False) $ do
+                     False
+                     []) $ do
           MP.initializeBlank =<< getStateDB
           setStateDBStateRoot MP.emptyTriePtr
           f
@@ -300,7 +302,8 @@ runContextM f = do
                        Q.empty
                        []
                        flags_blockstanbul
-                       False)
+                       False
+                       [])
 
 
 evalContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
@@ -337,13 +340,22 @@ putContextBestBlockInfo new = do
 
 queuePendingVote :: Address -> Bool -> ContextM ()
 queuePendingVote a r = do
-  $logInfoLS "queuePendingVote" (a, r)
+  let nonce = case r of
+        True -> 0xffffffffffffffff
+        False -> 0x0000000000000000
+  let newVote = (a, nonce)
+  $logInfoLS "queuePendingVote" newVote
+  ctx <- get
+  put ctx { contextCoinbaseQueue = newVote : (contextCoinbaseQueue ctx)}
 
 -- (Coinbase, Nonce) to be applied on a constructed block
 -- When no pending votes are available, supplies the default coinbase (0x0)
 peekPendingVote :: ContextM (Address, Word64)
 peekPendingVote = do
-  let ret = (0, 0)
+  ctx <- get
+  let ret = case contextCoinbaseQueue ctx of
+        [] -> (0,0)
+        x:_ -> x
   $logInfoLS "peekPendingVote" ret
   return ret
 

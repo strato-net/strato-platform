@@ -18,6 +18,7 @@ import qualified Data.Map.Ordered                   as OMap
 import qualified Data.Text                          as T
 import           Data.Time.Clock
 import qualified Data.Set                           as S
+import           Data.Word
 import           Numeric                            (readHex)
 
 import           Blockapps.Crossmon
@@ -50,11 +51,13 @@ import           Text.Format
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
     isBlockstanbul     :: m Bool
     getBaggerState     :: m B.BaggerState
+    peekPendingVote    :: m (Address, Word64)
+    clearPendingVote   :: BDB.Block -> m ()
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
-    {-# MINIMAL isBlockstanbul, getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
+    {-# MINIMAL isBlockstanbul, getBaggerState, peekPendingVote, clearPendingVote, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
 
     getCheckpointableState :: m (SHA, DD.BlockData)
     getCheckpointableState = do
@@ -131,12 +134,13 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
                     existingStateDbStateRoot <- getStateRoot
                     isPBFT <- isBlockstanbul
+                    (coinbaseAddr,_) <- peekPendingVote
                     let lastSR          = B.lastExecutedStateRoot cache
                     let lastSHA         = B.bestBlockSHA cache
                     let lastHead        = B.bestBlockHeader cache
                     let promoted        = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
                     let time            = B.startTimestamp cache
-                    let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT
+                    let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr
                     let remGas          = B.remainingGas cache
                     $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
@@ -383,6 +387,7 @@ buildFromMiningCache = do
     $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
     state <- getBaggerState
     isPBFT <- isBlockstanbul
+    (coinbaseAddr, _) <- peekPendingVote
     let cache        = B.miningCache state
     let uncles       = []
     let parentHash   = B.bestBlockSHA cache
@@ -394,7 +399,7 @@ buildFromMiningCache = do
     let parentTS     = DD.blockDataTimestamp parentHeader
     let time         = B.startTimestamp cache
     let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
-    let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT
+    let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr
     recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
     return OutputBlock { obOrigin = TO.Quarry
@@ -414,8 +419,9 @@ buildNextBlockHeader :: DD.BlockData
                      -> [OutputTx]
                      -> UTCTime
                      -> Bool
+                     -> Address
                      -> DD.BlockData
-buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT =
+buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr =
     let parentDiff = DD.blockDataDifficulty parentHeader
         parentNum  = DD.blockDataNumber parentHeader
         parentTS   = DD.blockDataTimestamp parentHeader
@@ -423,7 +429,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT =
         in DD.BlockData { DD.blockDataParentHash       = parentHash
                         , DD.blockDataUnclesHash       = V.ommersVerificationValue uncles
                         -- TODO: when `isPBFT`, coinbase and nonce should be set from a queue of pending votes
-                        , DD.blockDataCoinbase         = if isPBFT then Address 0x0 else ourCoinbase
+                        , DD.blockDataCoinbase         = if isPBFT then coinbaseAddr else ourCoinbase
                         , DD.blockDataStateRoot        = stateRoot
                         , DD.blockDataTransactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs)
                         , DD.blockDataReceiptsRoot     = V.receiptsVerificationValue ()
