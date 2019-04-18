@@ -30,6 +30,7 @@ data BlockDBNamespace = Headers
                       | PrivateChainInfo
                       | PrivateChainMembers
                       | PrivateTransactions
+                      | PrivateTxsInBlocks
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -66,6 +67,10 @@ instance RedisDBValuable RedisChainMembers where
     toValue   = rlpSerialize . rlpEncode
     fromValue = rlpDecode . rlpDeserialize
 
+instance RedisDBValuable RedisChainTxsInBlocks where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
 instance RedisDBKeyable Integer where
     toKey = S8.pack . show
 
@@ -87,6 +92,7 @@ newtype RedisTxs       = RedisTxs      [RedisTx]       deriving (Eq, Read, Show,
 newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
 newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving (Eq, Show, RLPSerializable)
 newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving (Eq, Show, RLPSerializable)
+newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [SHA]) deriving (Eq, Show, RLPSerializable)
 data RedisBestBlock = RedisBestBlock { bestBlockHash            :: SHA
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
                                      , bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty
