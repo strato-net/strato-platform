@@ -1,11 +1,25 @@
 -- for openid reference see https://github.com/zmartzone/lua-resty-openidc 
 
+-- This Lua script supports two request types:
+-- 1. access_token provided directly in Authorization header (OAuth2 authorization flow happens on the third-party application side) -
+--    the token is being verified and either authorizes the request or exits with 403
+-- 2. Nginx session-based OAuth2 (for SMD and API calls from browser; uses STRATO client id and secret): 
+--    if no session provided in request OR session is expired OR access token in session is expired on invalid:
+--      - if UI call (SMD, i.e. "/dashboard/..") - redirect to OAuth2 provider sign-in page, then redirect back to the requested page (without hash part of url);
+--      - if API call - return 401 Unauthorized
+--    if valid session is in request and has valid access token - request is authorized
+-- Nginx session based flow (2) has higher priority if both ways applied.
+
 local openidc = require("resty.openidc")
-local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
 
 local function isEmpty(s)
   return s == nil or s == ''
 end
+
+-- Which property of access token payload to use as STRATO account name
+local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
+
+local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
 local unique_name = ''
 local user_id = ''
@@ -31,15 +45,16 @@ local authenticate_opts = {
   renew_access_token_on_expiry = true,
   access_token_expires_in = 300,
   logout_path = "/auth/logout",
-  post_logout_redirect_uri = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
+  post_logout_redirect_uri = node_host_with_protocol
 }
 
+-- If it is a direct call to APIs - without session but with access_token provided as Bearer token in Authorization header
 if not ngx.var['cookie_strato_session'] and ngx.req.get_headers()["Authorization"] then
   local verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
 
   if verify_err or not verify_res then
     ngx.status = 403
-    ngx.say(verify_err and verify_err or "no access_token provided")
+    ngx.say(verify_err and verify_err or "bearer token invalid, expired or not provided")
     ngx.exit(ngx.HTTP_FORBIDDEN)
   end
 
@@ -52,15 +67,29 @@ if not ngx.var['cookie_strato_session'] and ngx.req.get_headers()["Authorization
   user_id = verify_res.sub
 
 else
-  local referer_url = ngx.var.http_referer
+  -- Else - use the openidc authenticate flow
+
   -- If it's the logout request - unset custom cookies. All the rest is handled by .authenticate()
   if ngx.var.request_uri == authenticate_opts.logout_path then
     ngx.header['Set-Cookie'] = 'strato_user_name=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    referer_url = nil
   end
 
-  local authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, referer_url)
+  local authenticate_res, authenticate_err
+  -- if requested_uri is the UI page (like SMD) or the API call
+  if ngx.var.is_ui == "true" then
+    -- authenticate with full flow - authenticate() handles authorization, all OAuth2 redirects, sessions, logout flow; 
+    -- processes the OAuth2 sign-in and token exchange redirects until the request is completely authorized, or there is an error
+    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts)
+  else
+    -- only validate the session, do not redirect, respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
+    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "pass")
+    if (authenticate_res == authenticate_err and authenticate_res == nil) then
+      ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
+      ngx.exit(ngx.HTTP_UNAUTHORIZED)
+    end
+  end
 
+  -- in case of internal server error
   if authenticate_err then
     ngx.status = 500
     ngx.header['Set-Cookie'] = 'strato_user_name=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
@@ -68,6 +97,7 @@ else
     ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
 
+  -- Request is authorized at this point - prepare data
   if not isEmpty(authenticate_res.id_token[username_property]) then
     unique_name = authenticate_res.id_token[username_property]
   else
@@ -76,12 +106,13 @@ else
 
   user_id = authenticate_res.id_token.sub
 
+  -- set the username cookie on client
   if not ngx.var['cookie_strato_user_name'] or ngx.var['cookie_strato_user_name'] ~= unique_name then
     ngx.header['Set-Cookie'] = string.format('strato_user_name=%s; path=/', unique_name)
   end
 end
 
--- set request header to forward to APIs
+-- set request headers to forward to APIs
 ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
 ngx.req.set_header("X-USER-ID", user_id)
 -- removing the Authorization header FROM REQUEST to prevent Postgrest's built-in JWT permissioning to trigger

@@ -35,6 +35,13 @@ Object {
 }
 `;
 
+exports[`Socket: action subscribe health 1`] = `
+Object {
+  "name": "SUBSCRIBE/GET_HEALTH",
+  "type": "SOCKET_SUBSCRIBE_ROOM",
+}
+`;
+
 exports[`Socket: action subscribe last block number 1`] = `
 Object {
   "name": "SUBSCRIBE/LAST_BLOCK_NUMBER",
@@ -66,6 +73,13 @@ Object {
 exports[`Socket: action subscribe transactions type 1`] = `
 Object {
   "name": "SUBSCRIBE/TRANSACTIONS_TYPE",
+  "type": "SOCKET_SUBSCRIBE_ROOM",
+}
+`;
+
+exports[`Socket: action subscribe uptime 1`] = `
+Object {
+  "name": "SUBSCRIBE/GET_NODE_UPTIME",
   "type": "SOCKET_SUBSCRIBE_ROOM",
 }
 `;
@@ -112,6 +126,13 @@ Object {
 }
 `;
 
+exports[`Socket: action unsubscribe health 1`] = `
+Object {
+  "name": "UNSUBSCRIBE/GET_HEALTH",
+  "type": "SOCKET_UNSUBSCRIBE_ROOM",
+}
+`;
+
 exports[`Socket: action unsubscribe last block number 1`] = `
 Object {
   "name": "UNSUBSCRIBE/LAST_BLOCK_NUMBER",
@@ -143,6 +164,13 @@ Object {
 exports[`Socket: action unsubscribe transactions type 1`] = `
 Object {
   "name": "UNSUBSCRIBE/TRANSACTIONS_TYPE",
+  "type": "SOCKET_UNSUBSCRIBE_ROOM",
+}
+`;
+
+exports[`Socket: action unsubscribe uptime 1`] = `
+Object {
+  "name": "UNSUBSCRIBE/GET_NODE_UPTIME",
   "type": "SOCKET_UNSUBSCRIBE_ROOM",
 }
 `;

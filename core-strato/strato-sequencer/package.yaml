@@ -61,6 +61,7 @@ dependencies:
   - exceptions
   - unliftio
   - seqevents
+  - cross-monitoring
 
 ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 

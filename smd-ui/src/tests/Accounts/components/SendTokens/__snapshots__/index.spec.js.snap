@@ -221,7 +221,7 @@ exports[`SendTokens: index render enterprise mode with values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
   <form>
-    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
         <div>
           <div className=\\"row\\">
@@ -232,7 +232,7 @@ exports[`SendTokens: index render enterprise mode with values 1`] = `
             </div>
             <div className=\\"col-sm-8 smd-pad-4\\">
               <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+                <Field className=\\"pt-input chain-field\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
                   <option />
                   <option value=\\"airline cartel 9\\">
                     airline cartel 9
@@ -600,7 +600,7 @@ exports[`SendTokens: index render enterprise mode without values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
   <form>
-    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
           <div className=\\"col-sm-4 text-right\\">
@@ -725,7 +725,7 @@ exports[`SendTokens: index render public mode with values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
   <form>
-    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
         <div>
           <div className=\\"row\\">
@@ -736,7 +736,7 @@ exports[`SendTokens: index render public mode with values 1`] = `
             </div>
             <div className=\\"col-sm-8 smd-pad-4\\">
               <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+                <Field className=\\"pt-input chain-field\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
                   <option />
                   <option value=\\"airline cartel 9\\">
                     airline cartel 9
@@ -921,7 +921,7 @@ exports[`SendTokens: index render public mode without values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
   <form>
-    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
         <div>
           <div className=\\"row\\">
@@ -932,7 +932,7 @@ exports[`SendTokens: index render public mode without values 1`] = `
             </div>
             <div className=\\"col-sm-8 smd-pad-4\\">
               <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+                <Field className=\\"pt-input chain-field\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
                   <option />
                   <option value=\\"airline cartel 9\\">
                     airline cartel 9

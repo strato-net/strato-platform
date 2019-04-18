@@ -1,0 +1,62 @@
+name:                fastMP
+version:             0.1.0.0
+
+dependencies:
+- ansi-wl-pprint
+- base >= 4.7 && < 5
+- base16-bytestring
+- blockapps-util
+- bytestring
+- conduit
+- ethereum-rlp
+- format
+- leveldb-haskell
+- merkle-patricia-db
+- monad-loops
+- nibblestring
+- resourcet
+- strato-model
+
+library:
+  source-dirs:         src
+  ghc-options:
+  - -threaded
+  - -rtsopts
+  - -with-rtsopts=-N
+
+
+executables:
+  fastMP-exe:
+    main:                Main.hs
+    source-dirs:         app
+    dependencies:	 fastMP
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+
+  insertMP:
+    main:                insertMP.hs
+    source-dirs:         app
+    dependencies:	 fastMP
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+
+  insertLDB:
+    main:                insertLDB.hs
+    source-dirs:         app
+    dependencies:	 fastMP
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+
+  makeSampleKVs:
+    main:                makeSampleKVs.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N

@@ -149,25 +149,22 @@ tab [] = []
 tab ('\n':rest) = "\n    " ++ tab rest
 tab (x:rest) = x:tab rest
 
-indent :: [Statement] -> String
-indent = tab . unlines . map unparseStatement
-
 unparseStatement :: Statement -> String
 unparseStatement (SimpleStatement s) = unparseSimpleStatement s ++ ";"
 unparseStatement (IfStatement e s1 s2) =
-  let elseString = maybe (""::String) (printf " else {\n%s}" . indent) s2
-  in printf "if (%s) {\n%s} %s" (unparseExpression e) (indent s1) elseString
+  let
+    elseString Nothing = ""
+    elseString (Just elseStatements) =
+      " else {" ++ unlines (map unparseStatement elseStatements) ++ "}"
+  in
+    "if (" ++ unparseExpression e ++ ") {\n    " ++ tab (unlines (map unparseStatement s1)) ++ "}" ++ elseString s2
 unparseStatement (ForStatement v1 v2 v3 s) =
-  let mSimple = maybe "" unparseSimpleStatement
-      mExpr = maybe "" unparseExpression
-  in printf "for (%s;%s;%s) {\n%s\n}" (mSimple v1) (mExpr v2) (mExpr v3) (indent s)
-unparseStatement (WhileStatement c s) = printf "while (%s) {\n%s}" (unparseExpression c) (indent s)
+  "for (" ++ fromMaybe "" (fmap unparseSimpleStatement v1) ++ "; " ++ fromMaybe "" (fmap unparseExpression v2) ++ "; " ++ fromMaybe "" (fmap unparseExpression v3) ++ ") {\n    " ++ tab (unlines (map unparseStatement s)) ++ "}"
 unparseStatement (Return Nothing) = "return;"
 unparseStatement (Return (Just e)) = "return " ++ unparseExpression e ++ ";"
 unparseStatement Break = "break;"
 unparseStatement Continue = "continue;"
-unparseStatement (AssemblyStatement (MloadAdd32 dst src)) =
-    printf "assembly { %s := mload(add(%s, 32)) }" dst src
+unparseStatement (AssemblyStatement (MloadAdd32 dst src)) = printf "assembly { %s := mload(add(%s, 32)) }" dst src
 --unparseStatement x = show x
 unparseStatement x = error $ "missing case in call to unparseStatement: " ++ show x
 
