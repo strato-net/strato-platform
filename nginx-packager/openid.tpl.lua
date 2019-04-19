@@ -9,6 +9,8 @@
 --      - if API call - return 401 Unauthorized
 --    if valid session is in request and has valid access token - request is authorized
 -- Flow (1) is used when Authorization header is provided in the request.
+-- Access token has a slack time of 120 sec (default) after access token or session is expired (see for `iat_slack` param in opts)
+
 
 local openidc = require("resty.openidc")
 
@@ -54,7 +56,7 @@ if ngx.req.get_headers()["Authorization"] then
 
   if verify_err or not verify_res then
     ngx.status = 403
-    ngx.say("Authorization header is provided but the bearer token is invalid or expired: " .. (verify_err and verify_err or 'unknown error'))
+    ngx.say("Authorization header is provided but the bearer token is invalid or expired: " .. (verify_err or 'unknown error'))
     ngx.exit(ngx.HTTP_FORBIDDEN)
   end
 
@@ -76,7 +78,7 @@ else
 
   local authenticate_res, authenticate_err
   -- if requested_uri is the UI page (like SMD) or the API call
-  if ngx.var.is_ui and ngx.var.is_ui == "true" then
+  if ngx.var.is_ui == "true" then
     -- authenticate with full flow - authenticate() handles authorization, all OAuth2 redirects, sessions, logout flow; 
     -- processes the OAuth2 sign-in and token exchange redirects until the request is completely authorized, or there is an error
     authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts)
