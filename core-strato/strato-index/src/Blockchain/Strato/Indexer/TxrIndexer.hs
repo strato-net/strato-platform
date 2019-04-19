@@ -15,6 +15,7 @@ import           Data.Binary
 import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Lazy               as BL
+import           Data.Foldable                      (for_)
 import           Data.Maybe                         (isJust)
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8)
@@ -30,6 +31,8 @@ import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Format
 
+import           Blockchain.Sequencer.Event         (IngestEvent(..))
+import           Blockchain.Sequencer.Kafka
 import           Blockchain.SHA                     (hash)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
@@ -69,11 +72,11 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                           enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
                           enode' = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
                       mEnode <- liftIO $ (Just <$> evaluate (readEnode enode')) `catch` (\(_ :: SomeException) -> return Nothing)
-                      when (isJust mEnode) $ do
-                        let Just enode = mEnode
+                      for_ mEnode $ \enode -> do
                         $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
                         lift $ addMember chainId address enode' -- We only need the Text version for Postgres
                         void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
+                        void . withKafkaRetry1s $ writeUnseqEvents [IENewChainMember chainId address enode]
                     Just x | SHA x == removeTopic -> do
                       let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
                       $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
