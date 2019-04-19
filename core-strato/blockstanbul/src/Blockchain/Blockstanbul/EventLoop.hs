@@ -275,6 +275,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   v <- use view
   when authz $ case ev of
     NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
+      pendingvotes %= M.insert benf dir
       authSenders %= M.insert addr nonc
       yield $ PendingVote benf dir
     PreviousBlock blk -> do
