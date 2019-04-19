@@ -134,27 +134,37 @@ updateAccount chainId blockNumber address diff = do
 
 commitStorage :: MonadIO m =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()
-commitStorage addrID key = \case
-  Create{newValue} ->
-    SQL.insert_ $ Storage addrID EVM (word256ToHexStorage key) (word256ToHexStorage newValue)
-  Delete{} -> do
-    storageID <- getStorageKeySQL addrID (word256ToHexStorage key) "delete"
-    SQL.delete storageID
-  Update{newValue} -> do
-    storageID <- getStorageKeySQL addrID (word256ToHexStorage key) "update"
-    SQL.update storageID [ StorageValue =. (word256ToHexStorage newValue) ]
+commitStorage addrID key v =
+  let key' = word256ToHexStorage key
+   in case v of
+        Create{newValue} ->
+          SQL.insert_ $ Storage addrID EVM key' (word256ToHexStorage newValue)
+        Delete{} -> do
+          mStorageID <- getStorageKeySQL addrID key'
+          for_ mStorageID SQL.delete
+        Update{newValue} -> do
+          let newValue' = word256ToHexStorage newValue
+          mStorageID <- getStorageKeySQL addrID key'
+          case mStorageID of
+            Nothing -> SQL.insertMany_ [Storage addrID key' newValue']
+            Just storageID -> SQL.update storageID [ StorageValue =. newValue' ]
 
 commitSolidStorage :: MonadIO m =>
                       SQL.Key AddressStateRef -> BS.ByteString -> Diff BS.ByteString 'Incremental -> SqlDbM m ()
-commitSolidStorage addrID key = \case
-  Create{newValue} ->
-    SQL.insert_ $ Storage addrID SolidVM (HexStorage key) (HexStorage newValue)
-  Delete{} -> do
-    storageID <- getStorageKeySQL addrID (HexStorage key) "delete"
-    SQL.delete storageID
-  Update{newValue} -> do
-    storageID <- getStorageKeySQL addrID (HexStorage key) "update"
-    SQL.update storageID [ StorageValue =. HexStorage newValue ]
+commitSolidStorage addrID key v =
+  let key' = HexStorage key
+   in case v of
+        Create{newValue} ->
+          SQL.insert_ $ Storage addrID SolidVM key' (HexStorage newValue)
+        Delete{} -> do
+          mStorageID <- getStorageKeySQL addrID key'
+          for_ mStorageID SQL.delete
+        Update{newValue} -> do
+          let newValue' = HexStorage newValue
+          mStorageID <- getStorageKeySQL addrID key'
+          case mStorageID of
+            Nothing -> SQL.insertMany_ [Storage addrID key' newValue']
+            Just storageID -> SQL.update storageID [ StorageValue =. newValue' ]
 
 getAddressStateSQL :: MonadIO m
                    => Maybe Word256
@@ -168,12 +178,9 @@ getAddressStateSQL chainId addr' = do
 getStorageKeySQL :: MonadIO m
                  => SQL.Key AddressStateRef
                  -> HexStorage
-                 -> String
-                 -> SqlDbM m (SQL.Key Storage)
-getStorageKeySQL addrID storageKey' s = do
+                 -> SqlDbM m (Maybe (SQL.Key Storage))
+getStorageKeySQL addrID storageKey' = do
   storageIDs <- SQL.selectKeysList
               [ StorageAddressStateRefId SQL.==. addrID, StorageKey SQL.==. storageKey' ]
               [ LimitTo 1 ]
-  if null storageIDs
-    then error $ s ++ ": Storage key not found in SQL db: " ++ show storageKey'
-    else return $ head storageIDs
+  return $ listToMaybe storageIDs
