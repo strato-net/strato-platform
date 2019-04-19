@@ -146,7 +146,7 @@ commitStorage addrID key v =
           let newValue' = word256ToHexStorage newValue
           mStorageID <- getStorageKeySQL addrID key'
           case mStorageID of
-            Nothing -> SQL.insertMany_ [Storage addrID key' newValue']
+            Nothing -> SQL.insert_ $ Storage addrID EVM key' newValue'
             Just storageID -> SQL.update storageID [ StorageValue =. newValue' ]
 
 commitSolidStorage :: MonadIO m =>
@@ -163,7 +163,7 @@ commitSolidStorage addrID key v =
           let newValue' = HexStorage newValue
           mStorageID <- getStorageKeySQL addrID key'
           case mStorageID of
-            Nothing -> SQL.insertMany_ [Storage addrID key' newValue']
+            Nothing -> SQL.insert_ $ Storage addrID SolidVM key' newValue'
             Just storageID -> SQL.update storageID [ StorageValue =. newValue' ]
 
 getAddressStateSQL :: MonadIO m
