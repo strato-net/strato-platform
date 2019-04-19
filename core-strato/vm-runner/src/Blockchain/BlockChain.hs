@@ -694,7 +694,9 @@ calculateAndEmitStateDiffs newBlock mOldPubHeader mOldPrivHeader = when flags_sq
       Nothing -> return []
     chainDiffs <- case mOldPrivHeader of
       Just oldHeader -> do
-        let oldHash = blockHeaderParentHash oldHeader
+        let oldHash = if blockHeaderParentHash oldHeader == SHA 0
+                        then blockHeaderHash oldHeader
+                        else blockHeaderParentHash oldHeader
         $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs from: " ++ format oldHash ++ "\nto: " ++ format newHash
         chainDiff newNumber oldHash newHash
       Nothing -> return []
