@@ -184,11 +184,15 @@ addBlocks blocks' = do
       let filtered = filter ((/= 0) . blockDataNumber . obBlockData) blocks'
       $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
                                              (show . blockDataNumber . obBlockData $ head filtered))
-      didReplaceBest <- liftIO (newIORef False)
-      ranPrivateTxs  <- liftIO (newIORef False)
-      replacedBest   <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
+      didReplaceBest   <- liftIO (newIORef False)
+      worstHeader <- liftIO (newIORef oldHeader)
+      ranPrivateTxs    <- liftIO (newIORef False)
+      replacedBest     <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
       actions <- forM filtered $ \block -> timeit ("Block #" ++ show (blockDataNumber . obBlockData $ block) ++ " (" ++ show (length . obReceiptTransactions $ block) ++ " TXs) insertion") timerToUse $ do
         actions <- addBlock block
+        lowestOrdering <- fmap blockHeaderOrdering . liftIO $ readIORef worstHeader
+        when (lowestOrdering > blockOrdering block) $
+          liftIO . writeIORef worstHeader $ obBlockData block
         (didReplaceThisTime, ranPriv, replacedBits) <- replaceBestIfBetter block
         when didReplaceThisTime . liftIO $ do
           writeIORef didReplaceBest True
@@ -205,12 +209,12 @@ addBlocks blocks' = do
       when (didReplaceBest' || ranPrivateTxs') $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
+        oldPrivHeader <- liftIO (readIORef worstHeader)
         timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
         timeit "calculateAndEmitStateDiffs " timerToUse $
           calculateAndEmitStateDiffs theBlock
-                                     oldHeader
-                                     didReplaceBest'
-                                     ranPrivateTxs'
+                                     (if didReplaceBest' then Just oldHeader else Nothing)
+                                     (if ranPrivateTxs' then Just oldPrivHeader else Nothing)
       return $ concat actions
 
   where
@@ -674,27 +678,26 @@ splitCreateDiffs =
 
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
-                           -> BlockData
-                           -> Bool
-                           -> Bool
+                           -> Maybe BlockData
+                           -> Maybe BlockData
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldHeader runPublic runPrivate = when flags_sqlDiff $ do
-    let oldHash      = blockHeaderHash oldHeader
-        oldStateRoot = MP.StateRoot $ blockHeaderStateRoot oldHeader
-        newHeader    = blockHeader newBlock
+calculateAndEmitStateDiffs newBlock mOldPubHeader mOldPrivHeader = when flags_sqlDiff $ do
+    let newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
-    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
-    diffs <- if runPublic
-      then (:[]) <$> stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
-      else return []
-    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs from: " ++ format oldHash ++ "\nto: " ++ format newHash
-    chainDiffs <- if runPrivate
-      then if runPublic
-        then chainDiff newNumber oldHash newHash
-        else chainDiff newNumber (blockHeaderParentHash newHeader) newHash
-      else return []
+    diffs <- case mOldPubHeader of
+      Just oldHeader -> do
+        let oldStateRoot = MP.StateRoot $ blockHeaderStateRoot oldHeader
+        $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
+        (:[]) <$> stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
+      Nothing -> return []
+    chainDiffs <- case mOldPrivHeader of
+      Just oldHeader -> do
+        let oldHash = blockHeaderParentHash oldHeader
+        $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs from: " ++ format oldHash ++ "\nto: " ++ format newHash
+        chainDiff newNumber oldHash newHash
+      Nothing -> return []
     $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
 
     let allDiffs = diffs ++ chainDiffs
