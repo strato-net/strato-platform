@@ -13,6 +13,7 @@ module Blockchain.Strato.RedisBlockDB
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
+    , getIPChains, addIPChain, removeIPChain
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
     , getTransactions, getPrivateTransactions, getUncles
@@ -88,6 +89,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateChainMembers -> "m:"
             PrivateTransactions -> "pt:"
             PrivateTxsInBlocks  -> "pb:"
+            PrivateIPChains     -> "pic:"
 
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)
@@ -138,7 +140,7 @@ addChainMember cId address enode = do
     let mems' = RedisChainMembers $ M.insert address enode mems
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
     case res of
-        TxSuccess _ -> pure $ Right Ok
+        TxSuccess _ -> addIPChain (ipAddress enode) cId
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
 
@@ -147,10 +149,13 @@ removeChainMember :: Word256
                   -> Redis (Either Reply Status)
 removeChainMember cId address = do
     mems <- getChainMembers cId
-    let mems' = RedisChainMembers $ M.delete address mems
+    let mEnode = M.lookup address mems
+        mems' = RedisChainMembers $ M.delete address mems
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
     case res of
-        TxSuccess _ -> pure $ Right Ok
+        TxSuccess _ -> case mEnode of
+          Nothing -> pure $ Right Ok -- TODO: Maybe this should return a Left?
+          Just enode -> removeIPChain (ipAddress enode) cId
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
@@ -186,6 +191,38 @@ addChainTxsInBlock bHash cId shas = do
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
+
+getIPChains :: IPAddress
+            -> Redis [Word256]
+getIPChains ip = getInNamespace PrivateIPChains ip >>= \case
+    Left _               -> return []
+    Right Nothing        -> return []
+    Right (Just rchains) -> let RedisIPChains chains = fromValue rchains
+                             in return chains
+
+addIPChain :: IPAddress
+           -> Word256
+           -> Redis (Either Reply Status)
+addIPChain ip cId = do
+    chains <- getIPChains ip
+    let chains' = RedisIPChains (cId:chains)
+    res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Error" ++ e)
+
+removeIPChain :: IPAddress
+              -> Word256
+              -> Redis (Either Reply Status)
+removeIPChain ip cId = do
+    chains <- getIPChains ip
+    let chains' = RedisIPChains $ filter (/= cId) chains
+    res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Error" ++ e)
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"

@@ -8,6 +8,7 @@
 module Blockchain.Event (
   module Blockchain.EventModel,
   handleEvents,
+  handleGetChainDetails,
   getBestKafkaBlockNumber
   ) where
 
@@ -45,6 +46,7 @@ import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.EventModel
 import           Blockchain.EventException
+import           Blockchain.ExtWord
 import           Blockchain.Options
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -279,20 +281,7 @@ handleEvents peer = awaitForever $ \case
       SK.emitBlockstanbulMsg wm
 
     -- private chains
-    MsgEvt (GetChainDetails cids) -> do
-      stampActionTimestamp
-      $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
-      mems <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainMembers cids
-      let pairs = zip cids mems
-          filteredPairs = map fst $ filter ((checkPeerIsMember peer) . snd) pairs
-
-      unless (null filteredPairs) $ do
-        cInfos <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo cids
-        let finalPairs = map (fmap fromJust) . filter (isJust . snd) $ zip cids cInfos
-        yield $ ChainDetails finalPairs
-        stampActionTimestamp
-        $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
-          (intercalate "\n" $ show <$> finalPairs)
+    MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer cids'
 
     MsgEvt (ChainDetails chpairs) -> do
       stampActionTimestamp
@@ -408,6 +397,34 @@ handleEvents peer = awaitForever $ \case
       yield $ Disconnect AlreadyConnected
     event -> liftIO . error $ "unrecognized event: " ++ show event
 
+handleGetChainDetails :: ( MonadIO m
+                         , MonadResource m
+                         , RBDB.HasRedisBlockDB m
+                         , SK.HasUnseqSink m
+                         , MonadState Context m
+                         , MonadLogger m
+                         )
+                      => PPeer
+                      -> [Word256]
+                      -> ConduitM Event Message m ()
+handleGetChainDetails peer cids' = do
+  cids <- case cids' of
+            [] -> RBDB.withRedisBlockDB $ RBDB.getIPChains (peerIPAddress peer)
+            xs -> return xs
+  stampActionTimestamp
+  $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
+  mems <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainMembers cids
+  let pairs = zip cids mems
+      filteredPairs = map fst $ filter ((checkPeerIsMember peer) . snd) pairs
+
+  unless (null filteredPairs) $ do
+    cInfos <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo cids
+    let finalPairs = map (fmap fromJust) . filter (isJust . snd) $ zip cids cInfos
+    yield $ ChainDetails finalPairs
+    stampActionTimestamp
+    $logInfoS "handleGetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
+      (intercalate "\n" $ show <$> finalPairs)
+
 numFromRedis :: Maybe RedisBestBlock -> Integer
 numFromRedis = \case
     Nothing                     -> 0
@@ -451,5 +468,7 @@ shouldSendGossip peer txo = recordGossipFinal
 checkPeerIsMember :: PPeer -> Map Address Enode -> Bool
 checkPeerIsMember peer mems =
   let ips = S.fromList . map ipAddress $ M.elems mems
-      pIp = readIP $ T.unpack (pPeerIp peer)
-   in S.member pIp ips
+   in S.member (peerIPAddress peer) ips
+
+peerIPAddress :: PPeer -> IPAddress
+peerIPAddress = readIP . T.unpack . pPeerIp
