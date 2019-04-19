@@ -21,7 +21,6 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
 import           Blockchain.SHA
-import           Blockchain.Util
 
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -130,12 +129,14 @@ commitStorage addrID key Create{newValue} =
   SQL.insert_ $ Storage addrID key newValue
 
 commitStorage addrID key Delete{} = do
-  storageID <- getStorageKeySQL addrID key "delete"
-  SQL.delete storageID
+  mStorageID <- getStorageKeySQL addrID key
+  for_ mStorageID SQL.delete
 
 commitStorage addrID key Update{newValue} = do
-  storageID <- getStorageKeySQL addrID key "update"
-  SQL.update storageID [ StorageValue =. newValue ]
+  mStorageID <- getStorageKeySQL addrID key
+  case mStorageID of
+    Nothing -> SQL.insertMany_ [Storage addrID key newValue]
+    Just storageID -> SQL.update storageID [ StorageValue =. newValue ]
 
 getAddressStateSQL :: MonadResource m
                    => Maybe Word256
@@ -149,12 +150,9 @@ getAddressStateSQL chainId addr' = do
 getStorageKeySQL :: MonadResource m
                  => SQL.Key AddressStateRef
                  -> Word256
-                 -> String
-                 -> SqlDbM m (SQL.Key Storage)
-getStorageKeySQL addrID storageKey' s = do
+                 -> SqlDbM m (Maybe (SQL.Key Storage))
+getStorageKeySQL addrID storageKey' = do
   storageIDs <- SQL.selectKeysList
               [ StorageAddressStateRefId SQL.==. addrID, StorageKey SQL.==. storageKey' ]
               [ LimitTo 1 ]
-  if null storageIDs
-    then error $ s ++ ": Storage key not found in SQL db: " ++ showHex4 storageKey'
-    else return $ head storageIDs
+  return $ listToMaybe storageIDs
