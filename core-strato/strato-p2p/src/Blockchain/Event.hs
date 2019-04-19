@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TupleSections       #-}
 
 module Blockchain.Event (
   module Blockchain.EventModel,
@@ -17,6 +18,7 @@ import           Blockchain.Output
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Conduit
+import           Data.Foldable                         (for_)
 import           Data.List
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
@@ -353,6 +355,14 @@ handleEvents peer = awaitForever $ \case
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cId)
       OEGetChain chainIds -> yield $ GetChainDetails chainIds
       OEGetTx shas -> yield $ GetTransactions shas
+      OENewChainMember cId _ _ -> do
+        let formatted = format $ SHA cId
+        $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "New member added to chain " ++ formatted
+        mems <- lift . RBDB.withRedisBlockDB $ RBDB.getChainMembers cId
+        when (checkPeerIsMember peer mems) $ do
+          $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
+          mcInfo <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
+          for_ ((cId,) <$> mcInfo) $ yield . ChainDetails . (:[])
       OEBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
