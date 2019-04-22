@@ -18,6 +18,7 @@ import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import           Blockchain.Data.Transaction
+import           Blockchain.VMOptions
 
 data ExecResults =
   ExecResults {
@@ -38,7 +39,10 @@ instance NFData ExecResults
 calculateReturned :: Transaction -> ExecResults -> Integer
 calculateReturned t er =
   let realRefund = min (erRefund er) ((transactionGasLimit t - erRemainingTxGas er) `div` 2)
-  in realRefund + erRefund er
+      addend = if flags_brokenRefundReenable
+                 then erRefund er
+                 else erRemainingTxGas er
+  in realRefund + addend
 
 
 evmErrorResults :: Integer -> VMException -> ExecResults
