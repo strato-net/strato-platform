@@ -94,3 +94,11 @@ spec = describe "VMContext" $ do
     blk'' <- addVote cb2 nonc2
     clearPendingVote blk''
     peekPendingVote `shouldReturn` (0, 0)
+
+  it "ignores blks from a different sender, even if they have the same vote" $ do
+    queuePendingVote recipient True 0x4444
+    (cb, nonc) <- peekPendingVote
+    -- Note: `addVote` always comes from `sender`
+    blk' <- addVote cb nonc
+    clearPendingVote blk'
+    peekPendingVote `shouldReturn` (cb, nonc)
