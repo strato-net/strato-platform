@@ -119,7 +119,7 @@ data OutputEvent = OETx Timestamp OutputTx
                  -- Ask and push for inclusive ranges of blocks
                  | OEAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
                  | OEPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
-                 | OEVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool }
+                 | OEVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
@@ -323,7 +323,7 @@ instance Binary OutputEvent where
     put (OECreateBlockCommand) = putWord8 8
     put (OEAskForBlocks s e p) = putWord8 11 >> put s >> put e >> put p
     put (OEPushBlocks s e p) = putWord8 12 >> put s >> put e >> put p
-    put (OEVoteToMake r d) = putWord8 13 >> put r >> put d
+    put (OEVoteToMake r d s) = putWord8 13 >> put r >> put d >> put s
     get = do
         tag <- getWord8
         case tag of
@@ -340,7 +340,7 @@ instance Binary OutputEvent where
             10 -> OEPushBlocks <$> get <*> get <*> pure 0x0 -- legacy OEPB
             11 -> OEAskForBlocks <$> get <*> get <*> get
             12 -> OEPushBlocks <$> get <*> get <*> get
-            13 -> OEVoteToMake <$> get <*> get
+            13 -> OEVoteToMake <$> get <*> get <*> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where

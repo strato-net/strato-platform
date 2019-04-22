@@ -19,6 +19,7 @@ dependencies:
   - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
+  - blockstanbul
   - bytestring
   - containers
   - cross-monitoring

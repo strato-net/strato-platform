@@ -125,7 +125,7 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               -- A PendingVote should be authenticated by blockstanbul, but applied
               -- by a Bagger monad. This is so that the stateroot is computed after
               -- the coinbase is modified to hold the vote.
-              | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool}
+              | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool, pendingVoteSender :: Address}
 
               deriving (Eq, Show, Generic)
 
@@ -137,7 +137,7 @@ instance Format OutEvent where
   format (ResetTimer rn) = "ResetTimer " ++ format rn
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
-  format (PendingVote reci dir) = "PendingVote " ++ show (reci, dir)
+  format (PendingVote reci dir s) = "PendingVote " ++ show (reci, dir, s)
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -167,7 +167,7 @@ outShortLog loc oev = $logInfoS loc . pack $
     ResetTimer rn -> CL.blue "RESET_TIMER " ++ show rn
     GapFound h r p -> CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
-    PendingVote r d -> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ if d then "AUTH" else "DROP"
+    PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ if d then "AUTH" else "DROP" ++ " FROM " ++ format s
 
 instance NFData OutEvent
 

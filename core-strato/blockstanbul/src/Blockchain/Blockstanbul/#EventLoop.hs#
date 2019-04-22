@@ -276,8 +276,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   when authz $ case ev of
     NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
       pendingvotes %= M.insert benf dir
-      authSenders %= M.insert addr nonc
-      yield $ PendingVote benf dir addr
+      Authsenders %= M.insert addr nonc
+      yield $ PendingVote benf dir
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
