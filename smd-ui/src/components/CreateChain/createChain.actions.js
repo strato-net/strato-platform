@@ -9,6 +9,7 @@ export const RESET_ERROR = "RESET_ERROR";
 export const COMPILE_CHAIN_CONTRACT_REQUEST = "COMPILE_CHAIN_CONTRACT_REQUEST";
 export const COMPILE_CHAIN_CONTRACT_SUCCESS = "COMPILE_CHAIN_CONTRACT_SUCCESS";
 export const COMPILE_CHAIN_CONTRACT_FAILURE = "COMPILE_CHAIN_CONTRACT_FAILURE";
+export const RESET_CONTRACT = "RESET_CONTRACT";
 
 export const openCreateChainOverlay = function () {
   return {
@@ -95,5 +96,11 @@ export const compileChainContractFailure = function (error) {
   return {
     type: COMPILE_CHAIN_CONTRACT_FAILURE,
     error
+  }
+}
+
+export const resetContract = function (error) {
+  return {
+    type: RESET_CONTRACT
   }
 }

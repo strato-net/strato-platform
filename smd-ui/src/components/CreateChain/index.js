@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError, compileChainContract } from './createChain.actions';
+import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError, compileChainContract, resetContract } from './createChain.actions';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -208,6 +208,8 @@ class CreateChain extends Component {
         self.updateGovernanceContract(fileName, fileContents);
       };
       reader.readAsText(file);
+    } else {
+      this.props.resetContract();
     }
   }
 
@@ -425,7 +427,7 @@ class CreateChain extends Component {
                             form: { contractSelected: 'Governance' },
                           };
                         });
-                        // this.handleContractFile(this.state.droppedFileName);
+                        this.handleContractFile(this.state.droppedFileName);
                       }
                     }
                   />
@@ -516,7 +518,8 @@ const connected = connect(
     closeCreateChainOverlay,
     createChain,
     resetError,
-    compileChainContract
+    compileChainContract,
+    resetContract
   }
 )(formed);
 
