@@ -17,6 +17,7 @@ import           Blockchain.Data.Block                     (Block)
 import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO
@@ -55,12 +56,14 @@ instance Format SeqLoopEvent where
 data IngestEvent = IETx Timestamp IngestTx
                  | IEBlock IngestBlock
                  | IEGenesis IngestGenesis
+                 | IENewChainMember Word256 A.Address Enode
                  | IEBlockstanbul PBFT.WireMessage
                  deriving (Eq, Show, GHCG.Generic)
 
 data IngestEventType = IETTransaction
                      | IETBlock
                      | IETGenesis
+                     | IETNewChainMember
                      | IETBlockstanbul
                      deriving (Eq, Ord, Show)
 
@@ -69,12 +72,14 @@ iEventType = \case
   IETx _ _    -> IETTransaction
   IEBlock _   -> IETBlock
   IEGenesis _ -> IETGenesis
+  IENewChainMember _ _ _ -> IETNewChainMember
   IEBlockstanbul _ -> IETBlockstanbul
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
+  format (IENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
   format (IEBlockstanbul o) = format o
 
 type Timestamp = Microtime
@@ -114,6 +119,7 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEJsonRpcCommand JsonRpcCommand
                  | OEGetChain [Word256]
                  | OEGetTx [SHA]
+                 | OENewChainMember Word256 A.Address Enode
                  | OEBlockstanbul PBFT.WireMessage
                  | OECreateBlockCommand
                  -- Ask and push for inclusive ranges of blocks
@@ -123,13 +129,14 @@ data OutputEvent = OETx Timestamp OutputTx
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
-  format (OETx ts o)        = show ts ++ " " ++ format o
-  format (OEBlock o)        = format o
-  format (OEGenesis o)      = show o
-  format (OEGetChain cids)  = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
-  format (OEGetTx shas)     = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format (OEBlockstanbul o) = format o
-  format x                  = show x
+  format (OETx ts o)              = show ts ++ " " ++ format o
+  format (OEBlock o)              = format o
+  format (OEGenesis o)            = show o
+  format (OEGetChain cids)        = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (OEGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
+  format (OENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
+  format (OEBlockstanbul o)       = format o
+  format x                        = show x
 
 data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otHash   :: SHA
@@ -280,6 +287,7 @@ instance Binary IngestEvent where
     put (IEBlock b) = putWord8 1 >> put b
     put (IEGenesis g) = putWord8 3 >> put g
     put (IEBlockstanbul m) = putWord8 4 >> put m
+    put (IENewChainMember c a e) = putWord8 5 >> put c >> put a >> put e
     get = do
         tag <- getWord8
         case tag of
@@ -288,6 +296,7 @@ instance Binary IngestEvent where
             2 -> IETx <$> get <*> get
             3 -> IEGenesis <$> get
             4 -> IEBlockstanbul <$> get
+            5 -> IENewChainMember <$> get <*> get <*> get
             x -> error $ "unknown InputEvent tag " ++ show x
 
 instance Binary JsonRpcCommand where
@@ -323,6 +332,7 @@ instance Binary OutputEvent where
     put (OECreateBlockCommand) = putWord8 8
     put (OEAskForBlocks s e p) = putWord8 11 >> put s >> put e >> put p
     put (OEPushBlocks s e p) = putWord8 12 >> put s >> put e >> put p
+    put (OENewChainMember c a e) = putWord8 13 >> put c >> put a >> put e
     put (OEVoteToMake r d s) = putWord8 13 >> put r >> put d >> put s
     get = do
         tag <- getWord8
@@ -340,7 +350,8 @@ instance Binary OutputEvent where
             10 -> OEPushBlocks <$> get <*> get <*> pure 0x0 -- legacy OEPB
             11 -> OEAskForBlocks <$> get <*> get <*> get
             12 -> OEPushBlocks <$> get <*> get <*> get
-            13 -> OEVoteToMake <$> get <*> get <*> get
+            13 -> OENewChainMember <$> get <*> get <*> get
+            14 -> OEVoteToMake <$> get <*> get <*> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where

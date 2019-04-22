@@ -3,10 +3,12 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TupleSections       #-}
 
 module Blockchain.Event (
   module Blockchain.EventModel,
   handleEvents,
+  handleGetChainDetails,
   getBestKafkaBlockNumber
   ) where
 
@@ -17,6 +19,7 @@ import           Blockchain.Output
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Conduit
+import           Data.Foldable                         (for_)
 import           Data.List
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
@@ -43,6 +46,7 @@ import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.EventModel
 import           Blockchain.EventException
+import           Blockchain.ExtWord
 import           Blockchain.Options
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -228,12 +232,23 @@ handleEvents peer = awaitForever $ \case
       yield (BlockBodies []) -- todo parity bans peers when they do this. should we?
     MsgEvt (GetBlockBodies shas) -> do
       stampActionTimestamp
-      getUntilMissing shas [] >>=  yield . BlockBodies . Prelude.reverse . fmap toBody
-        where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m) => [SHA] -> [Block] -> m [Block]
-              getUntilMissing []     bodies = return bodies
-              getUntilMissing (h:hs) bodies = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
-                  Nothing   -> return bodies
-                  Just body -> getUntilMissing hs (body:bodies)
+      getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
+          yield . BlockBodies . Prelude.reverse $ map toBody bodies
+          ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
+          unless (null ptxs) . yield $ Transactions ptxs)
+        where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m)
+                              => [SHA] -> [Block] -> [SHA] -> m ([Block],[SHA])
+              getUntilMissing []     bodies pshas = return (bodies, pshas)
+              getUntilMissing (h:hs) bodies pshas = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
+                  Nothing   -> return (bodies, pshas)
+                  Just body -> do
+                    cIdTxsMap <- RBDB.withRedisBlockDB $ RBDB.getChainTxsInBlock h
+                    let kvs = M.assocs cIdTxsMap
+                    mems <- RBDB.withRedisBlockDB . mapM (RBDB.getChainMembers . fst) $ kvs
+                    let trMems = zip kvs mems
+                        pshas' = concat . map (snd . fst) $
+                                  filter ((checkPeerIsMember peer) . snd) trMems
+                    getUntilMissing hs (body:bodies) (pshas ++ pshas')
 
               toBody :: Block -> ([Transaction], [BlockHeader])
               toBody = (blockTransactions &&& fmap morphBlockHeader . blockUncleHeaders)
@@ -266,20 +281,7 @@ handleEvents peer = awaitForever $ \case
       SK.emitBlockstanbulMsg wm
 
     -- private chains
-    MsgEvt (GetChainDetails cids) -> do
-      stampActionTimestamp
-      $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
-      mems <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainMembers cids
-      let pairs = zip cids mems
-          filteredPairs = map fst $ filter ((checkPeerIsMember peer) . snd) pairs
-
-      unless (null filteredPairs) $ do
-        cInfos <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo cids
-        let finalPairs = map (fmap fromJust) . filter (isJust . snd) $ zip cids cInfos
-        yield $ ChainDetails finalPairs
-        stampActionTimestamp
-        $logInfoS "handleEvents/GetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
-          (intercalate "\n" $ show <$> finalPairs)
+    MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer cids'
 
     MsgEvt (ChainDetails chpairs) -> do
       stampActionTimestamp
@@ -342,6 +344,14 @@ handleEvents peer = awaitForever $ \case
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cId)
       OEGetChain chainIds -> yield $ GetChainDetails chainIds
       OEGetTx shas -> yield $ GetTransactions shas
+      OENewChainMember cId _ _ -> do
+        let formatted = format $ SHA cId
+        $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "New member added to chain " ++ formatted
+        mems <- lift . RBDB.withRedisBlockDB $ RBDB.getChainMembers cId
+        when (checkPeerIsMember peer mems) $ do
+          $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
+          mcInfo <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
+          for_ ((cId,) <$> mcInfo) $ yield . ChainDetails . (:[])
       OEBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
@@ -388,6 +398,34 @@ handleEvents peer = awaitForever $ \case
       yield $ Disconnect AlreadyConnected
     event -> liftIO . error $ "unrecognized event: " ++ show event
 
+handleGetChainDetails :: ( MonadIO m
+                         , MonadResource m
+                         , RBDB.HasRedisBlockDB m
+                         , SK.HasUnseqSink m
+                         , MonadState Context m
+                         , MonadLogger m
+                         )
+                      => PPeer
+                      -> [Word256]
+                      -> ConduitM Event Message m ()
+handleGetChainDetails peer cids' = do
+  cids <- case cids' of
+            [] -> RBDB.withRedisBlockDB $ RBDB.getIPChains (peerIPAddress peer)
+            xs -> return xs
+  stampActionTimestamp
+  $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
+  mems <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainMembers cids
+  let pairs = zip cids mems
+      filteredPairs = map fst $ filter ((checkPeerIsMember peer) . snd) pairs
+
+  unless (null filteredPairs) $ do
+    cInfos <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo cids
+    let finalPairs = map (fmap fromJust) . filter (isJust . snd) $ zip cids cInfos
+    yield $ ChainDetails finalPairs
+    stampActionTimestamp
+    $logInfoS "handleGetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
+      (intercalate "\n" $ show <$> finalPairs)
+
 numFromRedis :: Maybe RedisBestBlock -> Integer
 numFromRedis = \case
     Nothing                     -> 0
@@ -431,5 +469,7 @@ shouldSendGossip peer txo = recordGossipFinal
 checkPeerIsMember :: PPeer -> Map Address Enode -> Bool
 checkPeerIsMember peer mems =
   let ips = S.fromList . map ipAddress $ M.elems mems
-      pIp = readIP $ T.unpack (pPeerIp peer)
-   in S.member pIp ips
+   in S.member (peerIPAddress peer) ips
+
+peerIPAddress :: PPeer -> IPAddress
+peerIPAddress = readIP . T.unpack . pPeerIp

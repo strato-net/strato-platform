@@ -16,6 +16,7 @@ import {
 } from '../Chains/chains.actions';
 
 import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 
 const url = env.BLOC_URL + "/chain"
 
@@ -37,6 +38,7 @@ export function createChainApiCall(label, members, balances, src, args) {
       })
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response;
     })
