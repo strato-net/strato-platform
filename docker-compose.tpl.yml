@@ -85,7 +85,6 @@ services:
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
     - SMD_MODE=${SMD_MODE}
-    - ssl=${ssl:-false}
     #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
     - vaultWrapperHost=vault-wrapper:8000
@@ -119,6 +118,7 @@ services:
     - addBootnodes=${addBootnodes}
     - backupblocks=${backupblocks}
     - blockstanbul=${blockstanbul}
+    - blockstanbulAdmins=${blockstanbulAdmins}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
     - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
@@ -154,7 +154,6 @@ services:
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
     - useSyncMode=${useSyncMode}
-    - blockstanbulAdmins=${blockstanbulAdmins:-}
     - validators=${validators}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - zkHost=zookeeper
