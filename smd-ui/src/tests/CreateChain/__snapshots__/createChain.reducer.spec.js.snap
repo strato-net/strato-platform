@@ -119,7 +119,7 @@ Object {
 exports[`CreateChain: reducer reset contract 1`] = `
 Object {
   "abi": null,
-  "error": "error",
+  "error": null,
   "isAddMemberModalOpen": true,
   "isOpen": true,
   "key": null,
