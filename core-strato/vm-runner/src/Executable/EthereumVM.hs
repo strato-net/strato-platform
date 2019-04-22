@@ -20,6 +20,7 @@ import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 import           Text.Printf
+import           Util
 
 import           Blockapps.Crossmon
 
@@ -82,7 +83,7 @@ ethereumVM = void . execContextM $ do
 
         insertNewChains seqEvents
 
-        mapM_ (uncurry queuePendingVote) [((r, d), s) | OEVoteToMake r d s <- seqEvents]
+        mapM_ (uncurry3 queuePendingVote) [(r, d, s) | OEVoteToMake r d s <- seqEvents]
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 

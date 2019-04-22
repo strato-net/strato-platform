@@ -22,6 +22,8 @@ TESTS=(
   strato-p2p
   strato-redis-blockdb
   strato-sequencer
+  vm-runner
+  vm-tools
 )
 
 BENCHES=(
