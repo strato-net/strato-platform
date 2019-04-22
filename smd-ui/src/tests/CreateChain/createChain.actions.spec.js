@@ -9,7 +9,8 @@ import {
   resetError,
   compileChainContract,
   compileChainContractSuccess,
-  compileChainContractFailure
+  compileChainContractFailure,
+  resetContract
 } from "../../components/CreateChain/createChain.actions";
 import { xabiMock } from "./createChainMock";
 
@@ -85,6 +86,10 @@ describe('CreateChain: action', () => {
 
   test('reset error', () => {
     expect(resetError()).toMatchSnapshot();
+  });
+
+  test('reset contract', () => {
+    expect(resetContract()).toMatchSnapshot();
   });
 
 });
