@@ -116,6 +116,17 @@ Object {
 }
 `;
 
+exports[`CreateChain: reducer reset contract 1`] = `
+Object {
+  "abi": null,
+  "error": "error",
+  "isAddMemberModalOpen": true,
+  "isOpen": true,
+  "key": null,
+  "spinning": false,
+}
+`;
+
 exports[`CreateChain: reducer reset error 1`] = `
 Object {
   "error": null,

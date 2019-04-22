@@ -99,7 +99,7 @@ export const compileChainContractFailure = function (error) {
   }
 }
 
-export const resetContract = function (error) {
+export const resetContract = function () {
   return {
     type: RESET_CONTRACT
   }
