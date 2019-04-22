@@ -8,9 +8,11 @@ dependencies:
   - containers
   - format
   - lens
+  - monad-alter
   - prometheus-client
   - QuickCheck
   - resourcet
+  - seqevents
   - strato-model
   - text
   - transformers

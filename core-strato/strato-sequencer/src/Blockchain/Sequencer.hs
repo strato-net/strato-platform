@@ -13,6 +13,7 @@ import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
 import           Blockchain.Output
+import qualified Control.Monad.Change.Alter                as A
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.IO.Class                    (liftIO)
@@ -21,6 +22,7 @@ import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable
 import           Data.Maybe
+import           Data.Proxy
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -256,7 +258,7 @@ transformFullTransactions pairs = do
           , format (SHA chainId)
           ]
         mapM_ (insertTransaction . snd) ptxs
-        mcInfo <- fmap _chainIdInfo <$> getChainIdEntry chainId
+        mcInfo <- fmap _chainIdInfo <$> A.lookup (Proxy :: Proxy ChainIdEntry) chainId
         case mcInfo of
           Nothing -> do
             logF . concat $
