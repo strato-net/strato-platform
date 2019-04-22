@@ -341,8 +341,8 @@ putContextBestBlockInfo new = do
     ctx <- get
     put ctx { contextBestBlockInfo = new }
 
-queuePendingVote :: (Address, Bool) -> Address -> ContextM ()
-queuePendingVote (a, r) s= do
+queuePendingVote :: Address -> Bool -> Address -> ContextM ()
+queuePendingVote a r s= do
   let nonce = case r of
         True -> maxBound
         False -> 0

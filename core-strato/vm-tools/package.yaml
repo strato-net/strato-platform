@@ -76,6 +76,7 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
-      - vm-tools
+      - blockapps-haskoin
       - hspec
       - hspec-expectations-lifted
+      - vm-tools
