@@ -518,5 +518,6 @@ spec = parallel $ do
 
   describe "A NewBeneficiary" $ do
     it "yields a vote" $ property $ \auth -> runTest $ do
+      me <- selfAddr
       sendMessages [NewBeneficiary auth (0xdeadbeef, True, 40)] `shouldReturn`
-        [PendingVote 0xdeadbeef True]
+        [PendingVote 0xdeadbeef True me]

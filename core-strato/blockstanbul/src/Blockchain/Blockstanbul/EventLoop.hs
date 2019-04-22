@@ -277,7 +277,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
       pendingvotes %= M.insert benf dir
       authSenders %= M.insert addr nonc
-      yield $ PendingVote benf dir addr
+      self <- selfAddr
+      yield $ PendingVote benf dir self
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
