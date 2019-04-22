@@ -364,8 +364,6 @@ peekPendingVote = do
 
 -- If the Block was sent out by us and contains our vote,
 -- mark the vote as committed and remove it from the queue.
--- TODO: Whats a good signal for "our" block? Examining the extradata
--- works, but requires ContextM to know what our validator address is.
 clearPendingVote :: Block -> ContextM ()
 clearPendingVote b = do
   let bd = blockBlockData b
