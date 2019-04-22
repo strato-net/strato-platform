@@ -8,7 +8,9 @@
 --      - if UI call (SMD, i.e. "/dashboard/..") - redirect to OAuth2 provider sign-in page, then redirect back to the requested page (without hash part of url);
 --      - if API call - return 401 Unauthorized
 --    if valid session is in request and has valid access token - request is authorized
--- Nginx session based flow (2) has higher priority if both ways applied.
+-- Flow (1) is used when Authorization header is provided in the request.
+-- Access token has a slack time of 120 sec (default) after access token or session is expired (see for `iat_slack` param in opts)
+
 
 local openidc = require("resty.openidc")
 
@@ -48,13 +50,13 @@ local authenticate_opts = {
   post_logout_redirect_uri = node_host_with_protocol
 }
 
--- If it is a direct call to APIs - without session but with access_token provided as Bearer token in Authorization header
-if not ngx.var['cookie_strato_session'] and ngx.req.get_headers()["Authorization"] then
+-- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)
+if ngx.req.get_headers()["Authorization"] then
   local verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
 
   if verify_err or not verify_res then
     ngx.status = 403
-    ngx.say(verify_err and verify_err or "bearer token invalid, expired or not provided")
+    ngx.say("Authorization header is provided but the bearer token is invalid or expired: " .. (verify_err or 'unknown error'))
     ngx.exit(ngx.HTTP_FORBIDDEN)
   end
 

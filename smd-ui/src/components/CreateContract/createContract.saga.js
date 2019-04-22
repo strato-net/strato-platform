@@ -14,6 +14,7 @@ import { CREATE_CONTRACT_FORM } from './'
 import { fetchCirrusInstances } from '../Contracts/components/ContractCard/contractCard.actions'
 import { env } from '../../env';
 import { COMPILE_CHAIN_CONTRACT_REQUEST, compileChainContractSuccess, compileChainContractFailure } from '../CreateChain/createChain.actions';
+import { handleErrors } from '../../lib/handleErrors';
 
 const url = env.BLOC_URL + "/users/:user/:address/contract?resolve&:chainid"
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
@@ -29,7 +30,9 @@ export function createContractApiCall(contract, src, username, address, password
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ contract, value: 0, password, src, args, metadata })
-    }).then(function (response) {
+    })
+    .then(handleErrors)
+    .then(function (response) {
       return response.json();
     }).catch(function (error) {
       throw error;
@@ -53,7 +56,9 @@ export function compileContractApiCall(contractName, source, s) {
           "searchable": searchable
         }
       ])
-    }).then(function (res) {
+    })
+    .then(handleErrors)
+    .then(function (res) {
       if (res.ok) {
         return res.json();
       } else {
@@ -73,7 +78,9 @@ export function compileContractApiCall(contractName, source, s) {
       "Content-Type": "application/x-www-form-urlencoded"
     },
     body: "src=" + encodeURIComponent(source)
-  }).then(function (res) {
+  })
+  .then(handleErrors)
+  .then(function (res) {
     if (res.ok) {
       return res.json();
     } else {

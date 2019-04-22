@@ -8,6 +8,7 @@ import { env } from '../../env';
 import { ATTEST_DOCUMENT_REQUEST, attestDocumentSuccess, attestDocumentFailure } from './Attest/attest.actions';
 import { verifyDocumentSuccess, verifyDocumentFailure, VERIFY_DOCUMENT_REQUEST } from './Verify/verify.actions';
 import { DOWNLOAD_REQUEST, downloadSuccess, downloadFailure } from './Download/download.actions';
+import { handleErrors } from '../../lib/handleErrors';
 
 const fetchUploadUrl = env.APEX_URL + "/bloc/file/list";
 const attestDocumentUrl = env.APEX_URL + "/bloc/file/attest";
@@ -24,6 +25,7 @@ export function fetchUploadListApiCall() {
       }
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })
@@ -43,6 +45,7 @@ export function attestDocumentApiCall(values) {
       body: JSON.stringify(values)
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })
@@ -61,6 +64,7 @@ export function verifyDocumentApiCall(contractAddress) {
       }
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })

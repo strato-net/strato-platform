@@ -6,6 +6,7 @@ import {
 import { UPLOAD_FILE_REQUEST, uploadFileSuccess, uploadFileFailure } from './uploadFile.actions';
 import { env } from '../../../env';
 import { fetchUploadList } from '../externalStorage.actions';
+import { handleErrors } from '../../../lib/handleErrors';
 
 const url = env.APEX_URL + "/bloc/file/upload";
 
@@ -27,6 +28,7 @@ export function uploadFileApiCall(data) {
       body: formData
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })

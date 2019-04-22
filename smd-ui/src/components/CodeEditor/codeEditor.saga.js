@@ -10,6 +10,7 @@ import {
 } from './codeEditor.actions';
 
 import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
@@ -57,7 +58,9 @@ export function compileSource(contractName, source) {
         "searchable": searchable
       }
     ])
-  }).then(function (res) {
+  })
+  .then(handleErrors)
+  .then(function (res) {
     if (res.ok) {
       return res.json();
     } else {

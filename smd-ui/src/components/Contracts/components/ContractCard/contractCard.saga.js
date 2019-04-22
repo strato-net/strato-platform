@@ -15,6 +15,7 @@ import {
   fetchAccountFailure
 } from './contractCard.actions';
 import { env } from '../../../../env.js'
+import { handleErrors } from '../../../../lib/handleErrors';
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress/state";
 const cirrusUrl = env.CIRRUS_URL + '/:contractName'
@@ -34,6 +35,7 @@ export function getState(contractName, contractAddress, chainId) {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })
@@ -52,6 +54,7 @@ export function getCirrusInstances(contractName) {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       if (response.status === 404) {
         throw new Error('No dice!')
@@ -73,6 +76,7 @@ export function getAccount(address) {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     }).catch(function (error) {

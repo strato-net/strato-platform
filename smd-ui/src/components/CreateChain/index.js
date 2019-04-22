@@ -171,7 +171,7 @@ class CreateChain extends Component {
   renderDropzoneInput = (field) => {
     const touchedAndHasErrors = field.meta.touched && field.meta.error
     return (
-      <div className="dropzoneContainer text-center chain-dropzone">
+      <div className="dropzoneContainer text-center">
         <Dropzone
           className="dropzone"
           name={field.name}
@@ -317,9 +317,6 @@ class CreateChain extends Component {
                     Contract
                   </label>
                 </div>
-              </div>
-              <div className="row">
-                <div className="col-sm-3 text-right" />
                 <div className="col-sm-9 smd-pad-4">
                   <Field
                     name="radio"
@@ -430,14 +427,21 @@ class CreateChain extends Component {
                         this.handleContractFile(this.state.droppedFileName);
                       }
                     }
-                  />
-                  <Field
-                    id="input-b"
-                    name="contract"
-                    component={this.renderDropzoneInput}
-                    dir="auto"
-                    title="Contract Source"
-                  />
+                  /> Upload file
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right" />
+                <div className="col-sm-9 smd-pad-4">
+                  {this.state.form.contractSelected === 'Governance' &&
+                    <Field
+                      id="input-b"
+                      name="contract"
+                      component={this.renderDropzoneInput}
+                      dir="auto"
+                      title="Contract Source"
+                    />
+                  }
                 </div>
               </div>
 
