@@ -21,7 +21,6 @@ import           UnliftIO.Concurrent
 import           UnliftIO.Exception
 import           UnliftIO.STM
 
-import           Blockchain.Metrics
 import           Blockchain.Output
 
 mergeSourcesByForce :: (MonadLogger mi, MonadResource mi, MonadUnliftIO mi, MonadIO mo)
@@ -33,9 +32,8 @@ mergeSourcesByForce sx bound = do
     (chkey, c) <- allocate (atomically $ newTBMChan bound) (atomically . closeTBMChan)
     st <- lift $ askUnliftIO
     regs <- forM sx $ \s -> do
-      register $ (\tid -> uncountFork >> killThread tid) =<< do
-        (liftIO $ forkWithUnmask $ \unmask -> do
-          countFork
+      register . killThread =<< do
+        (liftIO $ forkWithUnmask $ \unmask ->
           (unmask $ unliftIO st $
             runConduit $ s .| sinkTBMChan c)
           `finally` atomically (closeTBMChan c))

@@ -7,8 +7,6 @@ module Blockchain.Metrics ( recordEvent
                           , recordGossipFinal
                           , addCanary
                           , killCanary
-                          , countFork
-                          , uncountFork
                           ) where
 
 import Control.Monad.IO.Class
@@ -104,15 +102,3 @@ addCanary = liftIO $ incGauge canaryCount
 
 killCanary :: MonadIO m => m ()
 killCanary = liftIO $ decGauge canaryCount
-
-{-# NOINLINE forkCount #-}
-forkCount :: Gauge
-forkCount = unsafeRegister
-          . gauge
-          $ Info "p2p_fork_count" "Number of forks executed by mkEthP2PSource"
-
-countFork :: MonadIO m => m ()
-countFork = liftIO $ incGauge forkCount
-
-uncountFork :: MonadIO m => m ()
-uncountFork = liftIO $ decGauge forkCount
