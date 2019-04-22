@@ -479,39 +479,44 @@ spec = parallel $ do
                                        Preprepare roundPlus1 blk]
         other `shouldBe` [ResetTimer $ _round roundPlus1]
 
-    describe "Authentication" $ do
-      let resendLock :: Block -> HK.PrvKey -> HK.PrvKey
-                     -> StateT BlockstanbulContext (LoggingT IO) (Block, [OutEvent])
-          resendLock blk theirPK pk = do
-            v <- use view
-            me <- selfAddr
-            let them = prvKey2Address theirPK
-                vals = S.fromList [me, them]
-                blk' = addValidators vals . truncateExtra . setBlockNo 19 $ blk
-            validators .= vals
-            proposer .= me
-            pSeal <- proposerSeal blk' pk
-            let lockBlk = addProposerSeal pSeal blk'
-            myKey <- use prvkey
-            OMsg auth wm <- signMessage myKey $ Preprepare v lockBlk
-
-            lockSender .= Just them
-            blockLock .= Just lockBlk
-            omsgs <- sendMessages [IMsg auth wm]
-
-            return (lockBlk, omsgs)
-
-      it "accepts a block if the signer is the original sender" $ property $ \blk ->
-        runAuthTest $ do
-          theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+  describe "Authentication" $ do
+    let resendLock :: Block -> HK.PrvKey -> HK.PrvKey
+                   -> StateT BlockstanbulContext (LoggingT IO) (Block, [OutEvent])
+        resendLock blk theirPK pk = do
           v <- use view
-          (lockBlk, omsgs) <- resendLock blk theirPK theirPK
-          map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
-
-      it "accepts a block if the signer is not the original sender" $ property $ \blk ->
-        runAuthTest $ do
-          theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
-          v <- use view
+          me <- selfAddr
+          let them = prvKey2Address theirPK
+              vals = S.fromList [me, them]
+              blk' = addValidators vals . truncateExtra . setBlockNo 19 $ blk
+          validators .= vals
+          proposer .= me
+          pSeal <- proposerSeal blk' pk
+          let lockBlk = addProposerSeal pSeal blk'
           myKey <- use prvkey
-          (lockBlk, omsgs) <- resendLock blk theirPK myKey
-          map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+          OMsg auth wm <- signMessage myKey $ Preprepare v lockBlk
+
+          lockSender .= Just them
+          blockLock .= Just lockBlk
+          omsgs <- sendMessages [IMsg auth wm]
+
+          return (lockBlk, omsgs)
+
+    it "accepts a block if the signer is the original sender" $ property $ \blk ->
+      runAuthTest $ do
+        theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+        v <- use view
+        (lockBlk, omsgs) <- resendLock blk theirPK theirPK
+        map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+
+    it "accepts a block if the signer is not the original sender" $ property $ \blk ->
+      runAuthTest $ do
+        theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+        v <- use view
+        myKey <- use prvkey
+        (lockBlk, omsgs) <- resendLock blk theirPK myKey
+        map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+
+  describe "A NewBeneficiary" $ do
+    it "yields a vote" $ property $ \auth -> runTest $ do
+      sendMessages [NewBeneficiary auth (0xdeadbeef, True, 40)] `shouldReturn`
+        [PendingVote 0xdeadbeef True]

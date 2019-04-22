@@ -70,3 +70,12 @@ library:
     - Executable.EVMFlags
   ghc-options: -Wall -O2
 
+
+tests:
+  contextm-test:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - vm-tools
+      - hspec
+      - hspec-expectations-lifted
