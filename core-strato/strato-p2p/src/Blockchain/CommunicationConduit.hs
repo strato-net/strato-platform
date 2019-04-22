@@ -129,6 +129,8 @@ handleMsgClientConduit myId peer = do
                 Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
                 mrh <- gets maxReturnedHeaders
                 yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
+                yield $ GetChainDetails []
+                handleGetChainDetails peer []
                 stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer

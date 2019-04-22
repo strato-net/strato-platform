@@ -22,7 +22,7 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock #-}
 
     blockOrdering :: b -> Integer
-    blockOrdering = blockHeaderBlockNumber . blockHeader
+    blockOrdering = blockHeaderOrdering . blockHeader
 
     blockHash :: b -> SHA
     blockHash = blockHeaderHash . blockHeader
@@ -83,6 +83,9 @@ class RLPSerializable h => BlockHeaderLike h where
       -- , rlpEncode (round $ utcTimeToPOSIXSeconds (blockHeaderTimestamp h)::Integer)
       , rlpEncode $ blockHeaderExtraData        h
       ]
+
+    blockHeaderOrdering :: h -> Integer
+    blockHeaderOrdering = blockHeaderBlockNumber
 
 data TransactionType = ContractCreation | Message | PrivateHash deriving (Eq, Ord, Read, Show)
 
