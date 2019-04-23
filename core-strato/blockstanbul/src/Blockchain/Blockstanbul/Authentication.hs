@@ -6,7 +6,6 @@ module Blockchain.Blockstanbul.Authentication
   , module Blockchain.Blockstanbul.Model.Authentication
   ) where
 
-import Control.Applicative ((<|>))
 import Control.Monad (liftM2, liftM3, unless)
 import Control.Monad.IO.Class
 import Control.Lens
@@ -44,6 +43,11 @@ instance Arbitrary ExtraData where
 truncateExtra :: Block -> Block
 truncateExtra = over extraLens $ B.take 32
 
+addValidators :: S.Set Address -> Block -> Block
+addValidators vs = over extraLens $
+    uncookRawExtra
+  . set istanbul (Just (IstanbulExtra (S.toList vs) Nothing []))
+  . cookRawExtra
 
 getValidatorList :: Block -> [Address]
 getValidatorList x = view (istanbul . _Just . validatorList) (cookRawExtra $ view extraLens x )
@@ -54,28 +58,16 @@ getProposerSeal x = do
   sig <- view proposedSig ist
   return sig
 
-addIstIfMissing :: ExtraData -> ExtraData
-addIstIfMissing = over istanbul (<|> Just (IstanbulExtra [] Nothing []))
-
-addValidators :: S.Set Address -> Block -> Block
-addValidators vs = over extraLens $
-    uncookRawExtra
-  . set (istanbul . _Just . validatorList) (S.toList vs)
-  . addIstIfMissing
-  . cookRawExtra
-
 addProposerSeal :: ExtendedSignature -> Block -> Block
 addProposerSeal sig = over extraLens $
     uncookRawExtra
   . set (istanbul . _Just . proposedSig) (Just sig)
-  . addIstIfMissing
   . cookRawExtra
 
 addCommitmentSeals :: [ExtendedSignature] -> Block -> Block
 addCommitmentSeals sigs = over extraLens $
     uncookRawExtra
   . set (istanbul . _Just . commitment) sigs
-  . addIstIfMissing
   . cookRawExtra
 
 scrubAllSeals :: RawExtraData -> RawExtraData
