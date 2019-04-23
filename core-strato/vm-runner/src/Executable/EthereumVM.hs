@@ -76,7 +76,7 @@ ethereumVM = void . execContextM $ do
         recordBaggerMetrics =<< gets contextBaggerState
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
-        seqEvents <- loopTimeit "waiting for new events " $ getUnprocessedKafkaEvents cpOffset
+        seqEvents <- loopTimeit "======>>>> waiting for new events <<<<======" $ getUnprocessedKafkaEvents cpOffset
 
         logEventSummaries seqEvents
         
@@ -95,8 +95,6 @@ ethereumVM = void . execContextM $ do
                                   . K.withKafkaViolently
                                   . writeIndexEvents
                                   $ map (uncurry IndexTransaction) txPairs
-
-        $logInfoS "evm/loop" $ T.pack $ "#### incoming events ==> " ++ show (length allTxs) ++ " TXs, " ++ show (length blocks) ++ " new blocks"
 
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
@@ -285,7 +283,7 @@ logEventSummaries events = do
       numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
 
   $logInfoS "getUnprocessedKafkaEvents" . T.pack $
-    "Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"
+    "#### Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"
 
   where
     getNames :: OutputEvent -> String
