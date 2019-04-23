@@ -333,7 +333,7 @@ instance Binary OutputEvent where
     put (OEAskForBlocks s e p) = putWord8 11 >> put s >> put e >> put p
     put (OEPushBlocks s e p) = putWord8 12 >> put s >> put e >> put p
     put (OENewChainMember c a e) = putWord8 13 >> put c >> put a >> put e
-    put (OEVoteToMake r d s) = putWord8 13 >> put r >> put d >> put s
+    put (OEVoteToMake r d s) = putWord8 14 >> put r >> put d >> put s
     get = do
         tag <- getWord8
         case tag of
