@@ -220,8 +220,6 @@ roundChange = do
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent OutEvent m ()
 nextRound nt = do
-  -- TODO(tim): Create an emptyRound constant and override validators/proposer/view,
-  -- rather than reset everything in the state.
   --update validators list
   val <- uses validators S.toList
   vot <- use voted
