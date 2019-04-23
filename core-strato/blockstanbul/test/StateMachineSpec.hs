@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module StateMachineSpec where
@@ -21,6 +22,7 @@ import Data.List
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
+import Data.Word
 import Prelude hiding (round, sequence)
 
 import Blockchain.Data.ArbitraryInstances()
@@ -41,7 +43,7 @@ runTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
 runTest = runAuthTest . (disableAuth >>)
 
 runAuthTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
-runAuthTest = runNoLoggingT . flip evalStateT testContext
+runAuthTest = runLoggingT . flip evalStateT testContext
 
 instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) where
   putBlockstanbulContext = put
@@ -540,3 +542,53 @@ spec = parallel $ do
       me <- selfAddr
       sendMessages [NewBeneficiary auth (0xdeadbeef, True, 40)] `shouldReturn`
         [PendingVote 0xdeadbeef True me]
+
+  describe "PreviousBlock" $ do
+    let selfSignBlock :: Word64 -> Address -> Integer -> Block -> StateT BlockstanbulContext (LoggingT IO) Block
+        selfSignBlock nonc cb num blk0 = do
+          let blk1 = blk0{blockBlockData = (blockBlockData blk0)
+                            { blockDataCoinbase = cb
+                            , blockDataNonce = nonc
+                            , blockDataNumber = num
+                            }}
+          vals <- use validators
+          let blk2 = addValidators vals
+                   . truncateExtra
+                   $ blk1
+          private <- use prvkey
+          pSeal <- proposerSeal blk2 private
+          let blk3 = addProposerSeal pSeal blk2
+          cSeal <- commitmentSeal (blockHash blk3) private
+          return $ addCommitmentSeals [cSeal] blk3
+
+        votingBlock :: Block
+        votingBlock = makeBlock 3 3
+
+    it "will accept a previous block with the current sequence number" $ runTest $ do
+      me <- selfAddr
+      validators .= S.singleton me
+      blk <- selfSignBlock 6 0x0ddba11 19 votingBlock
+      sendMessages [PreviousBlock blk] `shouldReturn` [ToCommit blk]
+      use validators `shouldReturn` S.singleton me
+
+    it "will reject a previous block in the future" $ runTest $ do
+      me <- selfAddr
+      validators .= S.singleton me
+      blk <- selfSignBlock 6 0xdeadbeef 20 votingBlock
+      sendMessages [PreviousBlock blk] `shouldReturn` []
+      use validators `shouldReturn` S.singleton me
+
+    it "updates validators from a historic block" $ runTest $ do
+      me <- selfAddr
+      validators .= S.singleton me
+      blk <- selfSignBlock maxBound 0xdeadbeef 19 votingBlock
+      sendMessages [PreviousBlock blk] `shouldReturn` [ToCommit blk]
+      use validators `shouldReturn` S.fromList [me, 0xdeadbeef]
+
+    it "does not update validators from a rejected historic block" $ runTest $ do
+      me <- selfAddr
+      validators .= S.singleton me
+      blk <- selfSignBlock maxBound 0xdeadbeef 20 votingBlock
+
+      sendMessages [PreviousBlock blk] `shouldReturn` []
+      use validators `shouldReturn` S.singleton me
