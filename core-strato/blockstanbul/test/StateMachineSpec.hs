@@ -544,51 +544,106 @@ spec = parallel $ do
         [PendingVote 0xdeadbeef True me]
 
   describe "PreviousBlock" $ do
-    let selfSignBlock :: Word64 -> Address -> Integer -> Block -> StateT BlockstanbulContext (LoggingT IO) Block
-        selfSignBlock nonc cb num blk0 = do
-          let blk1 = blk0{blockBlockData = (blockBlockData blk0)
+    let selfSignBlock :: Word64 -> Address -> Integer -> HK.PrvKey -> [HK.PrvKey]
+                      -> StateT BlockstanbulContext (LoggingT IO) Block
+        selfSignBlock nonc cb num proper committers = do
+          let blk0 = votingBlock
+              blk1 = blk0{blockBlockData = (blockBlockData blk0)
                             { blockDataCoinbase = cb
                             , blockDataNonce = nonc
                             , blockDataNumber = num
                             }}
+          let commitAddresses = S.fromList $ map prvKey2Address committers
           vals <- use validators
+          commitAddresses `shouldBe` vals
           let blk2 = addValidators vals
                    . truncateExtra
                    $ blk1
-          private <- use prvkey
-          pSeal <- proposerSeal blk2 private
+          pSeal <- proposerSeal blk2 proper
           let blk3 = addProposerSeal pSeal blk2
-          cSeal <- commitmentSeal (blockHash blk3) private
-          return $ addCommitmentSeals [cSeal] blk3
+          cSeals <- mapM (commitmentSeal (blockHash blk3)) committers
+          return $ addCommitmentSeals cSeals blk3
 
         votingBlock :: Block
         votingBlock = makeBlock 3 3
 
+        genKeys :: MonadIO m => Int -> m [HK.PrvKey]
+        genKeys n = liftIO . replicateM n $ HK.withSource getEntropy HK.genPrvKey
+
+        checkedSend :: Block -> StateT BlockstanbulContext (LoggingT IO) ()
+        checkedSend blk = do
+          sendMessages [PreviousBlock blk] `shouldReturn` [ToCommit blk]
+          void $ sendMessages [CommitResult . Right $ blockHash blk]
+
     it "will accept a previous block with the current sequence number" $ runTest $ do
       me <- selfAddr
       validators .= S.singleton me
-      blk <- selfSignBlock 6 0x0ddba11 19 votingBlock
-      sendMessages [PreviousBlock blk] `shouldReturn` [ToCommit blk]
+      pk <- use prvkey
+      checkedSend =<< selfSignBlock 6 0x0ddba11 19 pk [pk]
       use validators `shouldReturn` S.singleton me
 
     it "will reject a previous block in the future" $ runTest $ do
       me <- selfAddr
       validators .= S.singleton me
-      blk <- selfSignBlock 6 0xdeadbeef 20 votingBlock
+      pk <- use prvkey
+      blk <- selfSignBlock 6 0xdeadbeef 20 pk [pk]
       sendMessages [PreviousBlock blk] `shouldReturn` []
       use validators `shouldReturn` S.singleton me
 
     it "updates validators from a historic block" $ runTest $ do
       me <- selfAddr
       validators .= S.singleton me
-      blk <- selfSignBlock maxBound 0xdeadbeef 19 votingBlock
-      sendMessages [PreviousBlock blk] `shouldReturn` [ToCommit blk]
+      pk <- use prvkey
+      checkedSend =<< selfSignBlock maxBound 0xdeadbeef 19 pk [pk]
       use validators `shouldReturn` S.fromList [me, 0xdeadbeef]
 
     it "does not update validators from a rejected historic block" $ runTest $ do
       me <- selfAddr
       validators .= S.singleton me
-      blk <- selfSignBlock maxBound 0xdeadbeef 20 votingBlock
+      pk <- use prvkey
+      blk <- selfSignBlock maxBound 0xdeadbeef 20 pk [pk]
 
       sendMessages [PreviousBlock blk] `shouldReturn` []
       use validators `shouldReturn` S.singleton me
+
+    it "requires 3 votes with four validators" . runTest $ do
+      prvKeys@[key1, key2, key3, key4] <- genKeys 4
+      let valSet = S.fromList $ map prvKey2Address prvKeys
+      validators .= valSet
+      let sgn n pk = selfSignBlock maxBound 0x6643 n pk prvKeys
+      checkedSend =<< sgn 19 key1
+      checkedSend =<< sgn 20 key2
+      use validators `shouldReturn` valSet
+      checkedSend =<< sgn 21 key3
+      use validators `shouldReturn` S.insert 0x6643 valSet
+      checkedSend =<< sgn 22 key4
+      use validators `shouldReturn` S.insert 0x6643 valSet
+
+    it "can interleave votes for two different candidates" . runTest $ do
+      prvKeys@[key1, key2] <- genKeys 2
+      let valSet = S.fromList $ map prvKey2Address prvKeys
+      validators .= valSet
+
+      [key3, key4] <- genKeys 2
+      let (cand3, cand4) = (prvKey2Address key3, prvKey2Address key4)
+
+      -- Key1 Votes for Key3
+      checkedSend =<< selfSignBlock maxBound cand3 19 key1 [key1, key2]
+      use validators `shouldReturn` valSet
+
+      -- Key1 votes for Key4
+      checkedSend =<< selfSignBlock maxBound cand4 20 key1 [key1, key2]
+      use validators `shouldReturn` valSet
+
+      -- Key2 votes for Key3
+      checkedSend =<< selfSignBlock maxBound cand3 21 key2 [key1, key2]
+      use validators `shouldReturn` S.insert cand3 valSet
+
+      -- Key2 votes for Key4
+      checkedSend =<< selfSignBlock maxBound cand4 22 key2 [key1, key2, key3]
+      -- Vote is no longer enough, 3 votes needed with 3 validators
+      use validators `shouldReturn` S.insert cand3 valSet
+
+      -- Key3 votes for Key4
+      checkedSend =<< selfSignBlock maxBound cand4 23 key3 [key1, key2, key3]
+      use validators `shouldReturn` S.fromList (map prvKey2Address [key1, key2, key3, key4])
