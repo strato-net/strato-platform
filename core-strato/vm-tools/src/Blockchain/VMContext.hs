@@ -370,12 +370,9 @@ clearPendingVote b = do
       currentBlockData = (blockDataCoinbase bd, blockDataNonce bd)
   $logInfoLS "clearPendingVote" currentBlockData
   ctx <- get
-  let sender = fromMaybe 0xdeadbeef $ do
-        seal <- getProposerSeal b
-        verifyProposerSeal b seal
+  let sender = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
   let ctxCoinbaseQ = contextCoinbaseQueue ctx
   let newCoinbaseQ = case Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ of
         Just i -> Q.deleteAt i ctxCoinbaseQ
         Nothing -> ctxCoinbaseQ
-  --return (Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ)
   put ctx { contextCoinbaseQueue = newCoinbaseQ}
