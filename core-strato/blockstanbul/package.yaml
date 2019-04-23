@@ -20,6 +20,7 @@ dependencies:
   - derive
   - ethereum-encryption
   - ethereum-rlp
+  - extra
   - format
   - ghc
   - fast-ecrecover

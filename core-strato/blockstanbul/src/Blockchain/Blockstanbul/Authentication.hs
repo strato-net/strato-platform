@@ -6,6 +6,7 @@ module Blockchain.Blockstanbul.Authentication
   , module Blockchain.Blockstanbul.Model.Authentication
   ) where
 
+import Control.Applicative ((<|>))
 import Control.Monad (liftM2, liftM3, unless)
 import Control.Monad.IO.Class
 import Control.Lens
@@ -61,13 +62,15 @@ getProposerSeal x = do
 addProposerSeal :: ExtendedSignature -> Block -> Block
 addProposerSeal sig = over extraLens $
     uncookRawExtra
-  . set (istanbul . _Just . proposedSig) (Just sig)
+  . over istanbul (\i -> fmap (set proposedSig (Just sig)) i
+                     <|> error "must set validators before proposer seal")
   . cookRawExtra
 
 addCommitmentSeals :: [ExtendedSignature] -> Block -> Block
 addCommitmentSeals sigs = over extraLens $
     uncookRawExtra
-  . set (istanbul . _Just . commitment) sigs
+  . over istanbul (\i -> fmap (set commitment sigs) i
+                     <|> error "must set validators before commitment seals")
   . cookRawExtra
 
 scrubAllSeals :: RawExtraData -> RawExtraData

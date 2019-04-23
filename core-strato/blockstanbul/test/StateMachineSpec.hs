@@ -27,6 +27,7 @@ import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
+import Blockchain.Blockstanbul.BenchmarkLib
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Strato.Model.Address
@@ -82,15 +83,24 @@ spec = parallel $ do
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
-    it "can handle several rounds in succession" $ withMaxSuccess 10 $ property $ \blk'' blk2'' as' seal ->
+    it "can handle several rounds in succession" $ withMaxSuccess 10 $ property $ \as' seal -> -- \blk'' blk2'' as' seal ->
       not (null as') ==> runTest $ do
+        let blk'' = makeBlock 1 1
+            blk2'' = makeBlock 2 2
         let as = nubBy (\l r -> sender l == sender r) . sortOn sender $ as'
             -- The nonce is set to avoid voting out the sole validator
             setNonce :: Block -> Block
             setNonce blk = blk{blockBlockData = (blockBlockData blk){blockDataNonce = 0x24444}}
-        let (blk', blk2') = over both (addProposerSeal seal . truncateExtra . setNonce) (blk'', blk2'')
+        let (blk', blk2') = over both ( addProposerSeal seal
+                                      . addValidators (S.fromList $ map sender as)
+                                      . truncateExtra
+                                      . setNonce)
+                           (blk'', blk2'')
             blk = setBlockNo 19 blk'
-        (v, hsh) <- setupRound blk . map sender $ as
+        validators .= S.fromList (map sender as)
+        v <- use view
+        let hsh = blockHash blk
+        -- (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
         proposer .= sender ppr
         omsgs1 <- sendMessages [IMsg ppr $ Preprepare v blk]
@@ -103,8 +113,16 @@ spec = parallel $ do
         seal' `shouldSatisfy` (== Just me) . verifyCommitmentSeal hsh
         let coms = map (\a -> IMsg a $ Commit v hsh seal) as
         xsp <- sendMessages coms
-        length xsp `shouldBe` 1
-        xsp `shouldBe` [ToCommit blk]
+        let [ToCommit comBlock] = xsp
+            n = length as
+            sealCount = n - floor (fromIntegral (n - 1) / 3 :: Double)
+        truncateExtra comBlock `shouldBe` truncateExtra blk
+        (comBlock ^. extraLens ^. to cookRawExtra ^. istanbul) `shouldBe`
+          Just IstanbulExtra { _validatorList = sort (map sender as)
+                             , _proposedSig = Just seal
+                             , _commitment = replicate sealCount seal
+                             }
+
         -- Pretend that in this interval, the block was committed
         sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn` []
         -- The proposer *shouldn't* change, because the round number is the same
@@ -159,14 +177,15 @@ spec = parallel $ do
         let blk = truncateExtra . setBlockNo 19 $ blk'
         proposer .= sender auth
         validators .= S.fromList [sender auth]
+        blockWithVs <- uses validators $ flip addValidators blk
         pk <- use prvkey
-        pseal <- proposerSeal blk pk
-        let sealedBlk = addProposerSeal pseal blk
+        pseal <- proposerSeal blockWithVs pk
+        let sealedBlk = addProposerSeal pseal blockWithVs
         curView <- use view
         let hsh = blockHash sealedBlk
         omsgs <- sendMessages [IMsg auth $ Preprepare curView sealedBlk]
         map oMessage omsgs `shouldBe` [Prepare curView hsh]
-        use proposal `shouldReturn` Just blk
+        use proposal `shouldReturn` Just sealedBlk
 
     it "rejects an unauthenticated preprepare" $ property $ \auth blk ->
       runTest $ do
