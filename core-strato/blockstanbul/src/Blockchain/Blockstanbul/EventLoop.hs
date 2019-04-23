@@ -290,13 +290,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                     . printf "Rejecting historical block #%d: %s" blockNo $ err
         Right (_, props) -> do
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
-          case extractBeneficiary blk of
-            Nothing -> return ()
-            Just (bnf, vot) -> do
-              val <- uses voted $M.lookup bnf
-              let unwrapVal = fromMaybe M.empty val
-              let nval = M.insert props vot unwrapVal
-              voted %= M.insert bnf nval
+          editVoted blk props
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
@@ -376,19 +370,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   blockcount += 1
                   proposal .= Just pp
                   pk <- use prvkey
-                  case extractBeneficiary pp of
-                    Nothing -> return()
-                    Just (bnef,vot) -> do
-                      -- insert the vote into map
-                      val <- uses voted $M.lookup bnef
-                      $logInfoS "blockstanbul/voting" . T.pack $
-                        "extractBeneficiary" ++ show val
-                      let unwrapVal = fromMaybe M.empty val
-                      let nval = M.insert pr vot unwrapVal
-                      voted %= M.insert bnef nval
-                      voted' <- use voted
-                      $logInfoS "blockstanbul/voting" . T.pack $
-                        "insert into voted map:" ++ show voted'
+                  editVoted pp pr
                   yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
@@ -501,6 +483,22 @@ currentView = maybe (View (-1) (-1)) _view <$> getBlockstanbulContext
 
 blockstanbulRunning :: HasBlockstanbulContext m => m Bool
 blockstanbulRunning = isJust <$> getBlockstanbulContext
+
+editVoted :: (MonadIO m, MonadLogger m, MonadState BlockstanbulContext m) => Block -> Address -> m ()
+editVoted pp pr = do
+  case extractBeneficiary pp of
+    Nothing -> return()
+    Just (bnef,vot) -> do
+      -- insert the vote into map
+      val <- uses voted $M.lookup bnef
+      $logInfoS "blockstanbul/voting" . T.pack $
+        "extractBeneficiary" ++ show val
+      let unwrapVal = fromMaybe M.empty val
+      let nval = M.insert pr vot unwrapVal
+      voted %= M.insert bnef nval
+      voted' <- use voted
+      $logInfoS "blockstanbul/voting" . T.pack $
+        "insert into voted map:" ++ show voted'
 
 recordInEvent :: (MonadIO m) => InEvent -> m ()
 recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
