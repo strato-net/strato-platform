@@ -240,7 +240,7 @@ nextRound nt = do
   vals <- use validators
   thisR <- use $ view . round
   epocheck <- use $ view . sequence
-  when (epocheck `mod` 100 == 0) $ do
+  when (epocheck `mod` 10000 == 0) $ do
       voted .= M.empty
       $logInfoS "blockstanbul/voting" . T.pack $
         "nextRound: voted map reset to empty with epocheck = " ++ show epocheck
