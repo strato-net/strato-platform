@@ -43,7 +43,7 @@ runTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
 runTest = runAuthTest . (disableAuth >>)
 
 runAuthTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
-runAuthTest = runLoggingT . flip evalStateT testContext
+runAuthTest = runNoLoggingT . flip evalStateT testContext
 
 instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) where
   putBlockstanbulContext = put
@@ -555,7 +555,7 @@ spec = parallel $ do
                             }}
           let commitAddresses = S.fromList $ map prvKey2Address committers
           vals <- use validators
-          commitAddresses `shouldBe` vals
+          S.toList vals `shouldContain` S.toList commitAddresses
           let blk2 = addValidators vals
                    . truncateExtra
                    $ blk1
