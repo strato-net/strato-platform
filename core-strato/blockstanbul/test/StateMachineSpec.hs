@@ -82,41 +82,51 @@ spec = parallel $ do
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
-    it "can handle several rounds in succession" $ withMaxSuccess 10 $ property $ \blk'' blk2'' as' seal ->
+    it "can handle several rounds in succession" $ withMaxSuccess 10 $ property $ \blk'' blk2'' as' fakeSeal ->
       not (null as') ==> runTest $ do
         let as = nubBy (\l r -> sender l == sender r) . sortOn sender $ as'
             -- The nonce is set to avoid voting out the sole validator
             setNonce :: Block -> Block
             setNonce blk = blk{blockBlockData = (blockBlockData blk){blockDataNonce = 0x24444}}
-        let (blk', blk2') = over both (addProposerSeal seal . truncateExtra . setNonce) (blk'', blk2'')
+        let (blk', blk2') = over both (addProposerSeal fakeSeal . truncateExtra . setNonce) (blk'', blk2'')
             blk = setBlockNo 19 blk'
-        (v, hsh) <- setupRound blk . map sender $ as
+        _istanbul (cookRawExtra (blk ^. extraLens)) `shouldBe` Just (IstanbulExtra [] (Just fakeSeal) [])
+        (v, hsh0) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
         proposer .= sender ppr
         omsgs1 <- sendMessages [IMsg ppr $ Preprepare v blk]
+        -- The block hash should change as the proposer seal is added to the block
+        map oMessage omsgs1 `shouldNotBe` [Prepare v hsh0]
+        hsh <- uses proposal $ blockHash . fromMaybe (error "should have proposal 1")
+
         map oMessage omsgs1 `shouldBe` [Prepare v hsh]
         let preps = map (\a -> IMsg a $ Prepare v hsh) as
         omsgs2 <- sendMessages preps
-        let [Commit v' hsh' seal'] = map oMessage omsgs2
+        let [Commit v' hsh' cseal] = map oMessage omsgs2
         (v', hsh') `shouldBe` (v, hsh)
         me <- selfAddr
-        seal' `shouldSatisfy` (== Just me) . verifyCommitmentSeal hsh
-        let coms = map (\a -> IMsg a $ Commit v hsh seal) as
+        cseal `shouldSatisfy` (== Just me) . verifyCommitmentSeal hsh
+        let coms = map (\a -> IMsg a $ Commit v hsh fakeSeal) as
         xsp <- sendMessages coms
         length xsp `shouldBe` 1
-        xsp `shouldBe` [ToCommit blk]
+        let [ToCommit committedBlock] = xsp
+            sealCount = length as - floor (fromIntegral (length as - 1) / (3 :: Double))
+        _istanbul (cookRawExtra (committedBlock ^. extraLens))
+          `shouldBe` Just (IstanbulExtra [] (Just fakeSeal) $ replicate sealCount fakeSeal)
+        truncateExtra committedBlock `shouldBe` truncateExtra blk
+
         -- Pretend that in this interval, the block was committed
         sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn` []
-        -- The proposer *shouldn't* change, because the round number is the same
-        let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
         use proposer `shouldReturn` sender ppr
         v2 <- use view
         v2 `shouldBe` over sequence (+1) v
         let blk2 = blk2'{blockBlockData = (blockBlockData blk2'){
                           blockDataNumber = 20,
                           blockDataParentHash = hsh}}
-        let hsh2 = blockHash blk2
+        -- The proposer *shouldn't* change, because the round number is the same
+        let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
         omsgs3 <- sendMessages [IMsg nextPpr $ Preprepare v2 blk2, IMsg ppr $ Preprepare v2 blk2]
+        hsh2 <- uses proposal $ blockHash . fromMaybe (error "should have proposal 2")
         map oMessage omsgs3 `shouldMatchList`
             if sender ppr == sender nextPpr
               then [Prepare v2 hsh2, Prepare v2 hsh2]
@@ -166,7 +176,7 @@ spec = parallel $ do
         let hsh = blockHash sealedBlk
         omsgs <- sendMessages [IMsg auth $ Preprepare curView sealedBlk]
         map oMessage omsgs `shouldBe` [Prepare curView hsh]
-        use proposal `shouldReturn` Just blk
+        use proposal `shouldReturn` Just sealedBlk
 
     it "rejects an unauthenticated preprepare" $ property $ \auth blk ->
       runTest $ do

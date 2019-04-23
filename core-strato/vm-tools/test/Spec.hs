@@ -2,7 +2,6 @@
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Maybe
-import qualified Data.Set as S
 import Data.Word
 import HFlags
 import Test.Hspec (hspec, describe, Spec)
@@ -49,9 +48,8 @@ addVote addr nonc = do
   let blk' = blk{blockBlockData = (blockBlockData blk)
     { blockDataCoinbase = addr
     , blockDataNonce = nonc}}
-  let blk'' = addValidators (S.singleton 0x88) blk'
-  pSeal <- proposerSeal blk'' prvKey
-  return $ addProposerSeal pSeal blk''
+  pSeal <- proposerSeal blk' prvKey
+  return $ addProposerSeal pSeal blk'
 
 
 spec :: Spec
