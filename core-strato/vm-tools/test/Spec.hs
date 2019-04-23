@@ -2,6 +2,7 @@
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Maybe
+import qualified Data.Set as S
 import Data.Word
 import HFlags
 import Test.Hspec (hspec, describe, Spec)
@@ -48,8 +49,9 @@ addVote addr nonc = do
   let blk' = blk{blockBlockData = (blockBlockData blk)
     { blockDataCoinbase = addr
     , blockDataNonce = nonc}}
-  pSeal <- proposerSeal blk' prvKey
-  return $ addProposerSeal pSeal blk'
+  let blk'' = addValidators (S.singleton 0x88) blk'
+  pSeal <- proposerSeal blk'' prvKey
+  return $ addProposerSeal pSeal blk''
 
 
 spec :: Spec
@@ -100,5 +102,8 @@ spec = describe "VMContext" $ do
     (cb, nonc) <- peekPendingVote
     -- Note: `addVote` always comes from `sender`
     blk' <- addVote cb nonc
+    let readSender = fromMaybe 0x0 $ verifyProposerSeal blk' =<< getProposerSeal blk'
+    readSender `shouldBe` sender
+    sender `shouldNotBe` 0x0
     clearPendingVote blk'
     peekPendingVote `shouldReturn` (cb, nonc)
