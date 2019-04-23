@@ -5,11 +5,13 @@ module Blockchain.JsonRpcCommand (
   ) where
 
 import           Prelude                         hiding (id)
+import qualified Control.Monad.Change.Alter      as A
 import           Control.Monad.IO.Class
 import           Data.Binary
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy            as BL
+import           Data.Proxy
 import           Network.Kafka
 import           Network.Kafka.Producer
 
@@ -48,14 +50,17 @@ runJsonRpcCommand :: ( MonadLogger (t m)
                      , HasHashDB (t m)
                      , HasCodeDB (t m)
                      , HasStorageDB (t m)
-                     , HasMemAddressStateDB (t m)) =>
-                   JsonRpcCommand -> t m ()
+                     , HasMemAddressStateDB (t m)
+                     , (Address `Alters` AddressState) (t m)
+                     )
+                  => JsonRpcCommand -> t m ()
 runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  addressState <- getAddressState address
-  let response = show $ addressStateBalance addressState
+  balance <- maybe 0 addressStateBalance <$>
+    A.lookup Proxy address
+  let response = show balance
   liftIO $ produceResponse id $ BC.pack response
   liftIO $ putStrLn response
 
@@ -63,7 +68,8 @@ runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  addressState <- getAddressState address
+  addressState <- fromMaybe blankAddressState <$>
+    A.lookup Proxy getAddressState address
   code <- getEVMCode $
                case addressStateCodeHash addressState of
                  EVMCode ch -> ch
@@ -74,8 +80,9 @@ runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  addressState <- getAddressState address
-  let response = show $ addressStateNonce addressState
+  nonce <- maybe 0 addressStateNonce <$>
+    A.lookup Proxy address
+  let response = show nonce
   liftIO $ produceResponse id $ BC.pack response
   liftIO $ putStrLn response
 

@@ -25,6 +25,7 @@ import           Conduit
 import           Control.Arrow                           ((&&&))
 import           Control.Lens.Operators
 import           Control.Monad
+import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans.Except
 import qualified Data.ByteString                         as B
@@ -33,6 +34,7 @@ import           Data.Either.Extra
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
+import           Data.Proxy
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
 import           Data.Time.Clock
@@ -393,7 +395,8 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
         $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
         $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
 
-    addressState <- lift $ getAddressState tAddr
+    addressState <- fmap (fromMaybe blankAddressState) . lift $
+      A.lookup (Proxy :: Proxy AddressState) tAddr
 
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         acctBalance = addressStateBalance addressState
@@ -431,7 +434,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (erSuicideList execResults))
                     forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
                         lift $ purgeStorageMap address'
-                        lift $ deleteAddressState address'
+                        lift $ A.delete (Proxy :: Proxy AddressState) address'
                     lift $ P.incCounter vmTxsSuccessful
 
 
@@ -440,8 +443,9 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
         else do
             s1 <- lift $ addToBalance (blockDataCoinbase b) (fromIntegral intrinsicGas' * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
-            addressState' <- lift $ getAddressState tAddr
-            $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
+            balance <- fmap (fromMaybe 0 . addressStateBalance) . lift $
+              A.lookup (Proxy :: Proxy AddressState) tAddr
+            $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show balance
             return $
               evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
 
@@ -465,8 +469,8 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
                          return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
   --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
-  addressState <- getAddressState tAddr
-  let newAddress = getNewAddress_unsafe tAddr (addressStateNonce addressState-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
+  nonce <- maybe 0 addressStateNonce <$> A.lookup (Proxy :: Proxy AddressState) tAddr
+  let newAddress = getNewAddress_unsafe tAddr (nonce-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
 
   create isRunningTests'
            isHomestead
@@ -490,7 +494,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
   let owner = transactionTo ut
 
 
-  addressState <- getAddressState owner
+  addressState <- fromMaybe blankAddressState <$> A.lookup (Proxy :: Proxy AddressState) owner
 
   let call =
         case addressStateCodeHash addressState of

@@ -34,6 +34,7 @@ dependencies:
   - lens
   - leveldb-haskell
   - merkle-patricia-db
+  - monad-alter
   - mtl
   - ordered-containers
   - persistent-postgresql

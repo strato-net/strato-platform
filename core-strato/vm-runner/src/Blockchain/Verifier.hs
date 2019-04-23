@@ -7,6 +7,7 @@ module Blockchain.Verifier (
   ) where
 
 import           Control.Monad
+import qualified Control.Monad.Change.Alter                  as A
 import           Control.Monad.IO.Class
 
 import           Blockchain.Constants
@@ -118,8 +119,8 @@ checkValidity isHomestead parentBSum b = do
                     transactionsTrie = 0,
 -}
 
-isNonceValid :: OutputTx -> ContextM Bool
-isNonceValid OutputTx{otBaseTx=base, otSigner=txAddr} = do
+isNonceValid :: (Address `A.Alters` AddressState) f => OutputTx -> f Bool
+isNonceValid OutputTx{otBaseTx=base, otSigner=txAddr} =
   let txNonce = transactionNonce base
-  addressState <- getAddressState txAddr
-  return $ addressStateNonce addressState == txNonce
+      addressState = fromMaybe blankAddressState <$> A.lookup Proxy txAddr
+   in (== txNonce) . addressStateNonce <$> addressState

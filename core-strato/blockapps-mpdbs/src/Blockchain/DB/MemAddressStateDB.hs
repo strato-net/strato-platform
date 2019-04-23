@@ -5,6 +5,7 @@ module Blockchain.DB.MemAddressStateDB (
   AddressStateModification(..),
   formatAddressStateDBMap,
   getAddressState,
+  getAddressStateMaybe,
   putAddressState,
   flushMemAddressStateTxToBlockDB,
   flushMemAddressStateDB,
@@ -57,6 +58,20 @@ getAddressState address = do
         Just (ASModification addressState) -> return addressState
         Just ASDeleted                     -> return blankAddressState
         Nothing                            -> DB.getAddressState address
+
+getAddressStateMaybe :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m)
+                     => Address -> m (Maybe AddressState)
+getAddressStateMaybe address = do
+  theMap <- getAddressStateTxDBMap
+  case M.lookup address theMap of
+    Just (ASModification addressState) -> return $ Just addressState
+    Just ASDeleted                     -> return $ Just blankAddressState
+    Nothing                            -> do
+      theBMap <- getAddressStateBlockDBMap
+      case M.lookup address theBMap of
+        Just (ASModification addressState) -> return $ Just addressState
+        Just ASDeleted                     -> return $ Just blankAddressState
+        Nothing                            -> DB.getAddressStateMaybe address
 
 getAllAddressStates::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
                      m [(Address, AddressState)]

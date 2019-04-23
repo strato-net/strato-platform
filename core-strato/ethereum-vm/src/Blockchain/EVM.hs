@@ -18,6 +18,7 @@ import           Clockwork
 import           Control.DeepSeq
 import           Control.Lens                       ((%=), (.=), at, mapped)
 import           Control.Monad
+import qualified Control.Monad.Change.Alter         as A
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Blockchain.Output
@@ -159,11 +160,11 @@ safe_rem x y = x `rem` y
 --exist....  This is a hack to mimic this behavior.
 accountCreationHack :: Address -> VMM ()
 accountCreationHack address = do
-  exists <- addressStateExists address
+  exists <- isJust <$> A.lookup (Proxy :: Proxy AddressState) address
   when (not exists) $ do
     vmState <- lift get
     when (not $ isNothing $ debugCallCreates vmState) $
-      putAddressState address blankAddressState
+      A.insert (Proxy :: Proxy AddressState) address blankAddressState
 
 
 
@@ -261,8 +262,9 @@ runOperation BALANCE = do
   exists <- addressStateExists address
   if exists
     then do
-    addressState <- getAddressState address
-    push $ addressStateBalance addressState
+    balance <- maybe 0 addressStateBalance <$>
+      A.lookup (Proxy :: Proxy AddressState) address
+    push balance
     else do
     accountCreationHack address --needed hack to get the tests working
     push (0::Word256)
@@ -307,7 +309,8 @@ runOperation GASPRICE = pushEnvVar envGasPrice
 runOperation EXTCODESIZE = do
   address <- pop
   accountCreationHack address --needed hack to get the tests working
-  addressState <- getAddressState address
+  addressState <- fromMaybe blankAddressState <$>
+    A.lookup (Proxy :: Proxy AddressState) address
   code <- getEVMCode' (addressStateCodeHash addressState)
   push $ (fromIntegral (B.length code)::Word256)
 
@@ -318,7 +321,8 @@ runOperation EXTCODECOPY = do
   codeOffset <- pop
   size <- pop
 
-  addressState <- getAddressState address
+  addressState <- fromMaybe blankAddressState <$>
+    A.lookup (Proxy :: Proxy AddressState) address
   code <- getEVMCode' (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 
@@ -495,7 +499,8 @@ runOperation CREATE = do
       (True, _) -> return Nothing
       (_, Nothing) -> create_debugWrapper block owner value initCodeBytes
       (_, Just _) -> do
-        addressState <- getAddressState owner
+        addressState <- fromMaybe blankAddressState <$>
+          A.lookup (Proxy :: Proxy AddressState) owner
 
         let newAddress = getNewAddress_unsafe owner $ addressStateNonce addressState
 
@@ -536,7 +541,8 @@ runOperation CALL = do
 
   let stipend = if value > 0 then fromIntegral gCALLSTIPEND  else 0
 
-  addressState <- getAddressState owner
+  addressState <- fromMaybe blankAddressState <$>
+    A.lookup (Proxy :: Proxy AddressState) owner
 
   callDepth <- getCallDepth
 
@@ -596,7 +602,8 @@ runOperation CALLCODE = do
 
 --  useGas $ fromIntegral newAccountCost
 
-  addressState <- getAddressState owner
+  addressState <- fromMaybe blankAddressState <$>
+    A.lookup (Proxy :: Proxy AddressState) owner
 
   callDepth <- getCallDepth
 
@@ -718,12 +725,13 @@ runOperation SUICIDE = do
   guardStorage
   address <- pop
   owner <- getEnvVar envOwner
-  addressState <- getAddressState owner
+  addressState <- fromMaybe blankAddressState <$>
+    A.lookup (Proxy :: Proxy AddressState) owner
 
   let allFunds = addressStateBalance addressState
   pay' "transferring all funds upon suicide" owner address allFunds
 
-  putAddressState owner addressState{addressStateBalance = 0} --yellowpaper needs address emptied, in the case that the transfer address is the same as the suicide one
+  A.insert (Proxy :: Proxy AddressState) owner addressState{addressStateBalance = 0} --yellowpaper needs address emptied, in the case that the transfer address is the same as the suicide one
 
 
   addSuicideList owner
@@ -1081,8 +1089,9 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
     --an existing one, but the ethereum tests test this.  They want the VM to preserve balance
     --but clean out storage.
     --This will never actually matter, but I add it to pass the tests.
-    newAddressState <- getAddressState newAddress
-    putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr}
+    A.repsert_ (Proxy :: Proxy AddressState) newAddress $ \mState ->
+      let newAddressState = fromMaybe blankAddressState mState
+       in pure newAddressState{addressStateContractRoot=MP.emptyTriePtr}
     --This next line will actually create the account addressState data....
     --In the extremely unlikely even that the address already exists, it will preserve
     --the existing balance.
@@ -1102,7 +1111,7 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
       _ <- pay "revert value transfer" newAddress sender (fromIntegral value)
 
       purgeStorageMap newAddress
-      deleteAddressState newAddress
+      A.delete (Proxy :: Proxy AddressState) newAddress
       -- Need to zero gas in the case of an exception.
       return execResults{erRemainingTxGas=0, erException=Just e}
     Nothing -> return $ execResults{erNewContractAddress=Just newAddress}
@@ -1148,8 +1157,9 @@ create' = do
     assignCode::B.ByteString->Address->VMM ()
     assignCode codeBytes address = do
       hsh <- addCode EVM codeBytes
-      newAddressState <- getAddressState address
-      putAddressState address newAddressState{addressStateCodeHash=EVMCode hsh}
+      A.repsert_ (Proxy :: Proxy AddressState) address $ \mState ->
+        let newAddressState = fromMaybe blankAddressState mState
+         in pure newAddressState{addressStateCodeHash=EVMCode hsh}
     assignDetails = do
       vmState <- lift get
       let Environment{..} = environment vmState
@@ -1185,7 +1195,8 @@ call :: Bool
 call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
      (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata = do
 
-  addressState <- getAddressState $ Address codeAddress
+  addressState <- fromMaybe blankAddressState <$>
+    A.lookup (Proxy :: Proxy AddressState) (Address codeAddress)
 
   code <-
     if 0 < codeAddress && codeAddress < 5
@@ -1215,7 +1226,8 @@ call' noValueTransfer = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  cp <- addressStateCodeHash <$> getAddressState receiveAddress
+  cp <- addressStateCodeHash . fromMaybe blankAddressState <$>
+    A.lookup (Proxy :: Proxy AddressState) receiveAddress
   let ch = case cp of
         EVMCode x -> x
         _ -> error "internal error- the EVM was called for non-evm code"
@@ -1252,7 +1264,8 @@ call' noValueTransfer = do
 create_debugWrapper :: BlockData -> Address -> Word256 -> B.ByteString -> VMM (Maybe Address)
 create_debugWrapper block owner value initCodeBytes = do
 
-  addressState <- getAddressState owner
+  addressState <- fromMaybe blankAddressState <$>
+    A.lookup (Proxy :: Proxy AddressState) owner
 
   if fromIntegral value > addressStateBalance addressState
     then return Nothing

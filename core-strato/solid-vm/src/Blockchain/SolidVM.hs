@@ -11,6 +11,7 @@ module Blockchain.SolidVM
 
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
+import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bits
@@ -23,6 +24,7 @@ import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
 import           Data.Maybe
+import           Data.Proxy
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
 import           Data.Time.Clock.POSIX
@@ -117,8 +119,9 @@ create' creator ch cc contractName' argExps = do
 
   initializeAction newAddress contractName' ch
 
-  newAddressState <- getAddressState newAddress
-  putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
+  A.repsert_ (Proxy :: Proxy AddressState) newAddress $ \mState ->
+    let newAddressState = fromMaybe blankAddressState mState
+     in newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
@@ -247,7 +250,7 @@ getCodeAndCollection address' = do
     (hsh, cc') <- getCurrentCodeCollection
     return (c', hsh, cc')
     else do
-    addressState <- getAddressState address'
+    addressState <- A.lookup (Proxy :: Proxy AddressState) address'
 
     (contractName', ch, cc) <-
       case addressStateCodeHash addressState of
