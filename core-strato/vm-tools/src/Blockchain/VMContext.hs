@@ -367,14 +367,15 @@ peekPendingVote = do
 clearPendingVote :: Block -> ContextM ()
 clearPendingVote b = do
   let bd = blockBlockData b
-      currentCoinbase = (blockDataCoinbase bd, blockDataNonce bd)
+      currentBlockData = (blockDataCoinbase bd, blockDataNonce bd)
+  $logInfoLS "clearPendingVote" currentBlockData
   ctx <- get
-  --check if the coinbase in the queue is from us, if so delete it
-  let sender = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
-  let ctxCoinbase = Q.filter (\ x -> snd x == sender && fst x == currentCoinbase) $ contextCoinbaseQueue ctx
-  case (ctxCoinbase == contextCoinbaseQueue ctx) of
-    False -> do
-      $logInfoLS "clearPendingVote" currentCoinbase
-      put ctx { contextCoinbaseQueue = ctxCoinbase}
-    _ -> $logInfoLS "clearPendingVote" "Skip; Not sender"
-    --do we remove it from blockData coinbase and nonce too?
+  let sender = fromMaybe 0xdeadbeef $ do
+        seal <- getProposerSeal b
+        verifyProposerSeal b seal
+  let ctxCoinbaseQ = contextCoinbaseQueue ctx
+  let newCoinbaseQ = case Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ of
+        Just i -> Q.deleteAt i ctxCoinbaseQ
+        Nothing -> ctxCoinbaseQ
+  --return (Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ)
+  put ctx { contextCoinbaseQueue = newCoinbaseQ}
