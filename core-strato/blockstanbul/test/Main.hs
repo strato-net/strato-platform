@@ -9,7 +9,7 @@ import Test.Hspec.Runner
 import qualified Spec
 
 predicate :: Path -> Bool
-predicate ("StateMachine":"PreviousBlock":[], "updates validators from a historic block") = True
+predicate ("StateMachine":"PreviousBlock":[], "requires 3 votes with four validators") = True
 predicate _ = False
 
 main :: IO ()
