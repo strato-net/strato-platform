@@ -64,7 +64,6 @@ data BlockstanbulContext = BlockstanbulContext {
   , _pendingvotes :: M.Map Address Bool
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
-  , _blockcount :: Int
   -- Block locking: a safety mechanism to prevent partial commits
   , _blockLock :: Maybe Block
   , _lockSender :: Maybe Address
@@ -112,7 +111,6 @@ newContext v as senderlist pk =
      , _voted = M.empty
      , _pendingvotes = M.empty
      , _prvkey = pk
-     , _blockcount = 0
      , _blockLock = Nothing
      , _lockSender = Nothing
      , _authSenders = generateNonceMap senderlist
@@ -224,11 +222,6 @@ nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent OutEvent m ()
 nextRound nt = do
   -- TODO(tim): Create an emptyRound constant and override validators/proposer/view,
   -- rather than reset everything in the state.
-  epocheck <- use blockcount
-  when (epocheck `mod` 10000 == 0) $ do
-      voted .= M.empty
-      blockcount .= 0
-
    --update validators list
   val <- uses validators S.toList
   vot <- use voted
@@ -246,6 +239,11 @@ nextRound nt = do
   use view >>= recordView
   vals <- use validators
   thisR <- use $ view . round
+  epocheck <- use $ view . sequence
+  when (epocheck `mod` 100 == 0) $ do
+      voted .= M.empty
+      $logInfoS "blockstanbul/voting" . T.pack $
+        "nextRound: voted map reset to empty with epocheck = " ++ show epocheck
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
@@ -367,7 +365,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   $logInfoS "blockstanbul/roundchange" "chain inconsistency"
                   roundChange
                 Right () -> do
-                  blockcount += 1
                   proposal .= Just pp
                   pk <- use prvkey
                   editVoted pp pr
