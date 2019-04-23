@@ -125,6 +125,7 @@ services:
     - blockstanbulSkipCheck=${blockstanbulSkipCheck}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
+    - brokenRefundReenable=${brokenRefundReenable}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
