@@ -222,8 +222,6 @@ roundChange = do
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent OutEvent m ()
 nextRound nt = do
-  -- TODO(tim): Create an emptyRound constant and override validators/proposer/view,
-  -- rather than reset everything in the state.
   epocheck <- use blockcount
   when (epocheck `mod` 10000 == 0) $ do
       voted .= M.empty
