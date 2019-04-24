@@ -28,6 +28,7 @@ import           Network.Wai.Handler.WarpTLS
 import           Network.Wai.Middleware.RequestLogger (Destination (Logger), IPAddrSource (..),
                                                        OutputFormat (..), destination,
                                                        mkRequestLogger, outputFormat)
+import           Network.Wai.Middleware.Prometheus
 import           System.Environment
 import           System.Exit
 import           System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet)
@@ -118,7 +119,7 @@ makeApplication foundation = do
     logWare <- makeLogware foundation
     -- Create the WAI application and apply middlewares
     app <- toWaiApp foundation
-    return $ logWare $ defaultMiddlewaresNoLogging app
+    return $ prometheus def $ logWare $ defaultMiddlewaresNoLogging app
 
 -- | Warp settings for the given foundation value.
 warpSettings :: App -> Settings
