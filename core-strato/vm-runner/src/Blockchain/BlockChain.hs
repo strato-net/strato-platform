@@ -92,6 +92,8 @@ import           Blockchain.Timing
 
 import qualified Text.Colors                             as CL
 import           Text.Format
+import           Text.ShortDescription
+import           Text.Tools
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
@@ -221,9 +223,6 @@ addBlocks blocks' = do
 
   where
     timerToUse = Just vmBlockInsertionMined
-
-setTitle :: String -> IO()
-setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
 
 setParentStateRoot :: OutputBlock -> ContextM BlockSummary
 setParentStateRoot b@OutputBlock{..} = do
@@ -476,7 +475,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
            (txMetadata ut)
 
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{otBaseTx=ut} = do --MessageTX
-  when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)
+  when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
 
   let owner = transactionTo ut
 
@@ -591,37 +590,38 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
         then return Nothing
         else return $ either (const Nothing) erAction result
 
-logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
-logWithBox source headerSize theLines = do
-    let headerAndFooter = indent ++ CL.magenta (replicate headerSize '=')
-        addBorder line  = indent ++ CL.magenta "|" ++ " " ++ line ++ " " ++ CL.magenta "|"
-        indent          = "    "
-    $logInfoS source $ T.pack headerAndFooter
-    forM_ (addBorder <$> theLines) ($logInfoS source . T.pack)
-    $logInfoS source $ T.pack headerAndFooter
+multilineLog :: MonadLogger m =>
+                T.Text -> String -> m ()
+multilineLog source theLines = do
+  forM_ (lines theLines) $ \theLine ->
+    $logInfoS source $ T.pack theLine
 
 printTransactionMessage::MonadLogger m=>
                          OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->m ()
 printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash} (Left errMsg) deltaT = do
-    let tNonce = transactionNonce baseTx
-    logWithBox "printTx/err" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
-                                , "Tx hash:  " ++ format theHash
-                                , printf "%-74s" $ "Tx nonce: " ++ show tNonce
-                                , CL.red "Transaction failure: " ++ CL.red (format errMsg)
-                                , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
-                                ]
+  let tNonce = transactionNonce baseTx
+  multilineLog "printTx/err" $ boringBox
+    [ "Adding transaction signed by: " ++ format tAddr
+    , "Tx hash:  " ++ format theHash
+    , "Tx nonce: " ++ show tNonce
+    , CL.red "Transaction failure: " ++ CL.red (format errMsg)
+    , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
+    ]
 
 printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Right results) deltaT = do
     let tNonce = transactionNonce t
-        txPretty = if isMessageTX t
-          then "MessageTX to " ++ show (pretty $ transactionTo t) ++ "                     "
-          else "Create Contract "  ++ fromMaybe "<failed>                                " (fmap (show . pretty) $ erNewContractAddress results) ++ "                  "
-    logWithBox "printTx/ok" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
-                               , "Tx hash:  " ++ format theHash
-                               , printf "%-74s" $ "Tx nonce: " ++ show tNonce
-                               , txPretty
-                               , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
-                               ]
+        extra =
+          if isMessageTX t
+          then ""
+          else fromMaybe "<failed>" $ fmap format $ erNewContractAddress results
+               
+    multilineLog "printTx/ok" $ boringBox
+      [ "Adding transaction signed by: " ++ format tAddr
+      , "Tx hash:  " ++ format theHash
+      , "Tx nonce: " ++ show tNonce
+      , shortDescription t ++ " " ++ extra
+      , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
+      ]
 
 indexMaybe :: [a] -> Int -> Maybe a
 indexMaybe _ i        | i < 0 = error "indexMaybe called for i < 0"
