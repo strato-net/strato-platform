@@ -97,6 +97,8 @@ import           Text.Format
 instance Bagger.MonadBagger ContextM where
     isBlockstanbul = State.gets contextHasBlockstanbul
     getBaggerState = State.gets contextBaggerState
+    peekPendingVote = peekPendingVote
+    clearPendingVote b = clearPendingVote b
     putBaggerState s = do
         ctx <- State.get
         State.put $ ctx { contextBaggerState = s }

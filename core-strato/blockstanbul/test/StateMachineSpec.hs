@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module StateMachineSpec where
@@ -21,12 +22,14 @@ import Data.List
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
+import Data.Word
 import Prelude hiding (round, sequence)
 
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
+import Blockchain.Blockstanbul.BenchmarkLib
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Strato.Model.Address
@@ -88,9 +91,16 @@ spec = parallel $ do
             -- The nonce is set to avoid voting out the sole validator
             setNonce :: Block -> Block
             setNonce blk = blk{blockBlockData = (blockBlockData blk){blockDataNonce = 0x24444}}
-        let (blk', blk2') = over both (addProposerSeal seal . truncateExtra . setNonce) (blk'', blk2'')
+        let (blk', blk2') = over both ( addProposerSeal seal
+                                      . addValidators (S.fromList $ map sender as)
+                                      . truncateExtra
+                                      . setNonce)
+                           (blk'', blk2'')
             blk = setBlockNo 19 blk'
-        (v, hsh) <- setupRound blk . map sender $ as
+        validators .= S.fromList (map sender as)
+        v <- use view
+        let hsh = blockHash blk
+        -- (v, hsh) <- setupRound blk . map sender $ as
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
         proposer .= sender ppr
         omsgs1 <- sendMessages [IMsg ppr $ Preprepare v blk]
@@ -103,8 +113,16 @@ spec = parallel $ do
         seal' `shouldSatisfy` (== Just me) . verifyCommitmentSeal hsh
         let coms = map (\a -> IMsg a $ Commit v hsh seal) as
         xsp <- sendMessages coms
-        length xsp `shouldBe` 1
-        xsp `shouldBe` [ToCommit blk]
+        let [ToCommit comBlock] = xsp
+            n = length as
+            sealCount = n - floor (fromIntegral (n - 1) / 3 :: Double)
+        truncateExtra comBlock `shouldBe` truncateExtra blk
+        (comBlock ^. extraLens ^. to cookRawExtra ^. istanbul) `shouldBe`
+          Just IstanbulExtra { _validatorList = sort (map sender as)
+                             , _proposedSig = Just seal
+                             , _commitment = replicate sealCount seal
+                             }
+
         -- Pretend that in this interval, the block was committed
         sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn` []
         -- The proposer *shouldn't* change, because the round number is the same
@@ -159,14 +177,15 @@ spec = parallel $ do
         let blk = truncateExtra . setBlockNo 19 $ blk'
         proposer .= sender auth
         validators .= S.fromList [sender auth]
+        blockWithVs <- uses validators $ flip addValidators blk
         pk <- use prvkey
-        pseal <- proposerSeal blk pk
-        let sealedBlk = addProposerSeal pseal blk
+        pseal <- proposerSeal blockWithVs pk
+        let sealedBlk = addProposerSeal pseal blockWithVs
         curView <- use view
         let hsh = blockHash sealedBlk
         omsgs <- sendMessages [IMsg auth $ Preprepare curView sealedBlk]
         map oMessage omsgs `shouldBe` [Prepare curView hsh]
-        use proposal `shouldReturn` Just blk
+        use proposal `shouldReturn` Just sealedBlk
 
     it "rejects an unauthenticated preprepare" $ property $ \auth blk ->
       runTest $ do
@@ -479,39 +498,150 @@ spec = parallel $ do
                                        Preprepare roundPlus1 blk]
         other `shouldBe` [ResetTimer $ _round roundPlus1]
 
-    describe "Authentication" $ do
-      let resendLock :: Block -> HK.PrvKey -> HK.PrvKey
-                     -> StateT BlockstanbulContext (LoggingT IO) (Block, [OutEvent])
-          resendLock blk theirPK pk = do
-            v <- use view
-            me <- selfAddr
-            let them = prvKey2Address theirPK
-                vals = S.fromList [me, them]
-                blk' = addValidators vals . truncateExtra . setBlockNo 19 $ blk
-            validators .= vals
-            proposer .= me
-            pSeal <- proposerSeal blk' pk
-            let lockBlk = addProposerSeal pSeal blk'
-            myKey <- use prvkey
-            OMsg auth wm <- signMessage myKey $ Preprepare v lockBlk
-
-            lockSender .= Just them
-            blockLock .= Just lockBlk
-            omsgs <- sendMessages [IMsg auth wm]
-
-            return (lockBlk, omsgs)
-
-      it "accepts a block if the signer is the original sender" $ property $ \blk ->
-        runAuthTest $ do
-          theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+  describe "Authentication" $ do
+    let resendLock :: Block -> HK.PrvKey -> HK.PrvKey
+                   -> StateT BlockstanbulContext (LoggingT IO) (Block, [OutEvent])
+        resendLock blk theirPK pk = do
           v <- use view
-          (lockBlk, omsgs) <- resendLock blk theirPK theirPK
-          map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
-
-      it "accepts a block if the signer is not the original sender" $ property $ \blk ->
-        runAuthTest $ do
-          theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
-          v <- use view
+          me <- selfAddr
+          let them = prvKey2Address theirPK
+              vals = S.fromList [me, them]
+              blk' = addValidators vals . truncateExtra . setBlockNo 19 $ blk
+          validators .= vals
+          proposer .= me
+          pSeal <- proposerSeal blk' pk
+          let lockBlk = addProposerSeal pSeal blk'
           myKey <- use prvkey
-          (lockBlk, omsgs) <- resendLock blk theirPK myKey
-          map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+          OMsg auth wm <- signMessage myKey $ Preprepare v lockBlk
+
+          lockSender .= Just them
+          blockLock .= Just lockBlk
+          omsgs <- sendMessages [IMsg auth wm]
+
+          return (lockBlk, omsgs)
+
+    it "accepts a block if the signer is the original sender" $ property $ \blk ->
+      runAuthTest $ do
+        theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+        v <- use view
+        (lockBlk, omsgs) <- resendLock blk theirPK theirPK
+        map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+
+    it "accepts a block if the signer is not the original sender" $ property $ \blk ->
+      runAuthTest $ do
+        theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
+        v <- use view
+        myKey <- use prvkey
+        (lockBlk, omsgs) <- resendLock blk theirPK myKey
+        map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+
+  describe "A NewBeneficiary" $ do
+    it "yields a vote" $ property $ \auth -> runTest $ do
+      me <- selfAddr
+      sendMessages [NewBeneficiary auth (0xdeadbeef, True, 40)] `shouldReturn`
+        [PendingVote 0xdeadbeef True me]
+
+  describe "PreviousBlock" $ do
+    let selfSignBlock :: Word64 -> Address -> Integer -> HK.PrvKey -> [HK.PrvKey]
+                      -> StateT BlockstanbulContext (LoggingT IO) Block
+        selfSignBlock nonc cb num proper committers = do
+          let blk0 = votingBlock
+              blk1 = blk0{blockBlockData = (blockBlockData blk0)
+                            { blockDataCoinbase = cb
+                            , blockDataNonce = nonc
+                            , blockDataNumber = num
+                            }}
+          let commitAddresses = S.fromList $ map prvKey2Address committers
+          vals <- use validators
+          S.toList vals `shouldContain` S.toList commitAddresses
+          let blk2 = addValidators vals
+                   . truncateExtra
+                   $ blk1
+          pSeal <- proposerSeal blk2 proper
+          let blk3 = addProposerSeal pSeal blk2
+          cSeals <- mapM (commitmentSeal (blockHash blk3)) committers
+          return $ addCommitmentSeals cSeals blk3
+
+        votingBlock :: Block
+        votingBlock = makeBlock 3 3
+
+        genKeys :: MonadIO m => Int -> m [HK.PrvKey]
+        genKeys n = liftIO . replicateM n $ HK.withSource getEntropy HK.genPrvKey
+
+        checkedSend :: Block -> StateT BlockstanbulContext (LoggingT IO) ()
+        checkedSend blk = do
+          sendMessages [PreviousBlock blk] `shouldReturn` [ToCommit blk]
+          void $ sendMessages [CommitResult . Right $ blockHash blk]
+
+    it "will accept a previous block with the current sequence number" $ runTest $ do
+      me <- selfAddr
+      validators .= S.singleton me
+      pk <- use prvkey
+      checkedSend =<< selfSignBlock 6 0x0ddba11 19 pk [pk]
+      use validators `shouldReturn` S.singleton me
+
+    it "will reject a previous block in the future" $ runTest $ do
+      me <- selfAddr
+      validators .= S.singleton me
+      pk <- use prvkey
+      blk <- selfSignBlock 6 0xdeadbeef 20 pk [pk]
+      sendMessages [PreviousBlock blk] `shouldReturn` []
+      use validators `shouldReturn` S.singleton me
+
+    it "updates validators from a historic block" $ runTest $ do
+      me <- selfAddr
+      validators .= S.singleton me
+      pk <- use prvkey
+      checkedSend =<< selfSignBlock maxBound 0xdeadbeef 19 pk [pk]
+      use validators `shouldReturn` S.fromList [me, 0xdeadbeef]
+
+    it "does not update validators from a rejected historic block" $ runTest $ do
+      me <- selfAddr
+      validators .= S.singleton me
+      pk <- use prvkey
+      blk <- selfSignBlock maxBound 0xdeadbeef 20 pk [pk]
+
+      sendMessages [PreviousBlock blk] `shouldReturn` []
+      use validators `shouldReturn` S.singleton me
+
+    it "requires 3 votes with four validators" . runTest $ do
+      prvKeys@[key1, key2, key3, key4] <- genKeys 4
+      let valSet = S.fromList $ map prvKey2Address prvKeys
+      validators .= valSet
+      let sgn n pk = selfSignBlock maxBound 0x6643 n pk prvKeys
+      checkedSend =<< sgn 19 key1
+      checkedSend =<< sgn 20 key2
+      use validators `shouldReturn` valSet
+      checkedSend =<< sgn 21 key3
+      use validators `shouldReturn` S.insert 0x6643 valSet
+      checkedSend =<< sgn 22 key4
+      use validators `shouldReturn` S.insert 0x6643 valSet
+
+    it "can interleave votes for two different candidates" . runTest $ do
+      prvKeys@[key1, key2] <- genKeys 2
+      let valSet = S.fromList $ map prvKey2Address prvKeys
+      validators .= valSet
+
+      [key3, key4] <- genKeys 2
+      let (cand3, cand4) = (prvKey2Address key3, prvKey2Address key4)
+
+      -- Key1 Votes for Key3
+      checkedSend =<< selfSignBlock maxBound cand3 19 key1 [key1, key2]
+      use validators `shouldReturn` valSet
+
+      -- Key1 votes for Key4
+      checkedSend =<< selfSignBlock maxBound cand4 20 key1 [key1, key2]
+      use validators `shouldReturn` valSet
+
+      -- Key2 votes for Key3
+      checkedSend =<< selfSignBlock maxBound cand3 21 key2 [key1, key2]
+      use validators `shouldReturn` S.insert cand3 valSet
+
+      -- Key2 votes for Key4
+      checkedSend =<< selfSignBlock maxBound cand4 22 key2 [key1, key2, key3]
+      -- Vote is no longer enough, 3 votes needed with 3 validators
+      use validators `shouldReturn` S.insert cand3 valSet
+
+      -- Key3 votes for Key4
+      checkedSend =<< selfSignBlock maxBound cand4 23 key3 [key1, key2, key3]
+      use validators `shouldReturn` S.fromList (map prvKey2Address [key1, key2, key3, key4])
