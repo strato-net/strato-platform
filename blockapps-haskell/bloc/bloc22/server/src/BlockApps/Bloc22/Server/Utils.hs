@@ -10,9 +10,13 @@ module BlockApps.Bloc22.Server.Utils
   , partitionWith
   , binRuntimeToCodeHash
   , emptyTxParams
+  , waitFor
   ) where
 
-import           Control.Monad                    (forM)
+import           Control.Concurrent               (threadDelay)
+import           Control.Monad                    (forM, unless, when)
+import           Control.Monad.Except             (throwError)
+import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.State.Strict
 import qualified Data.ByteString.Base16           as BS16
 import           Data.Functor.Identity
@@ -63,3 +67,13 @@ buildStateT s as f = execStateT (mapM_ f as) s
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
 partitionWith f as = Map.toList . fmap reverse . runIdentity . buildStateT Map.empty as $ \a ->
   modify $ Map.alter (Just . (a:) . fromMaybe []) (f a)
+
+waitFor :: Text.Text -> Bloc Bool -> Bloc ()
+waitFor msg action = go 20
+  where go :: Int -> Bloc ()
+        go ms = do
+          when (ms > 30000) . throwError $ CouldNotFind msg
+          b <- action
+          unless b $ do
+            liftIO . threadDelay $ ms * 1000
+            go $ 2 * ms

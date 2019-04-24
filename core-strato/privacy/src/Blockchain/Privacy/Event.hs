@@ -35,7 +35,7 @@ import           Control.Arrow                 ((&&&))
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Data.Foldable                 (for_, toList)
 import           Data.Maybe
 import qualified Data.Set                      as S

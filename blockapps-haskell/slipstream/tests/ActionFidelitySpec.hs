@@ -22,10 +22,10 @@ convert :: BS.Action -> Either String SS.Action'
 convert = eitherDecode . encode
 
 emptyEVMData :: BS.ActionData
-emptyEVMData = BS.ActionData (SHA 0) EVM (BS.ActionEVMDiff M.empty) []
+emptyEVMData = BS.ActionData (EVMCode $ SHA 0) EVM (BS.ActionEVMDiff M.empty) []
 
 emptySolidVMData :: BS.ActionData
-emptySolidVMData = BS.ActionData (SHA 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
+emptySolidVMData = BS.ActionData (SolidVMCode "ContractName" $ SHA 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
 
 emptyAction :: BS.Action
 emptyAction = BS.Action (SHA 0) (posixSecondsToUTCTime 0) 0 (SHA 0) Nothing 0x0 M.empty Nothing
@@ -120,7 +120,7 @@ spec = describe "Action conversions" $ do
             , (4, 0x73325f305f30000000000000000000000000000000000000000000000000000c)
             , (5, 0x73335f305f30000000000000000000000000000000000000000000000000000c)
             ]
-          , SS._codeHash = forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9"
+          , SS._codeHash = EVMCode $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9"
           , SS._codeKind = EVM
           , SS._callData = [SS.CallData
             { SS._callType = SS.Create

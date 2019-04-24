@@ -46,9 +46,11 @@ Object {
   ],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -63,9 +65,11 @@ Object {
   ],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -75,9 +79,11 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 9,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -87,9 +93,11 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 2,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -140,9 +148,11 @@ Object {
     },
   ],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -157,9 +167,11 @@ Object {
     },
   ],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -169,9 +181,11 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 2,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -181,9 +195,11 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 4,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -193,6 +209,7 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [
@@ -237,6 +254,7 @@ Object {
       "y": 1,
     },
   ],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -246,6 +264,7 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [
@@ -254,6 +273,7 @@ Object {
       "y": 0,
     },
   ],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -263,6 +283,7 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [
     Object {
@@ -279,6 +300,7 @@ Object {
     },
   ],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -288,6 +310,7 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [
     Object {
@@ -300,6 +323,7 @@ Object {
     },
   ],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;
@@ -309,9 +333,11 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 1,
 }
 `;
@@ -321,9 +347,11 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 2,
 }
 `;
@@ -333,9 +361,11 @@ Object {
   "blockDifficulty": Array [],
   "blockPropagation": Array [],
   "contractsCount": 0,
+  "healthStatus": false,
   "lastBlockNumber": 0,
   "transactionTypes": Array [],
   "transactionsCount": Array [],
+  "uptime": 0,
   "usersCount": 0,
 }
 `;

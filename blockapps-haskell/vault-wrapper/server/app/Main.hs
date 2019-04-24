@@ -8,7 +8,6 @@
 module Main where
 
 import           Control.Monad
-import           Control.Monad.Log                      (Severity(..))
 import           Database.PostgreSQL.Simple
 import           Data.Pool
 import           HFlags
@@ -22,6 +21,7 @@ import           System.IO                              (BufferMode (..),
                                                         hSetBuffering, stderr,
                                                         stdout)
 
+import           BlockApps.Logging                      (LogLevel(..), flags_minLogLevel)
 import qualified Strato.Strato23.API                    as Strato23
 import qualified Strato.Strato23.Database.Migrations    as Strato23
 import qualified Strato.Strato23.Monad                  as Strato23
@@ -58,12 +58,12 @@ main = do
 
   pool <- createPool (connect dbConnectInfo) close 5 3 5
   mgr <- newManager defaultManagerSettings
-  let env = Strato23.VaultWrapperEnv mgr pool (toEnum flags_loglevel)
+  let env = Strato23.VaultWrapperEnv mgr pool
   run flags_port (appVaultWrapper env)
 
 appVaultWrapper :: Strato23.VaultWrapperEnv -> Application
 appVaultWrapper env =
-  (if Strato23.logLevel env >= Informational then logStdoutDev else logStdout)
+  (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
   . cors (const $ Just policy)
   . provideOptions (Proxy @ Strato23.VaultWrapperAPI)
   . serve (Proxy @ (

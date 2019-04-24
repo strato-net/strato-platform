@@ -59,14 +59,14 @@ Object {
 exports[`Chains: action chain failure 1`] = `
 Object {
   "error": "error",
-  "type": "FETCH_CHAINS_FAILED",
+  "type": "FETCH_CHAINS_FAILURE",
 }
 `;
 
 exports[`Chains: action chain ids failure 1`] = `
 Object {
   "error": "error",
-  "type": "FETCH_CHAINS_IDS_FAILED",
+  "type": "FETCH_CHAINS_IDS_FAILURE",
 }
 `;
 

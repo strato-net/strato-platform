@@ -149,7 +149,7 @@ pipeline {
               cd strato-worktree
               RELEASE_VERSION=$(<VERSION)
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-              docker-compose -f docker-compose.push.yml push
+              docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
 
               # Release to strato-getting-started
               STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"

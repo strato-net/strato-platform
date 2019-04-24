@@ -1408,9 +1408,11 @@ ShallowWrapper {
         "blockDifficulty": Array [],
         "blockPropagation": Array [],
         "contractsCount": 0,
+        "healthStatus": false,
         "lastBlockNumber": 0,
         "transactionTypes": Array [],
         "transactionsCount": Array [],
+        "uptime": 0,
         "usersCount": 0,
       }
     }

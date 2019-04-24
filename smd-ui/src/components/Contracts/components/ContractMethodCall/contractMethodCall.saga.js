@@ -13,6 +13,7 @@ import {
 } from './contractMethodCall.actions';
 import { fetchState } from '../ContractCard/contractCard.actions';
 import { env } from '../../../../env.js'
+import { handleErrors } from '../../../../lib/handleErrors';
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress?:chainid";
 const methodUrl = env.BLOC_URL + "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve&:chainid";
@@ -30,6 +31,7 @@ export function getArgs(contractName, contractAddress, symbol, chainId) {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })
@@ -61,6 +63,7 @@ export function postMethodCall(payload) {
         args: payload.args
       })
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })

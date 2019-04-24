@@ -6,7 +6,7 @@ module Blockchain.DB.ModifyStateDB (
   pay
 ) where
 
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans
 
 import           Blockchain.Data.Address

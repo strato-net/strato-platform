@@ -18,7 +18,6 @@ import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Crypto.PubKey.ECC.DH
@@ -40,7 +39,7 @@ import           Blockchain.EthConf                    hiding (genesisHash, port
 import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Options
-import           Blockchain.Output                     (printLogMsg)
+import           Blockchain.Output
 import           Blockchain.P2PRPC
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
@@ -57,6 +56,8 @@ runPeer :: (MonadIO m, MonadLogger m, MonadThrow m, MonadUnliftIO m)
         -> CommPort      -- otherServiceCommPort
         -> m ()
 runPeer peer myPriv _ _ = runResourceT $ do
+  ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
+  void $ register ender
   ctx <- initContext flags_maxReturnedHeaders
   runContextM ctx $ do
     let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
@@ -147,7 +148,7 @@ stratoP2PClient = do
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> void . forkIO . flip runLoggingT printLogMsg $ do
+            Just _  -> void . forkIO . runLoggingT $ do
               result <- try $ runPeerInList p osch oscp
               liftIO (SSem.signal sem)
               handleRunPeerResult p result

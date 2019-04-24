@@ -26,7 +26,6 @@ dependencies:
   - extra
   - mtl
   - resourcet
-  - monad-logger
   - text
   - strato-genesis
   - leveldb-haskell
@@ -62,6 +61,7 @@ dependencies:
   - exceptions
   - unliftio
   - seqevents
+  - cross-monitoring
 
 ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 

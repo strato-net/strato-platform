@@ -87,6 +87,7 @@ decodeCC = decode
 decodeCCBench :: Benchmark
 decodeCCBench = bench "time to Data.Binary.decode wingsCC"
               $ nf decodeCC (encode wingsCC)
+
 main :: IO ()
 main = do
   defaultMain [strHashBench, strSipBench

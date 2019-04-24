@@ -9,14 +9,18 @@ box strings = unlines $
   [C.magenta ("╔" ++ replicate (width - 2) '═' ++ "╗")]
   ++ map (\s -> C.magenta "║ " ++ C.white s ++ replicate (width - printedLength s - 4) ' ' ++ C.magenta " ║") strings
   ++ [C.magenta ("╚" ++ replicate (width - 2) '═' ++ "╝")]
-  where width = maximum (map length strings) + 4
-        printedLength = go False
-        go :: Bool -> String -> Int
-        go True ('m':t) = go False t
-        go True (_:t) = go True t
-        go False ('\ESC':t) = go True t
-        go False (_:t) = 1 + go False t
-        go _ [] = 0
+  where width = maximum (map printedLength strings) + 4
+
+
+printedLength :: String -> Int
+printedLength = go False
+  where
+    go :: Bool -> String -> Int
+    go True ('m':t) = go False t
+    go True (_:t) = go True t
+    go False ('\ESC':t) = go True t
+    go False (_:t) = 1 + go False t
+    go _ [] = 0
 
 
 
@@ -26,15 +30,7 @@ boringBox strings = unlines $
   [C.magenta (replicate width '=')]
   ++ map (\s -> C.magenta "| " ++ C.white s ++ replicate (width - printedLength s - 4) ' ' ++ C.magenta " |") strings
   ++ [C.magenta (replicate width '=')]
-  where width = maximum (map length strings) + 4
-        printedLength = go False
-        go :: Bool -> String -> Int
-        go True ('m':t) = go False t
-        go True (_:t) = go True t
-        go False ('\ESC':t) = go True t
-        go False (_:t) = 1 + go False t
-        go _ [] = 0
-
+  where width = maximum (map printedLength strings) + 4
 
 tab::String->String
 tab []          = []

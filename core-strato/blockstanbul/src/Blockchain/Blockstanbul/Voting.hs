@@ -31,7 +31,7 @@ updateValidator val voted = sort newVals
                            threshold = (length val)*2 `div` 3
                            -- check if up and down votes exceed maxnum
                            helperAs valu = (length (L.filter (==True) (elems valu)) > threshold)
-                           helperDs valu =  (length (L.filter (==False) (elems valu)) > threshold)
+                           helperDs valu = (length (L.filter (==False) (elems valu)) > threshold)
 
 
 combined :: [Address] -> Map Address (Map Address Bool) -> Map Address (Map Address Bool) -> [Address]

@@ -27,6 +27,7 @@ dependencies:
   - conduit-combinators
   - conduit-extra
   - containers
+  - cross-monitoring
   - cryptohash
   - crypto-pubkey
   - crypto-pubkey-types
@@ -47,7 +48,6 @@ dependencies:
   - lens
   - lifted-base
   - monad-control
-  - monad-logger
   - monadIO
   - blockapps-milena
   - mtl

@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-import           Control.Monad.Logger
 import qualified Network.Socket               as S
 
 import           Blockchain.Output
@@ -9,4 +8,4 @@ import           HFlags
 main :: IO ()
 main = do
   _ <- $initHFlags "ethereum-discover"
-  S.withSocketsDo $ flip runLoggingT printLogMsg ethereumDiscovery
+  S.withSocketsDo $ runLoggingT ethereumDiscovery

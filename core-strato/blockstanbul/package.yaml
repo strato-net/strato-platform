@@ -8,6 +8,7 @@ dependencies:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
+  - blockapps-util
   - bytestring
   - containers
   - conduit
@@ -32,7 +33,6 @@ dependencies:
   - strato-model
   - text
   - transformers
-  - monad-logger
   - wai-extra
   - wai-middleware-prometheus
   - wai
@@ -50,6 +50,7 @@ executables:
     dependencies:
       - blockstanbul
       - base16-bytestring
+      - base64-bytestring
       - hflags
       - extra
 

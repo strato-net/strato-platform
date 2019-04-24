@@ -31,19 +31,19 @@ addBlock blockData = do
 --       produceMessages $ map (TopicAndMessage (lookupTopic "block") . makeMessage) [decodeWithCheck $ BL.toStrict blockData]
   return ()
 
-addStateDB::LDB.MonadResource m=>LDB.DB->BL.ByteString->m ()
+addStateDB::MonadIO m=>LDB.DB->BL.ByteString->m ()
 addStateDB db stateDBData = do
   let val = decodeWithCheck $ BL.toStrict stateDBData
   LDB.put db LDB.defaultWriteOptions (keccak256 val) val
   return ()
 
-addCode'::LDB.MonadResource m=>LDB.DB->BL.ByteString->m ()
+addCode'::MonadIO m=>LDB.DB->BL.ByteString->m ()
 addCode' db codeData = do
   let val = decodeWithCheck $ BL.toStrict codeData
   LDB.put db LDB.defaultWriteOptions (keccak256 val) val
   return ()
 
-addHash'::LDB.MonadResource m=>LDB.DB->BL.ByteString->m ()
+addHash'::MonadIO m=>LDB.DB->BL.ByteString->m ()
 addHash' db hashData = do
   let val = decodeWithCheck $ BL.toStrict hashData
   LDB.put db LDB.defaultWriteOptions (keccak256 val) val

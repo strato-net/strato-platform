@@ -20,7 +20,6 @@ import           Control.Concurrent.STM.TMChan
 import           Control.Concurrent.STM.TQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
-import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
@@ -131,7 +130,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
         boot = bootstrapGenesisBlock hsh difficulty
     fromLeft (error "webserver completed") <$>
-      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) dropLogMsg)
+      race (runNoLoggingT (runSequencerM cfg mCtx (boot >> m)))
            ( run testWebserverPort
                . logStdoutDev
                . prometheus def

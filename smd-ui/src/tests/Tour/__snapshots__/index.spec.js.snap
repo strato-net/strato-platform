@@ -31,7 +31,7 @@ ShallowWrapper {
     offsetParentSelector="body"
     resizeDebounce={false}
     resizeDebounceDelay={200}
-    run={true}
+    run={false}
     scrollOffset={20}
     scrollToFirstStep={false}
     scrollToSteps={true}

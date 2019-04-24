@@ -26,12 +26,12 @@ newtype ContextLite =
 instance  MonadUnliftIO m  => HasSQLDB (ReaderT ContextLite m) where
   getSQLDB = asks liteSQLDB
 
-initContextLite :: (MonadResource m, MonadUnliftIO m) => m ContextLite
+initContextLite :: MonadUnliftIO m => m ContextLite
 initContextLite = do
   dbs <- openDBs
   return ContextLite { liteSQLDB = sqlDB' dbs }
 
-addPeer :: (HasSQLDB m, MonadResource m)=>PPeer->m (SQL.Key PPeer)
+addPeer :: HasSQLDB m =>PPeer->m (SQL.Key PPeer)
 addPeer peer = do
   db <- getSQLDB
   maybePeer <- getPeerByIP (T.unpack $ pPeerIp peer)
@@ -43,7 +43,7 @@ addPeer peer = do
               SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.pPeerPubkey peer]
               return (SQL.entityKey peer')
 
-getPeerByIP :: (HasSQLDB m, MonadResource m)=>String->m (Maybe (SQL.Entity PPeer))
+getPeerByIP :: HasSQLDB m =>String->m (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = do
   db <- getSQLDB
   entPeer <- runResourceT $ SQL.runSqlPool actions db

@@ -13,6 +13,8 @@ import           Data.ByteString         (ByteString)
 import qualified Data.ByteString         as ByteString
 import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Lazy    as ByteString.Lazy
+import           Data.Hashable
+import qualified Data.IntMap             as I
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Map.Strict         as Map
 import           Data.Text               (Text)
@@ -46,14 +48,15 @@ valueBytes = ValueBytes Nothing
 
 data Value
   = SimpleValue SimpleValue
-  | ValueArrayDynamic [Value]
+  | ValueArrayDynamic (I.IntMap Value) -- A sparse representation makes updates more efficient than O(n)
   | ValueArrayFixed Word [Value]
   | ValueContract Address
   | ValueEnum Text Text Word256
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
-  -- | ValueMapping (Map SimpleValue Value)
-  | ValueStruct [(Text, Value)]
-  deriving (Eq, Show, Generic, NFData, Binary.Binary)
+  | ValueMapping (Map.Map SimpleValue Value)
+  | ValueStruct (Map.Map Text Value)
+  | ValueArraySentinel Int
+  deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord)
 
 data SimpleValue
   = ValueBool Bool
@@ -66,7 +69,25 @@ data SimpleValue
   | ValueBytes { bytesSize :: Maybe Integer
                , bytesVal  :: ByteString
                }
-    deriving (Eq, Show, Generic, NFData, Binary.Binary)
+    deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord, Hashable)
+
+zeroOf :: Value -> Value
+zeroOf = \case
+  SimpleValue sv -> SimpleValue $ case sv of
+    ValueBool{} -> ValueBool False
+    ValueAddress{} -> ValueAddress 0x0
+    ValueString{} -> ValueString ""
+    ValueInt sign size _ -> ValueInt sign size 0
+    ValueBytes size _ -> ValueBytes size ""
+  ValueContract{} -> ValueContract 0x0
+  ValueArrayDynamic{} -> ValueArrayDynamic I.empty
+  ValueMapping{} -> ValueMapping Map.empty
+  ValueStruct fs -> ValueStruct $ fmap zeroOf fs
+  ValueArraySentinel{} -> SimpleValue $ ValueInt True Nothing 0
+  ValueArrayFixed{} -> error "default value of sized array"
+  ValueFunction{} -> error "default value of function"
+  ValueEnum{} -> error "default value of enum"
+
 
 bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
 bytesToSimpleValue bs = \case
@@ -104,7 +125,7 @@ bytesToValue b = \case
     let
       rb = ByteString.drop 32 b
       valArray = splitBytes rb ty
-    in ValueArrayDynamic <$> sequence valArray
+    in ValueArrayDynamic . tosparse <$> sequence valArray
   TypeArrayFixed len ty ->
     let valArray = splitBytes b ty
     in ValueArrayFixed len <$> sequence valArray
@@ -189,18 +210,34 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
               return $
                 (tBytes,headType) : rest
 
+unsparse :: I.IntMap Value -> [Value]
+unsparse imap =
+  let def = fromMaybe (error "internal error: ValueDynamicArray must be nonempty")
+          $ zeroOf . snd <$> I.lookupMin imap
+      go _ [] = []
+      go n [(_, ValueArraySentinel len)] = replicate (len - n) def
+      go n kvs@((k, v):kvs') | n == k = v:go (n +1) kvs'
+                             | otherwise = def:go (n+1) kvs
+  in go 0 $ I.toList imap
+
+tosparse :: [Value] -> I.IntMap Value
+tosparse = I.fromList . zip [0..]
 
 valueToText :: Value -> Text
 valueToText = \case
   SimpleValue sv -> simpleValueToText sv
   ValueArrayDynamic vals ->
-    "[" <> Text.intercalate "," (map valueToText vals) <> "]"
+    "[" <> Text.intercalate "," (map valueToText $ unsparse vals) <> "]"
   ValueArrayFixed _ vals ->
     "[" <> Text.intercalate "," (map valueToText vals) <> "]"
+  ValueMapping m ->
+    let pairs = map (\(sv, v) -> simpleValueToText sv <> ": " <> valueToText v) $ Map.toList m
+    in "{" <> Text.intercalate "," pairs <> "}"
   ValueContract addr -> Text.pack $ addressString addr
-  ValueEnum{}        -> undefined -- TODO
-  ValueFunction{}    -> undefined -- TODO
-  ValueStruct{}      -> undefined
+  ValueEnum{}        -> error "ValueEnum to text"
+  ValueFunction{}    -> error "ValueFunction to text"
+  ValueStruct{}      -> error "ValueStruct to text"
+  ValueArraySentinel{} -> error "ValueArraySentinel to text"
 
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
@@ -213,7 +250,7 @@ simpleValueToText sv = case sv of
 textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
 textToValue defs str = \case
   SimpleType ty -> SimpleValue <$> textToSimpleValue str ty
-  TypeArrayDynamic ty -> ValueArrayDynamic <$>
+  TypeArrayDynamic ty -> ValueArrayDynamic . tosparse <$>
     traverse (flip (textToValue defs) ty)
       (Text.split (== ',') (Text.dropAround (\ c -> c == '[' || c == ']') str))
   TypeArrayFixed len ty -> ValueArrayFixed len <$>
@@ -228,9 +265,11 @@ textToValue defs str = \case
     Nothing -> Left $ "Enum values cannot be parsed without type definitions" -- TODO(dustin): Pass in TypeDefs
     Just tds -> case Map.lookup name (enumDefs tds) of
       Nothing -> Left $ "Missing enum name in type definitions: " <> name
-      Just eSet -> case Bimap.lookupR str eSet of
-        Nothing -> Left $ "Missing value '" <> str <> "' in enum definition for " <> name
-        Just i -> Right $ ValueEnum name str $ fromIntegral i
+      Just eSet ->
+        let str' = last $ Text.split (== '.') str
+         in case Bimap.lookupR str' eSet of
+              Nothing -> Left $ "Missing value '" <> str <> "' in enum definition for " <> name
+              Just i -> Right $ ValueEnum name str' $ fromIntegral i
   TypeStruct{}   -> Left "textToValue TODO: TypeStruct not yet implemented"
 
 textToSimpleValue :: Text -> SimpleType -> Either Text SimpleValue

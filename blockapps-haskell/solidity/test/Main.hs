@@ -4,7 +4,7 @@ import Test.Hspec.Runner
 import qualified Spec
 
 predicate :: Path -> Bool
-predicate ("BlockApps.SolidVMStorageDecoder":_, _) = True
+predicate (_, _) = True
 predicate _ = False
 
 main :: IO ()

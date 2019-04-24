@@ -3,7 +3,7 @@
 module InsertTX where
 
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import qualified Data.Binary                  as BN
 import qualified Data.ByteString              as B

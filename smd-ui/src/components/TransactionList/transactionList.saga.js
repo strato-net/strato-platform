@@ -9,6 +9,7 @@ import {
   fetchTxFailure
 } from './transactionList.actions';
 import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 
 const url = env.STRATO_URL + "/transaction/last/15";
 
@@ -23,11 +24,9 @@ export function getTx(last, chainId) {
         'Accept': 'application/json'
       },
     })
-    .then(function (response) {
-      return response.json()
-    })
+    .then(handleErrors)
     .then(function (res) {
-      return res;
+      return res.json();
     })
     .catch(function (error) {
       throw error;
