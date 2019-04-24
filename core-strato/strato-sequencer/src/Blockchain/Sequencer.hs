@@ -179,6 +179,8 @@ blockstanbulSend' msg = do
         [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
+  rch <- asks blockstanbulVoteResps
+  atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
   let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul
       rewriteBlock b = do

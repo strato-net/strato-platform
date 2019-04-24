@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -18,6 +19,7 @@ import           Network.HTTP
 import           Network.HTTP.Auth
 import           System.Console.GetOpt
 import           System.Environment
+import           System.Exit
 import           Text.Printf
 
 import           Blockchain.Blockstanbul.Authentication
@@ -132,4 +134,9 @@ main = do
       authStr = withAuthority auth req'
       req = insertHeaders [mkHeader HdrAuthorization authStr] req'
   putStrLn $ "request: " ++ show req
-  print =<< simpleHTTP req
+  eResp <- simpleHTTP req
+  case eResp of
+    Left err -> die $ "connection error: " ++ show err
+    Right resp -> do
+      print resp
+      putStrLn $ rspBody resp
