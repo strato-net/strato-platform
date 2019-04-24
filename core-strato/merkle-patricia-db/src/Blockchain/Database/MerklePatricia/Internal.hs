@@ -1,4 +1,6 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.Database.MerklePatricia.Internal (
   Key,
@@ -25,14 +27,14 @@ module Blockchain.Database.MerklePatricia.Internal (
   ) where
 
 
-import           Control.Monad.IO.Class
+import           Control.Monad.Change.Alter                   (Alters)
+import qualified Control.Monad.Change.Alter                   as A
 import qualified Data.ByteString                              as B
-import           Data.Default
 import           Data.Function
 import           Data.List
 import           Data.Maybe
 import qualified Data.NibbleString                            as N
-import qualified Database.LevelDB                             as DB
+import           Data.Proxy
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.MPDB
@@ -41,29 +43,29 @@ import           Blockchain.Database.MerklePatricia.StateRoot
 import           Blockchain.Strato.Model.SHA                  (keccak256)
 import           Text.Format
 
-unsafePutKeyVal::MonadIO m=>MPDB->Key->Val->m MPDB
-unsafePutKeyVal db key val = do
-  dbNodeData <- getNodeData db (PtrRef $ stateRoot db)
-  dbPutNodeData <- putKV_NodeData db key val dbNodeData
-  p <- putNodeData db dbPutNodeData
-  return db{stateRoot=p}
+unsafePutKeyVal :: (Monad m, (StateRoot `Alters` NodeData) m)
+                => StateRoot -> Key -> Val -> m StateRoot
+unsafePutKeyVal sr key val = do
+  dbNodeData <- getNodeData $ PtrRef sr
+  dbPutNodeData <- putKV_NodeData key val dbNodeData
+  putNodeData dbPutNodeData
 
-unsafeGetKeyVals::MonadIO m=>MPDB->Key->m [(Key, Val)]
-unsafeGetKeyVals db =
-  let dbNodeRef = PtrRef $ stateRoot db
-  in getKeyVals_NodeRef db dbNodeRef
+unsafeGetKeyVals :: (Monad m, (StateRoot `Alters` NodeData) m)
+                 => StateRoot -> Key -> m [(Key, Val)]
+unsafeGetKeyVals sr = getKeyVals_NodeRef $ PtrRef sr
 
-unsafeGetAllKeyVals::MonadIO m=>MPDB->m [(Key, Val)]
-unsafeGetAllKeyVals db = unsafeGetKeyVals db N.empty
+unsafeGetAllKeyVals :: (Monad m, (StateRoot `Alters` NodeData) m)
+                    => StateRoot -> m [(Key, Val)]
+unsafeGetAllKeyVals sr = unsafeGetKeyVals sr N.empty
 
-unsafeDeleteKey::MonadIO m=>MPDB->Key->m MPDB
-unsafeDeleteKey db key = do
-  dbNodeData <- getNodeData db (PtrRef $ stateRoot db)
-  dbDeleteNodeData <- deleteKey_NodeData db key dbNodeData
-  p <- putNodeData db dbDeleteNodeData
-  return db{stateRoot=p}
+unsafeDeleteKey :: (Monad m, (StateRoot `Alters` NodeData) m)
+                => StateRoot -> Key -> m StateRoot
+unsafeDeleteKey sr key = do
+  dbNodeData <- getNodeData (PtrRef sr)
+  dbDeleteNodeData <- deleteKey_NodeData key dbNodeData
+  putNodeData dbDeleteNodeData
 
-keyToSafeKey::N.NibbleString->N.NibbleString
+keyToSafeKey :: N.NibbleString -> N.NibbleString
 keyToSafeKey key =
   N.EvenNibbleString $ keccak256 keyByteString
   where
@@ -71,57 +73,58 @@ keyToSafeKey key =
 
 -----
 
-putKV_NodeData::MonadIO m=>MPDB->Key->Val->NodeData->m NodeData
+putKV_NodeData :: (Monad m, (StateRoot `Alters` NodeData) m)
+               => Key -> Val -> NodeData -> m NodeData
 
-putKV_NodeData _ key val EmptyNodeData =
+putKV_NodeData key val EmptyNodeData =
   return $ ShortcutNodeData key (Right val)
 
-putKV_NodeData db key val (FullNodeData options nodeValue)
+putKV_NodeData key val (FullNodeData options nodeValue)
   | options `slotIsEmpty` N.head key =
     do
-      tailNode <- newShortcut db (N.tail key) $ Right val
+      tailNode <- newShortcut (N.tail key) $ Right val
       return $ FullNodeData (replace options (N.head key) tailNode) nodeValue
 
   | otherwise =
       do
         let conflictingNodeRef = options!!fromIntegral (N.head key)
-        newNode <- putKV_NodeRef db (N.tail key) val conflictingNodeRef
+        newNode <- putKV_NodeRef (N.tail key) val conflictingNodeRef
         return $ FullNodeData (replace options (N.head key) newNode) nodeValue
 
-putKV_NodeData db key1 val1 (ShortcutNodeData key2 val2)
+putKV_NodeData key1 val1 (ShortcutNodeData key2 val2)
   | key1 == key2 =
     case val2 of
       Right _  -> return $ ShortcutNodeData key1 $ Right val1
       Left ref -> do
-        newNodeRef <- putKV_NodeRef db key1 val1 ref
+        newNodeRef <- putKV_NodeRef key1 val1 ref
         return $ ShortcutNodeData key2 (Left newNodeRef)
 
   | N.null key1 = do
-      newNodeRef <- newShortcut db (N.tail key2) val2
+      newNodeRef <- newShortcut (N.tail key2) val2
       return $ FullNodeData (list2Options 0 [(N.head key2, newNodeRef)]) $ Just val1
 
   | key1 `N.isPrefixOf` key2 = do
-      tailNode <- newShortcut db (N.drop (N.length key1) key2) val2
-      modifiedTailNode <- putKV_NodeRef db "" val1 tailNode
+      tailNode <- newShortcut (N.drop (N.length key1) key2) val2
+      modifiedTailNode <- putKV_NodeRef "" val1 tailNode
       return $ ShortcutNodeData key1 $ Left modifiedTailNode
 
   | key2 `N.isPrefixOf` key1 =
     case val2 of
-      Right val -> putKV_NodeData db key2 val (ShortcutNodeData key1 $ Right val1)
+      Right val -> putKV_NodeData key2 val (ShortcutNodeData key1 $ Right val1)
       Left ref  -> do
-        newNode <- putKV_NodeRef db (N.drop (N.length key2) key1) val1 ref
+        newNode <- putKV_NodeRef (N.drop (N.length key2) key1) val1 ref
         return $ ShortcutNodeData key2 $ Left newNode
 
   | N.head key1 == N.head key2 =
     let (commonPrefix, suffix1, suffix2) =
           getCommonPrefix (N.unpack key1) (N.unpack key2)
     in do
-      nodeAfterCommonBeforePut <- newShortcut db (N.pack suffix2) val2
-      nodeAfterCommon <- putKV_NodeRef db (N.pack suffix1) val1 nodeAfterCommonBeforePut
+      nodeAfterCommonBeforePut <- newShortcut (N.pack suffix2) val2
+      nodeAfterCommon <- putKV_NodeRef (N.pack suffix1) val1 nodeAfterCommonBeforePut
       return $ ShortcutNodeData (N.pack commonPrefix) $ Left nodeAfterCommon
   | otherwise = do
-      tailNode1 <- newShortcut db (N.tail key1) $ Right val1
-      tailNode2 <- newShortcut db (N.tail key2) val2
+      tailNode1 <- newShortcut (N.tail key1) $ Right val1
+      tailNode2 <- newShortcut (N.tail key2) val2
       return $ FullNodeData
         (list2Options 0 $ sortBy (compare `on` fst)
          [(N.head key1, tailNode1), (N.head key2, tailNode2)])
@@ -129,28 +132,29 @@ putKV_NodeData db key1 val1 (ShortcutNodeData key2 val2)
 
 -----
 
-getKeyVals_NodeData::MonadIO m=>MPDB->NodeData->Key->m [(Key, Val)]
+getKeyVals_NodeData :: (Monad m, (StateRoot `Alters` NodeData) m)
+                    => NodeData -> Key -> m [(Key, Val)]
 
-getKeyVals_NodeData _ EmptyNodeData _ = return []
+getKeyVals_NodeData EmptyNodeData _ = return []
 
-getKeyVals_NodeData db (FullNodeData {choices=cs}) "" = do
-  partialKVs <- sequence $ (\ref -> getKeyVals_NodeRef db ref "") <$> cs
+getKeyVals_NodeData (FullNodeData {choices=cs}) "" = do
+  partialKVs <- sequence $ (\ref -> getKeyVals_NodeRef ref "") <$> cs
   return $ concatMap
     (uncurry $ map . (prependToKey . N.singleton)) (zip [0..] partialKVs)
 
-getKeyVals_NodeData db (FullNodeData {choices=cs}) key
+getKeyVals_NodeData (FullNodeData {choices=cs}) key
   | ref == emptyRef = return []
   | otherwise = fmap (prependToKey $ N.singleton $ N.head key) <$>
-                getKeyVals_NodeRef db ref (N.tail key)
+                getKeyVals_NodeRef ref (N.tail key)
   where ref = cs !! fromIntegral (N.head key)
 
-getKeyVals_NodeData db ShortcutNodeData{nextNibbleString=s, nextVal=Left ref} key
+getKeyVals_NodeData ShortcutNodeData{nextNibbleString=s, nextVal=Left ref} key
   | key `N.isPrefixOf` s = prependNext ""
   | s `N.isPrefixOf` key = prependNext $ N.drop (N.length s) key
   | otherwise = return []
-  where prependNext key' = fmap (prependToKey s) <$> getKeyVals_NodeRef db ref key'
+  where prependNext key' = fmap (prependToKey s) <$> getKeyVals_NodeRef ref key'
 
-getKeyVals_NodeData _ ShortcutNodeData{nextNibbleString=s, nextVal=Right val} key =
+getKeyVals_NodeData ShortcutNodeData{nextNibbleString=s, nextVal=Right val} key =
   return $
     if key `N.isPrefixOf` s
     then [(s,val)]
@@ -158,75 +162,67 @@ getKeyVals_NodeData _ ShortcutNodeData{nextNibbleString=s, nextVal=Right val} ke
 
 -----
 
-deleteKey_NodeData::MonadIO m=>MPDB->Key->NodeData->m NodeData
+deleteKey_NodeData :: (Monad m, (StateRoot `Alters` NodeData) m) => Key -> NodeData -> m NodeData
 
-deleteKey_NodeData _ _ EmptyNodeData = return EmptyNodeData
+deleteKey_NodeData _ EmptyNodeData = return EmptyNodeData
 
-deleteKey_NodeData db key nd@(FullNodeData options val)
+deleteKey_NodeData key nd@(FullNodeData options val)
   | N.null key = return $ FullNodeData options Nothing
 
   | options `slotIsEmpty` N.head key = return nd
 
   | otherwise = do
     let nodeRef = options!!fromIntegral (N.head key)
-    newNodeRef <- deleteKey_NodeRef db (N.tail key) nodeRef
+    newNodeRef <- deleteKey_NodeRef (N.tail key) nodeRef
     let newOptions = replace options (N.head key) newNodeRef
-    simplify_NodeData db $ FullNodeData newOptions val
+    simplify_NodeData $ FullNodeData newOptions val
 
-deleteKey_NodeData _ key1 nd@(ShortcutNodeData key2 (Right _)) =
+deleteKey_NodeData key1 nd@(ShortcutNodeData key2 (Right _)) =
   return $
     if key1 == key2
     then EmptyNodeData
     else nd
 
-deleteKey_NodeData db key1 nd@(ShortcutNodeData key2 (Left ref))
+deleteKey_NodeData key1 nd@(ShortcutNodeData key2 (Left ref))
   | key2 `N.isPrefixOf` key1 = do
-    newNodeRef <- deleteKey_NodeRef db (N.drop (N.length key2) key1) ref
-    simplify_NodeData db $ ShortcutNodeData key2 $ Left newNodeRef
+    newNodeRef <- deleteKey_NodeRef (N.drop (N.length key2) key1) ref
+    simplify_NodeData $ ShortcutNodeData key2 $ Left newNodeRef
 
   | otherwise = return nd
 
 -----
 
-putKV_NodeRef::MonadIO m=>MPDB->Key->Val->NodeRef->m NodeRef
-putKV_NodeRef db key val nodeRef = do
-  nodeData <- getNodeData db nodeRef
-  newNodeData <- putKV_NodeData db key val nodeData
-  nodeData2NodeRef db newNodeData
+putKV_NodeRef :: (Monad m, (StateRoot `Alters` NodeData) m) => Key -> Val -> NodeRef -> m NodeRef
+putKV_NodeRef key val nodeRef = do
+  nodeData <- getNodeData nodeRef
+  newNodeData <- putKV_NodeData key val nodeData
+  nodeData2NodeRef newNodeData
 
-
-getKeyVals_NodeRef::MonadIO m=>MPDB->NodeRef->Key->m [(Key, Val)]
-getKeyVals_NodeRef db ref key = do
-  nodeData <- getNodeData db ref
-  getKeyVals_NodeData db nodeData key
+getKeyVals_NodeRef :: (Monad m, (StateRoot `Alters` NodeData) m) => NodeRef -> Key -> m [(Key, Val)]
+getKeyVals_NodeRef ref key = do
+  nodeData <- getNodeData ref
+  getKeyVals_NodeData nodeData key
 
 --TODO- This is looking like a lift, I probably should make NodeRef some sort of Monad....
 
-deleteKey_NodeRef::MonadIO m=>MPDB->Key->NodeRef->m NodeRef
-deleteKey_NodeRef db key nodeRef =
-  nodeData2NodeRef db =<< deleteKey_NodeData db key =<< getNodeData db nodeRef
+deleteKey_NodeRef :: (Monad m, (StateRoot `Alters` NodeData) m) => Key -> NodeRef -> m NodeRef
+deleteKey_NodeRef key nodeRef =
+  nodeData2NodeRef =<< deleteKey_NodeData key =<< getNodeData nodeRef
 
 -----
 
-getNodeData::MonadIO m=>MPDB->NodeRef->m NodeData
-getNodeData _ (SmallRef x) = return $ rlpDecode $ rlpDeserialize x
-getNodeData db (PtrRef ptr@(StateRoot p)) = do
-  bytes <-
-    fromMaybe
-    (error $ "Missing StateRoot in call to getNodeData: " ++ format ptr) <$>
-    DB.get (ldb db) def p
-  return $ bytes2NodeData bytes
-    where
-      bytes2NodeData::B.ByteString->NodeData
-      bytes2NodeData bytes | B.null bytes = EmptyNodeData
-      bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
+getNodeData :: (StateRoot `Alters` NodeData) m => NodeRef -> m NodeData
+getNodeData (SmallRef x) = pure $ rlpDecode $ rlpDeserialize x
+getNodeData (PtrRef sr) =
+  fromMaybe (error $ "Missing StateRoot in call to getNodeData: " ++ format sr) <$>
+  A.lookup Proxy sr
 
-putNodeData::MonadIO m=>MPDB->NodeData->m StateRoot
-putNodeData db nd = do
+putNodeData :: (Monad m, (StateRoot `Alters` NodeData) m) => NodeData -> m StateRoot
+putNodeData nd = do
   let bytes = rlpSerialize $ rlpEncode nd
-      ptr = keccak256 bytes
-  DB.put (ldb db) def ptr bytes
-  return $ StateRoot ptr
+      ptr = StateRoot $ keccak256 bytes
+  A.insert Proxy ptr nd
+  return ptr
 
 -----
 
@@ -241,33 +237,33 @@ putNodeData db nd = do
 -- the whole database.  The delete function only will "break" the
 -- canonical structure locally, so deep recursion isn't required.
 
-simplify_NodeData::MonadIO m=>MPDB->NodeData->m NodeData
-simplify_NodeData _ EmptyNodeData = return EmptyNodeData
-simplify_NodeData db nd@(ShortcutNodeData key (Left ref)) = do
-  refNodeData <- getNodeData db ref
+simplify_NodeData :: (Monad m, (StateRoot `Alters` NodeData) m) => NodeData -> m NodeData
+simplify_NodeData EmptyNodeData = return EmptyNodeData
+simplify_NodeData nd@(ShortcutNodeData key (Left ref)) = do
+  refNodeData <- getNodeData ref
   case refNodeData of
     (ShortcutNodeData key2 v2) -> return $ ShortcutNodeData (key `N.append` key2) v2
     _                          -> return nd
-simplify_NodeData db (FullNodeData options Nothing) = do
+simplify_NodeData (FullNodeData options Nothing) = do
     case options2List options of
       [(n, nodeRef)] ->
-          simplify_NodeData db $ ShortcutNodeData (N.singleton n) $ Left nodeRef
+          simplify_NodeData $ ShortcutNodeData (N.singleton n) $ Left nodeRef
       _ -> return $ FullNodeData options Nothing
-simplify_NodeData _ x = return x
+simplify_NodeData x = return x
 
 -----
 
-newShortcut::MonadIO m=>MPDB->Key->Either NodeRef Val->m NodeRef
-newShortcut _ "" (Left ref) = return ref
-newShortcut db key val      = nodeData2NodeRef db $ ShortcutNodeData key val
+newShortcut :: (Monad m, (StateRoot `Alters` NodeData) m) => Key -> Either NodeRef Val -> m NodeRef
+newShortcut "" (Left ref) = return ref
+newShortcut key val      = nodeData2NodeRef $ ShortcutNodeData key val
 
-nodeData2NodeRef::MonadIO m=>MPDB->NodeData->m NodeRef
-nodeData2NodeRef db nodeData =
+nodeData2NodeRef :: (Monad m, (StateRoot `Alters` NodeData) m) => NodeData -> m NodeRef
+nodeData2NodeRef nodeData =
   case rlpSerialize $ rlpEncode nodeData of
     bytes | B.length bytes < 32 -> return $ SmallRef bytes
-    _     -> PtrRef <$> putNodeData db nodeData
+    _     -> PtrRef <$> putNodeData nodeData
 
-list2Options::N.Nibble->[(N.Nibble, NodeRef)]->[NodeRef]
+list2Options :: N.Nibble -> [(N.Nibble, NodeRef)] -> [NodeRef]
 list2Options start [] = replicate (fromIntegral $ 0x10 - start) emptyRef
 list2Options start x | start > 15 =
   error $
@@ -276,26 +272,25 @@ list2Options start x | start > 15 =
 list2Options start ((firstNibble, firstPtr):rest) =
     replicate (fromIntegral $ firstNibble - start) emptyRef ++ [firstPtr] ++ list2Options (firstNibble+1) rest
 
-options2List::[NodeRef]->[(N.Nibble, NodeRef)]
+options2List :: [NodeRef] -> [(N.Nibble, NodeRef)]
 options2List theList = filter ((/= emptyRef) . snd) $ zip [0..] theList
 
-prependToKey::Key->(Key, Val)->(Key, Val)
+prependToKey :: Key -> (Key, Val) -> (Key, Val)
 prependToKey prefix (key, val) = (prefix `N.append` key, val)
 
-replace::Integral i=>[a]->i->a->[a]
+replace :: Integral i => [a] -> i -> a -> [a]
 replace lst i newVal = left ++ [newVal] ++ right
             where
               (left, _:right) = splitAt (fromIntegral i) lst
 
-slotIsEmpty::[NodeRef]->N.Nibble->Bool
+slotIsEmpty :: [NodeRef] -> N.Nibble -> Bool
 slotIsEmpty [] _ =
   error "slotIsEmpty was called for value greater than the size of the list"
 slotIsEmpty (x:_) 0 | x == emptyRef = True
 slotIsEmpty _ 0 = False
 slotIsEmpty (_:rest) n = slotIsEmpty rest (n-1)
 
-
-getCommonPrefix::Eq a=>[a]->[a]->([a], [a], [a])
+getCommonPrefix :: Eq a => [a] -> [a] -> ([a], [a], [a])
 getCommonPrefix (c1:rest1) (c2:rest2)
   | c1 == c2 = prefixTheCommonPrefix c1 (getCommonPrefix rest1 rest2)
   where

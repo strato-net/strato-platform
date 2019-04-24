@@ -1,10 +1,13 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators    #-}
 
 module BatchMerge (
   putManyKeyVal
   ) where
 
 import           Control.Monad
-import           Control.Monad.IO.Class
+import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.Loops
 import           Data.Default
 import           Data.Maybe
@@ -20,23 +23,23 @@ import FastMP
 import KV
 import ReverseOrderedKVs
 
-putManyKeyVal :: MonadIO m=>
-                 MP.MPDB -> [(MP.Key, MP.Val)] -> m MP.MPDB
-putManyKeyVal mpdb listOfInserts = do
+putManyKeyVal :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+              => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
+putManyKeyVal sr listOfInserts = do
   let listOfInserts' = map (\(k, v) -> (MP.keyToSafeKey k, v)) listOfInserts
 
-  nd <- MP.getNodeData mpdb (MP.PtrRef $ MP.stateRoot mpdb)
+  nd <- MP.getNodeData $ MP.PtrRef sr
 
-  finalNd <- putManyKeyVal_nodeData mpdb nd $ orderTheKVs $ map (uncurry createKV) listOfInserts'
+  finalNd <- putManyKeyVal_nodeData nd $ orderTheKVs $ map (uncurry createKV) listOfInserts'
 
-  nr <- MP.nodeData2NodeRef mpdb finalNd
+  nr <- MP.nodeData2NodeRef finalNd
 
   case nr of
-    MP.PtrRef sr -> return mpdb{MP.stateRoot=sr}
+    MP.PtrRef sr -> return sr
     MP.SmallRef v -> do -- The whole trie is too small to fit in a level db key, just create a stateroot from the full data....
       let newSR = keccak256 v
-      DB.put (MP.ldb mpdb) def newSR v
-      return mpdb{MP.stateRoot=MP.StateRoot newSR}
+      A.insert (A.Proxy @NodeData) newSR v
+      return $ MP.StateRoot newSR
 
 splitKeysByPrefix :: [Maybe N.Nibble] -> [KV] -> [[KV]]
 splitKeysByPrefix [] [] = []
@@ -47,9 +50,9 @@ splitKeysByPrefix (firstChar:remainingPrefix) kvs =
        Just _ -> map (\(KV k v) -> (KV (tail k) v)) matched:splitKeysByPrefix remainingPrefix remaining
        Nothing -> matched:splitKeysByPrefix remainingPrefix remaining
 
-putManyKeyVal_nodeData :: MonadIO m=>
-                          MP.MPDB -> MP.NodeData -> ReverseOrderedKVs -> m MP.NodeData
-putManyKeyVal_nodeData mpdb (MP.FullNodeData choices val) listOfInserts = do
+putManyKeyVal_nodeData :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+                       => MP.NodeData -> ReverseOrderedKVs -> m MP.NodeData
+putManyKeyVal_nodeData (MP.FullNodeData choices val) listOfInserts = do
   let kvsSplitByFirstNibble = splitKeysByPrefix (map Just [15,14..0] ++ [Nothing]) $ getTheKVs listOfInserts
   
   choices' <-
@@ -57,9 +60,9 @@ putManyKeyVal_nodeData mpdb (MP.FullNodeData choices val) listOfInserts = do
       if null newVals
         then return oldVal
         else do
-          oldNd <- MP.getNodeData mpdb oldVal
-          nd <- putManyKeyVal_nodeData mpdb oldNd $ iPromiseTheseKVsAreOrdered newVals
-          MP.nodeData2NodeRef mpdb nd
+          oldNd <- MP.getNodeData oldVal
+          nd <- putManyKeyVal_nodeData oldNd $ iPromiseTheseKVsAreOrdered newVals
+          MP.nodeData2NodeRef nd
 
   let val' =
         case last kvsSplitByFirstNibble of
@@ -72,11 +75,11 @@ putManyKeyVal_nodeData mpdb (MP.FullNodeData choices val) listOfInserts = do
 
 
   
-putManyKeyVal_nodeData mpdb (MP.ShortcutNodeData k (Right v)) listOfInserts = do
-   liftIO $ createMPFast_NodeData (MP.ldb mpdb) $ insertKV_ignoreIfExists listOfInserts $ KV (N.unpack k) $ Right v
+putManyKeyVal_nodeData (MP.ShortcutNodeData k (Right v)) listOfInserts = do
+   createMPFast_NodeData $ insertKV_ignoreIfExists listOfInserts $ KV (N.unpack k) $ Right v
 
 
-putManyKeyVal_nodeData mpdb (nd@(MP.ShortcutNodeData _ (Left _))) listOfInserts = do
+putManyKeyVal_nodeData (nd@(MP.ShortcutNodeData _ (Left _))) listOfInserts = do
   --OK, this case should be extrememly rare (since keys are always randomized by a hash function anyway).
   --This is both theoretically obvious, and seems to be empirically true in the times I have
   --already run things (this case hasn't been triggered yet).
@@ -87,7 +90,7 @@ putManyKeyVal_nodeData mpdb (nd@(MP.ShortcutNodeData _ (Left _))) listOfInserts 
   --now....
 
   
-  concatM (map (\(KV k (Right v)) -> MP.putKV_NodeData mpdb (N.pack k) v) $ getTheKVs listOfInserts) nd
+  concatM (map (\(KV k (Right v)) -> MP.putKV_NodeData (N.pack k) v) $ getTheKVs listOfInserts) nd
 
 
 
@@ -95,8 +98,8 @@ putManyKeyVal_nodeData mpdb (nd@(MP.ShortcutNodeData _ (Left _))) listOfInserts 
   
 
   
-putManyKeyVal_nodeData mpdb MP.EmptyNodeData listOfInserts = do
-  liftIO $ createMPFast_NodeData (MP.ldb mpdb) listOfInserts
+putManyKeyVal_nodeData MP.EmptyNodeData listOfInserts = do
+  createMPFast_NodeData listOfInserts
 
 
 createKV :: MP.Key -> MP.Val -> KV

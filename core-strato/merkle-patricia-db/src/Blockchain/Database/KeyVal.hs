@@ -4,20 +4,22 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
 
-module Blockchain.Database.KeyVal (
-    PointedKeyValDB(..),
-    KeyValMPLevelDB,
-    KeyValMPMap
-  ) where
+module Blockchain.Database.KeyVal where --(
+  --  PointedKeyValDB(..),
+  --  KeyValMPLevelDB,
+  --  KeyValMPMap
+  --) where
 
-import           Blockchain.Database.MerklePatricia
-import           Blockchain.Database.MerklePatriciaMem
-import           Control.Monad.Trans
-import           Control.Monad.Trans.Control
-import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.State
+--import           Blockchain.Database.MerklePatricia
+--import           Blockchain.Database.MerklePatriciaMem
+--import           Control.Monad.Change.Alter
+--import           Control.Monad.Trans
+--import           Control.Monad.Trans.Control
+--import           Control.Monad.Trans.Resource
+--import           Control.Monad.Trans.State
 
 {-
   A general interface for a key value "database" with a distinguished element
@@ -31,53 +33,53 @@ import           Control.Monad.Trans.State
   db.
 -}
 
-class (Monad m) => PointedKeyValDB m a b c t | c -> t where
-    getKV :: Monad m => a-> m (Maybe b)
-    putKV :: Monad m => (a,b) -> m c
-    deleteKV :: Monad m => a -> m c
-    emptyKV :: Monad m => t -> m c
-
-type KeyValMPLevelDB m = StateT MPDB (ResourceT m)
-type KeyValMPMap m = StateT MPMem m
-
-data Void
-
-instance (
-           Monad m,
-           MonadBaseControl IO m,
-           MonadIO m
-         )
-        => PointedKeyValDB (KeyValMPLevelDB m) Key Val MPDB String where
-
-    getKV key = do
-        db <- get
-        liftIO . runResourceT $ getKeyVal db key
-
-    putKV kvPair = do
-        db <- get
-        liftIO . runResourceT $ putKeyVal db (fst kvPair) (snd kvPair)
-
-    deleteKV key = do
-        db <- get
-        liftIO . runResourceT $ deleteKey db key
-
-    emptyKV path = liftIO . runResourceT $ openMPDB path  -- fix
-
-instance (
-           Monad m
-         )
-        => PointedKeyValDB (KeyValMPMap m) Key Val MPMem Void where
-
-    getKV key = do
-        db <- get
-        getKeyValMem db key
-
-    putKV kvPair = do
-        db <- get
-        putKeyValMem db (fst kvPair) (snd kvPair)
-
-    deleteKV key = do
-        db <- get
-        deleteKeyMem db key
-
-    emptyKV _ = return initializeBlankMem             -- fix
+--class (Monad m) => PointedKeyValDB m a b c t | c -> t where
+--    getKV :: Monad m => a-> m (Maybe b)
+--    putKV :: Monad m => (a,b) -> m c
+--    deleteKV :: Monad m => a -> m c
+--    emptyKV :: Monad m => t -> m c
+--
+--type KeyValMPLevelDB m = StateT MPDB (ResourceT m)
+--type KeyValMPMap m = StateT MPMem m
+--
+--data Void
+--
+--instance (
+--           Monad m,
+--           MonadBaseControl IO m,
+--           MonadIO m
+--         )
+--        => PointedKeyValDB (KeyValMPLevelDB m) Key Val MPDB String where
+--
+--    getKV key = do
+--        db <- get
+--        liftIO . runResourceT $ getKeyVal db key
+--
+--    putKV kvPair = do
+--        db <- get
+--        liftIO . runResourceT $ putKeyVal db (fst kvPair) (snd kvPair)
+--
+--    deleteKV key = do
+--        db <- get
+--        liftIO . runResourceT $ deleteKey db key
+--
+--    emptyKV path = liftIO . runResourceT $ openMPDB path  -- fix
+--
+--instance (
+--           Monad m
+--         )
+--        => PointedKeyValDB (KeyValMPMap m) Key Val MPMem Void where
+--
+--    getKV key = do
+--        db <- get
+--        getKeyValMem db key
+--
+--    putKV kvPair = do
+--        db <- get
+--        putKeyValMem db (fst kvPair) (snd kvPair)
+--
+--    deleteKV key = do
+--        db <- get
+--        deleteKeyMem db key
+--
+--    emptyKV _ = return initializeBlankMem             -- fix

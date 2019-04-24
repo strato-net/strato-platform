@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
+
 -- | This is an implementation of the modified Merkle Patricia database
 -- described in the Ethereum Yellowpaper
 -- (<http://gavwood.com/paper.pdf>).  This modified version works like a
@@ -25,10 +28,9 @@ module Blockchain.Database.MerklePatricia (
   initializeBlank, blankStateRoot
   ) where
 
-import           Control.Monad.IO.Class
-import           Data.Default
+import           Control.Monad.Change.Alter
 import           Data.Maybe                                  (isJust)
-import qualified Database.LevelDB                            as DB
+import           Data.Proxy
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.Internal
@@ -36,18 +38,20 @@ import           Blockchain.Strato.Model.SHA                 (keccak256)
 
 
 -- | Adds a new key/value pair.
-putKeyVal::MonadIO m=>MPDB -- ^ The object containing the current stateRoot.
-           ->Key -- ^ Key of the data to be inserted.
-           ->Val -- ^ Value of the new data
-           ->m MPDB -- ^ The object containing the stateRoot to the data after the insert.
-putKeyVal db = unsafePutKeyVal db . keyToSafeKey
+putKeyVal :: (Monad m, (StateRoot `Alters` NodeData) m)
+          => StateRoot -- ^ The object containing the current stateRoot.
+          -> Key -- ^ Key of the data to be inserted.
+          -> Val -- ^ Value of the new data
+          -> m StateRoot -- ^ The object containing the stateRoot to the data after the insert.
+putKeyVal sr = unsafePutKeyVal sr . keyToSafeKey
 
 -- | Retrieves all key/value pairs whose key starts with the given parameter.
-getKeyVal::MonadIO m=>MPDB -- ^ Object containing the current stateRoot.
-         -> Key -- ^ Key of the data to be inserted.
-         -> m (Maybe Val) -- ^ The requested value.
-getKeyVal db key = do
-  vals <- unsafeGetKeyVals db (keyToSafeKey key)
+getKeyVal :: (Monad m, (StateRoot `Alters` NodeData) m)
+          => StateRoot -- ^ Object containing the current stateRoot.
+          -> Key -- ^ Key of the data to be inserted.
+          -> m (Maybe Val) -- ^ The requested value.
+getKeyVal sr key = do
+  vals <- unsafeGetKeyVals sr (keyToSafeKey key)
   return $
     if not (null vals)
     then Just $ snd (head vals)
@@ -59,25 +63,27 @@ getKeyVal db key = do
 --
 -- Note that the key/value pair will still be present in the history, and
 -- can be accessed by using an older 'MPDB' object.
-deleteKey::MonadIO m=>MPDB -- ^ The object containing the current stateRoot.
-         ->Key -- ^ The key to be deleted.
-         ->m MPDB -- ^ The object containing the stateRoot to the data after the delete.
-deleteKey db = unsafeDeleteKey db . keyToSafeKey
+deleteKey :: (Monad m, (StateRoot `Alters` NodeData) m)
+          => StateRoot -- ^ The object containing the current stateRoot.
+          -> Key -- ^ The key to be deleted.
+          -> m StateRoot -- ^ The object containing the stateRoot to the data after the delete.
+deleteKey sr = unsafeDeleteKey sr . keyToSafeKey
 
 -- | Returns True is a key exists.
-keyExists::MonadIO m=>MPDB -- ^ The object containing the current stateRoot.
-         ->Key -- ^ The key to be deleted.
-         ->m Bool -- ^ True if the key exists
-keyExists db key = isJust <$> getKeyVal db key
+keyExists :: (Monad m, (StateRoot `Alters` NodeData) m)
+          => StateRoot -- ^ The object containing the current stateRoot.
+          -> Key -- ^ The key to be deleted.
+          -> m Bool -- ^ True if the key exists
+keyExists sr key = isJust <$> getKeyVal sr key
 
 -- | Returns the StateRoot of the blank database
 blankStateRoot :: StateRoot
 blankStateRoot = StateRoot $ keccak256 (rlpSerialize $ rlpEncode (0 :: Integer))
 
 -- | Initialize the DB by adding a blank stateroot.
-initializeBlank:: MonadIO m => MPDB -- ^ The object containing the current stateRoot.
-               ->m ()
-initializeBlank db =
-    let bytes = rlpSerialize $ rlpEncode (0::Integer)
-    in
-      DB.put (ldb db) def (keccak256 bytes) bytes
+initializeBlank :: (Monad m, (StateRoot `Alters` NodeData) m)
+                       -- ^ The object containing the current stateRoot.
+                => m ()
+initializeBlank =
+    let bytes = rlpSerialize $ rlpEncode EmptyNodeData
+    in insert Proxy (StateRoot (keccak256 bytes)) EmptyNodeData

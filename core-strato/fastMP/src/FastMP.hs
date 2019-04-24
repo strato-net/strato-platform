@@ -1,19 +1,29 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 module FastMP where
-  
+
 import Control.Monad
+import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Control.Monad.Loops
-import Control.Monad.Trans.Resource
+import Control.Monad.Trans.Reader
+import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
-import Data.Conduit
+import Data.Default (def)
 import Data.List
+import qualified Data.Map.Strict as M
+import Data.Maybe
 import qualified Data.NibbleString as N
+import Data.Proxy
 import qualified Database.LevelDB as LDB
 
 import Blockchain.Data.RLP
-import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
+-- import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
@@ -21,35 +31,46 @@ import qualified Blockchain.Database.MerklePatricia.NodeData as MP
 import Blockchain.Strato.Model.SHA (keccak256)
 
 import KV
-import LevelDBTools
 import ReverseOrderedKVs
 
 debug :: Bool
 debug = False
 
-
-
+instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT LDB.DB m) where
+  alterMany _ srs f = do
+    db <- ask
+    bss <- liftIO $ forM srs $ \(MP.StateRoot p) -> LDB.get db def p
+    let nds = map (fmap bytes2NodeData) bss
+    let m = M.fromList $ map (fmap fromJust) $ filter (isJust . snd) $ zip srs nds
+    m' <- f m
+    mapM_ (uncurry (LDB.put db def) . toBytes) $ M.toList m'
+    mapM_ (\(MP.StateRoot sr) -> LDB.delete db def sr) . M.keys $ m M.\\ m'
+    return m'
+    where
+      bytes2NodeData :: B.ByteString -> MP.NodeData
+      bytes2NodeData bytes | B.null bytes = MP.EmptyNodeData
+      bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
+      toBytes :: (MP.StateRoot, MP.NodeData) -> (B.ByteString, B.ByteString)
+      toBytes (MP.StateRoot sr, nd) = (sr, rlpSerialize $ rlpEncode nd)
 
 createMPFast :: LDB.DB -> ReverseOrderedKVs -> IO MP.StateRoot
 createMPFast db rOrderedKVs = do
-  nd <- createMPFast_NodeData db rOrderedKVs
-
-  let mpdb = MP.MPDB{MP.ldb = db, MP.stateRoot = MP.emptyTriePtr}
-
-  nr <- MP.nodeData2NodeRef mpdb nd
+  nr <- flip runReaderT db $ do
+    nd <- createMPFast_NodeData rOrderedKVs
+    MP.nodeData2NodeRef nd
 
   case nr of
     MP.PtrRef sr -> return sr
     MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
 
 
-createMPFast_NodeData :: LDB.DB -> ReverseOrderedKVs -> IO MP.NodeData
-createMPFast_NodeData db rOrderedKVs = do
-  runResourceT $ runConduit $ doit (getTheKVs rOrderedKVs, []) `fuseUpstream` outputToLDB db
+createMPFast_NodeData :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+                      => ReverseOrderedKVs -> m MP.NodeData
+createMPFast_NodeData rOrderedKVs = doit $ getTheKVs rOrderedKVs
 
 
 {-
-kvToStdout :: MonadIO m => ConduitT LevelKV Void m ()
+kvToStdout :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m) => ConduitT LevelKV Void m ()
 kvToStdout = do
   input <- await
   case input of
@@ -60,23 +81,24 @@ kvToStdout = do
 -}
 
 
-doit :: MonadIO m =>
-        ([KV], [([N.Nibble], PartialNode)]) -> ConduitT () LevelKV m MP.NodeData
-doit x = do
-  let inputIsExhausted :: ([KV], [([N.Nibble], PartialNode)]) -> Bool
-      inputIsExhausted ([], [([], _)]) = True
-      inputIsExhausted ([_], []) = True
-      inputIsExhausted ([], []) = True
-      inputIsExhausted _ = False
+doit :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m) =>
+        [KV] -> m MP.NodeData
+doit kvs = go (kvs, [])
+  where go x = do
+          let inputIsExhausted :: ([KV], [([N.Nibble], PartialNode)]) -> Bool
+              inputIsExhausted ([], [([], _)]) = True
+              inputIsExhausted ([_], []) = True
+              inputIsExhausted ([], []) = True
+              inputIsExhausted _ = False
 
-      getFinalPartialNode ([], [(_, finalPartialNode)]) = partialToNode finalPartialNode
-      getFinalPartialNode ([KV k v], []) = MP.ShortcutNodeData (N.pack k) v
-      getFinalPartialNode ([], []) = MP.EmptyNodeData
-      getFinalPartialNode _ = error "internal error: getFinalStateroot was called on a non-final state"
-  
-  finalValue <- iterateUntilM inputIsExhausted processNext x
+              getFinalPartialNode ([], [(_, finalPartialNode)]) = partialToNode finalPartialNode
+              getFinalPartialNode ([KV k v], []) = MP.ShortcutNodeData (N.pack k) v
+              getFinalPartialNode ([], []) = MP.EmptyNodeData
+              getFinalPartialNode _ = error "internal error: getFinalStateroot was called on a non-final state"
+          
+          finalValue <- iterateUntilM inputIsExhausted processNext x
 
-  return $ getFinalPartialNode finalValue
+          return $ getFinalPartialNode finalValue
   
 data NodePtr = NodePtr String deriving Show
 
@@ -97,8 +119,8 @@ partialToNode (PartialNode b v) =
     spreadOut _ [] = error "internal error: spreadOut was given input out of order or out of range"
     
 
-processNext :: MonadIO m =>
-               ([KV], [([N.Nibble], PartialNode)])->ConduitM () LevelKV m ([KV], [([N.Nibble], PartialNode)])
+processNext :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m) =>
+               ([KV], [([N.Nibble], PartialNode)]) -> m ([KV], [([N.Nibble], PartialNode)])
 
 --Create new Partial Node
 processNext x@((KV k1 v1:second@(KV k2 _):rest), partials) | shouldCreate x = do
@@ -107,7 +129,6 @@ processNext x@((KV k1 v1:second@(KV k2 _):rest), partials) | shouldCreate x = do
           Right tempStr -> Right tempStr
           Left val -> Left val
 
-                                                               
   let (prefix, (fkey, _)) = splitPrefix k1 k2
 
   partialNode <- addToPartial PartialNode{branches=[], value=Nothing} $ KV fkey v1'
@@ -136,8 +157,8 @@ processNext (input, ((prefix, partialNode):partialrest)) = do
 
   nodePtr <- nodeData2NodeRef node
   
-  when debug $
-    liftIO $ putStrLn $ "#### Flush Partial(" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
+--  when debug $
+--    liftIO $ putStrLn $ "#### Flush Partial(" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
     
   return ((KV prefix (Left nodePtr)):input, partialrest)
 
@@ -151,7 +172,8 @@ processNext _ = error "it should be impossible to arrive here"
 
 
 
-nodeData2NodeRef :: MonadIO m => MP.NodeData->ConduitM () LevelKV m MP.NodeRef
+nodeData2NodeRef :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+                 => MP.NodeData -> m MP.NodeRef
 nodeData2NodeRef nodeData =
   case rlpSerialize $ rlpEncode nodeData of
     bytes | BC.length bytes < 32 -> return $ MP.SmallRef bytes
@@ -161,22 +183,21 @@ nodeData2NodeRef nodeData =
 
 
 
-putNodeData :: MonadIO m => MP.NodeData->ConduitM () LevelKV m MP.StateRoot
+putNodeData :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+            => MP.NodeData -> m MP.StateRoot
 putNodeData nd = do
   let bytes = rlpSerialize $ rlpEncode nd
-      ptr = keccak256 bytes
-      levelKV = LevelKV ptr bytes
-  when debug $
-    liftIO $ putStrLn $ ">>>> " ++ formatLevelKV levelKV
-  yield levelKV
-  return $ MP.StateRoot ptr
+      sr = MP.StateRoot $ keccak256 bytes
+  A.insert Proxy sr nd
+  return sr
 
 
 --------------------
 
 
 
-addToPartial :: MonadIO m => PartialNode -> KV -> ConduitM () LevelKV m PartialNode
+addToPartial :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+             => PartialNode -> KV -> m PartialNode
 addToPartial partialNode (KV [] (Right val)) =
   return $ partialNode{value = Just val}
 addToPartial partialNode (KV [x] (Left nodePtr)) = do
@@ -184,8 +205,8 @@ addToPartial partialNode (KV [x] (Left nodePtr)) = do
 addToPartial partialNode (KV x@(_:rest) val) = do
   let node = MP.ShortcutNodeData (N.pack rest) val
   nodePtr <- nodeData2NodeRef node
-  when debug $
-    liftIO $ putStrLn $ "####addToPartial (" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
+--  when debug $
+--    liftIO $ putStrLn $ "####addToPartial (" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
 
   
   return $ partialNode{branches = (head x, nodePtr):branches partialNode}

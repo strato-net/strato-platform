@@ -105,7 +105,7 @@ newtype GenesisRoot = GenesisRoot { unGenesisRoot :: MP.StateRoot }
 newtype BestBlockRoot = BestBlockRoot { unBestBlockRoot :: MP.StateRoot }
   deriving (Eq, Ord, Show, Format, Generic, NFData)
 
-getLDB :: HasStateDB m => m DB.DB
+getLDB :: Modifiable MP.MPDB m => m DB.DB
 getLDB = MP.ldb <$> getStateDB
 
 word256ToMPKey :: Word256 -> N.NibbleString
@@ -117,7 +117,7 @@ getkv db = fmap (fmap rlpDecode) . MP.getKeyVal db
 putkv :: (RLPSerializable a, MonadIO m) => MP.MPDB -> N.NibbleString -> a -> m MP.StateRoot
 putkv db k = (fmap MP.stateRoot) . MP.putKeyVal db k . rlpEncode
 
-bootstrapChainDB :: (HasStateDB m, Modifiable BlockHashRoot m) => SHA -> m ()
+bootstrapChainDB :: (Modifiable MP.MPDB m, Modifiable BlockHashRoot m) => SHA -> m ()
 bootstrapChainDB genesisHash = putChainBlockHashInfo genesisHash (SHA 0) MP.emptyTriePtr
 
 putBlockHeaderInChainDB :: ( BlockHeaderLike h
