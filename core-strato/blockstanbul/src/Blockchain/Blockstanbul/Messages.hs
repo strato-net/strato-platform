@@ -166,7 +166,7 @@ outShortLog loc oev = $logInfoS loc . pack $
     ResetTimer rn -> CL.blue "RESET_TIMER " ++ show rn
     GapFound h r p -> CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
-    PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ if d then "AUTH" else "DROP" ++ " FROM " ++ format s
+    PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
 
 instance NFData OutEvent
 

@@ -53,7 +53,10 @@ executables:
       - base16-bytestring
       - base64-bytestring
       - hflags
+      - HTTP
       - extra
+      - strings
+      - curl
 
 tests:
   blockstanbul-test:
