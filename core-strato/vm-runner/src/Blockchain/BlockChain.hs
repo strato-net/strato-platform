@@ -92,6 +92,7 @@ import           Blockchain.Timing
 
 import qualified Text.Colors                             as CL
 import           Text.Format
+import           Text.Tools
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
@@ -186,7 +187,7 @@ addBlocks blocks' = do
       didReplaceBest <- liftIO (newIORef False)
       ranPrivateTxs  <- liftIO (newIORef False)
       replacedBest   <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
-      actions <- forM filtered $ \block -> timeit ("Block #" ++ show (blockDataNumber . obBlockData $ block) ++ " (" ++ show (length . obReceiptTransactions $ block) ++ " TXs) insertion") timerToUse $ do
+      actions <- forM filtered $ \block -> do
         actions <- addBlock block
         (didReplaceThisTime, ranPriv, replacedBits) <- replaceBestIfBetter block
         when didReplaceThisTime . liftIO $ do
@@ -215,19 +216,22 @@ addBlocks blocks' = do
   where
     timerToUse = Just vmBlockInsertionMined
 
-setTitle :: String -> IO()
-setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
-
 setParentStateRoot :: OutputBlock -> ContextM BlockSummary
-setParentStateRoot b@OutputBlock{..} = do
+setParentStateRoot OutputBlock{..} = do
     bSum <- BSDB.getBSum (blockDataParentHash obBlockData)
     liftIO $ setTitle $ "Block #" ++ show (blockDataNumber obBlockData)
-    $logInfoS "setParentStateRoot" . T.pack $ "Inserting block #" ++ show (blockDataNumber obBlockData) ++ " (" ++ format (outputBlockHash b) ++ ")."
     setStateDBStateRoot (bSumStateRoot bSum)
     return bSum
 
 addBlock :: OutputBlock -> ContextM [Action]
 addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} = do
+    $logInfoS "addBlocks" . T.pack $
+      "Inserting Block #"
+      ++ show (blockDataNumber . obBlockData $ b)
+      ++ " ("
+      ++ format (outputBlockHash b)
+      ++ ", " ++ show (length . obReceiptTransactions $ b)
+      ++ "TXs)."
     when flags_debug $ do
       bhr <- getBlockHashRoot
       cr <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
@@ -300,15 +304,16 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "Old chain state root: " ++ format sr
       $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
       actions <- addTransactions bd (blockDataGasLimit $ obBlockData b) txs -- TODO: Run the checks Bagger does reject invalid transactions for private chains
-      flushMemStorageDB
-      flushMemAddressStateDB
+      timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
+      timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
       when flags_debug $ do
         sr' <- getStateRoot
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "New chain state root: " ++ format sr'
       return actions
 
 addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM [Action]
-addTransactions bd bg ts = go bd bg ts []
+addTransactions bd bg ts = timeit ("addTransactions, " ++ show (length ts) ++ " TXs") (Just vmBlockInsertionMined) $
+  go bd bg ts []
   where
     go _ _ [] as = return . reverse $ catMaybes as
     go b blockGas (t@OutputTx{otBaseTx=bt}:rest) as = do
