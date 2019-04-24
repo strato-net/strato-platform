@@ -164,3 +164,6 @@ codePtrToSHA :: CodePtr -> SHA
 codePtrToSHA (EVMCode hsh) = hsh
 codePtrToSHA (SolidVMCode _ hsh) = hsh
 
+blockstanbulMixHash :: SHA
+blockstanbulMixHash = SHA 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
+

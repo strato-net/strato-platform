@@ -18,6 +18,7 @@ import qualified Data.Map.Ordered                   as OMap
 import qualified Data.Text                          as T
 import           Data.Time.Clock
 import qualified Data.Set                           as S
+import           Data.Word
 import           Numeric                            (readHex)
 
 import           Blockapps.Crossmon
@@ -48,12 +49,15 @@ import           Executable.EVMFlags                (flags_maxTxsPerBlock)
 import           Text.Format
 
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
+    isBlockstanbul     :: m Bool
     getBaggerState     :: m B.BaggerState
+    peekPendingVote    :: m (Address, Word64)
+    clearPendingVote   :: BDB.Block -> m ()
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
-    {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
+    {-# MINIMAL isBlockstanbul, getBaggerState, peekPendingVote, clearPendingVote, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
 
     getCheckpointableState :: m (SHA, DD.BlockData)
     getCheckpointableState = do
@@ -129,12 +133,14 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                 else do
                     $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
                     existingStateDbStateRoot <- getStateRoot
+                    isPBFT <- isBlockstanbul
+                    (coinbaseAddr, nonce) <- peekPendingVote
                     let lastSR          = B.lastExecutedStateRoot cache
                     let lastSHA         = B.bestBlockSHA cache
                     let lastHead        = B.bestBlockHeader cache
                     let promoted        = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
                     let time            = B.startTimestamp cache
-                    let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time
+                    let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr nonce
                     let remGas          = B.remainingGas cache
                     $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
@@ -380,6 +386,8 @@ buildFromMiningCache :: MonadBagger m => m OutputBlock
 buildFromMiningCache = do
     $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
     state <- getBaggerState
+    isPBFT <- isBlockstanbul
+    (coinbaseAddr, nonce) <- peekPendingVote
     let cache        = B.miningCache state
     let uncles       = []
     let parentHash   = B.bestBlockSHA cache
@@ -391,7 +399,7 @@ buildFromMiningCache = do
     let parentTS     = DD.blockDataTimestamp parentHeader
     let time         = B.startTimestamp cache
     let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
-    let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time
+    let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
     recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
     return OutputBlock { obOrigin = TO.Quarry
@@ -410,15 +418,19 @@ buildNextBlockHeader :: DD.BlockData
                      -> StateRoot
                      -> [OutputTx]
                      -> UTCTime
+                     -> Bool
+                     -> Address
+                     -> Word64
                      -> DD.BlockData
-buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time =
+buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce =
     let parentDiff = DD.blockDataDifficulty parentHeader
         parentNum  = DD.blockDataNumber parentHeader
         parentTS   = DD.blockDataTimestamp parentHeader
         nextDiff   = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
         in DD.BlockData { DD.blockDataParentHash       = parentHash
                         , DD.blockDataUnclesHash       = V.ommersVerificationValue uncles
-                        , DD.blockDataCoinbase         = ourCoinbase
+                        -- TODO: when `isPBFT`, coinbase and nonce should be set from a queue of pending votes
+                        , DD.blockDataCoinbase         = if isPBFT then coinbaseAddr else ourCoinbase
                         , DD.blockDataStateRoot        = stateRoot
                         , DD.blockDataTransactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs)
                         , DD.blockDataReceiptsRoot     = V.receiptsVerificationValue ()
@@ -429,8 +441,8 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time =
                         , DD.blockDataGasUsed          = 0
                         , DD.blockDataTimestamp        = time
                         , DD.blockDataExtraData        = ""
-                        , DD.blockDataMixHash          = SHA 0
-                        , DD.blockDataNonce            = 5
+                        , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else SHA 0x0
+                        , DD.blockDataNonce            = nonce
                         }
 
 buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData
@@ -438,7 +450,7 @@ buildRewardedBlockHeader bd uncles = do
   previousStateRoot <- getStateRoot
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
-  rewardedStateRoot <- rewardCoinbases  (DD.blockDataStateRoot bd) ourCoinbase uncles (DD.blockDataNumber bd)
+  rewardedStateRoot <- rewardCoinbases  (DD.blockDataStateRoot bd) (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
   setStateDBStateRoot previousStateRoot
   return bd{DD.blockDataStateRoot = rewardedStateRoot}

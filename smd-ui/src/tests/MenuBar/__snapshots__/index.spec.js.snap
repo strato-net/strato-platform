@@ -62,7 +62,7 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
       <span className=\\"pt-navbar-divider\\" />
       <small className=\\"pt-text-muted\\">
         <div className=\\"pt-select\\">
-          <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+          <Field className=\\"pt-input select-chain\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
             <option>
                Main Chain 
             </option>
@@ -141,7 +141,7 @@ exports[`MenuBar: index renders enterprise mode component without values 1`] = `
       <span className=\\"pt-navbar-divider\\" />
       <small className=\\"pt-text-muted\\">
         <div className=\\"pt-select\\">
-          <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+          <Field className=\\"pt-input select-chain\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
             <option>
                Main Chain 
             </option>
@@ -235,7 +235,7 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
       <span className=\\"pt-navbar-divider\\" />
       <small className=\\"pt-text-muted\\">
         <div className=\\"pt-select\\">
-          <Field className=\\"pt-input\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+          <Field className=\\"pt-input select-chain\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
             <option>
                Main Chain 
             </option>

@@ -19,6 +19,7 @@ dependencies:
   - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
+  - blockstanbul
   - bytestring
   - containers
   - cross-monitoring
@@ -69,3 +70,13 @@ library:
     - Executable.EVMFlags
   ghc-options: -Wall -O2
 
+
+tests:
+  contextm-test:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - blockapps-haskoin
+      - hspec
+      - hspec-expectations-lifted
+      - vm-tools

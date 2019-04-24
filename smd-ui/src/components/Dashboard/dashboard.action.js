@@ -12,6 +12,10 @@ export const PRELOAD_BLOCK_DIFFICULTY = 'PRELOAD_BLOCK_DIFFICULTY'
 export const UPDATE_BLOCK_DIFFICULTY = 'UPDATE_BLOCK_DIFFICULTY'
 export const PRELOAD_TRANSACTION_TYPES = 'PRELOAD_TRANSACTION_TYPES'
 export const UPDATE_TRANSACTION_TYPES = 'UPDATE_TRANSACTION_TYPES'
+export const PRELOAD_HEALTH = 'PRELOAD_HEALTH'
+export const UPDATE_HEALTH = 'UPDATE_HEALTH'
+export const PRELOAD_NODE_UPTIME = 'PRELOAD_NODE_UPTIME'
+export const UPDATE_NODE_UPTIME = 'UPDATE_NODE_UPTIME'
 
 // will trigger from socket.saga and update the dashboard store
 export const preloadBlockNumber = function (data) {
@@ -120,4 +124,32 @@ export const updateTransactionType = function (data) {
     type: UPDATE_TRANSACTION_TYPES,
     data
   }
+}
+
+export const preloadHealth= function (data) {
+    return {
+        type: PRELOAD_HEALTH,
+        data
+    }
+}
+
+export const updateHealth= function (data) {
+    return {
+        type: UPDATE_HEALTH,
+        data
+    }
+}
+
+export const preloadNodeUptime = function (data) {
+    return {
+        type: PRELOAD_NODE_UPTIME,
+        data
+    }
+}
+
+export const updateNodeUptime = function (data) {
+    return {
+        type: UPDATE_NODE_UPTIME,
+        data
+    }
 }

@@ -86,9 +86,21 @@ function newnode {
   if [ -n "${seqMaxUsPerIter}" ]; then
     usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
   fi
+  if [ -n "${blockstanbulAdmins}" ]; then
+    baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
+  fi
+  echo ${blockstanbulAdmins}
+  if [ -n "${blockstanbulSkipCheck}" ]; then
+    scFlag="--blockstanbul_skip_check=${blockstanbulSkipCheck}"
+    apiKey=
+  else
+    apiKey="${blockstanbulPrivateKey:-}"
+  fi
+
   NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
-    --minLogLevel=$seqMinLogLevel +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+    "${baFlag}" "${scFlag}" --minLogLevel=$seqMinLogLevel \
+    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -99,16 +111,18 @@ function newnode {
   echo "Starting strato-txr-indexer"
   runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
-
+  if [ -n "${brokenRefundReenable}" ]; then
+    breFlag="--brokenRefundReenable=${brokenRefundReenable}"
+  fi
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" +RTS "${vmRunnerRTSOPTs:-}" -N1 >> logs/vm-runner 2>&1
+                         "${tbFlag}" "${breFlag}" +RTS "${vmRunnerRTSOPTs:-}" -N1 >> logs/vm-runner 2>&1
 
   echo "Starting strato-api"
-  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=${blockstanbulPrivateKey:-} \
+  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
     runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
 
   echo "Configuring log maintenance"

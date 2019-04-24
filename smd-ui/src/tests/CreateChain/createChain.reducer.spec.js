@@ -9,7 +9,8 @@ import {
   createChainSuccess,
   createChainFailure,
   compileChainContractFailure,
-  compileChainContractSuccess
+  compileChainContractSuccess,
+  resetContract
 } from '../../components/CreateChain/createChain.actions';
 import { xabiMock } from './createChainMock';
 
@@ -185,6 +186,20 @@ describe('CreateChain: reducer', () => {
     };
 
     const action = resetError();
+    expect(reducer(initialState, action)).toMatchSnapshot();
+  });
+
+  test('reset contract', () => {
+    const initialState = {
+      isAddMemberModalOpen: true,
+      isOpen: true,
+      spinning: false,
+      key: null,
+      error: null,
+      abi: 'contract test {}'
+    };
+
+    const action = resetContract();
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 

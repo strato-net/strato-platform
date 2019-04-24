@@ -9,6 +9,7 @@ import {
   RESET_ERROR,
   COMPILE_CHAIN_CONTRACT_SUCCESS,
   COMPILE_CHAIN_CONTRACT_FAILURE,
+  RESET_CONTRACT,
 } from './createChain.actions';
 
 const initialState = {
@@ -73,6 +74,11 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         error: action.error
+      }
+    case RESET_CONTRACT:
+      return {
+        ...state,
+        abi: null
       }
     default:
       return state;

@@ -135,6 +135,12 @@ Object {
 }
 `;
 
+exports[`CreateChain: action reset contract 1`] = `
+Object {
+  "type": "RESET_CONTRACT",
+}
+`;
+
 exports[`CreateChain: action reset error 1`] = `
 Object {
   "type": "RESET_ERROR",

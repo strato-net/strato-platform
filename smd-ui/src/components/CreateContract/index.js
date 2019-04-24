@@ -21,6 +21,7 @@ import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
 import { isModePublic } from '../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
+import './createContract.css';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -293,12 +294,12 @@ class CreateContract extends Component {
             <div className="col-sm-3 text-right">
               <label className="pt-label smd-pad-4">
                 Chain
-          </label>
+              </label>
             </div>
             <div className="col-sm-9 smd-pad-4">
               <div className="pt-select">
                 <Field
-                  className="pt-input"
+                  className="pt-input chain-field"
                   component="select"
                   name="chainLabel"
                   onChange={
@@ -371,7 +372,7 @@ class CreateContract extends Component {
             isOpen={this.props.isOpen}
             onClose={this.props.contractCloseModal}
             title="Create New Contract"
-            className="pt-dark"
+            className="pt-dark create-contract-dialog"
           >
             <div className="pt-dialog-body">
               {this.renderChainFields()}

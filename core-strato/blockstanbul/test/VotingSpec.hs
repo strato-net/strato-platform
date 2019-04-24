@@ -1,7 +1,8 @@
 module VotingSpec where
 
-import Test.Hspec
 import Data.Map
+import Test.Hspec
+
 import Blockchain.Data.Address
 import Blockchain.Blockstanbul.Voting
 
@@ -33,3 +34,8 @@ spec = parallel $ do
       testUpdatedrop `shouldBe` [Address 0x323, Address 0x23451,Address 0x43123]
       testUpdatesize1 `shouldBe` [Address 0x23450,Address 0x43123]
       testUpdatesize2 `shouldBe` [Address 0x323,Address 0x23450,Address 0x43123]
+
+    it "Needs three votes from 4 validators" $ do
+      let validators = [1..4]
+          votes = singleton 0xff . fromList . zip [1, 3, 4] $ repeat True
+      updateValidator validators votes `shouldBe` [1,2,3,4,0xff]

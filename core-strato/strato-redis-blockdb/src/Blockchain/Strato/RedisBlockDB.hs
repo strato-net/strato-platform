@@ -12,6 +12,8 @@ module Blockchain.Strato.RedisBlockDB
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
+    , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
+    , getIPChains, addIPChain, removeIPChain
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
     , getTransactions, getPrivateTransactions, getUncles
@@ -36,6 +38,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
+import           Blockchain.Util                       (partitionWith)
 
 import           Control.Arrow                         ((&&&), second)
 import           Control.Concurrent                    (threadDelay)
@@ -85,6 +88,8 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateChainInfo    -> "x:"
             PrivateChainMembers -> "m:"
             PrivateTransactions -> "pt:"
+            PrivateTxsInBlocks  -> "pb:"
+            PrivateIPChains     -> "pic:"
 
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)
@@ -135,7 +140,7 @@ addChainMember cId address enode = do
     let mems' = RedisChainMembers $ M.insert address enode mems
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
     case res of
-        TxSuccess _ -> pure $ Right Ok
+        TxSuccess _ -> addIPChain (ipAddress enode) cId
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
 
@@ -144,12 +149,80 @@ removeChainMember :: Word256
                   -> Redis (Either Reply Status)
 removeChainMember cId address = do
     mems <- getChainMembers cId
-    let mems' = RedisChainMembers $ M.delete address mems
+    let mEnode = M.lookup address mems
+        mems' = RedisChainMembers $ M.delete address mems
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
     case res of
-        TxSuccess _ -> pure $ Right Ok
+        TxSuccess _ -> case mEnode of
+          Nothing -> pure $ Right Ok -- TODO: Maybe this should return a Left?
+          Just enode -> removeIPChain (ipAddress enode) cId
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
+
+getChainTxsInBlock :: SHA
+                   -> Redis (M.Map Word256 [SHA])
+getChainTxsInBlock bHash = getInNamespace PrivateTxsInBlocks bHash >>= \case
+    Left _             -> return M.empty
+    Right Nothing      -> return M.empty
+    Right (Just rmems) -> let RedisChainTxsInBlocks mems = fromValue rmems
+                           in return mems
+
+putChainTxsInBlock :: SHA
+                   -> M.Map Word256 [SHA]
+                   -> Redis (Either Reply Status)
+putChainTxsInBlock bHash chainIdTxHashMap = do
+    let rmems    = RedisChainTxsInBlocks chainIdTxHashMap
+
+    res <- multiExec $ setnx (inNamespace PrivateTxsInBlocks bHash) (toValue rmems)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Error" ++ e)
+
+addChainTxsInBlock :: SHA
+                   -> Word256
+                   -> [SHA]
+                   -> Redis (Either Reply Status)
+addChainTxsInBlock bHash cId shas = do
+    mems <- getChainTxsInBlock bHash
+    let mems' = RedisChainTxsInBlocks $ M.insertWith (++) cId shas mems
+    res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue mems')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
+
+getIPChains :: IPAddress
+            -> Redis [Word256]
+getIPChains ip = getInNamespace PrivateIPChains ip >>= \case
+    Left _               -> return []
+    Right Nothing        -> return []
+    Right (Just rchains) -> let RedisIPChains chains = fromValue rchains
+                             in return chains
+
+addIPChain :: IPAddress
+           -> Word256
+           -> Redis (Either Reply Status)
+addIPChain ip cId = do
+    chains <- getIPChains ip
+    let chains' = RedisIPChains (cId:chains)
+    res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Error" ++ e)
+
+removeIPChain :: IPAddress
+              -> Word256
+              -> Redis (Either Reply Status)
+removeIPChain ip cId = do
+    chains <- getIPChains ip
+    let chains' = RedisIPChains $ filter (/= cId) chains
+    res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Error" ++ e)
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
@@ -396,9 +469,12 @@ putBlock b = do
                     (morphTx <$> blockTransactions b :: [Models.RedisTx])
         uncles  = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
         inNS'   = flip inNamespace sha
-    unless (null ptxs) $
+    unless (null ptxs) $ do
       void . multiExec . msetnx $
         map ((inNamespace PrivateTransactions . txHash) &&& toValue) ptxs
+      forM_ (partitionWith (fromJust . txChainId) ptxs) $ \(cId, ptxs') ->
+                         -- ^-- already filtered on (isJust . txChainId)
+        addChainTxsInBlock sha cId $ map txHash ptxs'
     res <- multiExec $ do
         void $ setnx (inNS' Headers) (toValue header')
         void $ setnx (inNS' Transactions) (toValue txs)

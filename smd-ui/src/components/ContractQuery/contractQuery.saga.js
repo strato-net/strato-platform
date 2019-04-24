@@ -12,6 +12,7 @@ import {
   queryCirrusVarsFailure
 } from './contractQuery.actions';
 import { env } from '../../env.js'
+import { handleErrors } from '../../lib/handleErrors';
 
 const cirrusUrl = env.CIRRUS_URL + '/:contractName?:queryString:chainid';
 const contractUrl = env.BLOC_URL + '/contracts/:contractName/Latest';
@@ -32,6 +33,7 @@ export function queryCirrusRequest(name, queryString, chainId) {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })
@@ -50,6 +52,7 @@ export function queryCirrusVarsRequest(contractName) {
         'Accept': 'application/json'
       },
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })

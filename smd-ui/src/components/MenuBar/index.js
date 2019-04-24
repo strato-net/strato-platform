@@ -72,11 +72,11 @@ class MenuBar extends Component {
     if ( this.props.chainIds.length && (this.props.isLoggedIn || !isModePublic())) {
       return (
         <span>
-          <span className="pt-navbar-divider" />
+          <span className="pt-navbar-divider"/>
           <small className="pt-text-muted">
             <div className="pt-select">
               <Field
-                className="pt-input"
+                className="pt-input select-chain"
                 component="select"
                 name="chainLabel"
                 onChange={

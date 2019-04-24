@@ -170,7 +170,9 @@ export const initialState = {
   transactionsCount: [],
   blockPropagation: [],
   blockDifficulty: [],
-  transactionTypes: []
+  transactionTypes: [],
+  healthStatus: false,
+  uptime: 0
 };
 
 export const unSubscribeRoomMock = [
@@ -181,7 +183,10 @@ export const unSubscribeRoomMock = [
   ['BLOCKS_FREQUENCY'],
   ['BLOCKS_DIFFICULTY'],
   ['TRANSACTIONS_COUNT'],
-  ['TRANSACTIONS_TYPE']
+  ['TRANSACTIONS_TYPE'],
+  ['GET_HEALTH'],
+  ['GET_NODE_UPTIME']
+
 ]
 
 export const subscribeRoomMock = [
@@ -192,5 +197,7 @@ export const subscribeRoomMock = [
   ['BLOCKS_FREQUENCY'],
   ['BLOCKS_DIFFICULTY'],
   ['TRANSACTIONS_COUNT'],
-  ['TRANSACTIONS_TYPE']
+  ['TRANSACTIONS_TYPE'],
+  ['GET_HEALTH'],
+  ['GET_NODE_UPTIME']
 ]

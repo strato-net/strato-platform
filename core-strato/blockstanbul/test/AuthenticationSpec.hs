@@ -38,7 +38,7 @@ testBlock =
       blockDataTimestamp = posixSecondsToUTCTime 0,
       blockDataExtraData = "",
       blockDataNonce = 0,
-      blockDataMixHash = SHA 0x0
+      blockDataMixHash = blockstanbulMixHash
     },
     blockReceiptTransactions = [],
     blockBlockUncles = []
@@ -167,4 +167,4 @@ spec = do
       cSeal <- commitmentSeal (blockHash blk') private
       let blk = addCommitmentSeals [cSeal] blk'
           got = replayHistoricBlock vals 39 blk
-      got `shouldBe` Right 40
+      got `shouldBe` Right (40, S.elemAt 0 vals)
