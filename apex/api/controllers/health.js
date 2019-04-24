@@ -1,5 +1,6 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
+const nodeHealthCheck = require('../daemons/node-health-check')
 
 module.exports = {
   ping: function (req, res) {
@@ -69,7 +70,12 @@ module.exports = {
         const currentTime = Date.now();
 
         if (healthInfo && stallInfo){
-            healthStatus = healthInfo.dataValues.latestHealthStatus;
+            const nodeUp = ((currentTime - healthInfo.dataValues.latestCheckTimestamp) < config.healthCheck.maxResponseRange);
+            if (!nodeUp) {
+               const currentStatus = [false, 'Node'];
+               await nodeHealthCheck.updateCurrentHealth(currentStatus);
+            }
+            healthStatus = healthInfo.dataValues.latestHealthStatus && nodeUp;
             stallStatus = stallInfo.dataValues.latestHealthStatus;
             uptime = (healthStatus) ? currentTime - healthInfo.dataValues.lastFailureTimestamp : 0;
             isInc = stallInfo.dataValues.isBlocksValidInc;

@@ -82,7 +82,8 @@ function compareTimeStamp(obj) {
                 winston.warn(`Jobs are updated? The following prometheus job is not in the check list required: `, loc);
             }
 
-            ret[name] = true;
+            value = formatPromethusTimestamp(elem.value[0]);
+            ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
         } else {
             winston.info(`Metric format is updated; need to update its handling`);
         }
