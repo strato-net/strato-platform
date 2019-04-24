@@ -16,6 +16,7 @@ import {
 } from './user.actions';
 import { env } from '../../env';
 import { resetTemporarypassword } from '../VerifyAccount/verifyAccount.actions';
+import { handleErrors } from '../../lib/handleErrors';
 
 const loginUrl = env.APEX_URL + "/login";
 const logoutUrl = env.APEX_URL + "/logout";
@@ -33,6 +34,7 @@ function loginRequest(username, password) {
       },
       body: JSON.stringify({ username, password })
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })
@@ -52,6 +54,7 @@ function logoutAccount() {
         'Content-Type': 'application/json'
       }
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })

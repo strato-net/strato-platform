@@ -8,11 +8,11 @@ const util = common.util;
 const BigNumber = common.BigNumber;
 const constants = common.constants;
 const assert = common.assert;
-const config = common.config; 
+const config = common.config;
 const password = '1234';
 
 const label = 'My chain label';
-const src = 'contract Governance { }';
+const src = 'contract Governance { uint constant TEN = 10; }';
 const args = {};
 const members = [{
     address: "00000000000000000000000000000000deadbeef"
@@ -95,6 +95,13 @@ describe("Create Chain", function() {
     console.log('###CHAININFO###',chainInfo);
     assert.isDefined(chainInfo, "should exist");
     assert.deepEqual(label, chainInfo.label, "chain labels should be identical");
+
+    const chainAddress = '0000000000000000000000000000000000000100';
+
+    // Despite not running the constructor, bloch will at least
+    // return the constants and functions.
+    const state = yield api.bloc.state('Governance', chainAddress, chainId);
+    assert.hasAnyKeys(state, ['TEN']);
 
     for(var i=0; i < 10; i++) {
       const txResult = yield rest.send(alice, bob, 123456, false, null, chainId);

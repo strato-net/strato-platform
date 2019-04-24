@@ -145,18 +145,20 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   let storage = translateStorageMap storage'
 
   ret <- case (storage', mName) of
-    ([], _) -> return []
     (Storage{storageKind=SolidVM}:_, Nothing) -> return .
         decodeSolidVMValues $ map (\Storage{storageKV=SolidVMEntry k v} -> (k, v)) storage'
     (Storage{storageKind=SolidVM}:_, Just name) ->
        error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
-    (Storage{storageKind=EVM}:_, Nothing) ->
-      let vals = decodeValues fetchLimit (typeDefs contract') (mainStruct contract') storage 0
-          solVals = map (fmap valueToSolidityValue) vals
-      in return solVals
-    (Storage{storageKind=EVM}:_, Just name) ->
+    -- Treat this potentially empty storage as the EVM, even though it could be on SolidVM.
+    -- This may still be useful to return enums and constants in EVM, and should hopefully
+    -- still return [] for [] on SolidVM.
+    (_, Just name) ->
       let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0
                  ofs cnt mLength [name]
+          solVals = map (fmap valueToSolidityValue) vals
+      in return solVals
+    (_, Nothing) ->
+      let vals = decodeValues fetchLimit (typeDefs contract') (mainStruct contract') storage 0
           solVals = map (fmap valueToSolidityValue) vals
       in return solVals
   $logDebugS "getContractsState/storage" $ Text.unlines

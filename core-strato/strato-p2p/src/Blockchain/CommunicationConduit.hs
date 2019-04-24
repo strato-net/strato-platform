@@ -12,6 +12,7 @@ module Blockchain.CommunicationConduit
     ) where
 
 import           Blockchain.Output
+import           Control.Monad.IO.Unlift
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Crypto.Types.PubKey.ECC
@@ -21,10 +22,12 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Network
-import           Data.Conduit.TMChan
+import           Data.Conduit.TQueue
 import           Data.Maybe
 import qualified Data.Text                             as T
+import           Data.Void
 import           UnliftIO.Exception
+import           UnliftIO.STM
 
 import           Network.Kafka                         as K
 
@@ -39,6 +42,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
+import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
@@ -66,7 +70,9 @@ mkEthP2PEventSource :: ( Monad m
                     -> K.KafkaState
                     -> [ConduitM () Event m ()]
                     -> m (ConduitM () Event m ())
-mkEthP2PEventSource app inCtx ks extra = (.| CL.iterM recordEvent) <$> mergeSources (
+mkEthP2PEventSource app inCtx ks extra = do
+  canarySource <- mkCanarySource
+  (.| CL.iterM recordEvent) <$> mergeSourcesByForce (
     [ appSource app
         .| ethDecrypt inCtx
         .| bytesToMessages
@@ -74,7 +80,18 @@ mkEthP2PEventSource app inCtx ks extra = (.| CL.iterM recordEvent) <$> mergeSour
         .| CL.map MsgEvt
     , seqEventNotificationSource ks
         .| CL.map NewSeqEvent
+    , canarySource .| CL.map absurd
     ] ++ extra) 4096 -- 🙏
+
+mkCanarySource :: (MonadLogger m, MonadUnliftIO m, MonadResource m) => m (ConduitM () Void m ())
+mkCanarySource = do
+  ender <- toIO $ $logInfoS "canary/exit" "" >> killCanary
+  void . register $ ender
+  q <- atomically newTQueue
+  $logInfoS "canary/enter" ""
+  addCanary
+  -- Wait forever on nothing
+  return $ sourceTQueue q
 
 mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
@@ -129,6 +146,8 @@ handleMsgClientConduit myId peer = do
                 Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
                 mrh <- gets maxReturnedHeaders
                 yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
+                yield $ GetChainDetails []
+                handleGetChainDetails peer []
                 stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer

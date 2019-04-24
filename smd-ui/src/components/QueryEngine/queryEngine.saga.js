@@ -10,6 +10,7 @@ import {
 } from './queryEngine.actions';
 import { TRANSACTION_QUERY_TYPES } from './queryTypes';
 import { env } from '../../env';
+import { handleErrors } from '../../lib/handleErrors';
 
 const url = env.STRATO_URL;
 
@@ -39,11 +40,9 @@ export function query(query, resourceType, chainId) {
         'Accept': 'application/json'
       },
     })
-    .then(function (response) {
-      return response.json();
-    })
+    .then(handleErrors)
     .then(function (res) {
-      return res;
+      return res.json();
     })
     .catch(function (error) {
       throw error;
