@@ -61,10 +61,8 @@ data BlockstanbulContext = BlockstanbulContext {
   -- Which peers have we received a notice for a round-change
   , _roundChanged :: M.Map Address RoundNumber
   , _voted :: M.Map Address (M.Map Address Bool)
-  , _pendingvotes :: M.Map Address Bool
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
-  , _blockcount :: Int
   -- Block locking: a safety mechanism to prevent partial commits
   , _blockLock :: Maybe Block
   , _lockSender :: Maybe Address
@@ -110,9 +108,7 @@ newContext v as senderlist pk =
      , _pendingRound = Nothing
      , _roundChanged = M.empty
      , _voted = M.empty
-     , _pendingvotes = M.empty
      , _prvkey = pk
-     , _blockcount = 0
      , _blockLock = Nothing
      , _lockSender = Nothing
      , _authSenders = generateNonceMap senderlist
@@ -222,14 +218,7 @@ roundChange = do
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent OutEvent m ()
 nextRound nt = do
-  -- TODO(tim): Create an emptyRound constant and override validators/proposer/view,
-  -- rather than reset everything in the state.
-  epocheck <- use blockcount
-  when (epocheck `mod` 10000 == 0) $ do
-      voted .= M.empty
-      blockcount .= 0
-
-   --update validators list
+  --update validators list
   val <- uses validators S.toList
   vot <- use voted
   validators .= S.fromList (updateValidator val vot)
@@ -246,6 +235,11 @@ nextRound nt = do
   use view >>= recordView
   vals <- use validators
   thisR <- use $ view . round
+  epocheck <- use $ view . sequence
+  when (epocheck `mod` 10000 == 0) $ do
+      voted .= M.empty
+      $logInfoS "blockstanbul/voting" . T.pack $
+        "nextRound: voted map reset to empty with epocheck = " ++ show epocheck
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
@@ -275,8 +269,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   v <- use view
   when authz $ case ev of
     NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
-      pendingvotes %= M.insert benf dir
       authSenders %= M.insert addr nonc
+      self <- selfAddr
+      yield $ PendingVote benf dir self
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
@@ -288,13 +283,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                     . printf "Rejecting historical block #%d: %s" blockNo $ err
         Right (_, props) -> do
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
-          case extractBeneficiary blk of
-            Nothing -> return ()
-            Just (bnf, vot) -> do
-              val <- uses voted $M.lookup bnf
-              let unwrapVal = fromMaybe M.empty val
-              let nval = M.insert props vot unwrapVal
-              voted %= M.insert bnf nval
+          editVoted blk props
           yield . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
@@ -304,25 +293,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (isNothing ppl && leader == self) $ do
         pk <- use prvkey
         vs <- use validators
-        --extract from pending list and vote
-        pending <- use pendingvotes
-        $logInfoS "blockstanbul/voting" . T.pack $
-                 "pending votes: " ++ show pending
-        editedBlk <- if null pending
-              then do
-                $logDebugS "blockstanbul/voting" "No votes pending"
-                return blk
-              else do
-                 let ((bnf,nonc),newPending) = M.deleteFindMin pending
-                 pendingvotes .= newPending
-                 let nb = editBeneficiary blk bnf nonc
-                 $logInfoS "blockstanbul/voting" . T.pack
-                    . printf "Casting vote for %s" . show . blockDataCoinbase $ blockBlockData nb
-                 return nb
-        pending' <- use pendingvotes
-        $logInfoS "blockstanbul/voting" . T.pack $
-           "pending votes after editBeneficiary" ++ show pending'
-        let blockWithVs = addValidators vs editedBlk
+        let blockWithVs = addValidators vs blk
         pseal <- proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
@@ -371,22 +342,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   $logInfoS "blockstanbul/roundchange" "chain inconsistency"
                   roundChange
                 Right () -> do
-                  blockcount += 1
                   proposal .= Just pp
                   pk <- use prvkey
-                  case extractBeneficiary pp of
-                    Nothing -> return()
-                    Just (bnef,vot) -> do
-                      -- insert the vote into map
-                      val <- uses voted $M.lookup bnef
-                      $logInfoS "blockstanbul/voting" . T.pack $
-                        "extractBeneficiary" ++ show val
-                      let unwrapVal = fromMaybe M.empty val
-                      let nval = M.insert pr vot unwrapVal
-                      voted %= M.insert bnef nval
-                      voted' <- use voted
-                      $logInfoS "blockstanbul/voting" . T.pack $
-                        "insert into voted map:" ++ show voted'
+                  editVoted pp pr
                   yield =<< signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
@@ -500,6 +458,22 @@ currentView = maybe (View (-1) (-1)) _view <$> getBlockstanbulContext
 blockstanbulRunning :: HasBlockstanbulContext m => m Bool
 blockstanbulRunning = isJust <$> getBlockstanbulContext
 
+editVoted :: (MonadIO m, MonadLogger m, MonadState BlockstanbulContext m) => Block -> Address -> m ()
+editVoted pp pr = do
+  case extractBeneficiary pp of
+    Nothing -> return()
+    Just (bnef,vot) -> do
+      -- insert the vote into map
+      val <- uses voted $M.lookup bnef
+      $logInfoS "blockstanbul/voting" . T.pack $
+        "extractBeneficiary" ++ show val
+      let unwrapVal = fromMaybe M.empty val
+      let nval = M.insert pr vot unwrapVal
+      voted %= M.insert bnef nval
+      voted' <- use voted
+      $logInfoS "blockstanbul/voting" . T.pack $
+        "insert into voted map:" ++ show voted'
+
 recordInEvent :: (MonadIO m) => InEvent -> m ()
 recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
   in case ev of
@@ -525,3 +499,4 @@ recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCount
     ResetTimer{} -> inc "reset_timer"
     GapFound{} -> inc "gap_found"
     LeadFound{} -> inc "lead_found"
+    PendingVote{} -> inc" pending_vote"

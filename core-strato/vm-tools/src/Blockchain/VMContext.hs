@@ -7,6 +7,7 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# OPTIONS -fno-warn-orphans      #-}
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 
 module Blockchain.VMContext
@@ -24,6 +25,9 @@ module Blockchain.VMContext
     , getContextBestBlockInfo
     , putContextBestBlockInfo
     , contextBlockRequested
+    , queuePendingVote
+    , peekPendingVote
+    , clearPendingVote
     ) where
 
 
@@ -39,7 +43,9 @@ import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
 import           Data.Foldable                      (toList)
 import qualified Data.Map                           as M
+import           Data.Maybe                         (fromMaybe)
 import qualified Data.Sequence                      as Q
+import           Data.Word
 import qualified Data.Text                          as T
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Postgresql        as PSQL
@@ -55,6 +61,7 @@ import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 import           Prometheus
 
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
+import           Blockchain.Blockstanbul.Authentication as Auth
 import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
@@ -110,6 +117,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextLogDBQueue             :: [LogDB]
                        , contextHasBlockstanbul        :: Bool
                        , _contextBlockRequested        :: Bool
+                       , contextCoinbaseQueue          :: Q.Seq ((Address,Word64), Address)
                        } deriving (Generic, NFData)
 makeLenses ''Context
 
@@ -255,7 +263,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      redisPool
                      Q.empty []
                      False
-                     False) $ do
+                     False
+                     Q.empty) $ do
           MP.initializeBlank =<< getStateDB
           setStateDBStateRoot MP.emptyTriePtr
           f
@@ -296,7 +305,8 @@ runContextM f = do
                        Q.empty
                        []
                        flags_blockstanbul
-                       False)
+                       False
+                       Q.empty)
 
 
 evalContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
@@ -330,3 +340,39 @@ putContextBestBlockInfo :: ContextBestBlockInfo -> ContextM ()
 putContextBestBlockInfo new = do
     ctx <- get
     put ctx { contextBestBlockInfo = new }
+
+queuePendingVote :: Address -> Bool -> Address -> ContextM ()
+queuePendingVote a r s= do
+  let nonce = case r of
+        True -> maxBound
+        False -> 0
+  let newVote = ((a, nonce), s)
+  $logInfoLS "queuePendingVote" newVote
+  ctx <- get
+  put ctx { contextCoinbaseQueue = newVote Q.<| (contextCoinbaseQueue ctx)}
+
+-- (Coinbase, Nonce) to be applied on a constructed block
+-- When no pending votes are available, supplies the default coinbase (0x0)
+peekPendingVote :: ContextM (Address, Word64)
+peekPendingVote = do
+  ctx <- get
+  case Q.viewl $ contextCoinbaseQueue ctx of
+    Q.EmptyL -> return (0,0)
+    ( v Q.:< _) -> do
+      $logInfoLS "peekPendingVote" v
+      return $ fst v
+
+-- If the Block was sent out by us and contains our vote,
+-- mark the vote as committed and remove it from the queue.
+clearPendingVote :: Block -> ContextM ()
+clearPendingVote b = do
+  let bd = blockBlockData b
+      currentBlockData = (blockDataCoinbase bd, blockDataNonce bd)
+  $logInfoLS "clearPendingVote" currentBlockData
+  ctx <- get
+  let sender = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
+  let ctxCoinbaseQ = contextCoinbaseQueue ctx
+  let newCoinbaseQ = case Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ of
+        Just i -> Q.deleteAt i ctxCoinbaseQ
+        Nothing -> ctxCoinbaseQ
+  put ctx { contextCoinbaseQueue = newCoinbaseQ}

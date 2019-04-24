@@ -20,6 +20,7 @@ import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 import           Text.Printf
+import           Util
 
 import           Blockapps.Crossmon
 
@@ -82,6 +83,7 @@ ethereumVM = void . execContextM $ do
 
         insertNewChains seqEvents
 
+        mapM_ (uncurry3 queuePendingVote) [(r, d, s) | OEVoteToMake r d s <- seqEvents]
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
@@ -109,6 +111,7 @@ ethereumVM = void . execContextM $ do
                 txCount = length . obReceiptTransactions $ b
             recordMaxBlockNumber "vm_seqevents" number
             $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
+            clearPendingVote (outputBlockToBlock b)
             writeBlockSummary b
         actions <- addBlocks blocks
 

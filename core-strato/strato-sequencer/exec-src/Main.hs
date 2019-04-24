@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -47,9 +48,9 @@ main = do
                           (khost, kport) -> Just ( KP.Host (KP.KString (C8.pack khost))
                                                  , KP.Port (readDef 9092 (drop 1 kport)))
       eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
-      validators = fromRight (error "invalid validators") eValidators
+      !validators = fromRight (error "invalid validators") eValidators
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
-      authSenders = fromRight (error "invalid validators") eAuthSenders
+      !authSenders = fromRight (error "invalid admins") eAuthSenders
       ctx = newContext (View 0 0) validators authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
   mCtx <- if not flags_blockstanbul
@@ -58,9 +59,9 @@ main = do
                     $ "cannot specify --validators with --blockstanbul=false"
                 return Nothing
              else do
-                skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-                let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
-                    pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+                !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
+                let !bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
+                    !pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                     selfAddress = prvKey2Address pkey
                 putStrLn . ("NODEKEY address: " ++) . formatAddress $ selfAddress
                 addSelfAsMetric selfAddress
