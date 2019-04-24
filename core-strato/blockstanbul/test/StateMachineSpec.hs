@@ -85,10 +85,8 @@ spec = parallel $ do
       _ <- sendMessages [Timeout 20]
       use pendingRound `shouldReturn` Just 21
 
-    it "can handle several rounds in succession" $ withMaxSuccess 10 $ property $ \as' seal -> -- \blk'' blk2'' as' seal ->
+    it "can handle several rounds in succession" $ withMaxSuccess 10 $ property $ \blk'' blk2'' as' seal ->
       not (null as') ==> runTest $ do
-        let blk'' = makeBlock 1 1
-            blk2'' = makeBlock 2 2
         let as = nubBy (\l r -> sender l == sender r) . sortOn sender $ as'
             -- The nonce is set to avoid voting out the sole validator
             setNonce :: Block -> Block
