@@ -21,7 +21,7 @@ import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 import           Text.Printf
-import           Util
+import           Util                                  hiding (intercalate)
 
 import           Blockapps.Crossmon
 
@@ -301,6 +301,8 @@ logEventSummaries events = do
     getNames OECreateBlockCommand = "CreateBlockCommand"
     getNames (OEAskForBlocks _ _ _) = "AskForBlocks"
     getNames (OEPushBlocks _ _ _) = "PushBlocks"
+    getNames (OENewChainMember _ _ _) = "OENewChainMember"
+    getNames (OEVoteToMake _ _ _) = "OEVoteToMake"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
