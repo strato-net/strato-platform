@@ -44,6 +44,7 @@ module Blockchain.EVM.VMM (
 
 import           Control.Monad
 import qualified Control.Monad.Change.Alter         as A
+import           Control.Monad.Change.Modify        hiding (get, put)
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
@@ -106,19 +107,26 @@ instance HasStateDB VMM where
       vmState <- lift get
       lift $ put vmState{dbs=(dbs vmState){contextStateDB=(contextStateDB $ dbs vmState){MP.stateRoot=x}}}
 
-instance HasChainDB VMM where
-  getBlockHashRoot = lift $ fmap (contextBlockHashRoot . dbs) get
-  putBlockHashRoot sr = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextBlockHashRoot = sr}}
-  getGenesisRoot = lift $ fmap (contextGenesisRoot . dbs) get
-  putGenesisRoot sr = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
-  getBestBlockRoot = lift $ contextBestBlockRoot . dbs <$> get
-  putBestBlockRoot sr = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextBestBlockRoot = sr}}
+instance Modifiable BlockHashRoot VMM where
+  modify _ f = do
+    cxt <- lift get
+    bhr' <- f $ contextBlockHashRoot $ dbs cxt
+    lift $ put cxt{dbs = (dbs cxt){contextBlockHashRoot = bhr'}}
+    return bhr'
+
+instance Modifiable GenesisRoot VMM where
+  modify _ f = do
+    cxt <- lift get
+    gr' <- f $ contextGenesisRoot $ dbs cxt
+    lift $ put cxt{dbs = (dbs cxt){contextGenesisRoot = gr'}}
+    return gr'
+
+instance Modifiable BestBlockRoot VMM where
+  modify _ f = do
+    cxt <- lift get
+    bbr' <- f $ contextBestBlockRoot $ dbs cxt
+    lift $ put cxt{dbs = (dbs cxt){contextBestBlockRoot = bbr'}}
+    return bbr'
 
 instance HasRawStorageDB VMM where
     getRawStorageTxDB = do

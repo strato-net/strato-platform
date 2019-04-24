@@ -36,6 +36,7 @@ import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter         as A
+import           Control.Monad.Change.Modify        hiding (get, put)
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
@@ -112,9 +113,9 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
                        , contextStorageTxMap           :: M.Map (Address, B.ByteString) B.ByteString
                        , contextStorageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
-                       , contextBlockHashRoot          :: MP.StateRoot
-                       , contextGenesisRoot            :: MP.StateRoot
-                       , contextBestBlockRoot          :: MP.StateRoot
+                       , contextBlockHashRoot          :: BlockHashRoot
+                       , contextGenesisRoot            :: GenesisRoot
+                       , contextBestBlockRoot          :: BestBlockRoot
                        , contextBaggerState            :: !BaggerState
                        , contextKafkaState             :: K.KafkaState
                        , contextBestBlockInfo          :: ContextBestBlockInfo
@@ -167,19 +168,26 @@ instance HasStateDB ContextM where
     cxt <- get
     put cxt{contextStateDB=(contextStateDB cxt){MP.stateRoot=sr}}
 
-instance HasChainDB ContextM where
-  getBlockHashRoot = contextBlockHashRoot <$> get
-  putBlockHashRoot sr = do
+instance Modifiable BlockHashRoot ContextM where
+  modify _ f = do
     cxt <- get
-    put cxt{contextBlockHashRoot = sr}
-  getGenesisRoot = contextGenesisRoot <$> get
-  putGenesisRoot sr = do
+    bhr' <- f $ contextBlockHashRoot cxt
+    put cxt{contextBlockHashRoot = bhr'}
+    return bhr'
+
+instance Modifiable GenesisRoot ContextM where
+  modify _ f = do
     cxt <- get
-    put cxt{contextGenesisRoot = sr}
-  getBestBlockRoot = contextBestBlockRoot <$> get
-  putBestBlockRoot sr = do
+    gr' <- f $ contextGenesisRoot cxt
+    put cxt{contextGenesisRoot = gr'}
+    return gr'
+
+instance Modifiable BestBlockRoot ContextM where
+  modify _ f = do
     cxt <- get
-    put cxt{contextBestBlockRoot = sr}
+    bbr' <- f $ contextBestBlockRoot cxt
+    put cxt{contextBestBlockRoot = bbr'}
+    return bbr'
 
 instance K.HasKafkaState ContextM where
     getKafkaState = contextKafkaState <$> get
@@ -273,9 +281,9 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      M.empty
                      M.empty
                      M.empty
-                     MP.emptyTriePtr
-                     MP.emptyTriePtr
-                     MP.emptyTriePtr
+                     (BlockHashRoot MP.emptyTriePtr)
+                     (GenesisRoot MP.emptyTriePtr)
+                     (BestBlockRoot MP.emptyTriePtr)
                      defaultBaggerState
                      initialKafkaState
                      Unspecified
@@ -315,9 +323,9 @@ runContextM f = do
                        M.empty
                        M.empty
                        M.empty
-                       MP.emptyTriePtr
-                       MP.emptyTriePtr
-                       MP.emptyTriePtr
+                       (BlockHashRoot MP.emptyTriePtr)
+                       (GenesisRoot MP.emptyTriePtr)
+                       (BestBlockRoot MP.emptyTriePtr)
                        defaultBaggerState
                        initialKafkaState
                        Unspecified

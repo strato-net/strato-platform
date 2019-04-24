@@ -27,22 +27,20 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
 import           Control.Applicative
+import           Control.Monad.Change.Modify
+import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString                             as B
 import           Data.Function
 import           Data.Maybe
 import           Data.String
-import           Data.Text                                   (Text)
 import           Data.Traversable                            (forM)
-
-import           Data.ByteString                             (ByteString)
-
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as Map
-
+import           Data.Maybe
 import qualified Data.NibbleString                           as N
-
+import           Data.String
+import           Data.Text                                   (Text)
 import           GHC.Generics
-
 import           Text.Format
 
 -- | Describes all the changes that have occurred in the blockchain
@@ -160,7 +158,13 @@ instance Detailed StorageDiff where
   incrementalToEventual (EVMDiff m) = EVMDiff $ Map.map incrementalToEventual m
   incrementalToEventual (SolidVMDiff m) = SolidVMDiff $ Map.map incrementalToEventual m
 
-chainDiff :: (HasStateDB m, HasChainDB m, HasCodeDB m, HasHashDB m)
+chainDiff :: ( HasStateDB m
+             , HasCodeDB m
+             , HasHashDB m
+             , Modifiable BlockHashRoot m
+             , Modifiable GenesisRoot m
+             , Modifiable BestBlockRoot m
+             )
           => Integer -> SHA -> [Word256] -> m [StateDiff]
 chainDiff newBlockNum newBlockHash chains = fmap catMaybes . forM chains $ \chainId -> do
   newSR <- fromMaybe emptyTriePtr <$> getChainStateRoot chainId newBlockHash

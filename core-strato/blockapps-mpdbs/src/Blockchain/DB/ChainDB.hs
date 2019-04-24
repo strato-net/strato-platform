@@ -1,7 +1,11 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
-module Blockchain.DB.ChainDB (
-    HasChainDB(..)
+module Blockchain.DB.ChainDB
+  ( BlockHashRoot(..)
+  , GenesisRoot(..)
   , bootstrapChainDB
   , putBlockHeaderInChainDB
   , getChainRoot
@@ -13,17 +17,16 @@ module Blockchain.DB.ChainDB (
   , withBlockchain
   ) where
 
+import           Control.DeepSeq
 import           Control.Monad                        (join, when)
+import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 
 import           Data.Maybe                           (isNothing)
 import qualified Data.NibbleString                    as N
+import           Data.Proxy
 import           Data.Traversable                     (for)
-
 import qualified Database.LevelDB                     as DB
-
-
-
 
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.Data.RLP
@@ -33,6 +36,7 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import           Blockchain.Strato.Model.SHA          (SHA(..))
 
+import           GHC.Generics
 import           Text.Format
 
 
@@ -92,13 +96,14 @@ import           Text.Format
 |-------------------------------------------------------------------------------|
 -}
 
-class Monad m => HasChainDB m where
-  getBlockHashRoot    :: m MP.StateRoot
-  putBlockHashRoot    :: MP.StateRoot -> m ()
-  getGenesisRoot      :: m MP.StateRoot
-  putGenesisRoot      :: MP.StateRoot -> m ()
-  getBestBlockRoot    :: m MP.StateRoot
-  putBestBlockRoot    :: MP.StateRoot -> m ()
+newtype BlockHashRoot = BlockHashRoot { unBlockHashRoot :: MP.StateRoot }
+  deriving (Eq, Ord, Show, Format, Generic, NFData)
+
+newtype GenesisRoot = GenesisRoot { unGenesisRoot :: MP.StateRoot }
+  deriving (Eq, Ord, Show, Format, Generic, NFData)
+
+newtype BestBlockRoot = BestBlockRoot { unBestBlockRoot :: MP.StateRoot }
+  deriving (Eq, Ord, Show, Format, Generic, NFData)
 
 getLDB :: HasStateDB m => m DB.DB
 getLDB = MP.ldb <$> getStateDB
@@ -112,10 +117,15 @@ getkv db = fmap (fmap rlpDecode) . MP.getKeyVal db
 putkv :: (RLPSerializable a, MonadIO m) => MP.MPDB -> N.NibbleString -> a -> m MP.StateRoot
 putkv db k = (fmap MP.stateRoot) . MP.putKeyVal db k . rlpEncode
 
-bootstrapChainDB :: (HasStateDB m, HasChainDB m) => SHA -> m ()
+bootstrapChainDB :: (HasStateDB m, Modifiable BlockHashRoot m) => SHA -> m ()
 bootstrapChainDB genesisHash = putChainBlockHashInfo genesisHash (SHA 0) MP.emptyTriePtr
 
-putBlockHeaderInChainDB :: (BlockHeaderLike h, Format h, HasStateDB m, HasChainDB m) => h -> m ()
+putBlockHeaderInChainDB :: ( BlockHeaderLike h
+                           , Format h
+                           , HasStateDB m
+                           , Modifiable BlockHashRoot m
+                           )
+                        => h -> m ()
 putBlockHeaderInChainDB b = do
   let p = blockHeaderParentHash b
       h = blockHeaderHash b
@@ -126,35 +136,39 @@ putBlockHeaderInChainDB b = do
       Nothing -> error $ "putBlockHeaderInChainDB: No parent block with hash " ++ format p ++ " found.\n" ++ format b
       Just chainRoot -> putChainBlockHashInfo h p chainRoot
 
-getChainRoot :: (HasStateDB m, HasChainDB m) => SHA -> m (Maybe MP.StateRoot)
+getChainRoot :: (HasStateDB m, Modifiable BlockHashRoot m) => SHA -> m (Maybe MP.StateRoot)
 getChainRoot = fmap (fmap snd) . getChainBlockHashInfo
 
-getChainBlockHashInfo :: (HasStateDB m, HasChainDB m) => SHA -> m (Maybe (SHA, MP.StateRoot))
+getChainBlockHashInfo :: (HasStateDB m, Modifiable BlockHashRoot m) => SHA -> m (Maybe (SHA, MP.StateRoot))
 getChainBlockHashInfo (SHA h) = do
-  bhdb <- MP.MPDB <$> getLDB <*> getBlockHashRoot
+  bhdb <- MP.MPDB <$> getLDB <*> (unBlockHashRoot <$> get Proxy)
   getkv bhdb (word256ToMPKey h)
 
-putChainBlockHashInfo :: (HasStateDB m, HasChainDB m) => SHA -> SHA -> MP.StateRoot -> m ()
+putChainBlockHashInfo :: (HasStateDB m, Modifiable BlockHashRoot m) => SHA -> SHA -> MP.StateRoot -> m ()
 putChainBlockHashInfo (SHA h) parentHash sr = do
-  bhdb <- MP.MPDB <$> getLDB <*> getBlockHashRoot
+  bhdb <- MP.MPDB <$> getLDB <*> (unBlockHashRoot <$> get Proxy)
   newBlockHashRoot <- putkv bhdb (word256ToMPKey h) (parentHash, sr)
-  putBlockHashRoot newBlockHashRoot
+  put Proxy $ BlockHashRoot newBlockHashRoot
 
-getGenesisStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> m (Maybe MP.StateRoot)
+getGenesisStateRoot :: (HasStateDB m, Modifiable GenesisRoot m) => Word256 -> m (Maybe MP.StateRoot)
 getGenesisStateRoot = fmap (fmap snd) . getChainGenesisInfo
 
-getChainGenesisInfo :: (HasStateDB m, HasChainDB m) => Word256 -> m (Maybe (SHA, MP.StateRoot))
+getChainGenesisInfo :: (HasStateDB m, Modifiable GenesisRoot m) => Word256 -> m (Maybe (SHA, MP.StateRoot))
 getChainGenesisInfo cid = do
-  gdb <- MP.MPDB <$> getLDB <*> getGenesisRoot
+  gdb <- MP.MPDB <$> getLDB <*> (unGenesisRoot <$> get Proxy)
   getkv gdb (word256ToMPKey cid)
 
-putChainGenesisInfo :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> MP.StateRoot -> m ()
+putChainGenesisInfo :: (HasStateDB m, Modifiable GenesisRoot m) => Word256 -> SHA -> MP.StateRoot -> m ()
 putChainGenesisInfo chainId creationBlock stateRoot = do
-  gdb <- MP.MPDB <$> getLDB <*> getGenesisRoot
+  gdb <- MP.MPDB <$> getLDB <*> (unGenesisRoot <$> get Proxy)
   newGenesisRoot <- putkv gdb (word256ToMPKey chainId) (creationBlock, stateRoot)
-  putGenesisRoot newGenesisRoot
+  put Proxy $ GenesisRoot newGenesisRoot
 
-getChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> m (Maybe MP.StateRoot)
+getChainStateRoot :: ( HasStateDB m
+                     , Modifiable BlockHashRoot m
+                     , Modifiable GenesisRoot m
+                     )
+                  => Word256 -> SHA -> m (Maybe MP.StateRoot)
 getChainStateRoot chainId bHash = do
   mChainRoot <- getChainBlockHashInfo bHash
   fmap join . for mChainRoot $ \(parentHash, chainRoot) -> do
@@ -172,7 +186,7 @@ getChainStateRoot chainId bHash = do
             putChainStateRoot chainId bHash stateRoot
             return stateRoot
 
-putChainStateRoot :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> MP.StateRoot -> m ()
+putChainStateRoot :: (HasStateDB m, Modifiable BlockHashRoot m) => Word256 -> SHA -> MP.StateRoot -> m ()
 putChainStateRoot chainId bHash stateRoot = do
   mChainRoot <- getChainBlockHashInfo bHash
   case mChainRoot of
@@ -182,18 +196,22 @@ putChainStateRoot chainId bHash stateRoot = do
       newChainRoot <- putkv cdb (word256ToMPKey chainId) (chainId, stateRoot)
       putChainBlockHashInfo bHash parentHash newChainRoot
 
-getChainBestBlock :: (HasStateDB m, HasChainDB m) => Word256 -> m (Maybe (SHA, Integer))
+getChainBestBlock :: (HasStateDB m, Modifiable BestBlockRoot m) => Word256 -> m (Maybe (SHA, Integer))
 getChainBestBlock chainId = do
-  bbdb <- MP.MPDB <$> getLDB <*> getBestBlockRoot
+  bbdb <- MP.MPDB <$> getLDB <*> (unBestBlockRoot <$> get Proxy)
   getkv bbdb (word256ToMPKey chainId)
 
-putChainBestBlock :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> Integer -> m ()
+putChainBestBlock :: (HasStateDB m, Modifiable BestBlockRoot m) => Word256 -> SHA -> Integer -> m ()
 putChainBestBlock chainId bHash ordering = do
-  bbdb <- MP.MPDB <$> getLDB <*> getBestBlockRoot
+  bbdb <- MP.MPDB <$> getLDB <*> (unBestBlockRoot <$> get Proxy)
   newBestBlockRoot <- putkv bbdb (word256ToMPKey chainId) (bHash, ordering)
-  putBestBlockRoot newBestBlockRoot
+  put Proxy $ BestBlockRoot newBestBlockRoot
 
-withBlockchain :: (HasStateDB m, HasChainDB m) => SHA -> Maybe Word256 -> m a -> m a
+withBlockchain :: ( HasStateDB m
+                  , Modifiable BlockHashRoot m
+                  , Modifiable GenesisRoot m
+                  )
+               => SHA -> Maybe Word256 -> m a -> m a
 withBlockchain bh cid f = do
   case cid of
     Nothing -> f
