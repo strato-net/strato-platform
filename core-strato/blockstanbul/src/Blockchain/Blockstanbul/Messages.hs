@@ -129,7 +129,6 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
 
               deriving (Eq, Show, Generic)
 
-
 instance Format OutEvent where
   format (OMsg (MsgAuth s _) msg) = "OMsg " ++ format msg ++ " " ++ format s
   format (ToCommit blk) = "ToCommit " ++ format (blockHash blk)
