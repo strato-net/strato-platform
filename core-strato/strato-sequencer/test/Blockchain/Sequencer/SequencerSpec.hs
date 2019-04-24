@@ -253,9 +253,7 @@ spec = do
                 pvk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 addr = prvKey2Address pvk
                 (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
-            -- create the extendedsignature for (beneficiary, nonce)
             esign <- signBenfInfo pvk (testAddr, True, 1)
-            --rlp serialize and hex and string the signature
             let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
                 vote = API.CandidateReceived{API.sender=addr
                                            , API.signature=esignStr
@@ -267,12 +265,8 @@ spec = do
             voteList <- drainVotes
             voteList `shouldMatchList` [vote]
             checkForVotes voteList
-            bct' <- getBlockstanbulContext
-            let unwrapbct = fromMaybe bct bct'
-            let pv = _pendingvotes unwrapbct
-                val = M.lookup testAddr pv
-            val `shouldBe` Just True
-            pv `shouldBe` M.singleton testAddr True
+            vmevs <- drainVM
+            vmevs `shouldContain` [OEVoteToMake { voteRecipient = testAddr, voteVotingDir = True, voteSender = addr}]
             esign' <- signBenfInfo pvk (testAddr, False, 1)
             let esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
                 vote' = API.CandidateReceived{API.sender=addr
@@ -284,12 +278,10 @@ spec = do
             voteList' <- drainVotes
             voteList' `shouldMatchList` [vote']
             checkForVotes voteList'
+            vmevs' <- drainVM
+            vmevs' `shouldNotContain` [OEVoteToMake { voteRecipient = testAddr, voteVotingDir = False, voteSender = addr}]
             bctn <- getBlockstanbulContext
             let unwrapbct' = fromMaybe bct bctn
-            let pv' = _pendingvotes unwrapbct'
-                val' = M.lookup testAddr pv'
-            val' `shouldBe` Just True
-            pv' `shouldBe` M.singleton testAddr True
             _authSenders unwrapbct' `shouldBe` M.singleton addr 1
 
     describe "fuseChannels" $ do

@@ -1,3 +1,4 @@
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -61,7 +62,6 @@ data BlockstanbulContext = BlockstanbulContext {
   -- Which peers have we received a notice for a round-change
   , _roundChanged :: M.Map Address RoundNumber
   , _voted :: M.Map Address (M.Map Address Bool)
-  , _pendingvotes :: M.Map Address Bool
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
   -- Block locking: a safety mechanism to prevent partial commits
@@ -109,7 +109,6 @@ newContext v as senderlist pk =
      , _pendingRound = Nothing
      , _roundChanged = M.empty
      , _voted = M.empty
-     , _pendingvotes = M.empty
      , _prvkey = pk
      , _blockLock = Nothing
      , _lockSender = Nothing
@@ -271,7 +270,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   v <- use view
   when authz $ case ev of
     NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
-      pendingvotes %= M.insert benf dir
       authSenders %= M.insert addr nonc
       self <- selfAddr
       yield $ PendingVote benf dir self
@@ -296,25 +294,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       when (isNothing ppl && leader == self) $ do
         pk <- use prvkey
         vs <- use validators
-        --extract from pending list and vote
-        pending <- use pendingvotes
-        $logInfoS "blockstanbul/voting" . T.pack $
-                 "pending votes: " ++ show pending
-        editedBlk <- if null pending
-              then do
-                $logDebugS "blockstanbul/voting" "No votes pending"
-                return blk
-              else do
-                 let ((bnf,nonc),newPending) = M.deleteFindMin pending
-                 pendingvotes .= newPending
-                 let nb = editBeneficiary blk bnf nonc
-                 $logInfoS "blockstanbul/voting" . T.pack
-                    . printf "Casting vote for %s" . show . blockDataCoinbase $ blockBlockData nb
-                 return nb
-        pending' <- use pendingvotes
-        $logInfoS "blockstanbul/voting" . T.pack $
-           "pending votes after editBeneficiary" ++ show pending'
-        let blockWithVs = addValidators vs editedBlk
+        let blockWithVs = addValidators vs blk
         pseal <- proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
