@@ -5,6 +5,7 @@ module Blockchain.DB.ChainDB (
   , bootstrapChainDB
   , putBlockHeaderInChainDB
   , getChainRoot
+  , getChainStateRoot
   , getGenesisStateRoot
   , putChainGenesisInfo
   , getChainBestBlock

@@ -26,7 +26,6 @@ import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.ExtendedWord
 
-import           Control.Monad                               (when)
 import           Control.Monad.Trans.Resource
 
 import           Data.Aeson
@@ -34,6 +33,7 @@ import           Data.Function
 import           Data.Maybe
 import           Data.String
 import           Data.Text                                   (Text)
+import           Data.Traversable                            (forM)
 
 import           Data.ByteString                             (ByteString)
 
@@ -153,35 +153,17 @@ instance Detailed (Diff SHA) where
   incrementalToEventual Delete{} = Value $ hash ""
   incrementalToEventual x        = Value $ newValue x
 
-chainDiff :: (HasStateDB m, HasChainDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
-             Integer -> SHA -> SHA -> m [StateDiff]
-chainDiff blockNumber oldBlockHash newBlockHash = do
-  mChainRoots <- (,) <$> getChainRoot oldBlockHash <*> getChainRoot newBlockHash
-  case mChainRoots of
-    (Just old, Just new) -> do
-      db <- getStateDB
-      diffs <- Diff.dbDiff db old new
-      go [] diffs
-    (Nothing, _) -> error $ "chainDiff: Missing chain root for block hash " ++ format oldBlockHash
-    (_, Nothing) -> error $ "chainDiff: Missing chain root for block hash " ++ format newBlockHash
-  where
-    go sds [] = return sds
-    go sds (Diff.Create _ v : rest) = do
-      let (chainId, sr) = rlpDecode v
-      genSR <- maybe emptyTriePtr id <$> getGenesisStateRoot chainId
-      sd <- stateDiff (Just chainId) blockNumber newBlockHash genSR sr
-      go (sd:sds) rest
-    go sds (Diff.Delete _ v : rest) = do
-      let (chainId, sr) = rlpDecode v
-      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr emptyTriePtr
-      go (sd:sds) rest
-    go sds (Diff.Update _ v1 v2 : rest) = do
-      let (chainId, sr1) = rlpDecode v1
-          (chainId2, sr2) = rlpDecode v2
-      when (chainId /= chainId2) $
-        error $ "chainDiff.Update: decoded two different chainIds for Update: " ++ show chainId ++ " and " ++ show chainId2
-      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr1 sr2
-      go (sd:sds) rest
+chainDiff :: (HasStateDB m, HasChainDB m, HasCodeDB m, HasHashDB m, MonadResource m)
+          => Integer -> SHA -> [Word256] -> m [StateDiff]
+chainDiff newBlockNum newBlockHash chains = fmap catMaybes . forM chains $ \chainId -> do
+  newSR <- fromMaybe emptyTriePtr <$> getChainStateRoot chainId newBlockHash
+  ~(bHash, bNum) <- fromMaybe (SHA 0, 0) <$> getChainBestBlock chainId
+  if newBlockNum < bNum
+    then return Nothing
+    else do
+      sr <- fromMaybe emptyTriePtr <$> getChainStateRoot chainId bHash
+      putChainBestBlock chainId newBlockHash newBlockNum
+      Just <$> stateDiff (Just chainId) newBlockNum newBlockHash sr newSR
 
 stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
              Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
