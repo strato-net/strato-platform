@@ -29,6 +29,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Control.Monad.Trans.Resource
 
 import           Data.Aeson
+
 import           Data.Function
 import           Data.Maybe
 import           Data.String
@@ -165,7 +166,7 @@ chainDiff newBlockNum newBlockHash chains = fmap catMaybes . forM chains $ \chai
       putChainBestBlock chainId newBlockHash newBlockNum
       Just <$> stateDiff (Just chainId) newBlockNum newBlockHash sr newSR
 
-stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
+stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m) =>
              Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   db <- getStateDB
