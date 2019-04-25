@@ -15,6 +15,7 @@ import GHC.Generics
 import Test.QuickCheck
 import Text.Printf
 
+import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Data.RLP
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
@@ -126,6 +127,7 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               -- by a Bagger monad. This is so that the stateroot is computed after
               -- the coinbase is modified to hold the vote.
               | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool, pendingVoteSender :: Address}
+              | VoteResponse HA.VoteResult
 
               deriving (Eq, Show, Generic)
 
@@ -137,6 +139,7 @@ instance Format OutEvent where
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
   format (PendingVote reci dir s) = "PendingVote " ++ show (reci, dir, s)
+  format (VoteResponse resp) = "VoteResponse " ++ show resp
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -167,6 +170,7 @@ outShortLog loc oev = $logInfoS loc . pack $
     GapFound h r p -> CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
+    VoteResponse resp -> CL.blue "VOTE_RESPONSE " ++ show resp
 
 instance NFData OutEvent
 
@@ -256,3 +260,5 @@ instance RLPSerializable OutEvent where
   rlpDecode _ = error "cannot rlpdecode OutEvents"
   rlpEncode (OMsg a m) = rlpEncode (WireMessage a m)
   rlpEncode x = error $ "cannot rlpencode non-message OutEvent: " ++ show x
+
+data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)

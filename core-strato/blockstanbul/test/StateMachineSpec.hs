@@ -31,6 +31,7 @@ import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.BenchmarkLib
 import Blockchain.Blockstanbul.EventLoop
+import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA
@@ -539,7 +540,13 @@ spec = parallel $ do
     it "yields a vote" $ property $ \auth -> runTest $ do
       me <- selfAddr
       sendMessages [NewBeneficiary auth (0xdeadbeef, True, 40)] `shouldReturn`
-        [PendingVote 0xdeadbeef True me]
+        [PendingVote 0xdeadbeef True me, VoteResponse HA.Enqueued]
+
+    it "rejects a badly signed vote" $ property $ \auth -> runAuthTest $ do
+      let vote = NewBeneficiary auth (0xdeadbeef, True, 30)
+      resp <- sendMessages [vote]
+      let [VoteResponse (HA.Rejected msg)] = resp
+      msg `shouldStartWith` "Rejecting NewBeneficiary"
 
   describe "PreviousBlock" $ do
     let selfSignBlock :: Word64 -> Address -> Integer -> HK.PrvKey -> [HK.PrvKey]
