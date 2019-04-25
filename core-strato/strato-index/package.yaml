@@ -17,6 +17,7 @@ dependencies:
   - bytestring
   - clock
   - containers
+  - deepseq
   - format
   - hedis
   - hflags
