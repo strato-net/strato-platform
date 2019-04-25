@@ -64,7 +64,9 @@ main = do
 
 appVaultWrapper :: Strato23.VaultWrapperEnv -> Application
 appVaultWrapper env =
-    prometheus def
+    prometheus def{ prometheusEndPoint = ["strato", "v2.3", "metrics"]
+                  , prometheusInstrumentApp = False}
+  . instrumentApp "vault-wrapper"
   . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
   . cors (const $ Just policy)
   . provideOptions (Proxy @ Strato23.VaultWrapperAPI)

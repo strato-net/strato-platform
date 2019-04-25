@@ -102,5 +102,6 @@ main = do
   race_ (runTheGregor gregorCfg)
       . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))
       . run flags_blockstanbul_port
-      . prometheus def
+      . prometheus def{ prometheusInstrumentApp = False }
+      . instrumentApp "blockstanbul-votes"
       . createWebServer $ chv

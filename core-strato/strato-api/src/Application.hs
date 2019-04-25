@@ -119,7 +119,9 @@ makeApplication foundation = do
     logWare <- makeLogware foundation
     -- Create the WAI application and apply middlewares
     app <- toWaiApp foundation
-    return $ prometheus def $ logWare $ defaultMiddlewaresNoLogging app
+    return $ prometheus def{prometheusInstrumentApp=False}
+           $ instrumentApp "strato-api"
+           $ logWare $ defaultMiddlewaresNoLogging app
 
 -- | Warp settings for the given foundation value.
 warpSettings :: App -> Settings

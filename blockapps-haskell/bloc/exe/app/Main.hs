@@ -88,7 +88,9 @@ serveErrorsPlain app req respond = app req $ \resp -> respond $
 
 appBloc :: Bloc22.BlocEnv -> Application
 appBloc env22 =
-    prometheus def
+    prometheus def{ prometheusEndPoint = ["bloc", "v2.2", "metrics"]
+                  , prometheusInstrumentApp = False}
+  . instrumentApp "bloc22"
   . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
   . serveErrorsPlain
   . cors (const $ Just policy)
