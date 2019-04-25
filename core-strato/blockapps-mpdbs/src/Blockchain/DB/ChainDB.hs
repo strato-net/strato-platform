@@ -5,8 +5,11 @@ module Blockchain.DB.ChainDB (
   , bootstrapChainDB
   , putBlockHeaderInChainDB
   , getChainRoot
+  , getChainStateRoot
   , getGenesisStateRoot
   , putChainGenesisInfo
+  , getChainBestBlock
+  , putChainBestBlock
   , withBlockchain
   ) where
 
@@ -94,6 +97,8 @@ class Monad m => HasChainDB m where
   putBlockHashRoot    :: MP.StateRoot -> m ()
   getGenesisRoot      :: m MP.StateRoot
   putGenesisRoot      :: MP.StateRoot -> m ()
+  getBestBlockRoot    :: m MP.StateRoot
+  putBestBlockRoot    :: MP.StateRoot -> m ()
 
 getLDB :: HasStateDB m => m DB.DB
 getLDB = MP.ldb <$> getStateDB
@@ -176,6 +181,17 @@ putChainStateRoot chainId bHash stateRoot = do
       cdb <- flip MP.MPDB chainRoot <$> getLDB
       newChainRoot <- putkv cdb (word256ToMPKey chainId) (chainId, stateRoot)
       putChainBlockHashInfo bHash parentHash newChainRoot
+
+getChainBestBlock :: (HasStateDB m, HasChainDB m) => Word256 -> m (Maybe (SHA, Integer))
+getChainBestBlock chainId = do
+  bbdb <- MP.MPDB <$> getLDB <*> getBestBlockRoot
+  getkv bbdb (word256ToMPKey chainId)
+
+putChainBestBlock :: (HasStateDB m, HasChainDB m) => Word256 -> SHA -> Integer -> m ()
+putChainBestBlock chainId bHash ordering = do
+  bbdb <- MP.MPDB <$> getLDB <*> getBestBlockRoot
+  newBestBlockRoot <- putkv bbdb (word256ToMPKey chainId) (bHash, ordering)
+  putBestBlockRoot newBestBlockRoot
 
 withBlockchain :: (HasStateDB m, HasChainDB m) => SHA -> Maybe Word256 -> m a -> m a
 withBlockchain bh cid f = do

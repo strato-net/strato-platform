@@ -109,6 +109,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextStorageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
                        , contextBlockHashRoot          :: MP.StateRoot
                        , contextGenesisRoot            :: MP.StateRoot
+                       , contextBestBlockRoot          :: MP.StateRoot
                        , contextBaggerState            :: !BaggerState
                        , contextKafkaState             :: K.KafkaState
                        , contextBestBlockInfo          :: ContextBestBlockInfo
@@ -167,6 +168,10 @@ instance HasChainDB ContextM where
   putGenesisRoot sr = do
     cxt <- get
     put cxt{contextGenesisRoot = sr}
+  getBestBlockRoot = contextBestBlockRoot <$> get
+  putBestBlockRoot sr = do
+    cxt <- get
+    put cxt{contextBestBlockRoot = sr}
 
 instance K.HasKafkaState ContextM where
     getKafkaState = contextKafkaState <$> get
@@ -257,6 +262,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      M.empty
                      MP.emptyTriePtr
                      MP.emptyTriePtr
+                     MP.emptyTriePtr
                      defaultBaggerState
                      initialKafkaState
                      Unspecified
@@ -296,6 +302,7 @@ runContextM f = do
                        M.empty
                        M.empty
                        M.empty
+                       MP.emptyTriePtr
                        MP.emptyTriePtr
                        MP.emptyTriePtr
                        defaultBaggerState
