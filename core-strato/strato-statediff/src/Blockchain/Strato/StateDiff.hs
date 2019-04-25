@@ -26,10 +26,9 @@ import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.ExtendedWord
 
+import           Control.Applicative
 import           Control.Monad.Trans.Resource
-
 import           Data.Aeson
-
 import           Data.Function
 import           Data.Maybe
 import           Data.String
@@ -162,8 +161,8 @@ chainDiff newBlockNum newBlockHash chains = fmap catMaybes . forM chains $ \chai
   if newBlockNum < bNum
     then return Nothing
     else do
-      genSR <- fromMaybe emptyTriePtr <$> getGenesisStateRoot chainId
-      sr <- fromMaybe genSR <$> getChainStateRoot chainId bHash
+      mSR <- liftA2 (<|>) (getChainStateRoot chainId bHash) (getGenesisStateRoot chainId)
+      let sr = fromMaybe emptyTriePtr mSR
       putChainBestBlock chainId newBlockHash newBlockNum
       Just <$> stateDiff (Just chainId) newBlockNum newBlockHash sr newSR
 
