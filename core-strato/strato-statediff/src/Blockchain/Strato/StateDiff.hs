@@ -162,7 +162,8 @@ chainDiff newBlockNum newBlockHash chains = fmap catMaybes . forM chains $ \chai
   if newBlockNum < bNum
     then return Nothing
     else do
-      sr <- fromMaybe emptyTriePtr <$> getChainStateRoot chainId bHash
+      genSR <- fromMaybe emptyTriePtr <$> getGenesisStateRoot chainId
+      sr <- fromMaybe genSR <$> getChainStateRoot chainId bHash
       putChainBestBlock chainId newBlockHash newBlockNum
       Just <$> stateDiff (Just chainId) newBlockNum newBlockHash sr newSR
 
