@@ -45,7 +45,6 @@ data Void
 instance (
            Monad m,
            MonadBaseControl IO m,
-           MonadThrow m,
            MonadIO m
          )
         => PointedKeyValDB (KeyValMPLevelDB m) Key Val MPDB String where

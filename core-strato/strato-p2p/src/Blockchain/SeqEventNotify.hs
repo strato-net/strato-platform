@@ -20,7 +20,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka (readSeqP2pEvents, seqP2pEventsTopicName)
 
 seqEventNotificationSource :: ( MonadIO m
-                              , Monad m
                               , MonadResource m
                               , MonadLogger m
                               )

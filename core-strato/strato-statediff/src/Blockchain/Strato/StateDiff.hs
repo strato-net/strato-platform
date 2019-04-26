@@ -313,14 +313,14 @@ decodeStorageKV k v = do
   let val = decodeMPDBValue v
   return (key, val)
 
-lookupAddress :: (HasCodeDB m, HasHashDB m) => [N.Nibble] -> m Address
+lookupAddress :: HasHashDB m => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
 lookupCode :: (HasHashDB m, HasCodeDB m) => CodePtr -> m (CodeKind, ByteString)
 lookupCode (EVMCode ch) = lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = lookupInMPDB "contract code" getCode ch
 
-lookupInMPDB :: (HasHashDB m, HasCodeDB m, Format a) =>
+lookupInMPDB :: (HasHashDB m, Format a) =>
                 String -> (a -> m (Maybe b)) -> a -> m b
 lookupInMPDB name f k = do
   v <- f k

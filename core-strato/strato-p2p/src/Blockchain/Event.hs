@@ -72,8 +72,6 @@ import           Debug.Trace                           (trace)
 
 setTitleAndProduceBlocks :: ( MonadLogger m
                             , MonadIO m
-                            , RBDB.HasRedisBlockDB m
-                            , MonadState Context m
                             , HasVMEventsSink m
                             ) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
@@ -426,7 +424,6 @@ handleEvents peer = awaitForever $ \case
 handleGetChainDetails :: ( MonadIO m
                          , MonadResource m
                          , RBDB.HasRedisBlockDB m
-                         , SK.HasUnseqSink m
                          , MonadState Context m
                          , MonadLogger m
                          )
@@ -458,7 +455,7 @@ numFromRedis = \case
 
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
-syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m)
+syncFetch :: (MonadIO m, MonadState Context m)
           => Direction -> Integer -> ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context

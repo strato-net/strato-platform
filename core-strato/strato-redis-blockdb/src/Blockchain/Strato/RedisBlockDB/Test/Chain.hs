@@ -187,9 +187,6 @@ stem' l (c:cs) | l == c     = [l]
 showTree :: (Show a) => Tree a -> String
 showTree = drawTree . prettyTree
 
-showTree' :: (Show a) => Tree a -> Tree a -> String
-showTree' = undefined
-
 prettyTree' :: Tree BlockData -> Tree String
 prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
 

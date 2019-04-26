@@ -6,9 +6,6 @@ module Blockchain.DB.ModifyStateDB (
   pay
 ) where
 
-import           Blockchain.Output
-import           Control.Monad.Trans
-
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.DB.HashDB
@@ -28,7 +25,7 @@ addToBalance address val = do
     putAddressState address addressState{addressStateBalance = newVal}
     return True
 
-pay :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m) =>
+pay :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m) =>
      String -> Address -> Address -> Integer -> m Bool
 pay _description fromAddr toAddr val = do
   -- TODO - figure out why the next lines create infinite loops when run in pizza app (with debug flag on)

@@ -227,7 +227,7 @@ codeRoundTrip = it "preserves code in json -> hs -> json" $ do
 
 -- compare checks that the parsed value (`actual`) is structurally equivalent
 -- to the bytestring by diffing the corresponding Aeson.Values
-compareJSON :: (Show a, FromJSON a, ToJSON a) => C8.ByteString -> Either String a -> Expectation
+compareJSON :: (ToJSON a) => C8.ByteString -> Either String a -> Expectation
 compareJSON expected actual =
   case actual of
       Left r -> expectationFailure r

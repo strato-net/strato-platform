@@ -107,7 +107,7 @@ makeLogware foundation =
 noPool :: PG.Connection -> IO ()
 noPool = const $ return ()
 
-myPool :: (MonadLogger m, MonadIO m, MonadUnliftIO m)
+myPool :: (MonadLogger m, MonadUnliftIO m)
        => ConnectionString -> Int -> m ConnectionPool
 myPool = createPostgresqlPoolModified $ noPool
 

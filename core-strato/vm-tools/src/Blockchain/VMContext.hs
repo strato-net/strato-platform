@@ -232,7 +232,7 @@ instance RBDB.HasRedisBlockDB ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
-runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadMask m,
+runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadMask m,
                     HasStateDB (StateT Context (ReaderT Config (ResourceT m)))) =>
                    StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
@@ -281,7 +281,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
           setStateDBStateRoot MP.emptyTriePtr
           f
 
-runContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) =>
+runContextM :: (MonadIO m, MonadUnliftIO m) =>
                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
@@ -322,10 +322,10 @@ runContextM f = do
                        Q.empty)
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
+evalContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
+execContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
 execContextM f = snd <$> runContextM f
 
 incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()
