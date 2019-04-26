@@ -43,6 +43,9 @@ spec = do
                                    (Just $ Variable "c"))
                 , ("int(8824)", FunctionCall (Variable "int") [(Nothing, NumberLiteral 8824 Nothing)])
                 , ("int32(8824)", FunctionCall (Variable "int32") [(Nothing, NumberLiteral 8824 Nothing)])
+                , ("int(x)[y]", IndexAccess (FunctionCall (Variable "int") [(Nothing, Variable "x")])
+                                            $ Just $ Variable "y")
+
                 ]
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want

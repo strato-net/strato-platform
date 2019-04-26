@@ -10,7 +10,7 @@ module Blockchain.SolidVM
       call
     , create
     ) where
-
+import Debug.Trace
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
@@ -330,8 +330,9 @@ callWrapper from to mContract functionName argExps = do
 runStatements :: [Xabi.Statement] -> SM (Maybe Value)
 runStatements [] = return Nothing
 runStatements (s:rest) = do
-  onTraced $
+  onTraced $ do
     liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
+    liftIO $ putStrLn $ C.green $ show s
   ret <- runStatement s
   case ret of
     Nothing -> runStatements rest
@@ -400,7 +401,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType maybeLoc varNames maybeExpression)) = do
   -- todo: use maybeLoc to determine whether to store this locally or create a reference
   let theType = fromMaybe (todo "type inference not implemented" s) maybeType
-  value <-
+  !value <-
     case maybeExpression of
       Nothing ->
         case varNames of
@@ -539,6 +540,7 @@ expToPath (Xabi.Variable x) = do
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
     parvar <- expToVar parent
+    traceShowM ('p':"arvar", parvar)
     case parvar of
       StorageItem apt -> return apt
       _ -> expToPath parent
@@ -730,6 +732,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
                 $ M.lookup name theMap
             _ -> todo "access member of storage item" (val', name, apt)
 
+-- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
 expToVar' x@(Xabi.IndexAccess{}) = StorageItem <$> expToPath x
 
 expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger

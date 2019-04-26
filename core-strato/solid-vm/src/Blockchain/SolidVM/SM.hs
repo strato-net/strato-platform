@@ -8,8 +8,6 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 
 
---{-# OPTIONS -fno-warn-unused-top-binds  #-}
-
 module Blockchain.SolidVM.SM (
   CallInfo(..),
   SState(..),
@@ -35,6 +33,7 @@ module Blockchain.SolidVM.SM (
   markDiffForAction
   ) where
 
+import Debug.Trace
 import           Control.Applicative ((<|>))
 import           Control.Exception
 import           Control.Lens
@@ -277,13 +276,14 @@ toMaybe False _ = Nothing
 
 getVariableOfName :: String -> SM Variable
 getVariableOfName name = do
+  runLoggingT $ $logInfoLS "getVariableOfName" name
   sstate <- get
   let currentCallInfo =
         case callStack sstate of
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
       vars = localVariables currentCallInfo
-      t s v = ('x':s) `seq` v
+      t s v = traceShow ('x':s, v) `seq` v
   maybeLocalValue <-
     -- TODO(tim): consult memory map for locals instead of storage
     case M.lookup name vars of
@@ -304,7 +304,8 @@ getVariableOfName name = do
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "int", "byte", "string", "keccak256"
+      maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "int", "byte", "bytes"
+                                                  , "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"]) $

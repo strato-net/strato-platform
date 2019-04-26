@@ -10,7 +10,7 @@ import Executable.EVMFlags() -- for HFlags
 import qualified Spec
 
 predicate :: Path -> Bool
-predicate (_, _) = True
+predicate (_, "can array convert for index") = True
 predicate _ = False
 
 main :: IO ()

@@ -1944,3 +1944,40 @@ contract qq {
   }
 }|]
     getFields ["x", "y"] `shouldReturn` [BInteger 10, BInteger 20]
+
+  it "can array convert for index" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    string txt = "hello, world";
+    x = bytes(txt)[3];
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0x6c]
+
+  it "can increment array members" . runTest $ do
+    runBS [r|
+contract qq {
+    uint[] xs = [1,1,3];
+    constructor() public {
+        xs[1]++;
+    }
+}|]
+    getAll [ [Field "xs", Field "length"]
+           , [Field "xs", ArrayIndex 0]
+           , [Field "xs", ArrayIndex 1]
+           , [Field "xs", ArrayIndex 2]
+           ] `shouldReturn` [BInteger 3, BInteger 1, BInteger 2, BInteger 3]
+
+  it "can reference characters" . runTest $ do
+    liftIO $ pendingWith "TODO: something"
+    runBS [r|
+contract qq {
+    string public xs = "ok";
+    constructor() public {
+      bytes(xs)[0] = 't';
+      bytes(xs)[1] = 'y';
+    }
+}|]
+    getFields ["xs"] `shouldReturn` [BString "ty"]

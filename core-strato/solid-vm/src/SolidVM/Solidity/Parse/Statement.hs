@@ -94,15 +94,15 @@ expression :: SolidityParser Expression
 expression =
   buildExpressionParser
   [
-    [Postfix $ do
-      idxs <- many1 . brackets $ optionMaybe expression
-      return $ \x -> foldl IndexAccess x idxs],
     [postfix $ choice
      [
        (do { name <- (reservedOp "." >> memberName); return $ flip MemberAccess name}),
        (do { exps <- parens $ commaSep expression; return (\e -> FunctionCall e (map ((,) Nothing) exps))})
      ]
     ],
+    [Postfix $ do
+      idxs <- many1 . brackets $ optionMaybe expression
+      return $ \x -> foldl IndexAccess x idxs],
     [Postfix (do { reservedOp "++"; return PlusPlus})],
     [Postfix (reservedOp "--" >> return MinusMinus)],
     [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
