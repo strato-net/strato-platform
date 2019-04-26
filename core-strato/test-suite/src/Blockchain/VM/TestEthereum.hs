@@ -275,7 +275,7 @@ runTest test = do
         flushMemAddressStateDB
 
         return $ case result of
-            Right (er@(ExecResults _ _ retVal _ rLogs _ _ _ _)) ->
+            Right er@ExecResults{erReturnVal=retVal, erLogs=rLogs} ->
                       (Right (), BSS.fromShort <$> retVal,
                        fromIntegral $ currentGasLimit (env test) - (transactionGasLimit signedTransaction' - calculateReturned signedTransaction' er),
                        rLogs, Just [], Nothing)

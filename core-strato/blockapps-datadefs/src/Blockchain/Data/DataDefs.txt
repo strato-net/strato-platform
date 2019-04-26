@@ -98,6 +98,7 @@ TransactionResult json
     deletedStorage String
     status TransactionResultStatus Maybe
     chainId Word256 Maybe
+    kind CodeKind Maybe
     deriving Eq Read Show Generic
 
 UserN json
