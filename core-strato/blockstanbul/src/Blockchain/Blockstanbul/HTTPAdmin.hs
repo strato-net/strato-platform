@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
@@ -8,25 +9,28 @@
 
 module Blockchain.Blockstanbul.HTTPAdmin (
   CandidateReceived(..),
+  VoteResult(..),
   uploadVote,
   createWebServer
 ) where
 
 import Servant
+import Control.DeepSeq
 import Control.Monad
 import Data.Aeson
+import qualified Data.ByteString.Lazy.Char8          as C8
 import qualified GHC.Generics                        as GHCG
 import Servant.Client
 
-import Control.Concurrent.STM
-import Control.Concurrent.STM.TMChan
 import Control.Monad.IO.Class
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Test.QuickCheck
+import UnliftIO.STM
+import UnliftIO.Timeout
 
-import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances()
-import Blockchain.Format
+import Blockchain.Strato.Model.Address
+import Text.Format
 
 -- API
 
@@ -42,6 +46,8 @@ data CandidateReceived = CandidateReceived { sender :: Address
                                            , nonce :: Int
                                            } deriving (Eq, Show, GHCG.Generic)
 
+data VoteResult = Enqueued | Rejected String deriving (Show, Eq, GHCG.Generic, NFData)
+
 adminAPI :: Proxy AdminAPI
 adminAPI = Proxy
 
@@ -53,16 +59,25 @@ instance Arbitrary CandidateReceived where
 
 -- Server
 
-admin :: TMChan CandidateReceived -> Server AdminAPI
-admin = createVote
+admin :: TQueue CandidateReceived -> TQueue VoteResult -> Server AdminAPI
+admin ich och = createVote ich och
 
-createVote :: TMChan CandidateReceived -> CandidateReceived -> Handler CandidateReceived
-createVote ch cr = do
-  liftIO $ atomically $ writeTMChan ch cr
-  return cr
+createVote :: TQueue CandidateReceived -> TQueue VoteResult -> CandidateReceived
+           -> Handler CandidateReceived
+createVote ich och cr = do
+  mResp <- liftIO $ timeout 60000000 $ do -- 60s
+    -- TODO: Tag requests with unique IDs, and `retry` the read when the response doesn't match
+    atomically $ writeTQueue ich cr
+    atomically $ readTQueue och
+  case mResp of
+    Nothing -> throwError $ err500 {
+      errBody = C8.pack $ "timed out while waiting for vote response: " ++ show cr }
+    Just (Rejected msg) -> throwError $ err400 {
+      errBody = C8.pack $ "unable to accept vote: " ++ msg }
+    Just Enqueued -> return cr
 
-createWebServer :: TMChan CandidateReceived -> Application
-createWebServer ch = serve adminAPI (admin ch)
+createWebServer :: TQueue CandidateReceived -> TQueue VoteResult -> Application
+createWebServer ich och = serve adminAPI (admin ich och)
 
 -- Client
 

@@ -9,15 +9,6 @@
 
 module Blockchain.Data.Json where
 
-import           Blockchain.Data.Address
-import           Blockchain.Data.Block
-import           Blockchain.Data.Code
-import           Blockchain.Data.DataDefs
-import           Blockchain.Data.Transaction
-import           Blockchain.Format
-import           Blockchain.Strato.Model.ExtendedWord (Word256)
-import           Blockchain.Util                      (toMaybe)
-
 import           Data.Aeson
 import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
@@ -31,6 +22,15 @@ import           Data.Word
 import           GHC.Generics
 import           Numeric
 import           Text.Read
+
+import           Blockchain.Data.Address
+import           Blockchain.Data.Block
+import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Transaction
+import           Blockchain.Strato.Model.ExtendedWord (Word256)
+import           Blockchain.Util                      (toMaybe)
+import           Text.Format
 
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON

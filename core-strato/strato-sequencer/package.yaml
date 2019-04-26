@@ -14,10 +14,10 @@ dependencies:
   - bimap
   - blockapps-privacy
   - classy-prelude
-  - strato-model
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-util
-  - strato-conf
+  - format
   - clock
   - conduit
   - containers
@@ -26,7 +26,6 @@ dependencies:
   - extra
   - mtl
   - resourcet
-  - monad-logger
   - text
   - strato-genesis
   - leveldb-haskell
@@ -54,13 +53,17 @@ dependencies:
   - transformers
   - warp
   - servant-client
+  - strato-conf
+  - strato-model
   - wai-extra
   - wai-middleware-prometheus
   - deepseq
   - exceptions
   - unliftio
+  - seqevents
+  - cross-monitoring
 
-ghc-options: -Wall -O2 -threaded
+ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 library:
   source-dirs:     src

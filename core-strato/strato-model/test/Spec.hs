@@ -1,16 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 import Control.Monad
+import qualified Data.Aeson as Ae
+import Data.Aeson.QQ
 import qualified Data.Bits as Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as C8
 import Data.Word
 import GHC.Exts
 import GHC.Integer.GMP.Internals
 import Test.Hspec
 import Test.QuickCheck
 
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.SHA
 import Network.Haskoin.Internals (BigWord(..))
 
 main :: IO ()
@@ -66,3 +73,32 @@ spec = do
       fastWord256LSB n `shouldBe` slowByte n
     it "works on S# Word256" $ do
       fastWord256LSB (BigWord (S# 0x93342434#)) `shouldBe` 0x34
+
+  describe "Address serialization" $ do
+    it "should be fixed width" $ do
+      addressToHex 0xdeadbeef `shouldBe`
+                    "00000000000000000000000000000000deadbeef"
+      addressToHex 0 `shouldBe` C8.replicate 40 '0'
+      addressToHex 0xca35b7d915458ef540ade6068dfe2f44e8fa733c `shouldBe`
+                    "ca35b7d915458ef540ade6068dfe2f44e8fa733c"
+
+  describe "CodePtr parsing" $ do
+    let parse :: Ae.Value -> Either String CodePtr
+        parse = Ae.eitherDecode . Ae.encode
+    it "can parse legacy digests" $
+      parse [aesonQQ|"ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"|]
+        `shouldBe` Right (EVMCode $ SHA 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+
+    it "can parse evm object digests" $
+      parse [aesonQQ|{"kind": "EVM",
+                      "digest": "ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"}|]
+        `shouldBe` Right (EVMCode $ SHA 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+
+    it "can parse solidvm object digests" $
+      parse [aesonQQ|{"kind": "SolidVM", "name": "SimpleStorage",
+                      "digest": "ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"}|]
+        `shouldBe` Right (SolidVMCode "SimpleStorage"
+                            $ SHA 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+
+    it "round trips correctly" $ property $ \(ptr::CodePtr) -> do
+      Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr

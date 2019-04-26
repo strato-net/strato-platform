@@ -4,7 +4,7 @@
 module Blockchain.Sequencer.Metrics where
 
 import Control.Monad.IO.Class
-import Control.Monad.Logger
+import Blockchain.Output
 import Control.Monad.Trans.Resource
 import Data.Ratio ((%))
 import Data.Text

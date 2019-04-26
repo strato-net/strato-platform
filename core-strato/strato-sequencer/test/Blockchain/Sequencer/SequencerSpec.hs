@@ -20,7 +20,6 @@ import           Control.Concurrent.STM.TMChan
 import           Control.Concurrent.STM.TQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
-import           Control.Monad.Logger
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
@@ -38,7 +37,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction         (createChainMessageTX)
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin as TO
-import           Blockchain.Format
 import           Blockchain.Output
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.CablePackage
@@ -66,6 +64,8 @@ import           Test.QuickCheck
 import           System.Directory                    (createDirectoryIfMissing, getCurrentDirectory,
                                                       removeDirectoryRecursive, setCurrentDirectory)
 
+import           Text.Format
+
 fromLeft :: a -> Either a b -> a
 fromLeft _ (Left a) = a
 fromLeft a _ = a
@@ -92,8 +92,8 @@ runPBFTTestM m = do
 runPBFTTestMWithGenesis :: (SHA -> SequencerM a) -> IO ()
 runPBFTTestMWithGenesis m = do
   gb <- makeGenesisBlock
-  let hash = blockHash . ingestBlockToBlock $ gb
-  void $ withTemporaryDepBlockDB True gb (m hash)
+  let hsh = blockHash . ingestBlockToBlock $ gb
+  void $ withTemporaryDepBlockDB True gb (m hsh)
 
 withTemporaryDepBlockDB :: Bool -> IngestBlock -> SequencerM a -> IO a
 withTemporaryDepBlockDB pbft genesisBlock m = do
@@ -104,7 +104,8 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
     pkg <- atomically newCablePackage
-    vch <- atomically newTMChan
+    vch <- atomically newTQueue
+    rch <- atomically newTQueue
     tch <- atomically newTMChan
     let
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
@@ -114,6 +115,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
                                , blockstanbulBeneficiary = vch
+                               , blockstanbulVoteResps = rch
                                , blockstanbulTimeouts = tch
                                , cablePackage = pkg
                                , maxUsPerIter = 200
@@ -126,15 +128,15 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         auSenders = [myAddr]
         ctx = newContext (View 0 0) vals auSenders pkey
         mCtx = if pbft then Just ctx else Nothing
-        hash = blockHash . ingestBlockToBlock $ genesisBlock
+        hsh = blockHash . ingestBlockToBlock $ genesisBlock
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
-        boot = bootstrapGenesisBlock hash difficulty
+        boot = bootstrapGenesisBlock hsh difficulty
     fromLeft (error "webserver completed") <$>
-      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)) dropLogMsg)
+      race (runNoLoggingT (runSequencerM cfg mCtx (boot >> m)))
            ( run testWebserverPort
                . logStdoutDev
                . prometheus def
-               . API.createWebServer $ vch)
+               $ API.createWebServer vch rch)
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -253,26 +255,24 @@ spec = do
                 pvk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 addr = prvKey2Address pvk
                 (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
-            -- create the extendedsignature for (beneficiary, nonce)
             esign <- signBenfInfo pvk (testAddr, True, 1)
-            --rlp serialize and hex and string the signature
             let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
                 vote = API.CandidateReceived{API.sender=addr
                                            , API.signature=esignStr
                                            , API.recipient=testAddr
                                            , API.votingdir=True
                                            , API.nonce = 1}
+            -- Simulate a successful response from blockstanbul by violating causality
+            -- This is pretty fragile to implementation details
+            rch <- asks blockstanbulVoteResps
+            atomically $ writeTQueue rch API.Enqueued
             let url = BaseUrl Http "localhost" testWebserverPort ""
             liftIO $ API.uploadVote url vote `shouldReturn` Right ()
             voteList <- drainVotes
             voteList `shouldMatchList` [vote]
             checkForVotes voteList
-            bct' <- getBlockstanbulContext
-            let unwrapbct = fromMaybe bct bct'
-            let pv = _pendingvotes unwrapbct
-                val = M.lookup testAddr pv
-            val `shouldBe` Just True
-            pv `shouldBe` M.singleton testAddr True
+            vmevs <- drainVM
+            vmevs `shouldContain` [OEVoteToMake { voteRecipient = testAddr, voteVotingDir = True, voteSender = addr}]
             esign' <- signBenfInfo pvk (testAddr, False, 1)
             let esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
                 vote' = API.CandidateReceived{API.sender=addr
@@ -284,12 +284,10 @@ spec = do
             voteList' <- drainVotes
             voteList' `shouldMatchList` [vote']
             checkForVotes voteList'
+            vmevs' <- drainVM
+            vmevs' `shouldNotContain` [OEVoteToMake { voteRecipient = testAddr, voteVotingDir = False, voteSender = addr}]
             bctn <- getBlockstanbulContext
             let unwrapbct' = fromMaybe bct bctn
-            let pv' = _pendingvotes unwrapbct'
-                val' = M.lookup testAddr pv'
-            val' `shouldBe` Just True
-            pv' `shouldBe` M.singleton testAddr True
             _authSenders unwrapbct' `shouldBe` M.singleton addr 1
 
     describe "fuseChannels" $ do
@@ -299,7 +297,7 @@ spec = do
         uch <- asks $ unseqEvents . cablePackage
         atomically . writeTQueue uch $ iev
         vch <- asks blockstanbulBeneficiary
-        atomically . writeTMChan vch $ vote
+        atomically . writeTQueue vch $ vote
         src0 <- sealConduitT <$> fuseChannels
         (src1, ev1) <- src0 $$++ headC
         (src2, ev2) <- src1 $$++ headC

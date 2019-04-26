@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { withRouter, Link } from 'react-router-dom';
 import { connect } from 'react-redux';
+import Cookies from 'js-cookie';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
 import logo from './blockapps-cube-color-430x500.png';
@@ -11,7 +12,7 @@ import WalkThrough from '../WalkThrough';
 import { Button } from '@blueprintjs/core';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 import qs from 'query-string';
-import { isModePublic } from '../../lib/checkMode';
+import { isModePublic, isModeOauth } from '../../lib/checkMode';
 import { Field, reduxForm } from 'redux-form';
 import { selectChain, fetchChainIds } from '../Chains/chains.actions';
 
@@ -45,6 +46,12 @@ class MenuBar extends Component {
             <a target="_blank" rel="noopener noreferrer">
               <button className="pt-button pt-minimal pt-small" onClick={() => { this.props.logout() }}>Logout</button>
             </a></span>}
+          {isModeOauth() && <span><span className="pt-navbar-divider" />
+            <small className="pt-text-muted welcome-user"> {Cookies.get('strato_user_name')} </small>
+            <span className="pt-navbar-divider" />
+            <a target="_blank" rel="noopener noreferrer">
+              <button className="pt-button pt-minimal pt-small" onClick={() => { window.location.href = '/auth/logout' }}>Logout</button>
+            </a></span>}
         </div>
       );
     }
@@ -65,11 +72,11 @@ class MenuBar extends Component {
     if ( this.props.chainIds.length && (this.props.isLoggedIn || !isModePublic())) {
       return (
         <span>
-          <span className="pt-navbar-divider" />
+          <span className="pt-navbar-divider"/>
           <small className="pt-text-muted">
             <div className="pt-select">
               <Field
-                className="pt-input"
+                className="pt-input select-chain"
                 component="select"
                 name="chainLabel"
                 onChange={

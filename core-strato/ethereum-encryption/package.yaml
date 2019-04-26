@@ -23,9 +23,9 @@ dependencies:
   - crypto-random
   - entropy
   - ethereum-rlp
+  - format
   - blockapps-haskoin
   - memory
-  - monad-logger
   - lifted-base
   - mtl
   - strato-model

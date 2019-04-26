@@ -11,21 +11,23 @@ dependencies:
   - base
   - binary
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-milena
   - blockapps-util
   - bytestring
   - clock
   - containers
+  - deepseq
+  - format
   - hedis
   - hflags
-  - monad-logger
   - persistent
   - persistent-postgresql
   - resourcet
   - strato-conf
   - strato-model
   - strato-redis-blockdb
-  - strato-sequencer
+  - seqevents
   - text
   - transformers
 

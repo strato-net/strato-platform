@@ -25,7 +25,7 @@ import qualified Network.Socket.ByteString             as NB
 import           Control.Error                         (fmapL, note)
 import           Control.Exception
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Crypto.Types.PubKey.ECC
 import           Data.Binary
 import           Data.Bits
@@ -42,17 +42,17 @@ import           Numeric
 import           System.Endian
 import           System.Timeout
 
-import qualified Blockchain.Colors                     as CL
 import           Blockchain.Data.RLP
 import           Blockchain.ExtendedECDSA
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..), hPubKeyToPubKey)
 import           Blockchain.Strato.Model.SHA           (keccak256)
 import           Blockchain.Util
 
 import           Blockchain.Strato.Discovery.Data.Peer
+import qualified Text.Colors                           as CL
+import           Text.Format
 
 encrypt :: H.PrvKey -> Word256 -> H.SecretT IO ExtendedSignature
 encrypt = flip extSignMsg

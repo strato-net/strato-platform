@@ -1,3 +1,4 @@
+#strato-getting-started-min-version:2.7
 version: "3"
 volumes:
   dapps:
@@ -15,20 +16,14 @@ services:
     - prometheus
     - strato
     environment:
-    - APEX_URL=${APEX_URL}
-    - BLOC_DOC_URL=${BLOC_DOC_URL}
-    - BLOC_URL=${BLOC_URL}
-    - CIRRUS_URL=${CIRRUS_URL}
     - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
-    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
-    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
+    - NODE_HOST=${NODE_HOST}
     - NODE_NAME=${NODE_NAME}
+    - OAUTH_ENABLED=${OAUTH_ENABLED}
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
-    - STRATO_DOC_URL=${STRATO_DOC_URL}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
-    - STRATO_URL=${STRATO_URL}
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
@@ -44,6 +39,7 @@ services:
     - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
     - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
     - NODE_HOST=${NODE_HOST}
+    - OAUTH_ENABLED=${OAUTH_ENABLED}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
@@ -54,6 +50,7 @@ services:
     - SMD_MODE=${SMD_MODE}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - stratoHost=strato:3000
+    - vaultWrapperHost=vault-wrapper:8000
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
     volumes:
@@ -65,9 +62,8 @@ services:
     - postgrest
     - strato
     environment:
-    - BLOC_URL=${BLOC_URL}
-    - CIRRUS_URL=${CIRRUS_URL}
-    - STRATO_URL=${STRATO_URL}
+    - NODE_HOST=${NODE_HOST}
+    - ssl=${ssl:-false}
     build: .
     image: ${DAPPSTORE_IMAGE:-<REPO_URL>dappstore:<VERSION>}
     restart: always
@@ -77,7 +73,7 @@ services:
     - strato
     - vault-wrapper
     environment:
-    - loglevel=${loglevel}
+    - BLOC_DEBUG=${BLOC_DEBUG}
     - kafkaHost=kafka
     - kafkaPort=9092
     - postgres_host=postgres
@@ -86,9 +82,9 @@ services:
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
     - PROCESS_MONITORING=${PROCESS_MONITORING}
+    - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
     - SMD_MODE=${SMD_MODE}
-    - ssl=${ssl:-false}
     #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
     - vaultWrapperHost=vault-wrapper:8000
@@ -109,6 +105,7 @@ services:
     - postgres_port=5432
     - postgres_user=postgres
     - postgres_vault_wrapper_db=oauth
+    - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
@@ -121,11 +118,14 @@ services:
     - addBootnodes=${addBootnodes}
     - backupblocks=${backupblocks}
     - blockstanbul=${blockstanbul}
+    - blockstanbulAdmins=${blockstanbulAdmins}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
     - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
+    - blockstanbulSkipCheck=${blockstanbulSkipCheck}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
+    - brokenRefundReenable=${brokenRefundReenable}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
@@ -153,8 +153,10 @@ services:
     - seqDebugMode=${seqDebugMode}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
+    - seqRTSOPTs=${seqRTSOPTs}
     - useSyncMode=${useSyncMode}
-    - validators=${validators:-}
+    - validators=${validators}
+    - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
@@ -196,17 +198,18 @@ services:
     - authBasic=${authBasic}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
-    #- NODE_HOST=${NODE_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-    - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
-    - OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false}
-    - OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL}
+    - OAUTH_ENABLED=${OAUTH_ENABLED}
     - OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY}
+    - OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false} # for backwards-compatibility with 4.2
+    - OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL} # for backwards-compatibility with 4.2
+    - OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK} # for backwards-compatibility with 4.2
     - SMD_MODE=${SMD_MODE}
-    - ssl=${ssl:-false}
-    - sslCertFileType=${sslCertFileType:-crt}
+    - SERVE_LOGS=${SERVE_LOGS}
+    - ssl=${ssl}
+    - sslCertFileType=${sslCertFileType}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - uiPassword=${uiPassword}
     build: .
@@ -220,8 +223,7 @@ services:
   docs:
     environment:
     - API_URL=/strato-api/eth/v1.2/swagger.json
-    build: .
-    image: ${DOCS_IMAGE:-<REPO_URL>docs:<VERSION>}
+    image: swaggerapi/swagger-ui:v3.22.1
     restart: always
   zookeeper:
     image: wurstmeister/zookeeper:3.4.6

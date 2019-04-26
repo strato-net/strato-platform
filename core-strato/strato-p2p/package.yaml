@@ -19,6 +19,7 @@ dependencies:
   - binary
   - aeson
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-util
   - bytestring
   - classy-prelude
@@ -26,6 +27,7 @@ dependencies:
   - conduit-combinators
   - conduit-extra
   - containers
+  - cross-monitoring
   - cryptohash
   - crypto-pubkey
   - crypto-pubkey-types
@@ -36,6 +38,7 @@ dependencies:
   - ethereum-encryption
   - ethereum-rlp
   - exceptions
+  - format
   - ghc
   - blockapps-haskoin
   - hflags
@@ -45,7 +48,6 @@ dependencies:
   - lens
   - lifted-base
   - monad-control
-  - monad-logger
   - monadIO
   - blockapps-milena
   - mtl
@@ -67,7 +69,7 @@ dependencies:
   - warp
   - ansi-wl-pprint
   - strato-conf
-  - strato-sequencer
+  - seqevents
   - strato-model
   - strato-redis-blockdb
   - hedis

@@ -26,7 +26,6 @@ fakeHandle = FakeHandle
 
 -- Why is this garbage here? Because persistent forces the new composite
 -- key type to have Show and Read instances to use derivePeristField.
-deriving instance Read Address
 deriving instance Read ChainId
 
 -- Primary keys are not nullable, so avoid using persistent's Maybe modifier

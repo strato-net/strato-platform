@@ -8,13 +8,10 @@ import           Test.QuickCheck
 
 import           Data.ByteString.Arbitrary
 import qualified Data.ByteString                    as B
-import qualified Data.ByteString.Internal           as IB
 import qualified Data.Text                          as T
-import           Data.Time
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Code
@@ -22,20 +19,11 @@ import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia hiding (stateRoot)
-import           Blockchain.SHA
+import           Blockchain.MiscArbitrary()
 import           Blockchain.Util
 
 import qualified Network.Haskoin.Crypto             as H
 
-
--- via https://gist.github.com/agrafix/2b48ec069693e3ab851e
-instance Arbitrary UTCTime where
-    arbitrary =
-        do randomDay <- choose (1, 28) :: Gen Int
-           randomMonth <- choose (1, 12) :: Gen Int
-           randomYear <- choose (1970, 2018) :: Gen Integer
-           randomTime <- choose (0, 86399) :: Gen Int
-           return $ UTCTime (fromGregorian randomYear randomMonth randomDay) (fromIntegral randomTime)
 
 instance Arbitrary Microtime where
     arbitrary = (Microtime . unboxPI) <$> (arbitrary :: Gen PositiveInteger)
@@ -57,14 +45,6 @@ instance Arbitrary PositiveInteger where
 
 instance Arbitrary HaskoinPrvKey where
     arbitrary = HaskoinPrvKey <$> fromJust <$> ((H.makePrvKey <$> arbitrary) `suchThat` (isJust))
-
-instance Arbitrary Address where
-    arbitrary = do
-        random160Bit <- fastRandBs 20
-        return . Address . fromIntegral . byteString2Integer $ random160Bit
-
-instance Arbitrary T.Text where
-  arbitrary = T.pack <$> arbitrary
 
 instance Arbitrary BlockData where
     arbitrary = do
@@ -144,17 +124,8 @@ instance Arbitrary Code where
         randomCode <- arbitrary
         return $ Code { codeBytes = randomCode }
 
-instance Arbitrary SHA where
-    arbitrary = do
-        random256Bit <- fastRandBs 32
-        return . SHA . fromIntegral . byteString2Integer $ random256Bit
-
 instance Arbitrary StateRoot where
     arbitrary = StateRoot <$> fastRandBs 32
-
-instance Arbitrary IB.ByteString where
---     arbitrary = fastRandBs =<< choose (1024, 1024*1024) -- use this for (theoretical) correctness
-    arbitrary = fastRandBs 1024 -- use this for speed
 
 instance Arbitrary IPAddress where
   arbitrary = IPv4 <$> arbitrary

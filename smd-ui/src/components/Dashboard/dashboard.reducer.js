@@ -12,7 +12,11 @@ import {
   PRELOAD_BLOCK_DIFFICULTY,
   UPDATE_BLOCK_DIFFICULTY,
   PRELOAD_TRANSACTION_TYPES,
-  UPDATE_TRANSACTION_TYPES
+  UPDATE_TRANSACTION_TYPES,
+  PRELOAD_HEALTH,
+  UPDATE_HEALTH,
+  PRELOAD_NODE_UPTIME,
+  UPDATE_NODE_UPTIME
 } from './dashboard.action'
 
 const initialState = {
@@ -22,7 +26,9 @@ const initialState = {
   transactionsCount: [],
   blockPropagation: [],
   blockDifficulty: [],
-  transactionTypes: []
+  transactionTypes: [],
+  healthStatus: false,
+  uptime: 0
 };
 
 const reducer = function (state = initialState, action) {
@@ -109,6 +115,30 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         transactionTypes: action.data
+      }
+
+    case PRELOAD_HEALTH:
+      return {
+        ...state,
+        healthStatus: action.data
+      }
+
+    case UPDATE_HEALTH:
+      return {
+        ...state,
+          uptime: action.data
+      }
+
+    case PRELOAD_NODE_UPTIME:
+      return {
+        ...state,
+        healthStatus: action.data
+      }
+
+    case UPDATE_NODE_UPTIME:
+      return {
+        ...state,
+        uptime: action.data
       }
 
     default:

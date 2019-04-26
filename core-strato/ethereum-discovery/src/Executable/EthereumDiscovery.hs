@@ -7,7 +7,7 @@ module Executable.EthereumDiscovery (
 
 import           UnliftIO.Exception
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Base16                  as B16
 import           Data.Maybe
@@ -15,13 +15,13 @@ import qualified Data.Text                               as T
 import qualified Network.Haskoin.Internals               as H
 import qualified Network.Socket                          as S
 
-import qualified Blockchain.Colors                       as CL
 import           Blockchain.Data.PubKey
 import           Blockchain.EthConf
 
 import           Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.Strato.Discovery.P2PUtil
 import           Blockchain.Strato.Discovery.UDPServer
+import qualified Text.Colors                             as CL
 
 privateKey :: H.PrvKey
 privateKey = fromMaybe (error "Bad value for hardcoded private key in ethconf.yaml") $ H.makePrvKey $ unPrivKey $ privKey ethConf

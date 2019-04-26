@@ -18,7 +18,7 @@ module Blockchain.Strato.Indexer.IContext
     ) where
 
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State

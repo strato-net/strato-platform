@@ -9,6 +9,8 @@ const externalStorage = require('../lib/externalStorage/externalStorage');
 const crypto = require('crypto');
 var rp = require('request-promise');
 
+const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
+
 module.exports = {
   upload: function (req, res, next) {
     co(function* () {
@@ -24,7 +26,7 @@ module.exports = {
 
       if (!metadata || !provider || !username || !password || !address) {
         let err = new Error('wrong params, expected: {username, password, address, provider, metadata}');
-        err.status = 400;
+        err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
 
@@ -51,13 +53,21 @@ module.exports = {
         yield rp.post(options);
       } catch (error) {
         let err = new Error('Unable to verify username/password pair');
-        err.status = 400;
+        err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
 
+      let uploadedFile;
+      
       try {
-        const uploadedFile = yield uploader.upload(params);
-
+        uploadedFile = yield uploader.upload(params);
+      } catch (error) {
+        let err = new Error(`AWS S3 upload file to bucket error: ${JSON.stringify(error)}`);
+        err.status = RestStatus.INTERNAL_SERVER_ERROR;
+        return next(err);
+      }
+      
+      try {
         const args = {
           _uri: uploadedFile.Location,
           _host: provider,
@@ -79,10 +89,10 @@ module.exports = {
           hash: hash
         });
 
-        res.status(200).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
+        res.status(RestStatus.OK).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
       } catch (error) {
         let err = new Error(error);
-        err.status = 500;
+        err.status = RestStatus.INTERNAL_SERVER_ERROR;
         return next(err);
       };
     });
@@ -93,7 +103,7 @@ module.exports = {
       const uploads = yield models.Upload.all({
         attributes: ['contractAddress', 'uri', 'hash', 'createdAt']
       });
-      res.status(200).json({ list: uploads });
+      res.status(RestStatus.OK).json({ list: uploads });
     });
   },
 
@@ -103,7 +113,7 @@ module.exports = {
 
       if (!contractAddress) {
         let err = new Error('wrong params, expected: {contractAddress}');
-        err.status = 400;
+        err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
 
@@ -113,16 +123,16 @@ module.exports = {
 
       if (!record) {
         let err = new Error('Address not found');
-        err.status = 400;
+        err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
 
       try {
         const data = yield externalStorage.getExternalStorage(contractAddress);
-        res.status(200).json({ uri: data.uri, timeStamp: data.timeStamp, signers: data.signers });
+        res.status(RestStatus.OK).json({ uri: data.uri, timeStamp: data.timeStamp, signers: data.signers });
       } catch (error) {
         let err = new Error(error);
-        err.status = 500;
+        err.status = RestStatus.INTERNAL_SERVER_ERROR;
         return next(err);
       }
     });
@@ -137,7 +147,7 @@ module.exports = {
 
       if (!contractAddress || !username || !password || !address) {
         let err = new Error('wrong params, expected: {username, password, address, contractAddress}');
-        err.status = 400;
+        err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
 
@@ -147,7 +157,7 @@ module.exports = {
 
       if (!record) {
         let err = new Error('Contract address not found');
-        err.status = 400;
+        err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
 
@@ -163,16 +173,16 @@ module.exports = {
 
         if (result.signers.indexOf(address) > -1) {
           let err = new Error('You already signed this transaction');
-          err.status = 400;
+          err.status = RestStatus.BAD_REQUEST;
           return next(err);
         } else {
           const data = yield externalStorage.attest(userCredentials, contractAddress, args);
-          res.status(200).json({ attested: true, signers: data[0] });
+          res.status(RestStatus.OK).json({ attested: true, signers: data[0] });
         }
 
       } catch (error) {
         let err = new Error(error);
-        err.status = 500;
+        err.status = RestStatus.INTERNAL_SERVER_ERROR;
         return next(err);
       }
     });
@@ -184,7 +194,7 @@ module.exports = {
 
       if (!contractAddress) {
         let err = new Error('wrong params, expected: {contractAddress}');
-        err.status = 400;
+        err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
 
@@ -194,7 +204,7 @@ module.exports = {
 
       if (!record) {
         let err = new Error('Address not found');
-        err.status = 400;
+        err.status = RestStatus.BAD_REQUEST;
         return next(err);
       }
 
@@ -208,11 +218,11 @@ module.exports = {
         };
 
         const url = s3.getSignedUrl('getObject', options);
-        res.status(200).json({ url: url });
+        res.status(RestStatus.OK).json({ url: url });
 
       } catch (error) {
         let err = new Error(error);
-        err.status = 500;
+        err.status = RestStatus.INTERNAL_SERVER_ERROR;
         return next(err);
       }
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-import Control.Monad.Logger
+import Blockchain.Output
 import Control.Monad.Trans.State.Lazy
 
 import Blockchain.Blockstanbul
@@ -11,10 +11,10 @@ import Criterion.Main
 
 -- Note: it may be worthwhile to add more layers so that it resembles
 -- the sequencer
-runBlockstanbul :: StateT BlockstanbulContext (NoLoggingT IO) a -> IO a
+runBlockstanbul :: StateT BlockstanbulContext (LoggingT IO) a -> IO a
 runBlockstanbul = runNoLoggingT . flip evalStateT benchContext
 
-instance HasBlockstanbulContext (StateT BlockstanbulContext (NoLoggingT IO)) where
+instance HasBlockstanbulContext (StateT BlockstanbulContext (LoggingT IO)) where
   getBlockstanbulContext = gets Just
   putBlockstanbulContext = put
 

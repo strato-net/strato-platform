@@ -21,32 +21,32 @@ class CreateBlocUser extends Component {
 
   render() {
     return (
-      <div className="smd-pad-16">
-        <Button onClick={() => {
-          mixpanelWrapper.track('create_user_open_click');
-          this.props.reset();
-          this.props.openOverlay();
-        }} className="pt-intent-primary pt-icon-add"
-          id="accounts-create-user-button"
-          text="Create User" />
+    <div className="smd-pad-16">
+      <Button onClick={() => {
+        mixpanelWrapper.track('create_user_open_click');
+        this.props.reset();
+        this.props.openOverlay();
+      }} className="pt-intent-primary pt-icon-add"
+              id="accounts-create-user-button"
+              text="Create User"/>
 
 
-        <Dialog
+      <Dialog
           iconName="inbox"
           isOpen={this.props.isOpen}
           onClose={this.props.closeOverlay}
           title="Create New User"
           className="pt-dark"
-        >
-          <form>
-            <div className="pt-dialog-body bloc-user-form">
-              <div className="pt-form-group">
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-a">
-                    Username
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
+      >
+        <form>
+          <div className="pt-dialog-body bloc-user-form">
+            <div className="pt-form-group">
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-a">
+                  Username
+                </label>
+                <div className="pt-form-content">
+                  <Field
                       name="username"
                       component="input"
                       type="text"
@@ -54,17 +54,17 @@ class CreateBlocUser extends Component {
                       className="pt-input form-width"
                       tabIndex="1"
                       required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.username}</div>
-                  </div>
+                  />
+                  <div className="pt-form-helper-text">{this.props.errors && this.props.errors.username}</div>
                 </div>
+              </div>
 
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
-                    Password
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-b">
+                  Password
+                </label>
+                <div className="pt-form-content">
+                  <Field
                       name="password"
                       component="input"
                       type="password"
@@ -72,17 +72,17 @@ class CreateBlocUser extends Component {
                       className="pt-input form-width"
                       tabIndex="2"
                       required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.password}</div>
-                  </div>
+                  />
+                  <div className="pt-form-helper-text">{this.props.errors && this.props.errors.password}</div>
                 </div>
+              </div>
 
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
-                    Confirm Password
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-b">
+                  Confirm Password
+                </label>
+                <div className="pt-form-content">
+                  <Field
                       name="confirm_password"
                       component="input"
                       type="password"
@@ -90,37 +90,37 @@ class CreateBlocUser extends Component {
                       className="pt-input form-width"
                       tabIndex="3"
                       required
-                    />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.confirm_password}</div>
-                  </div>
+                  />
+                  <div className="pt-form-helper-text">{this.props.errors && this.props.errors.confirm_password}</div>
                 </div>
-              </div>
-
-              <div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
               </div>
             </div>
 
-            <div className="pt-dialog-footer">
-              <div className="pt-dialog-footer-actions">
-                <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track('create_user_close_click');
-                  this.props.reset();
-                  this.props.closeOverlay();
-                }} />
-                <Button
+            <div>
+              <div className="col-sm-3"></div>
+              <div className="col-sm-3"></div>
+              <div className="col-sm-3"></div>
+            </div>
+          </div>
+
+          <div className="pt-dialog-footer">
+            <div className="pt-dialog-footer-actions">
+              <Button text="Cancel" onClick={() => {
+                mixpanelWrapper.track('create_user_close_click');
+                this.props.reset();
+                this.props.closeOverlay();
+              }}/>
+              <Button
                   intent={Intent.PRIMARY}
                   onClick={this.props.handleSubmit(this.submit)}
                   text="Create User"
-                />
-              </div>
+              />
             </div>
-          </form>
-        </Dialog>
+          </div>
+        </form>
+      </Dialog>
 
-      </div>
+    </div>
     );
   }
 }

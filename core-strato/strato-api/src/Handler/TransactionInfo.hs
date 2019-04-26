@@ -25,13 +25,13 @@ import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf          (runKafkaConfigured)
-import           Blockchain.Format
 import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
 import           Blockchain.Util             (getCurrentMicrotime)
 import           Handler.Common
 import           Handler.Filters
 import           Import
+import           Text.Format
 
 instance NFData RawTransaction'
 

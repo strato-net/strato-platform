@@ -11,6 +11,7 @@ library:
     - base
     - binary
     - bytestring
+    - format
     - nibblestring
     - text
     - containers
@@ -20,6 +21,8 @@ library:
     - strato-model
     - strato-conf
     - blockapps-data
+    - blockapps-datadefs
+    - blockapps-mpdbs
     - blockapps-util
     - ethereum-rlp
     - merkle-patricia-db

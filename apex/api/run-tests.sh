@@ -9,11 +9,33 @@ zip -r testdata.zip .
 cd -
 
 if [ "$NODE_ENV" == development ]; then
+
+  echo " "
+  echo "==========="
+  echo "Fixme: Have you run start:dev yet to create the apex_dev database?"
+  echo "Todo: maybe create that here instead..."
+  echo "==========="
+  echo " "
+
+  # Check if postgres client is installed
+  if ! command -v psql &> /dev/null; then
+    echo "no postgres-client installed, please install"
+    exit 20
+  fi
+
   # Set environment variables
   export SINGLE_NODE=true
   export NODE_HOST=localhost
-  export stratoRoot=http://localhost/strato-api/eth/v1.2/
-  export blocRoot=http://localhost/bloc/v2.2/
+  export OAUTH_ENABLED=${OAUTH_ENABLED:-}
+
+  #strato:3000 , bloc:8000 & vault-wrapper:8000 ports should be mapped locally in your docker-compose.yml
+  export blocRoot=http://${BLOC_HOST}/bloc/v2.2
+  export stratoRoot=http://${STRATO_HOST}/eth/v1.2
+  export vaultRoot=http://${VAULT_HOST}/strato/v2.3
+  export postgresPort=${POSTGRES_PORT:-5432}
+  export blocHttpHost=http://${BLOC_HOST}
+  export vaultWrapperHttpHost=http://${VAULT_HOST}
+  export postgrestHttpHost=http://${POSTGREST_HOST}
 
   export PG_HOST=localhost
   export PG_PORT=5432
@@ -40,6 +62,9 @@ if [ "$NODE_ENV" == development ]; then
       sleep 1
   done
   echo 'postgres is available'
+
+
+
 
   ./node_modules/mocha/bin/mocha $NODE_DEBUG_OPTION --config=config-local.yaml test/
 fi

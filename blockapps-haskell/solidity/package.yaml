@@ -33,9 +33,9 @@ dependencies:
   - deepseq
   - extra
   - generic-random
+  - hashable
   - http-api-data
   - lens
-  - logging-effect
   - memory
   - mtl
   - ordered-containers
@@ -47,6 +47,8 @@ dependencies:
   - semver-range
   - servant
   - servant-docs
+  - solid-vm-model
+  - strato-model
   - swagger2
   - text
   - unordered-containers
@@ -57,9 +59,10 @@ library:
 
 tests:
   blockapps-solidity-test:
-    main: Spec.hs
+    main: Main.hs
     source-dirs: test/
     dependencies:
+     - aeson-qq
      - blockapps-solidity
      - blockapps-strato-api
      - hspec

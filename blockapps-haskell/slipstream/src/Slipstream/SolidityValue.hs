@@ -8,6 +8,7 @@
     , TemplateHaskell
     , FlexibleContexts
     , GeneralizedNewtypeDeriving
+    , TupleSections
 #-}
 
 module Slipstream.SolidityValue where
@@ -20,6 +21,8 @@ import qualified Data.ByteString          as B
 import qualified Data.ByteString.Char8    as BC
 import           Data.Foldable            (toList)
 import           Data.List
+import qualified Data.Map                 as M
+import           Data.Maybe               (mapMaybe)
 import           Data.Scientific          (floatingOrInteger)
 import           Data.Text (Text)
 import qualified Data.Text as Text
@@ -67,23 +70,39 @@ instance FromJSON SolidityValue where
   parseJSON _ = fail "Failed to parse solidity value"
 
 valueToSolidityValue :: Value -> SolidityValue
-valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
-valueToSolidityValue (SimpleValue (ValueInt _ _ v)) =  SolidityNum $ toInteger v
+valueToSolidityValue v = case valueToSolidityValue' v of
+  Just sv -> sv
+  Nothing -> case v of
+      -- This would be better handled by Value synthesis, but it seems difficult
+      -- to distinguish the length of a nested array and an unaggregated sentinel.
+      ValueArraySentinel len -> SolidityArray $ replicate len $ SolidityValueAsString "0"
+      _ -> error $ "internal error: unanticpated problem with value construction: " ++ show v
 
-valueToSolidityValue (SimpleValue (ValueString s)) = SolidityValueAsString s
-valueToSolidityValue (SimpleValue (ValueAddress (Address addr))) =
-  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSolidityValue (ValueContract (Address addr)) =
-  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSolidityValue (ValueArrayFixed _ values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (ValueArrayDynamic values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (SimpleValue (ValueBytes _ bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
-valueToSolidityValue (ValueEnum _ _ index)              = SolidityValueAsString $ Text.pack $ show index
-valueToSolidityValue (ValueStruct namedItems) =
-  SolidityObject $ map (fmap valueToSolidityValue) namedItems
-valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
-  SolidityValueAsString $ Text.pack $ "function ("
-                          ++ intercalate "," (map (formatType . snd) paramTypes)
-                          ++ ") returns ("
-                          ++ intercalate "," (map (formatType . snd) returnTypes)
-                          ++ ")"
+valueToSolidityValue' :: Value -> Maybe SolidityValue
+valueToSolidityValue' = \case
+  SimpleValue (ValueBool x) -> Just $ SolidityBool x
+  SimpleValue (ValueInt _ _ v) ->  Just $ SolidityNum $ toInteger v
+
+  SimpleValue (ValueString s) -> Just $ SolidityValueAsString s
+  SimpleValue (ValueAddress (Address addr)) ->
+   Just $ SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  ValueContract (Address addr) ->
+   Just $ SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  SimpleValue (ValueBytes _ bytes) -> Just $ SolidityValueAsString $ Text.pack $ BC.unpack bytes
+  ValueEnum _ _ index              -> Just $ SolidityValueAsString $ Text.pack $ show index
+  ValueFunction _ paramTypes returnTypes -> Just $
+   SolidityValueAsString $ Text.pack $ "function ("
+                           ++ intercalate "," (map (formatType . snd) paramTypes)
+                           ++ ") returns ("
+                           ++ intercalate "," (map (formatType . snd) returnTypes)
+                           ++ ")"
+
+  ValueArrayFixed _ values -> Just . SolidityArray . mapMaybe valueToSolidityValue' $ values
+  ValueArrayDynamic values -> Just . SolidityArray . mapMaybe valueToSolidityValue' $ unsparse values
+  -- TODO(tim): What if struct declaration order is needed here?
+  ValueStruct namedItems -> Just . SolidityObject . M.toList $ M.mapMaybe valueToSolidityValue' namedItems
+  ValueMapping ms -> Just . SolidityObject $ mapMaybe convertBoth (M.toList ms)
+  ValueArraySentinel{} -> Nothing
+
+ where convertBoth :: (SimpleValue, Value) -> Maybe (Text, SolidityValue)
+       convertBoth (sv, v) = (simpleValueToText sv, ) <$> valueToSolidityValue' v

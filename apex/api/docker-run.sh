@@ -2,21 +2,26 @@
 set -e
 set -x
 
-postgrestRoot=http://${postgrestHost}
-export blocRoot=http://${blocHost}/bloc/v2.2 # Used in apex to compile contracts
-export stratoRoot=http://${stratoHost}/eth/v1.2 # to be available from js AS WELL
-export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
-export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
+# exported values are accessible in the app via process.env[]
+export blocRoot=http://${blocHost}/bloc/v2.2
+export stratoRoot=http://${stratoHost}/eth/v1.2
+export STRATO_GS_MODE=${STRATO_GS_MODE}
+export PROD_DEV_MODE=${PROD_DEV_MODE:-false}
+export vaultWrapperHttpHost=http://${vaultWrapperHost}
+export blocHttpHost=http://${blocHost}
+export postgrestHttpHost=http://${postgrestHost}
+
+if [[ ${OAUTH_ENABLED} = true && ${SMD_MODE} = public ]]; then
+  echo "SMD public mode is incompatible with OAuth"
+  exit 1
+fi
 
 sed -i -e 's|__stratoUrl__|http://'"${stratoHost}"'|g' config-prod.yaml
 sed -i -e 's|__blocUrl__|'"${blocRoot}"'|g' config-prod.yaml
-# IMPORTANT: blockapps-rest is not designed to be used internally between containers through docker network
-# We are putting `postgrest:3001` docker host here but blockapps-rest adds /search/ to this host in some cases
-# (mostly used in tests - search for "searchUrl" in blockapps-rest code) which will fail.
-# So far it works fine for Apex (these ba-rest features are not used) but we need to add the simplest proxy to postgrest
-# to proxy all requests coming to postgrest:3001/search/<something> -> to postgrest:3001/<something>
-#  to avoid blockapps-rest issues
-sed -i -e 's|__searchUrl__|'"${postgrestRoot}"'|g' config-prod.yaml
+# Despite blockapps-rest wasn't initially designed for use inside the platform (to interact between micro-services) and 
+# should only call STRATO platform through nginx - starting with version 6.4.0 it supports different formats of searchUrl
+# to be also used to call postgrest directly, without 'cirrus/(search)' substring in URI
+sed -i -e 's|__searchUrl__|'"${postgrestHttpHost}"'|g' config-prod.yaml
 
 # Set postgres configurations
 sed -i -e 's|__apex_postgres_user__|'"${postgres_user}"'|g' config/config.json
@@ -51,7 +56,7 @@ done
 echo 'strato is available'
 
 echo 'Waiting for postgrest to be available...'
-until curl --silent --output /dev/null --fail --location ${postgrestRoot}
+until curl --silent --output /dev/null --fail --location ${postgrestHttpHost}
 do
   echo "Check at $(date)"
   sleep 1

@@ -1,29 +1,45 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Blockchain.Strato.Model.SHA where
+
 
 import              Blockchain.Strato.Model.Util
 import              Control.DeepSeq
-import "cryptonite" Crypto.Hash                          (Digest, hash, Keccak_512)
+import qualified "cryptonite" Crypto.Hash                as Cr (Digest, hash, Keccak_512)
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Encoding                  as Enc
+import qualified    Data.Aeson.Types                     as Ae
 import              Data.Binary
 import              Data.Binary.Get
 import              Data.Binary.Put
 import              Data.ByteArray                       (convert)
 import qualified    Data.ByteString                      as B
+import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
 import qualified    Data.ByteString.Char8                as S8
 import qualified    Data.ByteString.Lazy                 as BL
+import              Data.DeriveTH
+import              Data.Hashable                        (Hashable)
 import qualified    Data.Text                            as T
 import              GHC.Generics
 import              Numeric                              (readHex, showHex)
+import              Web.HttpApiData
+import              Web.PathPieces
+import              Test.QuickCheck
 
 import              FastKeccak256
 import              Blockchain.Data.RLP
+import              Blockchain.SolidVM.Model             (CodeKind(..))
 import              Blockchain.Strato.Model.ExtendedWord
+import qualified    Text.Colors                          as CL
+import              Text.Format
 
 newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
+                          deriving anyclass (Hashable)
 
 instance NFData SHA
 
@@ -64,7 +80,90 @@ keccak256 :: S8.ByteString -> S8.ByteString
 keccak256 = fastKeccak256
 
 keccak512 :: S8.ByteString -> S8.ByteString
-keccak512 bs = convert (hash bs :: Digest Keccak_512)
+keccak512 bs = convert (Cr.hash bs :: Cr.Digest Cr.Keccak_512)
 
 rlpHash :: RLPSerializable a => a -> SHA
 rlpHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode
+
+hash :: S8.ByteString -> SHA
+hash = superProprietaryStratoSHAHash
+
+formatSHAWithoutColor :: SHA -> String
+formatSHAWithoutColor s@(SHA x)
+  | s == hash "" = "<blank>"
+  | otherwise    = padZeros 64 $ showHex x ""
+
+instance Format SHA where
+  format = CL.yellow . formatSHAWithoutColor
+
+
+-- I think we want this first definition, but the API already uses the second one!
+-- Someday we should fix this, but it will probably change our external (API) behavior.
+{-
+instance PathPiece SHA where
+  toPathPiece (SHA x) = T.pack $ padZeros 64 $ showHex x ""
+  fromPathPiece t = Just (SHA wd160)
+    where
+      ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word256,String)]
+-}
+
+instance PathPiece SHA where
+  toPathPiece = T.pack . show
+  fromPathPiece t =
+    case readHex $ T.unpack t of
+      [(x, "")] -> Just $ SHA x
+      _         -> Nothing
+
+instance ToHttpApiData SHA where
+    toUrlPiece = toPathPiece
+
+instance FromHttpApiData SHA where
+    parseUrlPiece = unmaybe . fromPathPiece
+        where unmaybe = \case
+                Nothing -> Left "couldn't parse SHA"
+                Just x  -> Right x
+
+instance Arbitrary SHA where
+    arbitrary = do
+        random256Bit <- fastRandBs 32
+        return . SHA . fromIntegral . byteString2Integer $ random256Bit
+
+data CodePtr = EVMCode SHA | SolidVMCode String SHA
+             deriving (Read, Eq, Ord, Generic, NFData, Hashable)
+
+instance Show CodePtr where
+  show (EVMCode hsh) = "EVMCode " ++ format hsh
+  show (SolidVMCode name hsh) = "SolidVMCode " ++ name ++ " " ++ format hsh
+
+instance Ae.ToJSON CodePtr where
+  toJSON (EVMCode hsh) = Ae.object [("kind", Ae.toJSON EVM), ("digest", Ae.toJSON hsh)]
+  toJSON (SolidVMCode name hsh) = Ae.object [ ("kind", Ae.toJSON SolidVM)
+                                            , ("name", Ae.toJSON name)
+                                            , ("digest", Ae.toJSON hsh)
+                                            ]
+
+instance Ae.FromJSON CodePtr where
+  parseJSON (st@Ae.String{}) = EVMCode <$> Ae.parseJSON st
+  parseJSON (Ae.Object o) = do
+    kind <- o Ae..: "kind"
+    hsh <- o Ae..: "digest"
+    case kind of
+      EVM -> return $ EVMCode hsh
+      SolidVM -> do
+        name <- o Ae..: "name"
+        return $ SolidVMCode name hsh
+  parseJSON x = Ae.typeMismatch "CodePtr" x
+
+derive makeArbitrary ''CodePtr
+
+instance Format CodePtr where
+  format (EVMCode ch) = format ch
+  format (SolidVMCode n ch) = "<" ++ n ++ ", " ++ format ch ++ ">"
+
+codePtrToSHA :: CodePtr -> SHA
+codePtrToSHA (EVMCode hsh) = hsh
+codePtrToSHA (SolidVMCode _ hsh) = hsh
+
+blockstanbulMixHash :: SHA
+blockstanbulMixHash = SHA 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
+

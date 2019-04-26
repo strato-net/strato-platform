@@ -6,6 +6,7 @@ module Blockchain.Blockstanbul.Authentication
   , module Blockchain.Blockstanbul.Model.Authentication
   ) where
 
+import Control.Applicative ((<|>))
 import Control.Monad (liftM2, liftM3, unless)
 import Control.Monad.IO.Class
 import Control.Lens
@@ -21,7 +22,6 @@ import Text.Printf
 
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication
-import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB(blockHash)
 import Blockchain.Data.ArbitraryInstances()
@@ -29,8 +29,9 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.ExtendedECDSA
 import Blockchain.FastECRecover
-import Blockchain.SHA
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.SHA
 import qualified Network.Haskoin.Crypto as HK
 
 instance Arbitrary IstanbulExtra where
@@ -61,13 +62,15 @@ getProposerSeal x = do
 addProposerSeal :: ExtendedSignature -> Block -> Block
 addProposerSeal sig = over extraLens $
     uncookRawExtra
-  . set (istanbul . _Just . proposedSig) (Just sig)
+  . over istanbul (\i -> fmap (set proposedSig (Just sig)) i
+                     <|> error "must set validators before proposer seal")
   . cookRawExtra
 
 addCommitmentSeals :: [ExtendedSignature] -> Block -> Block
 addCommitmentSeals sigs = over extraLens $
     uncookRawExtra
-  . set (istanbul . _Just . commitment) sigs
+  . over istanbul (\i -> fmap (set commitment sigs) i
+                     <|> error "must set validators before commitment seals")
   . cookRawExtra
 
 scrubAllSeals :: RawExtraData -> RawExtraData
@@ -143,10 +146,8 @@ authenticate (IMsg (MsgAuth addr sig) tm) =
   in mAddress == Just addr
 authenticate _ = True -- Non-messages are trusted implicitly
 
-replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String Word256
+replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String (Word256, Address)
 replayHistoricBlock realValidators seqNo blk = do
-  -- TODO(tim): This needs to be fixed for validator voting, as the current list
-  -- may have diverged from the validators at the time of commit
   let ExtraData{..} = cookRawExtra . view extraLens $ blk
   IstanbulExtra{..} <- case _istanbul of
     Nothing -> Left "no istanbul metadata"
@@ -160,16 +161,15 @@ replayHistoricBlock realValidators seqNo blk = do
     Left $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
   unless (realValidators == S.fromList _validatorList) $
     Left "mismatched validators"
-  case mProp of
-    Nothing -> Left "invalid proposer seal"
-    Just prop -> unless (prop `S.member` realValidators) $
-      Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
+  prop <- maybe (Left "invalid proposer seal") Right mProp
+  unless (prop `S.member` realValidators) $
+    Left . printf "proposer %s not a validator" . formatAddressWithoutColor $ prop
   unless (signers `S.isSubsetOf` realValidators) $ do
     let unexplained = intercalate "," . map formatAddressWithoutColor . S.toList $ signers S.\\ realValidators
     Left $ "unknown signers: " ++ unexplained
   unless (3 * S.size signers > 2 * S.size realValidators) $
     Left $ printf "not enough commit seals (have %d out of %d)" (S.size signers) (S.size realValidators)
-  Right . fromIntegral $ seqNo + 1
+  Right (fromIntegral $ seqNo + 1, prop)
 
 isHistoricBlock :: Block -> Bool
 isHistoricBlock = (> 32) . B.length . view extraLens

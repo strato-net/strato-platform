@@ -94,9 +94,6 @@ exports[`CreateChain: index render component with empty values 1`] = `
               Contract
             </label>
           </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
             <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"AutoApprove\\" checked={false} onClick={[Function: onClick]} />
              AutoApprove
@@ -126,7 +123,13 @@ exports[`CreateChain: index render component with empty values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Governance\\" checked={true} onClick={[Function: onClick]} />
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Governance\\" checked={true} onClick={[Function: onClick]} />
+             Upload file
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
             <Field id=\\"input-b\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" />
           </div>
         </div>
@@ -209,9 +212,6 @@ exports[`CreateChain: index render component with values 1`] = `
               Contract
             </label>
           </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
             <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={0} label=\\"AutoApprove\\" checked={false} onClick={[Function: onClick]} />
              AutoApprove
@@ -241,7 +241,13 @@ exports[`CreateChain: index render component with values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field style={{...}} name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Governance\\" checked={true} onClick={[Function: onClick]} />
+            <Field name=\\"radio\\" component=\\"input\\" type=\\"radio\\" value={1} label=\\"Governance\\" checked={true} onClick={[Function: onClick]} />
+             Upload file
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\" />
+          <div className=\\"col-sm-9 smd-pad-4\\">
             <Field id=\\"input-b\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" />
           </div>
         </div>

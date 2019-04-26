@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
@@ -21,6 +22,7 @@ import qualified Data.Text                         as Text
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Ethereum
+import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
@@ -32,6 +34,7 @@ import           BlockApps.Strato.Client           as Strato
 import           BlockApps.Strato.TypeLits
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.Bloc22.Database.Queries
+import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
 governanceAddress :: Address
@@ -43,8 +46,8 @@ replaceMembers :: Struct
                -> Map.Map Text Text
 replaceMembers Struct{..} addrs m =
   let tag = "__members__"
-      members = valueToText $ ValueArrayDynamic $ map (SimpleValue . ValueAddress) addrs
-      m' = Map.alter (const members) tag m
+      members = valueToText $ ValueArrayDynamic . tosparse $ map (SimpleValue . ValueAddress) addrs
+      m' = Map.alter (const $ Just members) tag m
    in case OMap.lookup tag fields of
         Nothing -> m'
         Just (Left _, _) -> m
@@ -58,7 +61,7 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
   idsAndDetails <- if (Text.null src)
                      then return Map.empty
-                     else compileContract src
+                     else sourceToContractDetails True src
   mContract <- case Map.toList idsAndDetails of
             [] -> return Nothing
             [(_, x)] -> return $ Just x
@@ -102,10 +105,21 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
         )
         Nothing
   chainId <- blocStrato $ Strato.postChain chainInfo
+  waitForChainInfo chainId
   when (isJust mContract) $ do
     let Just (cmId, _) = mContract
     void $ insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
+
+waitForChainInfo :: ChainId -> Bloc ()
+waitForChainInfo chainId = waitFor "failed to retrieve chain info" go
+  where go :: Bloc Bool
+        go = do
+          infos <- getChainInfo [chainId]
+          $logInfoLS "waitForChainInfo/req" chainId
+          $logInfoLS "waitForChainInfo/resp" infos
+          return . not $ null infos
+
 
 getChainInfo :: [ChainId] -> Bloc [ChainIdChainOutput]
 getChainInfo chainIds = do

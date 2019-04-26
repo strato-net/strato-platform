@@ -27,10 +27,12 @@ dependencies:
   - blockapps-vault-wrapper-client
   - classy-prelude
   - clock
+  - common-log
   - containers
   - contravariant
   - cryptonite
   - directory
+  - extra
   - filepath
   - bytestring
   - base16-bytestring
@@ -45,7 +47,6 @@ dependencies:
   - lens
   - lifted-async
   - lifted-base
-  - logging-effect
   - memory
   - monad-control
   - monad-loops
@@ -72,6 +73,7 @@ dependencies:
   - servant-swagger
   - servant-swagger-ui
   - stm
+  - strato-model
   - swagger2
   - text
   - temporary

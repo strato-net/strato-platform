@@ -16,6 +16,7 @@ import {
 import { env } from '../../env';
 import { loginSuccess } from '../User/user.actions';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
+import { handleErrors } from '../../lib/handleErrors';
 
 const url = env.APEX_URL + "/users";
 
@@ -31,6 +32,7 @@ export function createUserApiCall(username, password) {
       body: JSON.stringify({ username, password }),
     }
   )
+    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })

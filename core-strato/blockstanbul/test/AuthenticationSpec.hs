@@ -15,9 +15,9 @@ import Blockchain.Blockstanbul.Authentication
 import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Database.MerklePatricia.StateRoot
-import Blockchain.SHA
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.StateRoot
 import qualified Network.Haskoin.Crypto as HK
 
 testBlock :: Block
@@ -38,7 +38,7 @@ testBlock =
       blockDataTimestamp = posixSecondsToUTCTime 0,
       blockDataExtraData = "",
       blockDataNonce = 0,
-      blockDataMixHash = SHA 0x0
+      blockDataMixHash = blockstanbulMixHash
     },
     blockReceiptTransactions = [],
     blockBlockUncles = []
@@ -88,7 +88,7 @@ spec = do
       let bs = trim (isJust ist) bs'
           iex = ExtraData bs ist
       in do
-        bs `shouldSatisfy` (== 32) . B.length
+        bs `shouldSatisfy` (<= 32) . B.length
         cookRawExtra (uncookRawExtra iex) `shouldBe` iex
 
     it "by default only populates vanity" $ do
@@ -167,4 +167,4 @@ spec = do
       cSeal <- commitmentSeal (blockHash blk') private
       let blk = addCommitmentSeals [cSeal] blk'
           got = replayHistoricBlock vals 39 blk
-      got `shouldBe` Right 40
+      got `shouldBe` Right (40, S.elemAt 0 vals)

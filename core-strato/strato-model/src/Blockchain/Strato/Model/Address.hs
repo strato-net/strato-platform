@@ -6,20 +6,17 @@
 module Blockchain.Strato.Model.Address
     ( Address(..),
       prvKey2Address, pubKey2Address,
-      formatAddress, stringAddress
+      formatAddress, formatAddressWithoutColor, stringAddress,
+      getNewAddress_unsafe,
+      addressAsNibbleString, addressFromNibbleString,
+      addressToHex, addressFromHex
     ) where
 
 import           Control.DeepSeq
 import           Control.Monad
 import           Data.Maybe                           (fromMaybe)
 import           Numeric
-
-import           Blockchain.Data.RLP
-import qualified Blockchain.Strato.Model.Colors       as CL
-import           Blockchain.Strato.Model.Format
-import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import           Blockchain.Strato.Model.SHA          (keccak256)
-import           Blockchain.Strato.Model.Util
+import           Test.QuickCheck                      (Arbitrary(..))
 
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
@@ -27,18 +24,27 @@ import qualified Data.Aeson.Encoding                  as Enc
 
 import           Data.Binary
 import qualified Data.ByteString                      as B
+import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Lazy                 as BL
+import qualified Data.NibbleString                    as N
 
+import           Data.Hashable
 import qualified Data.Text                            as T
 import           Text.Read                            (readMaybe)
 
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
--- import           Text.PrettyPrint.ANSI.Leijen         hiding ((<$>))
 import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
 import           Text.Printf
 import           Web.PathPieces
 import           Web.HttpApiData
+
+import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
+import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
+import           Blockchain.Strato.Model.Util
+import qualified Text.Colors       as CL
+import           Text.Format
 
 import           GHC.Generics
 
@@ -47,15 +53,17 @@ instance RLPSerializable Address where
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
   rlpDecode x             = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
-newtype Address = Address Word160 deriving (Show, Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral)
+newtype Address = Address Word160 deriving (Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral, Hashable)
+
+instance Show Address where
+  show (Address a) = printf "%040x" a
 
 instance PrintfArg Address where
   formatArg (Address word) = formatArg word
 
 prvKey2Address :: PrvKey -> Address
 prvKey2Address prvKey =
-  Address $ fromInteger $ byteString2Integer $ keccak256 $ BL.toStrict $ encode x `BL.append` encode y
-  --B16.encode $ hash 256 $ BL.toStrict $ encode x `BL.append` encode y
+  Address $ fromInteger $ byteString2Integer $ SHA.keccak256 $ BL.toStrict $ encode x `BL.append` encode y
   where
     point = pubKeyPoint $ derivePubKey prvKey
     x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
@@ -63,8 +71,7 @@ prvKey2Address prvKey =
 
 pubKey2Address :: PubKey -> Address
 pubKey2Address pubKey =
-  Address $ fromInteger $ byteString2Integer $ keccak256 $ BL.toStrict $ encode x `BL.append` encode y
-  --B16.encode $ hash 256 $ BL.toStrict $ encode x `BL.append` encode y
+  Address $ fromInteger $ byteString2Integer $ SHA.keccak256 $ BL.toStrict $ encode x `BL.append` encode y
   where
     x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
     y = fromMaybe (error "getY failed in prvKey2Address") $ getY point
@@ -101,6 +108,9 @@ instance AS.FromJSON Address where
           drop0x cs = cs
   parseJSON x = typeMismatch "Address" x
 
+instance FromJSONKey Address where
+  fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
+
 instance Lei.Pretty Address where
   pretty = Lei.text . CL.yellow . formatAddress
 
@@ -121,3 +131,31 @@ instance ToHttpApiData Address where
   toUrlPiece = T.pack . formatAddress
 
 instance NFData Address
+
+getNewAddress_unsafe ::Address->Integer->Address
+getNewAddress_unsafe a n =
+    let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode a, rlpEncode n]
+    in decode $ BL.drop 12 $ encode theHash
+
+addressAsNibbleString::Address->N.NibbleString
+addressAsNibbleString (Address s) =
+  byteString2NibbleString $ BL.toStrict $ encode s
+
+addressFromNibbleString::N.NibbleString->Address
+addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteString
+
+formatAddressWithoutColor::Address->String
+formatAddressWithoutColor = formatAddress
+
+addressToHex :: Address -> B.ByteString
+addressToHex = B16.encode . BL.toStrict . encode
+
+addressFromHex :: B.ByteString -> Either String Address
+addressFromHex hex = case B16.decode hex of
+                     (h, "") -> case decodeOrFail (BL.fromStrict h) of
+                                  Right (_, _, a) -> return a
+                                  Left (_, _, msg) -> Left $ "cannot decode address: " ++ msg
+                     (_, _) -> Left $ "invalid hex address: " ++ show hex
+
+instance Arbitrary Address where
+  arbitrary = Address <$> arbitrary

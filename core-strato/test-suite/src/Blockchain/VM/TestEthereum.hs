@@ -12,13 +12,14 @@ module Blockchain.VM.TestEthereum
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
 import           Data.Aeson
 import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Lazy                        as BL
+import qualified Data.ByteString.Short                       as BSS
 import           Data.Either
 import           Data.IORef.Unboxed
 import           Data.List
@@ -33,7 +34,6 @@ import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>), (</>
 import           Test.Hspec.Expectations.Lifted
 
 import           Blockchain.BlockChain
-import qualified Blockchain.Colors                           as C
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -48,28 +48,30 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.EVM
+import           Blockchain.EVM.Code
+import           Blockchain.EVM.Environment
+import           Blockchain.EVM.VMM (readGasRemaining)
+import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.SHA                 (keccak256)
 import           Blockchain.SHA
 import           Blockchain.Util
-import           Blockchain.VM
-import           Blockchain.VM.Code
-import           Blockchain.VM.Environment
-import           Blockchain.VM.VMM (readGasRemaining)
-import           Blockchain.VM.VMState
 import           Blockchain.VMContext
 
 import           Blockchain.VM.TestDescriptions
 import           Blockchain.VM.TestFiles
+
+import qualified Text.Colors                                 as C
+import           Text.Format
 
 defineFlag "debugEnabled" False "enable debugging"
 defineFlag "debugEnabled2" False "enable debugging"
 
 populateAndConvertAddressState :: Maybe Word256 -> Address -> AddressState' -> ContextM AddressState
 populateAndConvertAddressState cid owner addressState' = do
-  addCode . codeBytes . contractCode' $ addressState'
+  hsh <- addCode EVM . codeBytes . contractCode' $ addressState'
 
   forM_ (M.toList $ storage' addressState') $
     \(key, val) -> putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
@@ -81,7 +83,7 @@ populateAndConvertAddressState cid owner addressState' = do
       (nonce' addressState')
       (balance' addressState')
       (addressStateContractRoot addressState)
-      (hash $ codeBytes $ contractCode' addressState')
+      (EVMCode hsh)
       cid
 
 showHexInt::Integer->String
@@ -94,8 +96,10 @@ showHexInt x
 
 getDataAndRevertAddressState::Address->AddressState->ContextM AddressState'
 getDataAndRevertAddressState _ addressState = do
-  theCode <- fromMaybe (error $ "Missing code in getDataAndRevertAddressState: " ++ format addressState) <$>
-             getCode (addressStateCodeHash addressState)
+  theCode <- getEVMCode $
+             case addressStateCodeHash addressState of
+               EVMCode x -> x
+               _ -> error "getDataAndRevertAddressState only supports EVMCode"
 
   -- Copied wholesale from Context.hs:getAllStorageKeyVals'
   -- since that function requires an unhashed owner.
@@ -233,11 +237,11 @@ runTest test = do
         flushMemStorageDB
         flushMemAddressStateDB
 
-        case vmException vmState1 of
-         Nothing -> do
+        case result of
+         Right _ -> do
           gr <- readGasRemaining vmState1
           return (result, returnVal vmState1, gr, logs vmState1, debugCallCreates vmState1, Just vmState1)
-         Just _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
+         Left _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
 
       ITransaction transaction -> do
         let t = case tTo' transaction of
@@ -271,8 +275,10 @@ runTest test = do
         flushMemAddressStateDB
 
         return $ case result of
-            Right (ExecResults remGas _ retVal _ rLogs _ _ _) ->
-                      (Right (), retVal, fromIntegral remGas, rLogs, Just [], Nothing)
+            Right (er@(ExecResults _ _ retVal _ rLogs _ _ _ _)) ->
+                      (Right (), BSS.fromShort <$> retVal,
+                       fromIntegral $ currentGasLimit (env test) - (transactionGasLimit signedTransaction' - calculateReturned signedTransaction' er),
+                       rLogs, Just [], Nothing)
             Left _ -> (Right (), Nothing, 0, [], Just [], Nothing)
 
   afterAddressStates <- addressStates

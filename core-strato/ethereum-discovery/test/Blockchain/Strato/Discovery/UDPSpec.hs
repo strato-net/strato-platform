@@ -6,8 +6,8 @@ import           Data.Bits
 import           Network.Socket                  (inet_addr, tupleToHostAddress6)
 import           Test.Hspec
 
-import           Blockchain.Format
 import           Blockchain.Strato.Discovery.UDP
+import           Text.Format
 
 spec :: Spec
 spec = do

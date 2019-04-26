@@ -16,24 +16,26 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-data
+  - blockapps-datadefs
+  - blockapps-haskoin
+  - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - cmdargs
   - data-default
   - ethereum-rlp
   - filepath
-  - blockapps-haskoin
+  - format
   - leveldb-haskell
   - merkle-patricia-db
   - blockapps-milena
-  - monad-logger
   - monad-loops
   - nibblestring
   - persistent-postgresql
   - resourcet
   - time
   - strato-conf
-  - strato-sequencer
+  - seqevents
   - strato-index
   - strato-redis-blockdb
   - strato-model

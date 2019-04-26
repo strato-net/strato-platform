@@ -13,9 +13,7 @@ module Blockchain.Database.MerklePatricia.Map (
 import           Prelude                                     hiding (map)
 
 import           Control.Monad
---import Control.Monad.IO.Class
---import qualified Data.ByteString.Char8 as BC
---import qualified Data.ByteString.Base16 as B16
+import           Control.Monad.IO.Class
 import qualified Data.NibbleString                           as N
 import qualified Database.LevelDB                            as LDB
 
@@ -24,11 +22,11 @@ import           Blockchain.Database.MerklePatricia
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.NodeData
 
-map::LDB.MonadResource m=>(Key->RLPObject->m ())->MPDB->m ()
+map::MonadIO m=>(Key->RLPObject->m ())->MPDB->m ()
 map f mpdb = do
   mapNodeRef (ldb mpdb) "" f (PtrRef $ stateRoot mpdb)
 
-mapNodeData::LDB.MonadResource m=>LDB.DB->Key->(Key->RLPObject->m ())->NodeData->m ()
+mapNodeData::MonadIO m=>LDB.DB->Key->(Key->RLPObject->m ())->NodeData->m ()
 mapNodeData _ _ _ EmptyNodeData = return ()
 mapNodeData db partialKey f FullNodeData {choices=choices', nodeVal = maybeV} = do
   forM_ (zip [0..] choices') $ \(k, ch) -> do
@@ -42,7 +40,7 @@ mapNodeData db partialKey f ShortcutNodeData {nextNibbleString=remainingKey, nex
    Right v -> f (partialKey `N.append` remainingKey) v
 
 
-mapNodeRef::LDB.MonadResource m=>LDB.DB->Key->(Key->RLPObject->m ())->NodeRef->m ()
+mapNodeRef::MonadIO m=>LDB.DB->Key->(Key->RLPObject->m ())->NodeRef->m ()
 mapNodeRef db partialKey f (PtrRef sr) = do
   nodeData <- getNodeData (MPDB db sr) $ PtrRef sr
   mapNodeData db partialKey f nodeData

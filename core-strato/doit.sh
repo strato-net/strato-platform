@@ -19,6 +19,7 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
+  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
   if $mineBlocks
   then echo "Starting strato-adit"
@@ -85,9 +86,21 @@ function newnode {
   if [ -n "${seqMaxUsPerIter}" ]; then
     usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
   fi
+  if [ -n "${blockstanbulAdmins}" ]; then
+    baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
+  fi
+  echo ${blockstanbulAdmins}
+  if [ -n "${blockstanbulSkipCheck}" ]; then
+    scFlag="--blockstanbul_skip_check=${blockstanbulSkipCheck}"
+    apiKey=
+  else
+    apiKey="${blockstanbulPrivateKey:-}"
+  fi
+
   NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
-    --minLogLevel=$seqMinLogLevel &>> logs/strato-sequencer
+    "${baFlag}" "${scFlag}" --minLogLevel=$seqMinLogLevel \
+    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -98,16 +111,18 @@ function newnode {
   echo "Starting strato-txr-indexer"
   runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
-
-  echo "Starting ethereum-vm"
-  runBackgroundProcess ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
+  if [ -n "${brokenRefundReenable}" ]; then
+    breFlag="--brokenRefundReenable=${brokenRefundReenable}"
+  fi
+  echo "Starting vm-runner"
+  runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" +RTS -N1 >> logs/ethereum-vm 2>&1
+                         "${tbFlag}" "${breFlag}" +RTS "${vmRunnerRTSOPTs:-}" -N1 >> logs/vm-runner 2>&1
 
   echo "Starting strato-api"
-  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=${blockstanbulPrivateKey:-} \
+  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
     runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
 
   echo "Configuring log maintenance"
@@ -121,7 +136,8 @@ function newnode {
       for monitored_pid in "${!MONITORED_PIDS[@]}"; do
         # if process with pid does not exist
         if ! (ps -p ${monitored_pid} > /dev/null); then
-          echo "Process ${MONITORED_PIDS[${monitored_pid}]} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+          DEAD_PROCESS=${MONITORED_PIDS[${monitored_pid}]}
+          echo "Process ${DEAD_PROCESS} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
           # Kill all the rest of monitored processes
           for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
             if ps -p ${pid_to_kill} > /dev/null; then
@@ -130,6 +146,11 @@ function newnode {
               echo "done"
             fi
           done
+          FILE_NAME="/var/lib/strato/logs/$(echo ${DEAD_PROCESS} | cut -d ' ' -f 1)"
+          echo "Tail of logs for crashed process:"
+          echo "+tail -n 20 ${FILE_NAME}"
+          tail -n 20 $FILE_NAME
+          echo "End of logs."
           echo "STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/ in the container"
           # Keep container running idle
           tail -f /dev/null

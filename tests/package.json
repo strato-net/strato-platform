@@ -9,13 +9,16 @@
     "test:load": "mocha load/stratoLoad.test.js --batchCount 20 --batchSize 20 && mocha load/stratoLoadFactory.test.js --batchCount 20 --batchSize 20",
     "test:load10k": "mocha load/stratoLoad.test.js --batchCount 100 --batchSize 100",
     "test:loadecho": "mocha load/stratoLoadEcho.test.js --batchCount 20 --batchSize 20 --config config/localhost.config.yaml",
+    "test:solidvm": "mocha e2e/solidvm.test.js",
     "test:upload": "mocha load/uploadString.test.js --batchCount 10 --batchSize 10 && mocha load/uploadUniqueAddresses.test.js --batchCount 10 --batchSize 10",
     "test:upload10k": "mocha load/uploadString.test.js --batchCount 100 --batchSize 100",
     "test:truchainz": "mocha e2e/createChain.test.js && mocha e2e/governance.test.js",
-    "test:multicontract": "mocha e2e/multicontract.test.js"
+    "test:multicontract": "mocha e2e/multicontract.test.js",
+    "test:uploadOrder": "mocha e2e/uploadOrder.test.js",
+    "test:slipstream": "mocha e2e/slipstream.test.js"
   },
   "dependencies": {
-    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#develop",
+    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#6fe2bc46dadb5e5af1a6027ddf5fb52492fa2c4f",
     "chai": "^4.0.2",
     "co": "^4.6.0",
     "co-mocha": "^1.2.0",

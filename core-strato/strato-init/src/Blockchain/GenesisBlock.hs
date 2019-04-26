@@ -11,9 +11,8 @@ module Blockchain.GenesisBlock (
 
 
 import           Control.Monad
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
 import qualified Data.ByteString.Lazy.Char8                   as BLC
@@ -26,7 +25,7 @@ import qualified Data.Text                                    as T
 import           System.Directory
 
 import           Blockchain.BackupBlocks
-import qualified Blockchain.Data.Action                       as A
+import qualified Blockchain.Strato.Model.Action                       as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
@@ -45,7 +44,6 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Util
@@ -73,6 +71,8 @@ import qualified Blockchain.Strato.Model.Address      as Ad
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
+
+import           Text.Format
 
 readSupplementaryAccounts :: String -> IO [AccountInfo]
 readSupplementaryAccounts genesisBlockName = do
@@ -110,8 +110,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 
-initializeGenesisBlock :: ( MonadResource m
-                          , HasCodeDB m
+initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
                           , Mem.HasMemAddressStateDB m
                           , RBDB.HasRedisBlockDB m
@@ -202,14 +201,22 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             , A._actionTransactionSender = Ad.Address 0
             , A._actionData = Map.singleton a $
                                 A.ActionData
-                                  (codeHash d)
-                                  (Map.map fromDiff $ storage d)
+                                  (EVMCode ch)
+                                  EVM
+                                  (case storage d of
+                                    EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
+                                    SolidVMDiff _ -> error "TODO(tim): SolidVMDiff genesis block support")
                                   [A.emptyCallData]
-            , A._actionMetadata = getMetadata (codeHash d)
+            , A._actionMetadata = getMetadata ch
             }
+            where ch =
+                    case codeHash d of
+                      EVMCode ch' -> ch'
+                      SolidVMCode _ ch' -> ch'
           fromDiff :: Diff Word256 'Eventual -> Word256
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList
+
 
       fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
       filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList filteredAddrStates
@@ -225,6 +232,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             }
 
       commitSqlDiffs (statediff fullAccountDiffs)
+
       mErr <- liftIO . runKafkaConfigured "strato-init" $ writeActionJSONToKafka filteredActions
       case filterResponse <$> mErr of
        Right [] -> return ()

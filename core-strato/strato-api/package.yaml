@@ -40,6 +40,7 @@ dependencies:
   - blaze-html
   - blaze-markup
   - blockapps-data
+  - blockapps-datadefs
   - blockapps-haskoin
   - blockapps-util
   - bytestring                    >= 0.9
@@ -56,9 +57,9 @@ dependencies:
   - file-embed
   - filepath
   - foreign-store
+  - format
   - hjsmin                        >= 0.1
   - mime-mail
-  - monad-logger                  >= 0.3
   - mtl
   - persistent                    >= 2.0
   - persistent-postgresql         >= 2.1.1
@@ -67,9 +68,8 @@ dependencies:
   - shakespeare                   >= 2.0
   - strato-conf
   - strato-genesis
-  - strato-init
   - strato-model
-  - strato-sequencer
+  - seqevents
   - template-haskell
   - text                          >= 0.11
   - time
@@ -78,6 +78,7 @@ dependencies:
   - wai
 
   - wai-extra                     >= 3.0
+  - wai-middleware-prometheus
   - warp                          >= 3.0
   - warp-tls
   - yaml                          >= 0.8

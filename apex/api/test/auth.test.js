@@ -43,10 +43,25 @@ const waitFaucet = async function(address) {
 
 chai.use(chaiHttp);
 
-describe('App', function () {
+const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
+
+describe('non-OAuth/public Auth tests', function () {
   this.timeout(10000);
 
+    //need to add skip check to each describe block because of mocha bug.
+    // technically beforeEach would work, but other beforeEach's still run
+  before(function(){
+      if(SKIP_TEST_BLOCK){
+          this.skip();
+      }
+  })
+
   before(async function () {
+
+    if(SKIP_TEST_BLOCK){
+        this.skip();
+    }
+
     try {
       await tools.dropdb();
     } catch (error) {
@@ -74,22 +89,51 @@ describe('App', function () {
   });
 
   after(function () {
+
+      if(SKIP_TEST_BLOCK){
+          this.skip();
+      }
+
     rp.post.restore();
   })
 
   describe('In public mode', function () {
     let app, checkModeStub;
+
+    before(function(){
+        if(SKIP_TEST_BLOCK){
+            this.skip();
+        }
+    })
+
     beforeEach(function () {
+
+        if(SKIP_TEST_BLOCK){
+            this.skip();
+        }
+
       checkModeStub = sinon.stub(checkMode, 'checkMode').callsFake(function (req, res, next) {
         return next();
       });
       app = require('../app');
     });
     afterEach(function () {
+
+        if(SKIP_TEST_BLOCK){
+            this.skip();
+        }
+
       checkMode.checkMode.restore();
     })
 
     describe('post /login', function () {
+
+      before(function(){
+          if(SKIP_TEST_BLOCK){
+              this.skip();
+          }
+      })
+
       it('replies Bad Request without un/pw', async function () {
         chai.request(app)
           .post('/login')
@@ -263,14 +307,24 @@ describe('App', function () {
     });
 
     describe('post /verify-email', function () {
-      const rpStub = sinon.stub(rp, 'post');
-      rpStub.onFirstCall().rejects();
-      rpStub.onSecondCall().resolves({
-        hash: null
-      });
-      rpStub.resolves({
-        hash: bcrypt.hashSync('temporarypassword', appConfig.passwordSaltRounds)
-      });
+      let rpStub;
+
+      before(function(){
+          if(SKIP_TEST_BLOCK){
+              this.skip();
+          }
+
+          rpStub = sinon.stub(rp, 'post');
+          rpStub.onFirstCall().rejects();
+          rpStub.onSecondCall().resolves({
+              hash: null
+          });
+          rpStub.resolves({
+              hash: bcrypt.hashSync('temporarypassword', appConfig.passwordSaltRounds)
+          });
+
+      })
+
 
       it('replies 400 when email is missing', async function () {
         chai.request(app)
@@ -379,6 +433,13 @@ describe('App', function () {
     });
 
     describe('post /verify-temporary-password', function () {
+
+      before(function(){
+          if(SKIP_TEST_BLOCK){
+              this.skip();
+          }
+      })
+
       it('replies 400 when arguments are missing', async function () {
         chai.request(app)
           .post('/verify-temporary-password')
@@ -490,7 +551,19 @@ describe('App', function () {
   describe('Checkmode middleware', function () {
     const rewiredCheckMode = rewire('../lib/checkMode');
     let mockReq, mockRes, mockNext, status, json, nextCalled;
+
+    before(function(){
+        if(SKIP_TEST_BLOCK){
+            this.skip();
+        }
+    })
+
     beforeEach(function () {
+
+      if(SKIP_TEST_BLOCK){
+        this.skip();
+      }
+
       mockReq = {
         headers: {}
       }

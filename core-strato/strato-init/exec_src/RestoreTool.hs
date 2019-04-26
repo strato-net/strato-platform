@@ -6,7 +6,7 @@
 
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import           Database.Persist.Postgresql  hiding (get)
@@ -15,7 +15,7 @@ import qualified Blockchain.BackupBlocks
 import qualified Blockchain.DB.SQLDB          as SQLDB
 import           Blockchain.EthConf
 
-instance (MonadUnliftIO m, MonadResource m) => SQLDB.HasSQLDB (ReaderT SQLDB.SQLDB m) where
+instance MonadUnliftIO m => SQLDB.HasSQLDB (ReaderT SQLDB.SQLDB m) where
   getSQLDB = ask
 
 main :: IO ()

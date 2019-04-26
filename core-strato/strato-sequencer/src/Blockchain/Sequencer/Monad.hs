@@ -32,7 +32,7 @@ import           Control.Concurrent                        (forkIO, threadDelay)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -60,18 +60,17 @@ import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
-import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
 import           System.Directory                          (createDirectoryIfMissing)
+import           Text.Format
 
 import qualified Database.LevelDB                          as LDB
 
 data SequencerContext = SequencerContext
                       { _dependentBlockDB    :: DependentBlockDB
-                      , _seenBlockDB         :: SeenBlockDB
                       , _seenTransactionDB   :: SeenTransactionDB
                       , _blockHashRegistry   :: Map SHA OutputBlock
                       , _txHashRegistry      :: Map SHA OutputTx
@@ -96,7 +95,8 @@ data SequencerConfig =
                      , syncWrites              :: Bool
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
-                     , blockstanbulBeneficiary :: TMChan CandidateReceived
+                     , blockstanbulBeneficiary :: TQueue CandidateReceived
+                     , blockstanbulVoteResps   :: TQueue VoteResult
                      , blockstanbulTimeouts    :: TMChan RoundNumber
                      , cablePackage            :: CablePackage
                      , maxEventsPerIter        :: Int
@@ -155,10 +155,6 @@ instance (HasPrivateHashDB BlockData OutputTx OutputBlock) SequencerM where
       chainIdRegistry %= M.alter (const mcie) cId
       return mcie
 
-instance HasSeenBlockDB SequencerM where
-    getSeenBlockDB = use seenBlockDB
-    putSeenBlockDB = assign seenBlockDB
-
 instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = use seenTransactionDB
     putSeenTransactionDB = assign seenTransactionDB
@@ -179,7 +175,6 @@ runSequencerM c mbc m = do
         latestRound <- liftIO $ newIORef 0
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
-            , _seenBlockDB         = mkSeenBlockDB stxSize
             , _seenTransactionDB   = mkSeenTxDB stxSize
             , _blockHashRegistry   = M.empty
             , _txHashRegistry      = M.empty
@@ -248,7 +243,7 @@ drainTimeouts :: SequencerM [RoundNumber]
 drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
 
 drainVotes :: SequencerM [CandidateReceived]
-drainVotes = atomically . drainTMChan =<< asks blockstanbulBeneficiary
+drainVotes = atomically . flushTQueue =<< asks blockstanbulBeneficiary
 
 clearLdbBatchOps :: SequencerM ()
 clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
@@ -265,10 +260,10 @@ fuseChannels = do
   votes <- asks blockstanbulBeneficiary
   timers <- asks blockstanbulTimeouts
   loop <- use loopTimeout
-  let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . show))
+  let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift) <$> mergeSources
                [ sourceTQueue unseq .| mapC UnseqEvent
-               , sourceTMChan votes .| mapC VoteMade
+               , sourceTQueue votes .| mapC VoteMade
                , sourceTMChan timers .| mapC TimerFire
                , sourceTMChan loop .| mapC (const WaitTerminated)]
                4096 -- 🙏

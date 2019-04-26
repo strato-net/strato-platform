@@ -12,7 +12,7 @@ import           ClassyPrelude                             (atomically)
 import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.IO.Class                    (liftIO)
@@ -31,13 +31,11 @@ import           Text.Printf
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
-import           Blockchain.Sequencer.DB.SeenBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.DB.Witnessable
 import           Blockchain.Sequencer.Event
@@ -55,6 +53,7 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
+import           Text.Format
 
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
@@ -83,11 +82,11 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   vmEvs <- drainVM
   unless (null vmEvs) $ do
     writeSeqVmEvents vmEvs
-    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show vmEvs ++ " SeqEvents to VM"
+    $logDebugS "sequencer" . T.pack $ "Wrote " ++ format vmEvs ++ " SeqEvents to VM"
   p2pEvs <- drainP2P
   unless (null p2pEvs) $ do
     writeSeqP2pEvents p2pEvs
-    $logDebugS "sequencer" . T.pack $ "Wrote " ++ show p2pEvs ++ " SeqEvents to P2P"
+    $logDebugS "sequencer" . T.pack $ "Wrote " ++ format p2pEvs ++ " SeqEvents to P2P"
   return src'
 
 clearAll :: SequencerM ()
@@ -113,7 +112,7 @@ readEventsInBufferedWindow src = do
   (src'', events) <- src' $$++ takeWhileC (/= WaitTerminated)
                           .| takeC maxEvents
                           .| sinkList
-  $logDebugS "sequencer/events" . T.pack . show $ events
+  $logDebugS "sequencer/events" . T.pack $ format events
   logF . printf "read %d events from fused channels" $ length events
   return (src'', events)
 
@@ -126,7 +125,9 @@ checkForVotes crs = do
           let extsign = RL.rlpDecode
                       . RL.rlpDeserialize
                       . fst
-                      . B16.decode $ pack (API.signature br)
+                      . B16.decode
+                      . pack
+                      . API.signature $ br
               bauth = MsgAuth { sender = API.sender br, signature = extsign}
           in NewBeneficiary bauth (API.recipient br, API.votingdir br, API.nonce br)
 
@@ -178,16 +179,17 @@ blockstanbulSend' msg = do
         [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ show blocks
+  rch <- asks blockstanbulVoteResps
+  atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
+  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
   let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul
       rewriteBlock b = do
         let msb = getSequencedBlock b
         for msb $ \sb -> do
-          witnessBlockHash (blockHeaderHash $ sbBlockData sb) sb
           return . OEBlock $ sequencedBlockToOutputBlock sb 1
       creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
   rBlocks <- fmap catMaybes $ mapM rewriteBlock blocks
-  let vmevs = creates ++ rBlocks
+  let vmevs = creates ++ rBlocks ++ [OEVoteToMake r d s| PendingVote r d s <- resp]
       p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [OEAskForBlocks (h+1) l p | GapFound h l p <- resp]
             ++ [OEPushBlocks (l+1) h p | LeadFound h l p <- resp]
@@ -199,9 +201,9 @@ blockstanbulSend' msg = do
     now <- liftIO getCurrentTime
     when (now < tNext) $
       liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
-  $logDebugS "seq/pbft/send_p2p" . T.pack . show $ p2pevs
+  $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
   mapM_ markForP2P p2pevs
-  $logDebugS "seq/pbft/send_vm" . T.pack . show $ vmevs
+  $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   return vmevs
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
@@ -365,7 +367,6 @@ transformBlocks = mapM_ $ \ib -> do
         $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
       P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
     Just sb -> do
-      witnessBlockHash (sbHash sb) sb -- TODO: this is for PoW, but we should figure out how to move it into `runConsensus`
       runBlockWithConsensus sb
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
@@ -386,19 +387,23 @@ splitEvents :: [IngestEvent] -> SequencerM ()
 splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
   case eventType of
     IETTransaction -> do
-      liftIO $ withLabel eventsplitMetrics "inevent_type_transaction" (flip unsafeAddCounter . fromIntegral . length $ es)
+      liftIO $ withLabel eventsplitMetrics "inevent_type_transaction" (flip unsafeAddCounter . fromIntegral . length $ events)
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestTransactions"
       transformTransactions $ map (\(IETx ts tx) -> (ts,tx)) events
     IETBlock -> do
-      liftIO $ withLabel eventsplitMetrics "inevent_type_block" (flip unsafeAddCounter . fromIntegral . length $ es)
+      liftIO $ withLabel eventsplitMetrics "inevent_type_block" (flip unsafeAddCounter . fromIntegral . length $ events)
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlocks"
       transformBlocks $ map (\(IEBlock ob) -> ob) events
     IETGenesis -> do
-      liftIO $ withLabel eventsplitMetrics "inevent_type_genesis" (flip unsafeAddCounter . fromIntegral . length $ es)
+      liftIO $ withLabel eventsplitMetrics "inevent_type_genesis" (flip unsafeAddCounter . fromIntegral . length $ events)
       $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
+    IETNewChainMember -> do
+      liftIO $ withLabel eventsplitMetrics "inevent_type_new_chain_member" (flip unsafeAddCounter . fromIntegral . length $ events)
+      $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestNewChainMembers"
+      mapM_ (\(IENewChainMember c a e) -> markForP2P $ OENewChainMember c a e) events
     IETBlockstanbul -> do
-      liftIO $ withLabel eventsplitMetrics "inevent_type_blockstanbul" (flip unsafeAddCounter . fromIntegral . length $ es)
+      liftIO $ withLabel eventsplitMetrics "inevent_type_blockstanbul" (flip unsafeAddCounter . fromIntegral . length $ events)
       $logInfoS "splitevents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
 

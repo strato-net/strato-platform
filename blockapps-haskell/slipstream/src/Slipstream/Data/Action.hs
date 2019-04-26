@@ -17,32 +17,23 @@ import           BlockApps.Ethereum
 import           Control.DeepSeq
 import           Control.Lens            hiding ((.=))
 import qualified Data.Aeson.Encoding     as AesonEnc
+import           Data.Aeson.Types
 import           Data.ByteString         (ByteString)
-import qualified Data.ByteString.Base16  as B16
 import           Data.Map.Strict         (Map)
 import qualified Data.Map.Strict         as M
 import           Data.Maybe              (fromMaybe,listToMaybe)
 import           Data.Text               (Text)
 import qualified Data.Text               as T
-import           Data.Text.Encoding
 import           Data.Time
-import           Data.Aeson
 import           GHC.Generics
 
-instance ToJSON ByteString where
-    toJSON  = String . decodeUtf8 .  B16.encode
-
-instance FromJSON ByteString where
-    parseJSON (String t) = pure . fst . B16.decode $ encodeUtf8 t
-    parseJSON v          = error $ "parseJSON ByteString: expected String, got: " ++ show v
+import qualified Blockchain.Strato.Model.Action as BS
+import           Blockchain.SolidVM.Model
 
 instance (Integral a, Show a) => ToJSONKey (Hex a) where
   toJSONKey = ToJSONKeyText f g
     where f x = T.pack $ show x
           g x = AesonEnc.text . T.pack $ show x
-
-instance FromJSONKey Address where
-    fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
 instance FromJSONKey (Hex Word256) where
     fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
@@ -57,7 +48,7 @@ data CallData = CallData
   , _value       :: Integer
   , _input       :: ByteString
   , _output      :: Maybe ByteString
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData)
 makeLenses ''CallData
 
 instance ToJSON CallData where
@@ -83,36 +74,42 @@ instance FromJSON CallData where
   parseJSON o = error $ "parseJSON CallData: Expected object, got: " ++ show o
 
 data ActionData = ActionData
-  { _codeHash     :: Keccak256
-  , _storageDiffs :: Map Word256 Word256
+  { _codeHash     :: CodePtr
+  , _codeKind     :: CodeKind
+  , _storageDiffs :: BS.ActionDataDiff
   , _callData     :: [CallData]
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData)
 makeLenses ''ActionData
 
 instance ToJSON ActionData where
   toJSON ActionData{..} = object
     [ "codeHash" .= _codeHash
-    , "diff"     .= (M.mapKeys Hex $ M.map Hex _storageDiffs)
+    , "codeKind" .= _codeKind
+    , "diff"     .= _storageDiffs
     , "data"     .= _callData
     ]
 
 instance FromJSON ActionData where
-  parseJSON (Object o) = ActionData
-    <$> (o .: "codeHash")
-    <*> (fmap (M.mapKeys unHex . M.map unHex) (o .: "diff"))
-    <*> (o .: "data")
+  parseJSON (Object o) = do
+    ch <- o .: "codeHash"
+    ck <- o .:? "codeKind" .!= EVM
+    df <- (case ck of
+      EVM -> explicitParseField BS.parseDiffEVM
+      SolidVM -> explicitParseField BS.parseDiffSolidVM) o "diff"
+    dt <- o .: "data"
+    return $ ActionData ch ck df dt
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Action' = Action'
-  { _blockHash          :: Keccak256
+  { _blockHash          :: SHA
   , _blockTimestamp     :: UTCTime
   , _blockNumber        :: Integer
-  , _transactionHash    :: Keccak256
+  , _transactionHash    :: SHA
   , _transactionChainId :: Maybe ChainId
   , _transactionSender  :: Address
   , _actionData         :: Map Address ActionData
   , _metadata           :: Maybe (Map Text Text)
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData)
 makeLenses ''Action'
 
 instance ToJSON Action' where
@@ -140,15 +137,15 @@ instance FromJSON Action' where
   parseJSON o = error $ "parseJSON Action: Expected object, got: " ++ show o
 
 data Action = Action
-  { actionBlockHash      :: Keccak256
+  { actionBlockHash      :: SHA
   , actionBlockTimestamp :: UTCTime
   , actionBlockNumber    :: Integer
-  , actionTxHash         :: Keccak256
+  , actionTxHash         :: SHA
   , actionTxChainId      :: Maybe ChainId
   , actionTxSender       :: Address
   , actionAddress        :: Address
-  , actionCodeHash       :: Keccak256
-  , actionStorage        :: Map Word256 Word256
+  , actionCodeHash       :: CodePtr
+  , actionStorage        :: BS.ActionDataDiff
   , actionType           :: CallType
   , actionCallData       :: [CallData]
   , actionMetadata       :: Map Text Text
@@ -191,7 +188,9 @@ formatAction Action{..} = T.concat
   , " with address: "
   , tshow actionAddress
   , " with "
-  , tshow (M.size actionStorage)
+  , tshow (case actionStorage of
+      BS.ActionEVMDiff m -> M.size m
+      BS.ActionSolidVMDiff m -> M.size m)
   , " items\n"
   , "    codeHash = "
   , tshow actionCodeHash

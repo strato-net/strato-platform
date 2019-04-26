@@ -17,11 +17,13 @@ module BlockApps.SolidityVarReader (
   encodeValue,
   word256ToByteString,
   byteStringToWord256,
-  valueToSolidityValue
+  valueToSolidityValue,
+  structSort -- for testing
   ) where
 
 import           Control.Exception
 import           Control.Monad.Except
+import           Data.Bifunctor                   (bimap)
 import qualified Data.Bimap                       as Bimap
 import           Data.Bits
 import qualified Data.ByteArray                   as ByteArray
@@ -29,6 +31,7 @@ import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Base16           as B16
 import qualified Data.ByteString.Char8            as BC
+import qualified Data.IntMap                      as I
 import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
@@ -58,25 +61,30 @@ data SolidityDecodingException = EnumOutOfBounds Text Int
 instance Exception SolidityDecodingException
 
 valueToSolidityValue::Value->SolidityValue
-valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
-valueToSolidityValue (SimpleValue (ValueInt _ _ v)) = SolidityValueAsString $ Text.pack $ show v
-valueToSolidityValue (SimpleValue (ValueString s)) = SolidityValueAsString s
-valueToSolidityValue (SimpleValue (ValueAddress (Address addr))) =
-  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSolidityValue (ValueContract (Address addr)) =
-  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSolidityValue (ValueArrayFixed _ values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (ValueArrayDynamic values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (SimpleValue (ValueBytes _ bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
-valueToSolidityValue (ValueEnum _ _ index)              = SolidityValueAsString $ Text.pack $ show index -- SolidityValueAsString $ name `Text.append` "." `Text.append` value
-valueToSolidityValue (ValueStruct namedItems) =
-  SolidityObject $ map (fmap valueToSolidityValue) namedItems
-valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
-  SolidityValueAsString $ Text.pack $ "function ("
-                          ++ intercalate "," (map (formatType . snd) paramTypes)
-                          ++ ") returns ("
-                          ++ intercalate "," (map (formatType . snd) returnTypes)
-                          ++ ")"
+valueToSolidityValue = \case
+  SimpleValue (ValueBool x) -> SolidityBool x
+  SimpleValue (ValueInt _ _ v) -> SolidityValueAsString $ Text.pack $ show v
+  SimpleValue (ValueString s) -> SolidityValueAsString s
+  SimpleValue (ValueAddress (Address addr)) ->
+   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  ValueContract (Address addr) ->
+   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  ValueArrayFixed _ values -> SolidityArray $ map valueToSolidityValue values
+  ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue $ unsparse values
+  SimpleValue (ValueBytes _ bytes) ->
+   SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
+  ValueEnum _ _ index              -> SolidityValueAsString $ Text.pack $ show index
+  -- TODO(tim): What if declaration order is needed here?
+  ValueStruct namedItems -> SolidityObject . Map.toList $ fmap valueToSolidityValue namedItems
+  ValueMapping m -> SolidityObject . map (bimap simpleValueToText valueToSolidityValue) . Map.toList $ m
+  ValueFunction _ paramTypes returnTypes ->
+    SolidityValueAsString $ Text.pack $ "function ("
+                              ++ intercalate "," (map (formatType . snd) paramTypes)
+                              ++ ") returns ("
+                              ++ intercalate "," (map (formatType . snd) returnTypes)
+                              ++ ")"
+  ValueArraySentinel{} -> error "TODO(tim): ValueArraySentinel"
+
 
 
 word256ToByteString::Word256->ByteString
@@ -132,7 +140,8 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
               let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
                   n' = fromInteger $ toInteger elementSize * toInteger n
               in [(offset, n')]
-        TypeMapping _ _ -> undefined -- TODO: The only way to get the offset of a mapping is by supplying the key
+        -- TODO: The only way to get the offset of a mapping is by supplying the key
+        TypeMapping _ _ -> error "decodeStorageKey: TypeMapping"
         TypeFunction name _ _ -> error $ "Cannot retrieve "
                                        ++ show (ByteString.unpack name)
                                        ++ ": Functions are not kept in storage"
@@ -147,13 +156,14 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
         TypeContract _ -> [(offset, 1)]
 
 decodeCacheValues
-  :: TypeDefs
-  -> Struct
+  :: Contract
   -> Cache
-  -> Word256
   -> [(Text, Value)]
   -> [(Text, Value)]
-decodeCacheValues typeDefs' struct'@Struct{..} cache offset state =
+decodeCacheValues (Contract struct' typeDefs') cache state = decodeCacheValues' typeDefs' struct' cache 0 state
+
+decodeCacheValues' :: TypeDefs -> Struct -> Cache -> Word256 -> [(Text, Value)] -> [(Text, Value)]
+decodeCacheValues' typeDefs' struct' cache offset state =
   zipWith fromMaybe state $ map (decodeCacheValue typeDefs' struct' cache offset) state
 
 decodeCacheValue
@@ -247,14 +257,15 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
         where
           vlen = length vals
           len = fromMaybe vlen $ fromIntegral <$> cache offset
-          vals' = if len < vlen
-                    then take len vals
-                    else vals ++ replicate (len - vlen) (decodeValue' typeDefs' (const 0) 0 0 False doesntMatter ty)
-                      -- Our cache function is (Just 0), so we don't need to pass in the correct offset
-                      where doesntMatter = Storage.Position 0 0
+          doesntMatter = decodeValue' typeDefs' (const 0) 0 0 False (Storage.Position 0 0) ty
+          -- The value backs provide a default value for every key, so that `mapWithKey` will be called
+          -- for each offset.
+          valueBacks = I.fromList [(k, doesntMatter) | k <- [0..len -1]]
+          vals' = I.filterWithKey (\k _ -> k < len) vals `I.union` valueBacks
           (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-          theList = zipWith (\ofs val -> decodeCacheValue' typeDefs' cache ((arrayPosition (toInteger elementSize) ofs) `Storage.addOffset` startingKey) val ty) [0..] vals'
           startingKey = getArrayStartingKey offset
+          toPosition ofs' = arrayPosition (toInteger elementSize) (fromIntegral ofs') `Storage.addOffset` startingKey
+          theList = I.mapWithKey (\ofs val -> decodeCacheValue' typeDefs' cache (toPosition ofs) val ty) vals'
       v -> error $ "decodeCacheValue': Expected ValueArrayDynamic, but got: " ++ show v
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
@@ -278,8 +289,16 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
     case Map.lookup name structDefs of
      Nothing -> throw $ MissingTypeStruct name
      Just theStruct -> case value of
-       ValueStruct kvs -> ValueStruct $ decodeCacheValues typeDefs' theStruct cache (Storage.alignedByte position) kvs
+       ValueStruct kvs ->
+        let raw_kvs = structSort theStruct $ Map.toList kvs
+        in ValueStruct . Map.fromList $ decodeCacheValues' typeDefs' theStruct cache (Storage.alignedByte position) raw_kvs
        v -> error $ "decodeCacheValue': Expected ValueStruct, but got: " ++ show v
+
+structSort :: Struct -> [(Text, Value)] -> [(Text, Value)]
+structSort (Struct om _)  = sortBy omOrder
+  -- Struct sort should run in O(n * log n * log n) as each comparison takes log n
+  where omOrder :: (Text, Value) -> (Text, Value) -> Ordering
+        omOrder (k1, _) (k2, _) = OMap.findIndex k1 om `compare` OMap.findIndex k2 om
 
 decodeValues
   :: Integer
@@ -394,7 +413,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
   TypeArrayDynamic ty -> if len
     then SimpleValue $ valueUInt (toInteger $ storage offset)
-    else ValueArrayDynamic theList
+    else ValueArrayDynamic $ tosparse theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
@@ -419,7 +438,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
   TypeStruct name ->
     case Map.lookup name structDefs of
      Nothing -> throw $ MissingTypeStruct name
-     Just theStruct -> ValueStruct $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
+
+     Just theStruct -> ValueStruct . Map.fromList $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
 
 
 
@@ -528,8 +548,8 @@ encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} ty = \case
     TypeArrayDynamic ty' ->
       let (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty'
           startingKey = getArrayStartingKey offset
-          f i v = encodeValue' typeDefs' (arrayPosition (toInteger elementSize) i `Storage.addOffset` startingKey) ty' v
-       in (offset, fromIntegral $ length vs) : (join $ zipWith f [0..] vs)
+          f (i, v) = encodeValue' typeDefs' (arrayPosition (toInteger elementSize) (fromIntegral i) `Storage.addOffset` startingKey) ty' v
+       in (offset, fromIntegral $ fst (I.findMax vs) + 1) : concatMap f (I.toList vs)
     _ -> error $ "encodeValue': Expected ValueArrayDynamic to have type TypeArrayDynamic, but got: " ++ show ty
 
   -- ValueMapping _ -> error "Mappings not supported yet" --SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleValue tyk ++ " => " ++ formatValue tyv ++ ")"
@@ -537,6 +557,8 @@ encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} ty = \case
   ValueEnum _ _ index -> encodeInt offset byte index
 
   ValueStruct _ -> error "Structs not supported yet"
+  ValueMapping{} -> error "Mappings unsupported in EVM values"
+  ValueArraySentinel{} -> error "ArraySentinel unsupported in EVM values"
 
 
 

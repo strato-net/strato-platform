@@ -8,7 +8,7 @@ module Blockchain.TimerSource (
 import           Control.Concurrent     (threadDelay)
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Data.Conduit
 
 import           Blockchain.Event

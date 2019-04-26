@@ -7,12 +7,14 @@ declare -i RESULT=0
 TESTS=(
   blockapps-data
   blockapps-ecrecover
+  blockapps-mpdbs
   blockstanbul
   ethereum-discovery
   ethereum-rlp
   ethereum-vm
   fast-keccak256
   merkle-patricia-db
+  solid-vm
   strato-api:unittests
   strato-genesis
   strato-init
@@ -20,10 +22,12 @@ TESTS=(
   strato-p2p
   strato-redis-blockdb
   strato-sequencer
+  vm-runner
+  vm-tools
 )
 
 BENCHES=(
-  ethereum-vm
+  vm-runner
 )
 # There's a good chance that strato-getting-started is also running, so
 # we change redis's port to avoid a conflict.

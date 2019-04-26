@@ -10,28 +10,29 @@ ghc-options: -Wall -O2
 
 dependencies:
   - base
-  - bytestring
-  - monad-logger
-  - blockapps-data
-  - random
-  - stm
-  - normaldistribution
   - ansi-wl-pprint
-  - cryptohash
-  - hflags
-  - blockapps-util
+  - blockapps-data
+  - blockapps-datadefs
   - blockapps-milena
-  - ethereum-rlp
-  - ethereum-discovery
-  - resourcet
-  - time
-  - lifted-base
-  - text
-  - strato-conf
-  - strato-sequencer
-  - mtl
-  - lens
+  - blockapps-util
+  - bytestring
   - containers
+  - cryptohash
+  - ethereum-discovery
+  - ethereum-rlp
+  - format
+  - hflags
+  - lens
+  - lifted-base
+  - mtl
+  - normaldistribution
+  - random
+  - resourcet
+  - seqevents
+  - stm
+  - strato-conf
+  - text
+  - time
   - unliftio
 
 other-extensions: OverloadedStrings

@@ -9,7 +9,7 @@ module Application
 
 
 import           Control.Monad.Except
-import           Control.Monad.Logger
+import           Blockchain.Output
 import qualified Data.Binary                          as BN
 import qualified Data.ByteString.Lazy                 as BL
 import qualified Data.ByteString.Base64               as B64
@@ -28,6 +28,7 @@ import           Network.Wai.Handler.WarpTLS
 import           Network.Wai.Middleware.RequestLogger (Destination (Logger), IPAddrSource (..),
                                                        OutputFormat (..), destination,
                                                        mkRequestLogger, outputFormat)
+import           Network.Wai.Middleware.Prometheus
 import           System.Environment
 import           System.Exit
 import           System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet)
@@ -52,8 +53,8 @@ import           Handler.UUIDInfo
 
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Format
 import qualified Network.Haskoin.Crypto as HK
+import           Text.Format
 
 mkYesodDispatch "App" resourcesApp
 
@@ -79,13 +80,13 @@ makeFoundation appSettings appFaucetKey = do
 --        logFunc = messageLoggerSource tempFoundation appLogger
 
     -- Create the database connection pool
-    pool <-  myLogger $ myPool
+    pool <- runNoLoggingT $ myPool
         (pgConnStr  $ appDatabaseConf appSettings)
         (pgPoolSize $ appDatabaseConf appSettings)
 
     -- Perform database migration using our application's logging settings.
     --runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
-    _ <- myLogger (runSqlPool (runMigrationSilent migrateAll) pool) --runMigration
+    _ <- runNoLoggingT (runSqlPool (runMigrationSilent migrateAll) pool) --runMigration
 
     -- Return the foundation
     return $ mkFoundation pool
@@ -103,9 +104,6 @@ makeLogware foundation =
         , destination = Logger $ loggerSet $ appLogger foundation
         }
 
-myLogger :: NoLoggingT m a -> m a
-myLogger = runNoLoggingT --runStdoutLoggingT
-
 noPool :: PG.Connection -> IO ()
 noPool = const $ return ()
 
@@ -121,7 +119,9 @@ makeApplication foundation = do
     logWare <- makeLogware foundation
     -- Create the WAI application and apply middlewares
     app <- toWaiApp foundation
-    return $ logWare $ defaultMiddlewaresNoLogging app
+    return $ prometheus def{prometheusInstrumentApp=False}
+           $ instrumentApp "strato-api"
+           $ logWare $ defaultMiddlewaresNoLogging app
 
 -- | Warp settings for the given foundation value.
 warpSettings :: App -> Settings

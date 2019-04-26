@@ -271,7 +271,7 @@ class SendTokens extends Component {
             <div className="col-sm-8 smd-pad-4">
               <div className="pt-select">
                 <Field
-                  className="pt-input"
+                  className="pt-input chain-field"
                   component="select"
                   name="chainLabel"
                   onChange={
@@ -349,7 +349,7 @@ class SendTokens extends Component {
             style={{
               width: "560px"
             }}
-            className="pt-dark"
+            className="pt-dark send-tokens-dialog"
           >
             <div className="pt-dialog-body">
               {this.renderChainFields()}

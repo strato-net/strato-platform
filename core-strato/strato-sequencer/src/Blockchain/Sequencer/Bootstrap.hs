@@ -1,8 +1,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
-import ClassyPrelude (atomically, newTMChan, fromMaybe)
-import Control.Monad.Logger
+import ClassyPrelude (atomically, newTMChan, newTQueue, fromMaybe)
 import qualified Data.ByteString.Char8 as C8
 
 import Blockchain.Constants
@@ -51,7 +50,8 @@ bootstrapSequencer Block{blockBlockData = bd,
   initLevelDB :: CablePackage -> IO ()
   initLevelDB pkg = do
       tch <- atomically newTMChan
-      vch <- atomically newTMChan
+      vch <- atomically newTQueue
+      rch <- atomically newTQueue
       let dummySequencerCfg = SequencerConfig
             { depBlockDBCacheSize   = 0
             , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
@@ -60,12 +60,13 @@ bootstrapSequencer Block{blockBlockData = bd,
             , blockstanbulBlockPeriod = 0
             , blockstanbulRoundPeriod = 0
             , blockstanbulBeneficiary = vch
+            , blockstanbulVoteResps = rch
             , blockstanbulTimeouts = tch
             , cablePackage = pkg
             , maxEventsPerIter = 65
             , maxUsPerIter = 20000
             }
-      flip runLoggingT printLogMsg . runSequencerM dummySequencerCfg Nothing $ do
+      runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty
   initKafka :: CablePackage -> IO ()
   initKafka pkg = do

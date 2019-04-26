@@ -15,12 +15,12 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - blockapps-ethereum
-  - blockapps-solidity
   - binary
   - bytestring
   - aeson
   - aeson-casing
   - containers
+  - derive
   - generic-random
   - http-api-data
   - http-client
@@ -30,6 +30,7 @@ dependencies:
   - servant
   - servant-client
   - servant-docs
+  - strato-model
   - swagger2
   - text
   - time
@@ -43,5 +44,6 @@ tests:
     main: Spec.hs
     source-dirs: test/
     dependencies:
+      - aeson-qq
       - blockapps-strato-api
       - hspec

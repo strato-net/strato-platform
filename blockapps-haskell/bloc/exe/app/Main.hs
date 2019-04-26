@@ -9,13 +9,15 @@
 module Main where
 
 import           Control.Monad
-import           Control.Monad.Log                  (Severity(..))
 import           Database.PostgreSQL.Simple
 import           Data.Pool
 import           HFlags
-import           Network.HTTP.Client hiding (Proxy)
+import           Network.HTTP.Client hiding (Proxy, responseStatus)
+import           Network.HTTP.Types (hContentType, status400)
+import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
+import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Servant.Options
 import           Servant
@@ -31,6 +33,7 @@ import qualified BlockApps.Bloc22.Database.Create as Bloc22
 import qualified BlockApps.Bloc22.Database.Migration as Bloc22
 import qualified BlockApps.Bloc22.Monad as Bloc22
 import qualified BlockApps.Bloc22.Server as Bloc22
+import           BlockApps.Logging (LogLevel(..), flags_minLogLevel)
 
 import           Options
 
@@ -68,7 +71,7 @@ main = do
   stratoUrl <- parseBaseUrl flags_stratourl
   vaultWrapperUrl <- parseBaseUrl flags_vaultwrapperurl
   let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
-  let blocEnv = Bloc22.BlocEnv stratoUrl vaultWrapperUrl mgr pool22 (toEnum flags_loglevel) mode flags_stateFetchLimit
+  let blocEnv = Bloc22.BlocEnv stratoUrl vaultWrapperUrl mgr pool22 mode flags_stateFetchLimit
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   void $ Bloc22.runBlocToIO blocEnv Bloc22.runBlocMigrations
   run flags_port (appBloc blocEnv)
@@ -76,9 +79,20 @@ main = do
 dbExistsQuery22 :: Query
 dbExistsQuery22 = "SELECT 1 FROM pg_database WHERE datname='bloc22';"
 
+serveErrorsPlain :: Middleware
+serveErrorsPlain app req respond = app req $ \resp -> respond $
+  if responseStatus resp < status400
+    then resp
+    else mapResponseHeaders ((hContentType, "text/plain"):) resp
+
+
 appBloc :: Bloc22.BlocEnv -> Application
 appBloc env22 =
-  (if Bloc22.logLevel env22 >= Informational then logStdoutDev else logStdout)
+    prometheus def{ prometheusEndPoint = ["bloc", "v2.2", "metrics"]
+                  , prometheusInstrumentApp = False}
+  . instrumentApp "bloc22"
+  . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
+  . serveErrorsPlain
   . cors (const $ Just policy)
   . provideOptions (Proxy @ Bloc22.BlocAPI)
   . serve (Proxy @ (

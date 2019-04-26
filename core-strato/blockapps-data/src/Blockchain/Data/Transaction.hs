@@ -6,16 +6,10 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TypeFamilies          #-}
-{-# OPTIONS  -fno-warn-orphans          #-}
+{-# OPTIONS  -fno-warn-orphans     #-}
 module Blockchain.Data.Transaction (
-{-  Transaction(transactionNonce,
-              transactionGasPrice,
-              transactionGasLimit,
-              transactionTo,
-              transactionValue,
-              transactionData,
-              transactionInit), -}
   Transaction(..),
+  isMessageTX,
   txAndTime2RawTX,
   tx2RawTXAndTime,
   rawTX2TX,
@@ -27,7 +21,6 @@ module Blockchain.Data.Transaction (
   createChainMessageTX,
   createContractCreationTX,
   createChainContractCreationTX,
-  isMessageTX,
   isContractCreationTX,
   whoSignedThisTransaction,
   transactionHash,
@@ -288,10 +281,6 @@ whoSignedThisTransaction tx = case tx of
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           SHA theHash = partialTransactionHash t
-
-isMessageTX::Transaction->Bool
-isMessageTX MessageTX{} = True
-isMessageTX _           = False
 
 isContractCreationTX::Transaction->Bool
 isContractCreationTX ContractCreationTX{} = True

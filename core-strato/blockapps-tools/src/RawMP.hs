@@ -16,7 +16,7 @@ formatKV :: (N.NibbleString, RLPObject) -> Doc
 formatKV (key, val) =
     pretty key <> text ": " <> pretty (rlpDeserialize $ rlpDecode val)
 
-showVals :: DB.MonadResource m => DB.DB -> MP.StateRoot -> m ()
+showVals :: MonadIO m => DB.DB -> MP.StateRoot -> m ()
 showVals sdb sr = do
   kvs <- MP.unsafeGetKeyVals MP.MPDB{MP.ldb=sdb, MP.stateRoot=sr} ""
   liftIO . print $ length kvs

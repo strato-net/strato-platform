@@ -27,7 +27,6 @@ module Blockchain.Privacy.Event
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord
-import           Blockchain.Format
 import           Blockchain.Privacy.Monad
 import           Blockchain.Privacy.Metrics
 import           Blockchain.SHA
@@ -36,7 +35,7 @@ import           Control.Arrow                 ((&&&))
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Blockchain.Output
 import           Data.Foldable                 (for_, toList)
 import           Data.Maybe
 import qualified Data.Set                      as S
@@ -46,6 +45,7 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           Data.Traversable
 import           Prometheus
+import           Text.Format
 
 logFF :: MonadLogger m => Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
@@ -185,7 +185,8 @@ hydratePrivateHashes :: HasPrivateHashDB h t b m
 hydratePrivateHashes chainF b = do
   let logF = logFF "hydratePrivateHashes"
       bHash = blockHeaderHash $ blockHeader b
-  insertBlockHashEntry bHash b
+  when (any isPrivateHashTX $ blockTransactions b) $
+    insertBlockHashEntry bHash b
   let discluded cId = maybe False (/= cId) chainF
   (txs', (depTXs,newDiscludes)) <- accumT ([],S.empty) (blockTransactions b) $ \st@(dts,cs) tx -> do
     let tHash = txHash tx

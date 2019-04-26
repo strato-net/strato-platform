@@ -7,7 +7,7 @@ module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
 import Control.Lens
-import Control.Monad.Logger
+import Blockchain.Output
 import Data.Binary
 import Data.DeriveTH
 import Data.Text
@@ -15,15 +15,16 @@ import GHC.Generics
 import Test.QuickCheck
 import Text.Printf
 
+import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Data.RLP
-import Blockchain.ExtWord
-import Blockchain.Format
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
-import Blockchain.SHA
-import qualified Blockchain.Strato.Model.Colors as CL
+import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.ExtendedWord
+import qualified Text.Colors as CL
+import Text.Format
 
 type RoundNumber = Word256
 type SequenceNumber = Word256
@@ -46,6 +47,12 @@ data TrustedMessage = Preprepare View Block
                     | Commit View SHA ExtendedSignature
                     | RoundChange {roundchangeView :: View }
                     deriving (Eq, Show, Generic)
+
+instance Format TrustedMessage where
+  format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
+  format (Prepare v theSHA) = CL.blue "PREPARE " ++ format v ++ " " ++ format theSHA
+  format (Commit v theSHA _) = CL.blue "COMMIT " ++ format v ++ " " ++ format theSHA
+  format (RoundChange v) = CL.blue "ROUNDCHANGE " ++ format v
 
 data MessageKind = PreprepareK | PrepareK | CommitK | RoundChangeK deriving (Eq, Show, Enum, Generic)
 
@@ -81,11 +88,7 @@ derive makeArbitrary ''TrustedMessage
 derive makeArbitrary ''WireMessage
 
 instance Format WireMessage where
-  format (WireMessage (MsgAuth s _) (Preprepare v theBlock)) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format s ++ "\n" ++ format theBlock
-  format (WireMessage (MsgAuth s _) (Prepare v theSHA)) = CL.blue "PREPARE " ++ format v ++ " " ++ format s ++ " " ++ format theSHA
-  format (WireMessage (MsgAuth s _) (Commit v theSHA _)) = CL.blue "COMMIT " ++ format v ++ " " ++ format s ++ " " ++ format theSHA
-  format (WireMessage (MsgAuth s _) (RoundChange v)) = CL.blue "ROUNDCHANGE " ++ format v ++ " " ++ format s
-
+  format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
 
 preprepareCode, prepareCode, commitCode, roundchangeCode :: Integer
 preprepareCode = 0
@@ -103,8 +106,13 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              deriving (Eq, Show)
 
 instance Format InEvent where
-  format (IMsg a m) = format $ WireMessage a m
-  format x = show x
+  format (IMsg (MsgAuth s _) msg) = "IMsg " ++ format msg ++ " " ++ format s
+  format (Timeout rn) = "Timeout " ++ format rn
+  format (CommitResult (Left text)) = unpack $ "CommitResult Error: " <> text
+  format (CommitResult (Right sha)) = "CommitResult Success: " ++ format sha
+  format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
+  format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
+  format (NewBeneficiary (MsgAuth s _) ben) = "NewBeneficiary " ++ show ben ++ " " ++ format s
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
@@ -115,7 +123,23 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
                 -- will erase the gap with PreviousBlocks.
               | GapFound {have :: Integer, require :: Integer, peer :: Address}
               | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
+              -- A PendingVote should be authenticated by blockstanbul, but applied
+              -- by a Bagger monad. This is so that the stateroot is computed after
+              -- the coinbase is modified to hold the vote.
+              | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool, pendingVoteSender :: Address}
+              | VoteResponse HA.VoteResult
+
               deriving (Eq, Show, Generic)
+
+instance Format OutEvent where
+  format (OMsg (MsgAuth s _) msg) = "OMsg " ++ format msg ++ " " ++ format s
+  format (ToCommit blk) = "ToCommit " ++ format (blockHash blk)
+  format MakeBlockCommand = "MakeBlockCommand"
+  format (ResetTimer rn) = "ResetTimer " ++ format rn
+  format (GapFound we they p) = "GapFound " ++ show (we, they, p)
+  format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
+  format (PendingVote reci dir s) = "PendingVote " ++ show (reci, dir, s)
+  format (VoteResponse resp) = "VoteResponse " ++ show resp
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -145,10 +169,8 @@ outShortLog loc oev = $logInfoS loc . pack $
     ResetTimer rn -> CL.blue "RESET_TIMER " ++ show rn
     GapFound h r p -> CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
-
-instance Format OutEvent where
-  format (OMsg a m) = format $ WireMessage a m
-  format x = show x
+    PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
+    VoteResponse resp -> CL.blue "VOTE_RESPONSE " ++ show resp
 
 instance NFData OutEvent
 
@@ -238,3 +260,5 @@ instance RLPSerializable OutEvent where
   rlpDecode _ = error "cannot rlpdecode OutEvents"
   rlpEncode (OMsg a m) = rlpEncode (WireMessage a m)
   rlpEncode x = error $ "cannot rlpencode non-message OutEvent: " ++ show x
+
+data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)

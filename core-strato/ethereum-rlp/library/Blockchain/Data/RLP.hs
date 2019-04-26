@@ -182,7 +182,7 @@ instance RLPSerializable Integer where
   rlpDecode (RLPString s) = byteString2Integer s
   rlpDecode (RLPArray _)  = error "rlpDecode called for Integer for array"
 
-instance RLPSerializable String where
+instance {-# OVERLAPPING #-} RLPSerializable String where
   rlpEncode s = rlpEncode $ BC.pack s
 
   rlpDecode (RLPString s) = BC.unpack s
@@ -200,6 +200,11 @@ instance RLPSerializable B.ByteString where
 instance RLPSerializable T.Text where
   rlpEncode = rlpEncode . T.unpack
   rlpDecode = T.pack . rlpDecode
+
+instance RLPSerializable a => RLPSerializable [a] where
+  rlpEncode as = RLPArray $ map rlpEncode as
+  rlpDecode (RLPArray as) = map rlpDecode as
+  rlpDecode x = error $ "rlpDecode [a]: Expected RLPArray, got " ++ show x
 
 -- serialization for tuples, triples, etc. of serializable types
 instance (RLPSerializable a, RLPSerializable b) => RLPSerializable (a,b) where
@@ -262,3 +267,10 @@ instance (RLPSerializable k, RLPSerializable v, Ord k, Ord v)
   rlpEncode mp = RLPArray $ map rlpEncode (M.toList mp)
   rlpDecode (RLPArray rp) = M.fromList (map rlpDecode rp)
   rlpDecode x = error $ "rlpDecode for Map not defined for " ++ show x
+
+instance RLPSerializable Bool where
+  rlpEncode True = RLPScalar 1
+  rlpEncode False = RLPScalar 0
+  rlpDecode (RLPScalar 0) = False
+  rlpDecode (RLPScalar 1) = True
+  rlpDecode x = error $ "rlpDecode for Bool not defined for " ++ show x

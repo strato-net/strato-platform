@@ -5,16 +5,15 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 module BlockApps.Bloc22.Monad where
 
 
 import           Control.Exception.Lifted           hiding (Handler, handle)
-import Data.Pool (Pool, withResource)
 import           Control.Monad.Base
 import           Control.Monad.Except
-import           Control.Monad.Log                  hiding (Handler)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import qualified Data.Aeson                         as JSON
@@ -22,12 +21,10 @@ import qualified Data.ByteString.Lazy.Char8         as Lazy.Char8
 import           Data.Foldable
 import qualified Data.HashMap.Lazy                  as HashMap
 import           Data.Maybe                         (fromMaybe)
+import           Data.Pool (Pool, withResource)
 import           Data.Profunctor.Product.Default
-import           Data.String
 import           Data.Text                          (Text)
 import qualified Data.Text                          as Text
-import           Data.Text.Prettyprint.Doc
-import           Data.Time.Format
 import           Database.PostgreSQL.Simple         (Connection,
                                                      withTransaction)
 import           GHC.Stack
@@ -36,11 +33,14 @@ import           Network.HTTP.Types.Status
 import           Opaleye
 import           Servant
 import           Servant.Client
+import           Text.Printf
+
+import           BlockApps.Logging
 
 newtype Bloc x = Bloc
   { runBloc ::
       ReaderT BlocEnv -- global immutable environment variable
-        ( LoggingT (WithSeverity (WithCallStack (WithTimestamp Text))) -- log all the things
+        ( LoggingT
           ( ExceptT BlocError IO ) -- throw and catch errors
         ) x
   } deriving
@@ -50,16 +50,17 @@ newtype Bloc x = Bloc
   , MonadIO
   , MonadBase IO
   , MonadReader BlocEnv
-  , MonadLog (WithSeverity (WithCallStack (WithTimestamp Text)))
+  , MonadLogger
   )
 
 
 instance MonadError BlocError Bloc where
   throwError err@(RuntimeError _) = do
-    logWith logError (Text.pack $ formatError err ++ "\n  callstack missing for runtime errors")
+    $logErrorS "throwError/RuntimeError" . Text.pack $
+      formatError err ++ "\n  callstack missing for runtime errors"
     Bloc $ throwError err
   throwError err = do
-    logWith logError (Text.pack (formatError err))
+    $logErrorS "throwError" . Text.pack $ formatError err
     Bloc $ throwError err
   catchError m handle =
     Bloc $ catchError (runBloc m) (runBloc . handle)
@@ -89,7 +90,8 @@ prettyCallStack' cs =
 
 blocError::HasCallStack=>BlocError->Bloc y
 blocError err = do
-    logWithCallStack ?callStack logError (Text.pack (show err ++ "\n" ++ prettyCallStack' ?callStack))
+    logErrorCS callStack . Text.pack $
+      printf "err: %s\nCallstack:%s" (show err) (prettyCallStack callStack)
     Bloc $ throwError err
 
 
@@ -106,7 +108,6 @@ data BlocEnv = BlocEnv
   , urlVaultWrapper :: BaseUrl
   , httpManager     :: Manager
   , dbPool          :: Pool Connection
-  , logLevel        :: Severity
   , deployMode      :: DeployMode
   , stateFetchLimit :: Integer
   }
@@ -122,34 +123,13 @@ data BlocError
   | Unimplemented Text
   | AlreadyExists Text
   | RuntimeError SomeException
+  | UnavailableError Text
   deriving Show
 
 --------------------------------------------------------------------------------
-boxIt::String->String
-boxIt string =
-  replicate (len+4) '=' ++ "\n"
-  ++ unlines (map (\x -> "| " ++ x ++ " |") theLines)
-  ++ replicate (len+4) '='
-  where
-    len = Prelude.maximum $ map length theLines
-    theLines = lines string
-
-filterPrintLog::MonadIO m=>Severity->WithSeverity (WithCallStack (WithTimestamp Text))->m ()
-filterPrintLog minSeverity x | msgSeverity x >= minSeverity = return ()
-filterPrintLog _ x =
-    liftIO . print . render pretty $ x
-  where
-    render :: (a0 -> Doc ann) -> WithSeverity (WithCallStack (WithTimestamp a0)) -> Doc ann
-    render = renderWithSeverity
-           . renderLocation
-           . renderWithTimestamp (formatTime defaultTimeLocale $ iso8601DateFormat (Just "%H:%M:%S"))
-
-renderLocation:: (a -> Doc ann) -> WithCallStack a -> Doc ann
-renderLocation k (WithCallStack stack msg) =
-  fill 40 (pretty (formatTopLocation $ getCallStack stack)) <> k msg
 
 runBlocWithEnv :: BlocEnv -> Bloc a -> ExceptT BlocError IO a
-runBlocWithEnv env = flip runLoggingT (filterPrintLog $ logLevel env)
+runBlocWithEnv env = runLoggingT
                    . flip runReaderT env
                    . runBloc
 
@@ -173,7 +153,7 @@ enterBloc env x
     reThrowError
       = \case
           StratoError (FailureResponse (Response Status{statusCode=404} _ _ _)) ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc seems to be improperly configured: Strato page is missing.",
@@ -181,9 +161,9 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           StratoError (FailureResponse Response{..}) | statusIsClientError responseStatusCode ->
-            err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
+            err400{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           StratoError (ConnectionError _) ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc can not connect to Strato.",
@@ -192,7 +172,7 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           StratoError _ ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc recieved a malformed response from Strato.",
@@ -201,9 +181,9 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           VaultWrapperError (FailureResponse Response{..}) | statusIsClientError responseStatusCode ->
-            err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
+            err400{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           VaultWrapperError (ConnectionError _) ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc can not connect to Strato.",
@@ -212,7 +192,7 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           VaultWrapperError _ ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Error!",
                      "Bloc recieved a malformed response from Strato.",
@@ -221,19 +201,20 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           DBError _ ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Internal Error!",
                      "Something is broken in the Bloc Server database.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
-          CirrusError err -> err500{errBody = Lazy.Char8.pack (show err)}
-          UserError err -> err400{errBody = fromString $ show err}
-          AlreadyExists err -> err409{errBody = fromString $ show err}
-          CouldNotFind err -> err404{errBody = fromString $ show err}
+          CirrusError err -> err500{errBody = JSON.encode (show err)}
+          UserError err -> err400{errBody = JSON.encode err}
+          AlreadyExists err -> err409{errBody = JSON.encode err}
+          CouldNotFind err -> err404{errBody = JSON.encode err}
+          UnavailableError err -> err503{errBody = JSON.encode err}
           AnError _ ->
-            err500{errBody = fromString $ unlines
+            err500{errBody = JSON.encode $ unlines
                    [
                      "Internal Error!",
                      "Something is broken in the Bloc Server.",
@@ -241,13 +222,13 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           Unimplemented err ->
-            err501{errBody = fromString $ unlines
+            err501{errBody = JSON.encode $ unlines
                    [
                      "Internal Error!",
                      "You are using a feature of the Bloc Server that has not yet been implemented.",
                      Text.unpack err
                    ]}
-          RuntimeError _ -> err500{errBody = fromString $ unlines
+          RuntimeError _ -> err500{errBody = JSON.encode $ unlines
                    [
                      "Internal Error!",
                      "Something wrong has happened inside of bloc.",
@@ -270,23 +251,12 @@ formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"
 formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
 
-
-logWithCallStack
-  :: CallStack
-  -> (WithCallStack (WithTimestamp x) -> Bloc ()) -> x -> Bloc ()
-logWithCallStack stack logFn x = logFn . WithCallStack stack =<< timestamp x
-
-logWith
-  :: HasCallStack
-  => (WithCallStack (WithTimestamp x) -> Bloc ()) -> x -> Bloc ()
-logWith = logWithCallStack callStack
-
 blocQuery
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
   => Query x
   -> Bloc [y]
 blocQuery q = do
-  traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
+  traverse_ (logInfoCS callStack . Text.pack) (showSql q)
   pool <- asks dbPool
   withResource pool $ liftIO . flip runQuery q
 
@@ -312,13 +282,13 @@ blocQuery1 loc q = blocQuery q >>= \case
 
 blocModify :: HasCallStack => (Connection -> IO x) -> Bloc x
 blocModify modify = do
-  logWithCallStack callStack logNotice "Updating the database"
+  logInfoCS callStack "Updating the database"
   pool <- asks dbPool
   withResource pool (liftIO . modify)
 
 blocModify1 :: HasCallStack => (Connection -> IO [x]) -> Bloc x
 blocModify1 modify = do
-  logWithCallStack callStack logNotice "Updating the database"
+  logInfoCS callStack "Updating the database"
   results <- blocModify modify
   case results of
     []    -> throwError $ DBError "No result, expected one row"
@@ -332,7 +302,7 @@ blocTransaction bloc = do
 
 blocStrato :: HasCallStack => ClientM x -> Bloc x
 blocStrato client' = do
-  logWithCallStack callStack logNotice "Querying Strato"
+  logInfoCS callStack "Querying Strato"
   url <- asks urlStrato
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
@@ -340,7 +310,7 @@ blocStrato client' = do
 
 blocVaultWrapper :: HasCallStack => ClientM x -> Bloc x
 blocVaultWrapper client' = do
-  logWithCallStack callStack logNotice "Querying Vault Wrapper"
+  logInfoCS callStack "Querying Vault Wrapper"
   url <- asks urlVaultWrapper
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
@@ -348,24 +318,3 @@ blocVaultWrapper client' = do
 
 blocMaybe :: Text -> Maybe x -> Bloc x
 blocMaybe msg = maybe (throwError (CouldNotFind msg)) return
-{-
-blocCirrusFireForget :: HasCallStack => ClientM x -> Bloc Bool
-blocCirrusFireForget client' = do
-  logWithCallStack callStack logNotice "Querying Cirrus"
-  url <- asks urlCirrus
-  mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
-  case resultEither of
-    Left err -> do
-      logWith logError (Text.pack $ show err ++ "\n  Cirrus returned an error")
-      return False
-    Right _ -> return True
-
-blocCirrus :: HasCallStack => ClientM x -> Bloc x
-blocCirrus client' = do
-  logWithCallStack callStack logNotice "Querying Cirrus"
-  url <- asks urlCirrus
-  mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
-  either (throwError . CirrusError) return resultEither
--}

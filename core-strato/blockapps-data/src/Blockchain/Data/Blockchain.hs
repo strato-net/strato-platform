@@ -17,19 +17,19 @@ module Blockchain.Data.Blockchain
       createDB, migrateDB, insertBlockchain, migrateAll
     ) where
 
-import qualified Blockchain.Colors           as CL
-
 import           Database.Persist
 import           Database.Persist.Postgresql hiding (get)
 import           Database.Persist.TH
 
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger        (runNoLoggingT, NoLoggingT)
+import           Blockchain.Output           (runNoLoggingT, LoggingT)
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
 
 import           Blockchain.DB.SQLDB         (runPostgresConn)
+import qualified Text.Colors                 as CL
+
 
 {- global registry of blockchains -}
 
@@ -46,7 +46,7 @@ createDB :: ConnectionString -> IO ()
 createDB pgConn = do
     putStrLn $ CL.yellow ">>>> Creating global database"
     let create = "CREATE DATABASE blockchain;"
-    runNoLoggingT $ withPostgresqlConn pgConn (runReaderT (rawExecute create []) :: SqlWriteBackend -> NoLoggingT IO ())
+    runNoLoggingT $ withPostgresqlConn pgConn (runReaderT (rawExecute create []) :: SqlWriteBackend -> LoggingT IO ())
 
 migrateDB :: (MonadBaseControl IO m, MonadIO m, MonadUnliftIO m) => ConnectionString -> m ()
 migrateDB pgConn = runNoLoggingT . runPostgresConn pgConn $ runMigration migrateAll

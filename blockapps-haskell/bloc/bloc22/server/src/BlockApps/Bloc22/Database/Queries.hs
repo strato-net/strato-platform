@@ -846,11 +846,15 @@ insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertMa
   ]
   (\ (contractInstanceId,_,_,_,_) -> contractInstanceId)
 
-compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
-compileContract source = do
+sourceToContractDetails :: Bool -> Text -> Bloc (Map Text (Int32, ContractDetails))
+sourceToContractDetails shouldCompile source = do
+  let createContractDetails =
+        if shouldCompile
+        then compileContract
+        else createMetadataNoCompile
   details <- blocQuery . contractBySourceHash . keccak256 $ Text.encodeUtf8 source
   if null details
-    then compileContractFromScratch source
+    then createContractDetails source
     else fmap Map.fromList . forM details $
       \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
         xabi <- deserializeXabi xabi'
@@ -865,8 +869,8 @@ compileContract source = do
           , contractdetailsChainId = Nothing
           }))
 
-compileContractFromScratch :: Text -> Bloc (Map Text (Int32, ContractDetails))
-compileContractFromScratch source = do
+compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
+compileContract source = do
   let eVerXabis = parseXabi "-" $ Text.unpack source
   (ver, xabis) <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
@@ -895,6 +899,33 @@ compileContractFromScratch source = do
 
   (_,srcHash) <- insertContractSourceQuery source
   contractIdMap <- createContractBatchQuery $ Map.keys details
+  let idDetails = Map.elems $ Map.intersectionWith (,) contractIdMap details
+  mdIdMap <- insertContractMetaDataBatchQuery srcHash idDetails
+  let cmIdDetails = Map.elems . Map.intersectionWith (,) mdIdMap $ Map.fromList idDetails
+  return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
+
+createMetadataNoCompile :: Text -> Bloc (Map Text (Int32, ContractDetails))
+createMetadataNoCompile source = do
+  let eVerXabis = parseXabi "-" $ Text.unpack source
+  xabis <- case eVerXabis of
+    Left err -> blocError . UserError . Text.pack $ err
+    Right (_, xs) -> return $ Map.fromList xs
+  let contracts = xabis
+      details = flip Map.mapWithKey contracts $ \ contrName (xabi) ->
+        ContractDetails
+        { contractdetailsBin = source
+        , contractdetailsAddress = Just (Named "Latest")
+        , contractdetailsBinRuntime = contrName `Text.append` source
+        , contractdetailsCodeHash =  keccak256 $ Char8.pack $ Text.unpack $ contrName `Text.append` source
+        , contractdetailsName = contrName
+        , contractdetailsSrc = source
+        , contractdetailsXabi = xabi
+        , contractdetailsChainId = Nothing
+        }
+
+  (_,srcHash) <- insertContractSourceQuery source
+  contractIdMap <- createContractBatchQuery $ Map.keys details
+
   let idDetails = Map.elems $ Map.intersectionWith (,) contractIdMap details
   mdIdMap <- insertContractMetaDataBatchQuery srcHash idDetails
   let cmIdDetails = Map.elems . Map.intersectionWith (,) mdIdMap $ Map.fromList idDetails

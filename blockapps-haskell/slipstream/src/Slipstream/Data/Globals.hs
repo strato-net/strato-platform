@@ -3,6 +3,8 @@ module Slipstream.Data.Globals where
 
 import Control.DeepSeq
 import Data.Cache.LRU
+import qualified Data.HashMap.Strict as HM
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Text
 import GHC.Generics
@@ -15,10 +17,11 @@ instance NFData (LRU key val) where
   rnf = (`seq` ()) -- LRU is already pretty strict
 
 
-data Globals = Globals { createdContracts :: S.Set Keccak256 -- list of contacts with a table
-                       , historyList :: S.Set Keccak256
-                       , noIndexList :: S.Set Keccak256
-                       , functionHistoryList :: S.Set Keccak256
+data Globals = Globals { createdContracts :: S.Set CodePtr -- list of contacts with a table
+                       , historyList :: S.Set CodePtr
+                       , noIndexList :: S.Set CodePtr
+                       , functionHistoryList :: S.Set CodePtr
+                       , solidVMABIs :: HM.HashMap SHA (M.Map Text Text)
                        , contractStates :: LRU (Address, Maybe ChainId) [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

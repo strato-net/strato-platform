@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 
 module BlockApps.Bloc22.Server.Contracts where
@@ -10,7 +11,6 @@ module BlockApps.Bloc22.Server.Contracts where
 import           ClassyPrelude                   ((<>))
 import           Control.Arrow
 import           Control.Monad.Except
-import           Control.Monad.Log
 import           Control.Monad.Reader.Class      (asks)
 import           Data.Foldable
 import           Data.Int
@@ -23,18 +23,21 @@ import           Data.Traversable
 import           Numeric
 import           Opaleye
 
+import           Blockchain.SolidVM.Model
+
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
---import           BlockApps.Cirrus.Client
 import           BlockApps.Ethereum
+import           BlockApps.Logging
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Parser (parseXabi)
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Solidity.Xabi.Def
 import           BlockApps.SolidityVarReader
+import           BlockApps.SolidVMStorageDecoder
 import           BlockApps.Storage               as S
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types          as T
@@ -81,7 +84,10 @@ getContractsContract name addr chainId =
 
 translateStorageMap :: [T.Storage] -> S.Storage
 translateStorageMap storage' =
-  let storageMap = Map.fromList $ map (\T.Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+  let storageMap = Map.fromList $ map (\T.Storage{..} -> case storageKV of
+        EVMEntry k v -> (unHex k, unHex v)
+        SolidVMEntry{} -> error "translateStorageMap: undefined for SolidVM") storage'
+
       storage k = fromMaybe 0 $ Map.lookup k storageMap
   in storage
 
@@ -138,19 +144,26 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
 
   let storage = translateStorageMap storage'
 
-  ret <- case mName of
-    Nothing ->
+  ret <- case (storage', mName) of
+    (Storage{storageKind=SolidVM}:_, Nothing) -> return .
+        decodeSolidVMValues $ map (\Storage{storageKV=SolidVMEntry k v} -> (k, v)) storage'
+    (Storage{storageKind=SolidVM}:_, Just name) ->
+       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
+    -- Treat this potentially empty storage as the EVM, even though it could be on SolidVM.
+    -- This may still be useful to return enums and constants in EVM, and should hopefully
+    -- still return [] for [] on SolidVM.
+    (_, Just name) ->
+      let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0
+                 ofs cnt mLength [name]
+          solVals = map (fmap valueToSolidityValue) vals
+      in return solVals
+    (_, Nothing) ->
       let vals = decodeValues fetchLimit (typeDefs contract') (mainStruct contract') storage 0
           solVals = map (fmap valueToSolidityValue) vals
       in return solVals
-    Just name ->
-      let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 ofs cnt mLength [name]
-          solVals = map (fmap valueToSolidityValue) vals
-      in return solVals
-
-  logWith logNotice $ Text.unlines
+  $logDebugS "getContractsState/storage" $ Text.unlines
     [ "Storage:"
-    , Text.pack $ unlines $ map (\Storage{..} -> "  " ++ show (unHex storageKey) ++ ":" ++ show storageValue) $ storage'
+    , Text.pack $ unlines $ map (("  " ++) . show . storageKV) $ storage'
     , "End of storage"
     ]
   return $ Map.fromList ret
@@ -251,11 +264,13 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
 
   fetchLimit <- fromInteger <$> asks stateFetchLimit
 
-  let storageMap = Map.fromList $ map (\T.Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+  let storageMap = Map.fromList $ map (\case
+        T.Storage{storageKV=EVMEntry k v } -> (unHex k, unHex v)
+        T.Storage{storageKV=SolidVMEntry{}} -> error "unimplemented: getContractsStateMapping for SolidVM") storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
       ret = valueToSolidityValue <$> decodeMapValue fetchLimit (typeDefs contract') (mainStruct contract') storage mappingName keyName
 
-  logWith logNotice $ Text.unlines
+  $logDebugS "getContractsStateMapping/storage" $ Text.unlines
     [ "Storage:"
     , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
     , "End of storage"
@@ -272,7 +287,7 @@ postContractsCompile :: [PostCompileRequest] -> Bloc [PostCompileResponse]
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
-      idsAndDetails <- compileContract postcompilerequestSource
+      idsAndDetails <- sourceToContractDetails True postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of
@@ -290,7 +305,7 @@ postContractsXabi PostXabiRequest{..} =
          Map.traverseWithKey completeXabi partialXabis
    in case xabis of
         Left msg -> throwError . UserError .
-            ("contract compilation for xabi failed: " <>) . Text.pack $msg
+            ("contract compilation for xabi failed: " <>) $ Text.pack msg
         Right xs -> return . PostXabiResponse $ xs
 
 

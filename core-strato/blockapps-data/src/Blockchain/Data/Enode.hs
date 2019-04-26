@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS -fno-warn-orphans #-}
@@ -14,6 +15,7 @@ module Blockchain.Data.Enode (
   ) where
 
 
+import                  Control.DeepSeq
 import                  Data.Bits
 import                  Data.Binary
 import qualified        Data.ByteString             as B
@@ -28,28 +30,24 @@ import                  Network.Socket.Internal
 import                  Blockchain.Data.RLP
 
 
-data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic)
-
-instance Binary IPAddress where
+data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary)
 
 instance RLPSerializable IPAddress where
   rlpEncode (IPv4 addy) = rlpEncode $ toInteger addy
   rlpDecode x = IPv4 (fromInteger $ rlpDecode x)
 
-data Enode = Enode 
+data Enode = Enode
   { pubKey     :: B.ByteString
   , ipAddress  :: IPAddress
   , tcpPort    :: Int
   , udpPort    :: Maybe Int
-  } deriving (Show, Read, Eq, Ord, GHCG.Generic)
-        
-instance Binary Enode where
+  } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary)
 
 instance RLPSerializable Enode where
-  rlpEncode (Enode pk ip tp up) = 
+  rlpEncode (Enode pk ip tp up) =
     RLPArray [rlpEncode pk, rlpEncode ip, rlpEncode $ toInteger tp, rlpEncode (toInteger <$> up)]
 
-  rlpDecode (RLPArray [a,b,c,d]) = 
+  rlpDecode (RLPArray [a,b,c,d]) =
     Enode (rlpDecode a) (rlpDecode b) (fromInteger $ rlpDecode c) (fromInteger <$> (rlpDecode d))
 
   rlpDecode _ = error "error in rlpDecode for Enode type: bad RLPObject"
@@ -80,25 +78,25 @@ readIP input =
       (b1, temp3) = break (=='.') s1
       b0 = dropWhile (=='.') temp3
 
-      addy = ((read b0) + (((read b1) .&. 0xff) `shiftL` 8) + (((read b2) .&. 0xff) `shiftL` 16) + 
+      addy = ((read b0) + (((read b1) .&. 0xff) `shiftL` 8) + (((read b2) .&. 0xff) `shiftL` 16) +
         (((read b3) .&. 0xff) `shiftL` 24))
   in (IPv4 addy)
 
 showEnode :: Enode -> String
-showEnode (Enode pk ip tp up) = 
-    "enode://" ++ 
+showEnode (Enode pk ip tp up) =
+    "enode://" ++
     (C8.unpack $ B16.encode pk) ++
     "@" ++
     (showIP ip) ++ ":" ++
-    (show tp) ++ uPort 
+    (show tp) ++ uPort
     where
-      uPort = 
+      uPort =
         case up of
           Nothing -> ""
           Just x -> "?discport=" ++ show x
 
 readEnode :: String -> Enode
-readEnode input = 
+readEnode input =
     let suffix = dropWhile (/='/') input
         pksuffix = dropWhile (=='/') suffix
         (pk, temp) = break (=='@') pksuffix
@@ -108,7 +106,7 @@ readEnode input =
         (tcp, temp3) = break (=='?') tcpsuffix
         udpsuffix = dropWhile (/='=') temp3
         udp = dropWhile (=='=') udpsuffix
-        up = 
+        up =
           case udp of
             [] -> Nothing
             _ -> Just (read udp)
