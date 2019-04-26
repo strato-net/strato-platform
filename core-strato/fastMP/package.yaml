@@ -16,6 +16,7 @@ dependencies:
 - nibblestring
 - resourcet
 - strato-model
+- vector
 
 library:
   source-dirs:         src

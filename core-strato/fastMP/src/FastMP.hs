@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module FastMP where
-  
+
+import Control.Arrow ((***), first)
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Loops
@@ -11,6 +12,7 @@ import Data.Conduit
 import Data.List
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as LDB
+import qualified Data.Vector as V
 
 import Blockchain.Data.RLP
 import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
@@ -73,11 +75,11 @@ doit x = do
       getFinalPartialNode ([KV k v], []) = MP.ShortcutNodeData (N.pack k) v
       getFinalPartialNode ([], []) = MP.EmptyNodeData
       getFinalPartialNode _ = error "internal error: getFinalStateroot was called on a non-final state"
-  
+
   finalValue <- iterateUntilM inputIsExhausted processNext x
 
   return $ getFinalPartialNode finalValue
-  
+
 data NodePtr = NodePtr String deriving Show
 
 data PartialNode =
@@ -88,14 +90,10 @@ data PartialNode =
 
 partialToNode :: PartialNode -> MP.NodeData
 partialToNode (PartialNode b v) =
-  MP.FullNodeData (spreadOut b [0..15]) v
+  MP.FullNodeData (spreadOut $ V.fromList b) v
   where
-    spreadOut :: [(N.Nibble, MP.NodeRef)] -> [N.Nibble] -> [MP.NodeRef]
-    spreadOut ((k, val):rest) (k2:rest2) | k == k2 = val:spreadOut rest rest2
-    spreadOut input (_:rest2) = MP.emptyRef:spreadOut input rest2
-    spreadOut [] [] = []
-    spreadOut _ [] = error "internal error: spreadOut was given input out of order or out of range"
-    
+    spreadOut :: V.Vector (N.Nibble, MP.NodeRef) -> V.Vector MP.NodeRef
+    spreadOut = V.update (V.replicate 16 MP.emptyRef) . V.map (first fromIntegral)
 
 processNext :: MonadIO m =>
                ([KV], [([N.Nibble], PartialNode)])->ConduitM () LevelKV m ([KV], [([N.Nibble], PartialNode)])
@@ -107,7 +105,6 @@ processNext x@((KV k1 v1:second@(KV k2 _):rest), partials) | shouldCreate x = do
           Right tempStr -> Right tempStr
           Left val -> Left val
 
-                                                               
   let (prefix, (fkey, _)) = splitPrefix k1 k2
 
   partialNode <- addToPartial PartialNode{branches=[], value=Nothing} $ KV fkey v1'
@@ -203,9 +200,7 @@ splitPrefix x y = ("", (x, y))
 -}
 
 splitPrefix :: [N.Nibble]->[N.Nibble]->([N.Nibble], ([N.Nibble], [N.Nibble]))
-splitPrefix first second =
-  let prefixLength = length $ takeWhile (==True) $ zipWith (==) first second
-  in (take prefixLength first, (drop prefixLength first, drop prefixLength second))
+splitPrefix l1 l2 = ((map fst) *** unzip) . span (uncurry (==)) $ zip l1 l2
 
 {-
 formatState :: ([KV], [(String, PartialNode)]) -> String

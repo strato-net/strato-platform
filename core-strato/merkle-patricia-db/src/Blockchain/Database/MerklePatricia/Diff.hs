@@ -9,6 +9,7 @@ import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
 import           Data.Function
 import qualified Data.NibbleString                           as N
+import qualified Data.Vector                                 as V
 
 -- Probably the entire MPDB system ought to be in this monad
 type MPReaderM a = ReaderT MPDB a
@@ -25,7 +26,7 @@ node _ = return EmptyNodeData
 simplify :: NodeData -> [MPChoice]
 simplify EmptyNodeData = replicate 17 None -- 17: not a mistake
 simplify FullNodeData{ choices = ch, nodeVal = v } =
-  maybe None Value v : map Ref ch
+  maybe None Value v : V.toList (V.map Ref ch)
 simplify n@ShortcutNodeData{ nextNibbleString = k, nextVal = v } = None : delta h
   where
     delta m =

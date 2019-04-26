@@ -1,9 +1,9 @@
 module Blockchain.Database.MerklePatricia.ForEach where
 
-import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.NibbleString (NibbleString)
 import qualified Data.NibbleString                            as N
+import qualified Data.Vector                                  as V
 
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.NodeData
@@ -19,8 +19,8 @@ forEach_NodeData::MonadIO m=>MPDB->NodeData->NibbleString->(Key->Val->m ())->m (
 forEach_NodeData _ EmptyNodeData _ _ = return ()
 
 forEach_NodeData db (FullNodeData {choices=cs}) partialKey f =
-  forM_ (zip cs [0..]) $ \(ref, n) ->
-    forEach_NodeRef db ref (partialKey `N.append` N.singleton n) f
+  flip V.imapM_ cs $ \n ref ->
+    forEach_NodeRef db ref (partialKey `N.append` N.singleton (fromIntegral n)) f
 
 forEach_NodeData db ShortcutNodeData{nextNibbleString=s, nextVal=Left ref} partialKey f =
   forEach_NodeRef db ref (partialKey `N.append` s) f

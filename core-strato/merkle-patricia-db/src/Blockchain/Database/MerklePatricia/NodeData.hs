@@ -14,6 +14,7 @@ import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as BC
 import           Data.ByteString.Internal
 import qualified Data.NibbleString                            as N
+import qualified Data.Vector                                  as V
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
@@ -46,7 +47,7 @@ data NodeData = EmptyNodeData
               | FullNodeData {
                  -- Why not make choices a map (choices::M.Map N.Nibble NodeRef)?  Because this type tends to be created
                  -- more than items are looked up in it....  It would actually slow things down to use it.
-                 choices :: [NodeRef],
+                 choices :: V.Vector NodeRef,
                  nodeVal :: Maybe Val
                 }
               | ShortcutNodeData {
@@ -63,15 +64,15 @@ instance Pretty NodeData where
   pretty EmptyNodeData = text "    <EMPTY>"
   pretty (ShortcutNodeData s (Left p)) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (pretty p)
   pretty (ShortcutNodeData s (Right val)) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (green $ pretty val)
-  pretty (FullNodeData cs val) = text "    val: " </> formatVal val </> text "\n        " </> vsep (showChoice <$> zip ([0..]::[Int]) cs)
+  pretty (FullNodeData cs val) = text "    val: " </> formatVal val </> text "\n        " </> vsep (V.toList $ V.imap showChoice cs)
     where
-      showChoice::(Int, NodeRef)->Doc
-      showChoice (v, SmallRef "") = blue (text $ showHex v "") </> text ": " </> red (text "NULL")
-      showChoice (v, p)           = blue (text $ showHex v "") </> text ": " </> green (pretty p)
+      showChoice :: Int -> NodeRef -> Doc
+      showChoice v (SmallRef "") = blue (text $ showHex v "") </> text ": " </> red (text "NULL")
+      showChoice v p           = blue (text $ showHex v "") </> text ": " </> green (pretty p)
 
 instance RLPSerializable NodeData where
   rlpEncode EmptyNodeData = RLPString ""
-  rlpEncode (FullNodeData {choices=cs, nodeVal=val}) = RLPArray ((encodeChoice <$> cs) ++ [encodeVal val])
+  rlpEncode (FullNodeData {choices=cs, nodeVal=val}) = RLPArray (V.toList (encodeChoice <$> cs) ++ [encodeVal val])
     where
       encodeChoice::NodeRef->RLPObject
       encodeChoice (SmallRef "")          = rlpEncode (0::Integer)
@@ -103,7 +104,7 @@ instance RLPSerializable NodeData where
     where
       (terminator, s) = string2TermNibbleString $ rlpDecode a
   rlpDecode (RLPArray x) | length x == 17 =
-    FullNodeData (getPtr <$> childPointers) val
+    FullNodeData (getPtr <$> V.fromList childPointers) val
     where
       childPointers = init x
       val = case last x of

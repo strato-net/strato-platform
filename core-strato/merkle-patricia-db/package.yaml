@@ -12,12 +12,14 @@ description:
 github: blockapps/strato-platform/strato-platform/merkle-patricia-db
 
 dependencies:
-  - base >= 4 && < 5
   - aeson
+  - ansi-wl-pprint
+  - base >= 4 && < 5
   - base16-bytestring
   - binary
   - blockapps-util
   - bytestring
+  - containers
   - cryptohash
   - data-default
   - deepseq
@@ -25,13 +27,12 @@ dependencies:
   - format
   - leveldb-haskell
   - monad-control
+  - mtl
   - nibblestring
   - resourcet
-  - transformers
-  - ansi-wl-pprint
-  - containers
-  - mtl
   - strato-model
+  - transformers
+  - vector
 
 library:
     source-dirs: src

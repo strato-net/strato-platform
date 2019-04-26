@@ -8,6 +8,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Loops
 import           Data.Maybe
 import qualified Data.NibbleString as N
+import qualified Data.Vector as V
 
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
@@ -46,9 +47,9 @@ putManyKeyVal_nodeData :: MonadIO m=>
                           MP.MPDB -> MP.NodeData -> ReverseOrderedKVs -> m MP.NodeData
 putManyKeyVal_nodeData mpdb (MP.FullNodeData choices val) listOfInserts = do
   let kvsSplitByFirstNibble = splitKeysByPrefix (map Just [15,14..0] ++ [Nothing]) $ getTheKVs listOfInserts
-  
+
   choices' <-
-    forM (zip kvsSplitByFirstNibble $ reverse choices) $ \(newVals, oldVal) -> do
+    forM (zip kvsSplitByFirstNibble . V.toList $ V.reverse choices) $ \(newVals, oldVal) -> do
       if null newVals
         then return oldVal
         else do
@@ -61,12 +62,12 @@ putManyKeyVal_nodeData mpdb (MP.FullNodeData choices val) listOfInserts = do
           [] -> val
           [KV _ (Right x)] -> Just x
           x -> error $ "internal error: forbidden pattern match in call to putManyKeyVal_nodeData: " ++ show x
-              
-  return $ MP.FullNodeData (reverse choices') val'
+
+  return $ MP.FullNodeData (V.reverse $ V.fromList choices') val'
 
 
 
-  
+
 putManyKeyVal_nodeData mpdb (MP.ShortcutNodeData k (Right v)) listOfInserts = do
    liftIO $ createMPFast_NodeData (MP.ldb mpdb) $ insertKV_ignoreIfExists listOfInserts $ KV (N.unpack k) $ Right v
 

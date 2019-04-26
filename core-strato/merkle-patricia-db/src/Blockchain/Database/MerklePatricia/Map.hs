@@ -12,9 +12,9 @@ module Blockchain.Database.MerklePatricia.Map (
 
 import           Prelude                                     hiding (map)
 
-import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.NibbleString                           as N
+import qualified Data.Vector                                 as V
 import qualified Database.LevelDB                            as LDB
 
 import           Blockchain.Data.RLP
@@ -29,8 +29,8 @@ map f mpdb = do
 mapNodeData::MonadIO m=>LDB.DB->Key->(Key->RLPObject->m ())->NodeData->m ()
 mapNodeData _ _ _ EmptyNodeData = return ()
 mapNodeData db partialKey f FullNodeData {choices=choices', nodeVal = maybeV} = do
-  forM_ (zip [0..] choices') $ \(k, ch) -> do
-    mapNodeRef db (partialKey `N.append` N.singleton k) f ch
+  flip V.imapM_ choices' $ \k ch -> do
+    mapNodeRef db (partialKey `N.append` N.singleton (fromIntegral k)) f ch
   case maybeV of
        Nothing -> return ()
        Just v  -> f partialKey v

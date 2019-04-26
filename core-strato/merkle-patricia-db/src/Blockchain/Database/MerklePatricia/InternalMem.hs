@@ -12,12 +12,14 @@ module Blockchain.Database.MerklePatricia.InternalMem (
   keyToSafeKeyMem
   ) where
 
+import           Control.Arrow                                (first)
 import qualified Data.ByteString                              as B
 import           Data.Function
 import           Data.List
 import qualified Data.Map                                     as Map
 import           Data.Maybe
 import qualified Data.NibbleString                            as N
+import qualified Data.Vector                                  as V
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.NodeData
@@ -74,7 +76,7 @@ putKV_NodeDataMem db key val (FullNodeData options nodeValue)
 
   | otherwise =
       do
-        let conflictingNodeRef = options!!fromIntegral (N.head key)
+        let conflictingNodeRef = options V.! fromIntegral (N.head key)
         newNode <- putKV_NodeRefMem db (N.tail key) val conflictingNodeRef
         return $ (fst newNode, FullNodeData (replace options (N.head key) (snd newNode)) nodeValue)
 
@@ -88,7 +90,7 @@ putKV_NodeDataMem db key1 val1 (ShortcutNodeData key2 val2)
 
   | N.null key1 = do
       newNodeRef <- newShortcutMem db (N.tail key2) val2
-      return $ (fst newNodeRef, FullNodeData (list2Options 0 [(N.head key2, snd newNodeRef)]) $ Just val1)
+      return $ (fst newNodeRef, FullNodeData (list2Options $ V.singleton (N.head key2, snd newNodeRef)) $ Just val1)
 
   | key1 `N.isPrefixOf` key2 = do
       tailNode <- newShortcutMem db (N.drop (N.length key1) key2) val2
@@ -119,8 +121,8 @@ putKV_NodeDataMem db key1 val1 (ShortcutNodeData key2 val2)
       tailNode1 <- newShortcutMem db (N.tail key1) $ Right val1
       tailNode2 <- newShortcutMem (fst tailNode1) (N.tail key2) val2
       return $ (fst tailNode2, FullNodeData
-          (list2Options 0 $ sortBy (compare `on` fst) [(N.head key1, snd tailNode1),
-                                                       (N.head key2, snd tailNode2)])
+          (list2Options . V.fromList $ sortBy (compare `on` fst) [(N.head key1, snd tailNode1),
+                                                                 (N.head key2, snd tailNode2)])
            Nothing)
 
 -----
@@ -132,13 +134,13 @@ getKeyVals_NodeDataMem _ EmptyNodeData _ = return []
 getKeyVals_NodeDataMem db (FullNodeData {choices=cs}) "" = do
   partialKVs <- sequence $ (\ref -> getKeyVals_NodeRefMem db ref "") <$> cs
   return $ concatMap
-    (uncurry $ map . (prependToKey . N.singleton)) (zip [0..] partialKVs)
+    (uncurry $ map . (prependToKey . N.singleton . fromIntegral)) (V.imap (,) partialKVs)
 
 getKeyVals_NodeDataMem db (FullNodeData {choices=cs}) key
   | ref == emptyRef = return []
   | otherwise = fmap (prependToKey $ N.singleton $ N.head key) <$>
                 getKeyVals_NodeRefMem db ref (N.tail key)
-  where ref = cs !! fromIntegral (N.head key)
+  where ref = cs V.! fromIntegral (N.head key)
 
 getKeyVals_NodeDataMem db ShortcutNodeData{nextNibbleString=s, nextVal=Left ref} key
   | key `N.isPrefixOf` s = prependNext ""
@@ -164,7 +166,7 @@ deleteKey_NodeDataMem db key nd@(FullNodeData options val)
   | options `slotIsEmpty` N.head key = return (db,nd)
 
   | otherwise = do
-    let nodeRef = options!!fromIntegral (N.head key)
+    let nodeRef = options V.! fromIntegral (N.head key)
     newNodeRef <- deleteKey_NodeRefMem db (N.tail key) nodeRef
     let newOptions = replace options (N.head key) (snd newNodeRef)
     simplify_NodeDataMem db $ FullNodeData newOptions val
@@ -236,8 +238,9 @@ simplify_NodeDataMem db nd@(ShortcutNodeData key (Left ref)) = do
     _                          -> return (db,nd)
 simplify_NodeDataMem db (FullNodeData options Nothing) = do
     case options2List options of
-      [(n, nodeRef)] ->
-          simplify_NodeDataMem db $ ShortcutNodeData (N.singleton n) $ Left nodeRef
+      v | V.length v == 1 ->
+          let (n, nodeRef) = first fromIntegral $ v V.! 0
+           in simplify_NodeDataMem db $ ShortcutNodeData (N.singleton n) $ Left nodeRef
       _ -> return $ (db,FullNodeData options Nothing)
 simplify_NodeDataMem db x = return (db,x)
 
@@ -253,32 +256,22 @@ nodeData2NodeRefMem db nodeData =
       new <- putNodeDataMem db nodeData
       return (new, PtrRef . mpStateRoot $ new)
 
-list2Options::N.Nibble->[(N.Nibble, NodeRef)]->[NodeRef]
-list2Options start [] = replicate (fromIntegral $ 0x10 - start) emptyRef
-list2Options start x | start > 15 =
-  error $
-  "value of 'start' in list2Option is greater than 15, it is: " ++ show start
-  ++ ", second param is " ++ show x
-list2Options start ((firstNibble, firstPtr):rest) =
-    replicate (fromIntegral $ firstNibble - start) emptyRef ++ [firstPtr] ++ list2Options (firstNibble+1) rest
+list2Options :: Integral i => V.Vector (i, NodeRef) -> V.Vector NodeRef
+list2Options = V.update (V.replicate 16 emptyRef) . V.map (first fromIntegral)
 
-options2List::[NodeRef]->[(N.Nibble, NodeRef)]
-options2List theList = filter ((/= emptyRef) . snd) $ zip [0..] theList
+options2List :: V.Vector NodeRef -> V.Vector (Int, NodeRef)
+options2List theList = V.filter ((/= emptyRef) . snd) $ V.imap (,) theList
 
 prependToKey::Key->(Key, Val)->(Key, Val)
 prependToKey prefix (key, val) = (prefix `N.append` key, val)
 
-replace::Integral i=>[a]->i->a->[a]
-replace lst i newVal = left ++ [newVal] ++ right
-            where
-              (left, _:right) = splitAt (fromIntegral i) lst
+replace :: Integral i => V.Vector a -> i -> a -> V.Vector a
+replace lst i newVal = V.update lst $ V.singleton (fromIntegral i, newVal)
 
-slotIsEmpty::[NodeRef]->N.Nibble->Bool
-slotIsEmpty [] _ =
+slotIsEmpty :: Integral i => V.Vector NodeRef -> i -> Bool
+slotIsEmpty v _ | V.null v =
   error "slotIsEmpty was called for value greater than the size of the list"
-slotIsEmpty (x:_) 0 | x == emptyRef = True
-slotIsEmpty _ 0 = False
-slotIsEmpty (_:rest) n = slotIsEmpty rest (n-1)
+slotIsEmpty v n = fromMaybe emptyRef (v V.!? fromIntegral n) == emptyRef
 
 
 getCommonPrefix::Eq a=>[a]->[a]->([a], [a], [a])
