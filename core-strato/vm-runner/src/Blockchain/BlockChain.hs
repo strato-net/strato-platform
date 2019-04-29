@@ -108,9 +108,11 @@ instance Bagger.MonadBagger ContextM where
     runFromStateRoot sr remainingGas theBlockHeader txs = do
         startingStateRoot <- getStateRoot
         setStateDBStateRoot sr
-        (TxMiningResult res ranTxs unranTxs newGas) <- mineTransactions' theBlockHeader remainingGas [] txs
-        flushMemStorageDB
-        flushMemAddressStateDB
+        (TxMiningResult res ranTxs unranTxs newGas) <-
+          timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
+          $ mineTransactions' theBlockHeader remainingGas [] txs
+        timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
+        timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
         newStateRoot <- getStateRoot
         setStateDBStateRoot startingStateRoot
         let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
