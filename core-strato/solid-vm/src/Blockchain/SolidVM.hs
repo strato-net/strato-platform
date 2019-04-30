@@ -262,7 +262,7 @@ logFunctionCall :: [(Maybe String, Xabi.Expression)] -> Address -> Contract -> S
 logFunctionCall args address contract functionName f = do
   onTraced $ do
     let argStrings = map (unparseExpression . snd) args
-    liftIO $ putStrLn $ box ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
+    liftIO $ putStrLn $ box $ concat $ map (wrap 150) ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
 
   result <- f
 

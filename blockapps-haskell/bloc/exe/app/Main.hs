@@ -17,6 +17,7 @@ import           Network.HTTP.Types (hContentType, status400)
 import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
+import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Servant.Options
 import           Servant
@@ -87,7 +88,10 @@ serveErrorsPlain app req respond = app req $ \resp -> respond $
 
 appBloc :: Bloc22.BlocEnv -> Application
 appBloc env22 =
-  (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
+    prometheus def{ prometheusEndPoint = ["bloc", "v2.2", "metrics"]
+                  , prometheusInstrumentApp = False}
+  . instrumentApp "bloc22"
+  . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
   . serveErrorsPlain
   . cors (const $ Just policy)
   . provideOptions (Proxy @ Bloc22.BlocAPI)

@@ -95,7 +95,8 @@ data SequencerConfig =
                      , syncWrites              :: Bool
                      , blockstanbulBlockPeriod :: NominalDiffTime
                      , blockstanbulRoundPeriod :: NominalDiffTime
-                     , blockstanbulBeneficiary :: TMChan CandidateReceived
+                     , blockstanbulBeneficiary :: TQueue CandidateReceived
+                     , blockstanbulVoteResps   :: TQueue VoteResult
                      , blockstanbulTimeouts    :: TMChan RoundNumber
                      , cablePackage            :: CablePackage
                      , maxEventsPerIter        :: Int
@@ -242,7 +243,7 @@ drainTimeouts :: SequencerM [RoundNumber]
 drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
 
 drainVotes :: SequencerM [CandidateReceived]
-drainVotes = atomically . drainTMChan =<< asks blockstanbulBeneficiary
+drainVotes = atomically . flushTQueue =<< asks blockstanbulBeneficiary
 
 clearLdbBatchOps :: SequencerM ()
 clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
@@ -262,7 +263,7 @@ fuseChannels = do
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift) <$> mergeSources
                [ sourceTQueue unseq .| mapC UnseqEvent
-               , sourceTMChan votes .| mapC VoteMade
+               , sourceTQueue votes .| mapC VoteMade
                , sourceTMChan timers .| mapC TimerFire
                , sourceTMChan loop .| mapC (const WaitTerminated)]
                4096 -- 🙏

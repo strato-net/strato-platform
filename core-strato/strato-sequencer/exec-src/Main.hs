@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -47,9 +48,9 @@ main = do
                           (khost, kport) -> Just ( KP.Host (KP.KString (C8.pack khost))
                                                  , KP.Port (readDef 9092 (drop 1 kport)))
       eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
-      validators = fromRight (error "invalid validators") eValidators
+      !validators = fromRight (error "invalid validators") eValidators
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
-      authSenders = fromRight (error "invalid validators") eAuthSenders
+      !authSenders = fromRight (error "invalid admins") eAuthSenders
       ctx = newContext (View 0 0) validators authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
   mCtx <- if not flags_blockstanbul
@@ -58,9 +59,9 @@ main = do
                     $ "cannot specify --validators with --blockstanbul=false"
                 return Nothing
              else do
-                skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-                let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
-                    pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
+                !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
+                let !bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
+                    !pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                     selfAddress = prvKey2Address pkey
                 putStrLn . ("NODEKEY address: " ++) . formatAddress $ selfAddress
                 addSelfAsMetric selfAddress
@@ -76,7 +77,8 @@ main = do
                     $ "--blockstanbul_round_period_s must be positive"
                 return . Just . ctx $ pkey
   pkg <- atomically newCablePackage
-  chv <- atomically newTMChan
+  chr <- atomically newTQueue
+  chv <- atomically newTQueue
   cht <- atomically newTMChan
 
   let seqCfg = SequencerConfig
@@ -87,6 +89,7 @@ main = do
         , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
         , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
         , blockstanbulBeneficiary = chv
+        , blockstanbulVoteResps = chr
         , blockstanbulTimeouts = cht
         , cablePackage = pkg
         , maxEventsPerIter = flags_seq_max_events_per_iter
@@ -101,5 +104,6 @@ main = do
   race_ (runTheGregor gregorCfg)
       . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))
       . run flags_blockstanbul_port
-      . prometheus def
-      . createWebServer $ chv
+      . prometheus def{ prometheusInstrumentApp = False }
+      . instrumentApp "blockstanbul-votes"
+      $ createWebServer chv chr

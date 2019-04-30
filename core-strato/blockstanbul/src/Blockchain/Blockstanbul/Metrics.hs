@@ -8,18 +8,21 @@ import Prometheus
 
 import Blockchain.Blockstanbul.Messages
 
+{-# NOINLINE inEventMetric #-}
 inEventMetric :: Vector Text Counter
 inEventMetric = unsafeRegister
               . vector "inevent_type"
               . counter
               $ Info "pbft_inevent" "Count of pbft inEvent"
 
+{-# NOINLINE outEventMetric #-}
 outEventMetric :: Vector Text Counter
 outEventMetric = unsafeRegister
                . vector "outevent_type"
                . counter
                $ Info "pbft_outevent" "Count of pbft outEvent"
 
+{-# NOINLINE currentView #-}
 currentView :: Vector Text Gauge
 currentView = unsafeRegister
             . vector "view_field"
@@ -30,3 +33,14 @@ recordView :: (MonadIO m) => View -> m ()
 recordView View{..} = liftIO $ do
   withLabel currentView "round_number" (flip setGauge . fromIntegral $ _round)
   withLabel currentView "sequence_number" (flip setGauge . fromIntegral $ _sequence)
+
+{-# NOINLINE authResults #-}
+authResults :: Vector Text Counter
+authResults = unsafeRegister
+            . vector "outcome"
+            . counter
+            $ Info "pbft_auth_results" "Number of authn/authz successes and failures"
+
+recordAuthResult :: MonadIO m => AuthResult -> m ()
+recordAuthResult AuthSuccess = liftIO $ withLabel authResults "success" incCounter
+recordAuthResult AuthFailure{} = liftIO $ withLabel authResults "failure" incCounter

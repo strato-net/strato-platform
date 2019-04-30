@@ -179,6 +179,8 @@ blockstanbulSend' msg = do
         [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
+  rch <- asks blockstanbulVoteResps
+  atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
   let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul
       rewriteBlock b = do
@@ -187,7 +189,7 @@ blockstanbulSend' msg = do
           return . OEBlock $ sequencedBlockToOutputBlock sb 1
       creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
   rBlocks <- fmap catMaybes $ mapM rewriteBlock blocks
-  let vmevs = creates ++ rBlocks
+  let vmevs = creates ++ rBlocks ++ [OEVoteToMake r d s| PendingVote r d s <- resp]
       p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [OEAskForBlocks (h+1) l p | GapFound h l p <- resp]
             ++ [OEPushBlocks (l+1) h p | LeadFound h l p <- resp]
