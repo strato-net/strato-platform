@@ -83,7 +83,7 @@ function compareTimeStamp(obj) {
             }
 
             value = formatPromethusTimestamp(elem.value[0]);
-            ret[name] = (Math.abs(timeNow - value) < config.healthCheck.maxResponseRange) && (elem.value[1] == 1) ? true : false;
+            ret[name] = (Math.abs(timeNow - elem.value[0]) < config.healthCheck.maxResponseRange/1000 ) && (elem.value[1] == 1) ? true : false;
         } else {
             winston.info(`Metric format is updated; need to update its handling`);
         }
