@@ -160,11 +160,6 @@ async function checkLatest() {
 
   const currentTime = Date.now();
   if (healthInfo) {
-
-    console.log("currentTime", currentTime)
-    console.log("latestC", healthInfo.latestCheckTimestamp )
-    console.log("pollf", config.healthCheck.pollFrequency * 3)
-
     const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * 3);
     if (!nodeUp) {
       const currentStatus = [false, 'Last Check Not Recent'];

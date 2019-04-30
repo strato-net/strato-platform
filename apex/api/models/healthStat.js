@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = function(sequelize, DataTypes) {
-    let HealthStat = sequelize.define('HealthStat', {
+    const HealthStat = sequelize.define('HealthStat', {
         processName: {type: DataTypes.STRING, allowNull: true},
         HealthStatus: {type: DataTypes.BOOLEAN, allowNull: true},
         timestamp: {
