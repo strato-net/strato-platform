@@ -247,6 +247,8 @@ services:
     - /var/run/docker.sock:/var/run/docker.sock
   prometheus:
     build: .
+    environment:
+      - NODE_HOST=${NODE_HOST}
     image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
     volumes:
     - prometheusdata:/prometheus
