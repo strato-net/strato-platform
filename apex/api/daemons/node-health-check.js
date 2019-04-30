@@ -31,6 +31,7 @@ function queryHealthStatus() {
     return new Promise(async (resolve, _void) => {
         try {
             const metricsResult = await getHealthPrometheus();
+            await checkLatest();
             const healthStatus = await compareTimeStamp(metricsResult);
             const overallStatus = await updateHealthStat(healthStatus);
             await updateCurrentHealth(overallStatus);
@@ -83,7 +84,7 @@ function compareTimeStamp(obj) {
             }
 
             value = formatPromethusTimestamp(elem.value[0]);
-            ret[name] = (Math.abs(timeNow - elem.value[0]) < config.healthCheck.maxResponseRange/1000 ) && (elem.value[1] == 1) ? true : false;
+            ret[name] = (Math.abs(timeNow - elem.value[0]) < config.healthCheck.pollFrequency*3 /1000 ) && (elem.value[1] == 1) ? true : false;
         } else {
             winston.info(`Metric format is updated; need to update its handling`);
         }
@@ -141,6 +142,35 @@ async function updateCurrentHealth(overallStat) {
 
 function formatPromethusTimestamp(timestamp) {
     return ( timestamp.toString().split('.')[0])
+}
+
+async function checkLatest() {
+  const healthInfo = await models.CurrentHealth.findOne({
+    where: {
+      processName: "HealthStat"
+    },
+    attributes: [
+      'latestHealthStatus',
+      'latestCheckTimestamp',
+      'lastFailureTimestamp'
+    ],
+    raw: true,
+  }).catch(err => next(err));
+
+
+  const currentTime = Date.now();
+  if (healthInfo) {
+
+    console.log("currentTime", currentTime)
+    console.log("latestC", healthInfo.latestCheckTimestamp )
+    console.log("pollf", config.healthCheck.pollFrequency * 3)
+
+    const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * 3);
+    if (!nodeUp) {
+      const currentStatus = [false, 'Last Check Not Recent'];
+      await updateCurrentHealth(currentStatus);
+    }
+  }
 }
 
 module.exports = {

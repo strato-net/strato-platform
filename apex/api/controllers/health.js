@@ -71,12 +71,7 @@ module.exports = {
         const currentTime = Date.now();
 
         if (healthInfo && stallInfo){
-            const nodeUp = ((currentTime - healthInfo.dataValues.latestCheckTimestamp) < config.healthCheck.maxResponseRange);
-            if (!nodeUp) {
-               const currentStatus = [false, 'Node'];
-               await nodeHealthCheck.updateCurrentHealth(currentStatus);
-            }
-            healthStatus = healthInfo.dataValues.latestHealthStatus && nodeUp;
+            healthStatus = healthInfo.dataValues.latestHealthStatus;
             stallStatus = stallInfo.dataValues.latestHealthStatus;
             uptime = (healthStatus) ? currentTime - healthInfo.dataValues.lastFailureTimestamp : 0;
             isInc = stallInfo.dataValues.isBlocksValidInc;
