@@ -36,7 +36,6 @@ module.exports = {
   healthCheck: {
       requestTimeout: 1 * 1000,
       pollFrequency: 15 * 1000,
-      maxResponseRange: 1 * 1000,
       cleanFrequency: 5 * 60 * 1000, //clean db every 5 mins
       retention_hours: 1 * 24,
       progressWindow: 10 * 60 * 1000
