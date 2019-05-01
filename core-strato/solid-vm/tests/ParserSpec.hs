@@ -61,6 +61,9 @@ spec = do
                    , ("f(true\n)", f true)
                    , ("f(\"ok\")", f ok)
                    , ("f(\"ok\"\n)", f ok)
+                   , ("f({})", f $ NamedArgs [])
+                   , ("f({ x : y})", f $ NamedArgs [("x", Variable "y")])
+                   , ("f ( { x : y , q : z } )", f $ NamedArgs [("x", Variable "y"), ("q", Variable "z")])
                    ]
       forM_ fcases $ \(input, want) -> do
         assertEqual input (Right want) (parseExpr input)

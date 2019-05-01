@@ -20,6 +20,7 @@ module SolidVM.Solidity.Parse.Lexer (
   commaSep1,
   commaSep,
   semi,
+  colon,
   comma,
   braces,
   solidityLanguage,
@@ -47,6 +48,7 @@ commaSep = P.commaSep solidityLexer
 commaSep1 = P.commaSep1 solidityLexer
 dot = P.dot solidityLexer
 semi = P.semi solidityLexer
+colon = P.colon solidityLexer
 --semiSep = P.semiSep solidityLexer
 --semiSep1 = P.semiSep1 solidityLexer
 stringLiteral :: SolidityParser String

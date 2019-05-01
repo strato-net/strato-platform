@@ -124,8 +124,15 @@ expression =
 
 functionCall :: SolidityParser (Expression -> Expression)
 functionCall = do
-  exps <- parens $ commaSep expression
-  return (\e -> FunctionCall e $ OrderedArgs exps)
+  args <- parens $ choice
+    [ fmap NamedArgs . braces $ commaSep $ do
+        fieldName <- identifier
+        void colon -- haha
+        fieldExpr <- expression
+        return (fieldName, fieldExpr)
+    , OrderedArgs <$> commaSep expression
+    ]
+  return $ flip FunctionCall args
 
 
 binary :: String -> Operator String u Identity Expression
