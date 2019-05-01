@@ -97,7 +97,7 @@ expression =
     [postfix $ choice
      [
        (do { name <- (reservedOp "." >> memberName); return $ flip MemberAccess name}),
-       (do { exps <- parens $ commaSep expression; return (\e -> FunctionCall e (map ((,) Nothing) exps))})
+       functionCall
      ]
     ],
     [Postfix $ do
@@ -121,6 +121,12 @@ expression =
     [Postfix (do { reservedOp "?"; e1 <- expression; reservedOp ":"; e2 <- expression; return (\e -> Ternary e e1 e2)})]
   ]
   (tuple <|> array <|> primaryExpression)
+
+functionCall :: SolidityParser (Expression -> Expression)
+functionCall = do
+  exps <- parens $ commaSep expression
+  return (\e -> FunctionCall e $ OrderedArgs exps)
+
 
 binary :: String -> Operator String u Identity Expression
 binary x = Infix (do { reservedOp x; return (Binary x)}) AssocLeft

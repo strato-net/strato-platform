@@ -207,11 +207,10 @@ unparseExpression (StringLiteral s) = show s
 unparseExpression (TupleExpression vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
 unparseExpression (IndexAccess e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
 unparseExpression (FunctionCall e args) =
-  let
-    showArg (Nothing, x) = unparseExpression x
-    showArg (Just name, x) = name ++ ": " ++ unparseExpression x
-  in
-    unparseExpression e ++ "(" ++ List.intercalate "," (map showArg args) ++ ")"
+    let shownArgs = case args of
+                      OrderedArgs xs -> List.intercalate "," $ map unparseExpression xs
+                      NamedArgs xs -> "{" ++ List.intercalate "," (map (\(n, x) -> printf "%s:%s" n $ unparseExpression x) xs) ++ "}"
+    in unparseExpression e ++ "(" ++ shownArgs ++ ")"
 unparseExpression (Ternary x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression x) = "new " ++ unparseVarType x
 unparseExpression (ArrayExpression xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"

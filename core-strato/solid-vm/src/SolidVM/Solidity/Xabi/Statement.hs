@@ -44,7 +44,7 @@ data Expression =
   | NewExpression Type
   | IndexAccess Expression (Maybe Expression)
   | MemberAccess Expression String -- ie- "x.y"
-  | FunctionCall Expression [(Maybe String, Expression)]
+  | FunctionCall Expression ArgList
   | Unitary String Expression
   | Binary String Expression Expression
   | Ternary Expression Expression Expression
@@ -55,5 +55,6 @@ data Expression =
   | ArrayExpression [Expression]
   | Variable String deriving (Show, Read, Eq, Generic, NFData, Binary)
 
+data ArgList = OrderedArgs [Expression] | NamedArgs [(String, Expression)] deriving (Show, Read, Eq, Generic, NFData, Binary)
 
 data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Read, Eq, Generic, NFData, Binary)

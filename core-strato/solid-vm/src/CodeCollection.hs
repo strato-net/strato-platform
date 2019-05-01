@@ -137,7 +137,9 @@ expressionCrawler = \case
     expressionCrawler expr
   Xabi.MemberAccess expr _ -> "MemberAccess":expressionCrawler expr
   Xabi.FunctionCall func args -> "FunctionCall" : do
-    expr <- func:map snd args
+    expr <- case args of
+      Xabi.OrderedArgs args' -> func:args'
+      Xabi.NamedArgs args' -> func:map snd args'
     expressionCrawler expr
   Xabi.Unitary n expr -> T.pack ("Unitary: " ++ n):expressionCrawler expr
   Xabi.Binary n lhs rhs -> T.pack ("Binary: " ++ n) : do

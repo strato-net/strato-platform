@@ -108,12 +108,12 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
     let maybeArgString = M.lookup "args" =<< metadata
         argString = maybe "()" T.unpack maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
-        !args = either (parseError "create arguments") id maybeArgs
+        !args = either (parseError "create arguments") Xabi.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' hsh cc contractName' args
 
-create' :: Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM ExecResults
+create' :: Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> SM ExecResults
 create' creator ch cc contractName' argExps = do
   newAddress <- getNewAddress creator
 
@@ -218,7 +218,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         maybeArgString = M.lookup "args" =<< metadata
         argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
-        !args = either (parseError "call arguments") (map (Nothing,)) maybeArgs
+        !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
     finalAct <- use action
     return $ ExecResults {
@@ -265,11 +265,13 @@ getCodeAndCollection address' = do
 
     return (contract', ch, cc)
 
-logFunctionCall :: [(Maybe String, Xabi.Expression)] -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
+logFunctionCall :: Xabi.ArgList -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
 logFunctionCall args address contract functionName f = do
   onTraced $ do
     let argStrings = map (unparseExpression . snd) args
-    liftIO $ putStrLn $ box $ concat $ map (wrap 150) ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ functionName ++ "(" ++ intercalate ", " argStrings ++ ")"]
+    let shownFunc = unparseExpression $ Xabi.FunctionCall (Xabi.Variable functionName) args
+    liftIO $ putStrLn $ box $ concat $ map (wrap 150)
+      ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ shownFunc]
 
   result <- f
 
@@ -281,13 +283,13 @@ logFunctionCall args address contract functionName f = do
   return result
 
 
-argsToVals :: Contract -> Xabi.Func -> [(Maybe String, Xabi.Expression)] -> SM [Value]
-argsToVals ctract fn = mapM (uncurry eval) . zipWith typeForName orderedTypes
-  where typeForName :: Xabi.Type -> (Maybe String, Xabi.Expression) -> (Xabi.Type, Xabi.Expression)
-        typeForName t (Nothing, ex) = (t, ex)
-        typeForName _ (Just name, _) = todo "argToVals/named arguments" name
+argsToVals :: Contract -> Xabi.Func -> Xabi.ArgList -> SM [Value]
+argsToVals ctract fn args =
+  case args of
+    Xabi.OrderedArgs xs -> zipWithM eval orderedTypes xs
+    Xabi.NamedArgs xs -> todo "argsToVals/NamedArgs" xs
 
-        orderedTypes :: [Xabi.Type]
+  where orderedTypes :: [Xabi.Type]
         orderedTypes = map Xabi.indexedTypeType
                      . sortOn Xabi.indexedTypeIndex
                      . M.elems $ Xabi.funcArgs fn
@@ -308,7 +310,7 @@ argsToVals ctract fn = mapM (uncurry eval) . zipWith typeForName orderedTypes
            _ -> getVar =<< expToVar x
 
 
-callWrapper :: Address -> Address -> Maybe String -> String -> [(Maybe String, Xabi.Expression)] -> SM (Maybe Value)
+callWrapper :: Address -> Address -> Maybe String -> String -> Xabi.ArgList -> SM (Maybe Value)
 callWrapper from to mContract functionName argExps = do
   (contract', hsh, cc) <- getCodeAndCollection to
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
@@ -832,26 +834,30 @@ expToVar' (Xabi.Ternary condition expr1 expr2) = do
   c <- getBool =<< expToVar condition
   expToVar $ if c then expr1 else expr2
 
-expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array {Xabi.entry=t})) args) = do
+expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array {Xabi.entry=t})) (Xabi.OrderedArgs args)) = do
   ctract <- getCurrentContract
   case args of
-    [(Nothing, a)] -> do
+    [a] -> do
       len <- getInt =<< expToVar a
       return . Constant . SArray t . V.replicate (fromIntegral len) . Constant $ defaultValue ctract t
     _ -> arityMismatch "new array" 1 (length args)
+expToVar' x@(Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array{})) Xabi.NamedArgs{}) =
+  typeError "cannot create new array with named arguments" x
+
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
   creator <- getCurrentAddress
-  let argExps = map (\(Nothing, arg) -> arg) args  --TODO- add support for named arguments
   (hsh, cc) <- getCurrentCodeCollection
   incrementNonce creator
-  execResults <- create' creator hsh cc contractName' argExps
+  execResults <- create' creator hsh cc contractName' args
   return $ Constant $ SContract contractName' $ fromIntegral
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAddress execResults
 
 expToVar' (Xabi.FunctionCall e args) = do
   var <- expToVar e
-  argVals <- for args $ \(Nothing, arg) -> getVar =<< expToVar arg --TODO- add support for named arguments
+  argVals <- mapM (getVar <=< expToVar) $ case args of
+                                             Xabi.OrderedArgs as -> as
+                                             Xabi.NamedArgs ns -> todo "namedArgs" ns
   case var of
     Constant (SBuiltinFunction name o) -> fmap Constant $ callBuiltin name argVals o
     Constant (SFunction name) -> do
@@ -1027,7 +1033,7 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: Address -> Address -> SHA -> CodeCollection -> String -> [Xabi.Expression] -> SM ()
+runTheConstructors :: Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> SM ()
 runTheConstructors from to hsh cc contractName' argExps = do
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
@@ -1040,19 +1046,21 @@ runTheConstructors from to hsh cc contractName' argExps = do
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
   argVals <- case argExps of
-                  [] -> return []
+                  (Xabi.OrderedArgs []) -> return []
+                  (Xabi.NamedArgs []) -> return []
                   _ -> argsToVals contract'
                                   (fromMaybe (error "arguments provided for missing constructor")
                                         $ _constructor contract')
-                                  $ map (Nothing,) argExps
+                                  argExps
 
   let zipped = zipWith (\(t, n) v -> (n, (t, coerceType contract' t v))) argTypeNames argVals
   addCallInfo to contract' hsh cc . fmap (fmap Constant) $ M.fromList zipped
   mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
-    let args = fromMaybe []
-               $ M.lookup parent =<< (fmap Xabi.funcConstructorCalls $ contract'^.constructor)
+    let args = Xabi.OrderedArgs
+             . fromMaybe []
+             $ M.lookup parent =<< (fmap Xabi.funcConstructorCalls $ contract'^.constructor)
     runTheConstructors from to hsh cc parent args
 
   _ <-

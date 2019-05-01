@@ -41,9 +41,9 @@ spec = do
                                        (Just $ Variable "a"))
                                      (Just $ Variable "b"))
                                    (Just $ Variable "c"))
-                , ("int(8824)", FunctionCall (Variable "int") [(Nothing, NumberLiteral 8824 Nothing)])
-                , ("int32(8824)", FunctionCall (Variable "int32") [(Nothing, NumberLiteral 8824 Nothing)])
-                , ("int(x)[y]", IndexAccess (FunctionCall (Variable "int") [(Nothing, Variable "x")])
+                , ("int(8824)", FunctionCall (Variable "int") $ OrderedArgs [NumberLiteral 8824 Nothing])
+                , ("int32(8824)", FunctionCall (Variable "int32") $ OrderedArgs [NumberLiteral 8824 Nothing])
+                , ("int(x)[y]", IndexAccess (FunctionCall (Variable "int") $ OrderedArgs [Variable "x"])
                                             $ Just $ Variable "y")
 
                 ]
@@ -55,8 +55,8 @@ spec = do
 
     it "can parse function calls" $ do
       let f = FunctionCall (Variable "f")
-          true = [(Nothing, BoolLiteral True)]
-          ok = [(Nothing, StringLiteral "ok")]
+          true = OrderedArgs [BoolLiteral True]
+          ok = OrderedArgs [StringLiteral "ok"]
           fcases = [ ("f(true)", f true)
                    , ("f(true\n)", f true)
                    , ("f(\"ok\")", f ok)
