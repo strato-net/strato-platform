@@ -12,6 +12,7 @@ module Blockchain.CommunicationConduit
     ) where
 
 import           Blockchain.Output
+import           Control.Concurrent.AlarmClock
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -25,7 +26,9 @@ import           Data.Conduit.Network
 import           Data.Conduit.TQueue
 import           Data.Maybe
 import qualified Data.Text                             as T
+import           Data.Time.Clock
 import           Data.Void
+import           UnliftIO.Concurrent                   hiding (yield)
 import           UnliftIO.Exception
 import           UnliftIO.STM
 
@@ -60,6 +63,39 @@ ethVersion = 62
 blockstanbulVersion :: Int
 blockstanbulVersion = 1
 
+-- The watchdog ensures that the this thread is not stuck. Blockstanbul
+-- will write a ROUNDCHANGE message to seq_p2p_events at a maximum
+-- interval of --flags_blockstanbulRoundPeriodS. If are not reading
+-- an event in twice that interval, then we are stuck. This has
+-- the caveat that we should be able to read an event and send it out within
+-- that period (which should be at a minimum 20s).
+data Watchdog = Watchdog (TVar Bool)
+
+data WatchdogBite = WatchdogBite ThreadId NominalDiffTime deriving (Show)
+
+instance Exception WatchdogBite where
+
+mkWatchdog :: MonadUnliftIO m => NominalDiffTime -> m Watchdog
+mkWatchdog interval = do
+  hasBeenPet <- atomically $ newTVar True
+  tid <- myThreadId
+  let checkForPet :: AlarmClock UTCTime -> UTCTime -> IO ()
+      checkForPet this now = do
+        lastValue <- atomically $ swapTVar hasBeenPet False
+        unless lastValue $
+          -- The assumption is made that this exception will eventually
+          -- make its way to the thread creating the alarm clock (or a parent)
+          throwIO $ WatchdogBite tid interval
+        let next = addUTCTime interval now
+        liftIO $ setAlarm this next
+  when (interval > 0) $ do
+    alarm <- liftIO $ newAlarmClock' checkForPet
+    liftIO $ setAlarmNow alarm
+  return $ Watchdog hasBeenPet
+
+petWatchDog :: MonadUnliftIO m => Watchdog -> m ()
+petWatchDog (Watchdog hasBeenPet) = atomically $ writeTVar hasBeenPet True
+
 mkEthP2PEventSource :: ( Monad m
                        , MonadResource m
                        , MonadLogger m
@@ -72,7 +108,7 @@ mkEthP2PEventSource :: ( Monad m
                     -> m (ConduitM () Event m ())
 mkEthP2PEventSource app inCtx ks extra = do
   canarySource <- mkCanarySource
-  (.| CL.iterM recordEvent) <$> mergeSourcesByForce (
+  merged <- mergeSourcesByForce (
     [ appSource app
         .| ethDecrypt inCtx
         .| bytesToMessages
@@ -82,6 +118,10 @@ mkEthP2PEventSource app inCtx ks extra = do
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
     ] ++ extra) 4096 -- 🙏
+  watchDog <- mkWatchdog $ fromIntegral flags_connectionTimeout
+  return $ merged
+        .| CL.iterM recordEvent
+        .| CL.iterM (const $ petWatchDog watchDog)
 
 mkCanarySource :: (MonadLogger m, MonadUnliftIO m, MonadResource m) => m (ConduitM () Void m ())
 mkCanarySource = do

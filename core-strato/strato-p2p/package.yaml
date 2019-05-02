@@ -12,6 +12,7 @@ description:
 github: blockapps/strato-platform/core-strato/strato-p2p
 
 dependencies:
+  - alarmclock
   - array
   - async
   - base >= 4 && < 5
