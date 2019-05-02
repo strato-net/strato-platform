@@ -13,10 +13,11 @@ import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Resource
+import           Data.Conduit
 import           Data.Conduit.TMChan          hiding (mergeSources)
 import           Data.Foldable
-
-import           Data.Conduit
+import qualified Data.Text                    as T
+import           Prometheus                   hiding (register)
 import           UnliftIO.Concurrent
 import           UnliftIO.Exception
 import           UnliftIO.STM
@@ -37,6 +38,26 @@ mergeSourcesByForce sx bound = do
           (unmask $ unliftIO st $
             runConduit $ s .| sinkTBMChan c)
           `finally` atomically (closeTBMChan c))
+    tid <- myThreadId
+    rkey <- register . killThread =<< do
+      liftIO . forkIO . forever $ do
+        threadDelay 15000000
+        recordChannelLength bound tid c
     sourceTBMChan c
     release chkey
+    release rkey
     traverse_ release regs
+
+
+{-# NOINLINE channelLengths #-}
+channelLengths :: Vector T.Text Gauge
+channelLengths = unsafeRegister
+               . vector "thread_id"
+               . gauge
+               $ Info "p2p_channel_lengths" "Number of elements queued in the merged sources for this peer thread"
+
+recordChannelLength :: Int -> ThreadId -> TBMChan a -> IO ()
+recordChannelLength total tid ch = do
+  free <- atomically $ freeSlotsTBMChan ch
+  withLabel channelLengths (T.pack $! show tid) $
+    \t -> setGauge t (fromIntegral $ total - free)
