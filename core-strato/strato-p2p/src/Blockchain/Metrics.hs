@@ -7,6 +7,8 @@ module Blockchain.Metrics ( recordEvent
                           , recordGossipFinal
                           , addCanary
                           , killCanary
+                          , recordWatchdogPet
+                          , recordWatchdogWake
                           ) where
 
 import Control.Monad.IO.Class
@@ -102,3 +104,16 @@ addCanary = liftIO $ incGauge canaryCount
 
 killCanary :: MonadIO m => m ()
 killCanary = liftIO $ decGauge canaryCount
+
+{-# NOINLINE watchdogActions #-}
+watchdogActions :: Vector Text Counter
+watchdogActions = unsafeRegister
+                . vector "action"
+                . counter
+                $ Info "p2p_watchdog_actions" "Number of wakes/pets that the watchdog has endured"
+
+recordWatchdogPet :: MonadIO m => m ()
+recordWatchdogPet = liftIO $ withLabel watchdogActions "pet" incCounter
+
+recordWatchdogWake :: MonadIO m => m ()
+recordWatchdogWake = liftIO $ withLabel watchdogActions "wake" incCounter

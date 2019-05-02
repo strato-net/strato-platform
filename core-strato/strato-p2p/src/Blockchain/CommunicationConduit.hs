@@ -81,6 +81,7 @@ mkWatchdog interval = do
   tid <- myThreadId
   let checkForPet :: AlarmClock UTCTime -> UTCTime -> IO ()
       checkForPet this now = do
+        recordWatchdogWake
         lastValue <- atomically $ swapTVar hasBeenPet False
         unless lastValue $
           -- The assumption is made that this exception will eventually
@@ -94,7 +95,9 @@ mkWatchdog interval = do
   return $ Watchdog hasBeenPet
 
 petWatchDog :: MonadUnliftIO m => Watchdog -> m ()
-petWatchDog (Watchdog hasBeenPet) = atomically $ writeTVar hasBeenPet True
+petWatchDog (Watchdog hasBeenPet) = do
+  recordWatchdogPet
+  atomically $ writeTVar hasBeenPet True
 
 mkEthP2PEventSource :: ( Monad m
                        , MonadResource m
