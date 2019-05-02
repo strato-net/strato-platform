@@ -45,6 +45,8 @@ import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
 import           Blockchain.Strato.Model.Util
 import qualified Text.Colors       as CL
 import           Text.Format
+import           Text.ShortDescription
+import           Text.Tools                           (shorten)
 
 import           GHC.Generics
 
@@ -116,6 +118,9 @@ instance Lei.Pretty Address where
 
 instance Format Address where
   format = CL.yellow . formatAddress
+
+instance ShortDescription Address where
+  shortDescription x = CL.yellow . shorten 12 . padZeros 40 $ showHex x ""
 
 instance Binary Address where
   put (Address x) = sequence_ $ fmap put $ word160ToBytes $ fromIntegral x
