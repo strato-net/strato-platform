@@ -28,6 +28,7 @@ import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Void
+import           UnliftIO.Concurrent                   hiding (yield)
 import           UnliftIO.Exception
 import           UnliftIO.STM
 
@@ -57,6 +58,7 @@ import           Blockchain.Strato.RedisBlockDB.Models
 import           Blockchain.Stream.VMEvent
 import           Blockchain.TimerSource
 import           Blockchain.Util
+import           Blockchain.Watchdog
 
 ethVersion :: Int
 ethVersion = 62
@@ -65,8 +67,7 @@ ethVersion = 62
 blockstanbulVersion :: Int
 blockstanbulVersion = 1
 
-mkEthP2PEventSource :: ( Monad m
-                       , MonadResource m
+mkEthP2PEventSource :: ( MonadResource m
                        , MonadLogger m
                        , MonadUnliftIO m
                        )
@@ -76,17 +77,22 @@ mkEthP2PEventSource :: ( Monad m
                     -> m (ConduitM () Event m ())
 mkEthP2PEventSource app inCtx ks = do
   canarySource <- mkCanarySource
-  (.| CL.iterM recordEvent) <$> mergeSourcesByForce (
+  tid <- myThreadId
+  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
+  merged <- mergeSourcesByForce (
     [ appSource app
         .| ethDecrypt inCtx
         .| bytesToMessages
         .| CL.iterM (displayMessage Inbound (show $ appSockAddr app))
         .| CL.map MsgEvt
+        .| CL.iterM (const $ petWatchdog recvWatchdog)
     , seqEventNotificationSource ks
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
     , timerSource
     ]) 4096 -- 🙏
+  return $ merged
+        .| CL.iterM recordEvent
 
 mkCanarySource :: (MonadLogger m, MonadUnliftIO m, MonadResource m) => m (ConduitM () Void m ())
 mkCanarySource = do
@@ -98,16 +104,19 @@ mkCanarySource = do
   -- Wait forever on nothing
   return $ sourceTQueue q
 
-mkEthP2PEventConduit :: (MonadResource m, MonadLogger m)
+mkEthP2PEventConduit :: (MonadResource m, MonadLogger m, MonadUnliftIO m)
                      => String
                      -> EthCryptState
-                     -> ConduitM (Either P2PCNC Message) BC.ByteString m ()
-mkEthP2PEventConduit str outCtx =
-     debounceTxSends
-  .| CL.iterM recordMessage
-  .| CL.iterM (displayMessage Outbound str)
-  .| messageToBytes
-  .| ethEncrypt outCtx
+                     -> m (ConduitM (Either P2PCNC Message) BC.ByteString m ())
+mkEthP2PEventConduit str outCtx = do
+  tid <- myThreadId
+  sendWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
+  return $ debounceTxSends
+        .| CL.iterM recordMessage
+        .| CL.iterM (displayMessage Outbound str)
+        .| CL.iterM (const $ petWatchdog sendWatchdog)
+        .| messageToBytes
+        .| ethEncrypt outCtx
 
 debounceTxSends :: MonadIO m => ConduitT (Either P2PCNC Message) Message m ()
 debounceTxSends = do

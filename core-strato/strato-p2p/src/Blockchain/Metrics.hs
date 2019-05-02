@@ -11,6 +11,8 @@ module Blockchain.Metrics ( recordEvent
                           , recordException
                           , recordQueuedTxs
                           , recordEmptyQueue
+                          , recordWatchdogPet
+                          , recordWatchdogWake
                           ) where
 
 import Control.Exception
@@ -134,3 +136,16 @@ recordQueuedTxs = liftIO . addGauge txQueueDepth . fromIntegral . Prelude.length
 
 recordEmptyQueue :: MonadIO m => m ()
 recordEmptyQueue = liftIO $ setGauge txQueueDepth 0
+
+{-# NOINLINE watchdogActions #-}
+watchdogActions :: Vector Text Counter
+watchdogActions = unsafeRegister
+                . vector "action"
+                . counter
+                $ Info "p2p_watchdog_actions" "Number of wakes/pets that the watchdog has endured"
+
+recordWatchdogPet :: MonadIO m => m ()
+recordWatchdogPet = liftIO $ withLabel watchdogActions "pet" incCounter
+
+recordWatchdogWake :: MonadIO m => m ()
+recordWatchdogWake = liftIO $ withLabel watchdogActions "wake" incCounter
