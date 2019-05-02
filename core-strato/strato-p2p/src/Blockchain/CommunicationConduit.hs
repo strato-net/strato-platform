@@ -120,7 +120,7 @@ mkEthP2PEventSource app inCtx ks extra = do
     , seqEventNotificationSource ks
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
-    ] ++ extra) 4096 -- 🙏
+    ] ++ extra) 409600 -- 🙏
   watchDog <- mkWatchdog $ fromIntegral flags_connectionTimeout
   return $ merged
         .| CL.iterM recordEvent
