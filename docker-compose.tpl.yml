@@ -148,6 +148,7 @@ services:
     - redisHost=redis
     - redisPort=6379
     - seqDebugMode=${seqDebugMode}
+    - seqEventsBatchSize=${seqEventsBatchSize}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}

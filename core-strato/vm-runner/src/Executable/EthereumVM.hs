@@ -145,6 +145,7 @@ ethereumVM = void . execContextM $ do
         loopTimeit "flushLogEntries" $ flushLogEntries
         loopTimeit "flushTransactionResults" $ flushTransactionResults
         loopTimeit "writeActionJSONToKafka" $ void . K.withKafkaViolently $ writeActionJSONToKafka actions
+        loopTimeit "compactContextM" $ compactContextM
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
@@ -250,8 +251,11 @@ getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
     ret <- K.withKafkaViolently (readSeqVmEvents offset)
-    $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret) ++ " unprocessed blocks/txs"
-    return ret
+    let ret' = if flags_seqEventsBatchSize > 0
+                 then take flags_seqEventsBatchSize ret
+                 else ret
+    $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret') ++ " unprocessed blocks/txs"
+    return ret'
 
 shouldProcessNewTransactions :: ContextM Bool -- todo: probably shouldn't do it by number, but tdiff.
 shouldProcessNewTransactions =

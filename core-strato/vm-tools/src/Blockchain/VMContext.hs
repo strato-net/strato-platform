@@ -24,6 +24,7 @@ module Blockchain.VMContext
     , getContextBestBlockInfo
     , putContextBestBlockInfo
     , contextBlockRequested
+    , compactContextM
     ) where
 
 
@@ -279,7 +280,7 @@ runContextM f = do
           redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
           let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
           runStateT f (Context
-                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
                        hdb
                        cdb
                        blksumdb
@@ -330,3 +331,6 @@ putContextBestBlockInfo :: ContextBestBlockInfo -> ContextM ()
 putContextBestBlockInfo new = do
     ctx <- get
     put ctx { contextBestBlockInfo = new }
+
+compactContextM :: ContextM ()
+compactContextM = modify' force
