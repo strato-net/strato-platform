@@ -12,6 +12,7 @@ module Blockchain.CommunicationConduit
     ) where
 
 import           Blockchain.Output
+--import           Control.Concurrent
 import           Control.Concurrent.AlarmClock
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
@@ -75,10 +76,9 @@ data WatchdogBite = WatchdogBite ThreadId NominalDiffTime deriving (Show)
 
 instance Exception WatchdogBite where
 
-mkWatchdog :: MonadUnliftIO m => NominalDiffTime -> m Watchdog
-mkWatchdog interval = do
+mkWatchdog :: MonadUnliftIO m => ThreadId -> NominalDiffTime -> m Watchdog
+mkWatchdog mtid interval = do
   hasBeenPet <- atomically $ newTVar True
-  tid <- myThreadId
   let checkForPet :: AlarmClock UTCTime -> UTCTime -> IO ()
       checkForPet this now = do
         recordWatchdogWake
@@ -86,7 +86,7 @@ mkWatchdog interval = do
         unless lastValue $
           -- The assumption is made that this exception will eventually
           -- make its way to the thread creating the alarm clock (or a parent)
-          throwIO $ WatchdogBite tid interval
+          throwTo mtid $ WatchdogBite mtid interval
         let next = addUTCTime interval now
         liftIO $ setAlarm this next
   when (interval > 0) $ do
@@ -121,7 +121,8 @@ mkEthP2PEventSource app inCtx ks extra = do
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
     ] ++ extra) flags_channelBound -- 🙏
-  watchDog <- mkWatchdog $ fromIntegral flags_connectionTimeout
+  tid <- myThreadId
+  watchDog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   return $ merged
         .| CL.iterM recordEvent
         .| CL.iterM (const $ petWatchDog watchDog)
