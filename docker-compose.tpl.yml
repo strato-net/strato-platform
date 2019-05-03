@@ -127,6 +127,7 @@ services:
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
     - connectionTimeout=${connectionTimeout}
+    - channelBound=${channelBound}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
