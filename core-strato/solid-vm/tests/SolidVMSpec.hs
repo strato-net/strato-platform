@@ -241,7 +241,7 @@ spec :: Spec
 spec = do
   describe "Ballot" $ do
     it "can be created" . runTest $ do
-      liftIO $ pendingWith "struct kwargs"
+      liftIO $ pendingWith "Enable"
       runFile "testdata/Ballot.sol"
 
   describe "Create" $ do
@@ -1946,6 +1946,7 @@ contract qq {
     getFields ["x", "y"] `shouldReturn` [BInteger 10, BInteger 20]
 
   it "can array convert for index" . runTest $ do
+    liftIO $ pendingWith "TODO: creating references into strings"
     runBS [r|
 contract qq {
   uint x;
@@ -1981,3 +1982,73 @@ contract qq {
     }
 }|]
     getFields ["xs"] `shouldReturn` [BString "ty"]
+
+  it "can parse named arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    x = f({y: 99});
+  }
+
+  function f(uint y) public returns (uint) {
+    return y + 2;
+  }
+}
+|]
+    getFields ["x"] `shouldReturn` [BInteger 101]
+
+  it "can call named argument constructors" . runTest $ do
+    runBS [r|
+contract X {
+  uint public y;
+  string public z;
+
+  constructor(uint _y, string _z) public {
+    y = _y;
+    z = _z;
+  }
+}
+
+contract qq {
+  X public x;
+  constructor() public {
+    x = new X({_z: "ok", _y: 0x777777});
+  }
+}|]
+    let recursiveAddr = getNewAddress_unsafe uploadAddress 1
+    getFields ["x"] `shouldReturn` [BContract "X" recursiveAddr]
+    mapM (getSolidStorageKeyVal' recursiveAddr) [MS.singleton "y", MS.singleton "z"]
+      `shouldReturn` [BInteger 0x777777, BString "ok"]
+
+  it "can cast a struct from named arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  struct S {
+    uint x;
+    uint y;
+    string z;
+  }
+  S s;
+  constructor() public {
+    s = S({y: 87, z: "goodbye", x: 33});
+  }12
+}|]
+    getAll [ [Field "s", Field "x"]
+           , [Field "s", Field "y"]
+           , [Field "s", Field "z"]
+           ] `shouldReturn` [BInteger 33, BInteger 87, BString "goodbye"]
+
+  it "should be able to adjust arrayed structs" . runTest $ do
+    runBS [r|
+contract qq {
+  struct X {
+    uint x;
+  }
+  X[] xs;
+  constructor() public {
+    xs.push(X({x: 55}));
+    xs[0].x *= 2;
+  }
+}|]
+    getAll [ [Field "xs", Field "x" ]] `shouldReturn` [BInteger 110]

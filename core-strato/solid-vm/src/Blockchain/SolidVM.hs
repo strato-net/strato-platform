@@ -10,7 +10,7 @@ module Blockchain.SolidVM
       call
     , create
     ) where
-import Debug.Trace
+
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
@@ -25,6 +25,7 @@ import qualified Data.ByteString.Short                as BSS
 import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
+import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
@@ -283,11 +284,17 @@ logFunctionCall args address contract functionName f = do
   return result
 
 
-argsToVals :: Contract -> Xabi.Func -> Xabi.ArgList -> SM [Value]
+argsToVals :: Contract -> Xabi.Func -> Xabi.ArgList -> SM ValList
 argsToVals ctract fn args =
   case args of
-    Xabi.OrderedArgs xs -> zipWithM eval orderedTypes xs
-    Xabi.NamedArgs xs -> todo "argsToVals/NamedArgs" xs
+    Xabi.OrderedArgs xs -> OrderedVals <$> zipWithM eval orderedTypes xs
+    Xabi.NamedArgs xs -> NamedVals . M.toList <$> do
+      let strTypes = M.mapKeys T.unpack $ Xabi.funcArgs fn
+      M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
+               (M.mapMissing $ curry $ invalidArguments "extra argument")
+               (M.zipWithAMatched $ \_k t x -> eval (Xabi.indexedTypeType t) x)
+               strTypes
+               $ M.fromList xs
 
   where orderedTypes :: [Xabi.Type]
         orderedTypes = map Xabi.indexedTypeType
@@ -334,7 +341,6 @@ runStatements [] = return Nothing
 runStatements (s:rest) = do
   onTraced $ do
     liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
-    liftIO $ putStrLn $ C.green $ show s
   ret <- runStatement s
   case ret of
     Nothing -> runStatements rest
@@ -542,7 +548,6 @@ expToPath (Xabi.Variable x) = do
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
     parvar <- expToVar parent
-    traceShowM ('p':"arvar", parvar)
     case parvar of
       StorageItem apt -> return apt
       _ -> expToPath parent
@@ -855,11 +860,14 @@ expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) arg
 
 expToVar' (Xabi.FunctionCall e args) = do
   var <- expToVar e
-  argVals <- mapM (getVar <=< expToVar) $ case args of
-                                             Xabi.OrderedArgs as -> as
-                                             Xabi.NamedArgs ns -> todo "namedArgs" ns
+  argVals <- case args of
+                 Xabi.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+                 Xabi.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
   case var of
-    Constant (SBuiltinFunction name o) -> fmap Constant $ callBuiltin name argVals o
+    Constant (SBuiltinFunction name o) -> case argVals of
+      OrderedVals vs -> Constant <$> callBuiltin name vs o
+      NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
+
     Constant (SFunction name) -> do
       contract' <- getCurrentContract
       address <- getCurrentAddress
@@ -872,16 +880,18 @@ expToVar' (Xabi.FunctionCall e args) = do
       contract' <- getCurrentContract
       let vals = fromMaybe (missingType "struct constructor not found" structName)
                $ M.lookup structName $ contract'^.structs
-      return $ Constant $ SStruct structName $ M.fromList
-        $ zip (map (T.unpack . fst) vals) $ map Constant argVals
+      return . Constant . SStruct structName . fmap Constant . M.fromList $
+        case argVals of
+          OrderedVals as -> zip (map (T.unpack . fst) vals) as
+          NamedVals ns -> ns
 
     Constant (SContractDef contractName') -> do
       case argVals of
-        [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
+        OrderedVals [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
           return $ Constant $ SContract contractName' $ Address $ fromInteger address
-        [SAddress address ] ->
+        OrderedVals [SAddress address ] ->
           return $ Constant $ SContract contractName' address
-        [SContract _ addr] ->
+        OrderedVals [SContract _ addr] ->
           return $ Constant $ SContract contractName' $ addr
         _ -> typeError "contract variable creation" argVals
 
@@ -897,7 +907,7 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant (SEnum enumName) -> do
       case argVals of
-        [SInteger i] -> do
+        OrderedVals [SInteger i] -> do
           c <- getCurrentContract
           let theEnum = fromMaybe (missingType "enum constructor" enumName)
                       $ M.lookup enumName $ c^.enums
@@ -912,13 +922,13 @@ expToVar' (Xabi.FunctionCall e args) = do
           idxPath = apt `apSnoc` MS.ArrayIndex len
       setVar lenPath newLen
       case argVals of
-        [av] -> setVar idxPath av
-        _ -> arityMismatch "push" (length argVals) 1
+        OrderedVals [av] -> setVar idxPath av
+        _ -> invalidArguments "push" argVals
       return $ Constant newLen
 
     Constant SHexDecodeAndTrim ->
         case argVals of
-          [s@SString{}] -> return $ Constant s
+          OrderedVals [s@SString{}] -> return $ Constant s
           -- [SString s] -> return . Constant . SString $
           --   case B16.decode (BC.pack s) of
           --     (b32, "") -> BC.unpack . B.takeWhile (/= 0) $ b32
@@ -1046,14 +1056,26 @@ runTheConstructors from to hsh cc contractName' argExps = do
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
   argVals <- case argExps of
-                  (Xabi.OrderedArgs []) -> return []
-                  (Xabi.NamedArgs []) -> return []
+                  (Xabi.OrderedArgs []) -> return $ OrderedVals []
+                  (Xabi.NamedArgs []) -> return $ NamedVals []
                   _ -> argsToVals contract'
                                   (fromMaybe (error "arguments provided for missing constructor")
                                         $ _constructor contract')
                                   argExps
 
-  let zipped = zipWith (\(t, n) v -> (n, (t, coerceType contract' t v))) argTypeNames argVals
+  let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
+      zipped = case argVals of
+                  OrderedVals vs -> zipWith (\(t, n) v -> (n, (t, coerceType contract' t v))) argTypeNames vs
+                  NamedVals ns ->
+                    let argTypes = maybe einval Xabi.funcArgs $ contract' ^. constructor
+                        typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
+                                             (M.mapMissing (curry $ invalidArguments "extra argument"))
+                                             (M.zipWithMatched $ \_k t v -> (t, v))
+                                             (M.mapKeys T.unpack argTypes)
+                                             $ M.fromList ns
+                    in  map snd . sortWith fst
+                      . map (\(n, (Xabi.IndexedType i t, v)) -> (i, (n, (t, coerceType contract' t v))))
+                      $ M.toList typeAndVal
   addCallInfo to contract' hsh cc . fmap (fmap Constant) $ M.fromList zipped
   mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
@@ -1091,15 +1113,29 @@ addLocalVariable theType name value = do
           {callStack = currentSlice{localVariables=M.insert name (theType, newVariable) $ localVariables currentSlice}:rest}
 
 
-runTheCall :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
+runTheCall :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> ValList -> SM (Maybe Value)
 runTheCall address' contract' hsh cc theFunction argVals = do
   --
   let returnMeta = map (\(n, Xabi.IndexedType _ t) -> (T.unpack n, t)) .  M.toList $ Xabi.funcVals theFunction
       returns = map (\(n, t) -> (n, (t, defaultValue contract' t))) returnMeta
-      argMeta = map fst . sortWith snd
-              . map (\(n, Xabi.IndexedType i t) -> ((T.unpack n, t), i))
-              . M.toList $ Xabi.funcArgs theFunction
-      args = zipWith (\(n, t) v -> (n, (t, v))) argMeta argVals
+      args = case argVals of
+        OrderedVals vs -> let argMeta = map fst . sortWith snd
+                                      . map (\(n, Xabi.IndexedType i t) -> ((T.unpack n, t), i))
+                                      . M.toList $ Xabi.funcArgs theFunction
+                          in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+        NamedVals ns ->
+          let strTypes = M.mapKeys T.unpack $ Xabi.funcArgs theFunction
+              typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
+                                   (M.mapMissing (curry $ invalidArguments "extra argument"))
+                                   (M.zipWithMatched $ \_k t v -> (t, v))
+                                   strTypes
+                                   $ M.fromList ns
+              -- These probably don't need to be sorted by argument index, as they are turned into a map
+              -- when added to the call info.
+              sortedArgs = map snd . sortWith fst
+                         . map (\(n, (Xabi.IndexedType i t, v)) -> (i, (n, (t, v))))
+                         $ M.toList typeAndVal
+          in sortedArgs
       locals = args ++ returns
 
   onTraced $ liftIO $ putStrLn $ "            args: " ++ show (map fst args)

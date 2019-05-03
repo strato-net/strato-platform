@@ -94,15 +94,11 @@ expression :: SolidityParser Expression
 expression =
   buildExpressionParser
   [
-    [postfix $ choice
-     [
-       (do { name <- (reservedOp "." >> memberName); return $ flip MemberAccess name}),
-       functionCall
-     ]
-    ],
+    [postfix functionCall ],
     [Postfix $ do
       idxs <- many1 . brackets $ optionMaybe expression
       return $ \x -> foldl IndexAccess x idxs],
+    [postfix memberAccess],
     [Postfix (do { reservedOp "++"; return PlusPlus})],
     [Postfix (reservedOp "--" >> return MinusMinus)],
     [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
@@ -134,6 +130,10 @@ functionCall = do
     ]
   return $ flip FunctionCall args
 
+memberAccess :: SolidityParser (Expression -> Expression)
+memberAccess = do
+  name <- reservedOp "." >> memberName
+  return $ flip MemberAccess name
 
 binary :: String -> Operator String u Identity Expression
 binary x = Infix (do { reservedOp x; return (Binary x)}) AssocLeft

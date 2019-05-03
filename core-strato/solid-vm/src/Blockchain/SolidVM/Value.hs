@@ -218,3 +218,8 @@ data BasicType = TInteger | TString | TBool | TAddress
                | TComplex
                | Todo String
                deriving (Show, Eq)
+
+-- Evaluated ArgLists
+data ValList = OrderedVals [Value]
+             | NamedVals [(String, Value)]
+             deriving (Show, Eq)

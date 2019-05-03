@@ -45,7 +45,10 @@ spec = do
                 , ("int32(8824)", FunctionCall (Variable "int32") $ OrderedArgs [NumberLiteral 8824 Nothing])
                 , ("int(x)[y]", IndexAccess (FunctionCall (Variable "int") $ OrderedArgs [Variable "x"])
                                             $ Just $ Variable "y")
-
+                , ("xs[y].z", MemberAccess
+                                (IndexAccess (Variable "xs") (Just $ Variable "y"))
+                                "z")
+                , ("x.f()", FunctionCall (MemberAccess (Variable "x") "f") $ OrderedArgs [])
                 ]
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want
