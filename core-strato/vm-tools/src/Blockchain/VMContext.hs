@@ -28,6 +28,7 @@ module Blockchain.VMContext
     , queuePendingVote
     , peekPendingVote
     , clearPendingVote
+    , compactContextM
     ) where
 
 
@@ -294,7 +295,7 @@ runContextM f = do
           redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
           let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
           runStateT f (Context
-                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
                        hdb
                        cdb
                        blksumdb
@@ -383,3 +384,6 @@ clearPendingVote b = do
         Just i -> Q.deleteAt i ctxCoinbaseQ
         Nothing -> ctxCoinbaseQ
   put ctx { contextCoinbaseQueue = newCoinbaseQ}
+
+compactContextM :: ContextM ()
+compactContextM = modify' force
