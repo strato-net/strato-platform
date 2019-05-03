@@ -11,6 +11,7 @@ module Blockchain.ExtMergeSources (
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
+import           Control.Monad.Logger
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Resource
 import           Data.Conduit.TMChan          hiding (mergeSources)
@@ -20,8 +21,6 @@ import           Data.Conduit
 import           UnliftIO.Concurrent
 import           UnliftIO.Exception
 import           UnliftIO.STM
-
-import           Blockchain.Output
 
 mergeSourcesByForce :: (MonadLogger mi, MonadResource mi, MonadUnliftIO mi, MonadIO mo)
                     => [ConduitM () a mi ()] -- sources to merge

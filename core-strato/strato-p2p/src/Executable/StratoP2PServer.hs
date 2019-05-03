@@ -33,7 +33,7 @@ import           Blockchain.P2PUtil
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Text.Colors                           as C
 
-runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
+runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m, MonadResource m)
              => PrivateNumber
              -> Int
              -> m ()
@@ -79,4 +79,4 @@ stratoP2PServer = do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
 
-  void $ runEthServer myPriv flags_listen
+  void $ runResourceT $ runEthServer myPriv flags_listen
