@@ -30,6 +30,8 @@ mergeSourcesByForce :: (MonadLogger mi, MonadResource mi, MonadUnliftIO mi, Mona
                     -> mo (ConduitM () a mi ())
 mergeSourcesByForce sx bound = do
   return $ do
+    tid <- myThreadId
+    resetKey <- register $ removeChannelLength tid
     (chkey, c) <- allocate (atomically $ newTBMChan bound) (atomically . closeTBMChan)
     st <- lift $ askUnliftIO
     regs <- forM sx $ \s -> do
@@ -38,15 +40,13 @@ mergeSourcesByForce sx bound = do
           (unmask $ unliftIO st $
             runConduit $ s .| sinkTBMChan c)
           `finally` atomically (closeTBMChan c))
-    tid <- myThreadId
     rkey <- register . killThread =<< do
       liftIO . forkIO . forever $ do
         threadDelay 15000000
         recordChannelLength bound tid c
-    resetKey <- register $ removeChannelLength tid
     sourceTBMChan c
-    release chkey
     release rkey
+    release chkey
     release resetKey
     traverse_ release regs
 
