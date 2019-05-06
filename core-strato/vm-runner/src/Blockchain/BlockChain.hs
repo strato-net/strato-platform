@@ -45,6 +45,7 @@ import           Blockchain.Constants
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.AddressStateRef
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
@@ -217,7 +218,8 @@ addBlocks blocks' = do
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
         oldPrivHeader <- liftIO (readIORef worstHeader)
         timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-        timeit "calculateAndEmitStateDiffs " timerToUse $
+        
+        when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
           calculateAndEmitStateDiffs theBlock
                                      (if didReplaceBest' then Just oldHeader else Nothing)
                                      (if ranPrivateTxs' then Just oldPrivHeader else Nothing)
@@ -321,6 +323,15 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "Old chain state root: " ++ format sr
       $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
       actions <- addTransactions bd (blockDataGasLimit $ obBlockData b) txs -- TODO: Run the checks Bagger does reject invalid transactions for private chains
+
+      flushMemAddressStateTxToBlockDB
+
+
+      when (not flags_sqlDiff) $ timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $ do
+        asm <- getAddressStateBlockDBMap
+        lift $ updateSQLBalanceAndNonce $ [(theAddress, (addressStateBalance asMod, addressStateNonce asMod)) | (theAddress, ASModification asMod) <- M.toList asm]
+--        lift $ updateSQLBalanceAndNonce $ map (fmap (\(ASModification x) -> (addressStateBalance x, addressStateNonce x))) $ M.toList asm
+
       timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
       timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
       when flags_debug $ do
@@ -692,7 +703,7 @@ calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData 
                            -> Maybe BlockData
                            -> Maybe BlockData
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock mOldPubHeader mOldPrivHeader = when flags_sqlDiff $ do
+calculateAndEmitStateDiffs newBlock mOldPubHeader mOldPrivHeader = do
     let newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
