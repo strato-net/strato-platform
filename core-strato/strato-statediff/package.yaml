@@ -5,59 +5,48 @@ maintainer:          blockapps
 build-type:          Simple
 license:             Apache-2.0
 
-dependencies:
-  - base
-  - binary
-  - bytestring
-  - format
-  - nibblestring
-  - text
-  - containers
-  - unordered-containers
-  - resourcet
-  - aeson
-  - strato-model
-  - strato-conf
-  - blockapps-data
-  - blockapps-datadefs
-  - blockapps-mpdbs
-  - blockapps-util
-  - ethereum-rlp
-  - extra
-  - merkle-patricia-db
-  - monad-control
-  - persistent
-  - persistent-postgresql
-  - blockapps-milena
-  - lens
-  - transformers
-  - time
-
-default-extensions:
-  - MultiParamTypeClasses
-  - FlexibleContexts
-  - FlexibleInstances
-  - GeneralizedNewtypeDeriving
-  - GADTs
-  - LambdaCase
-  - RecordWildCards
-  - FunctionalDependencies
-  - DataKinds
-  - DeriveGeneric
-  - ExplicitForAll
-  - NamedFieldPuns
-  - OverloadedStrings
-  - TypeFamilies
-  - ViewPatterns
-ghc-options: -Wall -Werror -fno-warn-orphans -fno-warn-unused-imports
-
 library:
   source-dirs: src/
-
-tests:
-  statediff-test:
-    main: Spec.hs
-    source-dirs: test/
-    dependencies:
-      - strato-statediff
-      - hspec
+  dependencies:
+    - base
+    - binary
+    - bytestring
+    - format
+    - nibblestring
+    - text
+    - containers
+    - unordered-containers
+    - resourcet
+    - aeson
+    - strato-model
+    - strato-conf
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-mpdbs
+    - blockapps-util
+    - ethereum-rlp
+    - merkle-patricia-db
+    - monad-control
+    - persistent
+    - persistent-postgresql
+    - blockapps-milena
+    - lens
+    - transformers
+    - time
+  default-extensions:
+    - MultiParamTypeClasses
+    - FlexibleContexts
+    - FlexibleInstances
+    - GeneralizedNewtypeDeriving
+    - GADTs
+    - LambdaCase
+    - RecordWildCards
+    - FunctionalDependencies
+    - DataKinds
+    - DeriveGeneric
+    - ExplicitForAll
+    - NamedFieldPuns
+    - OverloadedStrings
+    - TypeFamilies
+    - ViewPatterns
+  ghc-options: -Wall -Werror -fno-warn-orphans -fno-warn-unused-imports
