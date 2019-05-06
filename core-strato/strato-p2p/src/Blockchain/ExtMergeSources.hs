@@ -43,9 +43,11 @@ mergeSourcesByForce sx bound = do
       liftIO . forkIO . forever $ do
         threadDelay 15000000
         recordChannelLength bound tid c
+    resetKey <- register $ removeChannelLength tid
     sourceTBMChan c
     release chkey
     release rkey
+    release resetKey
     traverse_ release regs
 
 
@@ -61,3 +63,6 @@ recordChannelLength total tid ch = do
   free <- atomically $ freeSlotsTBMChan ch
   withLabel channelLengths (T.pack $! show tid) $
     \t -> setGauge t (fromIntegral $ total - free)
+
+removeChannelLength :: ThreadId -> IO ()
+removeChannelLength = removeLabel channelLengths . T.pack . show
