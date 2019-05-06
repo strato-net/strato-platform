@@ -18,11 +18,13 @@ import           Control.Monad.Trans.Resource
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
-import           Data.Conduit
+import           Conduit
 import qualified Data.Conduit.Binary                   as CB
+import           Data.Conduit.Combinators              (yieldMany)
 import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Network
 import           Data.Conduit.TQueue
+import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Void
@@ -34,9 +36,10 @@ import           Network.Kafka                         as K
 import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context
 import           Blockchain.Data.Block
+import           Blockchain.Data.Control               (P2PCNC(..))
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
-import           Blockchain.Data.Wire
+import           Blockchain.Data.Wire                  as W
 import           Blockchain.DB.DetailsDB               hiding (getBestBlockHash)
 import           Blockchain.DB.SQLDB
 import           Blockchain.Display
@@ -96,12 +99,24 @@ mkCanarySource = do
 mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
-                     -> ConduitM Message BC.ByteString m ()
+                     -> ConduitM (Either P2PCNC Message) BC.ByteString m ()
 mkEthP2PEventConduit str outCtx =
-     CL.iterM recordMessage
+     debounceTxSends
+  .| CL.iterM recordMessage
   .| CL.iterM (displayMessage Outbound str)
   .| messageToBytes
   .| ethEncrypt outCtx
+
+debounceTxSends :: MonadIO m => ConduitT (Either P2PCNC Message) Message m ()
+debounceTxSends = do
+  txq <- atomically newTQueue
+  awaitForever $ \case
+    Right (W.Transactions txs) -> do
+      atomically $ mapM_ (writeTQueue txq) txs
+    Right other -> yield other
+    Left TXQueueTimeout -> do
+      txs <- atomically $ flushTQueue txq
+      yieldMany . map W.Transactions $ chunksOf 100 txs
 
 handleMsgClientConduit :: ( MonadIO (StateT Context m)
                           , MonadResource m
@@ -111,10 +126,10 @@ handleMsgClientConduit :: ( MonadIO (StateT Context m)
                           )
                        => Point
                        -> PPeer
-                       -> ConduitM Event Message (StateT Context m) ()
+                       -> ConduitM Event (Either P2PCNC Message) (StateT Context m) ()
 handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
-    yield Hello { version = 4
+    yield $ Right Hello { version = 4
                       , clientId = stratoVersionString
                       , capability = [ ETH . fromIntegral $ ethVersion
                                      , IST . fromIntegral $ blockstanbulVersion
@@ -129,7 +144,7 @@ handleMsgClientConduit myId peer = do
                 Nothing -> error "we don't have a local BestBlock"
                 Just (RedisBestBlock hash _ tdiff) -> do
                     genHash <- lift . runWithSQL $ getGenesisBlockHash
-                    yield Status {
+                    yield $ Right Status {
                         protocolVersion = fromIntegral ethVersion,
                         networkID       = computeNetworkID,
                         totalDifficulty = fromIntegral tdiff,
@@ -145,8 +160,8 @@ handleMsgClientConduit myId peer = do
                 lastBlockNumber <- liftIO getBestKafkaBlockNumber
                 Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
                 mrh <- gets maxReturnedHeaders
-                yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
-                yield $ GetChainDetails []
+                yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
+                yield . Right $ GetChainDetails []
                 handleGetChainDetails peer []
                 stampActionTimestamp
         other -> assertHandshake other
@@ -160,7 +175,7 @@ handleMsgServerConduit :: (MonadIO (StateT Context m)
                          )
                  => Point
                  -> PPeer
-                 -> ConduitM Event Message (StateT Context m) ()
+                 -> ConduitM Event (Either P2PCNC Message) (StateT Context m) ()
 handleMsgServerConduit myPubkey peer = do
     $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
@@ -173,7 +188,7 @@ handleMsgServerConduit myPubkey peer = do
                 port = 0,
                 nodeId = myPubkey
             }
-            yield helloMsg'
+            yield $ Right helloMsg'
         other -> assertHandshake $ other
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
@@ -184,7 +199,7 @@ handleMsgServerConduit myPubkey peer = do
                     genHash <- lift . runWithSQL $ getGenesisBlockHash
                     when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
                     void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
-                    yield Status {
+                    yield $ Right Status {
                         protocolVersion=fromIntegral ethVersion,
                         networkID=computeNetworkID,
                         totalDifficulty= fromIntegral tdiff,
@@ -194,11 +209,11 @@ handleMsgServerConduit myPubkey peer = do
         other -> assertHandshake other
     handleEvents peer
 
-awaitMsg :: (MonadIO m) => ConduitM Event Message m (Maybe Message)
+awaitMsg :: (MonadIO m) => ConduitM Event (Either P2PCNC Message) m (Maybe Message)
 awaitMsg = await >>= \case
     Just (MsgEvt msg) -> return (Just msg)
-    Nothing              -> return Nothing
-    _                    -> awaitMsg
+    Nothing           -> return Nothing
+    _                 -> awaitMsg
 
 assertHandshake :: (MonadLogger m, MonadIO m)
                 => Maybe Message
@@ -234,11 +249,6 @@ bytesToMessages = forever $ do
     yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
 messageToBytes :: Monad m => ConduitM Message B.ByteString m ()
-messageToBytes = do
-    maybeMsg <- await
-    case maybeMsg of
-     Nothing -> return ()
-     Just msg -> do
-        let (theWord, o) = wireMessage2Obj msg
-        yield $ theWord `B.cons` rlpSerialize o
-        messageToBytes
+messageToBytes = mapC $ \msg ->
+  let (theWord, o) = wireMessage2Obj msg
+  in theWord `B.cons` rlpSerialize o

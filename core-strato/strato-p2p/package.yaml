@@ -57,6 +57,7 @@ dependencies:
   - random
   - resourcet
   - SafeSemaphore
+  - split
   - stm
   - stm-conduit
   - streaming-commons
