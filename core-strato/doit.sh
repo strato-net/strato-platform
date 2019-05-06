@@ -50,6 +50,7 @@ function newnode {
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
      --connectionTimeout=$actualTimeout \
+     --channelBound=${channelBound:-409600} \
      --sqlPeers=true \
      --debugFail=${debugFail:-true}  \
      --maxConn=$maxConn \
