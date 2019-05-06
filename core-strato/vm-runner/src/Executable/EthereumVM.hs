@@ -141,7 +141,8 @@ ethereumVM = void . execContextM $ do
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-            newBlock <- loopTimeit "Bagger.makeNewBlock" Bagger.makeNewBlock
+            newBlock <- --loopTimeit "Bagger.makeNewBlock"
+                        Bagger.makeNewBlock
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
             loopTimeit "produceUnminedBlocksM" $ K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
