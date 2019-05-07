@@ -14,6 +14,7 @@ import           HFlags
 import           Network.HTTP.Client                    hiding (Proxy)
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
+import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Servant.Options
 import           Servant
@@ -63,7 +64,10 @@ main = do
 
 appVaultWrapper :: Strato23.VaultWrapperEnv -> Application
 appVaultWrapper env =
-  (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
+    prometheus def{ prometheusEndPoint = ["strato", "v2.3", "metrics"]
+                  , prometheusInstrumentApp = False}
+  . instrumentApp "vault-wrapper"
+  . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
   . cors (const $ Just policy)
   . provideOptions (Proxy @ Strato23.VaultWrapperAPI)
   . serve (Proxy @ (

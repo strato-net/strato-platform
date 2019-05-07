@@ -8,6 +8,7 @@ module Blockchain.Blockstanbul.EventLoop where
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
+import Control.Monad.Trans.Except
 import Blockchain.Output
 import Control.Monad.State.Class
 import qualified Data.Map.Strict as M
@@ -26,6 +27,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
 import Blockchain.Blockstanbul.Authentication
+import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.Voting
@@ -131,65 +133,63 @@ setLock = do
   (blockLock .=) =<< use proposal
   (lockSender .=) =<< uses proposer Just
 
-authorize :: (StateMachineM m) => InEvent -> m Bool
+authorize :: (StateMachineM m) => InEvent -> ExceptT String m ()
 authorize = \case
   IMsg (MsgAuth addr _) _ -> do
     ret <- uses validators (addr `S.member`)
-    unless ret $
-      $logWarnS "blockstanbul/auth" . T.pack $ "Rejecting message; sender not a validator: " ++ show addr
-    return ret
-  _ -> return True
+    unless ret $ do
+      let reason = "Rejecting message; sender not a validator: " ++ show addr
+      $logWarnS "blockstanbul/auth" . T.pack $ reason
+      throwE reason
+  _ -> return ()
 
-isAuthorized :: (StateMachineM m) => InEvent -> m Bool
-isAuthorized iev = do
+
+isAuthorized :: (StateMachineM m) => InEvent -> m AuthResult
+isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
   let authenticated = authenticate iev
-      warn = when doAuthn . $logWarnS "blockstanbul/auth" . T.pack
-  unless authenticated $
-    warn $ "Rejecting inevent; message failed authentication: " ++ show iev
-  authorized <- authorize iev
-  specificAuth <-
-    case iev of
-      NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
-        -- Check nonce for replay attack
-        slist <- use authSenders
-        let ifAuthMember = M.member addr slist
-            nonceAuth = Just nonc > M.lookup addr slist
-            signAuth = Just addr == verifyBenfInfo (benf,dir,nonc) sign
-        unless  ifAuthMember $
-          warn $ "Rejecting NewBeneficiary; Sender is not approved " ++ show addr
-              ++ " is not a authorized sender" ++ show slist
-        unless nonceAuth $
-          warn $ "Rejecting NewBeneficiary; Nonce is incorrect " ++ show nonc
-        unless signAuth $
-          warn $ "Rejecting NewBeneficiary; bad seal, address: " ++ show addr ++ " Seal: "
-              ++ show sign ++ " info: " ++ show (benf, dir, nonc) ++ " address decoded: "
-              ++ show (fromJust (verifyBenfInfo (benf,dir,nonc) sign))
-        return $ ifAuthMember && nonceAuth && signAuth
-      -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
-      -- but with incorrect extraData.
-      IMsg _ (Preprepare _ pp) -> do
-        vals <- use validators
-        let payloadVals = S.fromList (getValidatorList pp)
-            validatorsMatch = vals == payloadVals
-            signatory = verifyProposerSeal pp =<< getProposerSeal pp
-            signerExists = signatory `S.member` S.map Just vals
-        unless signerExists $
-          warn $ "Rejecting Preprepare; signer " ++ show (format <$> signatory)
-              ++ " is not a known validator"
-        unless validatorsMatch $
-          warn $ "Rejecting Preprepare; payload validators "
-              ++ show (S.map format payloadVals) ++ " are not expected validators "
-              ++ show (S.map format vals)
-        return $ signerExists && validatorsMatch
-      IMsg (MsgAuth addr _) (Commit _ di seal) -> do
-        let ret = Just addr == verifyCommitmentSeal di seal
-        unless ret . warn $ "Rejecting Commit; bad seal"
-        return ret
-      _ -> return True -- No specific auth for any other messages
-  return $ if doAuthn
-              then authorized && authenticated && specificAuth
-              else authorized
+      raiseInProd reason = when doAuthn $ do
+        $logWarnS "blockstanbul/auth" . T.pack $ reason
+        throwE reason
+  unless authenticated $ do
+    raiseInProd $ "Rejecting inevent; message failed authentication: " ++ show iev
+  authorize iev
+  case iev of
+    NewBeneficiary (MsgAuth addr sign) (benf, dir, nonc) -> do
+      -- Check nonce for replay attack
+      slist <- use authSenders
+      let ifAuthMember = M.member addr slist
+          nonceAuth = Just nonc > M.lookup addr slist
+          signAuth = Just addr == verifyBenfInfo (benf,dir,nonc) sign
+
+      unless ifAuthMember $
+        raiseInProd $ "Rejecting NewBeneficiary; Sender is not approved " ++ show addr
+                   ++ " is not a authorized sender" ++ show slist
+      unless nonceAuth $
+        raiseInProd $ "Rejecting NewBeneficiary; Nonce is incorrect " ++ show nonc
+      unless signAuth $
+        raiseInProd $ "Rejecting NewBeneficiary; bad seal, address: " ++ show addr ++ " Seal: "
+                   ++ show sign ++ " info: " ++ show (benf, dir, nonc) ++ " address decoded: "
+                   ++ show (fromJust (verifyBenfInfo (benf,dir,nonc) sign))
+    -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
+    -- but with incorrect extraData.
+    IMsg _ (Preprepare _ pp) -> do
+      vals <- use validators
+      let payloadVals = S.fromList (getValidatorList pp)
+          validatorsMatch = vals == payloadVals
+          signatory = verifyProposerSeal pp =<< getProposerSeal pp
+          signerExists = signatory `S.member` S.map Just vals
+      unless signerExists $
+        raiseInProd $ "Rejecting Preprepare; signer " ++ show (format <$> signatory)
+                   ++ " is not a known validator"
+      unless validatorsMatch $
+        raiseInProd $ "Rejecting Preprepare; payload validators "
+                   ++ show (S.map format payloadVals) ++ " are not expected validators "
+                  ++ show (S.map format vals)
+    IMsg (MsgAuth addr _) (Commit _ di seal) -> do
+      let ret = Just addr == verifyCommitmentSeal di seal
+      unless ret . raiseInProd $ "Rejecting Commit; bad seal"
+    _ -> return () -- No specific auth for any other messages
 
 assertChainConsistency :: HK.Word256 -> Maybe SHA -> Block -> Either T.Text ()
 assertChainConsistency seqNo wantParent blk = do
@@ -266,12 +266,17 @@ eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEve
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   debugShowCtx
   authz <- lift $ isAuthorized ev
+  recordAuthResult authz
   v <- use view
-  when authz $ case ev of
+  case authz of
+   AuthFailure reason -> case ev of
+      NewBeneficiary{} -> yield . VoteResponse $ HA.Rejected reason
+      _ -> return ()
+   AuthSuccess -> case ev of
     NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
       authSenders %= M.insert addr nonc
       self <- selfAddr
-      yield $ PendingVote benf dir self
+      yieldMany [PendingVote benf dir self, VoteResponse HA.Enqueued]
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
@@ -499,4 +504,5 @@ recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCount
     ResetTimer{} -> inc "reset_timer"
     GapFound{} -> inc "gap_found"
     LeadFound{} -> inc "lead_found"
-    PendingVote{} -> inc" pending_vote"
+    PendingVote{} -> inc "pending_vote"
+    VoteResponse{} -> inc "vote_response"

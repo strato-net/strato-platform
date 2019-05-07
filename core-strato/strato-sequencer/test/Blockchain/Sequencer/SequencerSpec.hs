@@ -104,7 +104,8 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
     pkg <- atomically newCablePackage
-    vch <- atomically newTMChan
+    vch <- atomically newTQueue
+    rch <- atomically newTQueue
     tch <- atomically newTMChan
     let
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0
@@ -114,6 +115,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , blockstanbulBlockPeriod = 0
                                , blockstanbulRoundPeriod = 10000000
                                , blockstanbulBeneficiary = vch
+                               , blockstanbulVoteResps = rch
                                , blockstanbulTimeouts = tch
                                , cablePackage = pkg
                                , maxUsPerIter = 200
@@ -134,7 +136,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
            ( run testWebserverPort
                . logStdoutDev
                . prometheus def
-               . API.createWebServer $ vch)
+               $ API.createWebServer vch rch)
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -260,6 +262,10 @@ spec = do
                                            , API.recipient=testAddr
                                            , API.votingdir=True
                                            , API.nonce = 1}
+            -- Simulate a successful response from blockstanbul by violating causality
+            -- This is pretty fragile to implementation details
+            rch <- asks blockstanbulVoteResps
+            atomically $ writeTQueue rch API.Enqueued
             let url = BaseUrl Http "localhost" testWebserverPort ""
             liftIO $ API.uploadVote url vote `shouldReturn` Right ()
             voteList <- drainVotes
@@ -291,7 +297,7 @@ spec = do
         uch <- asks $ unseqEvents . cablePackage
         atomically . writeTQueue uch $ iev
         vch <- asks blockstanbulBeneficiary
-        atomically . writeTMChan vch $ vote
+        atomically . writeTQueue vch $ vote
         src0 <- sealConduitT <$> fuseChannels
         (src1, ev1) <- src0 $$++ headC
         (src2, ev2) <- src1 $$++ headC

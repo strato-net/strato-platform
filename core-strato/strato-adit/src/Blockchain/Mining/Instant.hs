@@ -10,10 +10,7 @@ instantMiner::Miner
 instantMiner = Miner mineInstant verifyInstant
 
 mineInstant :: Block -> IO (Maybe Integer)
-mineInstant _ = do
-            return $ Just 6
+mineInstant = return . Just . fromIntegral . blockDataNonce . blockBlockData
 
 verifyInstant :: Block -> Bool
-verifyInstant Block{blockBlockData=bd} =
-    nonce == 6
-      where nonce = blockDataNonce bd
+verifyInstant = const True

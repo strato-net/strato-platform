@@ -77,7 +77,8 @@ main = do
                     $ "--blockstanbul_round_period_s must be positive"
                 return . Just . ctx $ pkey
   pkg <- atomically newCablePackage
-  chv <- atomically newTMChan
+  chr <- atomically newTQueue
+  chv <- atomically newTQueue
   cht <- atomically newTMChan
 
   let seqCfg = SequencerConfig
@@ -88,6 +89,7 @@ main = do
         , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
         , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
         , blockstanbulBeneficiary = chv
+        , blockstanbulVoteResps = chr
         , blockstanbulTimeouts = cht
         , cablePackage = pkg
         , maxEventsPerIter = flags_seq_max_events_per_iter
@@ -102,5 +104,6 @@ main = do
   race_ (runTheGregor gregorCfg)
       . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))
       . run flags_blockstanbul_port
-      . prometheus def
-      . createWebServer $ chv
+      . prometheus def{ prometheusInstrumentApp = False }
+      . instrumentApp "blockstanbul-votes"
+      $ createWebServer chv chr

@@ -71,6 +71,7 @@ dependencies:
 - wai
 - wai-cors
 - wai-extra
+- wai-middleware-prometheus
 - wai-middleware-static
 - warp
 

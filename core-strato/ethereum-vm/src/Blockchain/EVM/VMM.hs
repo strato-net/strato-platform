@@ -106,6 +106,10 @@ instance HasChainDB VMM where
   putGenesisRoot sr = do
     vmState <- lift get
     lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
+  getBestBlockRoot = lift $ contextBestBlockRoot . dbs <$> get
+  putBestBlockRoot sr = do
+    vmState <- lift get
+    lift $ put vmState{dbs=(dbs vmState){contextBestBlockRoot = sr}}
 
 instance HasRawStorageDB VMM where
     getRawStorageTxDB = do
