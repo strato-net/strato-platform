@@ -1405,6 +1405,7 @@ vmStateToExecResults vmState = do
       , erSuicideList        = suicideList vmState
       , erAction             = Just $ _action vmState
       , erException          = Nothing
+      , erKind               = EVM
       }
 
 

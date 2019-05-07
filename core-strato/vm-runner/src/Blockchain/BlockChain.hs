@@ -28,6 +28,7 @@ import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Short                   as BSS
+import           Data.Either.Extra
 import           Data.IORef
 import           Data.List
 import qualified Data.Map                                as M
@@ -161,6 +162,7 @@ instance Bagger.MonadBagger ContextM where
                                        , transactionResultDeletedStorage   = ""
                                        , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
                                        , transactionResultChainId          = txChainId . otBaseTx $ rejectedTx rejection
+                                       , transactionResultKind             = Nothing
                                        }
 
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, SHA) -- pretty, txHash
@@ -581,6 +583,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultDeletedStorage   = ""
                                , transactionResultStatus           = Just txrStatus
                                , transactionResultChainId          = chainId
+                               , transactionResultKind             = erKind <$> eitherToMaybe result
                                }
       if not flags_diffPublish
         then return Nothing
@@ -610,7 +613,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Ri
           if isMessageTX t
           then ""
           else fromMaybe "<failed>" $ fmap format $ erNewContractAddress results
-               
+
     multilineLog "printTx/ok" $ boringBox
       [ "Adding transaction signed by: " ++ format tAddr
       , "Tx hash:  " ++ format theHash

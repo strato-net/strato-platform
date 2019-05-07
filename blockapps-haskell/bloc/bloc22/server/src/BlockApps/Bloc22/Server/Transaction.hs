@@ -14,6 +14,7 @@ import           Control.Monad.Except
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Text                         (Text)
+import qualified Data.Text                         as Text
 
 import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Bloc22.API.Users
@@ -63,7 +64,8 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
           [] -> return []
           [x] -> do
             p <- fromContract x
-            let bcp = ContractParameters
+            let md = contractpayloadMetadata p
+                bcp = ContractParameters
                         addr
                         (contractpayloadSrc p)
                         (contractpayloadContract p)
@@ -73,7 +75,13 @@ postBlocTransaction mUserName mUserId chainId resolve (PostBlocTransactionReques
                         (contractpayloadMetadata p)
                         chainId
                         resolve
-            fmap (:[]) $ postUsersContractEVM' bcp (callSignature userName userId)
+                poster = case Map.lookup "VM" =<< md of
+                            Nothing -> postUsersContractEVM'
+                            Just "EVM" -> postUsersContractEVM'
+                            Just "SolidVM" -> postUsersContractSolidVM'
+                            Just vm -> \_ _ -> throwError $ UserError $ Text.pack
+                                             $ "Invalid value for VM choice: " ++ show vm
+            fmap (:[]) $ poster bcp (callSignature userName userId)
           xs -> do
             p <- mapM fromContract xs
             let bclp = ContractListParameters
