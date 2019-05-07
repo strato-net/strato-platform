@@ -84,7 +84,7 @@ function compareTimeStamp(obj) {
             }
 
             value = formatPromethusTimestamp(elem.value[0]);
-            ret[name] = (Math.abs(timeNow - elem.value[0]) < config.healthCheck.pollFrequency*3 /1000 ) && (elem.value[1] == 1) ? true : false;
+            ret[name] = (Math.abs(timeNow - elem.value[0]) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy /1000 ) && (elem.value[1] == 1) ? true : false;
         } else {
             winston.info(`Metric format is updated; need to update its handling`);
         }
@@ -160,7 +160,7 @@ async function checkLatest() {
 
   const currentTime = Date.now();
   if (healthInfo) {
-    const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * 3);
+    const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy);
     if (!nodeUp) {
       const currentStatus = [false, 'Last Check Not Recent'];
       await updateCurrentHealth(currentStatus);

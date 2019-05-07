@@ -65,7 +65,7 @@ describe('Tests - Node-level Health Check', function () {
     let testObj = sampleResponse2;
     const currentTime = Date.now();
     testObj.data.result.forEach((elem) => {
-      elem.value[0] = (currentTime - config.healthCheck.pollFrequency * 3)/1000;
+      elem.value[0] = (currentTime - config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy)/1000;
     })
     const res = nodeHealthCheckJs.compareTimeStamp(testObj);
     const stat = await nodeHealthCheckJs.updateHealthStat(res);
