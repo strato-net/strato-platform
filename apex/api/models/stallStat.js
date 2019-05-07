@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = function(sequelize, DataTypes) {
-    let StallStat = sequelize.define('StallStat', {
+    const StallStat = sequelize.define('StallStat', {
         blockType: {type: DataTypes.STRING, allowNull: true},
         blockCount: {type: DataTypes.INTEGER, allowNull: true},
         timestamp: {type: DataTypes.DATE, allowNull: true}

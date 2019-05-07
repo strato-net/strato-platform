@@ -1,5 +1,7 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
+const nodeHealthCheck = require('../daemons/node-health-check')
+const config = require('../config/app.config');
 
 module.exports = {
   ping: function (req, res) {
