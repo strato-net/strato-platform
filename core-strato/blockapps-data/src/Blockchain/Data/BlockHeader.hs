@@ -10,6 +10,7 @@ import qualified Data.ByteString                    as B
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import           Data.Word
+import           Data.Bits (shiftL)
 import           Numeric
 
 import           Blockchain.Data.Address
@@ -151,3 +152,12 @@ blockToBody Block{blockReceiptTransactions=transactions, blockBlockUncles=uncles
 blockDataToBlockHeader::BlockData->BlockHeader
 blockDataToBlockHeader (BlockData ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
   BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
+
+extraData2TxsLen :: B.ByteString -> Maybe Int
+extraData2TxsLen ed = result
+  where len1 = toInteger $ B.index ed 0
+        len2 = toInteger $ B.index ed 1
+        len = (shiftL len1 8) + len2
+        result = case len of
+          0 -> Nothing
+          x -> Just (fromInteger x :: Int)
