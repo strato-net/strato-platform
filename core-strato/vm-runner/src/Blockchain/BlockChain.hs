@@ -18,9 +18,11 @@ module Blockchain.BlockChain
     , outputTransactionResult
     , runCodeForTransaction
     , calculateIntrinsicGas'
+    , compactDiffs -- For testing
   ) where
 
 import           Control.Arrow                           ((&&&))
+import           Control.Lens.Operators
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Control.Monad.State                     as State
@@ -29,7 +31,6 @@ import           Control.Monad.Trans.Except
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Short                   as BSS
 import           Data.Either.Extra
-import           Data.IORef
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
@@ -40,6 +41,7 @@ import           Blockchain.MilenaTools                  (withKafkaViolently)
 import           Prometheus                                as P
 import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
+import           UnliftIO.IORef
 
 import           Blockchain.Constants
 import           Blockchain.Strato.Model.Action
@@ -194,18 +196,28 @@ addBlocks blocks' = do
       didReplaceBest   <- liftIO (newIORef False)
       ranPrivateTxs    <- liftIO (newIORef S.empty)
       replacedBest     <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
-      actions <- forM filtered $ \block -> timeit ("Block #" ++ show (blockDataNumber . obBlockData $ block) ++ " (" ++ show (length . obReceiptTransactions $ block) ++ " TXs) insertion") timerToUse $ do
-        actions <- addBlock block
-        (didReplaceThisTime, ranPriv, replacedBits) <- replaceBestIfBetter block
-        when didReplaceThisTime . liftIO $ do
+      (actions, srLog') <- flip State.runStateT [] $ forM filtered $ \block ->
+          let blockNo = blockDataNumber $! obBlockData block
+              txCount = length $! obReceiptTransactions block
+          in timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
+        actions <- lift $ addBlock block
+        (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift $ replaceBestIfBetter block
+        when didReplaceThisTime $ do
           writeIORef didReplaceBest True
           writeIORef replacedBest (block, replacedBits)
+          -- Gather a chain of better block stateroots. The last one found should be the best block,
+          -- and the intermediate ones increase the granularity at which we can compute a sequence
+          -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
+          -- the diff between them, which is estimated by the number of transactions.
+          id %= ((blockDataStateRoot $ obBlockData block, hsh, num, txCount):)
         unless (S.null ranPriv) . liftIO $ do
           modifyIORef' ranPrivateTxs (S.union ranPriv)
           drb <- liftIO (readIORef didReplaceBest)
           unless drb $ do
             writeIORef replacedBest (block, replacedBits)
         return actions
+      let srLog = reverse srLog'
+      $logDebugLS "addBlocks/srLog" srLog
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
       timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
@@ -214,9 +226,10 @@ addBlocks blocks' = do
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
         timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
         timeit "calculateAndEmitStateDiffs " timerToUse $
-          calculateAndEmitStateDiffs theBlock
+          calculateAndEmitStateDiffs srLog
                                      (if didReplaceBest' then Just oldHeader else Nothing)
                                      ranPrivateTxs'
+                                     theBlock
       return $ concat actions
 
   where
@@ -677,23 +690,21 @@ splitCreateDiffs =
         srch = map ch . join . map sequence . map sr
      in S.toList . S.fromList . srch
 
-calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
-                           => b
+calculateAndEmitStateDiffs :: [(MP.StateRoot, SHA, Integer, Int)]
                            -> Maybe BlockData
                            -> S.Set Word256
+                           -> OutputBlock
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock mOldPubHeader chainIds = when flags_sqlDiff $ do
+calculateAndEmitStateDiffs srLog mOldPubHeader chainIds newBlock = when flags_sqlDiff $ do
+    diffs <- case mOldPubHeader of
+      Nothing -> return []
+      Just oldHeader -> do
+        let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
+        calculateBatchedDiffs base srLog
+    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show (S.map (format . SHA) chainIds)
     let newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
-        newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderOrdering newHeader
-    diffs <- case mOldPubHeader of
-      Just oldHeader -> do
-        let oldStateRoot = MP.StateRoot $ blockHeaderStateRoot oldHeader
-        $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ format oldStateRoot ++ "\nto: " ++ format newStateRoot
-        (:[]) <$> stateDiff Nothing newNumber newHash oldStateRoot newStateRoot
-      Nothing -> return []
-    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show (S.map (format . SHA) chainIds)
     chainDiffs <- chainDiff newNumber newHash $ S.toList chainIds
 
     $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
@@ -701,3 +712,35 @@ calculateAndEmitStateDiffs newBlock mOldPubHeader chainIds = when flags_sqlDiff 
     let allDiffs = diffs ++ chainDiffs
 
     forM_ allDiffs $ lift . commitSqlDiffs
+
+diffMaxCost :: Int
+diffMaxCost = 500
+
+type PreDiff = (MP.StateRoot, SHA, Integer, Int)
+type ToDiff = (MP.StateRoot, MP.StateRoot, SHA, Integer)
+
+promote :: MP.StateRoot -> PreDiff -> ToDiff
+promote base (next, hsh, num, _) = (base, next, hsh, num)
+
+cost :: PreDiff -> Int
+cost (_, _, _, c) = c
+
+compactDiffs :: MP.StateRoot -> [PreDiff] -> [ToDiff]
+compactDiffs _ [] = error "should not be called on an empty list"
+compactDiffs base (p:ps) = go (cost p) (promote base p) ps
+  where go :: Int -> ToDiff -> [PreDiff] -> [ToDiff]
+        go _ lastPending [] = [lastPending]
+        go pendingCost pending@(pendingBase, pendingNext, _, _) (c:cs) =
+          -- If we can fit this PreDiff in, we augment it to the pending ToDiff.
+          -- Otherwise, we emit and create a new ToDiff
+          if pendingCost + cost c > diffMaxCost
+            then pending:go (cost c) (promote pendingNext c) cs
+            else go (pendingCost + cost c) (promote pendingBase c) cs
+
+calculateBatchedDiffs :: MP.StateRoot -> [(MP.StateRoot, SHA, Integer, Int)] -> ContextM [SD.StateDiff]
+calculateBatchedDiffs base = mapM go . compactDiffs base
+  where go :: (MP.StateRoot, MP.StateRoot, SHA, Integer) -> ContextM SD.StateDiff
+        go (src, dst, hsh, num) = do
+          $logInfoS "calculateAndEmitStateDiffs" . T.pack $
+              "Calculating StateDiff from: " ++ format src ++ "\nto: " ++ format dst
+          stateDiff Nothing num hsh src dst
