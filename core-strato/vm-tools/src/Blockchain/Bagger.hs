@@ -20,8 +20,7 @@ import           Data.Time.Clock
 import qualified Data.Set                           as S
 import           Data.Word
 import           Numeric                            (readHex)
-import qualified Data.ByteString                    as B
-import           Data.Bits                          (shiftR)
+
 import           Blockapps.Crossmon
 
 import           Blockchain.CoreFlags               (flags_difficultyBomb, flags_testnet)
@@ -445,11 +444,6 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else SHA 0x0
                         , DD.blockDataNonce            = nonce
                         }
-
-txsLen2ExtraData :: Int -> B.ByteString
-txsLen2ExtraData len = B.singleton len1 <> B.singleton len2 <> B.replicate 30 0
-  where len1 = fromIntegral $ shiftR len 8
-        len2 = fromIntegral len
 
 buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData
 buildRewardedBlockHeader bd uncles = do
