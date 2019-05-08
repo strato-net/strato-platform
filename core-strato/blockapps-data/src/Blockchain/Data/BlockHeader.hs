@@ -3,7 +3,8 @@ module Blockchain.Data.BlockHeader (
   BlockHeader(..),
   headerHash,
   blockToBlockHeader,
-  blockToBody
+  blockToBody,
+  extraData2TxsLen
   ) where
 
 import qualified Data.ByteString                    as B
