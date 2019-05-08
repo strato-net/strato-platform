@@ -44,6 +44,7 @@ import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Metrics
+import           Blockchain.SolidVM.Model
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
@@ -156,7 +157,8 @@ create' creator ch cc contractName' argExps = do
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
     erAction = Just $ sstate ^. action,
-    erException = Nothing
+    erException = Nothing,
+    erKind = SolidVM
     }
 
 
@@ -224,7 +226,8 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       erNewContractAddress = Nothing,
       erSuicideList = S.empty,
       erAction = Just $ finalAct,
-      erException = Nothing
+      erException = Nothing,
+      erKind = SolidVM
       }
 
 

@@ -1,5 +1,7 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
+const nodeHealthCheck = require('../daemons/node-health-check')
+const config = require('../config/app.config');
 
 module.exports = {
   ping: function (req, res) {
@@ -25,6 +27,47 @@ module.exports = {
         raw: true,
       });
 
+      let healthStatus, stallStatus, uptime, isInc, isPending;
+
+      const healthInfo = await models.CurrentHealth.findOne({
+        where: {
+          processName: "HealthStat"
+        },
+        attributes: [
+          'latestHealthStatus',
+          'latestCheckTimestamp',
+          'lastFailureTimestamp'
+        ],
+        raw:true,
+      }).catch(err => next(err));
+      const stallInfo = await models.CurrentHealth.findOne({
+        where: {
+          processName: "StallStat"
+        },
+        attributes: [
+          'latestHealthStatus',
+          'latestCheckTimestamp',
+          'lastFailureTimestamp',
+          'isBlocksValidInc',
+          'isLastPending'
+        ],
+        raw:true,
+      }).catch(err => next(err));
+
+      const currentTime = Date.now();
+
+      if (healthInfo && stallInfo){
+        healthStatus = healthInfo.latestHealthStatus;
+        stallStatus = stallInfo.latestHealthStatus;
+        uptime = (healthStatus) ? currentTime - healthInfo.lastFailureTimestamp : 0;
+        isInc = stallInfo.isBlocksValidInc;
+        isPending = stallInfo.isLastPending;
+      } else {
+        let err = new Error("Not Doing Health Check");
+        err.status = 500;
+        return next(err);
+      }
+
       res.status(200).json(
         {
           lastBlock: {
@@ -33,6 +76,13 @@ module.exports = {
             parentHash: lastBlock.parent_hash,
             totalDifficulty: lastBlock.total_difficulty,
             nonce: lastBlock.nonce,
+          },
+          healthInfo: {
+            uptime: uptime/1000,
+            isHealthy: healthStatus,
+            isNotStalled: stallStatus,
+            isValidBlocksInc: isInc || false,
+            isLastPending: isPending
           }
         }
       )

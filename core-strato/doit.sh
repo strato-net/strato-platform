@@ -114,12 +114,15 @@ function newnode {
   if [ -n "${brokenRefundReenable}" ]; then
     breFlag="--brokenRefundReenable=${brokenRefundReenable}"
   fi
+  if [ -n "${svmDev}" ]; then
+    svdFlag="--svmDev=${svmDev}"
+  fi
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" "${breFlag}" +RTS "${vmRunnerRTSOPTs:-}" -N1 >> logs/vm-runner 2>&1
+                         "${tbFlag}" "${breFlag}" "${svdFlag}" +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
