@@ -32,7 +32,7 @@
         "metric": {
           "__name__": "health_check",
           "instance": "strato:8000",
-          "job": "ethereum-vm",
+          "job": "vm-runner",
           "location": "vm_main"
         },
         "value": [

@@ -9,7 +9,7 @@ const config = require('../config/app.config');
 const neededJobs = {
     "slipstream_main":"slipstream",
     "strato_p2p":"strato-p2p",
-    "vm_main":"ethereum-vm",
+    "vm_main":"vm-runner",
     "seq_main":"strato-sequencer"
 }
 
