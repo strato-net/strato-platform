@@ -116,7 +116,7 @@ function newnode {
   fi
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
-                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
+                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
                          "${tbFlag}" "${breFlag}" +RTS "${vmRunnerRTSOPTs:-}" -N1 >> logs/vm-runner 2>&1
@@ -278,6 +278,7 @@ setEnv maxConn 20
 setEnv difficultyBomb false
 
 setEnv sqlDiff true
+setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
 
 setEnv backupLocation /var/lib/strato/backup_strato_block
