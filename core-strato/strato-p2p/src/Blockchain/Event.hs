@@ -161,10 +161,12 @@ handleEvents peer = awaitForever $ \case
 
     MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
       stampActionTimestamp
+      mrh <- gets maxReturnedHeaders
+      let max'' = max max' mrh
       start' <- case dir of
-        Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
+        Reverse -> return $ if start > fromIntegral max'' then start - (fromIntegral max'') else 1
         Forward -> return start
-      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
+      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max''
       when (null chain) $
         $logInfoS "handleEvents/GetBlockHeaders" $ T.pack $ "Warning: A peer requested blocks starting at #" ++ show start ++ ", but we don't have these in our canonical chain.... I don't know what to do, so I am returning a blank response. This may indicate something unhealthy in the network."
 
@@ -237,8 +239,10 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (GetBlockBodies [])   -> do
       stampActionTimestamp
       yieldR (BlockBodies []) -- todo parity bans peers when they do this. should we?
-    MsgEvt (GetBlockBodies shas) -> do
+    MsgEvt (GetBlockBodies shas') -> do
       stampActionTimestamp
+      mrh <- gets maxReturnedHeaders
+      let shas = take mrh shas'
       getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
           ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
