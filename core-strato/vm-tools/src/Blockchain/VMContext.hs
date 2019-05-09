@@ -43,6 +43,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
 import           Data.Foldable                      (toList)
+import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.Sequence                      as Q
@@ -85,6 +86,7 @@ import qualified Blockchain.Strato.Indexer.Kafka    as IK
 import qualified Blockchain.Strato.Indexer.Model    as IM
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
@@ -133,12 +135,15 @@ instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
     ctx <- get
     let q = contextTxResultQueue ctx
+    recordTxrEnqueue $ length txrs
     put $ ctx { contextTxResultQueue = q Q.>< Q.fromList txrs }
 
   flushTransactionResults = do
     ctx <- get
-    let toWrite = contextTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toList toWrite)
+    let q = contextTxResultQueue ctx
+        toWrite = chunksOf 2000 $ map IM.TxResult $ toList q
+    recordTxrFlush $ Q.length q
+    mapM_ (K.withKafkaViolently . IK.writeIndexEvents) toWrite
     put $ ctx { contextTxResultQueue = Q.empty }
 
 instance HasMemLogDB ContextM where
