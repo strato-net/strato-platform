@@ -210,7 +210,9 @@ handleEvents peer = awaitForever $ \case
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
             let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
-
+                txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+                txsLensInLimit = takeWhile (< Just flags_maxHeadersTxsLens) txsLens
+            let (neededHeaders', _) = splitAt (length txsLensInLimit) neededHeaders
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
             --     neededHashes = map headerHash neededHeaders
@@ -221,9 +223,9 @@ handleEvents peer = awaitForever $ \case
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
 
-            lift $ putBlockHeaders neededHeaders
-            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
-            yieldR . GetBlockBodies $ headerHash <$> neededHeaders
+            lift $ putBlockHeaders neededHeaders'
+            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
+            yieldR . GetBlockBodies $ headerHash <$> neededHeaders'
             stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
