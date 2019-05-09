@@ -277,7 +277,7 @@ setEnv minQuorumSize 1
 setEnv maxConn 20
 setEnv difficultyBomb false
 
-setEnv sqlDiff true
+setEnv sqlDiff ${sqlDiff:-true}
 setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
 

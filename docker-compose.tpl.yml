@@ -155,6 +155,7 @@ services:
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
     - svmTrace=${svmTrace}
+    - sqlDiff=${sqlDiff}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
