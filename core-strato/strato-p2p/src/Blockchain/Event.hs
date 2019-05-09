@@ -220,9 +220,7 @@ handleEvents peer = awaitForever $ \case
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
             let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
-                txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
-                txsLensInLimit = takeWhile (< Just flags_maxHeadersTxsLens) txsLens
-            let (neededHeaders', _) = splitAt (length txsLensInLimit) neededHeaders
+            let (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
             --     neededHashes = map headerHash neededHeaders
@@ -234,6 +232,7 @@ handleEvents peer = awaitForever $ \case
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
 
             lift $ putBlockHeaders neededHeaders'
+            lift $ putRemainingBHeaders remainingHeaders
             $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
             yieldR . GetBlockBodies $ headerHash <$> neededHeaders'
             stampActionTimestamp
@@ -251,10 +250,10 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (GetBlockBodies [])   -> do
       stampActionTimestamp
       yieldR (BlockBodies []) -- todo parity bans peers when they do this. should we?
-    MsgEvt (GetBlockBodies shas') -> do
+    MsgEvt (GetBlockBodies shas) -> do
       stampActionTimestamp
-      mrh <- gets maxReturnedHeaders
-      let shas = take mrh shas'
+      --mrh <- gets maxReturnedHeaders
+      --let shas = take mrh shas'
       getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
           ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
@@ -288,15 +287,17 @@ handleEvents peer = awaitForever $ \case
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
         forM_ blocks' $ lift . SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
-        let remainingHeaders = drop (length bodies) headers
-        lift $ putBlockHeaders remainingHeaders
-        if null remainingHeaders
+        rHeaders <- lift getRemainingBHeaders
+        let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
+        lift $ putBlockHeaders neededHeaders
+        lift $ putRemainingBHeaders remainingHeaders
+        if null neededHeaders
             then when (newCount > 0) $ do
                 mrh <- gets maxReturnedHeaders
                 yieldR $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
                 stampActionTimestamp
             else do
-                yieldR $ GetBlockBodies (map headerHash remainingHeaders)
+                yieldR $ GetBlockBodies (map headerHash neededHeaders)
                 stampActionTimestamp
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
@@ -499,3 +500,23 @@ checkPeerIsMember peer mems =
 
 peerIPAddress :: PPeer -> IPAddress
 peerIPAddress = readIP . T.unpack . pPeerIp
+
+{- to reduce redundant computations on dividing block chunks under txsLimit
+splitNeededHeaders :: [BlockHeader] -> [[BlockHeader]]
+splitNeededHeaders x =
+  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+      txsLensInLimit =  scanl (\x y -> if ((x+y)>flags_maxHeadersTxsLens) then y else x+y) 0 txsLens
+      indexToSplit :: Int -> [Int] -> [Int] -> [Int] -> [Int]
+      indexToSplit index li (x:xs) (y:ys) =  indexToSplit (index++) li' xs ys
+        where li = case (x==y) of
+          True -> li:index
+          False -> li
+      indexToSplit _ li [] [] = li
+  in splitAt -}
+
+splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
+splitNeededHeaders neededHeaders =
+  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+      txsLensInSums =  scanl (\a b -> let b' = if (b==Nothing) then (Just flags_averageTxsPerBlock) else b in Just (+) <*> a <*> b') (Just 0) txsLens
+      txsLensInLimit = takeWhile (< Just flags_maxHeadersTxsLens) txsLensInSums
+  in splitAt (length txsLensInLimit) neededHeaders
