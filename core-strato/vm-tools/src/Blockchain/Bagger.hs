@@ -34,6 +34,7 @@ import           Blockchain.Data.Address
 import qualified Blockchain.Data.AddressStateDB     as DD
 import qualified Blockchain.Data.BlockDB            as BDB
 import qualified Blockchain.Data.DataDefs           as DD
+import           Blockchain.Data.BlockHeader        (txsLen2ExtraData)
 import qualified Blockchain.Data.TransactionDef     as TD
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
