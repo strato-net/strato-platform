@@ -250,10 +250,10 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (GetBlockBodies [])   -> do
       stampActionTimestamp
       yieldR (BlockBodies []) -- todo parity bans peers when they do this. should we?
-    MsgEvt (GetBlockBodies shas) -> do
+    MsgEvt (GetBlockBodies shas') -> do
       stampActionTimestamp
-      --mrh <- gets maxReturnedHeaders
-      --let shas = take mrh shas'
+      mrh <- gets maxReturnedHeaders
+      let shas = take mrh shas'
       getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
           ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
@@ -517,6 +517,6 @@ splitNeededHeaders x =
 splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
 splitNeededHeaders neededHeaders =
   let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
-      txsLensInSums =  scanl (\a b -> let b' = if (b==Nothing) then (Just flags_averageTxsPerBlock) else b in Just (+) <*> a <*> b') (Just 0) txsLens
-      txsLensInLimit = takeWhile (< Just flags_maxHeadersTxsLens) txsLensInSums
+      txsLensInSums =  scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
+      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) txsLensInSums
   in splitAt (length txsLensInLimit) neededHeaders
