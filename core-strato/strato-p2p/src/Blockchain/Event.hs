@@ -161,16 +161,23 @@ handleEvents peer = awaitForever $ \case
 
     MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
       stampActionTimestamp
-      mrh <- gets maxReturnedHeaders
-      let max'' = max max' mrh
       start' <- case dir of
-        Reverse -> return $ if start > fromIntegral max'' then start - (fromIntegral max'') else 1
+        Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
         Forward -> return start
-      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max''
-      when (null chain) $
-        $logInfoS "handleEvents/GetBlockHeaders" $ T.pack $ "Warning: A peer requested blocks starting at #" ++ show start ++ ", but we don't have these in our canonical chain.... I don't know what to do, so I am returning a blank response. This may indicate something unhealthy in the network."
-
-      yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
+      mrh <- gets maxReturnedHeaders
+      -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
+      -- 3/4s of the blocks will be dropped when creating the blockheaders so we overcompensate here.
+      let offsets = [start', start' + fromIntegral ((1 + skip') * mrh)..fromIntegral max']
+      forM_ offsets $ \offset -> do
+        chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain offset mrh
+        when (null chain) $
+          $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $
+              ["Warning: A peer requested blocks starting at #"
+              , T.pack $ show start
+              , ", but we don't have these in our canonical chain...."
+              , " I don't know what to do, so I am returning a blank response."
+              , " This may indicate something unhealthy in the network."]
+        yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
       stampActionTimestamp
@@ -182,8 +189,11 @@ handleEvents peer = awaitForever $ \case
           start' <- case dir of
             Reverse -> return $ if num > fromIntegral max' then num - (fromIntegral max') else 1
             Forward -> return num
-          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
-          yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
+          mrh <- gets maxReturnedHeaders
+          let offsets = [start', start' + fromIntegral ((1 + skip') * mrh) ..start' + num]
+          forM_ offsets $ \offset -> do
+            chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain offset mrh
+            yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
         stampActionTimestamp
@@ -369,23 +379,25 @@ handleEvents peer = awaitForever $ \case
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yieldR outbound
-      OEAskForBlocks start end p -> do
+      OEAskForBlocks start _ p -> do
         ss <- shouldSendToPeer p
         when ss $ do
-          let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start + 1) 0 Forward
-          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Outgoing message: " ++ show outbound
-          yieldR outbound
+          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "syncFetch: " ++ show start
+          syncFetch Forward start
       OEPushBlocks start end p -> do
         ss <- shouldSendToPeer p
         when ss $ do
-          chain <- RBDB.withRedisBlockDB $
-            RBDB.getCanonicalHeaderChain start (fromIntegral $ end - start + 1)
-          when (null chain) $
-            $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
-              "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
-          let outbound = BlockHeaders . map snd $ chain
-          $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
-          yieldR outbound
+          mrh <- gets maxReturnedHeaders
+          let ranges = [start, start + fromIntegral mrh..end - start + 1]
+          forM_ ranges $ \offset -> do
+            chain <- RBDB.withRedisBlockDB $
+              RBDB.getCanonicalHeaderChain offset mrh
+            when (null chain) $
+              $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
+                "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
+            let outbound = BlockHeaders . map snd $ chain
+            $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
+            yieldR outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
       OEVoteToMake{} -> $logErrorS "handleEvents/OEVoteToMake" "absurd"
