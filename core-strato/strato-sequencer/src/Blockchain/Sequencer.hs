@@ -385,27 +385,30 @@ transformGenesis chains = forM_ chains $ \ig -> do
 
 splitEvents :: [IngestEvent] -> SequencerM ()
 splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
-  case eventType of
+  let num = length events
+      record :: T.Text -> T.Text -> SequencerM ()
+      record t k = do
+        liftIO $ withLabel eventsplitMetrics t (flip unsafeAddCounter . fromIntegral $ num)
+        $logInfoS "splitEvents" . T.pack $ printf "Running %d %s" num k
+  in case eventType of
     IETTransaction -> do
-      liftIO $ withLabel eventsplitMetrics "inevent_type_transaction" (flip unsafeAddCounter . fromIntegral . length $ events)
-      $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestTransactions"
+      record "inevent_type_transaction" "IngestTransactions"
       transformTransactions $ map (\(IETx ts tx) -> (ts,tx)) events
     IETBlock -> do
-      liftIO $ withLabel eventsplitMetrics "inevent_type_block" (flip unsafeAddCounter . fromIntegral . length $ events)
-      $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlocks"
+      record "inevent_type_block" "IngestBlocks"
       transformBlocks $ map (\(IEBlock ob) -> ob) events
     IETGenesis -> do
-      liftIO $ withLabel eventsplitMetrics "inevent_type_genesis" (flip unsafeAddCounter . fromIntegral . length $ events)
-      $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestGenesises"
+      record "inevent_type_genesis" "IngestGenesises"
       transformGenesis $ map (\(IEGenesis og) -> og) events
     IETNewChainMember -> do
-      liftIO $ withLabel eventsplitMetrics "inevent_type_new_chain_member" (flip unsafeAddCounter . fromIntegral . length $ events)
-      $logInfoS "splitEvents" . T.pack $ "Running " ++ show (length events) ++ " IngestNewChainMembers"
+      record "inevent_type_new_chain_member" "IngestNewChainMembers"
       mapM_ (\(IENewChainMember c a e) -> markForP2P $ OENewChainMember c a e) events
     IETBlockstanbul -> do
-      liftIO $ withLabel eventsplitMetrics "inevent_type_blockstanbul" (flip unsafeAddCounter . fromIntegral . length $ events)
-      $logInfoS "splitevents" . T.pack $ "Running " ++ show (length events) ++ " IngestBlockstanbuls"
+      record "inevent_type_blockstanbul" "IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
+    IETForcedConfigChange -> do
+      record "inevent_type_forced_config_change" "ForcedConfigChanges"
+      blockstanbulSend $ map (\(IEForcedConfigChange cc) -> ForcedConfigChange cc) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

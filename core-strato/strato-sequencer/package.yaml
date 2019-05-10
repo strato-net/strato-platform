@@ -88,6 +88,14 @@ executables:
       - hflags
     other-modules: [Flags]
 
+  forced-config-change:
+    source-dirs: exec-src
+    main: ForcedConfigChange.hs
+    other-modules: []
+    dependencies:
+      - hflags
+      - seqevents
+
 tests:
   strato-sequencer-spec:
     source-dirs:   test
