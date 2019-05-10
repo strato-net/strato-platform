@@ -111,3 +111,15 @@ recordTxrFlush n = liftIO $ do
 
 recordTxrEnqueue :: MonadIO m => Int -> m ()
 recordTxrEnqueue = liftIO . addGauge txrQueueLength . fromIntegral
+
+{-# NOINLINE seqEventCount #-}
+seqEventCount :: Vector T.Text Counter
+seqEventCount = unsafeRegister
+              . vector "event"
+              . counter
+              $ Info "vm_seqevents_count" "Count of seqevents read"
+
+recordSeqEventCount :: MonadIO m => Int -> Int -> m ()
+recordSeqEventCount bLen tLen = liftIO $ do
+  withLabel seqEventCount "block"  $ void . flip addCounter (fromIntegral bLen)
+  withLabel seqEventCount "tx"  $ void . flip addCounter (fromIntegral tLen)

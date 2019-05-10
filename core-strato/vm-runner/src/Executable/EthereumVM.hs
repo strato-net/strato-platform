@@ -94,8 +94,10 @@ ethereumVM = void . execContextM $ do
                                   . K.withKafkaViolently
                                   . writeIndexEvents
                                   $ map (uncurry IndexTransaction) txPairs
-
-        $logInfoS "evm/loop" $ T.pack $ "#### incoming events ==> " ++ show (length allTxs) ++ " TXs, " ++ show (length blocks) ++ " new blocks"
+        let (bLen, tLen) = (length blocks, length allTxs)
+        recordSeqEventCount bLen tLen
+        $logInfoS "evm/loop" $ T.pack $
+          printf "#### incoming events ==> %d TXs, %d new blocks" tLen bLen
 
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
