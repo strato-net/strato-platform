@@ -1,3 +1,4 @@
+
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -515,5 +516,5 @@ splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
 splitNeededHeaders neededHeaders =
   let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
       txsLensInSums =  scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
-      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) txsLensInSums
+      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
   in splitAt (length txsLensInLimit) neededHeaders
