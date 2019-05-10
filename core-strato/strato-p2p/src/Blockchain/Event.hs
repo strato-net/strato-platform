@@ -166,18 +166,18 @@ handleEvents peer = awaitForever $ \case
         Forward -> return start
       mrh <- gets maxReturnedHeaders
       -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
-      -- 3/4s of the blocks will be dropped when creating the blockheaders so we overcompensate here.
-      let offsets = [start', start' + fromIntegral ((1 + skip') * mrh)..fromIntegral max']
-      forM_ offsets $ \offset -> do
-        chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain offset mrh
-        when (null chain) $
-          $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $
-              ["Warning: A peer requested blocks starting at #"
-              , T.pack $ show start
-              , ", but we don't have these in our canonical chain...."
-              , " I don't know what to do, so I am returning a blank response."
-              , " This may indicate something unhealthy in the network."]
-        yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
+      -- 3/4s of the blocks will be dropped when creating the blockheaders
+      -- so we overcompensate here.
+      let count = (1 + skip') * max mrh max'
+      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' count
+      when (null chain) $
+        $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $
+            ["Warning: A peer requested blocks starting at #"
+            , T.pack $ show start
+            , ", but we don't have these in our canonical chain...."
+            , " I don't know what to do, so I am returning a blank response."
+            , " This may indicate something unhealthy in the network."]
+      yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
       stampActionTimestamp
@@ -190,10 +190,9 @@ handleEvents peer = awaitForever $ \case
             Reverse -> return $ if num > fromIntegral max' then num - (fromIntegral max') else 1
             Forward -> return num
           mrh <- gets maxReturnedHeaders
-          let offsets = [start', start' + fromIntegral ((1 + skip') * mrh) ..start' + num]
-          forM_ offsets $ \offset -> do
-            chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain offset mrh
-            yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
+          let count = (1 + skip') * min mrh (fromIntegral num)
+          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' count
+          yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
         stampActionTimestamp
@@ -386,16 +385,14 @@ handleEvents peer = awaitForever $ \case
         ss <- shouldSendToPeer p
         when ss $ do
           mrh <- gets maxReturnedHeaders
-          let ranges = [start, start + fromIntegral mrh..end - start + 1]
-          forM_ ranges $ \offset -> do
-            chain <- RBDB.withRedisBlockDB $
-              RBDB.getCanonicalHeaderChain offset mrh
-            when (null chain) $
-              $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
-                "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
-            let outbound = BlockHeaders . map snd $ chain
-            $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
-            yieldR outbound
+          let count = min mrh . fromIntegral $ end - start + 1
+          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start count
+          when (null chain) $
+            $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
+              "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
+          let outbound = BlockHeaders . map snd $ chain
+          $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
+          yieldR outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
       OEVoteToMake{} -> $logErrorS "handleEvents/OEVoteToMake" "absurd"
