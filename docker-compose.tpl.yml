@@ -153,6 +153,7 @@ services:
     - redisPort=6379
     - seqDebugMode=${seqDebugMode}
     - seqEventsBatchSize=${seqEventsBatchSize}
+    - seqEventsCostHeuristic=${seqEventsCostHeuristic}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
