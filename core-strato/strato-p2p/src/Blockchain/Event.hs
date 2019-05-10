@@ -1,3 +1,4 @@
+
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -164,10 +165,19 @@ handleEvents peer = awaitForever $ \case
       start' <- case dir of
         Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
         Forward -> return start
-      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
+      mrh <- gets maxReturnedHeaders
+      -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
+      -- 3/4s of the blocks will be dropped when creating the blockheaders
+      -- so we overcompensate here.
+      let count = (1 + skip') * max mrh max'
+      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' count
       when (null chain) $
-        $logInfoS "handleEvents/GetBlockHeaders" $ T.pack $ "Warning: A peer requested blocks starting at #" ++ show start ++ ", but we don't have these in our canonical chain.... I don't know what to do, so I am returning a blank response. This may indicate something unhealthy in the network."
-
+        $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $
+            ["Warning: A peer requested blocks starting at #"
+            , T.pack $ show start
+            , ", but we don't have these in our canonical chain...."
+            , " I don't know what to do, so I am returning a blank response."
+            , " This may indicate something unhealthy in the network."]
       yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
@@ -180,7 +190,9 @@ handleEvents peer = awaitForever $ \case
           start' <- case dir of
             Reverse -> return $ if num > fromIntegral max' then num - (fromIntegral max') else 1
             Forward -> return num
-          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
+          mrh <- gets maxReturnedHeaders
+          let count = (1 + skip') * min mrh (fromIntegral num)
+          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' count
           yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
@@ -208,7 +220,7 @@ handleEvents peer = awaitForever $ \case
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
             let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
-
+            let (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
             --     neededHashes = map headerHash neededHeaders
@@ -219,9 +231,10 @@ handleEvents peer = awaitForever $ \case
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
 
-            lift $ putBlockHeaders neededHeaders
-            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
-            yieldR . GetBlockBodies $ headerHash <$> neededHeaders
+            lift $ putBlockHeaders neededHeaders'
+            lift $ putRemainingBHeaders remainingHeaders
+            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
+            yieldR . GetBlockBodies $ headerHash <$> neededHeaders'
             stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
@@ -237,8 +250,10 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (GetBlockBodies [])   -> do
       stampActionTimestamp
       yieldR (BlockBodies []) -- todo parity bans peers when they do this. should we?
-    MsgEvt (GetBlockBodies shas) -> do
+    MsgEvt (GetBlockBodies shas') -> do
       stampActionTimestamp
+      mrh <- gets maxReturnedHeaders
+      let shas = take mrh shas'
       getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
           ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
@@ -272,15 +287,17 @@ handleEvents peer = awaitForever $ \case
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
         forM_ blocks' $ lift . SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
-        let remainingHeaders = drop (length bodies) headers
-        lift $ putBlockHeaders remainingHeaders
-        if null remainingHeaders
+        rHeaders <- lift getRemainingBHeaders
+        let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
+        lift $ putBlockHeaders neededHeaders
+        lift $ putRemainingBHeaders remainingHeaders
+        if null neededHeaders
             then when (newCount > 0) $ do
                 mrh <- gets maxReturnedHeaders
                 yieldR $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
                 stampActionTimestamp
             else do
-                yieldR $ GetBlockBodies (map headerHash remainingHeaders)
+                yieldR $ GetBlockBodies (map headerHash neededHeaders)
                 stampActionTimestamp
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
@@ -363,17 +380,17 @@ handleEvents peer = awaitForever $ \case
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yieldR outbound
-      OEAskForBlocks start end p -> do
+      OEAskForBlocks start _ p -> do
         ss <- shouldSendToPeer p
         when ss $ do
-          let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start + 1) 0 Forward
-          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Outgoing message: " ++ show outbound
-          yieldR outbound
+          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "syncFetch: " ++ show start
+          syncFetch Forward start
       OEPushBlocks start end p -> do
         ss <- shouldSendToPeer p
         when ss $ do
-          chain <- RBDB.withRedisBlockDB $
-            RBDB.getCanonicalHeaderChain start (fromIntegral $ end - start + 1)
+          mrh <- gets maxReturnedHeaders
+          let count = min mrh . fromIntegral $ end - start + 1
+          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start count
           when (null chain) $
             $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
               "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
@@ -481,3 +498,23 @@ checkPeerIsMember peer mems =
 
 peerIPAddress :: PPeer -> IPAddress
 peerIPAddress = readIP . T.unpack . pPeerIp
+
+{- to reduce redundant computations on dividing block chunks under txsLimit
+splitNeededHeaders :: [BlockHeader] -> [[BlockHeader]]
+splitNeededHeaders x =
+  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+      txsLensInLimit =  scanl (\x y -> if ((x+y)>flags_maxHeadersTxsLens) then y else x+y) 0 txsLens
+      indexToSplit :: Int -> [Int] -> [Int] -> [Int] -> [Int]
+      indexToSplit index li (x:xs) (y:ys) =  indexToSplit (index++) li' xs ys
+        where li = case (x==y) of
+          True -> li:index
+          False -> li
+      indexToSplit _ li [] [] = li
+  in splitAt -}
+
+splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
+splitNeededHeaders neededHeaders =
+  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+      txsLensInSums =  scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
+      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
+  in splitAt (length txsLensInLimit) neededHeaders

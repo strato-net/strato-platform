@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 
 import           Control.Monad
 import           Data.Aeson
@@ -14,10 +15,13 @@ import           Data.Maybe                      (isNothing)
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
+import           Data.Word
 import           Test.Hspec
+import           Test.Hspec.Runner
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.ArbitraryInstances()
+import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
@@ -30,8 +34,39 @@ import           Blockchain.Data.Transaction
 
 import           Test.QuickCheck
 
+predicate :: Path -> Bool
+predicate (_, _) = True
+predicate _ = False
+
 main :: IO()
-main = hspec $ do
+main = hspecWith (configAddFilter predicate defaultConfig) $ do
+  describe "ExtraData txcounts" $ do
+    it "does not parse a legacy extradata" $ example $ do
+      extraData2TxsLen "" `shouldBe` Nothing
+      extraData2TxsLen "Shortextra" `shouldBe` Nothing
+      extraData2TxsLen (B.replicate 32 0x0) `shouldBe` Nothing
+      extraData2TxsLen (B.replicate 32 0x0 <> "istanbul_extra") `shouldBe` Nothing
+
+    it "extracts two bytes from extradata" $ example $ do
+      extraData2TxsLen (B.replicate 32 0x6a) `shouldBe` Just 0x6a6a
+      extraData2TxsLen (B.replicate 32 0x76 <> "istanbul_extra") `shouldBe` Just 0x7676
+      extraData2TxsLen ("\x00\x82" <> B.replicate 30 0x0) `shouldBe` Just 0x82
+      extraData2TxsLen ("\x94\x00" <> B.replicate 40 0x0) `shouldBe` Just 0x9400
+
+    it "stores length in extradata" $ example $ do
+      txsLen2ExtraData 0 `shouldBe` B.replicate 32 0x0
+      txsLen2ExtraData 0xffff `shouldBe` ("\xff\xff" <> B.replicate 30 0x0)
+      txsLen2ExtraData 0xabcd `shouldBe` ("\xab\xcd" <> B.replicate 30 0x0)
+      txsLen2ExtraData 0xef `shouldBe` ("\x00\xef" <> B.replicate 30 0x0)
+      txsLen2ExtraData 0x1000 `shouldBe` ("\x10\x00" <> B.replicate 30 0x0)
+
+    it "round trips data appropriately" $ property $ \(w::Word16) ->
+      let input = fromIntegral w
+          got = extraData2TxsLen $ txsLen2ExtraData input
+      in if input > 0
+           then got `shouldBe` Just input
+           else got `shouldBe` Nothing
+
   describe "Data round trips" $ do
     enodeRLP
     enodeJSON

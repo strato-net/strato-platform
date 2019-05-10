@@ -34,6 +34,7 @@ import           Blockchain.Data.Address
 import qualified Blockchain.Data.AddressStateDB     as DD
 import qualified Blockchain.Data.BlockDB            as BDB
 import qualified Blockchain.Data.DataDefs           as DD
+import           Blockchain.Data.BlockHeader        (txsLen2ExtraData)
 import qualified Blockchain.Data.TransactionDef     as TD
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
@@ -440,7 +441,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataGasLimit         = nextGasLimit $ DD.blockDataGasLimit parentHeader
                         , DD.blockDataGasUsed          = 0
                         , DD.blockDataTimestamp        = time
-                        , DD.blockDataExtraData        = ""
+                        , DD.blockDataExtraData        = txsLen2ExtraData (length txs)
                         , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else SHA 0x0
                         , DD.blockDataNonce            = nonce
                         }

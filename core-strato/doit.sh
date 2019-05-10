@@ -46,6 +46,9 @@ function newnode {
   if [[ -n "${blockstanbul}" || -n "${txGossipFanout}" ]]; then
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
+  if [ -n "${averageTxsPerBlock}" ]; then
+    atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -56,6 +59,7 @@ function newnode {
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
      ${txgFlag} \
+     ${atbFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
@@ -120,13 +124,17 @@ function newnode {
   if [ -n "${seqEventsBatchSize}" ]; then
     sebFlag="--seqEventsBatchSize=${seqEventsBatchSize}"
   fi
+  if [-n "${seqEventsCostHeuristic}" ]; then
+      sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${svdFlag}" +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
+                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" \
+                         +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \

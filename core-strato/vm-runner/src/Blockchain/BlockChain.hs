@@ -21,12 +21,11 @@ module Blockchain.BlockChain
     , compactDiffs -- For testing
   ) where
 
+import           Conduit
 import           Control.Arrow                           ((&&&))
 import           Control.Lens.Operators
 import           Control.Monad
-import           Control.Monad.IO.Class
 import qualified Control.Monad.State                     as State
-import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Short                   as BSS
@@ -696,11 +695,14 @@ calculateAndEmitStateDiffs :: [(MP.StateRoot, SHA, Integer, Int)]
                            -> OutputBlock
                            -> ContextM ()
 calculateAndEmitStateDiffs srLog mOldPubHeader chainIds newBlock = when flags_sqlDiff $ do
-    diffs <- case mOldPubHeader of
-      Nothing -> return []
+    case mOldPubHeader of
+      Nothing -> return ()
       Just oldHeader -> do
         let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
-        calculateBatchedDiffs base srLog
+            diffLog = compactDiffs base srLog
+        runConduit $ yieldMany diffLog
+                  .| mapMC completeDiff
+                  .| mapM_C (lift . commitSqlDiffs)
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show (S.map (format . SHA) chainIds)
     let newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
@@ -709,9 +711,7 @@ calculateAndEmitStateDiffs srLog mOldPubHeader chainIds newBlock = when flags_sq
 
     $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
 
-    let allDiffs = diffs ++ chainDiffs
-
-    forM_ allDiffs $ lift . commitSqlDiffs
+    forM_ chainDiffs $ lift . commitSqlDiffs
 
 diffMaxCost :: Int
 diffMaxCost = 500
@@ -737,10 +737,8 @@ compactDiffs base (p:ps) = go (cost p) (promote base p) ps
             then pending:go (cost c) (promote pendingNext c) cs
             else go (pendingCost + cost c) (promote pendingBase c) cs
 
-calculateBatchedDiffs :: MP.StateRoot -> [(MP.StateRoot, SHA, Integer, Int)] -> ContextM [SD.StateDiff]
-calculateBatchedDiffs base = mapM go . compactDiffs base
-  where go :: (MP.StateRoot, MP.StateRoot, SHA, Integer) -> ContextM SD.StateDiff
-        go (src, dst, hsh, num) = do
-          $logInfoS "calculateAndEmitStateDiffs" . T.pack $
-              "Calculating StateDiff from: " ++ format src ++ "\nto: " ++ format dst
-          stateDiff Nothing num hsh src dst
+completeDiff :: ToDiff -> ContextM SD.StateDiff
+completeDiff (src, dst, hsh, num) = do
+  $logInfoS "calculateAndEmitStateDiffs" . T.pack $
+      "Calculating StateDiff from: " ++ format src ++ "\nto: " ++ format dst
+  stateDiff Nothing num hsh src dst
