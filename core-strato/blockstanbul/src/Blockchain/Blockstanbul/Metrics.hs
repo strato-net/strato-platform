@@ -53,3 +53,16 @@ proposalCount = unsafeRegister
 
 recordProposal :: MonadIO m => m ()
 recordProposal = liftIO $ incCounter proposalCount
+
+{-# NOINLINE historicBlocks #-}
+historicBlocks :: Vector Text Counter
+historicBlocks = unsafeRegister
+               . vector "result"
+               . counter
+               $ Info "pbft_historic_blocks" "Results of replaying historic blocks"
+
+acceptHistoric :: MonadIO m => m ()
+acceptHistoric = liftIO $ withLabel historicBlocks "accept" incCounter
+
+rejectHistoric :: MonadIO m => m ()
+rejectHistoric = liftIO $ withLabel historicBlocks "reject" incCounter

@@ -288,9 +288,12 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           blockNo = blockDataNumber . blockBlockData $ blk
       recordMaxBlockNumber "pbft_previousblock" blockNo
       case eNextSeqNo of
-        Left err -> $logWarnS "blockstanbul" . T.pack
-                    . printf "Rejecting historical block #%d: %s" blockNo $ err
+        Left err -> do
+          rejectHistoric
+          $logWarnS "blockstanbul" . T.pack
+                      . printf "Rejecting historical block #%d: %s" blockNo $ err
         Right (_, props) -> do
+          acceptHistoric
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
           editVoted blk props
           yield . ToCommit $ blk
