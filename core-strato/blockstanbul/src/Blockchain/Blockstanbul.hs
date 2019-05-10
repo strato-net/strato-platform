@@ -12,6 +12,7 @@ module Blockchain.Blockstanbul
   , TrustedMessage(..)
   , InEvent(..)
   , OutEvent(..)
+  , ForcedConfigChange(..)
   , finalHash
   , currentView
   , blockstanbulRunning
