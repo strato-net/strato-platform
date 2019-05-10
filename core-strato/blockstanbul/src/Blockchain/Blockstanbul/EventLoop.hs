@@ -416,6 +416,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
       lastParent .= Just hsh
       clearLock
+      leader <- use proposer
+      me <- selfAddr
+      when (leader == me) $
+        recordProposal
       s <- use $ view . sequence
       nextRound . Sequence $ s+1
 
