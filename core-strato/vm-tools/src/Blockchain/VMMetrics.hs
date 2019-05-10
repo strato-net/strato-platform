@@ -92,10 +92,10 @@ recordBaggerMetrics bs = liftIO $ do
   withLabel vmBaggerTxs "seen" $ \g -> setGauge g . fromIntegral . S.size . seen $ bs
 
 {-# NOINLINE numTxsFlushed #-}
-numTxsFlushed :: Counter
-numTxsFlushed = unsafeRegister
+numTxrsFlushed :: Counter
+numTxrsFlushed = unsafeRegister
               . counter
-              $ Info "vm_txs_flushed" "Number of transaction results flushed"
+              $ Info "vm_txrs_flushed" "Number of transaction results flushed"
 
 {-# NOINLINE txrQueueLength #-}
 txrQueueLength :: Gauge
