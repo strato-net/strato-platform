@@ -91,7 +91,7 @@ recordBaggerMetrics bs = liftIO $ do
   withLabel vmBaggerTxs "queued" $ \g -> setGauge g (atlVolume queued)
   withLabel vmBaggerTxs "seen" $ \g -> setGauge g . fromIntegral . S.size . seen $ bs
 
-{-# NOINLINE numTxsFlushed #-}
+{-# NOINLINE numTxrsFlushed #-}
 numTxrsFlushed :: Counter
 numTxrsFlushed = unsafeRegister
               . counter
@@ -106,7 +106,7 @@ txrQueueLength = unsafeRegister
 
 recordTxrFlush :: MonadIO m => Int -> m ()
 recordTxrFlush n = liftIO $ do
-  void $ addCounter numTxsFlushed $ fromIntegral n
+  void $ addCounter numTxrsFlushed $ fromIntegral n
   setGauge txrQueueLength 0
 
 recordTxrEnqueue :: MonadIO m => Int -> m ()
