@@ -219,7 +219,7 @@ handleEvents peer = awaitForever $ \case
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
             let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
-
+            let (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
             --     neededHashes = map headerHash neededHeaders
@@ -230,9 +230,10 @@ handleEvents peer = awaitForever $ \case
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
 
-            lift $ putBlockHeaders neededHeaders
-            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
-            yieldR . GetBlockBodies $ headerHash <$> neededHeaders
+            lift $ putBlockHeaders neededHeaders'
+            lift $ putRemainingBHeaders remainingHeaders
+            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
+            yieldR . GetBlockBodies $ headerHash <$> neededHeaders'
             stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
@@ -285,15 +286,17 @@ handleEvents peer = awaitForever $ \case
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
         forM_ blocks' $ lift . SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
-        let remainingHeaders = drop (length bodies) headers
-        lift $ putBlockHeaders remainingHeaders
-        if null remainingHeaders
+        rHeaders <- lift getRemainingBHeaders
+        let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
+        lift $ putBlockHeaders neededHeaders
+        lift $ putRemainingBHeaders remainingHeaders
+        if null neededHeaders
             then when (newCount > 0) $ do
                 mrh <- gets maxReturnedHeaders
                 yieldR $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
                 stampActionTimestamp
             else do
-                yieldR $ GetBlockBodies (map headerHash remainingHeaders)
+                yieldR $ GetBlockBodies (map headerHash neededHeaders)
                 stampActionTimestamp
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
@@ -494,3 +497,23 @@ checkPeerIsMember peer mems =
 
 peerIPAddress :: PPeer -> IPAddress
 peerIPAddress = readIP . T.unpack . pPeerIp
+
+{- to reduce redundant computations on dividing block chunks under txsLimit
+splitNeededHeaders :: [BlockHeader] -> [[BlockHeader]]
+splitNeededHeaders x =
+  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+      txsLensInLimit =  scanl (\x y -> if ((x+y)>flags_maxHeadersTxsLens) then y else x+y) 0 txsLens
+      indexToSplit :: Int -> [Int] -> [Int] -> [Int] -> [Int]
+      indexToSplit index li (x:xs) (y:ys) =  indexToSplit (index++) li' xs ys
+        where li = case (x==y) of
+          True -> li:index
+          False -> li
+      indexToSplit _ li [] [] = li
+  in splitAt -}
+
+splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
+splitNeededHeaders neededHeaders =
+  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+      txsLensInSums =  scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
+      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) txsLensInSums
+  in splitAt (length txsLensInLimit) neededHeaders
