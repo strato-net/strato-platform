@@ -46,6 +46,9 @@ function newnode {
   if [[ -n "${blockstanbul}" || -n "${txGossipFanout}" ]]; then
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
+  if [ -n "${averageTxsPerBlock}" ]; then
+    atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -56,6 +59,7 @@ function newnode {
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
      ${txgFlag} \
+     ${atbFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
