@@ -64,7 +64,10 @@ getRawStorageKeyValMC owner key = do
      theBMap <- fmap snd getRawStorageBlockDB
      case M.lookup (owner, key) theBMap of
        Just val' -> return val'
-       Nothing -> getRawStorageKeyValDB owner key
+       Nothing -> do
+         valFromDB <- getRawStorageKeyValDB owner key
+         putRawStorageKeyValMC owner key valFromDB --put in the TX cache for fast future lookups
+         return valFromDB
 
 getAllRawStorageKeyValsMC :: FullRawStorage m  => Address -> m [(MP.Key, B.ByteString)]
 getAllRawStorageKeyValsMC = getAllRawStorageKeyValsDB
@@ -120,7 +123,7 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
   forM_ (map fst allInserts) hashDBPut
   
   mpdb' <-
-    if False
+    if True                                 -- FEATUREFLAG  speed up putManyKeyVal
     then putManyKeyVal mpdb allInserts
     else putManyKeyValSlow mpdb allInserts
 
