@@ -42,7 +42,6 @@ import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
 import           Data.Foldable                 (for_, toList)
 import           Data.Maybe
-import           Data.Proxy
 import qualified Data.Set                      as S
 import qualified Data.Sequence                 as Q
 import           Data.String
