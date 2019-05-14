@@ -8,6 +8,7 @@ module Blockchain.Blockstanbul.EventLoop where
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
+import Control.Monad.Extra (whenM)
 import Control.Monad.Trans.Except
 import Blockchain.Output
 import Control.Monad.State.Class
@@ -57,6 +58,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _committed :: M.Map Address (SHA, ExtendedSignature)
   -- We've already sent out a commit message to indicate a transition
   -- to prepared
+  , _hasPreprepared :: Bool
   , _hasPrepared :: Bool
   , _hasCommitted :: Bool
   , _pendingRound :: Maybe RoundNumber
@@ -105,6 +107,7 @@ newContext v as senderlist pk =
      , _validators = valSet
      , _prepared = M.empty
      , _committed = M.empty
+     , _hasPreprepared = False
      , _hasPrepared = False
      , _hasCommitted = False
      , _pendingRound = Nothing
@@ -258,6 +261,7 @@ nextRound nt = do
   committed .= M.empty
   roundChanged .= M.empty
 
+  hasPreprepared .= False
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
@@ -315,6 +319,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
               $logErrorS "blockstanbul" "Lock has wrong block number; cannot commit"
             yield MakeBlockCommand
           Right () -> do
+            hasPreprepared .= True
             proposal .= Just realSealed
             yield =<< signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
@@ -416,9 +421,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
       lastParent .= Just hsh
       clearLock
-      leader <- use proposer
-      me <- selfAddr
-      when (leader == me) $
+      whenM (use hasPreprepared) $
         recordProposal
       s <- use $ view . sequence
       nextRound . Sequence $ s+1
