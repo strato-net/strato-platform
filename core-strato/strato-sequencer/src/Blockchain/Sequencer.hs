@@ -8,7 +8,7 @@
 {-# LANGUAGE TupleSections     #-}
 module Blockchain.Sequencer where
 
-import           ClassyPrelude                             (atomically)
+import           ClassyPrelude                             (atomically, sortOn)
 import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
@@ -320,7 +320,7 @@ expandBlock = awaitForever $ \sb -> do
       yield $ Left sb
     (ReadyToEmit totalPastDifficulty) -> do
       -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
-      (ldbOps, dryChain) <- lift . fmap unzip $ buildEmissionChain sb totalPastDifficulty
+      (ldbOps, dryChain) <- lift . fmap (unzip . sortOn (BDB.blockDataNumber . obBlockData . snd)) $ buildEmissionChain sb totalPastDifficulty
       lift . addLdbBatchOps . catMaybes $ ldbOps
       if dryChain /= []
         then do
