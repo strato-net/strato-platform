@@ -38,10 +38,8 @@ class (Ord k, Monad f) => Alters k a f where
   alterMany p ks f = do
     m <- lookupMany p ks
     m' <- f m
-    let inserts = m' M.\\ m
-        deletes = M.keys $ m  M.\\ m'
-    deleteMany p deletes
-    insertMany p inserts
+    deleteMany p . M.keys $ m M.\\ m'
+    insertMany p m'
     return m'
 
   alter :: Proxy a -> k -> (Maybe a -> f (Maybe a)) -> f (Maybe a)
