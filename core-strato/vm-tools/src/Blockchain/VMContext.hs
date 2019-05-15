@@ -32,7 +32,6 @@ module Blockchain.VMContext
     , compactContextM
     ) where
 
-
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch

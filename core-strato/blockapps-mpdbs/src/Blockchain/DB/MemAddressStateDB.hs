@@ -50,7 +50,7 @@ class HasMemAddressStateDB m where
   putAddressStateBlockDBMap :: M.Map Address AddressStateModification -> m ()
 
 getAddressState :: (Address `A.Alters` AddressState) m => Address -> m AddressState
-getAddressState = fmap (fromMaybe blankAddressState) . A.lookup A.Proxy
+getAddressState address = fromMaybe blankAddressState <$> A.lookup A.Proxy address
 
 getAddressStateMaybe :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m)
                      => Address -> m (Maybe AddressState)
