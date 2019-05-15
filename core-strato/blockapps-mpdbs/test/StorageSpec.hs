@@ -1,15 +1,19 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module StorageSpec (storageSpec) where
 
 import Control.DeepSeq
 import Control.Lens
 import Control.Monad
+import Control.Monad.Change.Alter
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
@@ -18,7 +22,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Database.LevelDB as DB
 import qualified Database.LevelDB.Base as DBB
 import GHC.Generics
-import Prelude hiding (abs)
+import Prelude hiding (abs, lookup)
 import System.Posix.Temp
 import System.Directory
 import Test.Hspec (Spec, describe, it)
@@ -65,6 +69,16 @@ instance HasMemAddressStateDB StorM where
   putAddressStateTxDBMap = assign atx
   getAddressStateBlockDBMap = use abs
   putAddressStateBlockDBMap = assign abs
+
+instance (Address `Alters` AddressState) StorM where
+  lookup _ k = M.lookup k <$> getAddressStateTxDBMap >>= \case
+    Just (ASModification as) -> return $ Just as
+    Just ASDeleted -> return Nothing
+    Nothing -> M.lookup k <$> getAddressStateBlockDBMap >>= \case
+      Just (ASModification as) -> return $ Just as
+      _ -> return Nothing
+  insert _ k v = getAddressStateTxDBMap >>= putAddressStateTxDBMap . M.insert k (ASModification v)
+  delete _ k   = getAddressStateTxDBMap >>= putAddressStateTxDBMap . M.insert k ASDeleted
 
 instance HasStateDB StorM where
   getStateDB = liftM2 MP.MPDB (use sdb) (use sdbsr)

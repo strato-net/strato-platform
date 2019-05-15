@@ -1,5 +1,7 @@
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.DB.RawStorageDB (
   HasRawStorageDB(..),
@@ -10,6 +12,7 @@ module Blockchain.DB.RawStorageDB (
   flushMemRawStorageDB
  ) where
 
+import           Control.Monad.Change.Alter                  (Alters)
 import           Control.Monad.Loops
 import           Control.Monad.State
 import           Data.ByteString                             (ByteString)
@@ -37,7 +40,12 @@ class MonadIO m => HasRawStorageDB m where
   getRawStorageBlockDB  :: m (DB.DB, M.Map (Address, B.ByteString) B.ByteString)
   putRawStorageBlockMap :: M.Map (Address, B.ByteString) B.ByteString -> m ()
 
-type FullRawStorage m = (HasMemAddressStateDB m, HasRawStorageDB m, HasStateDB m, HasHashDB m)
+type FullRawStorage m = ( HasMemAddressStateDB m
+                        , HasRawStorageDB m
+                        , HasStateDB m
+                        , HasHashDB m
+                        , (Address `Alters` AddressState) m
+                        )
 
 putRawStorageKeyVal' :: FullRawStorage m => Address -> B.ByteString -> B.ByteString -> m ()
 putRawStorageKeyVal' = putRawStorageKeyValMC
@@ -112,13 +120,13 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
       blankValRLP = rlpEncode blankVal
       (allDeletes, allInserts) = partition ((== blankValRLP) . snd) changes
       deleteKeys = map fst allDeletes
-  
+
   addressState <- getAddressState owner
-  db <- fmap fst getRawStorageBlockDB
+  db <- fst <$> getRawStorageBlockDB
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
-  
+
   forM_ (map fst allInserts) hashDBPut
-  
+
   mpdb' <-
     if False
     then putManyKeyVal mpdb allInserts

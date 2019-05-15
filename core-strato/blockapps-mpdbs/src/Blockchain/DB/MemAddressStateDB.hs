@@ -1,5 +1,7 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-} -- todo fixme
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric    #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 module Blockchain.DB.MemAddressStateDB (
   HasMemAddressStateDB(..),
   AddressStateModification(..),
@@ -15,7 +17,9 @@ module Blockchain.DB.MemAddressStateDB (
 ) where
 
 import           Control.Monad
+import qualified Control.Monad.Change.Alter     as A
 import           Control.DeepSeq
+import           Data.Maybe
 import qualified Data.Map                       as M
 import GHC.Generics
 
@@ -45,19 +49,8 @@ class HasMemAddressStateDB m where
   getAddressStateBlockDBMap :: m (M.Map Address AddressStateModification)
   putAddressStateBlockDBMap :: M.Map Address AddressStateModification -> m ()
 
-getAddressState :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
-                 Address -> m AddressState
-getAddressState address = do
-  theMap <- getAddressStateTxDBMap
-  case M.lookup address theMap of
-    Just (ASModification addressState) -> return addressState
-    Just ASDeleted                     -> return blankAddressState
-    Nothing                            -> do
-      theBMap <- getAddressStateBlockDBMap
-      case M.lookup address theBMap of
-        Just (ASModification addressState) -> return addressState
-        Just ASDeleted                     -> return blankAddressState
-        Nothing                            -> DB.getAddressState address
+getAddressState :: (Address `A.Alters` AddressState) m => Address -> m AddressState
+getAddressState = fmap (fromMaybe blankAddressState) . A.lookup A.Proxy
 
 getAddressStateMaybe :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m)
                      => Address -> m (Maybe AddressState)

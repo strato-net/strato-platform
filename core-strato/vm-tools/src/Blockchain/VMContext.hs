@@ -198,6 +198,11 @@ instance HasMemAddressStateDB ContextM where
     cxt <- get
     put $ cxt{contextAddressStateBlockDBMap=theMap}
 
+instance (Address `A.Alters` AddressState) ContextM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
+
 instance HasRawStorageDB ContextM where
   getRawStorageTxDB = do
     cxt <- get
@@ -338,15 +343,15 @@ incrementNonce address = A.repsert_ Proxy address $ \mState ->
 
 getNewAddress :: (MonadIO m, (Address `A.Alters` AddressState) m) => Address -> m Address
 getNewAddress address = do
-  addressState <- fromMaybe blankAddressState <$> A.lookup Proxy address
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show (addressStateNonce addressState)
-  let newAddress = getNewAddress_unsafe address (addressStateNonce addressState)
+  nonce <- addressStateNonce <$> getAddressState address
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show nonce
+  let newAddress = getNewAddress_unsafe address nonce
   incrementNonce address
   return newAddress
 
 purgeStorageMap :: HasStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  (_, storageMap) <- getRawStorageTxDB
+  storageMap <- snd <$> getRawStorageTxDB
   putRawStorageTxMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo

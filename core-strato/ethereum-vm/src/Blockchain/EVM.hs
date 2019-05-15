@@ -261,10 +261,7 @@ runOperation BALANCE = do
   address <- pop
   exists <- addressStateExists address
   if exists
-    then do
-    balance <- maybe 0 addressStateBalance <$>
-      A.lookup (Proxy :: Proxy AddressState) address
-    push balance
+    then push =<< addressStateBalance <$> getAddressState address
     else do
     accountCreationHack address --needed hack to get the tests working
     push (0::Word256)
@@ -309,8 +306,7 @@ runOperation GASPRICE = pushEnvVar envGasPrice
 runOperation EXTCODESIZE = do
   address <- pop
   accountCreationHack address --needed hack to get the tests working
-  addressState <- fromMaybe blankAddressState <$>
-    A.lookup (Proxy :: Proxy AddressState) address
+  addressState <- getAddressState address
   code <- getEVMCode' (addressStateCodeHash addressState)
   push $ (fromIntegral (B.length code)::Word256)
 
@@ -321,8 +317,7 @@ runOperation EXTCODECOPY = do
   codeOffset <- pop
   size <- pop
 
-  addressState <- fromMaybe blankAddressState <$>
-    A.lookup (Proxy :: Proxy AddressState) address
+  addressState <- getAddressState address
   code <- getEVMCode' (addressStateCodeHash addressState)
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 
@@ -499,8 +494,7 @@ runOperation CREATE = do
       (True, _) -> return Nothing
       (_, Nothing) -> create_debugWrapper block owner value initCodeBytes
       (_, Just _) -> do
-        addressState <- fromMaybe blankAddressState <$>
-          A.lookup (Proxy :: Proxy AddressState) owner
+        addressState <- getAddressState owner
 
         let newAddress = getNewAddress_unsafe owner $ addressStateNonce addressState
 
@@ -602,8 +596,7 @@ runOperation CALLCODE = do
 
 --  useGas $ fromIntegral newAccountCost
 
-  addressState <- fromMaybe blankAddressState <$>
-    A.lookup (Proxy :: Proxy AddressState) owner
+  addressState <- getAddressState owner
 
   callDepth <- getCallDepth
 
@@ -725,8 +718,7 @@ runOperation SUICIDE = do
   guardStorage
   address <- pop
   owner <- getEnvVar envOwner
-  addressState <- fromMaybe blankAddressState <$>
-    A.lookup (Proxy :: Proxy AddressState) owner
+  addressState <- getAddressState owner
 
   let allFunds = addressStateBalance addressState
   pay' "transferring all funds upon suicide" owner address allFunds
@@ -1195,8 +1187,7 @@ call :: Bool
 call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
      (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata = do
 
-  addressState <- fromMaybe blankAddressState <$>
-    A.lookup (Proxy :: Proxy AddressState) (Address codeAddress)
+  addressState <- getAddressState $ Address codeAddress
 
   code <-
     if 0 < codeAddress && codeAddress < 5
@@ -1226,8 +1217,7 @@ call' noValueTransfer = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  cp <- addressStateCodeHash . fromMaybe blankAddressState <$>
-    A.lookup (Proxy :: Proxy AddressState) receiveAddress
+  cp <- addressStateCodeHash <$> getAddressState receiveAddress
   let ch = case cp of
         EVMCode x -> x
         _ -> error "internal error- the EVM was called for non-evm code"
@@ -1264,10 +1254,9 @@ call' noValueTransfer = do
 create_debugWrapper :: BlockData -> Address -> Word256 -> B.ByteString -> VMM (Maybe Address)
 create_debugWrapper block owner value initCodeBytes = do
 
-  addressState <- fromMaybe blankAddressState <$>
-    A.lookup (Proxy :: Proxy AddressState) owner
+  balance <- addressStateBalance <$> getAddressState owner
 
-  if fromIntegral value > addressStateBalance addressState
+  if fromIntegral value > balance
     then return Nothing
     else do
       newAddress <- getNewAddress owner

@@ -38,7 +38,7 @@ module Blockchain.SolidVM.SM (
 import           Control.Applicative ((<|>))
 import           Control.Exception
 import           Control.Lens
-import           Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
@@ -51,10 +51,8 @@ import           Data.List (foldl')
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
-import           Data.Proxy
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
-import           Prelude hiding (lookup)
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
@@ -174,14 +172,7 @@ instance HasHashDB SM where
 instance HasCodeDB SM where
   getCodeDB = codeDB <$> get
 
-instance (Address `Alters` AddressState) SM where
-  alterMany _ addresses f = do
-    addressStates <- M.fromList . filter (isJust . snd) . zip addresses
-                 <$> mapM (lookup Proxy) addresses
-    addressStates' <- f addressStates
-    forM_ addressStates' . uncurry $ insert Proxy
-    mapM_ (uncurry $ delete Proxy) $ addressStates M.\\ addressStates'
-
+instance (Address `A.Alters` AddressState) SM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState

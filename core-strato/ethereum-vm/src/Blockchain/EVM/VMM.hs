@@ -1,9 +1,10 @@
-{-# LANGUAGE BangPatterns         #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 module Blockchain.EVM.VMM (
   VMM,
@@ -90,6 +91,11 @@ instance HasMemAddressStateDB VMM where
   putAddressStateBlockDBMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextAddressStateBlockDBMap=theMap}}
+
+instance (Address `A.Alters` AddressState) VMM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
 instance HasHashDB VMM where
     getHashDB = lift $ fmap (contextHashDB . dbs) get

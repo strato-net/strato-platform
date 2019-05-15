@@ -121,7 +121,7 @@ create' creator ch cc contractName' argExps = do
 
   A.repsert_ (Proxy :: Proxy AddressState) newAddress $ \mState ->
     let newAddressState = fromMaybe blankAddressState mState
-     in newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
+     in pure newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
@@ -250,10 +250,10 @@ getCodeAndCollection address' = do
     (hsh, cc') <- getCurrentCodeCollection
     return (c', hsh, cc')
     else do
-    addressState <- A.lookup (Proxy :: Proxy AddressState) address'
+    codeHash <- addressStateCodeHash <$> getAddressState address'
 
     (contractName', ch, cc) <-
-      case addressStateCodeHash addressState of
+      case codeHash of
         SolidVMCode cn ch' -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')

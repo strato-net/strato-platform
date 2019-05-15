@@ -1,8 +1,11 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 
 module Blockchain.TheDAOFork where
 
 import           Control.Monad
-import qualified Control.Monad.Change.Alter     as A
+import           Control.Monad.Change.Alter
+import           Data.Maybe                     (fromMaybe)
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
@@ -131,18 +134,18 @@ addresses = map Address
     0x807640a13483f8ac783c557fcdf27be11ea4ac7a
   ]
 
-runTheDAOFork :: (Monad m, (Address `Alters` AddressState) m) => m ()
+runTheDAOFork :: (Monad m, HasHashDB m, HasStateDB m, (Address `Alters` AddressState) m) => m ()
 runTheDAOFork = do
   values <-
     forM addresses $ \a -> do
-      balance <- maybe 0 addressStateBalance <$> a.lookup Proxy a
+      balance <- addressStateBalance <$> getAddressState a
       repsert_ Proxy a $ \mState ->
         let addressState = fromMaybe blankAddressState mState
-         in addressState{addressStateBalance=0}
+         in pure addressState{addressStateBalance=0}
       return balance
 
   let recipAddr = Address 0xbf4ed7b27f1d666546e30d74d50d173d20bca754
 
   repsert_ Proxy recipAddr $ \mState ->
     let recipAddressState = fromMaybe blankAddressState mState
-     in recipAddressState{addressStateBalance=addressStateBalance recipAddressState + sum values}
+     in pure recipAddressState{addressStateBalance=addressStateBalance recipAddressState + sum values}

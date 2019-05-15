@@ -1,4 +1,6 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.JsonRpcCommand (
   runJsonRpcCommand
@@ -11,7 +13,6 @@ import           Data.Binary
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy            as BL
-import           Data.Proxy
 import           Network.Kafka
 import           Network.Kafka.Producer
 
@@ -30,6 +31,7 @@ import           Blockchain.ExtWord
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.Address (Address(..))
 
 -- TODO: Add private chain functionality to JSON RPC commands
 
@@ -51,16 +53,14 @@ runJsonRpcCommand :: ( MonadLogger (t m)
                      , HasCodeDB (t m)
                      , HasStorageDB (t m)
                      , HasMemAddressStateDB (t m)
-                     , (Address `Alters` AddressState) (t m)
+                     , (Address `A.Alters` AddressState) (t m)
                      )
                   => JsonRpcCommand -> t m ()
 runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  balance <- maybe 0 addressStateBalance <$>
-    A.lookup Proxy address
-  let response = show balance
+  response <- show . addressStateBalance <$> getAddressState address
   liftIO $ produceResponse id $ BC.pack response
   liftIO $ putStrLn response
 
@@ -68,10 +68,9 @@ runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  addressState <- fromMaybe blankAddressState <$>
-    A.lookup Proxy getAddressState address
+  codeHash <- addressStateCodeHash <$> getAddressState address
   code <- getEVMCode $
-               case addressStateCodeHash addressState of
+               case codeHash of
                  EVMCode ch -> ch
                  _ -> error "runJsonRpcCommand currently only supported for the EVM"
   liftIO $ produceResponse id code
@@ -80,9 +79,7 @@ runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  nonce <- maybe 0 addressStateNonce <$>
-    A.lookup Proxy address
-  let response = show nonce
+  response <- show . addressStateNonce <$> getAddressState address
   liftIO $ produceResponse id $ BC.pack response
   liftIO $ putStrLn response
 

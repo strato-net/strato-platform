@@ -34,6 +34,7 @@ dependencies:
   - memory
   - merkle-patricia-db
   - merkle-patricia-db
+  - monad-alter
   - persistent-postgresql
   - resourcet
   - scientific

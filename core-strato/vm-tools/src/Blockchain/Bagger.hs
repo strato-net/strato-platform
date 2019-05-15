@@ -18,8 +18,6 @@ import           Control.Monad.Trans.Except
 import qualified Data.Map                           as M
 import           Data.Map.Ordered                   (OMap)
 import qualified Data.Map.Ordered                   as OMap
-import           Data.Maybe                         (fromMaybe)
-import           Data.Proxy
 import qualified Data.Text                          as T
 import           Data.Time.Clock
 import qualified Data.Set                           as S
@@ -29,6 +27,7 @@ import           Numeric                            (readHex)
 import           Blockapps.Crossmon
 
 import           Blockchain.CoreFlags               (flags_difficultyBomb, flags_testnet)
+import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 
 import qualified Blockchain.Bagger.BaggerState      as B
@@ -371,9 +370,7 @@ removeFromSeen :: MonadBagger m => OutputTx -> m ()
 removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
-getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance)
-                               . fromMaybe DD.blankAddressState
-                               <$> A.lookup Proxy addr
+getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$> getAddressState addr
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
 addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)

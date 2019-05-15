@@ -395,17 +395,16 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
         $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
         $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
 
-    addressState <- fmap (fromMaybe blankAddressState) . lift $
-      A.lookup (Proxy :: Proxy AddressState) tAddr
+    (acctBalance, acctNonce) <- lift $
+      (addressStateBalance &&& addressStateNonce) <$> getAddressState tAddr
 
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
-        acctBalance = addressStateBalance addressState
         realIG = fromIntegral intrinsicGas'
         maxGas = fromIntegral (maxBound :: Int)
     when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
     when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
     when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
-    unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState) t
+    unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
 
     let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
 
@@ -443,8 +442,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
         else do
             s1 <- lift $ addToBalance (blockDataCoinbase b) (fromIntegral intrinsicGas' * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
-            balance <- fmap (fromMaybe 0 . addressStateBalance) . lift $
-              A.lookup (Proxy :: Proxy AddressState) tAddr
+            balance <- lift $ addressStateBalance <$> getAddressState tAddr
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show balance
             return $
               evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
@@ -469,7 +467,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
                          return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
   --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
-  nonce <- maybe 0 addressStateNonce <$> A.lookup (Proxy :: Proxy AddressState) tAddr
+  nonce <- addressStateNonce <$> getAddressState tAddr
   let newAddress = getNewAddress_unsafe tAddr (nonce-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
 
   create isRunningTests'
@@ -494,10 +492,10 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
   let owner = transactionTo ut
 
 
-  addressState <- fromMaybe blankAddressState <$> A.lookup (Proxy :: Proxy AddressState) owner
+  codeHash <- addressStateCodeHash <$> getAddressState owner
 
   let call =
-        case addressStateCodeHash addressState of
+        case codeHash of
           EVMCode _ -> EVM.call
           SolidVMCode _ _ -> SolidVM.call
 
