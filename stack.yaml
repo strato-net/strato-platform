@@ -50,6 +50,7 @@ packages:
 - core-strato/blockstanbul/
 - core-strato/privacy/
 - core-strato/fastMP/
+- monad-alter/
 - shared-util/common-log/
 - shared-util/cross-monitoring/
 - shared-util/format
