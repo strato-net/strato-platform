@@ -535,13 +535,12 @@ runOperation CALL = do
 
   let stipend = if value > 0 then fromIntegral gCALLSTIPEND  else 0
 
-  addressState <- fromMaybe blankAddressState <$>
-    A.lookup (Proxy :: Proxy AddressState) owner
+  balance <- addressStateBalance <$> getAddressState owner
 
   callDepth <- getCallDepth
 
   (result, maybeBytes) <-
-    case (callDepth > 1023, fromIntegral value > addressStateBalance addressState, debugCallCreates vmState) of
+    case (callDepth > 1023, fromIntegral value > balance, debugCallCreates vmState) of
       (True, _, _) -> do
         lift $ $logInfoS "runOp/CALL" . T.pack $ CL.red "Call stack too deep."
         addGas stipend
