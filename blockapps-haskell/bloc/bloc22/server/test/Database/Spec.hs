@@ -89,7 +89,7 @@ solcSpec =
         mods `shouldSatisfy` isRight
 
 
-fromEither :: (Show a) => Either String a -> IO a
+fromEither :: Either String a -> IO a
 fromEither = either (error . ("Expected right: " ++)) return
 
 testUnparser :: String -> IO ()

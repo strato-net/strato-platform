@@ -45,7 +45,7 @@ import           Control.Monad                               (liftM)
 
 import qualified Data.NibbleString                           as N
 
-getAddressState :: (HasStateDB m, HasHashDB m) => Address -> m AddressState
+getAddressState :: HasStateDB m => Address -> m AddressState
 getAddressState address = do
     db <- getStateDB
     states <- MP.getKeyVal db $ addressAsNibbleString address

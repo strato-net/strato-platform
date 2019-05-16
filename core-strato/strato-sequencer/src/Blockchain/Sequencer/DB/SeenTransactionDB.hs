@@ -28,10 +28,10 @@ class (MonadIO m) => HasSeenTransactionDB m where
     putSeenTransactionDB :: SeenTransactionDB -> m ()
     {-# MINIMAL getSeenTransactionDB, putSeenTransactionDB #-}
 
-    wasTransactionHashWitnessed :: HasSeenTransactionDB m => SHA -> m Bool
+    wasTransactionHashWitnessed :: SHA -> m Bool
     wasTransactionHashWitnessed sha = (S.member sha . seen) <$> getSeenTransactionDB
 
-    witnessTransactionHash :: HasSeenTransactionDB m => SHA -> m ()
+    witnessTransactionHash :: SHA -> m ()
     witnessTransactionHash sha = do
         stxdb     <- getSeenTransactionDB
         let withClear = stxdb { operations = operations stxdb + 1
@@ -49,8 +49,8 @@ class (MonadIO m) => HasSeenTransactionDB m where
                                 (q Q.:< qs) -> withIntBoundFix { clearQueue = qs, seen = q `S.delete` seen withIntBoundFix }
         putSeenTransactionDB withPop
 
-    wasTransactionWitnessed :: (HasSeenTransactionDB m, Witnessable t) => t -> m Bool
+    wasTransactionWitnessed :: Witnessable t => t -> m Bool
     wasTransactionWitnessed  = wasTransactionHashWitnessed . witnessableHash
 
-    witnessTransaction      :: (HasSeenTransactionDB m, Witnessable t) => t -> m ()
+    witnessTransaction      :: Witnessable t => t -> m ()
     witnessTransaction       = witnessTransactionHash . witnessableHash

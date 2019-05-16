@@ -47,7 +47,6 @@ import           Blockchain.Strato.StateDiff.Kafka    (writeActionJSONToKafka, f
 
 import qualified Blockchain.Strato.Model.Address      as Ad
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
-import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 
 import           Text.Format
 
@@ -192,11 +191,8 @@ genesisInfoToGenesisBlock gi gn as = do
 
 initializeChainDBs :: ( HasCodeDB (t m)
                       , HasHashDB (t m)
-                      , Mem.HasMemAddressStateDB (t m)
-                      , RBDB.HasRedisBlockDB (t m)
                       , WrapsSQLDB t m
                       , HasStateDB (t m)
-                      , HasStorageDB (t m)
                       )
                    => Ext.Word256
                    -> ChainInfo

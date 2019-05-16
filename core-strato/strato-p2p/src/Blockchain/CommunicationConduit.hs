@@ -96,7 +96,7 @@ mkCanarySource = do
   -- Wait forever on nothing
   return $ sourceTQueue q
 
-mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
+mkEthP2PEventConduit :: (MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
                      -> ConduitM (Either P2PCNC Message) BC.ByteString m ()
