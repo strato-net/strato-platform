@@ -23,15 +23,15 @@ class Monad f => Modifiable a f where
   modify :: Proxy a -> (a -> f a) -> f a
   modify p f = get p >>= f >>= \a -> put p a >> return a
 
-  get :: Modifiable a f => Proxy a -> f a
+  get :: Proxy a -> f a
   get p = modify p pure
 
-  put :: Modifiable a f => Proxy a -> a -> f ()
+  put :: Proxy a -> a -> f ()
   put p a = modify_ p (pure . const a)
 
   {-# MINIMAL modify | get, put #-}
 
-  modify_ :: Modifiable a f => Proxy a -> (a -> f a) -> f ()
+  modify_ :: Proxy a -> (a -> f a) -> f ()
   modify_ p = void . modify p
 
   modifyStatefully :: Proxy a -> StateT a f () -> f a
