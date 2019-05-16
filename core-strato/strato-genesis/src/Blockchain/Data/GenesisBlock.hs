@@ -232,7 +232,6 @@ initializeChainDBs :: ( HasCodeDB (t m)
                       , HasHashDB (t m)
                       , WrapsSQLDB t m
                       , HasStateDB (t m)
-                      , (Ad.Address `A.Alters` AddressState) (t m)
                       )
                    => Ext.Word256
                    -> ChainInfo

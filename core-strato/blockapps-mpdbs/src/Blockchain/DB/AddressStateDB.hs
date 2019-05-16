@@ -61,7 +61,7 @@ getAddressState address = do
         where b = blankAddressState
       Just s -> return $ (rlpDecode . rlpDeserialize . rlpDecode) s
 
-getAddressStateMaybe :: (HasStateDB m, HasHashDB m) => Address -> m (Maybe AddressState)
+getAddressStateMaybe :: HasStateDB m => Address -> m (Maybe AddressState)
 getAddressStateMaybe address = do
   db <- getStateDB
   mState <- MP.getKeyVal db $ addressAsNibbleString address
