@@ -303,6 +303,7 @@ setEnv evmTraceMode false
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 
+mkdir -p /var/lib/strato
 cd /var/lib/strato
 
 if [[ -n $genesisBlock ]]
