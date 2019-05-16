@@ -15,7 +15,7 @@ module Blockchain.Data.GenesisBlock (
 
 import           Control.Exception
 import           Control.Monad
-import           Control.Monad.Change.Alter           (Alters)
+import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Crypto.Util                          (i2bs_unsized)
@@ -63,7 +63,7 @@ putStorageTrie :: ( HasHashDB m
                   , Mem.HasMemAddressStateDB m
                   , HasStateDB m
                   , HasStorageDB m
-                  , (Ad.Address `Alters` AddressState) m
+                  , (Ad.Address `A.Alters` AddressState) m
                   ) =>
                   Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
 putStorageTrie address slots = do
@@ -75,26 +75,28 @@ putAccount :: ( HasHashDB m
               , Mem.HasMemAddressStateDB m
               , HasStateDB m
               , HasStorageDB m
-              , (Ad.Address `Alters` AddressState) m
+              , (Ad.Address `A.Alters` AddressState) m
               )
            => AccountInfo
            -> m ()
 putAccount acc = case acc of
   NonContract address balance' ->
-    putAddressState address blankAddressState{addressStateBalance=balance'}
+    A.insert A.Proxy address blankAddressState{addressStateBalance=balance'}
   ContractNoStorage address balance' codeHash' -> do
-    putAddressState address blankAddressState{addressStateBalance=balance',
-                                              addressStateCodeHash=EVMCode codeHash'}
+    A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
+                                            , addressStateCodeHash=EVMCode codeHash'
+                                            }
   ContractWithStorage address balance' codeHash' slots -> do
-    putAddressState address blankAddressState{addressStateBalance=balance',
-                                              addressStateCodeHash=EVMCode codeHash'}
+    A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
+                                            , addressStateCodeHash=EVMCode codeHash'
+                                            }
     putStorageTrie address slots
 
 initializeStateDB :: ( HasHashDB m
                      , Mem.HasMemAddressStateDB m
                      , HasStateDB m
                      , HasStorageDB m
-                     , (Ad.Address `Alters` AddressState) m
+                     , (Ad.Address `A.Alters` AddressState) m
                      )
                   => [AccountInfo]
                   -> m ()
@@ -106,7 +108,7 @@ initializeStateDBAndAccountInfos :: ( HasHashDB m
                                     , Mem.HasMemAddressStateDB m
                                     , HasStateDB m
                                     , HasStorageDB m
-                                    , (Ad.Address `Alters` AddressState) m
+                                    , (Ad.Address `A.Alters` AddressState) m
                                     )
                                  => [AccountInfo]
                                  -> String
@@ -135,11 +137,11 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
          ["a", a, b]  -> do
            let address = Ad.Address $ parseHex a
            liftIO $ putStrLn $ "adding account: " ++ format address
-           putAddressState address blankAddressState{addressStateBalance= read b}
+           A.insert A.Proxy address blankAddressState{addressStateBalance= read b}
          ["a", a, b, c]  -> do
            let address = Ad.Address $ parseHex a
            liftIO $ putStrLn $ "adding account: " ++ format address
-           putAddressState address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ SHA $ parseHex c}
+           A.insert A.Proxy address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ SHA $ parseHex c}
          _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
 
       liftIO $ putStrLn $ "flushing batch: " ++ show batchCount
@@ -165,7 +167,7 @@ chainInfoToGenesisState :: ( HasCodeDB m
                            , Mem.HasMemAddressStateDB m
                            , HasStateDB m
                            , HasStorageDB m
-                           , (Ad.Address `Alters` AddressState) m
+                           , (Ad.Address `A.Alters` AddressState) m
                            )
                           => ChainInfo
                           -> m StateRoot
@@ -189,7 +191,7 @@ genesisInfoToGenesisBlock :: ( HasCodeDB m
                              , Mem.HasMemAddressStateDB m
                              , HasStateDB m
                              , HasStorageDB m
-                             , (Ad.Address `Alters` AddressState) m
+                             , (Ad.Address `A.Alters` AddressState) m
                              )
                           => GenesisInfo
                           -> String
@@ -228,7 +230,7 @@ initializeChainDBs :: ( HasCodeDB (t m)
                       , HasHashDB (t m)
                       , WrapsSQLDB t m
                       , HasStateDB (t m)
-                      , (Ad.Address `Alters` AddressState) (t m)
+                      , (Ad.Address `A.Alters` AddressState) (t m)
                       )
                    => Ext.Word256
                    -> ChainInfo

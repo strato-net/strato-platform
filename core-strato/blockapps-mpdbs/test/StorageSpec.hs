@@ -71,14 +71,9 @@ instance HasMemAddressStateDB StorM where
   putAddressStateBlockDBMap = assign abs
 
 instance (Address `Alters` AddressState) StorM where
-  lookup _ k = M.lookup k <$> getAddressStateTxDBMap >>= \case
-    Just (ASModification as) -> return $ Just as
-    Just ASDeleted -> return Nothing
-    Nothing -> M.lookup k <$> getAddressStateBlockDBMap >>= \case
-      Just (ASModification as) -> return $ Just as
-      _ -> return Nothing
-  insert _ k v = getAddressStateTxDBMap >>= putAddressStateTxDBMap . M.insert k (ASModification v)
-  delete _ k   = getAddressStateTxDBMap >>= putAddressStateTxDBMap . M.insert k ASDeleted
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
 instance HasStateDB StorM where
   getStateDB = liftM2 MP.MPDB (use sdb) (use sdbsr)

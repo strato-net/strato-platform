@@ -12,7 +12,7 @@ module Blockchain.DB.RawStorageDB (
   flushMemRawStorageDB
  ) where
 
-import           Control.Monad.Change.Alter                  (Alters)
+import qualified Control.Monad.Change.Alter                  as A
 import           Control.Monad.Loops
 import           Control.Monad.State
 import           Data.ByteString                             (ByteString)
@@ -44,7 +44,7 @@ type FullRawStorage m = ( HasMemAddressStateDB m
                         , HasRawStorageDB m
                         , HasStateDB m
                         , HasHashDB m
-                        , (Address `Alters` AddressState) m
+                        , (Address `A.Alters` AddressState) m
                         )
 
 putRawStorageKeyVal' :: FullRawStorage m => Address -> B.ByteString -> B.ByteString -> m ()
@@ -134,7 +134,7 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
 
   mpdb'' <- deleteManyKeyVal mpdb' deleteKeys
 
-  putAddressState owner addressState{addressStateContractRoot=MP.stateRoot mpdb''}
+  A.insert A.Proxy owner addressState{addressStateContractRoot=MP.stateRoot mpdb''}
 
 
 deleteManyKeyVal :: MonadIO m=>
@@ -146,7 +146,7 @@ putManyKeyValSlow :: MonadIO m=>
                      MP.MPDB -> [(MP.Key, MP.Val)] -> m MP.MPDB
 putManyKeyValSlow mpdb listOfInserts = do
   concatM (map (flip putRawStorageKeyValDB) listOfInserts) mpdb
-  
+
 putRawStorageKeyValDB :: MonadIO m =>
                          MP.MPDB -> (MP.Key, MP.Val) -> m MP.MPDB
 putRawStorageKeyValDB mpdb (key, val) = do

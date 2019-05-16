@@ -135,14 +135,9 @@ instance HasMemAddressStateDB SetupDBM where
     liftIO $ atomicWriteIORef lasbref theMap
 
 instance (Address `A.Alters` AddressState) SetupDBM where
-  lookup _ k = Map.lookup k <$> getAddressStateTxDBMap >>= \case
-    Just (ASModification as) -> return $ Just as
-    Just ASDeleted -> return Nothing
-    Nothing -> Map.lookup k <$> getAddressStateBlockDBMap >>= \case
-      Just (ASModification as) -> return $ Just as
-      _ -> return Nothing
-  insert _ k v = getAddressStateTxDBMap >>= putAddressStateTxDBMap . Map.insert k (ASModification v)
-  delete _ k   = getAddressStateTxDBMap >>= putAddressStateTxDBMap . Map.insert k ASDeleted
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
 instance HasHashDB SetupDBM where
   getHashDB = asks hashDB
