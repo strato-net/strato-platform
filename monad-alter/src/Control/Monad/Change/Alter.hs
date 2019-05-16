@@ -24,6 +24,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import qualified Control.Monad.State.Class   as State
 import           Control.Monad.Trans.State   (evalStateT, execStateT, StateT)
+import           Data.Default
 import qualified Data.IntMap                 as IM
 import           Data.IORef
 import           Data.Map.Strict             (Map)
@@ -100,6 +101,30 @@ class (Ord k, Monad f) => Alters k a f where
 
   adjustStatefully_ :: Monad f => Proxy a -> k -> StateT a f () -> f ()
   adjustStatefully_ p k = void . adjustStatefully p k
+
+  adjustWithDefault :: Default a => Proxy a -> k -> (a -> f a) -> f a
+  adjustWithDefault p k f = fmap fromJust $ alter p k (fmap Just . f . fromMaybe def)
+
+  adjustWithDefault_ :: Default a => Proxy a -> k -> (a -> f a) -> f ()
+  adjustWithDefault_ p k = void . adjustWithDefault p k
+
+  adjustWithDefaultStatefully :: (Default a, Monad f) => Proxy a -> k -> StateT a f () -> f a
+  adjustWithDefaultStatefully p k = adjustWithDefault p k . execStateT
+
+  adjustWithDefaultStatefully_ :: (Default a, Monad f) => Proxy a -> k -> StateT a f () -> f ()
+  adjustWithDefaultStatefully_ p k = void . adjustWithDefaultStatefully p k
+
+  adjustWithMempty :: Monoid a => Proxy a -> k -> (a -> f a) -> f a
+  adjustWithMempty p k f = fmap fromJust $ alter p k (fmap Just . f . fromMaybe mempty)
+
+  adjustWithMempty_ :: Monoid a => Proxy a -> k -> (a -> f a) -> f ()
+  adjustWithMempty_ p k = void . adjustWithMempty p k
+
+  adjustWithMemptyStatefully :: (Monoid a, Monad f) => Proxy a -> k -> StateT a f () -> f a
+  adjustWithMemptyStatefully p k = adjustWithMempty p k . execStateT
+
+  adjustWithMemptyStatefully_ :: (Monoid a, Monad f) => Proxy a -> k -> StateT a f () -> f ()
+  adjustWithMemptyStatefully_ p k = void . adjustWithMemptyStatefully p k
 
   repsert :: Proxy a -> k -> (Maybe a -> f a) -> f a
   repsert p k f = fmap fromJust $ alter p k (fmap Just . f)
