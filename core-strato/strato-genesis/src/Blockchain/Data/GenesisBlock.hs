@@ -84,12 +84,12 @@ putAccount acc = case acc of
     A.insert A.Proxy address blankAddressState{addressStateBalance=balance'}
   ContractNoStorage address balance' codeHash' -> do
     A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
-                                            , addressStateCodeHash=EVMCode codeHash'
-                                            }
+                                              , addressStateCodeHash=EVMCode codeHash'
+                                              }
   ContractWithStorage address balance' codeHash' slots -> do
     A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
-                                            , addressStateCodeHash=EVMCode codeHash'
-                                            }
+                                              , addressStateCodeHash=EVMCode codeHash'
+                                              }
     putStorageTrie address slots
 
 initializeStateDB :: ( HasHashDB m
