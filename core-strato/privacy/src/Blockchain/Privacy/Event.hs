@@ -103,7 +103,7 @@ insertChainHash cHash chainId = repsert_ Proxy cHash $ \case
   Nothing -> pure $ chainHashEntryWithChainId chainId
   Just che -> pure $ (onChainId .~ Just chainId) che
 
-useChainHash :: (Monad m, (SHA `Alters` ChainHashEntry) m) => SHA -> m ()
+useChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m ()
 useChainHash cHash = adjustStatefully_ Proxy cHash $ used .= True
 
 getChainBuffer :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m (CircularBuffer SHA)

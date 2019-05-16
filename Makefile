@@ -64,7 +64,7 @@ smd:
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/
 
 get_solcs:
-	mkdir -p ${TMDIR} ${FAKEROOT}
+	mkdir -p ${TMPDIR} ${FAKEROOT}/usr/local/bin
 	# One copy for the buildbase and one copy for the deploybase for tests and production respectively
 	blockapps-haskell/pull_solc.sh 0.4.25 ${TMPDIR}/solc-0.4 ${TMPDIR}/license-solc-0.4
 	blockapps-haskell/pull_solc.sh 0.5.2 ${TMPDIR}/solc-0.5 ${TMPDIR}/license-solc-0.5
