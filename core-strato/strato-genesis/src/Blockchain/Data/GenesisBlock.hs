@@ -103,6 +103,7 @@ initializeStateDB :: ( HasHashDB m
 initializeStateDB addressInfo = do
     initializeBlankStateDB
     mapM_ putAccount addressInfo
+    Mem.flushMemAddressStateDB
 
 initializeStateDBAndAccountInfos :: ( HasHashDB m
                                     , Mem.HasMemAddressStateDB m
@@ -151,6 +152,7 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
     forM_ addressInfo $ \account -> do
       liftIO $ print account
       putAccount account
+    Mem.flushMemAddressStateDB
 
 
 parseHex::(Num a, Eq a)=>String->a
