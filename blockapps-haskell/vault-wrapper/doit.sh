@@ -40,5 +40,6 @@ if [ ! -f initialized ]; then
     date '+%Y-%m-%d %H:%M:%S' > initialized
 fi
 
-/usr/bin/blockapps-vault-wrapper-server --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-                       --database="$postgres_vault_wrapper_db" --minLogLevel="${minLogLevel}"
+blockapps-vault-wrapper-server \
+  --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" \
+  --password="$postgres_password" --database="$postgres_vault_wrapper_db" --minLogLevel="${minLogLevel}"
