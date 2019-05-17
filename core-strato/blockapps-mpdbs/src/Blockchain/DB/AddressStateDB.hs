@@ -41,7 +41,6 @@ import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Base16                      as B16
 import qualified Data.ByteString.Char8                       as BC
 import           Data.Maybe
-import           Data.Traversable                            (for)
 
 import           Control.Monad                               (liftM)
 
@@ -65,7 +64,7 @@ getAddressStateMaybe :: HasStateDB m => Address -> m (Maybe AddressState)
 getAddressStateMaybe address = do
   db <- getStateDB
   mState <- MP.getKeyVal db $ addressAsNibbleString address
-  for mState $ return . rlpDecode . rlpDeserialize . rlpDecode
+  return $ rlpDecode . rlpDeserialize . rlpDecode <$> mState
 
 getAllAddressStates::(HasHashDB m, HasStateDB m) => m [(Address, AddressState)]
 getAllAddressStates = do
