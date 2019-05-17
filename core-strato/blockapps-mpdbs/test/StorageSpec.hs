@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -144,19 +145,19 @@ storageSpec = do
                             ]
 
     it "put 0 should not change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> getAddressState 0x1234
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (0x1234 :: Address)
       want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
       putStorageKeyVal' 0x1234 0x3 0x0
       flushMemStorageDB
-      got <- addressStateContractRoot <$> getAddressState 0x1234
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (0x1234 :: Address)
       want `shouldBe` got
 
 
     it "put 1 should change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> getAddressState 0x222
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (0x222 :: Address)
       putStorageKeyVal' 0x1234 0x3 0x44
       flushMemStorageDB
-      got <- addressStateContractRoot <$> getAddressState 0x1234
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (0x1234 :: Address)
       want `shouldNotBe` got
       got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
 

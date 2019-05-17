@@ -2,6 +2,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Blockchain.SolidVM
     (
@@ -24,7 +25,6 @@ import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
 import           Data.Maybe
-import           Data.Proxy
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
 import           Data.Time.Clock.POSIX
@@ -40,7 +40,6 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
-import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
@@ -119,7 +118,7 @@ create' creator ch cc contractName' argExps = do
 
   initializeAction newAddress contractName' ch
 
-  A.adjustWithDefault_ (Proxy :: Proxy AddressState) newAddress $ \newAddressState ->
+  A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
                         , addressStateCodeHash = SolidVMCode contractName' ch
                         }
@@ -251,7 +250,7 @@ getCodeAndCollection address' = do
     (hsh, cc') <- getCurrentCodeCollection
     return (c', hsh, cc')
     else do
-    codeHash <- addressStateCodeHash <$> getAddressState address'
+    codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
     (contractName', ch, cc) <-
       case codeHash of

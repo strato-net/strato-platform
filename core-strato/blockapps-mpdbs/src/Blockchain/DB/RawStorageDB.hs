@@ -121,7 +121,7 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
       (allDeletes, allInserts) = partition ((== blankValRLP) . snd) changes
       deleteKeys = map fst allDeletes
 
-  addressState <- getAddressState owner
+  addressState <- A.lookupWithDefault A.Proxy owner
   db <- fst <$> getRawStorageBlockDB
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
 
@@ -159,15 +159,15 @@ deleteRawStorageKeyValDB mpdb key =
 
 getRawStorageKeyValDB :: FullRawStorage m => Address -> B.ByteString -> m B.ByteString
 getRawStorageKeyValDB owner key = do
-  addressState <- getAddressState owner
-  db <- fmap fst getRawStorageBlockDB
-  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
+  contractRoot <- addressStateContractRoot <$> A.lookupWithDefault A.Proxy owner
+  db <- fst <$> getRawStorageBlockDB
+  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=contractRoot}
   maybe blankVal rlpDecode <$> MP.getKeyVal mpdb (N.EvenNibbleString key)
 
 getAllRawStorageKeyValsDB :: FullRawStorage m => Address -> m [(MP.Key, B.ByteString)]
 getAllRawStorageKeyValsDB owner = do
-  addressState <- getAddressState owner
-  db <- fmap fst getRawStorageBlockDB
-  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
+  contractRoot <- addressStateContractRoot <$> A.lookupWithDefault A.Proxy owner
+  db <- fst <$> getRawStorageBlockDB
+  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=contractRoot}
   kvs <- MP.unsafeGetAllKeyVals mpdb
   return $ map (fmap rlpDecode) kvs

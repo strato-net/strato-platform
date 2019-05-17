@@ -4,6 +4,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
 {-# OPTIONS -fprof-auto -fprof-cafs #-}
 module Blockchain.Bagger where
@@ -27,7 +28,6 @@ import           Numeric                            (readHex)
 import           Blockapps.Crossmon
 
 import           Blockchain.CoreFlags               (flags_difficultyBomb, flags_testnet)
-import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 
 import qualified Blockchain.Bagger.BaggerState      as B
@@ -370,7 +370,8 @@ removeFromSeen :: MonadBagger m => OutputTx -> m ()
 removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
-getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$> getAddressState addr
+getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$>
+  A.lookupWithDefault (A.Proxy @DD.AddressState) addr
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
 addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)

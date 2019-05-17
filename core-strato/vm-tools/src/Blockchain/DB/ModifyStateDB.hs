@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.DB.ModifyStateDB (
@@ -13,12 +14,11 @@ import qualified Control.Monad.Change.Alter      as A
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.DB.MemAddressStateDB
 
 addToBalance :: (Monad m, (Address `A.Alters` AddressState) m) =>
               Address -> Integer -> m Bool
 addToBalance address val = do
-  getAddressState address >>= \addressState ->
+  A.lookupWithDefault (A.Proxy @AddressState) address >>= \addressState ->
     let newVal = addressStateBalance addressState + val
      in if newVal < 0
           then return False
@@ -40,7 +40,7 @@ pay _description fromAddr toAddr val = do
         $logDebugS "pay" "insufficient funds"
   -}
 
-  balance <- addressStateBalance <$> getAddressState fromAddr
+  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy :: A.Proxy AddressState) fromAddr
   if balance < val
     then return False
     else do

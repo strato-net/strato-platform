@@ -19,7 +19,6 @@ import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
-import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Mining
 import           Blockchain.Mining.Instant
@@ -124,4 +123,4 @@ checkValidity isHomestead parentBSum b = do
 isNonceValid :: (Address `A.Alters` AddressState) f => OutputTx -> f Bool
 isNonceValid OutputTx{otBaseTx=base, otSigner=txAddr} =
   let txNonce = transactionNonce base
-   in (== txNonce) . addressStateNonce <$> getAddressState txAddr
+   in (== txNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy txAddr

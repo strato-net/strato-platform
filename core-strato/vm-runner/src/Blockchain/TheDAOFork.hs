@@ -8,9 +8,7 @@ import           Control.Monad.Change.Alter
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.HashDB
-import           Blockchain.DB.StateDB
 
 addresses::[Address]
 addresses = map Address
@@ -133,11 +131,11 @@ addresses = map Address
     0x807640a13483f8ac783c557fcdf27be11ea4ac7a
   ]
 
-runTheDAOFork :: (Monad m, HasHashDB m, HasStateDB m, (Address `Alters` AddressState) m) => m ()
+runTheDAOFork :: (Monad m, HasHashDB m, (Address `Alters` AddressState) m) => m ()
 runTheDAOFork = do
   values <-
     forM addresses $ \a -> do
-      balance <- addressStateBalance <$> getAddressState a
+      balance <- addressStateBalance <$> lookupWithDefault Proxy a
       adjustWithDefault_ Proxy a $ \addressState ->
         pure addressState{addressStateBalance=0}
       return balance

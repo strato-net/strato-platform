@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.JsonRpcCommand (
@@ -18,11 +19,10 @@ import           Network.Kafka.Producer
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
-import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.HashDB
-import           Blockchain.DB.MemAddressStateDB hiding (getAddressState)
+import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
@@ -60,7 +60,8 @@ runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  response <- show . addressStateBalance <$> getAddressState address
+  response <- show . addressStateBalance <$>
+    A.lookupWithDefault (A.Proxy @AddressState) address
   liftIO $ produceResponse id $ BC.pack response
   liftIO $ putStrLn response
 
@@ -68,7 +69,8 @@ runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  codeHash <- addressStateCodeHash <$> getAddressState address
+  codeHash <- addressStateCodeHash <$>
+    A.lookupWithDefault (A.Proxy @AddressState) address
   code <- getEVMCode $
                case codeHash of
                  EVMCode ch -> ch
@@ -79,7 +81,8 @@ runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- runWithSQL getBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
-  response <- show . addressStateNonce <$> getAddressState address
+  response <- show . addressStateNonce <$>
+    A.lookupWithDefault (A.Proxy @AddressState) address
   liftIO $ produceResponse id $ BC.pack response
   liftIO $ putStrLn response
 
