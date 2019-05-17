@@ -10,6 +10,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Control.Lens
 import           Control.Monad.IO.Class
+import           Data.Default
 import           Data.Function                 (on)
 import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
@@ -28,12 +29,21 @@ maxBufferCapacity = 4096
 emptyCircularBuffer :: CircularBuffer a
 emptyCircularBuffer = CircularBuffer maxBufferCapacity 0 Q.empty
 
+instance Default (CircularBuffer a) where
+  def = emptyCircularBuffer
+
 data ChainHashEntry = ChainHashEntry
   { _used         :: Bool
   , _onChainId    :: Maybe Word256
   , _inBlocks     :: Q.Seq SHA
   } deriving (Show)
 makeLenses ''ChainHashEntry
+
+blankChainHashEntry :: ChainHashEntry
+blankChainHashEntry = ChainHashEntry False Nothing Q.empty
+
+instance Default ChainHashEntry where
+  def = blankChainHashEntry
 
 chainHashEntryUsed :: ChainHashEntry
 chainHashEntryUsed = ChainHashEntry True Nothing Q.empty

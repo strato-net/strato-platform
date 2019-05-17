@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Blockchain.VM.TestEthereum
     ( runAllTests
@@ -11,6 +12,7 @@ module Blockchain.VM.TestEthereum
     ) where
 
 import           Control.Monad
+import qualified Control.Monad.Change.Alter                  as A
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Reader
@@ -76,7 +78,7 @@ populateAndConvertAddressState cid owner addressState' = do
   forM_ (M.toList $ storage' addressState') $
     \(key, val) -> putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
 
-  addressState <- getAddressState owner
+  addressState <- A.lookupWithDefault (A.Proxy @AddressState) owner
 
   return $
     AddressState

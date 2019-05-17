@@ -1,8 +1,10 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 module Blockchain.EVM.VMM (
   VMM,
@@ -41,7 +43,7 @@ module Blockchain.EVM.VMM (
   ) where
 
 import           Control.Monad
-import           Blockchain.Output
+import qualified Control.Monad.Change.Alter         as A
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
@@ -53,6 +55,7 @@ import qualified Data.Set                           as S
 import           MonadUtils
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -68,6 +71,7 @@ import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
+import           Blockchain.Output
 import           Blockchain.SHA
 import           Blockchain.VM.VMException
 import           Blockchain.VMContext
@@ -87,6 +91,11 @@ instance HasMemAddressStateDB VMM where
   putAddressStateBlockDBMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextAddressStateBlockDBMap=theMap}}
+
+instance (Address `A.Alters` AddressState) VMM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
 instance HasHashDB VMM where
     getHashDB = lift $ fmap (contextHashDB . dbs) get

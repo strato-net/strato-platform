@@ -6,6 +6,7 @@ dependencies:
   - blockapps-data
   - blockapps-util
   - containers
+  - data-default
   - format
   - lens
   - monad-alter

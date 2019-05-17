@@ -1,4 +1,6 @@
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds  #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 module Blockchain.DB.SolidStorageDB (
   HasSolidStorageDB,
   putSolidStorageKeyVal',
@@ -9,9 +11,11 @@ module Blockchain.DB.SolidStorageDB (
   FullSolidStorage
   ) where
 
+import           Control.Monad.Change.Alter                  (Alters)
 import           Data.Bifunctor                              (second)
 import qualified Data.ByteString                             as B
 
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia          as MP
 import           Blockchain.DB.HashDB
@@ -23,7 +27,12 @@ import           SolidVM.Model.Storable
 
 type HasSolidStorageDB = HasRawStorageDB
 
-type FullSolidStorage m = (HasMemAddressStateDB m, HasSolidStorageDB m, HasStateDB m, HasHashDB m)
+type FullSolidStorage m = ( HasMemAddressStateDB m
+                          , HasSolidStorageDB m
+                          , HasStateDB m
+                          , HasHashDB m
+                          , (Address `Alters` AddressState) m
+                          )
 
 toKey :: StoragePath -> B.ByteString
 toKey = unparsePath

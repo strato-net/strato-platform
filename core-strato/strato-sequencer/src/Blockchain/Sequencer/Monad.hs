@@ -34,7 +34,7 @@ import           Control.Concurrent                        (forkIO, threadDelay)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
-import           Control.Monad.Change.Alter
+import           Control.Monad.Change.Modify               (Has(..))
 import           Control.Monad.Reader
 import           Control.Monad.State
 
@@ -132,33 +132,17 @@ instance HasPrivateHashDB SequencerM where
     requestTransaction = insertGetTransactionsDB
 
     -- TODO: Add persistence layer
-instance (SHA `Alters` OutputBlock) SequencerM where
-  alterMany _ bHashes f = do
-    bhr <- use blockHashRegistry
-    bhr' <- f . M.restrictKeys bhr $ S.fromList bHashes
-    blockHashRegistry %= M.union bhr'
-    return bhr'
+instance SequencerContext `Has` (Map SHA OutputBlock) where
+  this _ = blockHashRegistry
 
-instance (SHA `Alters` OutputTx) SequencerM where
-  alterMany _ tHashes f = do
-    thr <- use txHashRegistry
-    thr' <- f . M.restrictKeys thr $ S.fromList tHashes
-    txHashRegistry %= M.union thr'
-    return thr'
+instance SequencerContext `Has` (Map SHA OutputTx) where
+  this _ = txHashRegistry
 
-instance (SHA `Alters` ChainHashEntry) SequencerM where
-  alterMany _ cHashes f = do
-    chr <- use chainHashRegistry
-    chr' <- f . M.restrictKeys chr $ S.fromList cHashes
-    chainHashRegistry %= M.union chr'
-    return chr'
+instance SequencerContext `Has` (Map SHA ChainHashEntry) where
+  this _ = chainHashRegistry
 
-instance (Word256 `Alters` ChainIdEntry) SequencerM where
-  alterMany _ cIds f = do
-    cir <- use chainIdRegistry
-    cir' <- f . M.restrictKeys cir $ S.fromList cIds
-    chainIdRegistry %= M.union cir'
-    return cir'
+instance SequencerContext `Has` (Map Word256 ChainIdEntry) where
+  this _ = chainIdRegistry
 
 instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = use seenTransactionDB
@@ -223,7 +207,7 @@ createNewTimer rn = do
   ch <- asks blockstanbulTimeouts
   dt <- asks blockstanbulRoundPeriod
   let act :: AlarmClock UTCTime -> IO ()
-      act this = do
+      act this' = do
         atomically $ writeTMChan ch rn
         globalRN <- readIORef rnref
         -- The first RoundChange for this message may have not
@@ -231,7 +215,7 @@ createNewTimer rn = do
         -- until an alarm lands and the round changes
         unless (globalRN > rn) $ do
           next <- addUTCTime dt <$> getCurrentTime
-          setAlarm this next
+          setAlarm this' next
   alarm <- liftIO $ newAlarmClock act
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next

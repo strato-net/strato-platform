@@ -16,6 +16,7 @@
 
 module Blockchain.DB.AddressStateDB (
   getAddressState,
+  getAddressStateMaybe,
   getAllAddressStates,
   putAddressState,
   deleteAddressState,
@@ -58,6 +59,12 @@ getAddressState address = do
         return b
         where b = blankAddressState
       Just s -> return $ (rlpDecode . rlpDeserialize . rlpDecode) s
+
+getAddressStateMaybe :: HasStateDB m => Address -> m (Maybe AddressState)
+getAddressStateMaybe address = do
+  db <- getStateDB
+  mState <- MP.getKeyVal db $ addressAsNibbleString address
+  return $ rlpDecode . rlpDeserialize . rlpDecode <$> mState
 
 getAllAddressStates::(HasHashDB m, HasStateDB m) => m [(Address, AddressState)]
 getAllAddressStates = do

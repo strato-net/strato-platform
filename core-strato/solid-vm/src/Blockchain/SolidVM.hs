@@ -2,6 +2,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Blockchain.SolidVM
     (
@@ -11,6 +12,7 @@ module Blockchain.SolidVM
 
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
+import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bits
@@ -38,7 +40,6 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
-import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
@@ -117,8 +118,10 @@ create' creator ch cc contractName' argExps = do
 
   initializeAction newAddress contractName' ch
 
-  newAddressState <- getAddressState newAddress
-  putAddressState newAddress newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
+  A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
+    pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
+                        , addressStateCodeHash = SolidVMCode contractName' ch
+                        }
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
@@ -247,10 +250,10 @@ getCodeAndCollection address' = do
     (hsh, cc') <- getCurrentCodeCollection
     return (c', hsh, cc')
     else do
-    addressState <- getAddressState address'
+    codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
     (contractName', ch, cc) <-
-      case addressStateCodeHash addressState of
+      case codeHash of
         SolidVMCode cn ch' -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')

@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.Privacy.Event
@@ -56,7 +57,7 @@ logFF :: MonadLogger m => Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
 
 lookupSeenChain :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m Bool
-lookupSeenChain chainId = isJust <$> lookup (Proxy :: Proxy ChainIdEntry) chainId
+lookupSeenChain chainId = isJust <$> lookup (Proxy @ChainIdEntry) chainId
 
 insertSeenChain :: (MonadIO m, (Word256 `Alters` ChainIdEntry) m)
                 => Word256 -> ChainInfo -> m ()
@@ -78,10 +79,10 @@ findChainHashUses chainId cHashes = do
           . S.fromList
           . concat
           . map (toList . maybe Q.empty _inBlocks)
-        <$> mapM (lookup (Proxy :: Proxy ChainHashEntry)) cHashes
-  bOrders <- map (fmap blockOrdering) <$> mapM (lookup (Proxy :: Proxy OutputBlock)) blocks
+        <$> mapM (lookup (Proxy @ChainHashEntry)) cHashes
+  bOrders <- map (fmap blockOrdering) <$> mapM (lookup (Proxy @OutputBlock)) blocks
   let infos = S.fromList . catMaybes $ zipWith (\b -> fmap (BlockInfo b)) blocks bOrders
-  adjustStatefully_ (Proxy :: Proxy ChainIdEntry) chainId $ blocksToRun %= S.union infos
+  adjustStatefully_ (Proxy @ChainIdEntry) chainId $ blocksToRun %= S.union infos
 
 insertPrivateHash :: ( HasPrivateHashDB m
                      , (SHA `Alters` OutputBlock) m
@@ -99,9 +100,8 @@ insertPrivateHash tx = case txChainId tx of
     findChainHashUses chainId cHashes
 
 insertChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> Word256 -> m ()
-insertChainHash cHash chainId = repsert_ Proxy cHash $ \case
-  Nothing -> pure $ chainHashEntryWithChainId chainId
-  Just che -> pure $ (onChainId .~ Just chainId) che
+insertChainHash cHash chainId =
+  adjustWithDefaultStatefully_ Proxy cHash $ onChainId .= Just chainId
 
 useChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m ()
 useChainHash cHash = adjustStatefully_ Proxy cHash $ used .= True
@@ -132,9 +132,9 @@ getNewChainHash chainId = do
   case Q.viewl q of
     Q.EmptyL -> error $ "getNewChainHash: Empty chain buffer for chainId " ++ show chainId
     (h Q.:< q') -> do
-      adjustStatefully_ (Proxy :: Proxy ChainIdEntry) chainId $
+      adjustStatefully_ (Proxy @ChainIdEntry) chainId $
         chainHashes .= CircularBuffer cap (sz - 1) q'
-      Just used' <- fmap _used <$> lookup (Proxy :: Proxy ChainHashEntry) h
+      Just used' <- fmap _used <$> lookup (Proxy @ChainHashEntry) h
       if not used'
         then useChainHash h >> return h
         else getNewChainHash chainId
@@ -182,9 +182,9 @@ runPrivateHashTX tHash cHash = do
     , " with chain hash "
     , format cHash
     ]
-  mthe <- lookup (Proxy :: Proxy OutputTx) tHash
-  for_ mthe . const $ repsert_ (Proxy :: Proxy ChainHashEntry) cHash $
-    return . maybe chainHashEntryUsed (used .~ True)
+  mthe <- lookup (Proxy @OutputTx) tHash
+  for_ mthe . const $
+    adjustWithDefaultStatefully_ (Proxy @ChainHashEntry) cHash $ used .= True
   checkIfIsMissingTX tHash cHash
 
 runBlocks :: ( HasPrivateHashDB m
@@ -197,16 +197,16 @@ runBlocks :: ( HasPrivateHashDB m
 runBlocks chainId = go
   where
     go = do
-      btr <- maybe S.empty _blocksToRun <$> lookup (Proxy :: Proxy ChainIdEntry) chainId
+      btr <- maybe S.empty _blocksToRun <$> lookup (Proxy @ChainIdEntry) chainId
       if S.null btr
         then return []
         else do
           let b0 = S.elemAt 0 btr
-          mBlock <- lookup (Proxy :: Proxy OutputBlock) (_bhash b0)
+          mBlock <- lookup (Proxy @OutputBlock) (_bhash b0)
           fmap (fromMaybe [] . join) . for mBlock $ \block -> do
             mHydrated <- hydratePrivateHashes (Just chainId) block
             for mHydrated $ \b -> do
-              adjustStatefully_ (Proxy :: Proxy ChainIdEntry) chainId $
+              adjustStatefully_ (Proxy @ChainIdEntry) chainId $
                 blocksToRun %= S.delete b0
               (b:) <$> go
 
@@ -230,7 +230,7 @@ hydratePrivateHashes chainF b = do
   let logF = logFF "hydratePrivateHashes"
       bHash = blockHeaderHash $ blockHeader b
   when (any isPrivateHashTX $ blockTransactions b) $
-    insert (Proxy :: Proxy OutputBlock) bHash b
+    insert (Proxy @OutputBlock) bHash b
   let discluded cId = maybe False (/= cId) chainF
   (txs', (depTXs,newDiscludes)) <- accumT ([],S.empty) (blockTransactions b) $ \st@(dts,cs) tx -> do
     let tHash = txHash tx
@@ -247,11 +247,9 @@ hydratePrivateHashes chainF b = do
       else do
         let cHash = txChainHash tx
         runPrivateHashTX tHash cHash
-        repsert_ (Proxy :: Proxy ChainHashEntry) cHash $
-          return . maybe
-            (chainHashEntryInBlock bHash)
-            (inBlocks %~ (Q.|> bHash))
-        mChainId <- join . fmap _onChainId <$> lookup (Proxy :: Proxy ChainHashEntry) cHash
+        adjustWithDefaultStatefully_ (Proxy @ChainHashEntry) cHash $
+          inBlocks %= (Q.|> bHash)
+        mChainId <- join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) cHash
         case mChainId of
           Nothing -> do
             notHydrating "we don't know the chain ID"
@@ -260,7 +258,7 @@ hydratePrivateHashes chainF b = do
             then do
               notHydrating "its chain ID is discluded from this hydration round"
               return (Nothing, st)
-            else lookup (Proxy :: Proxy ChainIdEntry) chainId >>= \case
+            else lookup (Proxy @ChainIdEntry) chainId >>= \case
               Nothing -> do
                 notHydrating "we don't have the info for its chain"
                 return (Nothing, st)
@@ -268,15 +266,15 @@ hydratePrivateHashes chainF b = do
                 if not (S.null _blocksToRun || (_bhash $ S.elemAt 0 _blocksToRun) == bHash)
                   then do
                     notHydrating "this is not the chain's next block to run"
-                    adjustStatefully_ (Proxy :: Proxy ChainIdEntry) chainId $
+                    adjustStatefully_ (Proxy @ChainIdEntry) chainId $
                       when (isNothing chainF) $
                         blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                     return (Nothing, (dts,S.insert chainId cs))
                   else do
-                    lookup (Proxy :: Proxy OutputTx) tHash >>= \case
+                    lookup (Proxy @OutputTx) tHash >>= \case
                       Nothing -> do
                         notHydrating "we don't have this transaction's body"
-                        adjustStatefully_ (Proxy :: Proxy ChainIdEntry) chainId $ do
+                        adjustStatefully_ (Proxy @ChainIdEntry) chainId $ do
                           when (isNothing chainF) $
                             blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                         return (Nothing, (tHash:dts, S.insert chainId cs))

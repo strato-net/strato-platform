@@ -37,6 +37,7 @@ dependencies:
   - lens
   - memory
   - merkle-patricia-db
+  - monad-alter
   - monad-control
   - parsec
   - prometheus-client
