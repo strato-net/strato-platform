@@ -1080,9 +1080,8 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
     --an existing one, but the ethereum tests test this.  They want the VM to preserve balance
     --but clean out storage.
     --This will never actually matter, but I add it to pass the tests.
-    A.repsert_ (Proxy :: Proxy AddressState) newAddress $ \mState ->
-      let newAddressState = fromMaybe blankAddressState mState
-       in pure newAddressState{addressStateContractRoot=MP.emptyTriePtr}
+    A.adjustWithDefault_ (Proxy :: Proxy AddressState) newAddress $ \newAddressState ->
+      pure newAddressState{addressStateContractRoot=MP.emptyTriePtr}
     --This next line will actually create the account addressState data....
     --In the extremely unlikely even that the address already exists, it will preserve
     --the existing balance.
@@ -1148,9 +1147,8 @@ create' = do
     assignCode::B.ByteString->Address->VMM ()
     assignCode codeBytes address = do
       hsh <- addCode EVM codeBytes
-      A.repsert_ (Proxy :: Proxy AddressState) address $ \mState ->
-        let newAddressState = fromMaybe blankAddressState mState
-         in pure newAddressState{addressStateCodeHash=EVMCode hsh}
+      A.adjustWithDefault_ (Proxy :: Proxy AddressState) address $ \newAddressState ->
+        pure newAddressState{addressStateCodeHash=EVMCode hsh}
     assignDetails = do
       vmState <- lift get
       let Environment{..} = environment vmState

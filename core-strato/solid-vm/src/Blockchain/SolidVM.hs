@@ -119,9 +119,10 @@ create' creator ch cc contractName' argExps = do
 
   initializeAction newAddress contractName' ch
 
-  A.repsert_ (Proxy :: Proxy AddressState) newAddress $ \mState ->
-    let newAddressState = fromMaybe blankAddressState mState
-     in pure newAddressState{addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=SolidVMCode contractName' ch}
+  A.adjustWithDefault_ (Proxy :: Proxy AddressState) newAddress $ \newAddressState ->
+    pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
+                        , addressStateCodeHash = SolidVMCode contractName' ch
+                        }
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 

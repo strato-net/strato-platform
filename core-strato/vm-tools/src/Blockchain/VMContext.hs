@@ -336,13 +336,12 @@ execContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (
 execContextM f = snd <$> runContextM f
 
 incrementNonce :: (Address `A.Alters` AddressState) f => Address -> f ()
-incrementNonce address = A.repsert_ Proxy address $ \mState ->
-  let addressState = fromMaybe blankAddressState mState
-   in pure addressState{ addressStateNonce = addressStateNonce addressState + 1 }
+incrementNonce address = A.adjustWithDefault_ Proxy address $ \addressState ->
+  pure addressState{ addressStateNonce = addressStateNonce addressState + 1 }
 
 getNewAddress :: (MonadIO m, (Address `A.Alters` AddressState) m) => Address -> m Address
 getNewAddress address = do
-  nonce <- addressStateNonce <$> getAddressState address
+  nonce <- addressStateNonce <$> A.lookupWithDefault Proxy address
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show nonce
   let newAddress = getNewAddress_unsafe address nonce
   incrementNonce address

@@ -99,9 +99,8 @@ insertPrivateHash tx = case txChainId tx of
     findChainHashUses chainId cHashes
 
 insertChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> Word256 -> m ()
-insertChainHash cHash chainId = repsert_ Proxy cHash $ \case
-  Nothing -> pure $ chainHashEntryWithChainId chainId
-  Just che -> pure $ (onChainId .~ Just chainId) che
+insertChainHash cHash chainId =
+  adjustWithDefaultStatefully_ Proxy cHash $ onChainId .= Just chainId
 
 useChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m ()
 useChainHash cHash = adjustStatefully_ Proxy cHash $ used .= True
@@ -183,8 +182,8 @@ runPrivateHashTX tHash cHash = do
     , format cHash
     ]
   mthe <- lookup (Proxy :: Proxy OutputTx) tHash
-  for_ mthe . const $ repsert_ (Proxy :: Proxy ChainHashEntry) cHash $
-    return . maybe chainHashEntryUsed (used .~ True)
+  for_ mthe . const $
+    adjustWithDefaultStatefully_ (Proxy :: Proxy ChainHashEntry) cHash $ used .= True
   checkIfIsMissingTX tHash cHash
 
 runBlocks :: ( HasPrivateHashDB m
@@ -247,10 +246,8 @@ hydratePrivateHashes chainF b = do
       else do
         let cHash = txChainHash tx
         runPrivateHashTX tHash cHash
-        repsert_ (Proxy :: Proxy ChainHashEntry) cHash $
-          return . maybe
-            (chainHashEntryInBlock bHash)
-            (inBlocks %~ (Q.|> bHash))
+        adjustWithDefaultStatefully_ (Proxy :: Proxy ChainHashEntry) cHash $
+          inBlocks %= (Q.|> bHash)
         mChainId <- join . fmap _onChainId <$> lookup (Proxy :: Proxy ChainHashEntry) cHash
         case mChainId of
           Nothing -> do
