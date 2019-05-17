@@ -53,7 +53,7 @@ module.exports = {
               uptime: uptime / 1000,
               isHealthy: healthStatus,
               isNotStalled: stallStatus,
-              isValidBlocksInc: isInc || false,
+              isValidBlocksInc: isInc ,
               isLastPending: isPending
             }
           }
@@ -88,7 +88,7 @@ module.exports = {
               uptime: uptime / 1000,
               isHealthy: healthStatus,
               isNotStalled: stallStatus,
-              isValidBlocksInc: isInc || false,
+              isValidBlocksInc: isInc ,
               isLastPending: isPending
             }
           }
