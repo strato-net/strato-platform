@@ -4,6 +4,7 @@ const Promise = require('bluebird');
 const rp = require('request-promise');
 const env = process.env.NODE_ENV || 'development';
 const moment = require('moment');
+const si = require('systeminformation');
 
 const config = require('../config/app.config');
 const neededJobs = {
@@ -26,12 +27,21 @@ setInterval(async () => {
     }
 }, config.healthCheck.pollFrequency);
 
+function checkSystemInfo() {
+  let sysInfoCollected = {}
+  si.cpu().then(data => sysInfoCollected.cpu = data)
+  si.mem().then(data => sysInfoCollected.mem = data)
+  let id;
+  si.dockerContainers(true).then(data => sysInfoCollected.containers = data)
+  winston.warn("id ", id)
+}
 
 function queryHealthStatus() {
     return new Promise(async (resolve, _void) => {
         try {
             const metricsResult = await getHealthPrometheus();
-            await checkLatest();
+            await checkLatest()
+            await checkSystemInfo();
             const healthStatus = await compareTimeStamp(metricsResult);
             const overallStatus = await updateHealthStat(healthStatus);
             await updateCurrentHealth(overallStatus);
@@ -83,7 +93,6 @@ function compareTimeStamp(obj) {
                 winston.warn(`Jobs are updated? The following prometheus job is not in the check list required: `, loc);
             }
 
-            value = formatPromethusTimestamp(elem.value[0]);
             ret[name] = (Math.abs(timeNow - elem.value[0]) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy /1000 ) && (elem.value[1] == 1) ? true : false;
         } else {
             winston.info(`Metric format is updated; need to update its handling`);
@@ -145,26 +154,30 @@ function formatPromethusTimestamp(timestamp) {
 }
 
 async function checkLatest() {
-  const healthInfo = await models.CurrentHealth.findOne({
-    where: {
-      processName: "HealthStat"
-    },
-    attributes: [
-      'latestHealthStatus',
-      'latestCheckTimestamp',
-      'lastFailureTimestamp'
-    ],
-    raw: true,
-  }).catch(err => next(err));
+  try {
+    const healthInfo = await models.CurrentHealth.findOne({
+      where: {
+        processName: "HealthStat"
+      },
+      attributes: [
+        'latestHealthStatus',
+        'latestCheckTimestamp',
+        'lastFailureTimestamp'
+      ],
+      raw: true,
+    })
 
 
-  const currentTime = Date.now();
-  if (healthInfo) {
-    const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy);
-    if (!nodeUp) {
-      const currentStatus = [false, 'Last Check Not Recent'];
-      await updateCurrentHealth(currentStatus);
+    const currentTime = Date.now();
+    if (healthInfo) {
+      const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy);
+      if (!nodeUp) {
+        const currentStatus = [false, 'Last Check Not Recent'];
+        await updateCurrentHealth(currentStatus);
+      }
     }
+  } catch (e) {
+    winston.warn(`Error ${e.message ? e.message : ''} occurred while checking and comparing the latest health`)
   }
 }
 
