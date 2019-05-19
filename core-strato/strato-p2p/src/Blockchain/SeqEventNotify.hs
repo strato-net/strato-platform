@@ -9,7 +9,6 @@ module Blockchain.SeqEventNotify (
   ) where
 
 import           Conduit
-import           Control.Monad.Change.Modify (Modifiable)
 import           Control.Monad
 import           Blockchain.Output
 import qualified Data.Text                   as T
@@ -23,7 +22,6 @@ import           Blockchain.Sequencer.Kafka (readSeqP2pEvents, seqP2pEventsTopic
 seqEventNotificationSource :: ( MonadIO m
                               , MonadResource m
                               , MonadLogger m
-                              , Modifiable K.KafkaState m
                               )
                            => K.KafkaState -> ConduitM () OutputEvent m ()
 seqEventNotificationSource ks = evalStateC ks $ do
