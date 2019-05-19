@@ -176,11 +176,8 @@ instance Context `Has` GenesisRoot where
 instance Context `Has` BestBlockRoot where
   this _ = lens contextBestBlockRoot (\c b -> c{contextBestBlockRoot = b})
 
-instance K.HasKafkaState ContextM where
-    getKafkaState = contextKafkaState <$> get
-    putKafkaState ks = do
-        ctx <- get
-        put $ ctx {contextKafkaState = ks}
+instance Context `Has` K.KafkaState where
+  this _ = lens contextKafkaState (\c b -> c{contextKafkaState = b})
 
 instance HasMemAddressStateDB ContextM where
   getAddressStateTxDBMap = contextAddressStateTxDBMap <$> get

@@ -24,6 +24,7 @@ dependencies:
   - hflags
   - lens
   - lifted-base
+  - monad-alter
   - mtl
   - normaldistribution
   - random
