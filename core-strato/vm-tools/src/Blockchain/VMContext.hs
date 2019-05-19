@@ -48,7 +48,6 @@ import           Data.Foldable                      (toList)
 import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
-import           Data.Proxy
 import qualified Data.Sequence                      as Q
 import           Data.Word
 import qualified Data.Text                          as T
@@ -168,26 +167,14 @@ instance HasStateDB ContextM where
     cxt <- get
     put cxt{contextStateDB=(contextStateDB cxt){MP.stateRoot=sr}}
 
-instance Modifiable BlockHashRoot ContextM where
-  modify _ f = do
-    cxt <- get
-    bhr' <- f $ contextBlockHashRoot cxt
-    put cxt{contextBlockHashRoot = bhr'}
-    return bhr'
+instance Context `Has` BlockHashRoot where
+  this _ = lens contextBlockHashRoot (\c b -> c{contextBlockHashRoot = b})
 
-instance Modifiable GenesisRoot ContextM where
-  modify _ f = do
-    cxt <- get
-    gr' <- f $ contextGenesisRoot cxt
-    put cxt{contextGenesisRoot = gr'}
-    return gr'
+instance Context `Has` GenesisRoot where
+  this _ = lens contextGenesisRoot (\c b -> c{contextGenesisRoot = b})
 
-instance Modifiable BestBlockRoot ContextM where
-  modify _ f = do
-    cxt <- get
-    bbr' <- f $ contextBestBlockRoot cxt
-    put cxt{contextBestBlockRoot = bbr'}
-    return bbr'
+instance Context `Has` BestBlockRoot where
+  this _ = lens contextBestBlockRoot (\c b -> c{contextBestBlockRoot = b})
 
 instance K.HasKafkaState ContextM where
     getKafkaState = contextKafkaState <$> get

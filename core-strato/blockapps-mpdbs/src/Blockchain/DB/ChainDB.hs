@@ -6,6 +6,7 @@
 module Blockchain.DB.ChainDB
   ( BlockHashRoot(..)
   , GenesisRoot(..)
+  , BestBlockRoot(..)
   , bootstrapChainDB
   , putBlockHeaderInChainDB
   , getChainRoot
@@ -24,7 +25,6 @@ import           Control.Monad.IO.Class
 
 import           Data.Maybe                           (isNothing)
 import qualified Data.NibbleString                    as N
-import           Data.Proxy
 import           Data.Traversable                     (for)
 import qualified Database.LevelDB                     as DB
 

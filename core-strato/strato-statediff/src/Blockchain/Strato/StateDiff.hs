@@ -36,9 +36,7 @@ import           Data.String
 import           Data.Traversable                            (forM)
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as Map
-import           Data.Maybe
 import qualified Data.NibbleString                           as N
-import           Data.String
 import           Data.Text                                   (Text)
 import           GHC.Generics
 import           Text.Format

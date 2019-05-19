@@ -44,7 +44,7 @@ module Blockchain.EVM.VMM (
 
 import           Control.Monad
 import qualified Control.Monad.Change.Alter         as A
-import           Control.Monad.Change.Modify        hiding (get, put)
+--import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
@@ -60,7 +60,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
-import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -107,27 +106,6 @@ instance HasStateDB VMM where
       vmState <- lift get
       lift $ put vmState{dbs=(dbs vmState){contextStateDB=(contextStateDB $ dbs vmState){MP.stateRoot=x}}}
 
-instance Modifiable BlockHashRoot VMM where
-  modify _ f = do
-    cxt <- lift get
-    bhr' <- f $ contextBlockHashRoot $ dbs cxt
-    lift $ put cxt{dbs = (dbs cxt){contextBlockHashRoot = bhr'}}
-    return bhr'
-
-instance Modifiable GenesisRoot VMM where
-  modify _ f = do
-    cxt <- lift get
-    gr' <- f $ contextGenesisRoot $ dbs cxt
-    lift $ put cxt{dbs = (dbs cxt){contextGenesisRoot = gr'}}
-    return gr'
-
-instance Modifiable BestBlockRoot VMM where
-  modify _ f = do
-    cxt <- lift get
-    bbr' <- f $ contextBestBlockRoot $ dbs cxt
-    lift $ put cxt{dbs = (dbs cxt){contextBestBlockRoot = bbr'}}
-    return bbr'
-
 instance HasRawStorageDB VMM where
     getRawStorageTxDB = do
       cxt <- lift get
@@ -143,7 +121,6 @@ instance HasRawStorageDB VMM where
     putRawStorageBlockMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
-
 
 instance HasCodeDB VMM where
     getCodeDB = lift $ fmap (contextCodeDB . dbs) get
