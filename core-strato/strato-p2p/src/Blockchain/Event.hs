@@ -112,7 +112,7 @@ yieldL = yield . Left
 
 handleEvents :: ( MonadIO m
                 , MonadResource m
-                , RBDB.HasRedisBlockDB m
+                , Accessible RBDB.RedisConnection m
                 , SK.HasUnseqSink m
                 , MonadState Context m
                 , MonadLogger m
@@ -259,7 +259,7 @@ handleEvents peer = awaitForever $ \case
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
           ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
           unless (null ptxs) . yieldR $ Transactions ptxs)
-        where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m)
+        where getUntilMissing :: (Accessible RBDB.RedisConnection m, MonadIO m)
                               => [SHA] -> [Block] -> [SHA] -> m ([Block],[SHA])
               getUntilMissing []     bodies pshas = return (bodies, pshas)
               getUntilMissing (h:hs) bodies pshas = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
@@ -426,7 +426,7 @@ handleEvents peer = awaitForever $ \case
 
 handleGetChainDetails :: ( MonadIO m
                          , MonadResource m
-                         , RBDB.HasRedisBlockDB m
+                         , Accessible RBDB.RedisConnection m
                          , MonadState Context m
                          , MonadLogger m
                          )

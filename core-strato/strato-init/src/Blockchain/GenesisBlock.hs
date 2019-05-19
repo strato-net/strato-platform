@@ -15,6 +15,7 @@ module Blockchain.GenesisBlock (
 import           Control.Monad
 import           Blockchain.Output
 import           Control.Monad.Change.Alter                   (Alters)
+import           Control.Monad.Change.Modify                  (Accessible)
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
@@ -122,7 +123,7 @@ data BackupType = NoBackup | BlockBackup | MPBackup
 initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
                           , Mem.HasMemAddressStateDB m
-                          , RBDB.HasRedisBlockDB m
+                          , Accessible RBDB.RedisConnection m
                           , HasSQLDB m
                           , HasStateDB m
                           , HasStorageDB m

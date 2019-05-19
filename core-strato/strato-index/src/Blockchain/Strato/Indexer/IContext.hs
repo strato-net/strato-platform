@@ -20,7 +20,7 @@ module Blockchain.Strato.Indexer.IContext
     ) where
 
 import           Control.Lens                    (lens)
-import           Control.Monad.Change.Modify     (Has(..))
+import           Control.Monad.Change.Modify     (Has(..), Accessible(..))
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.Resource
@@ -45,7 +45,7 @@ newtype IConfig = IConfig { contextSQLDB :: SQLDB }
 
 data IContext = IContext {
     contextKafkaState   :: KafkaState,
-    contextRedisBlockDB :: Redis.Connection,
+    contextRedisBlockDB :: RBDB.RedisConnection,
     contextBestBlock    :: IndexerBestBlockInfo
 }
 
@@ -61,8 +61,8 @@ instance HasSQLDB IConfigM where
 instance IContext `Has` KafkaState where
   this _ = lens contextKafkaState (\c k -> c{contextKafkaState = k})
 
-instance RBDB.HasRedisBlockDB IContextM where
-    getRedisBlockDB = contextRedisBlockDB <$> get
+instance Accessible RBDB.RedisConnection IContextM where
+  access _ = contextRedisBlockDB <$> get
 
 getIndexerBestBlockInfo :: IContextM IndexerBestBlockInfo
 getIndexerBestBlockInfo = contextBestBlock <$> get
@@ -92,7 +92,9 @@ runIContextM cid f = do
     redis <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
     (ret, _) <- runResourceT
               . flip runReaderT (IConfig sqldb)
-              . flip runStateT (IContext (mkConfiguredKafkaState cid) redis (reIBBI 0))
+              . flip runStateT (IContext (mkConfiguredKafkaState cid)
+                                         (RBDB.RedisConnection redis)
+                                         (reIBBI 0))
               $ f
     $logInfoS "runIContextM" "runIContextM complete, returning"
     return ret

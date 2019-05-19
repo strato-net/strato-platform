@@ -64,7 +64,7 @@ newtype Config = Config { configSQLDB :: SQLDB }
 
 data Context =
     Context {
-        contextRedisBlockDB :: Redis.Connection,
+        contextRedisBlockDB :: RBDB.RedisConnection,
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
         unseqSink           :: forall m . (MonadIO m, Modifiable K.KafkaState m) => [IngestEvent] -> m (),
@@ -84,8 +84,8 @@ type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 instance Context `Has` K.KafkaState where
   this _ = lens contextKafkaState (\c k -> c{contextKafkaState = k})
 
-instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
-    getRedisBlockDB = contextRedisBlockDB <$> get
+instance MonadState Context m => Accessible RBDB.RedisConnection m where
+  access _ = gets contextRedisBlockDB
 
 instance (MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
   getSQLDB = asks configSQLDB
@@ -157,7 +157,7 @@ initContext maxHeaders = do
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   return (Config (sqlDB' dbs),
          Context { actionTimestamp = Nothing
-                 , contextRedisBlockDB = redisBDBPool
+                 , contextRedisBlockDB = RBDB.RedisConnection redisBDBPool
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , blockHeaders=[]
                  , remainingBlockHeaders=[]

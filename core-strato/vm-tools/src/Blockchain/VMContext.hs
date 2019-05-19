@@ -93,8 +93,8 @@ import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 
-instance NFData Redis.Connection where
-  rnf c = c `seq` ()
+instance NFData RBDB.RedisConnection where
+  rnf (RBDB.RedisConnection c) = c `seq` ()
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show, Generic, NFData)
@@ -118,7 +118,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextBaggerState            :: !BaggerState
                        , contextKafkaState             :: K.KafkaState
                        , contextBestBlockInfo          :: ContextBestBlockInfo
-                       , contextRedisPool              :: Redis.Connection
+                       , contextRedisPool              :: RBDB.RedisConnection
                        , contextTxResultQueue          :: Q.Seq TransactionResult
                        , contextLogDBQueue             :: [LogDB]
                        , contextHasBlockstanbul        :: Bool
@@ -225,8 +225,8 @@ instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
 
-instance RBDB.HasRedisBlockDB ContextM where
-    getRedisBlockDB = contextRedisPool <$> get
+instance Accessible RBDB.RedisConnection ContextM where
+  access _ = contextRedisPool <$> get
 
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
@@ -271,7 +271,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      defaultBaggerState
                      initialKafkaState
                      Unspecified
-                     redisPool
+                     (RBDB.RedisConnection redisPool)
                      Q.empty []
                      False
                      False
@@ -313,7 +313,7 @@ runContextM f = do
                        defaultBaggerState
                        initialKafkaState
                        Unspecified
-                       redisPool
+                       (RBDB.RedisConnection redisPool)
                        Q.empty
                        []
                        flags_blockstanbul
