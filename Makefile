@@ -86,7 +86,6 @@ build_common: get_solcs build_buildbase
 	stack build \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
-	docker build --target built --file Dockerfile.multi ${FAKEROOT}
 
 build_common_profiled: get_solcs build_buildbase
 	@echo building haskell libraries and creating directories
@@ -96,7 +95,6 @@ build_common_profiled: get_solcs build_buildbase
 	stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
-	docker build --target built --file Dockerfile.multi ${FAKEROOT}
 
 bloc: build_common
 	@echo Now building bloc...
