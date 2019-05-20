@@ -11,10 +11,10 @@ module Blockchain.SeqEventNotify (
 import           Conduit
 import           Control.Monad
 import           Blockchain.Output
-import qualified Data.Text                   as T
-import qualified Network.Kafka               as K
-import qualified Blockchain.MilenaTools      as K
-import qualified Network.Kafka.Protocol      as KP
+import qualified Data.Text                  as T
+import qualified Network.Kafka              as K
+import qualified Blockchain.MilenaTools     as K
+import qualified Network.Kafka.Protocol     as KP
 
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka (readSeqP2pEvents, seqP2pEventsTopicName)

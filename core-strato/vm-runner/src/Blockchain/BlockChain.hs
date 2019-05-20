@@ -249,7 +249,7 @@ setParentStateRoot b@OutputBlock{..} = do
 addBlock :: OutputBlock -> ContextM [Action]
 addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} = do
     when flags_debug $ do
-      bhr <- Mod.get (Proxy :: Proxy BlockHashRoot)
+      bhr <- Mod.get (Proxy @BlockHashRoot)
       cr <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
       $logDebugS "addBlock" $ T.pack $ "Old blockhash root: " ++ format bhr
       $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
@@ -257,7 +257,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     putBlockHeaderInChainDB bd
 
     when flags_debug $ do
-      bhr' <- Mod.get (Proxy :: Proxy BlockHashRoot)
+      bhr' <- Mod.get (Proxy @BlockHashRoot)
       cr' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
       $logDebugS "addBlock" $ T.pack $ "New blockhash root after inserting header: " ++ format bhr'
       $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr'
@@ -304,7 +304,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
           Left  _ -> P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
     when flags_debug $ do
-      bhr'' <- Mod.get (Proxy :: Proxy BlockHashRoot)
+      bhr'' <- Mod.get (Proxy @BlockHashRoot)
       cr'' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
       $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
       $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr''
