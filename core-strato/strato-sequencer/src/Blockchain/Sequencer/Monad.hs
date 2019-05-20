@@ -1,10 +1,11 @@
-{-# LANGUAGE FlexibleContexts               #-}
-{-# LANGUAGE FlexibleInstances              #-}
-{-# LANGUAGE MultiParamTypeClasses          #-}
-{-# LANGUAGE TemplateHaskell                #-}
-{-# LANGUAGE OverloadedStrings              #-}
-{-# OPTIONS_GHC -fno-warn-orphans           #-}
-{-# OPTIONS_GHC -fno-warn-unused-top-binds  #-}
+{-# LANGUAGE FlexibleContexts              #-}
+{-# LANGUAGE FlexibleInstances             #-}
+{-# LANGUAGE MultiParamTypeClasses         #-}
+{-# LANGUAGE TemplateHaskell               #-}
+{-# LANGUAGE TypeOperators                 #-}
+{-# LANGUAGE OverloadedStrings             #-}
+{-# OPTIONS_GHC -fno-warn-orphans          #-}
+{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 module Blockchain.Sequencer.Monad (
     SequencerContext(..)
   , SequencerConfig(..)
@@ -26,18 +27,17 @@ module Blockchain.Sequencer.Monad (
   , createWaitTimer
 ) where
 
-import           ClassyPrelude                             (atomically, STM)
 import           Prelude                                   hiding (round)
+import           ClassyPrelude                             (atomically, STM)
+import           Conduit
 import           Control.Concurrent                        (forkIO, threadDelay)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
-import           Blockchain.Output
+import           Control.Monad.Change.Modify               (Has(..))
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Control.Monad.Trans.Resource
 
-import           Conduit
 import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue
 import           Data.Foldable                             (toList)
@@ -52,9 +52,9 @@ import           Data.Time.Clock
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord                        (Word256)
+import           Blockchain.Output
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -118,7 +118,7 @@ instance HasGetTransactionsDB SequencerM where
     getGetTransactionsDB = use getTransactionsDB
     putGetTransactionsDB = assign getTransactionsDB
 
-instance (HasPrivateHashDB BlockData OutputTx OutputBlock) SequencerM where
+instance HasPrivateHashDB SequencerM where
     getChainId = return . hash . rlpSerialize . rlpEncode
     generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
     generateChainHashes tx =
@@ -130,30 +130,19 @@ instance (HasPrivateHashDB BlockData OutputTx OutputBlock) SequencerM where
 
     requestChain = insertGetChainsDB
     requestTransaction = insertGetTransactionsDB
+
     -- TODO: Add persistence layer
-    alterBlockHashEntry bHash f = do
-      bhr <- use blockHashRegistry
-      mbhe <- f $ M.lookup bHash bhr
-      blockHashRegistry %= M.alter (const mbhe) bHash
-      return mbhe
+instance SequencerContext `Has` (Map SHA OutputBlock) where
+  this _ = blockHashRegistry
 
-    alterTxHashEntry tHash f = do
-      thr <- use txHashRegistry
-      mthe <- f $ M.lookup tHash thr
-      txHashRegistry %= M.alter (const mthe) tHash
-      return mthe
+instance SequencerContext `Has` (Map SHA OutputTx) where
+  this _ = txHashRegistry
 
-    alterChainHashEntry cHash f = do
-      chr <- use chainHashRegistry
-      mche <- f $ M.lookup cHash chr
-      chainHashRegistry %= M.alter (const mche) cHash
-      return mche
+instance SequencerContext `Has` (Map SHA ChainHashEntry) where
+  this _ = chainHashRegistry
 
-    alterChainIdEntry cId f = do
-      cir <- use chainIdRegistry
-      mcie <- f $ M.lookup cId cir
-      chainIdRegistry %= M.alter (const mcie) cId
-      return mcie
+instance SequencerContext `Has` (Map Word256 ChainIdEntry) where
+  this _ = chainIdRegistry
 
 instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = use seenTransactionDB
@@ -218,7 +207,7 @@ createNewTimer rn = do
   ch <- asks blockstanbulTimeouts
   dt <- asks blockstanbulRoundPeriod
   let act :: AlarmClock UTCTime -> IO ()
-      act this = do
+      act this' = do
         atomically $ writeTMChan ch rn
         globalRN <- readIORef rnref
         -- The first RoundChange for this message may have not
@@ -226,7 +215,7 @@ createNewTimer rn = do
         -- until an alarm lands and the round changes
         unless (globalRN > rn) $ do
           next <- addUTCTime dt <$> getCurrentTime
-          setAlarm this next
+          setAlarm this' next
   alarm <- liftIO $ newAlarmClock act
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next

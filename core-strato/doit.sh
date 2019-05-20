@@ -46,6 +46,9 @@ function newnode {
   if [[ -n "${blockstanbul}" || -n "${txGossipFanout}" ]]; then
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
+  if [ -n "${averageTxsPerBlock}" ]; then
+    atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -56,6 +59,7 @@ function newnode {
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
      ${txgFlag} \
+     ${atbFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
@@ -114,12 +118,23 @@ function newnode {
   if [ -n "${brokenRefundReenable}" ]; then
     breFlag="--brokenRefundReenable=${brokenRefundReenable}"
   fi
+  if [ -n "${svmDev}" ]; then
+    svdFlag="--svmDev=${svmDev}"
+  fi
+  if [ -n "${seqEventsBatchSize}" ]; then
+    sebFlag="--seqEventsBatchSize=${seqEventsBatchSize}"
+  fi
+  if [-n "${seqEventsCostHeuristic}" ]; then
+      sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
+  fi
+
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" "${breFlag}" +RTS "${vmRunnerRTSOPTs:-}" -N1 >> logs/vm-runner 2>&1
+                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" \
+                         +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
@@ -289,6 +304,7 @@ setEnv evmTraceMode false
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 
+mkdir -p /var/lib/strato
 cd /var/lib/strato
 
 if [[ -n $genesisBlock ]]

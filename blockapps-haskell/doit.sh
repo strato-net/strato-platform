@@ -105,11 +105,11 @@ function runBackgroundProcess {
   disown %
 }
 
-runBackgroundProcess /usr/bin/logserver "--directory=${PWD}/logs" --uri_root=/logs/bloc/ &>> logs/logserver
+runBackgroundProcess logserver "--directory=${PWD}/logs" --uri_root=/logs/bloc/ &>> logs/logserver
 
-runBackgroundProcess /usr/bin/blockapps-strato-server >> logs/strato-server 2>&1
+runBackgroundProcess blockapps-strato-server >> logs/strato-server 2>&1
 
-runBackgroundProcess /usr/bin/blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
+runBackgroundProcess blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
            --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" +RTS -N1 &>> logs/bloc
 
 until curl localhost:8000 &> /dev/null; do
@@ -118,7 +118,7 @@ until curl localhost:8000 &> /dev/null; do
 done
 echo "Bloc is up - running slipstream now..."
 
-SLIPSTREAM_CMD="/usr/bin/slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
+SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
   --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
   --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
   --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel}"

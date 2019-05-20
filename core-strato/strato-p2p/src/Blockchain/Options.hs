@@ -17,6 +17,8 @@ defineFlag "debugFail" True "Fail on errors we're not supposed to reach. If fals
 defineFlag "maxConn" (20::Int) "Maximum number of client connections."
 defineFlag "connectionTimeout" (300 :: Int) "Number of seconds to tolerate a useless peer"
 defineFlag "maxReturnedHeaders" (1000 :: Int) "Number of headers to return from a GetBlockHeaders request" -- todo: seriously???
+defineFlag "maxHeadersTxsLens" (2500 :: Int) "Number of txs size to return from a BlockHeader request"
+defineFlag "averageTxsPerBlock" (40 :: Int) "Average number of txs per block"
 defineFlag "txGossipFanout" (-1::Int) "Maxmimum number of peers to forward transactions to. Only\
                                       \ applicable for transactions received from peers, not\
                                       \ originating on this node."

@@ -273,6 +273,14 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       NewBeneficiary{} -> yield . VoteResponse $ HA.Rejected reason
       _ -> return ()
    AuthSuccess -> case ev of
+    ForcedConfigChange cc -> do
+      $logWarnLS "blockstanbul/config_change" cc
+      case cc of
+        ForcedRound rn ->
+          if rn >= _round v
+            then nextRound (Round rn)
+            else $logErrorS "blockstanbul/config_change" . T.pack $
+                   printf "Refusing to move round backwards in time %d to %d" (_round v) rn
     NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
       authSenders %= M.insert addr nonc
       self <- selfAddr
@@ -416,6 +424,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
       $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
       lastParent .= Just hsh
       clearLock
+      leader <- use proposer
+      me <- selfAddr
+      when (leader == me) $
+        recordProposal
       s <- use $ view . sequence
       nextRound . Sequence $ s+1
 
@@ -491,6 +503,7 @@ recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
    UnannouncedBlock{} -> inc "unannounced_block"
    PreviousBlock{} -> inc "previous_block"
    NewBeneficiary{} -> inc "new_beneficiary"
+   ForcedConfigChange{} -> inc "forced_config_change"
 
 recordOutEvent :: (MonadIO m) => OutEvent -> m ()
 recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCounter

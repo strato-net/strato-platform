@@ -1,0 +1,56 @@
+FROM ubuntu:18.04 as deploy
+
+RUN apt-get -y update && apt-get install -y \
+      autoconf \
+      curl \
+      libblas-dev \
+      libgmp-dev \
+      liblapack-dev \
+      libleveldb-dev \
+      libpcre3-dev \
+      libpq-dev \
+      libsodium-dev \
+      libstdc++6 \
+      locales \
+      netbase \
+      netcat-openbsd \
+      postgresql-client \
+  && apt-get autoremove \
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get clean \
+  && locale-gen en_US.UTF-8
+
+ENV LANG="en_US.UTF-8" \
+    LANGUAGE="en_US:en" \
+    LC_ALL="en_US.UTF-8"
+
+
+FROM deploy as built
+COPY ./usr/local/bin /usr/local/bin
+
+
+FROM built as strato
+COPY ./strato /strato
+EXPOSE 30303 30303/udp 3000
+HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
+  CMD pgrep vm-runner || exit 1
+ENTRYPOINT ["/strato/doit.sh"]
+
+
+FROM built as bloc
+COPY ./bloc /bloc
+EXPOSE 8000 8002
+HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
+  CMD curl --silent --output /dev/null --fail localhost:8000/bloc/v2.2 && \
+        pgrep slipstream && \
+        curl --silent --output /dev/null --fail localhost:8002/swagger.json || \
+        exit 1
+ENTRYPOINT ["/bloc/doit.sh"]
+
+
+FROM built as vault-wrapper
+COPY ./vault-wrapper /vault-wrapper
+EXPOSE 8000
+HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
+  CMD curl --silent --output /dev/null --fail localhost:8000/strato/v2.3/_ping || exit 1
+ENTRYPOINT ["/vault-wrapper/doit.sh"]

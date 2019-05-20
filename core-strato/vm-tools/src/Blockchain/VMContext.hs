@@ -3,9 +3,10 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE StandaloneDeriving    #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
@@ -28,12 +29,13 @@ module Blockchain.VMContext
     , queuePendingVote
     , peekPendingVote
     , clearPendingVote
+    , compactContextM
     ) where
-
 
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch
+import qualified Control.Monad.Change.Alter         as A
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
@@ -42,8 +44,10 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
 import           Data.Foldable                      (toList)
+import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
+import           Data.Proxy
 import qualified Data.Sequence                      as Q
 import           Data.Word
 import qualified Data.Text                          as T
@@ -84,6 +88,7 @@ import qualified Blockchain.Strato.Indexer.Kafka    as IK
 import qualified Blockchain.Strato.Indexer.Model    as IM
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
@@ -132,12 +137,15 @@ instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
     ctx <- get
     let q = contextTxResultQueue ctx
+    recordTxrEnqueue $ length txrs
     put $ ctx { contextTxResultQueue = q Q.>< Q.fromList txrs }
 
   flushTransactionResults = do
     ctx <- get
-    let toWrite = contextTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toList toWrite)
+    let q = contextTxResultQueue ctx
+        toWrite = chunksOf 2000 $ map IM.TxResult $ toList q
+    recordTxrFlush $ Q.length q
+    mapM_ (K.withKafkaViolently . IK.writeIndexEvents) toWrite
     put $ ctx { contextTxResultQueue = Q.empty }
 
 instance HasMemLogDB ContextM where
@@ -189,6 +197,11 @@ instance HasMemAddressStateDB ContextM where
     cxt <- get
     put $ cxt{contextAddressStateBlockDBMap=theMap}
 
+instance (Address `A.Alters` AddressState) ContextM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
+
 instance HasRawStorageDB ContextM where
   getRawStorageTxDB = do
     cxt <- get
@@ -226,7 +239,7 @@ instance RBDB.HasRedisBlockDB ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
-runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadMask m,
+runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadMask m,
                     HasStateDB (StateT Context (ReaderT Config (ResourceT m)))) =>
                    StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
@@ -275,7 +288,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
           setStateDBStateRoot MP.emptyTriePtr
           f
 
-runContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) =>
+runContextM :: (MonadIO m, MonadUnliftIO m) =>
                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
@@ -294,7 +307,7 @@ runContextM f = do
           redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
           let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
           runStateT f (Context
-                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
                        hdb
                        cdb
                        blksumdb
@@ -316,28 +329,27 @@ runContextM f = do
                        Q.empty)
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
+evalContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
+execContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
 execContextM f = snd <$> runContextM f
 
-incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()
-incrementNonce address = do
-  addressState <- getAddressState address
-  putAddressState address addressState{ addressStateNonce = addressStateNonce addressState + 1 }
+incrementNonce :: (Address `A.Alters` AddressState) f => Address -> f ()
+incrementNonce address = A.adjustWithDefault_ Proxy address $ \addressState ->
+  pure addressState{ addressStateNonce = addressStateNonce addressState + 1 }
 
-getNewAddress :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m Address
+getNewAddress :: (MonadIO m, (Address `A.Alters` AddressState) m) => Address -> m Address
 getNewAddress address = do
-  addressState <- getAddressState address
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show (addressStateNonce addressState)
-  let newAddress = getNewAddress_unsafe address (addressStateNonce addressState)
+  nonce <- addressStateNonce <$> A.lookupWithDefault Proxy address
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show nonce
+  let newAddress = getNewAddress_unsafe address nonce
   incrementNonce address
   return newAddress
 
 purgeStorageMap :: HasStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  (_, storageMap) <- getRawStorageTxDB
+  storageMap <- snd <$> getRawStorageTxDB
   putRawStorageTxMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo
@@ -383,3 +395,6 @@ clearPendingVote b = do
         Just i -> Q.deleteAt i ctxCoinbaseQ
         Nothing -> ctxCoinbaseQ
   put ctx { contextCoinbaseQueue = newCoinbaseQ}
+
+compactContextM :: ContextM ()
+compactContextM = modify' force

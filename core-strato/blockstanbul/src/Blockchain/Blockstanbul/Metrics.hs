@@ -44,3 +44,12 @@ authResults = unsafeRegister
 recordAuthResult :: MonadIO m => AuthResult -> m ()
 recordAuthResult AuthSuccess = liftIO $ withLabel authResults "success" incCounter
 recordAuthResult AuthFailure{} = liftIO $ withLabel authResults "failure" incCounter
+
+{- NOINLINE proposalCount #-}
+proposalCount :: Counter
+proposalCount = unsafeRegister
+              .  counter
+              $ Info "pbft_proposal_count" "Number of blocks I proposed that were accepted by peers"
+
+recordProposal :: MonadIO m => m ()
+recordProposal = liftIO $ incCounter proposalCount

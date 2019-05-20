@@ -1,12 +1,16 @@
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 {-# OPTIONS -fprof-auto -fprof-cafs #-}
 module Blockchain.Bagger where
 
 import           Control.Arrow                      ((&&&))
+import qualified Control.Monad.Change.Alter         as A
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Blockchain.Output
@@ -24,8 +28,6 @@ import           Numeric                            (readHex)
 import           Blockapps.Crossmon
 
 import           Blockchain.CoreFlags               (flags_difficultyBomb, flags_testnet)
-import           Blockchain.DB.HashDB
-import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 
 import qualified Blockchain.Bagger.BaggerState      as B
@@ -34,6 +36,7 @@ import           Blockchain.Data.Address
 import qualified Blockchain.Data.AddressStateDB     as DD
 import qualified Blockchain.Data.BlockDB            as BDB
 import qualified Blockchain.Data.DataDefs           as DD
+import           Blockchain.Data.BlockHeader        (txsLen2ExtraData)
 import qualified Blockchain.Data.TransactionDef     as TD
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
@@ -48,7 +51,7 @@ import           Executable.EVMFlags                (flags_maxTxsPerBlock)
 
 import           Text.Format
 
-class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
+class (Monad m, MonadIO m, MonadLogger m, HasStateDB m, (Address `A.Alters` DD.AddressState) m) => MonadBagger m where
     isBlockstanbul     :: m Bool
     getBaggerState     :: m B.BaggerState
     peekPendingVote    :: m (Address, Word64)
@@ -367,7 +370,8 @@ removeFromSeen :: MonadBagger m => OutputTx -> m ()
 removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
-getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$> getAddressState addr
+getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$>
+  A.lookupWithDefault (A.Proxy @DD.AddressState) addr
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
 addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)
@@ -440,7 +444,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataGasLimit         = nextGasLimit $ DD.blockDataGasLimit parentHeader
                         , DD.blockDataGasUsed          = 0
                         , DD.blockDataTimestamp        = time
-                        , DD.blockDataExtraData        = ""
+                        , DD.blockDataExtraData        = txsLen2ExtraData (length txs)
                         , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else SHA 0x0
                         , DD.blockDataNonce            = nonce
                         }

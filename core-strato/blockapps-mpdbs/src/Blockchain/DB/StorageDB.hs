@@ -1,4 +1,6 @@
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds  #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 module Blockchain.DB.StorageDB (
   HasStorageDB,
   putStorageKeyVal',
@@ -8,9 +10,11 @@ module Blockchain.DB.StorageDB (
   flushMemStorageDB
   ) where
 
+import           Control.Monad.Change.Alter                  (Alters)
 import           Data.Bifunctor                              (second)
 import qualified Data.ByteString                             as B
 
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia          as MP
 import           Blockchain.DB.HashDB
@@ -24,7 +28,12 @@ import           Blockchain.Strato.Model.ExtendedWord
 -- keys and values of Word256
 type HasStorageDB = HasRawStorageDB
 
-type FullStorage m = (HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)
+type FullStorage m = ( HasMemAddressStateDB m
+                     , HasStorageDB m
+                     , HasStateDB m
+                     , HasHashDB m
+                     , (Address `Alters` AddressState) m
+                     )
 
 toKey :: Word256 -> B.ByteString
 toKey = word256ToBytes

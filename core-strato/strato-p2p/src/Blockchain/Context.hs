@@ -19,6 +19,8 @@ module Blockchain.Context
     , addDebugMsg
     , getBlockHeaders
     , putBlockHeaders
+    , getRemainingBHeaders
+    , putRemainingBHeaders
     , clearDebugMsg
     , stampActionTimestamp
     , getActionTimestamp
@@ -66,6 +68,7 @@ data Context =
         unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => [IngestEvent] -> m (),
         vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m) => [VMEvent] -> m (),
         blockHeaders        :: [BlockHeader],
+        remainingBlockHeaders :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime,
         connectionTimeout   :: Int,
         maxReturnedHeaders  :: Int,
@@ -107,6 +110,14 @@ putBlockHeaders :: MonadState Context m => [BlockHeader]->m ()
 putBlockHeaders headers = do
     cxt <- get
     put cxt{blockHeaders=headers}
+
+getRemainingBHeaders :: MonadState Context m => m [BlockHeader]
+getRemainingBHeaders = remainingBlockHeaders <$> get
+
+putRemainingBHeaders :: MonadState Context m => [BlockHeader]->m ()
+putRemainingBHeaders headers = do
+    cxt <- get
+    put cxt{remainingBlockHeaders=headers}
 
 addDebugMsg :: MonadState Context m => String->m ()
 addDebugMsg msg = do
@@ -150,6 +161,7 @@ initContext maxHeaders = do
                  , contextRedisBlockDB = redisBDBPool
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , blockHeaders=[]
+                 , remainingBlockHeaders=[]
                  , unseqSink=void . K.withKafkaViolently . writeUnseqEvents
                  , vmEventsSink=void . produceVMEventsM
                  , vmTrace=[]

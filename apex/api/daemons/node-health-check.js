@@ -9,7 +9,7 @@ const config = require('../config/app.config');
 const neededJobs = {
     "slipstream_main":"slipstream",
     "strato_p2p":"strato-p2p",
-    "vm_main":"ethereum-vm",
+    "vm_main":"vm-runner",
     "seq_main":"strato-sequencer"
 }
 
@@ -31,6 +31,7 @@ function queryHealthStatus() {
     return new Promise(async (resolve, _void) => {
         try {
             const metricsResult = await getHealthPrometheus();
+            await checkLatest();
             const healthStatus = await compareTimeStamp(metricsResult);
             const overallStatus = await updateHealthStat(healthStatus);
             await updateCurrentHealth(overallStatus);
@@ -82,7 +83,8 @@ function compareTimeStamp(obj) {
                 winston.warn(`Jobs are updated? The following prometheus job is not in the check list required: `, loc);
             }
 
-            ret[name] = true;
+            value = formatPromethusTimestamp(elem.value[0]);
+            ret[name] = (Math.abs(timeNow - elem.value[0]) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy /1000 ) && (elem.value[1] == 1) ? true : false;
         } else {
             winston.info(`Metric format is updated; need to update its handling`);
         }
@@ -140,6 +142,30 @@ async function updateCurrentHealth(overallStat) {
 
 function formatPromethusTimestamp(timestamp) {
     return ( timestamp.toString().split('.')[0])
+}
+
+async function checkLatest() {
+  const healthInfo = await models.CurrentHealth.findOne({
+    where: {
+      processName: "HealthStat"
+    },
+    attributes: [
+      'latestHealthStatus',
+      'latestCheckTimestamp',
+      'lastFailureTimestamp'
+    ],
+    raw: true,
+  }).catch(err => next(err));
+
+
+  const currentTime = Date.now();
+  if (healthInfo) {
+    const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy);
+    if (!nodeUp) {
+      const currentStatus = [false, 'Last Check Not Recent'];
+      await updateCurrentHealth(currentStatus);
+    }
+  }
 }
 
 module.exports = {

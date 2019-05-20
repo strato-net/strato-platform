@@ -18,6 +18,7 @@ import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import           Blockchain.Data.Transaction
+import           Blockchain.SolidVM.Model
 import           Blockchain.VMOptions
 
 data ExecResults =
@@ -30,7 +31,8 @@ data ExecResults =
     erNewContractAddress :: Maybe Address,
     erSuicideList        :: S.Set Address,
     erAction             :: Maybe Action,
-    erException          :: Maybe (Either SolidException VMException)
+    erException          :: Maybe (Either SolidException VMException),
+    erKind               :: CodeKind
     } deriving (Eq, Show, Generic)
 
 instance NFData ExecResults
@@ -46,13 +48,13 @@ calculateReturned t er =
 
 
 evmErrorResults :: Integer -> VMException -> ExecResults
-evmErrorResults remainingGas e = errorResults remainingGas (Right e)
+evmErrorResults remainingGas e = errorResults EVM remainingGas (Right e)
 
 solidvmErrorResults :: SolidException -> ExecResults
-solidvmErrorResults e = errorResults 0 (Left e)
+solidvmErrorResults e = errorResults SolidVM 0 (Left e)
 
-errorResults :: Integer -> Either SolidException VMException -> ExecResults
-errorResults remainingGas e =
+errorResults :: CodeKind -> Integer -> Either SolidException VMException -> ExecResults
+errorResults ck remainingGas e =
   ExecResults {
     erRemainingTxGas=remainingGas
     , erRefund=0
@@ -63,5 +65,6 @@ errorResults remainingGas e =
     , erSuicideList = S.empty
     , erAction = Nothing
     , erException = Just e
+    , erKind = ck
     }
 

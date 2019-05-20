@@ -200,4 +200,6 @@ removeMember chainId address = do
             delete . entityKey $ head member
 
 terminateChain :: (MonadLogger m, HasSQLDB m) => Word256 -> m ()
-terminateChain _ = $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"
+terminateChain _ = do
+  db <- getSQLDB
+  db `seq` $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"

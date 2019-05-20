@@ -50,6 +50,7 @@ packages:
 - core-strato/blockstanbul/
 - core-strato/privacy/
 - core-strato/fastMP/
+- monad-alter/
 - shared-util/common-log/
 - shared-util/cross-monitoring/
 - shared-util/format
@@ -109,7 +110,7 @@ extra-lib-dirs:
 - /usr/local/lib
 
 ghc-options:
-  "$locals": -Wall -Werror
+  "$locals": -Wall -Werror -fwarn-redundant-constraints
   strato-api: -Wall -Werror -fno-warn-orphans
   strato-p2p: -Wall -Werror  -XMonoLocalBinds
   strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing

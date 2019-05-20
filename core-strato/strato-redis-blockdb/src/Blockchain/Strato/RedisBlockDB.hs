@@ -454,7 +454,7 @@ putHeaders :: (Traversable f, BlockHeaderLike h)
            -> Redis (f (Either Reply Status))
 putHeaders = mapM putHeader
 
-putBlock :: (BlockLike h t b, BlockHeaderLike h, TransactionLike t)
+putBlock :: (BlockLike h t b)
          => b
          -> Redis (Either Reply Status)
 putBlock b = do
@@ -488,7 +488,7 @@ putBlock b = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack e)
 
-putBlocks :: (Traversable f, BlockLike h t b, BlockHeaderLike h, TransactionLike t)
+putBlocks :: (Traversable f, BlockLike h t b)
           => f b
           -> Redis (f (Either Reply Status))
 putBlocks = mapM putBlock
@@ -577,11 +577,11 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 --validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
-forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
+forceBestBlockInfo :: RedisCtx m f => SHA -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
         forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
-forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> RedisBestBlock -> m (f Status)
+forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
 forceBestBlockInfo' key = set key . toValue
 
 getBestBlockInfo :: Redis (Maybe RedisBestBlock)

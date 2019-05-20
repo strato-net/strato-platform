@@ -1,8 +1,11 @@
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.Setup (
   oneTimeSetup
@@ -10,6 +13,7 @@ module Blockchain.Setup (
 
 import           Control.Concurrent
 import           Control.Monad
+import qualified Control.Monad.Change.Alter         as A
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
@@ -36,6 +40,7 @@ import           System.FilePath
 
 import           Blockchain.APIFiles
 import           Blockchain.Constants
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
 import           Blockchain.GenesisBlock
@@ -128,6 +133,11 @@ instance HasMemAddressStateDB SetupDBM where
   putAddressStateBlockDBMap theMap = do
     lasbref <- asks localAddressStateBlock
     liftIO $ atomicWriteIORef lasbref theMap
+
+instance (Address `A.Alters` AddressState) SetupDBM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
 instance HasHashDB SetupDBM where
   getHashDB = asks hashDB

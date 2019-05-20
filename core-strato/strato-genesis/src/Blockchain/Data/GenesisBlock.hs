@@ -1,7 +1,9 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.Data.GenesisBlock (
   parseHex,
@@ -13,6 +15,7 @@ module Blockchain.Data.GenesisBlock (
 
 import           Control.Exception
 import           Control.Monad
+import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Crypto.Util                          (i2bs_unsized)
@@ -47,7 +50,6 @@ import           Blockchain.Strato.StateDiff.Kafka    (writeActionJSONToKafka, f
 
 import qualified Blockchain.Strato.Model.Address      as Ad
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
-import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 
 import           Text.Format
 
@@ -57,35 +59,58 @@ initializeBlankStateDB = do
     liftIO . runResourceT $ initializeBlank db
     setStateDBStateRoot emptyTriePtr
 
-putStorageTrie :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m) =>
+putStorageTrie :: ( HasHashDB m
+                  , Mem.HasMemAddressStateDB m
+                  , HasStateDB m
+                  , HasStorageDB m
+                  , (Ad.Address `A.Alters` AddressState) m
+                  ) =>
                   Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
 putStorageTrie address slots = do
     mapM_ (\(k, v) -> putStorageKeyVal' address k v) slots
     flushMemStorageDB
     Mem.flushMemAddressStateDB
 
-putAccount :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
+putAccount :: ( HasHashDB m
+              , Mem.HasMemAddressStateDB m
+              , HasStateDB m
+              , HasStorageDB m
+              , (Ad.Address `A.Alters` AddressState) m
+              )
            => AccountInfo
            -> m ()
 putAccount acc = case acc of
   NonContract address balance' ->
-    putAddressState address blankAddressState{addressStateBalance=balance'}
+    A.insert A.Proxy address blankAddressState{addressStateBalance=balance'}
   ContractNoStorage address balance' codeHash' -> do
-    putAddressState address blankAddressState{addressStateBalance=balance',
-                                              addressStateCodeHash=EVMCode codeHash'}
+    A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
+                                              , addressStateCodeHash=EVMCode codeHash'
+                                              }
   ContractWithStorage address balance' codeHash' slots -> do
-    putAddressState address blankAddressState{addressStateBalance=balance',
-                                              addressStateCodeHash=EVMCode codeHash'}
+    A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
+                                              , addressStateCodeHash=EVMCode codeHash'
+                                              }
     putStorageTrie address slots
 
-initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
+initializeStateDB :: ( HasHashDB m
+                     , Mem.HasMemAddressStateDB m
+                     , HasStateDB m
+                     , HasStorageDB m
+                     , (Ad.Address `A.Alters` AddressState) m
+                     )
                   => [AccountInfo]
                   -> m ()
 initializeStateDB addressInfo = do
     initializeBlankStateDB
     mapM_ putAccount addressInfo
+    Mem.flushMemAddressStateDB
 
-initializeStateDBAndAccountInfos :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
+initializeStateDBAndAccountInfos :: ( HasHashDB m
+                                    , Mem.HasMemAddressStateDB m
+                                    , HasStateDB m
+                                    , HasStorageDB m
+                                    , (Ad.Address `A.Alters` AddressState) m
+                                    )
                                  => [AccountInfo]
                                  -> String
                                  -> m ()
@@ -113,11 +138,11 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
          ["a", a, b]  -> do
            let address = Ad.Address $ parseHex a
            liftIO $ putStrLn $ "adding account: " ++ format address
-           putAddressState address blankAddressState{addressStateBalance= read b}
+           A.insert A.Proxy address blankAddressState{addressStateBalance= read b}
          ["a", a, b, c]  -> do
            let address = Ad.Address $ parseHex a
            liftIO $ putStrLn $ "adding account: " ++ format address
-           putAddressState address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ SHA $ parseHex c}
+           A.insert A.Proxy address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ SHA $ parseHex c}
          _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
 
       liftIO $ putStrLn $ "flushing batch: " ++ show batchCount
@@ -127,6 +152,7 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
     forM_ addressInfo $ \account -> do
       liftIO $ print account
       putAccount account
+    Mem.flushMemAddressStateDB
 
 
 parseHex::(Num a, Eq a)=>String->a
@@ -138,7 +164,13 @@ parseHex theString =
 initializeCodeDB :: HasCodeDB m => [CodeInfo] -> m ()
 initializeCodeDB = mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin))
 
-chainInfoToGenesisState :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
+chainInfoToGenesisState :: ( HasCodeDB m
+                           , HasHashDB m
+                           , Mem.HasMemAddressStateDB m
+                           , HasStateDB m
+                           , HasStorageDB m
+                           , (Ad.Address `A.Alters` AddressState) m
+                           )
                           => ChainInfo
                           -> m StateRoot
 chainInfoToGenesisState ci = do
@@ -156,7 +188,13 @@ zipSourceInfo accounts codes =
       findCodeFor acc@(ContractWithStorage _ _ hsh _) = (acc,) <$> Map.lookup hsh codeMap
   in catMaybes . map findCodeFor $ accounts
 
-genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
+genesisInfoToGenesisBlock :: ( HasCodeDB m
+                             , HasHashDB m
+                             , Mem.HasMemAddressStateDB m
+                             , HasStateDB m
+                             , HasStorageDB m
+                             , (Ad.Address `A.Alters` AddressState) m
+                             )
                           => GenesisInfo
                           -> String
                           -> [AccountInfo]
@@ -192,11 +230,8 @@ genesisInfoToGenesisBlock gi gn as = do
 
 initializeChainDBs :: ( HasCodeDB (t m)
                       , HasHashDB (t m)
-                      , Mem.HasMemAddressStateDB (t m)
-                      , RBDB.HasRedisBlockDB (t m)
                       , WrapsSQLDB t m
                       , HasStateDB (t m)
-                      , HasStorageDB (t m)
                       )
                    => Ext.Word256
                    -> ChainInfo

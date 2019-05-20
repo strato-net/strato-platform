@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
 module Executable.EthereumVM (
@@ -16,7 +17,7 @@ import           Data.List
 import qualified Data.Text                             as T
 import qualified Data.Map.Ordered                      as O
 import qualified Data.Map                              as M
-import           Data.Maybe                            (isNothing)
+import           Data.Maybe                            (isNothing, fromMaybe)
 import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
@@ -26,7 +27,8 @@ import           Util                                  hiding (intercalate)
 import           Blockapps.Crossmon
 
 import           Blockchain.BlockChain
-import           Blockchain.Data.DataDefs              (blockDataNumber)
+import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber)
+import           Blockchain.Data.BlockHeader           (extraData2TxsLen)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.LogDB
@@ -97,6 +99,8 @@ ethereumVM = void . execContextM $ do
                                   . K.withKafkaViolently
                                   . writeIndexEvents
                                   $ map (uncurry IndexTransaction) txPairs
+        let (bLen, tLen) = (length blocks, length allTxs)
+        recordSeqEventCount bLen tLen
 
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
@@ -150,6 +154,7 @@ ethereumVM = void . execContextM $ do
         loopTimeit "flushLogEntries" $ flushLogEntries
         loopTimeit "flushTransactionResults" $ flushTransactionResults
         loopTimeit "writeActionJSONToKafka" $ void . K.withKafkaViolently $ writeActionJSONToKafka actions
+        loopTimeit "compactContextM" $ compactContextM
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
@@ -255,7 +260,26 @@ getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
     ret <- K.withKafkaViolently (readSeqVmEvents offset)
-    return ret
+    let countLimit = if flags_seqEventsBatchSize > 0
+                         then take flags_seqEventsBatchSize
+                         else id
+        eventLimit = if flags_seqEventsCostHeuristic > 0
+                         then take num
+                         else id
+        num = length
+            . takeWhile (<= flags_seqEventsCostHeuristic)
+            . scanl (+) 0
+            . map approxCost
+            $ ret
+        approxCost :: OutputEvent -> Int
+        approxCost = \case
+          OEBlock OutputBlock{..} -> fromMaybe (length obReceiptTransactions)
+                                   . extraData2TxsLen
+                                   $ blockDataExtraData obBlockData
+          _ -> 1
+
+        ret' = eventLimit . countLimit $ ret
+    return ret'
 
 shouldProcessNewTransactions :: ContextM Bool -- todo: probably shouldn't do it by number, but tdiff.
 shouldProcessNewTransactions =

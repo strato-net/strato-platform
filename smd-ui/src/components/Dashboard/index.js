@@ -9,7 +9,8 @@ import { endTour } from '../Tour/tour.actions';
 // import { callAfterTour } from '../Tour/tour.helpers';
 // import Tour from '../Tour';
 import Tour from '../Tour';
-
+import { env } from '../../env'
+import io from 'socket.io-client';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
 import './dashboard.css';
@@ -29,6 +30,7 @@ import {
 } from '../../sockets/rooms'
 import {sec2Date} from "../../lib/formatSeconds";
 
+const socket = io(env.SOCKET_SERVER, { path: '/apex-ws', transports: ['websocket'] });
 // TODO: these should be part of a reducer state. Do the same for other global variables.
 const tourSteps = [
   {
@@ -85,7 +87,11 @@ class Dashboard extends Component {
     const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
     const uptime = this.props.dashboard.uptime;
     const health = this.props.dashboard.healthStatus;
+    let connection = true;
 
+    socket.on('disconnect', e => {
+      connection = false;
+    });
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
@@ -97,8 +103,8 @@ class Dashboard extends Component {
         <div className="row">
           <div className="col-sm-3">
             <NumberCard
-              number={health ? 'HEALTHY':'UNHEALTHY'}
-              description= {sec2Date(uptime)}
+              number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
+              description= {connection ? (sec2Date(uptime)):"No Connection"}
               mode={health ? 'success':'warning' }
               iconClass={health ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />

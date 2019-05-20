@@ -131,7 +131,7 @@ decode' :: Binary a => BS.ByteString -> a
 decode' = decode . toLazyBS
 
 -- | Strict version of @Data.Binary.runGet@
-runGet' :: Binary a => Get a -> BS.ByteString -> a
+runGet' :: Get a -> BS.ByteString -> a
 runGet' m = (runGet m) . toLazyBS
 
 -- | Strict version of @Data.Binary.runPut@
@@ -148,8 +148,7 @@ decodeOrFail' bs = case decodeOrFail $ toLazyBS bs of
     Right (lbs,o,res) -> Right (toStrictBS lbs,o,res)
 
 -- | Strict version of @Data.Binary.runGetOrFail@
-runGetOrFail' ::
-    Binary a => Get a -> BS.ByteString ->
+runGetOrFail' :: Get a -> BS.ByteString ->
     Either (BS.ByteString, ByteOffset, String) (BS.ByteString, ByteOffset, a)
 runGetOrFail' m bs = case runGetOrFail m $ toLazyBS bs of
     Left  (lbs,o,err) -> Left  (toStrictBS lbs,o,err)
@@ -168,8 +167,7 @@ fromDecode bs def f = either (const def) (f . lst) $ decodeOrFail' bs
 
 -- | Try to run a Data.Binary.Get monad. If decoding succeeds, apply a function
 -- to the result. Otherwise, return the default value.
-fromRunGet :: Binary a
-           => Get a         -- ^ The Get monad to run
+fromRunGet :: Get a         -- ^ The Get monad to run
            -> BS.ByteString -- ^ The bytestring to decode
            -> b             -- ^ Default value to return when decoding fails
            -> (a -> b)      -- ^ Function to apply when decoding succeeds
@@ -195,7 +193,7 @@ decodeToMaybe bs = fromDecode bs Nothing Just
 -- @Int@ bytes of the input bytestring will be available for the Get monad to
 -- consume. This function will fail if the Get monad fails or some of the input
 -- is not consumed.
-isolate :: Binary a => Int -> Get a -> Get a
+isolate :: Int -> Get a -> Get a
 isolate i g = do
     bs <- getByteString i
     case runGetOrFail' g bs of

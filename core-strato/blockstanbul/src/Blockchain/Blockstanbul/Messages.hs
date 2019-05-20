@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
@@ -31,7 +32,7 @@ type SequenceNumber = Word256
 data View = View {
   _round :: RoundNumber,
   _sequence :: SequenceNumber
-} deriving (Eq, Show, Ord, Generic)
+} deriving (Eq, Show, Ord, Generic, Binary, NFData)
 makeLenses ''View
 
 instance Format View where
@@ -40,13 +41,13 @@ instance Format View where
 data MsgAuth = MsgAuth {
   sender :: Address,
   signature :: ExtendedSignature
-} deriving (Eq, Show, Generic)
+} deriving (Eq, Show, Generic, Binary, NFData)
 
 data TrustedMessage = Preprepare View Block
                     | Prepare View SHA
                     | Commit View SHA ExtendedSignature
                     | RoundChange {roundchangeView :: View }
-                    deriving (Eq, Show, Generic)
+                    deriving (Eq, Show, Generic, Binary, NFData)
 
 instance Format TrustedMessage where
   format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
@@ -66,26 +67,25 @@ categorize = \case
 data WireMessage = WireMessage {
   _msgAuth :: MsgAuth,
   _message :: TrustedMessage
-} deriving (Eq, Show, Generic)
+} deriving (Eq, Show, Generic, Binary, NFData)
 makeLenses ''WireMessage
+
+-- TODO: Allow changing blockstanbul admins without a restart
+data ForcedConfigChange = ForcedRound RoundNumber
+                        deriving (Eq, Show, Generic, Binary, NFData)
+
+instance Format ForcedConfigChange where
+  format = show
+
 
 blockstanbulSender :: WireMessage -> Address
 blockstanbulSender (WireMessage a _) = sender a
-
-instance Binary MsgAuth where
-instance Binary View where
-instance Binary TrustedMessage where
-instance Binary WireMessage where
-
-instance NFData MsgAuth
-instance NFData View
-instance NFData TrustedMessage
-instance NFData WireMessage
 
 derive makeArbitrary ''MsgAuth
 derive makeArbitrary ''View
 derive makeArbitrary ''TrustedMessage
 derive makeArbitrary ''WireMessage
+derive makeArbitrary ''ForcedConfigChange
 
 instance Format WireMessage where
   format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
@@ -103,6 +103,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | UnannouncedBlock Block
              | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
+             | ForcedConfigChange ForcedConfigChange
              deriving (Eq, Show)
 
 instance Format InEvent where
@@ -113,6 +114,7 @@ instance Format InEvent where
   format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
   format (NewBeneficiary (MsgAuth s _) ben) = "NewBeneficiary " ++ show ben ++ " " ++ format s
+  format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
@@ -159,6 +161,7 @@ inShortLog loc iev = $logInfoS loc . pack $
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     NewBeneficiary (MsgAuth s _) b -> CL.blue "NEW_BENEFICIARY " ++ format s ++ " " ++ show b
+    ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
 
 outShortLog :: MonadLogger m => Text -> OutEvent -> m ()
 outShortLog loc oev = $logInfoS loc . pack $

@@ -1,8 +1,10 @@
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
 
@@ -36,6 +38,7 @@ module Blockchain.SolidVM.SM (
 import           Control.Applicative ((<|>))
 import           Control.Exception
 import           Control.Lens
+import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
@@ -52,6 +55,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
@@ -59,6 +63,7 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
+import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
@@ -66,6 +71,7 @@ import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
+import           Blockchain.VMOptions
 
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
@@ -166,6 +172,11 @@ instance HasHashDB SM where
 instance HasCodeDB SM where
   getCodeDB = codeDB <$> get
 
+instance (Address `A.Alters` AddressState) SM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
+
 runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
 runSM maybeCode env f = do
   vmcontext <- get
@@ -190,8 +201,14 @@ runSM maybeCode env f = do
     -- TODO should also not happen, but since this is a work in progress they
     -- are a fact of life and should be fixed on demand.
     -- The rest should always be a user error and handled safely
-    Left ie@InternalError{} -> throw ie
-    Left se -> return $ Left se
+    Left ie@InternalError{} -> do
+      $logErrorLS "runSM/internalError" ie
+      throw ie
+    Left se -> do
+      $logErrorLS "runSM/error" se
+      if flags_svmDev
+        then throw se
+        else return $ Left se
     Right (value, sstateAfter) -> do
       vmcontext' <- get
       put vmcontext'{

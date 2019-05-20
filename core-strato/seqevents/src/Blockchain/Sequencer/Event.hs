@@ -58,6 +58,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IEGenesis IngestGenesis
                  | IENewChainMember Word256 A.Address Enode
                  | IEBlockstanbul PBFT.WireMessage
+                 | IEForcedConfigChange PBFT.ForcedConfigChange
                  deriving (Eq, Show, GHCG.Generic)
 
 data IngestEventType = IETTransaction
@@ -65,15 +66,17 @@ data IngestEventType = IETTransaction
                      | IETGenesis
                      | IETNewChainMember
                      | IETBlockstanbul
+                     | IETForcedConfigChange
                      deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
 iEventType = \case
-  IETx _ _    -> IETTransaction
-  IEBlock _   -> IETBlock
-  IEGenesis _ -> IETGenesis
-  IENewChainMember _ _ _ -> IETNewChainMember
-  IEBlockstanbul _ -> IETBlockstanbul
+  IETx{}                 -> IETTransaction
+  IEBlock{}              -> IETBlock
+  IEGenesis{}            -> IETGenesis
+  IENewChainMember{}     -> IETNewChainMember
+  IEBlockstanbul{}       -> IETBlockstanbul
+  IEForcedConfigChange{} -> IETForcedConfigChange
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -81,6 +84,7 @@ instance Format IngestEvent where
   format (IEGenesis o) = show o
   format (IENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
   format (IEBlockstanbul o) = format o
+  format (IEForcedConfigChange o) = format o
 
 type Timestamp = Microtime
 
@@ -288,6 +292,7 @@ instance Binary IngestEvent where
     put (IEGenesis g) = putWord8 3 >> put g
     put (IEBlockstanbul m) = putWord8 4 >> put m
     put (IENewChainMember c a e) = putWord8 5 >> put c >> put a >> put e
+    put (IEForcedConfigChange cc) = putWord8 6 >> put cc
     get = do
         tag <- getWord8
         case tag of
@@ -297,6 +302,7 @@ instance Binary IngestEvent where
             3 -> IEGenesis <$> get
             4 -> IEBlockstanbul <$> get
             5 -> IENewChainMember <$> get <*> get <*> get
+            6 -> IEForcedConfigChange <$> get
             x -> error $ "unknown InputEvent tag " ++ show x
 
 instance Binary JsonRpcCommand where

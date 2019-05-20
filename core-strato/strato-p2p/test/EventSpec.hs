@@ -53,6 +53,7 @@ testContext = do
                    , contextRedisBlockDB = redisBDBPool
                    , contextKafkaState = error "no kafka state available"
                    , blockHeaders=[]
+                   , remainingBlockHeaders=[]
                    , unseqSink=atomically . writeTMChan ch
                    , vmEventsSink=const (return ())
                    , vmTrace=[]
