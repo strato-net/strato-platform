@@ -59,7 +59,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
-import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
@@ -106,20 +105,6 @@ instance HasStateDB VMM where
       vmState <- lift get
       lift $ put vmState{dbs=(dbs vmState){contextStateDB=(contextStateDB $ dbs vmState){MP.stateRoot=x}}}
 
-instance HasChainDB VMM where
-  getBlockHashRoot = lift $ fmap (contextBlockHashRoot . dbs) get
-  putBlockHashRoot sr = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextBlockHashRoot = sr}}
-  getGenesisRoot = lift $ fmap (contextGenesisRoot . dbs) get
-  putGenesisRoot sr = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
-  getBestBlockRoot = lift $ contextBestBlockRoot . dbs <$> get
-  putBestBlockRoot sr = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextBestBlockRoot = sr}}
-
 instance HasRawStorageDB VMM where
     getRawStorageTxDB = do
       cxt <- lift get
@@ -135,7 +120,6 @@ instance HasRawStorageDB VMM where
     putRawStorageBlockMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
-
 
 instance HasCodeDB VMM where
     getCodeDB = lift $ fmap (contextCodeDB . dbs) get

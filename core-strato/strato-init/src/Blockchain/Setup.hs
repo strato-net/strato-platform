@@ -14,6 +14,7 @@ module Blockchain.Setup (
 import           Control.Concurrent
 import           Control.Monad
 import qualified Control.Monad.Change.Alter         as A
+import           Control.Monad.Change.Modify        (Accessible(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
@@ -92,7 +93,7 @@ data SetupDBs =
     hashDB  :: HashDB,
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
-    redisDB :: Redis.Connection,
+    redisDB :: RBDB.RedisConnection,
     localStorageTx :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
     localStorageBlock :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
     localAddressStateTx :: IORef (Map.Map Address AddressStateModification),
@@ -148,8 +149,8 @@ instance HasCodeDB SetupDBM where
 instance HasSQLDB SetupDBM where
   getSQLDB = asks sqlDB
 
-instance RBDB.HasRedisBlockDB SetupDBM where
-  getRedisBlockDB = asks redisDB
+instance Accessible RBDB.RedisConnection SetupDBM where
+  access _ = asks redisDB
 
 {-
 connStr :: ConnectionString
@@ -474,7 +475,7 @@ oneTimeSetup genesisBlockName = do
 
          pool <- runNoLoggingT $ createPostgresqlPool connStr 20
 
-         redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+         redisBDBPool <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
          void . runLoggingT $ flip runReaderT (SetupDBs smpdb hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
            void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.

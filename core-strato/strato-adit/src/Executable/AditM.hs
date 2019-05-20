@@ -1,11 +1,15 @@
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# LANGUAGE TemplateHaskell       #-}
 module Executable.AditM where
 
 import           Blockchain.Output
+import           Control.Lens                 (lens)
+import           Control.Monad.Change.Modify  (Has(..))
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Control.Lens
@@ -14,7 +18,6 @@ import           Data.Time.Clock
 
 import           Blockchain.EthConf           (mkConfiguredKafkaState)
 import           Network.Kafka
-import           Blockchain.MilenaTools
 
 data AditState = AditState {
     aditKafkaState  :: KafkaState,
@@ -40,11 +43,8 @@ recordException = do
 
 type AditM = StateT AditState (ResourceT (LoggingT IO))
 
-instance HasKafkaState AditM where
-    getKafkaState = aditKafkaState <$> get
-    putKafkaState ns = do
-        ctx <- get
-        put $ ctx { aditKafkaState = ns }
+instance AditState `Has` KafkaState where
+  this _ = lens aditKafkaState (\c a -> c{aditKafkaState = a})
 
 runAditT :: AditM a -> LoggingT IO a
 runAditT m = do

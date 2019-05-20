@@ -5,10 +5,12 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( inNamespace, getSHAsByNumber
+    ( RedisConnection(..), inNamespace, getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
@@ -24,7 +26,7 @@ module Blockchain.Strato.RedisBlockDB
     , getGenesisHash
     , putHeader, putHeaders, putBlock, putBlocks
     , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo
-    , HasRedisBlockDB(..), withRedisBlockDB
+    , withRedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
@@ -42,6 +44,7 @@ import           Blockchain.Util                       (partitionWith)
 
 import           Control.Arrow                         ((&&&), second)
 import           Control.Concurrent                    (threadDelay)
+import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
@@ -51,6 +54,8 @@ import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
 import           System.Random                         (randomIO)
+
+newtype RedisConnection = RedisConnection { unRedisConnection :: Connection }
 
 -- todo: move this somewhere?
 zipMapM :: (Traversable t, Monad m)
@@ -62,14 +67,11 @@ zipMapM f = mapM (\x -> (,) x <$> f x)
 liftLog :: LoggingT m a -> m a
 liftLog = runLoggingT
 
-class (Monad m) => HasRedisBlockDB m where
-    getRedisBlockDB :: m Connection
-
-withRedisBlockDB :: (MonadIO m, HasRedisBlockDB m)
+withRedisBlockDB :: (MonadIO m, Accessible RedisConnection m)
                  => Redis a
                  -> m a
 withRedisBlockDB m = do
-    db <- getRedisBlockDB
+    db <- unRedisConnection <$> access (Proxy @RedisConnection)
     liftIO $ runRedis db m
 
 inNamespace :: RedisDBKeyable k

@@ -36,6 +36,7 @@ import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter         as A
+import           Control.Monad.Change.Modify        hiding (get, put)
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
@@ -47,7 +48,6 @@ import           Data.Foldable                      (toList)
 import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
-import           Data.Proxy
 import qualified Data.Sequence                      as Q
 import           Data.Word
 import qualified Data.Text                          as T
@@ -93,8 +93,8 @@ import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 
-instance NFData Redis.Connection where
-  rnf c = c `seq` ()
+instance NFData RBDB.RedisConnection where
+  rnf (RBDB.RedisConnection c) = c `seq` ()
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show, Generic, NFData)
@@ -112,13 +112,13 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
                        , contextStorageTxMap           :: M.Map (Address, B.ByteString) B.ByteString
                        , contextStorageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
-                       , contextBlockHashRoot          :: MP.StateRoot
-                       , contextGenesisRoot            :: MP.StateRoot
-                       , contextBestBlockRoot          :: MP.StateRoot
+                       , contextBlockHashRoot          :: BlockHashRoot
+                       , contextGenesisRoot            :: GenesisRoot
+                       , contextBestBlockRoot          :: BestBlockRoot
                        , contextBaggerState            :: !BaggerState
                        , contextKafkaState             :: K.KafkaState
                        , contextBestBlockInfo          :: ContextBestBlockInfo
-                       , contextRedisPool              :: Redis.Connection
+                       , contextRedisPool              :: RBDB.RedisConnection
                        , contextTxResultQueue          :: Q.Seq TransactionResult
                        , contextLogDBQueue             :: [LogDB]
                        , contextHasBlockstanbul        :: Bool
@@ -167,25 +167,17 @@ instance HasStateDB ContextM where
     cxt <- get
     put cxt{contextStateDB=(contextStateDB cxt){MP.stateRoot=sr}}
 
-instance HasChainDB ContextM where
-  getBlockHashRoot = contextBlockHashRoot <$> get
-  putBlockHashRoot sr = do
-    cxt <- get
-    put cxt{contextBlockHashRoot = sr}
-  getGenesisRoot = contextGenesisRoot <$> get
-  putGenesisRoot sr = do
-    cxt <- get
-    put cxt{contextGenesisRoot = sr}
-  getBestBlockRoot = contextBestBlockRoot <$> get
-  putBestBlockRoot sr = do
-    cxt <- get
-    put cxt{contextBestBlockRoot = sr}
+instance Context `Has` BlockHashRoot where
+  this _ = lens contextBlockHashRoot (\c b -> c{contextBlockHashRoot = b})
 
-instance K.HasKafkaState ContextM where
-    getKafkaState = contextKafkaState <$> get
-    putKafkaState ks = do
-        ctx <- get
-        put $ ctx {contextKafkaState = ks}
+instance Context `Has` GenesisRoot where
+  this _ = lens contextGenesisRoot (\c b -> c{contextGenesisRoot = b})
+
+instance Context `Has` BestBlockRoot where
+  this _ = lens contextBestBlockRoot (\c b -> c{contextBestBlockRoot = b})
+
+instance Context `Has` K.KafkaState where
+  this _ = lens contextKafkaState (\c b -> c{contextKafkaState = b})
 
 instance HasMemAddressStateDB ContextM where
   getAddressStateTxDBMap = contextAddressStateTxDBMap <$> get
@@ -233,8 +225,8 @@ instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
 
-instance RBDB.HasRedisBlockDB ContextM where
-    getRedisBlockDB = contextRedisPool <$> get
+instance Accessible RBDB.RedisConnection ContextM where
+  access _ = contextRedisPool <$> get
 
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
@@ -273,13 +265,13 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      M.empty
                      M.empty
                      M.empty
-                     MP.emptyTriePtr
-                     MP.emptyTriePtr
-                     MP.emptyTriePtr
+                     (BlockHashRoot MP.emptyTriePtr)
+                     (GenesisRoot MP.emptyTriePtr)
+                     (BestBlockRoot MP.emptyTriePtr)
                      defaultBaggerState
                      initialKafkaState
                      Unspecified
-                     redisPool
+                     (RBDB.RedisConnection redisPool)
                      Q.empty []
                      False
                      False
@@ -315,13 +307,13 @@ runContextM f = do
                        M.empty
                        M.empty
                        M.empty
-                       MP.emptyTriePtr
-                       MP.emptyTriePtr
-                       MP.emptyTriePtr
+                       (BlockHashRoot MP.emptyTriePtr)
+                       (GenesisRoot MP.emptyTriePtr)
+                       (BestBlockRoot MP.emptyTriePtr)
                        defaultBaggerState
                        initialKafkaState
                        Unspecified
-                       redisPool
+                       (RBDB.RedisConnection redisPool)
                        Q.empty
                        []
                        flags_blockstanbul

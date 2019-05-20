@@ -19,6 +19,7 @@ dependencies:
   - hedis
   - lens-family
   - lens-family-th
+  - monad-alter
   - mtl
   - random
   - strato-conf

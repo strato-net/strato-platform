@@ -15,6 +15,7 @@ module Blockchain.Event (
 
 import           Control.Arrow                         ((&&&))
 import           Control.Monad
+import           Control.Monad.Change.Modify           hiding (get, put)
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.State
@@ -31,6 +32,7 @@ import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           MonadUtils
+import qualified Network.Kafka                         as K
 import           System.Random
 import           Text.Printf
 import           UnliftIO.Exception
@@ -110,10 +112,11 @@ yieldL = yield . Left
 
 handleEvents :: ( MonadIO m
                 , MonadResource m
-                , RBDB.HasRedisBlockDB m
+                , Accessible RBDB.RedisConnection m
                 , SK.HasUnseqSink m
                 , MonadState Context m
                 , MonadLogger m
+                , Modifiable K.KafkaState m
                 ) => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
@@ -123,7 +126,7 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (Transactions txs) -> do
         stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
-        SK.emitKafkaTransactions txo txs
+        lift $ SK.emitKafkaTransactions txo txs
 
     MsgEvt (NewBlock block' tdiff) -> do
         stampActionTimestamp
@@ -148,7 +151,7 @@ handleEvents peer = awaitForever $ \case
                     syncFetch Forward fetchNumber
                 Just _  -> do
                     lift . void $ setTitleAndProduceBlocks [block']
-                    void $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
+                    void . lift $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
         stampActionTimestamp
@@ -256,7 +259,7 @@ handleEvents peer = awaitForever $ \case
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
           ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
           unless (null ptxs) . yieldR $ Transactions ptxs)
-        where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m)
+        where getUntilMissing :: (Accessible RBDB.RedisConnection m, MonadIO m)
                               => [SHA] -> [Block] -> [SHA] -> m ([Block],[SHA])
               getUntilMissing []     bodies pshas = return (bodies, pshas)
               getUntilMissing (h:hs) bodies pshas = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
@@ -284,7 +287,7 @@ handleEvents peer = awaitForever $ \case
         $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
-        forM_ blocks' $ lift . SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
+        lift . forM_ blocks' $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
         rHeaders <- lift getRemainingBHeaders
         let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
         lift $ putBlockHeaders neededHeaders
@@ -300,14 +303,14 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
       setPeerAddrIfUnset $ blockstanbulSender wm
-      SK.emitBlockstanbulMsg wm
+      lift $ SK.emitBlockstanbulMsg wm
 
     -- private chains
     MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer cids'
 
     MsgEvt (ChainDetails chpairs) -> do
       stampActionTimestamp
-      mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
+      lift $ mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
     MsgEvt (GetTransactions trHashes) -> do
@@ -423,7 +426,7 @@ handleEvents peer = awaitForever $ \case
 
 handleGetChainDetails :: ( MonadIO m
                          , MonadResource m
-                         , RBDB.HasRedisBlockDB m
+                         , Accessible RBDB.RedisConnection m
                          , MonadState Context m
                          , MonadLogger m
                          )

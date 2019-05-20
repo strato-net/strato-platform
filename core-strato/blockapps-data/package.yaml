@@ -42,6 +42,7 @@ dependencies:
   - leveldb-haskell
   - lifted-base
   - merkle-patricia-db
+  - monad-alter
   - monad-control
   - mtl
   - network
