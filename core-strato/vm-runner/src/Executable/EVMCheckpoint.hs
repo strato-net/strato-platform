@@ -11,6 +11,7 @@ import qualified Network.Kafka.Protocol   as KP
 
 import qualified Blockchain.Data.DataDefs as DD
 import           Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.MilenaTools   as KP
 import           Blockchain.SHA
 import           Blockchain.VMContext     (ContextBestBlockInfo (..))
@@ -21,15 +22,20 @@ import           Text.Format
 data EVMCheckpoint = EVMCheckpoint {
     checkpointSHA    :: SHA,
     checkpointHead   :: DD.BlockData,
-    ctxBestBlockInfo :: ContextBestBlockInfo
+    ctxBestBlockInfo :: ContextBestBlockInfo,
+    ctxChainDBStateRoot :: Maybe MP.StateRoot
 } deriving (Read, Show)
 
 instance RLPSerializable EVMCheckpoint where
     rlpDecode (RLPArray [sha, header, bbi]) =
-        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi)
+        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi) Nothing
+    rlpDecode (RLPArray [sha, header, bbi, sr]) =
+        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi) (Just $ rlpDecode sr)
     rlpDecode _ = error "unexpected RLP object"
-    rlpEncode (EVMCheckpoint sha header bbi) =
+    rlpEncode (EVMCheckpoint sha header bbi Nothing) =
         RLPArray [rlpEncode sha, rlpEncode header, rlpEncode bbi]
+    rlpEncode (EVMCheckpoint sha header bbi (Just sr)) =
+        RLPArray [rlpEncode sha, rlpEncode header, rlpEncode bbi, rlpEncode sr]
 
 instance RLPSerializable ContextBestBlockInfo where
     rlpDecode (RLPArray [tag, body]) = case rlpDecode tag :: Integer of
@@ -57,7 +63,7 @@ instance RLPSerializable ContextBestBlockInfo where
 
 
 instance Format EVMCheckpoint where -- todo add format instance for ContextBestBlockInfo and show it here as well.
-    format (EVMCheckpoint sha _ _) =
+    format (EVMCheckpoint sha _ _ _) =
         "EVMCheckpoint " ++ CL.red (short sha)
             where short = take 16 . formatSHAWithoutColor
 

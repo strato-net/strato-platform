@@ -13,6 +13,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.State.Lazy        (gets)
+import           Data.Proxy
 import qualified Data.Text                             as T
 import qualified Data.Map.Ordered                      as O
 import qualified Data.Map                              as M
@@ -23,8 +24,9 @@ import qualified Network.Kafka.Protocol                as KP
 import           Text.Printf
 import           Util
 
-import           Blockapps.Crossmon
+import           Control.Monad.Change.Modify
 
+import           Blockapps.Crossmon
 import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber)
 import           Blockchain.Data.BlockHeader           (extraData2TxsLen)
@@ -67,9 +69,12 @@ ethereumVM = void . execContextM $ do
 
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI) <- getCheckpoint
+    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpMSR) <- getCheckpoint
+    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpMSR)
+
     putContextBestBlockInfo cpBBI
-    bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
+    mapM_ (put Proxy . BlockHashRoot) cpMSR
+
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
@@ -157,7 +162,8 @@ ethereumVM = void . execContextM $ do
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
-        setCheckpoint newOffset checkpointData
+        withChainroot <- checkpointData . Just . unBlockHashRoot <$> get Proxy
+        setCheckpoint newOffset withChainroot
 
 insertNewChains :: [OutputEvent] -> ContextM ()
 insertNewChains events = do
@@ -201,7 +207,8 @@ initializeCheckpointAndBlockSummary = do
         txL    = length txs
         uncL   = length (obBlockUncles block)
         cbbi   = ContextBestBlockInfo (sha, header, td, txL, uncL)
-    setCheckpoint 1 (EVMCheckpoint sha header cbbi)
+    bootstrapChainDB sha
+    setCheckpoint 1 (EVMCheckpoint sha header cbbi Nothing)
 
 
 writeBlockSummary :: OutputBlock -> ContextM ()
