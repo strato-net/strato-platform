@@ -44,7 +44,6 @@ module Blockchain.EVM.VMM (
 
 import           Control.Monad
 import qualified Control.Monad.Change.Alter         as A
---import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
