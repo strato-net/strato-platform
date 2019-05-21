@@ -341,7 +341,7 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
 
       when (not flags_sqlDiff) $ timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $ do
         asm <- getAddressStateBlockDBMap
-        lift $ updateSQLBalanceAndNonce $ [(theAddress, (addressStateBalance asMod, addressStateNonce asMod)) | (theAddress, ASModification asMod) <- M.toList asm]
+        lift $ updateSQLBalanceAndNonce $ [((theAddress, chainId), (addressStateBalance asMod, addressStateNonce asMod)) | (theAddress, ASModification asMod) <- M.toList asm]
 --        lift $ updateSQLBalanceAndNonce $ map (fmap (\(ASModification x) -> (addressStateBalance x, addressStateNonce x))) $ M.toList asm
 
       timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB

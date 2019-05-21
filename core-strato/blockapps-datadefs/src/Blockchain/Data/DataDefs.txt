@@ -51,9 +51,9 @@ AddressStateRef
     contractRoot StateRoot
     code BS.ByteString
     codeHash SHA
-    chainId Word256 Maybe
+    chainId Word256
     latestBlockDataRefNumber Integer
-    UniqueAddress address
+    UniqueAddress address chainId
     deriving Eq Read Show
 
 RawTransaction
