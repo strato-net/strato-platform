@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Rank2Types           #-}
@@ -34,6 +35,7 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Lens                          hiding (Context)
+import           Control.Monad.Change.Modify           hiding (get, put)
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -62,11 +64,11 @@ newtype Config = Config { configSQLDB :: SQLDB }
 
 data Context =
     Context {
-        contextRedisBlockDB :: Redis.Connection,
+        contextRedisBlockDB :: RBDB.RedisConnection,
         contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
-        unseqSink           :: forall m . (MonadIO m, K.HasKafkaState m) => [IngestEvent] -> m (),
-        vmEventsSink        :: forall m . (MonadIO m, K.HasKafkaState m) => [VMEvent] -> m (),
+        unseqSink           :: forall m . (MonadIO m, Modifiable K.KafkaState m) => [IngestEvent] -> m (),
+        vmEventsSink        :: forall m . (MonadIO m, Modifiable K.KafkaState m) => [VMEvent] -> m (),
         blockHeaders        :: [BlockHeader],
         remainingBlockHeaders :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime,
@@ -79,14 +81,11 @@ makeLenses ''Context
 
 type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 
-instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
-    getKafkaState = contextKafkaState <$> get
-    putKafkaState s = do
-      ctx <- get
-      put $ ctx { contextKafkaState = s }
+instance Context `Has` K.KafkaState where
+  this _ = lens contextKafkaState (\c k -> c{contextKafkaState = k})
 
-instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
-    getRedisBlockDB = contextRedisBlockDB <$> get
+instance MonadState Context m => Accessible RBDB.RedisConnection m where
+  access _ = gets contextRedisBlockDB
 
 instance (MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
   getSQLDB = asks configSQLDB
@@ -94,10 +93,10 @@ instance (MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
 
-instance (MonadState Context m, MonadIO m) => HasUnseqSink m where
+instance (MonadState Context m, MonadIO m, Modifiable K.KafkaState m) => HasUnseqSink m where
   getUnseqSink = gets unseqSink
 
-instance (MonadState Context m, MonadIO m) => HasVMEventsSink m where
+instance (MonadState Context m, MonadIO m, Modifiable K.KafkaState m) => HasVMEventsSink m where
   getVMEventsSink = gets vmEventsSink
 
 getDebugMsg :: MonadState Context m => m String
@@ -158,7 +157,7 @@ initContext maxHeaders = do
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   return (Config (sqlDB' dbs),
          Context { actionTimestamp = Nothing
-                 , contextRedisBlockDB = redisBDBPool
+                 , contextRedisBlockDB = RBDB.RedisConnection redisBDBPool
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , blockHeaders=[]
                  , remainingBlockHeaders=[]

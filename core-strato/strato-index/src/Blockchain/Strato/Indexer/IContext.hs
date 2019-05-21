@@ -1,9 +1,11 @@
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE LambdaCase           #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.Strato.Indexer.IContext
     ( IContext(..)
@@ -17,6 +19,8 @@ module Blockchain.Strato.Indexer.IContext
     , reIBBI
     ) where
 
+import           Control.Lens                    (lens)
+import           Control.Monad.Change.Modify     (Has(..), Accessible(..))
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.Resource
@@ -33,7 +37,6 @@ import qualified Blockchain.Strato.RedisBlockDB  as RBDB
 import qualified Database.Redis                  as Redis
 
 import           Network.Kafka
-import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           Blockchain.Strato.Indexer.Kafka
@@ -42,7 +45,7 @@ newtype IConfig = IConfig { contextSQLDB :: SQLDB }
 
 data IContext = IContext {
     contextKafkaState   :: KafkaState,
-    contextRedisBlockDB :: Redis.Connection,
+    contextRedisBlockDB :: RBDB.RedisConnection,
     contextBestBlock    :: IndexerBestBlockInfo
 }
 
@@ -55,14 +58,11 @@ newtype IndexerBestBlockInfo = IndexerBestBlockInfo (SQL.Key BlockDataRef)
 instance HasSQLDB IConfigM where
   getSQLDB = asks contextSQLDB
 
-instance HasKafkaState IContextM where
-    getKafkaState = contextKafkaState <$> get
-    putKafkaState ks = do
-        st <- get
-        put st { contextKafkaState = ks }
+instance IContext `Has` KafkaState where
+  this _ = lens contextKafkaState (\c k -> c{contextKafkaState = k})
 
-instance RBDB.HasRedisBlockDB IContextM where
-    getRedisBlockDB = contextRedisBlockDB <$> get
+instance Accessible RBDB.RedisConnection IContextM where
+  access _ = contextRedisBlockDB <$> get
 
 getIndexerBestBlockInfo :: IContextM IndexerBestBlockInfo
 getIndexerBestBlockInfo = contextBestBlock <$> get
@@ -92,7 +92,9 @@ runIContextM cid f = do
     redis <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
     (ret, _) <- runResourceT
               . flip runReaderT (IConfig sqldb)
-              . flip runStateT (IContext (mkConfiguredKafkaState cid) redis (reIBBI 0))
+              . flip runStateT (IContext (mkConfiguredKafkaState cid)
+                                         (RBDB.RedisConnection redis)
+                                         (reIBBI 0))
               $ f
     $logInfoS "runIContextM" "runIContextM complete, returning"
     return ret

@@ -26,6 +26,7 @@ library:
     - blockapps-util
     - ethereum-rlp
     - merkle-patricia-db
+    - monad-alter
     - monad-control
     - persistent
     - persistent-postgresql

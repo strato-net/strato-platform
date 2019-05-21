@@ -2,16 +2,17 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Blockchain.MilenaTools where
 
 
 import           Control.Concurrent     (threadDelay)
 import           Control.Lens
+import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Except        (ExceptT (..), runExceptT, throwError)
 import           Control.Monad.Trans.State
-import qualified Control.Monad.Trans.State.Strict as Str
 import           Network.Kafka
 import           Network.Kafka.Protocol
 import           Prelude
@@ -61,40 +62,27 @@ getConsumerGroupCoordinator group = do
         NoError -> return broker
         other   -> throwError $ KafkaFailedToFetchGroupCoordinator other
 
-
-class HasKafkaState m where
-    getKafkaState :: m KafkaState
-    putKafkaState :: KafkaState -> m ()
-
-instance (Monad m) => HasKafkaState (StateT KafkaState m) where
-    getKafkaState = get
-    putKafkaState = put
-
-instance (Monad m) => HasKafkaState (Str.StateT KafkaState m) where
-    getKafkaState = Str.get
-    putKafkaState = Str.put
-
-withKafkaViolently :: (MonadIO m, HasKafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaViolently :: (MonadIO m, Mod.Modifiable KafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaViolently k = do
-    s <- getKafkaState
+    s <- Mod.get (Mod.Proxy @KafkaState)
     r <- liftIO . runExceptT $ runStateT k s
     case r of
         Left err -> error $ show err
         Right (a, newS) -> do
-            putKafkaState newS
+            Mod.put (Mod.Proxy @KafkaState) newS
             return a
 
-withKafkaRetry :: (MonadIO m, HasKafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry :: (MonadIO m, Mod.Modifiable KafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry t k = do
-  s <- getKafkaState
+  s <- Mod.get (Mod.Proxy @KafkaState)
   let go = do
         r <- liftIO . runExceptT $ runStateT k s
         case r of
           Right a -> return a
           Left _ -> (liftIO $ threadDelay (1000*t)) >> go
   (a, newS) <- go
-  putKafkaState newS
+  Mod.put (Mod.Proxy @KafkaState) newS
   return a
 
-withKafkaRetry1s :: (MonadIO m, HasKafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry1s :: (MonadIO m, Mod.Modifiable KafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry1s = withKafkaRetry 1000
