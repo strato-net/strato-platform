@@ -2,7 +2,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
 module Control.Monad.Change.Modify
   ( Modifiable(..)
@@ -14,10 +13,7 @@ module Control.Monad.Change.Modify
 
 import           Control.Lens
 import           Control.Monad                    (void)
-import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State        (execStateT, StateT)
-import qualified Control.Monad.Trans.State.Lazy   as Lazy
-import qualified Control.Monad.Trans.State.Strict as Strict
 import           Data.Proxy
 
 class Monad f => Modifiable a f where
@@ -52,14 +48,6 @@ instance a `Has` a where
 instance (Identity a) `Has` a where
   this _ = lens runIdentity (const Identity)
 
-instance {-# OVERLAPPABLE #-} (Monad m, b `Has` a) => Modifiable a (Lazy.StateT b m) where
-  get p   = use (this p)
-  put p s = assign (this p) s
-
-instance {-# OVERLAPPABLE #-} (Monad m, b `Has` a) => Modifiable a (Strict.StateT b m) where
-  get p   = use (this p)
-  put p s = assign (this p) s
-
 
 
 class Accessible a f where
@@ -67,14 +55,3 @@ class Accessible a f where
 
 accesses :: (Functor f, Accessible a f) => Proxy a -> (a -> b) -> f b
 accesses = flip fmap . access
-
-
-
-instance Monad m => Accessible a (Lazy.StateT a m) where
-  access = const Lazy.get
-
-instance Monad m => Accessible a (Strict.StateT a m) where
-  access = const Strict.get
-
-instance Monad m => Accessible a (ReaderT a m) where
-  access = const ask
