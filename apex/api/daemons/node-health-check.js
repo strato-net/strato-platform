@@ -121,8 +121,6 @@ async function updateHealthStat(healthStatus) {
 async function updateCurrentHealth(overallStat) {
     let currentTime = Date.now();
     let [systemInfoStatus, systemInfo] = await checkSystemInfo();
-    winston.warn("[ ] ", systemInfoStatus)
-  winston.warn("SS[ ] ", systemInfo)
 
     await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
             latestHealthStatus: overallStat[0],
@@ -145,14 +143,14 @@ async function updateCurrentHealth(overallStat) {
   await models.CurrentHealth.findOrCreate({where: {processName: 'SystemInfoStat'}, defaults: {
       latestHealthStatus: systemInfoStatus,
       latestCheckTimestamp: currentTime,
-      additionalInfo: systemInfo.toString(),
+      additionalInfo: JSON.stringify(systemInfo),
       lastFailureTimestamp: currentTime  // default first time marked as failure
     }}).then(([stat, created]) => {
     if (!created){
       stat.update(
           {latestCheckTimestamp: currentTime,
             latestHealthStatus: systemInfoStatus,
-            additionalInfo: systemInfo.toString(),
+            additionalInfo: JSON.stringify(systemInfo),
             lastFailureTimestamp: systemInfoStatus ? stat.lastFailureTimestamp : currentTime
           }, {where: {processName: 'SystemInfoStat'}})
       stat;
@@ -203,9 +201,10 @@ async function checkSystemInfo() {
     await si.mem().then(data => {
       sysInfoCollected.mem_active = data.active;
       sysInfoCollected.mem_free = data.free;
-      if (data.free / data.total < .1) {
+      winston.warn("free/total", data.free / data.total)
+      if (data.free / data.total < config.healthCheck.memoryUsageBound) {
         ifHealthy = false;
-        additional_info.push("mem")
+        additional_info.push("Memory low")
       }
 
     })
@@ -244,7 +243,7 @@ async function checkSystemInfo() {
     })
 
     if (additional_info.toString() !== ""){
-      sysInfoCollected.additionalInfo = additional_info
+      sysInfoCollected.Alerts = additional_info
     }
 
     winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)

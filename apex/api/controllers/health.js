@@ -106,7 +106,7 @@ module.exports = {
           },
           warning: {
             systemHealth: systemInfoStatus,
-            systemAlerts: systemInfoAI
+            systemInfo: systemInfoAI
           }
         }
       )
