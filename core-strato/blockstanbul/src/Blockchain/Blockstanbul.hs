@@ -6,6 +6,7 @@ module Blockchain.Blockstanbul
   , sendAllMessages
   , RoundNumber
   , SequenceNumber
+  , Checkpoint(..)
   , View(..)
   , MsgAuth(..)
   , WireMessage(..)
@@ -19,6 +20,8 @@ module Blockchain.Blockstanbul
   , isHistoricBlock
   , blockstanbulSender
   , shortFormat
+  , decodeCheckpoint
+  , encodeCheckpoint
 ) where
 
 import Blockchain.Blockstanbul.EventLoop

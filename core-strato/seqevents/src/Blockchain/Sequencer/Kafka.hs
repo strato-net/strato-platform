@@ -49,10 +49,7 @@ seqP2pEventsTopicName :: KP.TopicName
 seqP2pEventsTopicName = lookupTopic "seq_p2p_events"
 
 assertTopicCreation :: K.Kafka k => k ()
-assertTopicCreation = do
-    K.updateMetadata unseqEventsTopicName
-    K.updateMetadata seqVmEventsTopicName
-    K.updateMetadata seqP2pEventsTopicName
+assertTopicCreation = K.updateMetadatas [unseqEventsTopicName, seqP2pEventsTopicName, seqVmEventsTopicName]
 
 readUnseqEvents :: K.Kafka k => KP.Offset -> k [IngestEvent]
 readUnseqEvents = readUnseqEventsFromTopic unseqEventsTopicName
@@ -92,7 +89,6 @@ readFromTopic' topic offset = do
   _ <- setDefaultKafkaState
   bytes <- fetchBytes topic offset
   return $ map (decode . BL.fromStrict) bytes
-  --  map (decode . BL.fromStrict) <$> fetchBytes topic offset
 {-# INLINE readFromTopic' #-}
 
 class HasUnseqSink k where

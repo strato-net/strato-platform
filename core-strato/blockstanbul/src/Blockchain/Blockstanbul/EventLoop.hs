@@ -95,12 +95,12 @@ debugShowCtx = do
   debugLog "showctx/roundChanged" roundChanged show
   debugLog "showctx/admins" authSenders show
 
-newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
-newContext v as senderlist pk =
+newContext :: Checkpoint -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
+newContext (Checkpoint view' voteRecord) as senderlist pk =
   let valSet = S.fromList as
       prop = fromMaybe 0x0 . S.lookupMin $ valSet
   in BlockstanbulContext
-     { _view = v
+     { _view = view'
      , _productionAuth = True
      , _proposal = Nothing
      , _proposer = prop
@@ -112,7 +112,7 @@ newContext v as senderlist pk =
      , _hasCommitted = False
      , _pendingRound = Nothing
      , _roundChanged = M.empty
-     , _voted = M.empty
+     , _voted = voteRecord
      , _prvkey = pk
      , _blockLock = Nothing
      , _lockSender = Nothing
@@ -265,6 +265,7 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
+  yield . NewCheckpoint =<< liftM2 Checkpoint (use view) (use voted)
 
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
@@ -525,3 +526,4 @@ recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCount
     LeadFound{} -> inc "lead_found"
     PendingVote{} -> inc "pending_vote"
     VoteResponse{} -> inc "vote_response"
+    NewCheckpoint{} -> inc "new_checkpoint"

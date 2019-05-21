@@ -130,6 +130,7 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
                  | OEPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
                  | OEVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
+                 | OENewCheckpoint (PBFT.Checkpoint)
                  deriving (Eq, Show, GHCG.Generic)
 
 instance Format OutputEvent where
@@ -340,6 +341,7 @@ instance Binary OutputEvent where
     put (OEPushBlocks s e p) = putWord8 12 >> put s >> put e >> put p
     put (OENewChainMember c a e) = putWord8 13 >> put c >> put a >> put e
     put (OEVoteToMake r d s) = putWord8 14 >> put r >> put d >> put s
+    put (OENewCheckpoint{}) = error "pbft checkpoints should not be sent to p2p/vm"
     get = do
         tag <- getWord8
         case tag of

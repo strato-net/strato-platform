@@ -191,7 +191,10 @@ blockstanbulSend' msg = do
           return . OEBlock $ sequencedBlockToOutputBlock sb 1
       creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
   rBlocks <- fmap catMaybes $ mapM rewriteBlock blocks
-  let vmevs = creates ++ rBlocks ++ [OEVoteToMake r d s| PendingVote r d s <- resp]
+  let vmevs = creates
+            ++ rBlocks
+            ++ [OEVoteToMake r d s| PendingVote r d s <- resp]
+            ++ [OENewCheckpoint ck | NewCheckpoint ck <- resp]
       p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [OEAskForBlocks (h+1) l p | GapFound h l p <- resp]
             ++ [OEPushBlocks (l+1) h p | LeadFound h l p <- resp]

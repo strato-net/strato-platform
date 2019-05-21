@@ -8,9 +8,15 @@ module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
 import Control.Lens
+import Control.Monad (liftM2)
 import Blockchain.Output
+import qualified Data.Aeson as Ae
 import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as LB
+import Data.Default
 import Data.DeriveTH
+import qualified Data.Map as M
 import Data.Text
 import GHC.Generics
 import Test.QuickCheck
@@ -34,6 +40,12 @@ data View = View {
   _sequence :: SequenceNumber
 } deriving (Eq, Show, Ord, Generic, Binary, NFData)
 makeLenses ''View
+
+instance Ae.ToJSON View where
+  toJSON (View r s) = Ae.object ["round" Ae..= r, "sequence" Ae..= s]
+
+instance Ae.FromJSON View where
+  parseJSON = Ae.withObject "View" $ \v -> liftM2 View (v Ae..: "round") (v Ae..: "sequence")
 
 instance Format View where
   format (View r s) = printf "View (round = %d, sequence = %d)" r s
@@ -130,6 +142,7 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               -- the coinbase is modified to hold the vote.
               | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool, pendingVoteSender :: Address}
               | VoteResponse HA.VoteResult
+              | NewCheckpoint Checkpoint
 
               deriving (Eq, Show, Generic)
 
@@ -142,6 +155,7 @@ instance Format OutEvent where
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
   format (PendingVote reci dir s) = "PendingVote " ++ show (reci, dir, s)
   format (VoteResponse resp) = "VoteResponse " ++ show resp
+  format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -174,6 +188,7 @@ outShortLog loc oev = $logInfoS loc . pack $
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
     VoteResponse resp -> CL.blue "VOTE_RESPONSE " ++ show resp
+    NewCheckpoint ckpt -> CL.blue "CHECKPOINT " ++ format (checkpointView ckpt)
 
 instance NFData OutEvent
 
@@ -265,3 +280,21 @@ instance RLPSerializable OutEvent where
   rlpEncode x = error $ "cannot rlpencode non-message OutEvent: " ++ show x
 
 data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
+
+data Checkpoint = Checkpoint
+                { checkpointView :: View
+                , checkpointVoteRecord :: M.Map Address (M.Map Address Bool)
+                } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON)
+
+instance Default Checkpoint where
+  def = Checkpoint (View 0 0) M.empty
+
+derive makeArbitrary ''Checkpoint
+
+-- JSON was chosen over binary to allow manual parsing in the event of
+-- an incompatible checkpoint datatype change in the executable.
+encodeCheckpoint :: Checkpoint -> B.ByteString
+encodeCheckpoint = LB.toStrict . Ae.encode
+
+decodeCheckpoint :: B.ByteString -> Either String Checkpoint
+decodeCheckpoint = Ae.eitherDecode . LB.fromStrict

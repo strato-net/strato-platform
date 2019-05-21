@@ -16,6 +16,7 @@ dependencies:
   - cross-monitoring
   - crypto-api
   - cryptonite
+  - data-default
   - deepseq
   - derive
   - ethereum-encryption

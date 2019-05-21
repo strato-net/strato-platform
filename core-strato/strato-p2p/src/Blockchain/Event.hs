@@ -403,6 +403,7 @@ handleEvents peer = awaitForever $ \case
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
       OEVoteToMake{} -> $logErrorS "handleEvents/OEVoteToMake" "absurd"
+      OENewCheckpoint{} -> $logErrorS "handleEvents/OENewCheckpoint" "Maybe the topics should have different types?"
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
