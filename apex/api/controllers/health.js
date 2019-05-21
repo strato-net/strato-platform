@@ -27,7 +27,7 @@ module.exports = {
         raw: true,
       });
 
-      let healthStatus, stallStatus, uptime, isInc, isPending;
+      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus;
 
       const healthInfo = await models.CurrentHealth.findOne({
         where: {
@@ -36,7 +36,8 @@ module.exports = {
         attributes: [
           'latestHealthStatus',
           'latestCheckTimestamp',
-          'lastFailureTimestamp'
+          'lastFailureTimestamp',
+          'additionalInfo'
         ],
         raw:true,
       }).catch(err => next(err));
@@ -49,7 +50,22 @@ module.exports = {
           'latestCheckTimestamp',
           'lastFailureTimestamp',
           'isBlocksValidInc',
-          'isLastPending'
+          'isLastPending',
+        ],
+        raw:true,
+      }).catch(err => next(err));
+
+      const systemInfo = await models.CurrentHealth.findOne({
+        where: {
+          processName: "SystemInfoStat"
+        },
+        attributes: [
+          'latestHealthStatus',
+          'latestCheckTimestamp',
+          'lastFailureTimestamp',
+          'isBlocksValidInc',
+          'isLastPending',
+          'additionalInfo'
         ],
         raw:true,
       }).catch(err => next(err));
@@ -62,6 +78,9 @@ module.exports = {
         uptime = (healthStatus) ? currentTime - healthInfo.lastFailureTimestamp : 0;
         isInc = stallInfo.isBlocksValidInc;
         isPending = stallInfo.isLastPending;
+        healthAI = healthInfo.additionalInfo;
+        systemInfoAI = systemInfo.additionalInfo;
+        systemInfoStatus = systemInfo.latestHealthStatus;
       } else {
         let err = new Error("Not Doing Health Check");
         err.status = 500;
@@ -82,7 +101,12 @@ module.exports = {
             isHealthy: healthStatus,
             isNotStalled: stallStatus,
             isValidBlocksInc: isInc || false,
-            isLastPending: isPending
+            isLastPending: isPending,
+            unhealthyProcess: healthAI
+          },
+          warning: {
+            systemHealth: systemInfoStatus,
+            systemAlerts: systemInfoAI
           }
         }
       )

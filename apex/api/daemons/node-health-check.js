@@ -7,6 +7,7 @@ const moment = require('moment');
 const si = require('systeminformation');
 
 const config = require('../config/app.config');
+
 const neededJobs = {
     "slipstream_main":"slipstream",
     "strato_p2p":"strato-p2p",
@@ -27,21 +28,11 @@ setInterval(async () => {
     }
 }, config.healthCheck.pollFrequency);
 
-function checkSystemInfo() {
-  let sysInfoCollected = {}
-  si.cpu().then(data => sysInfoCollected.cpu = data)
-  si.mem().then(data => sysInfoCollected.mem = data)
-  let id;
-  si.dockerContainers(true).then(data => sysInfoCollected.containers = data)
-  winston.warn("id ", id)
-}
-
 function queryHealthStatus() {
     return new Promise(async (resolve, _void) => {
         try {
             const metricsResult = await getHealthPrometheus();
             await checkLatest()
-            await checkSystemInfo();
             const healthStatus = await compareTimeStamp(metricsResult);
             const overallStatus = await updateHealthStat(healthStatus);
             await updateCurrentHealth(overallStatus);
@@ -129,6 +120,10 @@ async function updateHealthStat(healthStatus) {
 
 async function updateCurrentHealth(overallStat) {
     let currentTime = Date.now();
+    let [systemInfoStatus, systemInfo] = await checkSystemInfo();
+    winston.warn("[ ] ", systemInfoStatus)
+  winston.warn("SS[ ] ", systemInfo)
+
     await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
             latestHealthStatus: overallStat[0],
             latestCheckTimestamp: currentTime,
@@ -147,6 +142,24 @@ async function updateCurrentHealth(overallStat) {
     }).catch(err => {
         winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
     });
+  await models.CurrentHealth.findOrCreate({where: {processName: 'SystemInfoStat'}, defaults: {
+      latestHealthStatus: systemInfoStatus,
+      latestCheckTimestamp: currentTime,
+      additionalInfo: systemInfo.toString(),
+      lastFailureTimestamp: currentTime  // default first time marked as failure
+    }}).then(([stat, created]) => {
+    if (!created){
+      stat.update(
+          {latestCheckTimestamp: currentTime,
+            latestHealthStatus: systemInfoStatus,
+            additionalInfo: systemInfo.toString(),
+            lastFailureTimestamp: systemInfoStatus ? stat.lastFailureTimestamp : currentTime
+          }, {where: {processName: 'SystemInfoStat'}})
+      stat;
+    }
+  }).catch(err => {
+    winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
+  });
 }
 
 function formatPromethusTimestamp(timestamp) {
@@ -178,6 +191,67 @@ async function checkLatest() {
     }
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking and comparing the latest health`)
+  }
+}
+
+
+async function checkSystemInfo() {
+  try {
+    let additional_info = [];
+    let sysInfoCollected = {}
+    let ifHealthy = true;
+    await si.mem().then(data => {
+      sysInfoCollected.mem_active = data.active;
+      sysInfoCollected.mem_free = data.free;
+      if (data.free / data.total < .1) {
+        ifHealthy = false;
+        additional_info.push("mem")
+      }
+
+    })
+    await si.currentLoad().then(data => {
+      sysInfoCollected.currentLoad = data.currentload;
+    })
+
+    const fss = []
+    await si.fsSize().then(data => {
+      data.forEach(function (fs) {
+        const fsDetails = {}
+        fsDetails.name = fs.fs;
+        fsDetails.fsSize = fs.size;
+        fsDetails.fsSize_use = fs.use;
+        fsDetails.fsSize_used = fs.used;
+        fsDetails.fsSize_size = fs.size;
+        fss.push(fsDetails)
+      })
+      sysInfoCollected.fsSize = fss;
+    })
+    await si.fsStats().then(data => {
+      sysInfoCollected.fsStats_rx = data.rx;
+      sysInfoCollected.fsStats_wx = data.wx;
+    })
+
+    const nwStats = []
+    await si.networkStats().then(data => {
+      data.forEach(function (ntStat) {
+        const nsStatDetails = {}
+        nsStatDetails.iface = ntStat.iface;
+        nsStatDetails.networkStats_rx_bytes = ntStat.rx_bytes;
+        nsStatDetails.networkStats_tx_bytes = ntStat.tx_bytes;
+        nwStats.push(nsStatDetails)
+      })
+      sysInfoCollected.networkStats = nwStats;
+    })
+
+    if (additional_info.toString() !== ""){
+      sysInfoCollected.additionalInfo = additional_info
+    }
+
+    winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)
+
+    return [ifHealthy, sysInfoCollected];
+  } catch (e) {
+    winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
   }
 }
 
