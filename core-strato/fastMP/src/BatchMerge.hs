@@ -23,7 +23,7 @@ import FastMP
 import KV
 import ReverseOrderedKVs
 
-putManyKeyVal :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+putManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m
               => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
 putManyKeyVal sr listOfInserts = do
   let listOfInserts' = map (\(k, v) -> (MP.keyToSafeKey k, v)) listOfInserts
@@ -50,11 +50,11 @@ splitKeysByPrefix (firstChar:remainingPrefix) kvs =
        Just _ -> map (\(KV k v) -> (KV (tail k) v)) matched:splitKeysByPrefix remainingPrefix remaining
        Nothing -> matched:splitKeysByPrefix remainingPrefix remaining
 
-putManyKeyVal_nodeData :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+putManyKeyVal_nodeData :: (MP.StateRoot `A.Alters` MP.NodeData) m
                        => MP.NodeData -> ReverseOrderedKVs -> m MP.NodeData
 putManyKeyVal_nodeData (MP.FullNodeData choices val) listOfInserts = do
   let kvsSplitByFirstNibble = splitKeysByPrefix (map Just [15,14..0] ++ [Nothing]) $ getTheKVs listOfInserts
-  
+
   choices' <-
     forM (zip kvsSplitByFirstNibble $ reverse choices) $ \(newVals, oldVal) -> do
       if null newVals
@@ -69,12 +69,12 @@ putManyKeyVal_nodeData (MP.FullNodeData choices val) listOfInserts = do
           [] -> val
           [KV _ (Right x)] -> Just x
           x -> error $ "internal error: forbidden pattern match in call to putManyKeyVal_nodeData: " ++ show x
-              
+
   return $ MP.FullNodeData (reverse choices') val'
 
 
 
-  
+
 putManyKeyVal_nodeData (MP.ShortcutNodeData k (Right v)) listOfInserts = do
    createMPFast_NodeData $ insertKV_ignoreIfExists listOfInserts $ KV (N.unpack k) $ Right v
 
@@ -89,15 +89,15 @@ putManyKeyVal_nodeData (nd@(MP.ShortcutNodeData _ (Left _))) listOfInserts = do
   --Since this is difficult and rare, I am going to just default to slow one-by-one inserts for
   --now....
 
-  
+
   concatM (map (\(KV k (Right v)) -> MP.putKV_NodeData (N.pack k) v) $ getTheKVs listOfInserts) nd
 
 
 
 
-  
 
-  
+
+
 putManyKeyVal_nodeData MP.EmptyNodeData listOfInserts = do
   createMPFast_NodeData listOfInserts
 

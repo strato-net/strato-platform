@@ -7,7 +7,6 @@
 
 module FastMP where
 
-import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Control.Monad.Loops
@@ -16,8 +15,6 @@ import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Default (def)
 import Data.List
-import qualified Data.Map.Strict as M
-import Data.Maybe
 import qualified Data.NibbleString as N
 import Data.Proxy
 import qualified Database.LevelDB as LDB
@@ -37,21 +34,19 @@ debug :: Bool
 debug = False
 
 instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT LDB.DB m) where
-  alterMany _ srs f = do
+  lookup _ (MP.StateRoot p)    = do
     db <- ask
-    bss <- liftIO $ forM srs $ \(MP.StateRoot p) -> LDB.get db def p
-    let nds = map (fmap bytes2NodeData) bss
-    let m = M.fromList $ map (fmap fromJust) $ filter (isJust . snd) $ zip srs nds
-    m' <- f m
-    mapM_ (uncurry (LDB.put db def) . toBytes) $ M.toList m'
-    mapM_ (\(MP.StateRoot sr) -> LDB.delete db def sr) . M.keys $ m M.\\ m'
-    return m'
-    where
-      bytes2NodeData :: B.ByteString -> MP.NodeData
-      bytes2NodeData bytes | B.null bytes = MP.EmptyNodeData
-      bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
-      toBytes :: (MP.StateRoot, MP.NodeData) -> (B.ByteString, B.ByteString)
-      toBytes (MP.StateRoot sr, nd) = (sr, rlpSerialize $ rlpEncode nd)
+    mBytes <- LDB.get db def p
+    return $ bytes2NodeData <$> mBytes
+    where bytes2NodeData :: B.ByteString -> MP.NodeData
+          bytes2NodeData bytes | B.null bytes = MP.EmptyNodeData
+          bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
+
+  insert _ (MP.StateRoot p) nd = do
+    db <- ask
+    LDB.put db def p $ rlpSerialize $ rlpEncode nd
+
+  delete _ (MP.StateRoot p) = ask >>= \db -> LDB.delete db def p
 
 createMPFast :: LDB.DB -> ReverseOrderedKVs -> IO MP.StateRoot
 createMPFast db rOrderedKVs = do
@@ -64,7 +59,7 @@ createMPFast db rOrderedKVs = do
     MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
 
 
-createMPFast_NodeData :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+createMPFast_NodeData :: (MP.StateRoot `A.Alters` MP.NodeData) m
                       => ReverseOrderedKVs -> m MP.NodeData
 createMPFast_NodeData rOrderedKVs = doit $ getTheKVs rOrderedKVs
 
@@ -81,7 +76,7 @@ kvToStdout = do
 -}
 
 
-doit :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m) =>
+doit :: (MP.StateRoot `A.Alters` MP.NodeData) m =>
         [KV] -> m MP.NodeData
 doit kvs = go (kvs, [])
   where go x = do
@@ -119,7 +114,7 @@ partialToNode (PartialNode b v) =
     spreadOut _ [] = error "internal error: spreadOut was given input out of order or out of range"
     
 
-processNext :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m) =>
+processNext :: (MP.StateRoot `A.Alters` MP.NodeData) m =>
                ([KV], [([N.Nibble], PartialNode)]) -> m ([KV], [([N.Nibble], PartialNode)])
 
 --Create new Partial Node
@@ -172,7 +167,7 @@ processNext _ = error "it should be impossible to arrive here"
 
 
 
-nodeData2NodeRef :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+nodeData2NodeRef :: (MP.StateRoot `A.Alters` MP.NodeData) m
                  => MP.NodeData -> m MP.NodeRef
 nodeData2NodeRef nodeData =
   case rlpSerialize $ rlpEncode nodeData of
@@ -183,7 +178,7 @@ nodeData2NodeRef nodeData =
 
 
 
-putNodeData :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+putNodeData :: (MP.StateRoot `A.Alters` MP.NodeData) m
             => MP.NodeData -> m MP.StateRoot
 putNodeData nd = do
   let bytes = rlpSerialize $ rlpEncode nd
@@ -196,7 +191,7 @@ putNodeData nd = do
 
 
 
-addToPartial :: (Monad m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+addToPartial :: (MP.StateRoot `A.Alters` MP.NodeData) m
              => PartialNode -> KV -> m PartialNode
 addToPartial partialNode (KV [] (Right val)) =
   return $ partialNode{value = Just val}

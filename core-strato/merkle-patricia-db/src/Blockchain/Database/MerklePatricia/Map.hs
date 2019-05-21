@@ -23,13 +23,13 @@ import           Blockchain.Database.MerklePatricia
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.NodeData
 
-map :: (Monad m, (StateRoot `Alters` NodeData) m)
+map :: (StateRoot `Alters` NodeData) m
     => (Key -> RLPObject -> m ())
     -> StateRoot
     -> m ()
 map f = mapNodeRef "" f . PtrRef
 
-mapNodeData :: (Monad m, (StateRoot `Alters` NodeData) m)
+mapNodeData :: (StateRoot `Alters` NodeData) m
             => Key -> (Key->RLPObject->m ()) -> NodeData -> m ()
 mapNodeData _ _ EmptyNodeData = return ()
 mapNodeData partialKey f FullNodeData {choices=choices', nodeVal = maybeV} = do
@@ -43,7 +43,7 @@ mapNodeData partialKey f ShortcutNodeData {nextNibbleString=remainingKey, nextVa
    Left nr -> mapNodeRef (partialKey `N.append` remainingKey) f nr
    Right v -> f (partialKey `N.append` remainingKey) v
 
-mapNodeRef :: (Monad m, (StateRoot `Alters` NodeData) m)
+mapNodeRef :: (StateRoot `Alters` NodeData) m
            => Key -> (Key -> RLPObject -> m ()) -> NodeRef -> m ()
 mapNodeRef partialKey f (PtrRef sr) = do
   nodeData <- getNodeData (PtrRef sr)

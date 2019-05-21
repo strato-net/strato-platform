@@ -11,11 +11,11 @@ import qualified Data.NibbleString                            as N
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.NodeData
 
-forEach :: (Monad m, (StateRoot `Alters` NodeData) m)
+forEach :: (StateRoot `Alters` NodeData) m
         => StateRoot -> (Key -> Val -> m ()) -> m ()
 forEach sr = forEach_NodeRef (PtrRef sr) N.empty
 
-forEach_NodeData :: (Monad m, (StateRoot `Alters` NodeData) m)
+forEach_NodeData :: (StateRoot `Alters` NodeData) m
                  => NodeData -> NibbleString -> (Key -> Val -> m ()) -> m ()
 
 forEach_NodeData EmptyNodeData _ _ = return ()
@@ -32,7 +32,7 @@ forEach_NodeData ShortcutNodeData{nextNibbleString=s, nextVal=Right val} partial
 
 
 
-forEach_NodeRef :: (Monad m, (StateRoot `Alters` NodeData) m)
+forEach_NodeRef :: (StateRoot `Alters` NodeData) m
                 => NodeRef -> NibbleString -> (Key -> Val -> m ()) -> m ()
 forEach_NodeRef ref partialKey f = do
   nodeData <- getNodeData ref

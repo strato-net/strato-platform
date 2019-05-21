@@ -19,10 +19,7 @@ import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                                as B
 import           Data.Default                                   (def)
-import qualified Data.Map.Strict                                as M
-import           Data.Maybe
 import qualified Data.NibbleString                              as N
-import           Data.Traversable                               (forM)
 import qualified Database.LevelDB                               as LD
 import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit                       (fromHUnitTest)
@@ -44,7 +41,7 @@ bigTest=
     ("00000000000000000000000000000002ffffffffffffffff0000000000000003", "84548123a8")
   ]
 
-addAllKVs :: (RLPSerializable obj, Monad m, (StateRoot `Alters` NodeData) m)
+addAllKVs :: (RLPSerializable obj, (StateRoot `Alters` NodeData) m)
           => StateRoot -> [(N.NibbleString, obj)] -> m StateRoot
 addAllKVs x [] = return x
 addAllKVs sr (x:rest) = do
@@ -85,21 +82,18 @@ testGetPutRepeatedII = TestCase $ do
   assertEqual "get . putn = id" res [("00000000000000000000000000000002ffffffffffffffff0000000000000003",rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
 
 instance MonadIO m => (StateRoot `Alters` NodeData) (ReaderT LD.DB m) where
-  alterMany _ srs f = do
+  lookup _ (StateRoot sr) = do
     db <- ask
-    bss <- liftIO $ forM srs $ \(StateRoot p) -> LD.get db def p
-    let nds = map (fmap bytes2NodeData) bss
-    let m = M.fromList $ map (fmap fromJust) $ filter (isJust . snd) $ zip srs nds
-    m' <- f m
-    mapM_ (uncurry (LD.put db def) . toBytes) $ M.toList m'
-    mapM_ (\(StateRoot sr) -> LD.delete db def sr) . M.keys $ m M.\\ m'
-    return m'
-    where
-      bytes2NodeData :: B.ByteString -> NodeData
-      bytes2NodeData bytes | B.null bytes = EmptyNodeData
-      bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
-      toBytes :: (StateRoot, NodeData) -> (B.ByteString, B.ByteString)
-      toBytes (StateRoot sr, nd) = (sr, rlpSerialize $ rlpEncode nd)
+    fmap bytes2NodeData <$> LD.get db def sr
+    where bytes2NodeData :: B.ByteString -> NodeData
+          bytes2NodeData bytes | B.null bytes = EmptyNodeData
+          bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
+  insert _ (StateRoot sr) nd = do
+    db <- ask
+    LD.put db def sr $ rlpSerialize $ rlpEncode nd
+  delete _ (StateRoot sr) = do
+    db <- ask
+    LD.delete db def sr
 
 testSingleInsert :: Test
 testSingleInsert = TestCase $ do

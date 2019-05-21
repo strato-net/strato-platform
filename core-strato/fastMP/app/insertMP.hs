@@ -17,14 +17,14 @@ import Text.Format
 import FastMP()
 import KV
 
-insertKV :: (Monad m, (MP.StateRoot `Alters` MP.NodeData) m)
+insertKV :: (MP.StateRoot `Alters` MP.NodeData) m
          => MP.StateRoot -> KV -> m MP.StateRoot
 insertKV sr (KV key (Right val)) = do
   --liftIO $ putStrLn $ "key=" ++ show (N.pack $ map c2n key) ++ ", val=" ++ show val
   MP.unsafePutKeyVal sr (N.pack key) val
 insertKV _ (KV _ val) = error $ "insertKV called with val = " ++ show val
 
-insertKVs :: (Monad m, (MP.StateRoot `Alters` MP.NodeData) m)
+insertKVs :: (MP.StateRoot `Alters` MP.NodeData) m
           => MP.StateRoot -> [KV] -> m MP.StateRoot
 insertKVs sr [] = return sr
 insertKVs sr (x:rest) = do
@@ -41,5 +41,5 @@ main = do
     flip runReaderT ldb $ do
       MP.initializeBlank
       insertKVs MP.blankStateRoot input
-    
+
   putStrLn $ "new StateRoot: " ++ format sr'

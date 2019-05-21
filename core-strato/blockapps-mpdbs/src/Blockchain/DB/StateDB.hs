@@ -1,16 +1,17 @@
+{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances  #-}
-{-# OPTIONS_GHC -fno-warn-orphans  #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
 
 module Blockchain.DB.StateDB where
 
 import qualified Blockchain.Database.MerklePatricia as MP
-import           Control.Monad.Change.Modify
-import           Data.Proxy
+import           Control.Monad.Change
 
-instance (Monad m, Modifiable MP.MPDB m) => Modifiable MP.StateRoot m where
-  modify _ f = fmap MP.stateRoot . modify Proxy $ \mpdb -> do
-    sr <- f $ MP.stateRoot mpdb
-    return mpdb{MP.stateRoot = sr}
+type HasStateDB m = ((MP.StateRoot `Alters` MP.NodeData) m, Modifiable MP.StateRoot m)
+
+getStateDB :: HasStateDB m => m MP.StateRoot
+getStateDB = get (Proxy @MP.StateRoot)
+
+setStateDBStateRoot :: HasStateDB m => MP.StateRoot -> m ()
+setStateDBStateRoot = put (Proxy @MP.StateRoot)

@@ -15,6 +15,7 @@ import Control.DeepSeq
 import Control.Lens
 import Control.Monad
 import Control.Monad.Change.Alter
+import Control.Monad.Change.Modify hiding (get, put)
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
@@ -76,9 +77,8 @@ instance (Address `Alters` AddressState) StorM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance HasStateDB StorM where
-  getStateDB = liftM2 MP.MPDB (use sdb) (use sdbsr)
-  setStateDBStateRoot = assign sdbsr
+instance CachedStorage `Has` MP.StateRoot where
+  this _ = sdbsr
 
 instance HasHashDB StorM where
   getHashDB = use hdb
@@ -91,8 +91,7 @@ initialEnv = do
   s <- openDB "/state/"
   h <- openDB "/hash/"
   let st = CS s MP.emptyTriePtr h M.empty M.empty M.empty M.empty
-  fmap (tmpdir,) . runResourceT . flip execStateT st $ do
-    MP.initializeBlank =<< getStateDB
+  fmap (tmpdir,) . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
 runStorM mv = bracket initialEnv

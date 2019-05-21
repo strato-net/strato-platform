@@ -17,6 +17,7 @@ import           Control.Monad.Loops
 import           Control.Monad.State
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString                             as B
+import           Data.Foldable                               (for_)
 import           Data.List
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as M
@@ -45,6 +46,7 @@ type FullRawStorage m = ( HasMemAddressStateDB m
                         , HasStateDB m
                         , HasHashDB m
                         , (Address `A.Alters` AddressState) m
+                        , (MP.StateRoot `A.Alters` MP.NodeData) m
                         )
 
 putRawStorageKeyVal' :: FullRawStorage m => Address -> B.ByteString -> B.ByteString -> m ()
@@ -125,52 +127,41 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
       deleteKeys = map fst allDeletes
 
   addressState <- A.lookupWithDefault A.Proxy owner
-  db <- fst <$> getRawStorageBlockDB
-  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
+  let sr = addressStateContractRoot addressState
 
-  forM_ (map fst allInserts) hashDBPut
+  for_ allInserts $ hashDBPut . fst
 
-  mpdb' <-
+  sr' <-
     if True                                 -- FEATUREFLAG  speed up putManyKeyVal
-    then putManyKeyVal mpdb allInserts
-    else putManyKeyValSlow mpdb allInserts
+    then putManyKeyVal sr allInserts
+    else putManyKeyValSlow sr allInserts
 
-  mpdb'' <- deleteManyKeyVal mpdb' deleteKeys
+  sr'' <- deleteManyKeyVal sr' deleteKeys
 
-  A.insert A.Proxy owner addressState{addressStateContractRoot=MP.stateRoot mpdb''}
+  A.insert A.Proxy owner addressState{addressStateContractRoot=sr''}
 
 
-deleteManyKeyVal :: MonadIO m=>
-                    MP.MPDB -> [MP.Key] -> m MP.MPDB
-deleteManyKeyVal mpdb listOfDeletes = do
-  concatM (map (flip deleteRawStorageKeyValDB) listOfDeletes) mpdb
+deleteManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
+deleteManyKeyVal sr listOfDeletes =
+  concatM (map (flip deleteRawStorageKeyValDB) listOfDeletes) sr
 
-putManyKeyValSlow :: MonadIO m=>
-                     MP.MPDB -> [(MP.Key, MP.Val)] -> m MP.MPDB
-putManyKeyValSlow mpdb listOfInserts = do
-  concatM (map (flip putRawStorageKeyValDB) listOfInserts) mpdb
+putManyKeyValSlow :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
+putManyKeyValSlow sr listOfInserts =
+  concatM (map (flip putRawStorageKeyValDB) listOfInserts) sr
 
-putRawStorageKeyValDB :: MonadIO m =>
-                         MP.MPDB -> (MP.Key, MP.Val) -> m MP.MPDB
-putRawStorageKeyValDB mpdb (key, val) = do
-  MP.putKeyVal mpdb key val
+putRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> (MP.Key, MP.Val) -> m MP.StateRoot
+putRawStorageKeyValDB sr (key, val) = MP.putKeyVal sr key val
 
-deleteRawStorageKeyValDB :: MonadIO m =>
-                            MP.MPDB -> MP.Key -> m MP.MPDB
-deleteRawStorageKeyValDB mpdb key =
-  MP.deleteKey mpdb key
+deleteRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> MP.Key -> m MP.StateRoot
+deleteRawStorageKeyValDB sr key = MP.deleteKey sr key
 
 getRawStorageKeyValDB :: FullRawStorage m => Address -> B.ByteString -> m B.ByteString
 getRawStorageKeyValDB owner key = do
   contractRoot <- addressStateContractRoot <$> A.lookupWithDefault A.Proxy owner
-  db <- fst <$> getRawStorageBlockDB
-  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=contractRoot}
-  maybe blankVal rlpDecode <$> MP.getKeyVal mpdb (N.EvenNibbleString key)
+  maybe blankVal rlpDecode <$> MP.getKeyVal contractRoot (N.EvenNibbleString key)
 
 getAllRawStorageKeyValsDB :: FullRawStorage m => Address -> m [(MP.Key, B.ByteString)]
 getAllRawStorageKeyValsDB owner = do
   contractRoot <- addressStateContractRoot <$> A.lookupWithDefault A.Proxy owner
-  db <- fst <$> getRawStorageBlockDB
-  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=contractRoot}
-  kvs <- MP.unsafeGetAllKeyVals mpdb
+  kvs <- MP.unsafeGetAllKeyVals contractRoot
   return $ map (fmap rlpDecode) kvs

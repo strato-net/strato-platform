@@ -43,22 +43,22 @@ import           Blockchain.Database.MerklePatricia.StateRoot
 import           Blockchain.Strato.Model.SHA                  (keccak256)
 import           Text.Format
 
-unsafePutKeyVal :: (Monad m, (StateRoot `Alters` NodeData) m)
+unsafePutKeyVal :: (StateRoot `Alters` NodeData) m
                 => StateRoot -> Key -> Val -> m StateRoot
 unsafePutKeyVal sr key val = do
   dbNodeData <- getNodeData $ PtrRef sr
   dbPutNodeData <- putKV_NodeData key val dbNodeData
   putNodeData dbPutNodeData
 
-unsafeGetKeyVals :: (Monad m, (StateRoot `Alters` NodeData) m)
+unsafeGetKeyVals :: (StateRoot `Alters` NodeData) m
                  => StateRoot -> Key -> m [(Key, Val)]
 unsafeGetKeyVals sr = getKeyVals_NodeRef $ PtrRef sr
 
-unsafeGetAllKeyVals :: (Monad m, (StateRoot `Alters` NodeData) m)
+unsafeGetAllKeyVals :: (StateRoot `Alters` NodeData) m
                     => StateRoot -> m [(Key, Val)]
 unsafeGetAllKeyVals sr = unsafeGetKeyVals sr N.empty
 
-unsafeDeleteKey :: (Monad m, (StateRoot `Alters` NodeData) m)
+unsafeDeleteKey :: (StateRoot `Alters` NodeData) m
                 => StateRoot -> Key -> m StateRoot
 unsafeDeleteKey sr key = do
   dbNodeData <- getNodeData (PtrRef sr)
@@ -73,7 +73,7 @@ keyToSafeKey key =
 
 -----
 
-putKV_NodeData :: (Monad m, (StateRoot `Alters` NodeData) m)
+putKV_NodeData :: (StateRoot `Alters` NodeData) m
                => Key -> Val -> NodeData -> m NodeData
 
 putKV_NodeData key val EmptyNodeData =
@@ -132,7 +132,7 @@ putKV_NodeData key1 val1 (ShortcutNodeData key2 val2)
 
 -----
 
-getKeyVals_NodeData :: (Monad m, (StateRoot `Alters` NodeData) m)
+getKeyVals_NodeData :: (StateRoot `Alters` NodeData) m
                     => NodeData -> Key -> m [(Key, Val)]
 
 getKeyVals_NodeData EmptyNodeData _ = return []
@@ -162,7 +162,7 @@ getKeyVals_NodeData ShortcutNodeData{nextNibbleString=s, nextVal=Right val} key 
 
 -----
 
-deleteKey_NodeData :: (Monad m, (StateRoot `Alters` NodeData) m) => Key -> NodeData -> m NodeData
+deleteKey_NodeData :: (StateRoot `Alters` NodeData) m => Key -> NodeData -> m NodeData
 
 deleteKey_NodeData _ EmptyNodeData = return EmptyNodeData
 
@@ -192,20 +192,20 @@ deleteKey_NodeData key1 nd@(ShortcutNodeData key2 (Left ref))
 
 -----
 
-putKV_NodeRef :: (Monad m, (StateRoot `Alters` NodeData) m) => Key -> Val -> NodeRef -> m NodeRef
+putKV_NodeRef :: (StateRoot `Alters` NodeData) m => Key -> Val -> NodeRef -> m NodeRef
 putKV_NodeRef key val nodeRef = do
   nodeData <- getNodeData nodeRef
   newNodeData <- putKV_NodeData key val nodeData
   nodeData2NodeRef newNodeData
 
-getKeyVals_NodeRef :: (Monad m, (StateRoot `Alters` NodeData) m) => NodeRef -> Key -> m [(Key, Val)]
+getKeyVals_NodeRef :: (StateRoot `Alters` NodeData) m => NodeRef -> Key -> m [(Key, Val)]
 getKeyVals_NodeRef ref key = do
   nodeData <- getNodeData ref
   getKeyVals_NodeData nodeData key
 
 --TODO- This is looking like a lift, I probably should make NodeRef some sort of Monad....
 
-deleteKey_NodeRef :: (Monad m, (StateRoot `Alters` NodeData) m) => Key -> NodeRef -> m NodeRef
+deleteKey_NodeRef :: (StateRoot `Alters` NodeData) m => Key -> NodeRef -> m NodeRef
 deleteKey_NodeRef key nodeRef =
   nodeData2NodeRef =<< deleteKey_NodeData key =<< getNodeData nodeRef
 
@@ -217,7 +217,7 @@ getNodeData (PtrRef sr) =
   fromMaybe (error $ "Missing StateRoot in call to getNodeData: " ++ format sr) <$>
   A.lookup Proxy sr
 
-putNodeData :: (Monad m, (StateRoot `Alters` NodeData) m) => NodeData -> m StateRoot
+putNodeData :: (StateRoot `Alters` NodeData) m => NodeData -> m StateRoot
 putNodeData nd = do
   let bytes = rlpSerialize $ rlpEncode nd
       ptr = StateRoot $ keccak256 bytes
@@ -237,7 +237,7 @@ putNodeData nd = do
 -- the whole database.  The delete function only will "break" the
 -- canonical structure locally, so deep recursion isn't required.
 
-simplify_NodeData :: (Monad m, (StateRoot `Alters` NodeData) m) => NodeData -> m NodeData
+simplify_NodeData :: (StateRoot `Alters` NodeData) m => NodeData -> m NodeData
 simplify_NodeData EmptyNodeData = return EmptyNodeData
 simplify_NodeData nd@(ShortcutNodeData key (Left ref)) = do
   refNodeData <- getNodeData ref
@@ -253,11 +253,11 @@ simplify_NodeData x = return x
 
 -----
 
-newShortcut :: (Monad m, (StateRoot `Alters` NodeData) m) => Key -> Either NodeRef Val -> m NodeRef
+newShortcut :: (StateRoot `Alters` NodeData) m => Key -> Either NodeRef Val -> m NodeRef
 newShortcut "" (Left ref) = return ref
 newShortcut key val      = nodeData2NodeRef $ ShortcutNodeData key val
 
-nodeData2NodeRef :: (Monad m, (StateRoot `Alters` NodeData) m) => NodeData -> m NodeRef
+nodeData2NodeRef :: (StateRoot `Alters` NodeData) m => NodeData -> m NodeRef
 nodeData2NodeRef nodeData =
   case rlpSerialize $ rlpEncode nodeData of
     bytes | B.length bytes < 32 -> return $ SmallRef bytes

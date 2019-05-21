@@ -22,15 +22,14 @@
 -- Patricia Merkle Tree.
 
 module Blockchain.Database.MerklePatricia (
-  Key, Val, MPDB(..), StateRoot(..),
+  Key, Val, MPDB(..), StateRoot(..), NodeData(..),
   openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
   putKeyVal, getKeyVal, deleteKey, keyExists,
   initializeBlank, blankStateRoot
   ) where
 
 import           Control.Monad.Change.Alter
-import           Data.Maybe                                  (isJust)
-import           Data.Proxy
+import           Data.Maybe                                  (isJust, listToMaybe)
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.Internal
@@ -38,7 +37,7 @@ import           Blockchain.Strato.Model.SHA                 (keccak256)
 
 
 -- | Adds a new key/value pair.
-putKeyVal :: (Monad m, (StateRoot `Alters` NodeData) m)
+putKeyVal :: (StateRoot `Alters` NodeData) m
           => StateRoot -- ^ The object containing the current stateRoot.
           -> Key -- ^ Key of the data to be inserted.
           -> Val -- ^ Value of the new data
@@ -46,31 +45,24 @@ putKeyVal :: (Monad m, (StateRoot `Alters` NodeData) m)
 putKeyVal sr = unsafePutKeyVal sr . keyToSafeKey
 
 -- | Retrieves all key/value pairs whose key starts with the given parameter.
-getKeyVal :: (Monad m, (StateRoot `Alters` NodeData) m)
+getKeyVal :: (StateRoot `Alters` NodeData) m
           => StateRoot -- ^ Object containing the current stateRoot.
           -> Key -- ^ Key of the data to be inserted.
           -> m (Maybe Val) -- ^ The requested value.
-getKeyVal sr key = do
-  vals <- unsafeGetKeyVals sr (keyToSafeKey key)
-  return $
-    if not (null vals)
-    then Just $ snd (head vals)
-         -- Since we hash the keys, it's impossible
-         -- for vals to have more than one item
-    else Nothing
+getKeyVal sr key = fmap snd . listToMaybe <$> unsafeGetKeyVals sr (keyToSafeKey key)
 
 -- | Deletes a key (and its corresponding data) from the database.
 --
 -- Note that the key/value pair will still be present in the history, and
 -- can be accessed by using an older 'MPDB' object.
-deleteKey :: (Monad m, (StateRoot `Alters` NodeData) m)
+deleteKey :: (StateRoot `Alters` NodeData) m
           => StateRoot -- ^ The object containing the current stateRoot.
           -> Key -- ^ The key to be deleted.
           -> m StateRoot -- ^ The object containing the stateRoot to the data after the delete.
 deleteKey sr = unsafeDeleteKey sr . keyToSafeKey
 
 -- | Returns True is a key exists.
-keyExists :: (Monad m, (StateRoot `Alters` NodeData) m)
+keyExists :: (StateRoot `Alters` NodeData) m
           => StateRoot -- ^ The object containing the current stateRoot.
           -> Key -- ^ The key to be deleted.
           -> m Bool -- ^ True if the key exists
@@ -81,7 +73,7 @@ blankStateRoot :: StateRoot
 blankStateRoot = StateRoot $ keccak256 (rlpSerialize $ rlpEncode (0 :: Integer))
 
 -- | Initialize the DB by adding a blank stateroot.
-initializeBlank :: (Monad m, (StateRoot `Alters` NodeData) m)
+initializeBlank :: (StateRoot `Alters` NodeData) m
                        -- ^ The object containing the current stateRoot.
                 => m ()
 initializeBlank =

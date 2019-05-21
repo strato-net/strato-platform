@@ -13,7 +13,7 @@ import qualified Data.NibbleString                           as N
 
 data MPChoice = Data NodeData | Ref NodeRef | Value Val | None deriving (Eq)
 
-node :: (Monad m, (StateRoot `Alters` NodeData) m)
+node :: (StateRoot `Alters` NodeData) m
      => MPChoice -> m NodeData
 node (Data nd) = return nd
 node (Ref nr) = getNodeData nr
@@ -33,7 +33,7 @@ simplify n@ShortcutNodeData{ nextNibbleString = k, nextVal = v } = None : delta 
       | otherwise = Data n{ nextNibbleString = t }
     (h,t) = (fromIntegral $ N.head k, N.tail k)
 
-enter :: (Monad m, (StateRoot `Alters` NodeData) m) => MPChoice -> m [MPChoice]
+enter :: (StateRoot `Alters` NodeData) m => MPChoice -> m [MPChoice]
 enter = liftM simplify . node
 
 data DiffOp =
@@ -42,7 +42,7 @@ data DiffOp =
   Delete {key::[N.Nibble], oldVal::Val}
   deriving (Show, Eq)
 
-diffChoice :: (Monad m, (StateRoot `Alters` NodeData) m)
+diffChoice :: (StateRoot `Alters` NodeData) m
            => Maybe N.Nibble -> MPChoice -> MPChoice -> m [DiffOp]
 diffChoice n ch1 ch2 = case (ch1, ch2) of
   (None, Value v) -> return [Create sn v]
@@ -58,13 +58,13 @@ diffChoice n ch1 ch2 = case (ch1, ch2) of
       in map (maybe id prepend n)
     pRecurse = liftM prefix .* recurse
 
-diffChoices :: (Monad m, (StateRoot `Alters` NodeData) m)
+diffChoices :: (StateRoot `Alters` NodeData) m
             => [MPChoice] -> [MPChoice] -> m [DiffOp]
 diffChoices =
   liftM concat .* sequence .* zipWith3 diffChoice maybeNums
   where maybeNums = Nothing : map Just [0..]
 
-recurse :: (Monad m, (StateRoot `Alters` NodeData) m)
+recurse :: (StateRoot `Alters` NodeData) m
         => MPChoice -> MPChoice -> m [DiffOp]
 recurse = join .* (liftM2 diffChoices `on` enter)
 
@@ -72,10 +72,10 @@ infixr 9 .*
 (.*) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
 (.*) = (.) . (.)
 
-diff :: (Monad m, (StateRoot `Alters` NodeData) m)
+diff :: (StateRoot `Alters` NodeData) m
      => NodeRef -> NodeRef -> m [DiffOp]
 diff = recurse `on` Ref
 
-dbDiff :: (Monad m, (StateRoot `Alters` NodeData) m)
+dbDiff :: (StateRoot `Alters` NodeData) m
        => StateRoot -> StateRoot -> m [DiffOp]
 dbDiff = diff `on` PtrRef
