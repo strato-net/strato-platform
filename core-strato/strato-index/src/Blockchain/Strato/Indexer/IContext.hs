@@ -19,8 +19,7 @@ module Blockchain.Strato.Indexer.IContext
     , reIBBI
     ) where
 
-import           Control.Lens                    (lens)
-import           Control.Monad.Change.Modify     (Has(..), Accessible(..))
+import qualified Control.Monad.Change.Modify     as Mod
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.Resource
@@ -58,10 +57,11 @@ newtype IndexerBestBlockInfo = IndexerBestBlockInfo (SQL.Key BlockDataRef)
 instance HasSQLDB IConfigM where
   getSQLDB = asks contextSQLDB
 
-instance IContext `Has` KafkaState where
-  this _ = lens contextKafkaState (\c k -> c{contextKafkaState = k})
+instance Mod.Modifiable KafkaState IContextM where
+  get _   = gets contextKafkaState
+  put _ k = get >>= \c -> put c{contextKafkaState = k}
 
-instance Accessible RBDB.RedisConnection IContextM where
+instance Mod.Accessible RBDB.RedisConnection IContextM where
   access _ = contextRedisBlockDB <$> get
 
 getIndexerBestBlockInfo :: IContextM IndexerBestBlockInfo

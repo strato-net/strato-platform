@@ -26,7 +26,7 @@ module Blockchain.Sequencer.Gregor
 import           Control.Concurrent.Async.Lifted (race_)
 import           Control.Concurrent.STM (orElse, flushTQueue)
 import           Control.Lens               hiding (op)
-import           Control.Monad.Change.Modify (Has(..))
+import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.Text as T
@@ -80,8 +80,9 @@ runGregorM cfg = runLoggingT
                . runResourceT
                . flip evalStateT (convert cfg)
 
-instance GregorContext `Has` K.KafkaState where
-  this _ = gregorKafkaState
+instance Mod.Modifiable K.KafkaState GregorM where
+  get _ = use gregorKafkaState
+  put _ = assign gregorKafkaState
 
 getKafkaConsumerGroup :: GregorM KP.ConsumerGroup
 getKafkaConsumerGroup = use gregorConsumerGroup

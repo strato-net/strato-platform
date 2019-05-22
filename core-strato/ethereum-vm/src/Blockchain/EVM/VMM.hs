@@ -44,6 +44,7 @@ module Blockchain.EVM.VMM (
 
 import           Control.Monad
 import qualified Control.Monad.Change.Alter         as A
+import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
@@ -64,7 +65,6 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
@@ -96,14 +96,17 @@ instance (Address `A.Alters` AddressState) VMM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
+instance (MP.StateRoot `A.Alters` MP.NodeData) VMM where
+  lookup _ = MP.genericLookupDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
+  insert _ = MP.genericInsertDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
+  delete _ = MP.genericDeleteDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
+
 instance HasHashDB VMM where
     getHashDB = lift $ fmap (contextHashDB . dbs) get
 
-instance HasStateDB VMM where
-    getStateDB = lift $ fmap (contextStateDB . dbs) get
-    setStateDBStateRoot x = do
-      vmState <- lift get
-      lift $ put vmState{dbs=(dbs vmState){contextStateDB=(contextStateDB $ dbs vmState){MP.stateRoot=x}}}
+instance Mod.Modifiable MP.StateRoot VMM where
+  get _    = lift $ gets (MP.stateRoot . contextStateDB . dbs)
+  put _ sr = lift $ get >>= \c -> put c{dbs=(dbs c){contextStateDB=(contextStateDB $ dbs c){MP.stateRoot=sr}}}
 
 instance HasRawStorageDB VMM where
     getRawStorageTxDB = do

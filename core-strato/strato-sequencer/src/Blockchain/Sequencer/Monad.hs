@@ -34,7 +34,7 @@ import           Control.Concurrent                        (forkIO, threadDelay)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
-import           Control.Monad.Change.Modify               (Has(..))
+import qualified Control.Monad.Change.Alter                as A
 import           Control.Monad.Reader
 import           Control.Monad.State
 
@@ -132,17 +132,25 @@ instance HasPrivateHashDB SequencerM where
     requestTransaction = insertGetTransactionsDB
 
     -- TODO: Add persistence layer
-instance SequencerContext `Has` (Map SHA OutputBlock) where
-  this _ = blockHashRegistry
+instance (SHA `A.Alters` OutputBlock) SequencerM where
+  lookup _ bh    = use $ blockHashRegistry . at bh
+  insert _ bh ob = blockHashRegistry . at bh ?= ob
+  delete _ bh    = blockHashRegistry . at bh .= Nothing
 
-instance SequencerContext `Has` (Map SHA OutputTx) where
-  this _ = txHashRegistry
+instance (SHA `A.Alters` OutputTx) SequencerM where
+  lookup _ th     = use $ txHashRegistry . at th
+  insert _ th otx = txHashRegistry . at th ?= otx
+  delete _ th     = txHashRegistry . at th .= Nothing
 
-instance SequencerContext `Has` (Map SHA ChainHashEntry) where
-  this _ = chainHashRegistry
+instance (SHA `A.Alters` ChainHashEntry) SequencerM where
+  lookup _ ch     = use $ chainHashRegistry . at ch
+  insert _ ch che = chainHashRegistry . at ch ?= che
+  delete _ ch     = chainHashRegistry . at ch .= Nothing
 
-instance SequencerContext `Has` (Map Word256 ChainIdEntry) where
-  this _ = chainIdRegistry
+instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
+  lookup _ cid     = use $ chainIdRegistry . at cid
+  insert _ cid cie = chainIdRegistry . at cid ?= cie
+  delete _ cid     = chainIdRegistry . at cid .= Nothing
 
 instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = use seenTransactionDB

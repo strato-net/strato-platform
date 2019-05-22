@@ -39,6 +39,7 @@ import           Control.Applicative ((<|>))
 import           Control.Exception
 import           Control.Lens
 import qualified Control.Monad.Change.Alter as A
+import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
@@ -160,11 +161,9 @@ instance HasRawStorageDB SM where
     cxt <- get
     put cxt{storageBlockMap=theMap}
 
-instance HasStateDB SM where
-  getStateDB = stateDB <$> get
-  setStateDBStateRoot sr = do
-    cxt <- get
-    put cxt{stateDB=(stateDB cxt){MP.stateRoot=sr}}
+instance Mod.Modifiable MP.StateRoot SM where
+  get _    = gets (MP.stateRoot . stateDB)
+  put _ sr = get >>= \c -> put c{stateDB = (stateDB c){MP.stateRoot = sr}}
 
 instance HasHashDB SM where
   getHashDB = hashDB <$> get
@@ -176,6 +175,11 @@ instance (Address `A.Alters` AddressState) SM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
+
+instance (MP.StateRoot `A.Alters` MP.NodeData) SM where
+  lookup _ = MP.genericLookupDB $ gets (MP.ldb . stateDB)
+  insert _ = MP.genericInsertDB $ gets (MP.ldb . stateDB)
+  delete _ = MP.genericDeleteDB $ gets (MP.ldb . stateDB)
 
 runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
 runSM maybeCode env f = do

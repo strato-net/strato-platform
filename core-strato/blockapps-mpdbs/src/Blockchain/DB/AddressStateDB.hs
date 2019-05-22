@@ -91,14 +91,14 @@ putAddressState address newState = do
   hashDBPut addrNibbles
   db <- getStateDB
   db' <- MP.putKeyVal db addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
-  setStateDBStateRoot (MP.stateRoot db')
+  setStateDBStateRoot db'
   where addrNibbles = addressAsNibbleString address
 
 deleteAddressState :: HasStateDB m => Address -> m ()
 deleteAddressState address = do
   db <- getStateDB
   db' <- MP.deleteKey db (addressAsNibbleString address)
-  setStateDBStateRoot $ MP.stateRoot db'
+  setStateDBStateRoot db'
 
 addressStateExists :: HasStateDB m => Address -> m Bool
 addressStateExists address = do

@@ -32,11 +32,12 @@ module Blockchain.VMContext
     , compactContextM
     ) where
 
+import           Control.Arrow                      ((&&&))
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter         as A
-import           Control.Monad.Change.Modify        hiding (get, put)
+import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
@@ -161,33 +162,36 @@ instance HasMemLogDB ContextM where
     put $ ctx { contextLogDBQueue = [] }
 
 
-instance HasStateDB ContextM where
-  getStateDB = contextStateDB <$> get
-  setStateDBStateRoot sr = do
-    cxt <- get
-    put cxt{contextStateDB=(contextStateDB cxt){MP.stateRoot=sr}}
+instance Mod.Modifiable MP.StateRoot ContextM where
+  get _    = gets (MP.stateRoot . contextStateDB)
+  put _ sr = modify $ \c -> c{contextStateDB = (contextStateDB c){MP.stateRoot = sr}}
 
-instance Context `Has` BlockHashRoot where
-  this _ = lens contextBlockHashRoot (\c b -> c{contextBlockHashRoot = b})
+instance Mod.Modifiable BlockHashRoot ContextM where
+  get _     = gets contextBlockHashRoot
+  put _ bhr = modify $ \c -> c{contextBlockHashRoot = bhr}
 
-instance Context `Has` GenesisRoot where
-  this _ = lens contextGenesisRoot (\c b -> c{contextGenesisRoot = b})
+instance Mod.Modifiable GenesisRoot ContextM where
+  get _    = gets contextGenesisRoot
+  put _ gr = modify $ \c -> c{contextGenesisRoot = gr}
 
-instance Context `Has` BestBlockRoot where
-  this _ = lens contextBestBlockRoot (\c b -> c{contextBestBlockRoot = b})
+instance Mod.Modifiable BestBlockRoot ContextM where
+  get _     = gets contextBestBlockRoot
+  put _ bbr = modify $ \c -> c{contextBestBlockRoot = bbr}
 
-instance Context `Has` K.KafkaState where
-  this _ = lens contextKafkaState (\c b -> c{contextKafkaState = b})
+instance Mod.Modifiable K.KafkaState ContextM where
+  get _    = gets contextKafkaState
+  put _ ks = modify $ \c -> c{contextKafkaState = ks}
 
 instance HasMemAddressStateDB ContextM where
-  getAddressStateTxDBMap = contextAddressStateTxDBMap <$> get
-  putAddressStateTxDBMap theMap = do
-    cxt <- get
-    put $ cxt{contextAddressStateTxDBMap=theMap}
-  getAddressStateBlockDBMap = contextAddressStateBlockDBMap <$> get
-  putAddressStateBlockDBMap theMap = do
-    cxt <- get
-    put $ cxt{contextAddressStateBlockDBMap=theMap}
+  getAddressStateTxDBMap = gets contextAddressStateTxDBMap
+  putAddressStateTxDBMap theMap = modify $ \c -> c{contextAddressStateTxDBMap=theMap}
+  getAddressStateBlockDBMap = gets contextAddressStateBlockDBMap
+  putAddressStateBlockDBMap theMap = modify $ \c -> c{contextAddressStateBlockDBMap=theMap}
+
+instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
+  lookup _ = MP.genericLookupDB $ gets (MP.ldb . contextStateDB)
+  insert _ = MP.genericInsertDB $ gets (MP.ldb . contextStateDB)
+  delete _ = MP.genericDeleteDB $ gets (MP.ldb . contextStateDB)
 
 instance (Address `A.Alters` AddressState) ContextM where
   lookup _ = getAddressStateMaybe
@@ -195,29 +199,19 @@ instance (Address `A.Alters` AddressState) ContextM where
   delete _ = deleteAddressState
 
 instance HasRawStorageDB ContextM where
-  getRawStorageTxDB = do
-    cxt <- get
-    return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
-            contextStorageTxMap cxt)
-  putRawStorageTxMap theMap = do
-    cxt <- get
-    put cxt{contextStorageTxMap=theMap}
-  getRawStorageBlockDB = do
-    cxt <- get
-    return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
-            contextStorageBlockMap cxt)
-  putRawStorageBlockMap theMap = do
-    cxt <- get
-    put cxt{contextStorageBlockMap=theMap}
+  getRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
+  putRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
+  getRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
+  putRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
 
 instance HasHashDB ContextM where
-  getHashDB = contextHashDB <$> get
+  getHashDB = gets contextHashDB
 
 instance HasCodeDB ContextM where
-  getCodeDB = contextCodeDB <$> get
+  getCodeDB = gets contextCodeDB
 
 instance HasBlockSummaryDB ContextM where
-  getBlockSummaryDB = contextBlockSummaryDB <$> get
+  getBlockSummaryDB = gets contextBlockSummaryDB
 
 instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
   getSQLDB = asks configSQLDB
@@ -225,8 +219,8 @@ instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
 
-instance Accessible RBDB.RedisConnection ContextM where
-  access _ = contextRedisPool <$> get
+instance Mod.Accessible RBDB.RedisConnection ContextM where
+  access _ = gets contextRedisPool
 
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
@@ -276,7 +270,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      False
                      False
                      Q.empty) $ do
-          MP.initializeBlank =<< getStateDB
+          MP.initializeBlank
           setStateDBStateRoot MP.emptyTriePtr
           f
 
@@ -328,12 +322,12 @@ execContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (
 execContextM f = snd <$> runContextM f
 
 incrementNonce :: (Address `A.Alters` AddressState) f => Address -> f ()
-incrementNonce address = A.adjustWithDefault_ Proxy address $ \addressState ->
+incrementNonce address = A.adjustWithDefault_ Mod.Proxy address $ \addressState ->
   pure addressState{ addressStateNonce = addressStateNonce addressState + 1 }
 
 getNewAddress :: (MonadIO m, (Address `A.Alters` AddressState) m) => Address -> m Address
 getNewAddress address = do
-  nonce <- addressStateNonce <$> A.lookupWithDefault Proxy address
+  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy address
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show nonce
   let newAddress = getNewAddress_unsafe address nonce
   incrementNonce address

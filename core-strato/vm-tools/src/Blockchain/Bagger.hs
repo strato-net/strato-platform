@@ -11,6 +11,7 @@ module Blockchain.Bagger where
 
 import           Control.Arrow                      ((&&&))
 import qualified Control.Monad.Change.Alter         as A
+import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Blockchain.Output
@@ -19,6 +20,7 @@ import           Control.Monad.Trans.Except
 import qualified Data.Map                           as M
 import           Data.Map.Ordered                   (OMap)
 import qualified Data.Map.Ordered                   as OMap
+import           Data.Proxy
 import qualified Data.Text                          as T
 import           Data.Time.Clock
 import qualified Data.Set                           as S
@@ -39,7 +41,7 @@ import qualified Blockchain.Data.DataDefs           as DD
 import           Blockchain.Data.BlockHeader        (txsLen2ExtraData)
 import qualified Blockchain.Data.TransactionDef     as TD
 import qualified Blockchain.Data.TXOrigin           as TO
-import           Blockchain.Database.MerklePatricia (StateRoot (..))
+import           Blockchain.Database.MerklePatricia (StateRoot (..), NodeData)
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
@@ -51,7 +53,13 @@ import           Executable.EVMFlags                (flags_maxTxsPerBlock)
 
 import           Text.Format
 
-class (Monad m, MonadIO m, MonadLogger m, HasStateDB m, (Address `A.Alters` DD.AddressState) m) => MonadBagger m where
+class ( Monad m
+      , MonadIO m
+      , MonadLogger m
+      , Mod.Modifiable StateRoot m
+      , (StateRoot `A.Alters` NodeData) m
+      , (Address `A.Alters` DD.AddressState) m
+      ) => MonadBagger m where
     isBlockstanbul     :: m Bool
     getBaggerState     :: m B.BaggerState
     peekPendingVote    :: m (Address, Word64)
@@ -78,7 +86,7 @@ class (Monad m, MonadIO m, MonadLogger m, HasStateDB m, (Address `A.Alters` DD.A
         let publicTxs  = filter ((/= PrivateHash) . txType) ts
             privateTxs = filter ((== PrivateHash) . txType) ts
         $logDebugS "Bagger.addTransactionsToMempool" $ T.pack $ "Adding " ++ show (length ts) ++ " txs"
-        existingStateDbStateRoot <- getStateRoot
+        existingStateDbStateRoot <- Mod.get (Proxy @StateRoot)
         stateRoot <- (B.lastExecutedStateRoot . B.miningCache) <$> getBaggerState
         setStateDBStateRoot stateRoot
         sequence_ (addToQueued Insertion <$> publicTxs)
@@ -96,7 +104,7 @@ class (Monad m, MonadIO m, MonadLogger m, HasStateDB m, (Address `A.Alters` DD.A
     processNewBestBlock :: SHA -> DD.BlockData -> [SHA] -> m ()
     processNewBestBlock bh bd txShas = do
         $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
-        existingStateDbStateRoot <- getStateRoot
+        existingStateDbStateRoot <- Mod.get (Proxy @StateRoot)
         let thisStateRoot = DD.blockDataStateRoot bd
         state <- getBaggerState
         time  <- liftIO getCurrentTime
@@ -135,7 +143,7 @@ class (Monad m, MonadIO m, MonadLogger m, HasStateDB m, (Address `A.Alters` DD.A
                     return build
                 else do
                     $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
-                    existingStateDbStateRoot <- getStateRoot
+                    existingStateDbStateRoot <- Mod.get (Proxy @StateRoot)
                     isPBFT <- isBlockstanbul
                     (coinbaseAddr, nonce) <- peekPendingVote
                     let lastSR          = B.lastExecutedStateRoot cache
@@ -451,7 +459,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
 
 buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData
 buildRewardedBlockHeader bd uncles = do
-  previousStateRoot <- getStateRoot
+  previousStateRoot <- Mod.get (Proxy @StateRoot)
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
   rewardedStateRoot <- rewardCoinbases  (DD.blockDataStateRoot bd) (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)

@@ -23,6 +23,7 @@ dependencies:
   - bytestring
   - containers
   - cross-monitoring
+  - data-default
   - deepseq
   - directory
   - ethereum-rlp

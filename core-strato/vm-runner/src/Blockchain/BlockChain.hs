@@ -114,14 +114,14 @@ instance Bagger.MonadBagger ContextM where
         State.put $ ctx { contextBaggerState = s }
 
     runFromStateRoot sr remainingGas theBlockHeader txs = do
-        startingStateRoot <- getStateRoot
+        startingStateRoot <- Mod.get (Proxy @MP.StateRoot)
         setStateDBStateRoot sr
         (TxMiningResult res ranTxs unranTxs newGas) <-
           timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
           $ mineTransactions' theBlockHeader remainingGas [] txs
         timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
         timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
-        newStateRoot <- getStateRoot
+        newStateRoot <- Mod.get (Proxy @MP.StateRoot)
         setStateDBStateRoot startingStateRoot
         let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
         return $ case res of -- currently only get GasLimit errors out of mineTransactions'
@@ -132,7 +132,7 @@ instance Bagger.MonadBagger ContextM where
             Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
 
     rewardCoinbases sr us uncles ourNumber = do
-        startingStateRoot <- getStateRoot
+        startingStateRoot <- Mod.get (Proxy @MP.StateRoot)
         setStateDBStateRoot sr
         _ <- addToBalance us $ rewardBase flags_testnet
         forM_ uncles $ \uncle -> do
@@ -141,7 +141,7 @@ instance Bagger.MonadBagger ContextM where
             return ()
         flushMemStorageDB
         flushMemAddressStateDB
-        newStateRoot <- getStateRoot
+        newStateRoot <- Mod.get (Proxy @MP.StateRoot)
         setStateDBStateRoot startingStateRoot
         return newStateRoot
 
@@ -289,7 +289,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 
     actions <- addBlockTransactions True b
 
-    db <- getStateDB
+    sr <- Mod.get (Proxy @MP.StateRoot)
 
     -- If there are no transactions in th
     -- TODO: this should be handled more officially,
@@ -303,8 +303,8 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
                  -- it calculates will match the final one when the block is committed.
                  || (blockDataMixHash bd == blockstanbulMixHash && blockDataCoinbase bd /= 0x0)
     unless skipCheck $ do
-      when (blockDataStateRoot (obBlockData b) /= MP.stateRoot db) $ do
-        $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
+      when (blockDataStateRoot (obBlockData b) /= sr) $ do
+        $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format sr
         error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
 
       valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
@@ -332,7 +332,7 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
     $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ show chainId ++ " with " ++ show txs
     withBlockchain (blockHeaderHash bd) chainId $ do
       when flags_debug $ do
-        sr <- getStateRoot
+        sr <- Mod.get (Proxy @MP.StateRoot)
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "Old chain state root: " ++ format sr
       $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
       actions <- addTransactions bd (blockDataGasLimit $ obBlockData b) txs -- TODO: Run the checks Bagger does reject invalid transactions for private chains
@@ -348,7 +348,7 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
       timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
       timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
       when flags_debug $ do
-        sr' <- getStateRoot
+        sr' <- Mod.get (Proxy @MP.StateRoot)
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "New chain state root: " ++ format sr'
       return actions
 

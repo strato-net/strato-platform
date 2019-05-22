@@ -20,13 +20,9 @@ module Control.Monad.Change.Alter
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Change.Modify
-import           Control.Monad.IO.Class
-import           Control.Monad.Reader
-import qualified Control.Monad.State.Class   as State
 import           Control.Monad.Trans.State   (evalStateT, execStateT, StateT)
 import           Data.Default
 import qualified Data.IntMap                 as IM
-import           Data.IORef
 import           Data.Map.Strict             (Map)
 import qualified Data.Map.Strict             as M
 import           Data.Maybe
@@ -155,16 +151,6 @@ instance (Ord k, b `Has` (Map k a)) => (k `Maps` a) b where
 instance b `Has` (IM.IntMap a) => (Int `Maps` a) b where
   that _ k = this (Proxy :: Proxy (IM.IntMap a)) . at k
 
-instance {-# OVERLAPPABLE #-} (Monad m, Ord k, (k `Maps` a) b) => (k `Alters` a) (StateT b m) where
-  lookup p k = use (that p k)
-  insert p k = State.modify . set (that p k) . Just
-  delete p k = State.modify $ that p k .~ Nothing
-
-instance {-# OVERLAPPABLE #-} (MonadIO m, Ord k, (k `Maps` a) b) => (k `Alters` a) (ReaderT (IORef b) m) where
-  lookup p k   = fmap (view $ that p k) . liftIO . readIORef =<< ask
-  insert p k a = liftIO . flip modifyIORef' (that p k .~ Just a) =<< ask
-  delete p k   = liftIO . flip modifyIORef' (that p k .~ Nothing) =<< ask
-
 
 
 class Selectable k a f where
@@ -176,30 +162,8 @@ class Selectable k a f where
   selectWithMempty :: (Monoid a, Functor f) => Proxy a -> k -> f a
   selectWithMempty p k = fromMaybe mempty <$> select p k
 
-instance (Monad m, Ord k, b `Has` (Map k a)) => (Selectable k a) (StateT b m) where
-  select = lookup
-
-instance (MonadIO m, Ord k, b `Has` (Map k a)) => (Selectable k a) (ReaderT (IORef b) m) where
-  select = lookup
-
-
-
 class Replaceable k a f where
   replace :: Proxy a -> k -> a -> f ()
 
-instance (Monad m, Ord k, b `Has` (Map k a)) => (Replaceable k a) (StateT b m) where
-  replace = insert
-
-instance (MonadIO m, Ord k, b `Has` (Map k a)) => (Replaceable k a) (ReaderT (IORef b) m) where
-  replace = insert
-
-
-
 class Removable k a f where
   remove :: Proxy a -> k -> f ()
-
-instance (Monad m, Ord k, b `Has` (Map k a)) => (Removable k a) (StateT b m) where
-  remove = delete
-
-instance (MonadIO m, Ord k, b `Has` (Map k a)) => (Removable k a) (ReaderT (IORef b) m) where
-  remove = delete

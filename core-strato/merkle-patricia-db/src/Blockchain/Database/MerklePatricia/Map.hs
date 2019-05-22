@@ -1,4 +1,6 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.Database.MerklePatricia.Map (
   map
@@ -13,36 +15,37 @@ module Blockchain.Database.MerklePatricia.Map (
 import           Prelude                                     hiding (map)
 
 import           Control.Monad
-import           Control.Monad.IO.Class
+import           Control.Monad.Change.Alter
 import qualified Data.NibbleString                           as N
-import qualified Database.LevelDB                            as LDB
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.NodeData
 
-map::MonadIO m=>(Key->RLPObject->m ())->MPDB->m ()
-map f mpdb = do
-  mapNodeRef (ldb mpdb) "" f (PtrRef $ stateRoot mpdb)
+map :: (StateRoot `Alters` NodeData) m
+    => (Key -> RLPObject -> m ())
+    -> StateRoot
+    -> m ()
+map f = mapNodeRef "" f . PtrRef
 
-mapNodeData::MonadIO m=>LDB.DB->Key->(Key->RLPObject->m ())->NodeData->m ()
-mapNodeData _ _ _ EmptyNodeData = return ()
-mapNodeData db partialKey f FullNodeData {choices=choices', nodeVal = maybeV} = do
+mapNodeData :: (StateRoot `Alters` NodeData) m
+            => Key -> (Key->RLPObject->m ()) -> NodeData -> m ()
+mapNodeData _ _ EmptyNodeData = return ()
+mapNodeData partialKey f FullNodeData {choices=choices', nodeVal = maybeV} = do
   forM_ (zip [0..] choices') $ \(k, ch) -> do
-    mapNodeRef db (partialKey `N.append` N.singleton k) f ch
+    mapNodeRef (partialKey `N.append` N.singleton k) f ch
   case maybeV of
        Nothing -> return ()
        Just v  -> f partialKey v
-mapNodeData db partialKey f ShortcutNodeData {nextNibbleString=remainingKey, nextVal=nv} =
+mapNodeData partialKey f ShortcutNodeData {nextNibbleString=remainingKey, nextVal=nv} =
   case nv of
-   Left nr -> mapNodeRef db (partialKey `N.append` remainingKey) f nr
+   Left nr -> mapNodeRef (partialKey `N.append` remainingKey) f nr
    Right v -> f (partialKey `N.append` remainingKey) v
 
-
-mapNodeRef::MonadIO m=>LDB.DB->Key->(Key->RLPObject->m ())->NodeRef->m ()
-mapNodeRef db partialKey f (PtrRef sr) = do
-  nodeData <- getNodeData (MPDB db sr) $ PtrRef sr
-  mapNodeData db partialKey f nodeData
-mapNodeRef _ _ _ (SmallRef _) = return () --TODO I might have to deal with this also
-
+mapNodeRef :: (StateRoot `Alters` NodeData) m
+           => Key -> (Key -> RLPObject -> m ()) -> NodeRef -> m ()
+mapNodeRef partialKey f (PtrRef sr) = do
+  nodeData <- getNodeData (PtrRef sr)
+  mapNodeData partialKey f nodeData
+mapNodeRef _ _ (SmallRef _) = return () --TODO I might have to deal with this also
