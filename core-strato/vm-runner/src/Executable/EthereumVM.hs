@@ -13,6 +13,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.State.Lazy        (gets)
+import           Data.List
 import           Data.Proxy
 import qualified Data.Text                             as T
 import qualified Data.Map.Ordered                      as O
@@ -22,7 +23,7 @@ import qualified Data.ByteString                       as BS
 import qualified Blockchain.MilenaTools                as K
 import qualified Network.Kafka.Protocol                as KP
 import           Text.Printf
-import           Util
+import           Util                                  hiding (intercalate)
 
 import           Control.Monad.Change.Modify
 
@@ -83,8 +84,10 @@ ethereumVM = void . execContextM $ do
         recordBaggerMetrics =<< gets contextBaggerState
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
-        seqEvents <- loopTimeit "waiting for new events " $ getUnprocessedKafkaEvents cpOffset
+        seqEvents <- loopTimeit "======>>>> waiting for new events <<<<======" $ getUnprocessedKafkaEvents cpOffset
 
+        logEventSummaries seqEvents
+        
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
@@ -93,7 +96,7 @@ ethereumVM = void . execContextM $ do
         mapM_ (uncurry3 queuePendingVote) [(r, d, s) | OEVoteToMake r d s <- seqEvents]
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
-
+        
         let txPairs = [(ts,t) | OETx ts t <- seqEvents]
             allTxs = map (uncurry OETx) txPairs
             blocks = [b | OEBlock b <- seqEvents]
@@ -103,8 +106,6 @@ ethereumVM = void . execContextM $ do
                                   $ map (uncurry IndexTransaction) txPairs
         let (bLen, tLen) = (length blocks, length allTxs)
         recordSeqEventCount bLen tLen
-        $logInfoS "evm/loop" $ T.pack $
-          printf "#### incoming events ==> %d TXs, %d new blocks" tLen bLen
 
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
         let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
@@ -149,7 +150,8 @@ ethereumVM = void . execContextM $ do
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-            newBlock <- loopTimeit "Bagger.makeNewBlock" Bagger.makeNewBlock
+            newBlock <- --loopTimeit "Bagger.makeNewBlock"
+                        Bagger.makeNewBlock
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
             loopTimeit "produceUnminedBlocksM" $ K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
@@ -284,7 +286,6 @@ getUnprocessedKafkaEvents offset = do
           _ -> 1
 
         ret' = eventLimit . countLimit $ ret
-    $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret') ++ " unprocessed blocks/txs"
     return ret'
 
 shouldProcessNewTransactions :: ContextM Bool -- todo: probably shouldn't do it by number, but tdiff.
@@ -306,3 +307,35 @@ shouldProcessNewTransactions =
     else do
         $logInfoS "shouldProcessNewTransactions" "flags_useSyncMode == false, will process all new TXs"
         return True
+
+
+
+
+
+logEventSummaries :: [OutputEvent] -> ContextM ()
+logEventSummaries events = do
+  let names = map getNames events
+      numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
+
+  $logInfoS "getUnprocessedKafkaEvents" . T.pack $
+    "#### Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"
+
+  where
+    getNames :: OutputEvent -> String
+    getNames (OETx _ _) = "TX"
+    getNames (OEBlock _) = "Block"
+    getNames (OEGenesis _) = "GenesisBlock"
+    getNames (OEJsonRpcCommand _) = "JsonRpcCommand"
+
+    getNames (OEGetChain _) = "GetChain"
+    getNames (OEGetTx _) = "GetTx"
+    getNames (OEBlockstanbul _) = "Blockstanbul"
+    getNames OECreateBlockCommand = "CreateBlockCommand"
+    getNames (OEAskForBlocks _ _ _) = "AskForBlocks"
+    getNames (OEPushBlocks _ _ _) = "PushBlocks"
+    getNames (OENewChainMember _ _ _) = "OENewChainMember"
+    getNames (OEVoteToMake _ _ _) = "OEVoteToMake"
+
+    numberIt :: Int -> String -> String
+    numberIt 1 x = "1 " ++ x
+    numberIt i x = show i ++ " " ++ x ++ "s"

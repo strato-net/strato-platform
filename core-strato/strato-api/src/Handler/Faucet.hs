@@ -43,7 +43,7 @@ lookupNonce :: Address -> HandlerFor App Integer
 lookupNonce addr' = do
   addrSt <- runDB $ E.select $
                       E.from $ \accStateRef -> do
-                      E.where_ (E.isNothing (accStateRef E.^. AddressStateRefChainId)
+                      E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0
                          E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr')
                       return accStateRef
   return $ case addrSt of

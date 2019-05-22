@@ -50,6 +50,7 @@ import           Blockchain.Constants
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.AddressStateRef
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
@@ -115,9 +116,11 @@ instance Bagger.MonadBagger ContextM where
     runFromStateRoot sr remainingGas theBlockHeader txs = do
         startingStateRoot <- getStateRoot
         setStateDBStateRoot sr
-        (TxMiningResult res ranTxs unranTxs newGas) <- mineTransactions' theBlockHeader remainingGas [] txs
-        flushMemStorageDB
-        flushMemAddressStateDB
+        (TxMiningResult res ranTxs unranTxs newGas) <-
+          timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
+          $ mineTransactions' theBlockHeader remainingGas [] txs
+        timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
+        timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
         newStateRoot <- getStateRoot
         setStateDBStateRoot startingStateRoot
         let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
@@ -228,7 +231,7 @@ addBlocks blocks' = do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
         timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-        timeit "calculateAndEmitStateDiffs " timerToUse $
+        when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
           calculateAndEmitStateDiffs srLog
                                      (if didReplaceBest' then Just oldHeader else Nothing)
                                      ranPrivateTxs'
@@ -239,15 +242,21 @@ addBlocks blocks' = do
     timerToUse = Just vmBlockInsertionMined
 
 setParentStateRoot :: OutputBlock -> ContextM BlockSummary
-setParentStateRoot b@OutputBlock{..} = do
+setParentStateRoot OutputBlock{..} = do
     bSum <- BSDB.getBSum (blockDataParentHash obBlockData)
     liftIO $ setTitle $ "Block #" ++ show (blockDataNumber obBlockData)
-    $logInfoS "setParentStateRoot" . T.pack $ "Inserting block #" ++ show (blockDataNumber obBlockData) ++ " (" ++ format (outputBlockHash b) ++ ")."
     setStateDBStateRoot (bSumStateRoot bSum)
     return bSum
 
 addBlock :: OutputBlock -> ContextM [Action]
 addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} = do
+    $logInfoS "addBlocks" . T.pack $
+      "Inserting Block #"
+      ++ show (blockDataNumber . obBlockData $ b)
+      ++ " ("
+      ++ format (outputBlockHash b)
+      ++ ", " ++ show (length . obReceiptTransactions $ b)
+      ++ "TXs)."
     when flags_debug $ do
       bhr <- Mod.get (Proxy @BlockHashRoot)
       cr <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
@@ -327,15 +336,25 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "Old chain state root: " ++ format sr
       $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
       actions <- addTransactions bd (blockDataGasLimit $ obBlockData b) txs -- TODO: Run the checks Bagger does reject invalid transactions for private chains
-      flushMemStorageDB
-      flushMemAddressStateDB
+
+      flushMemAddressStateTxToBlockDB
+
+
+      when (not flags_sqlDiff) $ timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $ do
+        asm <- getAddressStateBlockDBMap
+        lift $ updateSQLBalanceAndNonce $ [((theAddress, chainId), (addressStateBalance asMod, addressStateNonce asMod)) | (theAddress, ASModification asMod) <- M.toList asm]
+--        lift $ updateSQLBalanceAndNonce $ map (fmap (\(ASModification x) -> (addressStateBalance x, addressStateNonce x))) $ M.toList asm
+
+      timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
+      timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
       when flags_debug $ do
         sr' <- getStateRoot
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "New chain state root: " ++ format sr'
       return actions
 
 addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM [Action]
-addTransactions bd bg ts = go bd bg ts []
+addTransactions bd bg ts = timeit ("addTransactions, " ++ show (length ts) ++ " TXs") (Just vmBlockInsertionMined) $
+  go bd bg ts []
   where
     go _ _ [] as = return . reverse $ catMaybes as
     go b blockGas (t@OutputTx{otBaseTx=bt}:rest) as = do
@@ -697,7 +716,7 @@ calculateAndEmitStateDiffs :: [(MP.StateRoot, SHA, Integer, Int)]
                            -> S.Set Word256
                            -> OutputBlock
                            -> ContextM ()
-calculateAndEmitStateDiffs srLog mOldPubHeader chainIds newBlock = when flags_sqlDiff $ do
+calculateAndEmitStateDiffs srLog mOldPubHeader chainIds newBlock = do
     case mOldPubHeader of
       Nothing -> return ()
       Just oldHeader -> do

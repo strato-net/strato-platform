@@ -6,12 +6,15 @@ module BatchMerge (
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Loops
+import           Data.Default
 import           Data.Maybe
 import qualified Data.NibbleString as N
+import qualified Database.LevelDB                             as DB
 
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
+import           Blockchain.Strato.Model.SHA                  (keccak256)
 
 import FastMP
 import KV
@@ -30,8 +33,10 @@ putManyKeyVal mpdb listOfInserts = do
 
   case nr of
     MP.PtrRef sr -> return mpdb{MP.stateRoot=sr}
-    MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
-
+    MP.SmallRef v -> do -- The whole trie is too small to fit in a level db key, just create a stateroot from the full data....
+      let newSR = keccak256 v
+      DB.put (MP.ldb mpdb) def newSR v
+      return mpdb{MP.stateRoot=MP.StateRoot newSR}
 
 splitKeysByPrefix :: [Maybe N.Nibble] -> [KV] -> [[KV]]
 splitKeysByPrefix [] [] = []

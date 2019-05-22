@@ -8,6 +8,7 @@ dependencies:
 - blockapps-util
 - bytestring
 - conduit
+- data-default
 - ethereum-rlp
 - format
 - leveldb-haskell
