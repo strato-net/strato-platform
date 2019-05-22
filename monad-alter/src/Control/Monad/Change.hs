@@ -1,6 +1,6 @@
 module Control.Monad.Change
-  ( Modifiable(..)
-  , Alters(..)
+  ( module Control.Monad.Change.Alter
+  , module Control.Monad.Change.Modify
   , module Data.Proxy
   ) where
 

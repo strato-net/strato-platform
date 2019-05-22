@@ -8,6 +8,9 @@ module Control.Monad.Change.Modify
   , Has(..)
   , Accessible(..)
   , accesses
+  , Inputs(..)
+  , inputs
+  , Outputs(..)
   , module Data.Proxy
   ) where
 
@@ -55,3 +58,12 @@ class Accessible a f where
 
 accesses :: (Functor f, Accessible a f) => Proxy a -> (a -> b) -> f b
 accesses = flip fmap . access
+
+class Inputs f a where
+  input :: f a
+
+inputs :: (Functor f, Inputs f a) => (a -> b) -> f b
+inputs f = f <$> input
+
+class Outputs f a where
+  output :: a -> f ()
