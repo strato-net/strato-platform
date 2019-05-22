@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MonoLocalBinds   #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators    #-}
 
@@ -8,6 +9,7 @@ module BatchMerge (
 
 import           Control.Monad
 import qualified Control.Monad.Change.Alter as A
+import           Control.Monad.Change.Modify (Outputs(..))
 import           Control.Monad.Loops
 import           Data.Maybe
 import qualified Data.NibbleString as N
@@ -21,7 +23,7 @@ import FastMP
 import KV
 import ReverseOrderedKVs
 
-putManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m
+putManyKeyVal :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
               => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
 putManyKeyVal sr listOfInserts = do
   let listOfInserts' = map (\(k, v) -> (MP.keyToSafeKey k, v)) listOfInserts
@@ -48,7 +50,7 @@ splitKeysByPrefix (firstChar:remainingPrefix) kvs =
        Just _ -> map (\(KV k v) -> (KV (tail k) v)) matched:splitKeysByPrefix remainingPrefix remaining
        Nothing -> matched:splitKeysByPrefix remainingPrefix remaining
 
-putManyKeyVal_nodeData :: (MP.StateRoot `A.Alters` MP.NodeData) m
+putManyKeyVal_nodeData :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
                        => MP.NodeData -> ReverseOrderedKVs -> m MP.NodeData
 putManyKeyVal_nodeData (MP.FullNodeData choices val) listOfInserts = do
   let kvsSplitByFirstNibble = splitKeysByPrefix (map Just [15,14..0] ++ [Nothing]) $ getTheKVs listOfInserts

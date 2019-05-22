@@ -32,6 +32,7 @@ module Blockchain.VMContext
     , compactContextM
     ) where
 
+import           Control.Arrow                      ((&&&))
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch
@@ -163,33 +164,29 @@ instance HasMemLogDB ContextM where
 
 instance Mod.Modifiable MP.StateRoot ContextM where
   get _    = gets (MP.stateRoot . contextStateDB)
-  put _ sr = get >>= \c -> put c{contextStateDB = (contextStateDB c){MP.stateRoot = sr}}
+  put _ sr = modify $ \c -> c{contextStateDB = (contextStateDB c){MP.stateRoot = sr}}
 
 instance Mod.Modifiable BlockHashRoot ContextM where
   get _     = gets contextBlockHashRoot
-  put _ bhr = get >>= \c -> put c{contextBlockHashRoot = bhr}
+  put _ bhr = modify $ \c -> c{contextBlockHashRoot = bhr}
 
 instance Mod.Modifiable GenesisRoot ContextM where
   get _    = gets contextGenesisRoot
-  put _ gr = get >>= \c -> put c{contextGenesisRoot = gr}
+  put _ gr = modify $ \c -> c{contextGenesisRoot = gr}
 
 instance Mod.Modifiable BestBlockRoot ContextM where
   get _     = gets contextBestBlockRoot
-  put _ bbr = get >>= \c -> put c{contextBestBlockRoot = bbr}
+  put _ bbr = modify $ \c -> c{contextBestBlockRoot = bbr}
 
 instance Mod.Modifiable K.KafkaState ContextM where
   get _    = gets contextKafkaState
-  put _ ks = get >>= \c -> put c{contextKafkaState = ks}
+  put _ ks = modify $ \c -> c{contextKafkaState = ks}
 
 instance HasMemAddressStateDB ContextM where
-  getAddressStateTxDBMap = contextAddressStateTxDBMap <$> get
-  putAddressStateTxDBMap theMap = do
-    cxt <- get
-    put $ cxt{contextAddressStateTxDBMap=theMap}
-  getAddressStateBlockDBMap = contextAddressStateBlockDBMap <$> get
-  putAddressStateBlockDBMap theMap = do
-    cxt <- get
-    put $ cxt{contextAddressStateBlockDBMap=theMap}
+  getAddressStateTxDBMap = gets contextAddressStateTxDBMap
+  putAddressStateTxDBMap theMap = modify $ \c -> c{contextAddressStateTxDBMap=theMap}
+  getAddressStateBlockDBMap = gets contextAddressStateBlockDBMap
+  putAddressStateBlockDBMap theMap = modify $ \c -> c{contextAddressStateBlockDBMap=theMap}
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
   lookup _ = MP.genericLookupDB $ gets (MP.ldb . contextStateDB)
@@ -202,26 +199,16 @@ instance (Address `A.Alters` AddressState) ContextM where
   delete _ = deleteAddressState
 
 instance HasRawStorageDB ContextM where
-  getRawStorageTxDB = do
-    cxt <- get
-    return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
-            contextStorageTxMap cxt)
-  putRawStorageTxMap theMap = do
-    cxt <- get
-    put cxt{contextStorageTxMap=theMap}
-  getRawStorageBlockDB = do
-    cxt <- get
-    return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
-            contextStorageBlockMap cxt)
-  putRawStorageBlockMap theMap = do
-    cxt <- get
-    put cxt{contextStorageBlockMap=theMap}
+  getRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
+  putRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
+  getRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
+  putRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
 
 instance HasHashDB ContextM where
-  getHashDB = contextHashDB <$> get
+  getHashDB = gets contextHashDB
 
 instance HasCodeDB ContextM where
-  getCodeDB = contextCodeDB <$> get
+  getCodeDB = gets contextCodeDB
 
 instance HasBlockSummaryDB ContextM where
   getBlockSummaryDB = gets contextBlockSummaryDB

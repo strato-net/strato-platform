@@ -105,7 +105,6 @@ blankStateRoot = StateRoot $ keccak256 (rlpSerialize $ rlpEncode (0 :: Integer))
 
 -- | Initialize the DB by adding a blank stateroot.
 initializeBlank :: (StateRoot `Alters` NodeData) m
-                       -- ^ The object containing the current stateRoot.
                 => m ()
 initializeBlank =
     let bytes = rlpSerialize $ rlpEncode EmptyNodeData

@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MonoLocalBinds        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeOperators         #-}
@@ -7,7 +8,10 @@
 
 module FastMP where
 
+import Control.Monad (when)
 import qualified Control.Monad.Change.Alter as A
+import Control.Monad.Change.Modify (Outputs(..))
+import Control.Monad.IO.Class
 import Control.Monad.Loops
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as BC
@@ -17,7 +21,7 @@ import Data.Proxy
 import qualified Database.LevelDB as LDB
 
 import Blockchain.Data.RLP
--- import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
+import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
 import           Blockchain.Database.MerklePatricia          ()
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
@@ -26,10 +30,14 @@ import qualified Blockchain.Database.MerklePatricia.NodeData as MP
 import Blockchain.Strato.Model.SHA (keccak256)
 
 import KV
+import LevelDBTools
 import ReverseOrderedKVs
 
 debug :: Bool
 debug = False
+
+instance MonadIO m => m `Outputs` String where
+  output = liftIO . putStrLn
 
 createMPFast :: LDB.DB -> ReverseOrderedKVs -> IO MP.StateRoot
 createMPFast db rOrderedKVs = do
@@ -42,7 +50,7 @@ createMPFast db rOrderedKVs = do
     MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
 
 
-createMPFast_NodeData :: (MP.StateRoot `A.Alters` MP.NodeData) m
+createMPFast_NodeData :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
                       => ReverseOrderedKVs -> m MP.NodeData
 createMPFast_NodeData rOrderedKVs = doit $ getTheKVs rOrderedKVs
 
@@ -59,25 +67,20 @@ kvToStdout = do
 -}
 
 
-doit :: (MP.StateRoot `A.Alters` MP.NodeData) m =>
+doit :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String) =>
         [KV] -> m MP.NodeData
-doit kvs = go (kvs, [])
-  where go x = do
-          let inputIsExhausted :: ([KV], [([N.Nibble], PartialNode)]) -> Bool
-              inputIsExhausted ([], [([], _)]) = True
-              inputIsExhausted ([_], []) = True
-              inputIsExhausted ([], []) = True
-              inputIsExhausted _ = False
+doit kvs = getFinalPartialNode <$> iterateUntilM inputIsExhausted processNext (kvs, [])
+  where inputIsExhausted :: ([KV], [([N.Nibble], PartialNode)]) -> Bool
+        inputIsExhausted ([], [([], _)]) = True
+        inputIsExhausted ([_], []) = True
+        inputIsExhausted ([], []) = True
+        inputIsExhausted _ = False
 
-              getFinalPartialNode ([], [(_, finalPartialNode)]) = partialToNode finalPartialNode
-              getFinalPartialNode ([KV k v], []) = MP.ShortcutNodeData (N.pack k) v
-              getFinalPartialNode ([], []) = MP.EmptyNodeData
-              getFinalPartialNode _ = error "internal error: getFinalStateroot was called on a non-final state"
-          
-          finalValue <- iterateUntilM inputIsExhausted processNext x
+        getFinalPartialNode ([], [(_, finalPartialNode)]) = partialToNode finalPartialNode
+        getFinalPartialNode ([KV k v], []) = MP.ShortcutNodeData (N.pack k) v
+        getFinalPartialNode ([], []) = MP.EmptyNodeData
+        getFinalPartialNode _ = error "internal error: getFinalStateroot was called on a non-final state"
 
-          return $ getFinalPartialNode finalValue
-  
 data NodePtr = NodePtr String deriving Show
 
 data PartialNode =
@@ -95,9 +98,8 @@ partialToNode (PartialNode b v) =
     spreadOut input (_:rest2) = MP.emptyRef:spreadOut input rest2
     spreadOut [] [] = []
     spreadOut _ [] = error "internal error: spreadOut was given input out of order or out of range"
-    
 
-processNext :: (MP.StateRoot `A.Alters` MP.NodeData) m =>
+processNext :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String) =>
                ([KV], [([N.Nibble], PartialNode)]) -> m ([KV], [([N.Nibble], PartialNode)])
 
 --Create new Partial Node
@@ -127,17 +129,17 @@ processNext ((KV k1 v1:rest), ((partialPrefix, thePartialNode):partialRest)) |
 
   modifiedPartialNode <- addToPartial thePartialNode (KV (drop (length partialPrefix) k1) v1)
   return (rest, (partialPrefix, modifiedPartialNode):partialRest)
-    
+
 
 --Flush Partial Node
 processNext (input, ((prefix, partialNode):partialrest)) = do
   let node = partialToNode partialNode
 
   nodePtr <- nodeData2NodeRef node
-  
---  when debug $
---    liftIO $ putStrLn $ "#### Flush Partial(" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
-    
+
+  when debug $
+    output $ "#### Flush Partial(" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
+
   return ((KV prefix (Left nodePtr)):input, partialrest)
 
 
@@ -150,7 +152,7 @@ processNext _ = error "it should be impossible to arrive here"
 
 
 
-nodeData2NodeRef :: (MP.StateRoot `A.Alters` MP.NodeData) m
+nodeData2NodeRef :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
                  => MP.NodeData -> m MP.NodeRef
 nodeData2NodeRef nodeData =
   case rlpSerialize $ rlpEncode nodeData of
@@ -161,11 +163,14 @@ nodeData2NodeRef nodeData =
 
 
 
-putNodeData :: (MP.StateRoot `A.Alters` MP.NodeData) m
+putNodeData :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
             => MP.NodeData -> m MP.StateRoot
 putNodeData nd = do
   let bytes = rlpSerialize $ rlpEncode nd
-      sr = MP.StateRoot $ keccak256 bytes
+      ptr = keccak256 bytes
+      sr = MP.StateRoot ptr
+  when debug $
+    output $ ">>>> " ++ formatLevelKV (LevelKV ptr bytes)
   A.insert Proxy sr nd
   return sr
 
@@ -174,7 +179,7 @@ putNodeData nd = do
 
 
 
-addToPartial :: (MP.StateRoot `A.Alters` MP.NodeData) m
+addToPartial :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
              => PartialNode -> KV -> m PartialNode
 addToPartial partialNode (KV [] (Right val)) =
   return $ partialNode{value = Just val}
@@ -183,10 +188,9 @@ addToPartial partialNode (KV [x] (Left nodePtr)) = do
 addToPartial partialNode (KV x@(_:rest) val) = do
   let node = MP.ShortcutNodeData (N.pack rest) val
   nodePtr <- nodeData2NodeRef node
---  when debug $
---    liftIO $ putStrLn $ "####addToPartial (" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
+  when debug $
+    output $ "####addToPartial (" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
 
-  
   return $ partialNode{branches = (head x, nodePtr):branches partialNode}
 addToPartial _ (KV [] (Left _)) =
   error "addToPartial should never be called with a NodePtrValue for the default value"

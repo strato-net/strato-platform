@@ -107,7 +107,7 @@ instance Mod.Modifiable MP.StateRoot SetupDBM where
   get _    = liftIO . readIORef =<< asks stateRoot
   put _ sr = do
     srRef <- asks stateRoot
-    liftIO $ atomicModifyIORef' srRef (const (sr, ()))
+    liftIO $ atomicWriteIORef srRef sr
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
   lookup _ = MP.genericLookupDB $ asks stateDB
