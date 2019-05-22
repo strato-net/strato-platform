@@ -1,9 +1,0 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
-
-exports[`VerifyAccount: validate with values 1`] = `Object {}`;
-
-exports[`VerifyAccount: validate without values 1`] = `
-Object {
-  "tempPassword": "Temporary password required",
-}
-`;
