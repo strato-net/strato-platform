@@ -9,10 +9,8 @@ module BatchMerge (
 import           Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.Loops
-import           Data.Default
 import           Data.Maybe
 import qualified Data.NibbleString as N
-import qualified Database.LevelDB                             as DB
 
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
@@ -35,11 +33,11 @@ putManyKeyVal sr listOfInserts = do
   nr <- MP.nodeData2NodeRef finalNd
 
   case nr of
-    MP.PtrRef sr -> return sr
+    MP.PtrRef sr' -> return sr'
     MP.SmallRef v -> do -- The whole trie is too small to fit in a level db key, just create a stateroot from the full data....
-      let newSR = keccak256 v
-      A.insert (A.Proxy @NodeData) newSR v
-      return $ MP.StateRoot newSR
+      let newSR = MP.StateRoot $ keccak256 v
+      A.insert (A.Proxy @MP.NodeData) newSR finalNd
+      return newSR
 
 splitKeysByPrefix :: [Maybe N.Nibble] -> [KV] -> [[KV]]
 splitKeysByPrefix [] [] = []

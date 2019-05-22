@@ -27,6 +27,7 @@ module Blockchain.Database.MerklePatricia.Internal (
   ) where
 
 
+import           Control.Monad                                ((<=<))
 import           Control.Monad.Change.Alter                   (Alters)
 import qualified Control.Monad.Change.Alter                   as A
 import qualified Data.ByteString                              as B
@@ -193,10 +194,7 @@ deleteKey_NodeData key1 nd@(ShortcutNodeData key2 (Left ref))
 -----
 
 putKV_NodeRef :: (StateRoot `Alters` NodeData) m => Key -> Val -> NodeRef -> m NodeRef
-putKV_NodeRef key val nodeRef = do
-  nodeData <- getNodeData nodeRef
-  newNodeData <- putKV_NodeData key val nodeData
-  nodeData2NodeRef newNodeData
+putKV_NodeRef key val = nodeData2NodeRef <=< putKV_NodeData key val <=< getNodeData
 
 getKeyVals_NodeRef :: (StateRoot `Alters` NodeData) m => NodeRef -> Key -> m [(Key, Val)]
 getKeyVals_NodeRef ref key = do
@@ -206,8 +204,7 @@ getKeyVals_NodeRef ref key = do
 --TODO- This is looking like a lift, I probably should make NodeRef some sort of Monad....
 
 deleteKey_NodeRef :: (StateRoot `Alters` NodeData) m => Key -> NodeRef -> m NodeRef
-deleteKey_NodeRef key nodeRef =
-  nodeData2NodeRef =<< deleteKey_NodeData key =<< getNodeData nodeRef
+deleteKey_NodeRef key = nodeData2NodeRef <=< deleteKey_NodeData key <=< getNodeData
 
 -----
 
