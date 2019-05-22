@@ -18,7 +18,7 @@ testNumber = do
 
 testConsistent :: RLPObject -> Expectation
 testConsistent obj =
-  let oldEnc = rlpSerialize_slow obj
+  let oldEnc = rlpSerialize_original obj
       newEnc = rlpSerialize obj
   in newEnc `shouldBe` oldEnc
 

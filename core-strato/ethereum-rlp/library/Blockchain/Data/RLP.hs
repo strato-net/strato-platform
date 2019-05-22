@@ -10,8 +10,15 @@ module Blockchain.Data.RLP (
   formatRLPObject,
   RLPSerializable(..),
   rlpSplit,
+  
   rlpSerialize,
-  rlpSerialize_slow,
+  --These are alternate versions of rlpSerialize that have difference performance profiles
+  --(each runs faster in different use cases)
+  --rlpSerialize is currently set to the original, because it comes in faster overall on some
+  --of our real world tests.
+  rlpSerialize_binaryPut,
+  rlpSerialize_original,
+  
   rlpDeserialize
   ) where
 
@@ -140,14 +147,15 @@ rlpDeserialize s =
 -- | Converts 'RLPObject's to bytes.
 --
 -- Full serialization of an object can be obtained using @rlpSerialize . rlpEncode@.
-rlpSerialize_slow::RLPObject->B.ByteString
-rlpSerialize_slow = B.pack . rlp2Bytes
+rlpSerialize_original::RLPObject->B.ByteString
+rlpSerialize_original = B.pack . rlp2Bytes
 
 rlpSerialize :: RLPObject -> B.ByteString
-rlpSerialize = BL.toStrict . rlpSerialize'
+rlpSerialize = rlpSerialize_original
+--rlpSerialize = BL.toStrict . rlpSerialize_binaryPut
 
-rlpSerialize':: RLPObject -> BL.ByteString
-rlpSerialize' = runPut . rlpToPut
+rlpSerialize_binaryPut:: RLPObject -> BL.ByteString
+rlpSerialize_binaryPut = runPut . rlpToPut
 
 rlpToPut :: RLPObject -> Put
 rlpToPut = \case
@@ -162,7 +170,7 @@ rlpToPut = \case
         in putWord8 (0xb7 + fromIntegral ll) >> mapM_ putWord8 ibs
     putByteString s
   (RLPArray innerObjects) -> do
-    let innerBytes = BL.concat . map rlpSerialize' $ innerObjects
+    let innerBytes = BL.concat . map rlpSerialize_binaryPut $ innerObjects
         l = BL.length innerBytes
     if l <= 55
       then putWord8 (0xc0 + fromIntegral l)
