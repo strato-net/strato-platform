@@ -15,7 +15,7 @@ import Control.DeepSeq
 import Control.Lens
 import Control.Monad
 import Control.Monad.Change.Alter
-import Control.Monad.Change.Modify hiding (get, put)
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
@@ -36,7 +36,6 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
-import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
 import Blockchain.Strato.Model.Address
@@ -77,8 +76,14 @@ instance (Address `Alters` AddressState) StorM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance CachedStorage `Has` MP.StateRoot where
-  this _ = sdbsr
+instance (MP.StateRoot `Alters` MP.NodeData) StorM where
+  lookup _ = MP.genericLookupDB $ use sdb
+  insert _ = MP.genericInsertDB $ use sdb
+  delete _ = MP.genericDeleteDB $ use sdb
+
+instance Mod.Modifiable MP.StateRoot StorM where
+  get _ = use sdbsr
+  put _ = assign sdbsr
 
 instance HasHashDB StorM where
   getHashDB = use hdb

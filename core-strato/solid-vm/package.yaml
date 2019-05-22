@@ -29,12 +29,14 @@ dependencies:
   - bytestring
   - containers
   - cryptonite
+  - data-default
   - deepseq
   - extra
   - format
   - generic-random
   - hashable
   - lens
+  - leveldb-haskell
   - memory
   - merkle-patricia-db
   - monad-alter

@@ -8,8 +8,7 @@
 module Executable.AditM where
 
 import           Blockchain.Output
-import           Control.Lens                 (lens)
-import           Control.Monad.Change.Modify  (Has(..))
+import qualified Control.Monad.Change.Modify  as Mod
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Control.Lens
@@ -43,8 +42,9 @@ recordException = do
 
 type AditM = StateT AditState (ResourceT (LoggingT IO))
 
-instance AditState `Has` KafkaState where
-  this _ = lens aditKafkaState (\c a -> c{aditKafkaState = a})
+instance Mod.Modifiable KafkaState AditM where
+  get _   = gets aditKafkaState
+  put _ k = get >>= \c -> put c{aditKafkaState = k}
 
 runAditT :: AditM a -> LoggingT IO a
 runAditT m = do

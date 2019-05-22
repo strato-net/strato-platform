@@ -9,7 +9,6 @@ module Blockchain.Verifier (
 
 import           Control.Monad
 import qualified Control.Monad.Change.Alter                  as A
-import           Control.Monad.IO.Class
 
 import           Blockchain.Constants
 import           Blockchain.Data.Address
@@ -72,11 +71,12 @@ checkParentChildValidity isHomestead OutputBlock{obBlockData=c} parentBSum = do
 verifier::Miner
 verifier = (if (flags_miner == Normal) then normalMiner else if(flags_miner == Instant) then instantMiner else shaMiner)
 
-addAllKVs::RLPSerializable obj=>MonadIO m=>MP.MPDB->[(Integer, obj)]->m MP.MPDB
+addAllKVs :: (RLPSerializable obj, (MP.StateRoot `A.Alters` MP.NodeData) m)
+          => MP.StateRoot -> [(Integer, obj)] -> m MP.StateRoot
 addAllKVs x [] = return x
-addAllKVs mpdb (x:rest) = do
-  mpdb' <- MP.unsafePutKeyVal mpdb (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVs mpdb' rest
+addAllKVs sr (x:rest) = do
+  sr' <- MP.unsafePutKeyVal sr (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
+  addAllKVs sr' rest
 
 verifyTransactionRoot'::OutputBlock -> (Bool,MP.StateRoot)
 verifyTransactionRoot' OutputBlock{obBlockData=bd,obReceiptTransactions=txs} =
@@ -84,9 +84,7 @@ verifyTransactionRoot' OutputBlock{obBlockData=bd,obReceiptTransactions=txs} =
 
 verifyTransactionRoot::HasStateDB m=>OutputBlock->m (Bool,MP.StateRoot)
 verifyTransactionRoot OutputBlock{obBlockData=bd,obReceiptTransactions=txs} = do
-  mpdb <- getStateDB
-
-  MP.MPDB{MP.stateRoot=sr} <- addAllKVs mpdb{MP.stateRoot=MP.emptyTriePtr} $ zip [0..] $ (otBaseTx <$> txs)
+  sr <- addAllKVs MP.emptyTriePtr $ zip [0..] $ (otBaseTx <$> txs)
   return (blockDataTransactionsRoot bd == sr, sr)
 
 verifyOmmersRoot::HasStateDB m=>OutputBlock->m Bool

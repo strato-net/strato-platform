@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.Data.GenesisBlock (
@@ -16,8 +17,8 @@ module Blockchain.Data.GenesisBlock (
 import           Control.Exception
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
+import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
 import           Crypto.Util                          (i2bs_unsized)
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.Map                             as Map
@@ -53,11 +54,8 @@ import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 
 import           Text.Format
 
-initializeBlankStateDB :: HasStateDB m => m ()
-initializeBlankStateDB = do
-    db <- getStateDB
-    liftIO . runResourceT $ initializeBlank db
-    setStateDBStateRoot emptyTriePtr
+initializeBlankStateDB :: (Modifiable StateRoot m, (StateRoot `A.Alters` NodeData) m) => m ()
+initializeBlankStateDB = initializeBlank >> setStateDBStateRoot emptyTriePtr
 
 putStorageTrie :: ( HasHashDB m
                   , Mem.HasMemAddressStateDB m
@@ -107,9 +105,10 @@ initializeStateDB addressInfo = do
 
 initializeStateDBAndAccountInfos :: ( HasHashDB m
                                     , Mem.HasMemAddressStateDB m
-                                    , HasStateDB m
                                     , HasStorageDB m
+                                    , Modifiable StateRoot m
                                     , (Ad.Address `A.Alters` AddressState) m
+                                    , (StateRoot `A.Alters` NodeData) m
                                     )
                                  => [AccountInfo]
                                  -> String
@@ -176,7 +175,7 @@ chainInfoToGenesisState :: ( HasCodeDB m
 chainInfoToGenesisState ci = do
     initializeCodeDB (codeInfo $ chainInfo ci)
     initializeStateDB (accountInfo $ chainInfo ci)
-    stateRoot <$> getStateDB
+    get (Proxy @StateRoot)
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
 zipSourceInfo accounts codes =
@@ -204,14 +203,14 @@ genesisInfoToGenesisBlock gi gn as = do
     let accounts = genesisInfoAccountInfo gi
     initializeCodeDB codes
     initializeStateDBAndAccountInfos accounts gn
-    db <- getStateDB
+    sr <- get (Proxy @StateRoot)
     let sourceInfo = zipSourceInfo (accounts ++ as) codes
     return (sourceInfo, Block {
         blockBlockData = BlockData {
             blockDataParentHash = genesisInfoParentHash gi,
             blockDataUnclesHash = genesisInfoUnclesHash gi,
             blockDataCoinbase = genesisInfoCoinbase gi,
-            blockDataStateRoot = stateRoot db,
+            blockDataStateRoot = sr,
             blockDataTransactionsRoot = genesisInfoTransactionsRoot gi,
             blockDataReceiptsRoot = genesisInfoReceiptsRoot gi,
             blockDataLogBloom = genesisInfoLogBloom gi,

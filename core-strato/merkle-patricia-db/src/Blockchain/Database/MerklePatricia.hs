@@ -1,5 +1,8 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 -- | This is an implementation of the modified Merkle Patricia database
 -- described in the Ethereum Yellowpaper
@@ -22,6 +25,7 @@
 -- Patricia Merkle Tree.
 
 module Blockchain.Database.MerklePatricia (
+  genericLookupDB, genericInsertDB, genericDeleteDB,
   Key, Val, MPDB(..), StateRoot(..), NodeData(..),
   openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
   putKeyVal, getKeyVal, deleteKey, keyExists,
@@ -29,12 +33,39 @@ module Blockchain.Database.MerklePatricia (
   ) where
 
 import           Control.Monad.Change.Alter
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader
+import qualified Data.ByteString                             as B
+import           Data.Default
 import           Data.Maybe                                  (isJust, listToMaybe)
+import qualified Database.LevelDB                            as DB
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Strato.Model.SHA                 (keccak256)
 
+genericLookupDB :: MonadIO m => m DB.DB -> StateRoot -> m (Maybe NodeData)
+genericLookupDB f (StateRoot sr) = do
+  db <- f
+  fmap bytes2NodeData <$> DB.get db def sr
+  where bytes2NodeData :: B.ByteString -> NodeData
+        bytes2NodeData bytes | B.null bytes = EmptyNodeData
+        bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
+
+genericInsertDB :: MonadIO m => m DB.DB -> StateRoot -> NodeData -> m ()
+genericInsertDB f (StateRoot sr) nd = do
+  db <- f
+  DB.put db def sr $ rlpSerialize $ rlpEncode nd
+
+genericDeleteDB :: MonadIO m => m DB.DB -> StateRoot -> m ()
+genericDeleteDB f (StateRoot sr) = do
+  db <- f
+  DB.delete db def sr
+
+instance MonadIO m => (StateRoot `Alters` NodeData) (ReaderT DB.DB m) where
+  lookup _ = genericLookupDB ask
+  insert _ = genericInsertDB ask
+  delete _ = genericDeleteDB ask
 
 -- | Adds a new key/value pair.
 putKeyVal :: (StateRoot `Alters` NodeData) m

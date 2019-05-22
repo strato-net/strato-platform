@@ -107,10 +107,9 @@ getDataAndRevertAddressState _ addressState = do
   -- since that function requires an unhashed owner.
   -- This piece of code really should be in the lib somewhere
   storage <- do
-    dbs' <- get
-    let mpdb = (contextStateDB dbs'){stateRoot=addressStateContractRoot addressState}
-    kvs <- lift $ unsafeGetKeyVals mpdb ""
-    let toInt = fromInteger . rlpDecode . rlpDeserialize . rlpDecode
+    let sr = addressStateContractRoot addressState
+        toInt = fromInteger . rlpDecode . rlpDeserialize . rlpDecode
+    kvs <- unsafeGetKeyVals sr ""
     return $ map (fmap toInt) kvs :: ContextM [(Key, Integer)]
 
   return $
@@ -161,7 +160,7 @@ runTest test = do
     liftIO . print $ test
   let cid = Nothing
 
-  MP.initializeBlank =<< getStateDB
+  MP.initializeBlank
   setStateDBStateRoot emptyTriePtr
 
   forM_ (M.toList $ pre test) $

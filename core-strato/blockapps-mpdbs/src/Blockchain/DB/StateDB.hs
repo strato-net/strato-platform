@@ -7,6 +7,9 @@ module Blockchain.DB.StateDB where
 
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Control.Monad.Change
+import qualified Database.LevelDB                   as DB
+
+type StateDB = DB.DB
 
 type HasStateDB m = ((MP.StateRoot `Alters` MP.NodeData) m, Modifiable MP.StateRoot m)
 

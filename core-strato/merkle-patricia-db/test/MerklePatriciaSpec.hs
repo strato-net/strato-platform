@@ -14,11 +14,8 @@ import           Blockchain.Database.MerklePatricia.InternalMem
 import           Blockchain.Database.MerklePatriciaMem
 import           Blockchain.Util
 import           Control.Monad.Change.Alter
-import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString                                as B
-import           Data.Default                                   (def)
 import qualified Data.NibbleString                              as N
 import qualified Database.LevelDB                               as LD
 import           Test.Hspec
@@ -80,20 +77,6 @@ testGetPutRepeatedII = TestCase $ do
   res <- getSingleKV db "00000000000000000000000000000002ffffffffffffffff0000000000000003"
 
   assertEqual "get . putn = id" res [("00000000000000000000000000000002ffffffffffffffff0000000000000003",rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
-
-instance MonadIO m => (StateRoot `Alters` NodeData) (ReaderT LD.DB m) where
-  lookup _ (StateRoot sr) = do
-    db <- ask
-    fmap bytes2NodeData <$> LD.get db def sr
-    where bytes2NodeData :: B.ByteString -> NodeData
-          bytes2NodeData bytes | B.null bytes = EmptyNodeData
-          bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
-  insert _ (StateRoot sr) nd = do
-    db <- ask
-    LD.put db def sr $ rlpSerialize $ rlpEncode nd
-  delete _ (StateRoot sr) = do
-    db <- ask
-    LD.delete db def sr
 
 testSingleInsert :: Test
 testSingleInsert = TestCase $ do

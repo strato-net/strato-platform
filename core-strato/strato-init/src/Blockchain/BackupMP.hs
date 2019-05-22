@@ -1,10 +1,14 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.BackupMP (
   backupMP
   ) where
 
 import           Control.Monad
+import           Control.Monad.Change.Modify        (Accessible(..), Proxy(..))
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
@@ -56,20 +60,20 @@ decodeWithCheck x =
    (result, "") -> result
    _            -> error $ "bad data passed to decodeWithCheck: " ++ show x
 
-backupMP::(HasSQLDB m, HasStateDB m, HasCodeDB m, HasHashDB m)=>m Block
+backupMP::(HasSQLDB m, HasStateDB m, HasCodeDB m, HasHashDB m, Accessible LDB.DB m)=>m Block
 backupMP = do
-    sdb <- getStateDB
+    sdb <- access (Proxy @LDB.DB)
     codedb <- getCodeDB
     hashdb <- getHashDB
     rawData <- liftIO $ fmap BLC.lines $ BL.getContents
     let gb = rlpDecode $ rlpDeserialize $ decodeWithCheck $ BL.toStrict $ BL.tail $ head rawData
-    MPDB.initializeBlank sdb
+    MPDB.initializeBlank
     forM_ rawData $ \line -> do
       case line of
        x | BLC.head x == 'b' -> addBlock $ BL.tail x
        x | BLC.head x == 'c' -> addCode' codedb $ BL.tail x
        x | BLC.head x == 'g' -> putGenesisHash $ SHA $ fromInteger $ fst $ head $ readHex $ BLC.unpack $ BL.tail x
        x | BLC.head x == 'h' -> addHash' hashdb $ BL.tail x
-       x | BLC.head x == 's' -> addStateDB (MPDB.ldb sdb) $ BL.tail x
+       x | BLC.head x == 's' -> addStateDB sdb $ BL.tail x
        x -> error $ "Malformed line in input: " ++ show x
     return gb

@@ -8,12 +8,9 @@
 module FastMP where
 
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.IO.Class
 import Control.Monad.Loops
 import Control.Monad.Trans.Reader
-import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
-import Data.Default (def)
 import Data.List
 import qualified Data.NibbleString as N
 import Data.Proxy
@@ -22,6 +19,7 @@ import qualified Database.LevelDB as LDB
 import Blockchain.Data.RLP
 -- import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
+import           Blockchain.Database.MerklePatricia          ()
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
 
@@ -32,21 +30,6 @@ import ReverseOrderedKVs
 
 debug :: Bool
 debug = False
-
-instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT LDB.DB m) where
-  lookup _ (MP.StateRoot p)    = do
-    db <- ask
-    mBytes <- LDB.get db def p
-    return $ bytes2NodeData <$> mBytes
-    where bytes2NodeData :: B.ByteString -> MP.NodeData
-          bytes2NodeData bytes | B.null bytes = MP.EmptyNodeData
-          bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
-
-  insert _ (MP.StateRoot p) nd = do
-    db <- ask
-    LDB.put db def p $ rlpSerialize $ rlpEncode nd
-
-  delete _ (MP.StateRoot p) = ask >>= \db -> LDB.delete db def p
 
 createMPFast :: LDB.DB -> ReverseOrderedKVs -> IO MP.StateRoot
 createMPFast db rOrderedKVs = do
