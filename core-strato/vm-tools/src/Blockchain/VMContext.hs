@@ -44,7 +44,6 @@ import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
-import           Data.Default
 import           Data.Foldable                      (toList)
 import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
@@ -73,7 +72,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs           (LogDB, TransactionResult)
 import           Blockchain.Data.LogDB
-import           Blockchain.Data.RLP
 import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -194,19 +192,9 @@ instance HasMemAddressStateDB ContextM where
     put $ cxt{contextAddressStateBlockDBMap=theMap}
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
-  lookup _ (MP.StateRoot sr) = do
-    db <- gets (MP.ldb . contextStateDB)
-    fmap bytes2NodeData <$> DB.get db def sr
-    where bytes2NodeData :: B.ByteString -> MP.NodeData
-          bytes2NodeData bytes | B.null bytes = MP.EmptyNodeData
-          bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
-  insert _ (MP.StateRoot sr) nd = do
-    db <- gets (MP.ldb . contextStateDB)
-    DB.put db def sr $ rlpSerialize $ rlpEncode nd
-  delete _ (MP.StateRoot sr) = do
-    db <- gets (MP.ldb . contextStateDB)
-    DB.delete db def sr
-
+  lookup _ = MP.genericLookupDB $ gets (MP.ldb . contextStateDB)
+  insert _ = MP.genericInsertDB $ gets (MP.ldb . contextStateDB)
+  delete _ = MP.genericDeleteDB $ gets (MP.ldb . contextStateDB)
 
 instance (Address `A.Alters` AddressState) ContextM where
   lookup _ = getAddressStateMaybe
