@@ -300,7 +300,8 @@ runContextM f = do
           runStateT f (Context
                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
                        (HashDB hdb)
-                       (CodeDB cdb) blksumdb
+                       (CodeDB cdb)
+                       blksumdb
                        M.empty
                        M.empty
                        M.empty
