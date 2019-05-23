@@ -32,6 +32,7 @@ dependencies:
   - resourcet
   - solid-vm-model
   - strato-model
+  - transformers
 
 ghc-options: -Wall -O2
 

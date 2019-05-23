@@ -81,12 +81,14 @@ instance (MP.StateRoot `Alters` MP.NodeData) StorM where
   insert _ = MP.genericInsertDB $ use sdb
   delete _ = MP.genericDeleteDB $ use sdb
 
+instance (N.NibbleString `Alters` N.NibbleString) StorM where
+  lookup _ = genericLookupHashDB $ use hdb
+  insert _ = genericInsertHashDB $ use hdb
+  delete _ = genericDeleteHashDB $ use hdb
+
 instance Mod.Modifiable MP.StateRoot StorM where
   get _ = use sdbsr
   put _ = assign sdbsr
-
-instance HasHashDB StorM where
-  getHashDB = use hdb
 
 initialEnv :: IO (FilePath, CachedStorage)
 initialEnv = do
@@ -94,7 +96,7 @@ initialEnv = do
   let ldbOptions = DB.defaultOptions { DB.createIfMissing = True }
       openDB b = DBB.open (tmpdir ++ b) ldbOptions
   s <- openDB "/state/"
-  h <- openDB "/hash/"
+  h <- HashDB <$> openDB "/hash/"
   let st = CS s MP.emptyTriePtr h M.empty M.empty M.empty M.empty
   fmap (tmpdir,) . runResourceT $ execStateT MP.initializeBlank st
 

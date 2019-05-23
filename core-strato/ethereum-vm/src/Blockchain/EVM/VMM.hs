@@ -52,6 +52,7 @@ import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
 import           Data.IORef.Unboxed
 import           Data.Maybe                         (fromMaybe)
+import qualified Data.NibbleString                  as N
 import qualified Data.Set                           as S
 import           MonadUtils
 
@@ -101,8 +102,10 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) VMM where
   insert _ = MP.genericInsertDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
   delete _ = MP.genericDeleteDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
 
-instance HasHashDB VMM where
-    getHashDB = lift $ fmap (contextHashDB . dbs) get
+instance (N.NibbleString `A.Alters` N.NibbleString) VMM where
+  lookup _ = genericLookupHashDB $ lift $ gets $ contextHashDB . dbs
+  insert _ = genericInsertHashDB $ lift $ gets $ contextHashDB . dbs
+  delete _ = genericDeleteHashDB $ lift $ gets $ contextHashDB . dbs
 
 instance Mod.Modifiable MP.StateRoot VMM where
   get _    = lift $ gets (MP.stateRoot . contextStateDB . dbs)
@@ -124,8 +127,10 @@ instance HasRawStorageDB VMM where
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
 
-instance HasCodeDB VMM where
-    getCodeDB = lift $ fmap (contextCodeDB . dbs) get
+instance (SHA `A.Alters` DBCode) VMM where
+  lookup _ = genericLookupCodeDB $ lift $ gets $ contextCodeDB . dbs
+  insert _ = genericInsertCodeDB $ lift $ gets $ contextCodeDB . dbs
+  delete _ = genericDeleteCodeDB $ lift $ gets $ contextCodeDB . dbs
 
 instance HasBlockSummaryDB VMM where
     getBlockSummaryDB = lift $ fmap (contextBlockSummaryDB . dbs) get

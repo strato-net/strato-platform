@@ -8,7 +8,7 @@ module Blockchain.BackupMP (
   ) where
 
 import           Control.Monad
-import           Control.Monad.Change.Modify        (Accessible(..), Proxy(..))
+import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
@@ -41,7 +41,7 @@ addStateDB db stateDBData = do
   LDB.put db LDB.defaultWriteOptions (keccak256 val) val
   return ()
 
-addCode'::MonadIO m=>LDB.DB->BL.ByteString->m ()
+addCode' :: MonadIO m => LDB.DB -> BL.ByteString -> m ()
 addCode' db codeData = do
   let val = decodeWithCheck $ BL.toStrict codeData
   LDB.put db LDB.defaultWriteOptions (keccak256 val) val
@@ -60,11 +60,16 @@ decodeWithCheck x =
    (result, "") -> result
    _            -> error $ "bad data passed to decodeWithCheck: " ++ show x
 
-backupMP::(HasSQLDB m, HasStateDB m, HasCodeDB m, HasHashDB m, Accessible LDB.DB m)=>m Block
+backupMP::( HasSQLDB m
+          , HasStateDB m
+          , Accessible LDB.DB m
+          , Accessible CodeDB m
+          , Accessible HashDB m
+          ) => m Block
 backupMP = do
     sdb <- access (Proxy @LDB.DB)
-    codedb <- getCodeDB
-    hashdb <- getHashDB
+    codedb <- accesses (Proxy @CodeDB) unCodeDB
+    hashdb <- accesses (Proxy @HashDB) unHashDB
     rawData <- liftIO $ fmap BLC.lines $ BL.getContents
     let gb = rlpDecode $ rlpDeserialize $ decodeWithCheck $ BL.toStrict $ BL.tail $ head rawData
     MPDB.initializeBlank
