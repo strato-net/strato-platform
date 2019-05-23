@@ -59,10 +59,6 @@ shaToKey = BL.toStrict . encode . sha2StateRoot
 dbCodeToValue :: DBCode -> B.ByteString
 dbCodeToValue = uncurry B.cons . first toWord8
 
---codeValueToCode :: B.ByteString -> Either String Code
---codeValueToCode = maybe (Left err) (Right . first fromWord8) . B.uncons
---  where err = "codeValueToCode: encountered empty ByteString"
-
 genericLookupCodeDB :: MonadIO m => m CodeDB -> SHA -> m (Maybe DBCode)
 genericLookupCodeDB f codeHash = do
   db <- unCodeDB <$> f
