@@ -61,15 +61,15 @@ decodeWithCheck x =
    _            -> error $ "bad data passed to decodeWithCheck: " ++ show x
 
 backupMP::( HasSQLDB m
-          , HasHashDB m
           , HasStateDB m
           , Accessible LDB.DB m
           , Accessible CodeDB m
+          , Accessible HashDB m
           ) => m Block
 backupMP = do
     sdb <- access (Proxy @LDB.DB)
     codedb <- accesses (Proxy @CodeDB) unCodeDB
-    hashdb <- getHashDB
+    hashdb <- accesses (Proxy @HashDB) unHashDB
     rawData <- liftIO $ fmap BLC.lines $ BL.getContents
     let gb = rlpDecode $ rlpDeserialize $ decodeWithCheck $ BL.toStrict $ BL.tail $ head rawData
     MPDB.initializeBlank

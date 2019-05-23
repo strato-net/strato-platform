@@ -41,6 +41,7 @@ dependencies:
   - merkle-patricia-db
   - monad-alter
   - monad-control
+  - nibblestring
   - parsec
   - prometheus-client
   - QuickCheck

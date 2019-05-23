@@ -37,6 +37,7 @@ dependencies:
   - merkle-patricia-db
   - monad-alter
   - mtl
+  - nibblestring
   - ordered-containers
   - persistent-postgresql
   - persistent-sqlite

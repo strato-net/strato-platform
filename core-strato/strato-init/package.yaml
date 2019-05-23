@@ -44,6 +44,7 @@ dependencies:
   - merkle-patricia-db
   - monad-alter
   - mtl
+  - nibblestring
   - persistent-postgresql
   - resourcet
   - scientific

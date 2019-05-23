@@ -27,6 +27,7 @@ import           Data.IORef
 import           Data.List.Split                    (splitWhen)
 import qualified Data.Map                           as Map
 import           Data.Maybe
+import qualified Data.NibbleString                  as N
 import           Data.String
 import qualified Data.Text                          as T
 import           Data.Yaml
@@ -151,8 +152,10 @@ instance (SHA `A.Alters` DBCode) SetupDBM where
   insert _ = genericInsertCodeDB $ asks codeDB
   delete _ = genericDeleteCodeDB $ asks codeDB
 
-instance HasHashDB SetupDBM where
-  getHashDB = asks hashDB
+instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
+  lookup _ = genericLookupHashDB $ asks hashDB
+  insert _ = genericInsertHashDB $ asks hashDB
+  delete _ = genericDeleteHashDB $ asks hashDB
 
 instance HasSQLDB SetupDBM where
   getSQLDB = asks sqlDB
@@ -473,7 +476,7 @@ oneTimeSetup genesisBlockName = do
 
          sdb <- DB.open (dbDir "h" ++ stateDBPath)
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-         hdb <- DB.open (dbDir "h" ++ hashDBPath)
+         hdb <- HashDB <$> DB.open (dbDir "h" ++ hashDBPath)
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
          cdb <- CodeDB <$> DB.open (dbDir "h" ++ codeDBPath)
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}

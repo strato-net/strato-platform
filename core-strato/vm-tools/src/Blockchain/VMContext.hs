@@ -49,6 +49,7 @@ import           Data.Foldable                      (toList)
 import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
+import qualified Data.NibbleString                  as N
 import qualified Data.Sequence                      as Q
 import           Data.Word
 import qualified Data.Text                          as T
@@ -203,14 +204,16 @@ instance (SHA `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ gets contextCodeDB
   delete _ = genericDeleteCodeDB $ gets contextCodeDB
 
+instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
+  lookup _ = genericLookupHashDB $ gets contextHashDB
+  insert _ = genericInsertHashDB $ gets contextHashDB
+  delete _ = genericDeleteHashDB $ gets contextHashDB
+
 instance HasRawStorageDB ContextM where
   getRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
   putRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
   getRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
   putRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
-
-instance HasHashDB ContextM where
-  getHashDB = gets contextHashDB
 
 instance HasBlockSummaryDB ContextM where
   getBlockSummaryDB = gets contextBlockSummaryDB
@@ -254,7 +257,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                                                (K.Host (K.KString "localhost"), K.Port 1234132)
         flip runStateT (Context
                      MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "must set stateroot for test context"}
-                     hdb
+                     (HashDB hdb)
                      (CodeDB cdb)
                      blksumdb
                      M.empty
@@ -296,9 +299,8 @@ runContextM f = do
           let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
           runStateT f (Context
                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
-                       hdb
-                       (CodeDB cdb)
-                       blksumdb
+                       (HashDB hdb)
+                       (CodeDB cdb) blksumdb
                        M.empty
                        M.empty
                        M.empty
