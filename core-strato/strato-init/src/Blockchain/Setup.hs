@@ -163,7 +163,7 @@ instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   delete _ = genericDeleteHashDB $ asks hashDB
 
 instance SetupDBM `Mod.Outputs` String where
-  output = MP.genericOutputsStringIO
+  output = Mod.genericOutputsStringIO
 
 instance HasSQLDB SetupDBM where
   getSQLDB = asks sqlDB

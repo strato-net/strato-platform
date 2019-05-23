@@ -60,7 +60,7 @@ makeLenses ''CachedStorage
 type StorM = StateT CachedStorage (ResourceT IO)
 
 instance StorM `Mod.Outputs` String where
-  output = MP.genericOutputsStringIO
+  output = Mod.genericOutputsStringIO
 
 instance HasMemRawStorageDB StorM where
   getMemRawStorageTxDB = liftM2 (,) (use sdb) (use stx)

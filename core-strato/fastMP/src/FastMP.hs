@@ -9,13 +9,12 @@ module FastMP where
 
 import Control.Monad (when)
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Change.Modify (Outputs(..))
+import Control.Monad.Change.Modify (Outputs(..), genericOutputsStringIO)
 import Control.Monad.Loops
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as BC
 import Data.List
 import qualified Data.NibbleString as N
-import Data.Proxy
 import qualified Database.LevelDB as LDB
 
 import Blockchain.Data.RLP
@@ -30,6 +29,12 @@ import Blockchain.Strato.Model.SHA (keccak256)
 import KV
 import LevelDBTools
 import ReverseOrderedKVs
+
+instance IO `Outputs` String where
+  output = genericOutputsStringIO
+
+instance (ReaderT LDB.DB IO) `Outputs` String where
+  output = genericOutputsStringIO
 
 debug :: Bool
 debug = False
@@ -166,7 +171,7 @@ putNodeData nd = do
       sr = MP.StateRoot ptr
   when debug $
     output $ ">>>> " ++ formatLevelKV (LevelKV ptr bytes)
-  A.insert Proxy sr nd
+  A.insert A.Proxy sr nd
   return sr
 
 

@@ -138,7 +138,7 @@ instance Show Context where
   show = const "<context>"
 
 instance ContextM `Mod.Outputs` String where
-  output = MP.genericOutputsStringIO
+  output = Mod.genericOutputsStringIO
 
 instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
