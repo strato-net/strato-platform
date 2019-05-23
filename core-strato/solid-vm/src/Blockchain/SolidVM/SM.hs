@@ -146,21 +146,26 @@ instance HasMemAddressStateDB SM where
     sstate <- get
     put $ sstate{addressStateBlockDBMap=theMap}
 
-instance HasRawStorageDB SM where
-  getRawStorageTxDB = do
+instance HasMemRawStorageDB SM where
+  getMemRawStorageTxDB = do
     cxt <- get
     return (MP.ldb $ stateDB cxt, --storage and states use the same database!
             storageTxMap cxt)
-  putRawStorageTxMap theMap = do
+  putMemRawStorageTxMap theMap = do
     cxt <- get
     put cxt{storageTxMap=theMap}
-  getRawStorageBlockDB = do
+  getMemRawStorageBlockDB = do
     cxt <- get
     return (MP.ldb $ stateDB cxt, --storage and states use the same database!
             storageBlockMap cxt)
-  putRawStorageBlockMap theMap = do
+  putMemRawStorageBlockMap theMap = do
     cxt <- get
     put cxt{storageBlockMap=theMap}
+
+instance (RawStorageKey `A.Alters` RawStorageValue) SM where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
 
 instance Mod.Modifiable MP.StateRoot SM where
   get _    = gets (MP.stateRoot . stateDB)

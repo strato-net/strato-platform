@@ -25,6 +25,7 @@
 -- Patricia Merkle Tree.
 
 module Blockchain.Database.MerklePatricia (
+  genericOutputsStringIO,
   genericLookupDB, genericInsertDB, genericDeleteDB,
   Key, Val, MPDB(..), StateRoot(..), NodeData(..),
   openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
@@ -33,6 +34,7 @@ module Blockchain.Database.MerklePatricia (
   ) where
 
 import           Control.Monad.Change.Alter
+import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import qualified Data.ByteString                             as B
@@ -43,6 +45,15 @@ import qualified Database.LevelDB                            as DB
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Strato.Model.SHA                 (keccak256)
+
+genericOutputsStringIO :: MonadIO m => String -> m ()
+genericOutputsStringIO = liftIO . putStrLn
+
+instance IO `Outputs` String where
+  output = genericOutputsStringIO
+
+instance (ReaderT DB.DB IO) `Outputs` String where
+  output = genericOutputsStringIO
 
 genericLookupDB :: MonadIO m => m DB.DB -> StateRoot -> m (Maybe NodeData)
 genericLookupDB f (StateRoot sr) = do

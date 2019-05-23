@@ -137,6 +137,9 @@ type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 instance Show Context where
   show = const "<context>"
 
+instance ContextM `Mod.Outputs` String where
+  output = MP.genericOutputsStringIO
+
 instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
     ctx <- get
@@ -211,11 +214,16 @@ instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   insert _ = genericInsertHashDB $ gets contextHashDB
   delete _ = genericDeleteHashDB $ gets contextHashDB
 
-instance HasRawStorageDB ContextM where
-  getRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
-  putRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
-  getRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
-  putRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
+instance HasMemRawStorageDB ContextM where
+  getMemRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
+  putMemRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
+  getMemRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
+  putMemRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
+
+instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
 
 instance HasBlockSummaryDB ContextM where
   getBlockSummaryDB = gets contextBlockSummaryDB
@@ -344,10 +352,10 @@ getNewAddress address = do
   incrementNonce address
   return newAddress
 
-purgeStorageMap :: HasStorageDB m => Address -> m ()
+purgeStorageMap :: HasMemStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  storageMap <- snd <$> getRawStorageTxDB
-  putRawStorageTxMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
+  storageMap <- snd <$> getMemRawStorageTxDB
+  putMemRawStorageTxMap $ M.filterWithKey (const . (/= address) . fst) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo
 getContextBestBlockInfo = contextBestBlockInfo <$> get

@@ -59,11 +59,14 @@ makeLenses ''CachedStorage
 
 type StorM = StateT CachedStorage (ResourceT IO)
 
-instance HasRawStorageDB StorM where
-  getRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
-  putRawStorageTxMap = assign stx
-  getRawStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
-  putRawStorageBlockMap = assign sbs
+instance StorM `Mod.Outputs` String where
+  output = MP.genericOutputsStringIO
+
+instance HasMemRawStorageDB StorM where
+  getMemRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
+  putMemRawStorageTxMap = assign stx
+  getMemRawStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
+  putMemRawStorageBlockMap = assign sbs
 
 instance HasMemAddressStateDB StorM where
   getAddressStateTxDBMap = use atx
@@ -85,6 +88,11 @@ instance (N.NibbleString `Alters` N.NibbleString) StorM where
   lookup _ = genericLookupHashDB $ use hdb
   insert _ = genericInsertHashDB $ use hdb
   delete _ = genericDeleteHashDB $ use hdb
+
+instance (RawStorageKey `Alters` RawStorageValue) StorM where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
 
 instance Mod.Modifiable MP.StateRoot StorM where
   get _ = use sdbsr
@@ -115,7 +123,7 @@ storageSpec = do
 
     it "gets its puts after a partial flush" . runStorM $ do
       putStorageKeyVal' 0x1 0x2 0x3
-      flushStorageTxDBToBlockDB
+      flushMemStorageTxDBToBlockDB
       use stx `shouldReturn` M.empty
       getStorageKeyVal' 0x1 0x2 `shouldReturn` 0x3
       putStorageKeyVal' 0x1 0x2 0x77777
@@ -169,8 +177,8 @@ storageSpec = do
 
   describe "RawStorageDB" $ do
     it "should get its puts" . runStorM $ do
-      putRawStorageKeyVal' 0x888 "aKey" "aValue"
-      getRawStorageKeyVal' 0x888 "aKey" `shouldReturn` "aValue"
+      putRawStorageKeyVal' (0x888, "aKey") "aValue"
+      getRawStorageKeyVal' (0x888, "aKey") `shouldReturn` "aValue"
 
   describe "SolidStorageDB" $ do
     it "should get its puts" . runStorM $ do

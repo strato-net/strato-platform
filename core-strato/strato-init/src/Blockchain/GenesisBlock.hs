@@ -15,7 +15,7 @@ module Blockchain.GenesisBlock (
 import           Control.Monad
 import           Blockchain.Output
 import           Control.Monad.Change.Alter                   (Alters)
-import           Control.Monad.Change.Modify                  (Accessible)
+import           Control.Monad.Change.Modify                  (Accessible, Outputs)
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
@@ -101,7 +101,9 @@ getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         , Mem.HasMemAddressStateDB m
                                         , HasStateDB m
                                         , HasStorageDB m
+                                        , HasMemStorageDB m
                                         , (Ad.Address `Alters` AddressState) m
+                                        , m `Outputs` String
                                         )
                                      => String
                                      -> [Ad.Address]
@@ -127,8 +129,10 @@ initializeGenesisBlock :: ( HasCodeDB m
                           , HasSQLDB m
                           , HasStateDB m
                           , HasStorageDB m
+                          , HasMemStorageDB m
                           , MonadLogger m
                           , (Ad.Address `Alters` AddressState) m
+                          , m `Outputs` String
                           )
                        => BackupType
                        -> String

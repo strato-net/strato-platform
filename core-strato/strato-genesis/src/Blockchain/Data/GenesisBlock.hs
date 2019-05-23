@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE MonoLocalBinds    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
@@ -61,11 +62,13 @@ putStorageTrie :: ( HasHashDB m
                   , Mem.HasMemAddressStateDB m
                   , HasStateDB m
                   , HasStorageDB m
+                  , HasMemStorageDB m
                   , (Ad.Address `A.Alters` AddressState) m
+                  , m `Outputs` String
                   ) =>
                   Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
 putStorageTrie address slots = do
-    mapM_ (\(k, v) -> putStorageKeyVal' address k v) slots
+    mapM_ (uncurry $ putStorageKeyVal' address) slots
     flushMemStorageDB
     Mem.flushMemAddressStateDB
 
@@ -73,7 +76,9 @@ putAccount :: ( HasHashDB m
               , Mem.HasMemAddressStateDB m
               , HasStateDB m
               , HasStorageDB m
+              , HasMemStorageDB m
               , (Ad.Address `A.Alters` AddressState) m
+              , m `Outputs` String
               )
            => AccountInfo
            -> m ()
@@ -94,7 +99,9 @@ initializeStateDB :: ( HasHashDB m
                      , Mem.HasMemAddressStateDB m
                      , HasStateDB m
                      , HasStorageDB m
+                     , HasMemStorageDB m
                      , (Ad.Address `A.Alters` AddressState) m
+                     , m `Outputs` String
                      )
                   => [AccountInfo]
                   -> m ()
@@ -106,9 +113,12 @@ initializeStateDB addressInfo = do
 initializeStateDBAndAccountInfos :: ( HasHashDB m
                                     , Mem.HasMemAddressStateDB m
                                     , HasStorageDB m
+                                    , HasMemStorageDB m
                                     , Modifiable StateRoot m
                                     , (Ad.Address `A.Alters` AddressState) m
                                     , (StateRoot `A.Alters` NodeData) m
+                                    , m `Outputs` String
+                                    , MonadIO m
                                     )
                                  => [AccountInfo]
                                  -> String
@@ -118,14 +128,11 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
 
     let accountInfoFilename = genesisBlockName ++ "AccountInfo"
 
-    liftIO $ putStrLn $ "Attempting to read account info from file: " ++ accountInfoFilename
+    output $ "Attempting to read account info from file: " ++ accountInfoFilename
 
-    accountInfoString <-
+    accountInfoBatches <- fmap (chunksOf 10000 . BLC.lines) $
       liftIO $
       fmap (either (const ""::SomeException->BLC.ByteString) id) $ try $ BLC.readFile accountInfoFilename
-    let accountinfo = BLC.lines accountInfoString
-
-    let accountInfoBatches = chunksOf 10000 accountinfo
 
     forM_ (zip [(1::Integer)..] accountInfoBatches) $ \(batchCount, batch) -> do
       forM_ batch $ \theLine -> do
@@ -136,20 +143,20 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
            putStorageKeyVal' address (parseHex k) (parseHex v)
          ["a", a, b]  -> do
            let address = Ad.Address $ parseHex a
-           liftIO $ putStrLn $ "adding account: " ++ format address
+           output $ "adding account: " ++ format address
            A.insert A.Proxy address blankAddressState{addressStateBalance= read b}
          ["a", a, b, c]  -> do
            let address = Ad.Address $ parseHex a
-           liftIO $ putStrLn $ "adding account: " ++ format address
+           output $ "adding account: " ++ format address
            A.insert A.Proxy address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ SHA $ parseHex c}
          _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
 
-      liftIO $ putStrLn $ "flushing batch: " ++ show batchCount
+      output $ "flushing batch: " ++ show batchCount
       flushMemStorageDB
       Mem.flushMemAddressStateDB
 
     forM_ addressInfo $ \account -> do
-      liftIO $ print account
+      output $ show account
       putAccount account
     Mem.flushMemAddressStateDB
 
@@ -168,7 +175,9 @@ chainInfoToGenesisState :: ( HasCodeDB m
                            , Mem.HasMemAddressStateDB m
                            , HasStateDB m
                            , HasStorageDB m
+                           , HasMemStorageDB m
                            , (Ad.Address `A.Alters` AddressState) m
+                           , m `Outputs` String
                            )
                           => ChainInfo
                           -> m StateRoot
@@ -192,7 +201,10 @@ genesisInfoToGenesisBlock :: ( HasCodeDB m
                              , Mem.HasMemAddressStateDB m
                              , HasStateDB m
                              , HasStorageDB m
+                             , HasMemStorageDB m
                              , (Ad.Address `A.Alters` AddressState) m
+                             , m `Outputs` String
+                             , MonadIO m
                              )
                           => GenesisInfo
                           -> String

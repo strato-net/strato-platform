@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MonoLocalBinds        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeOperators         #-}
@@ -11,7 +10,6 @@ module FastMP where
 import Control.Monad (when)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify (Outputs(..))
-import Control.Monad.IO.Class
 import Control.Monad.Loops
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as BC
@@ -35,9 +33,6 @@ import ReverseOrderedKVs
 
 debug :: Bool
 debug = False
-
-instance MonadIO m => m `Outputs` String where
-  output = liftIO . putStrLn
 
 createMPFast :: LDB.DB -> ReverseOrderedKVs -> IO MP.StateRoot
 createMPFast db rOrderedKVs = do
