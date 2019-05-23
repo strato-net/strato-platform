@@ -23,6 +23,7 @@ dependencies:
   - bytestring
   - containers
   - cross-monitoring
+  - data-default
   - deepseq
   - directory
   - ethereum-rlp
@@ -34,6 +35,7 @@ dependencies:
   - lens
   - leveldb-haskell
   - merkle-patricia-db
+  - monad-alter
   - mtl
   - ordered-containers
   - persistent-postgresql
@@ -46,6 +48,7 @@ dependencies:
   - strato-model
   - strato-redis-blockdb
   - seqevents
+  - split
   - text
   - temporary
   - time

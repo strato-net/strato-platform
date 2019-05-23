@@ -183,8 +183,7 @@ createInsertHistoryTable g cs = do
     insertHistoryTable g cs
 
 createInsertFunctionHistoryTable
-  :: OutputM m
-  => IORef Globals
+  :: IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
 createInsertFunctionHistoryTable _ cs = do

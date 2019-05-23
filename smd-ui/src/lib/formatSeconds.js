@@ -1,6 +1,6 @@
 export function sec2Date(sec){
     if (sec == 0){
-        return "Unhealthy";
+        return " ";
     }
     let seconds = sec;
     const days = Math.floor(seconds / (3600*24));

@@ -40,12 +40,12 @@ accountInfo params = do
               E.from $ \(accStateRef) -> do
 
               let criteria = P.map (getAccFilter (accStateRef)) $ params
-              let matchChainId cid = (accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val $ fromHexText cid)
+              let matchChainId cid = (accStateRef E.^. AddressStateRefChainId) E.==. (E.val $ fromHexText cid)
               let chainCriteria = case chainIds of
-                    [] -> [(E.isNothing $ accStateRef E.^. AddressStateRefChainId)]
+                    [] -> [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
                     [cid] -> do
                         if (T.unpack cid == "main")
-                            then [(E.isNothing $ accStateRef E.^. AddressStateRefChainId)]
+                            then [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
                             else if (T.unpack cid == "all")
                                      then []
                                      else [matchChainId cid]

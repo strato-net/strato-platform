@@ -44,3 +44,25 @@ authResults = unsafeRegister
 recordAuthResult :: MonadIO m => AuthResult -> m ()
 recordAuthResult AuthSuccess = liftIO $ withLabel authResults "success" incCounter
 recordAuthResult AuthFailure{} = liftIO $ withLabel authResults "failure" incCounter
+
+{- NOINLINE proposalCount #-}
+proposalCount :: Counter
+proposalCount = unsafeRegister
+              .  counter
+              $ Info "pbft_proposal_count" "Number of blocks I proposed that were accepted by peers"
+
+recordProposal :: MonadIO m => m ()
+recordProposal = liftIO $ incCounter proposalCount
+
+{-# NOINLINE historicBlocks #-}
+historicBlocks :: Vector Text Counter
+historicBlocks = unsafeRegister
+               . vector "result"
+               . counter
+               $ Info "pbft_historic_blocks" "Results of replaying historic blocks"
+
+acceptHistoric :: MonadIO m => m ()
+acceptHistoric = liftIO $ withLabel historicBlocks "accept" incCounter
+
+rejectHistoric :: MonadIO m => m ()
+rejectHistoric = liftIO $ withLabel historicBlocks "reject" incCounter

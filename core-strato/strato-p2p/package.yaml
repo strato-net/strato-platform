@@ -47,6 +47,7 @@ dependencies:
   - json-rpc-client
   - lens
   - lifted-base
+  - monad-alter
   - monad-control
   - monadIO
   - blockapps-milena
@@ -57,6 +58,7 @@ dependencies:
   - random
   - resourcet
   - SafeSemaphore
+  - split
   - stm
   - stm-conduit
   - streaming-commons

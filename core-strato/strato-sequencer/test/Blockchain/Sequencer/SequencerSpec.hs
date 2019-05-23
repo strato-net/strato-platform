@@ -243,7 +243,7 @@ spec = do
         out <- drainTimeouts
         filter (==20) out `shouldBe` [20]
         filter (==30) out `shouldBe` [30]
-        filter (==45) out `shouldContain` [45, 45, 45]
+        filter (==45) out `shouldContain` [45, 45]
 
       it "checks for votes" $ runPBFTTestM $ do
         bc <- getBlockstanbulContext

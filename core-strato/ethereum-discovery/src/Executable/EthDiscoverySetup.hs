@@ -5,17 +5,15 @@ module Executable.EthDiscoverySetup (
   ) where
 
 import           Control.Monad
-import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
-import           Control.Monad.Trans.Control
 import qualified Data.Text                             as T
 import           Database.Persist.Postgresql
 
 import           Blockchain.EthConf
 import           Blockchain.Strato.Discovery.Data.Peer
 
-setup :: (MonadLogger m, MonadBaseControl IO m, MonadIO m, MonadUnliftIO m) => Maybe [String] -> m ()
+setup :: (MonadLogger m, MonadUnliftIO m) => Maybe [String] -> m ()
 setup maybeStratoNodes = do
   withPostgresqlConn connStr $ runSqlConn $ do
     runMigration migrateAll

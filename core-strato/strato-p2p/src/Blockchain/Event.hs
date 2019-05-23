@@ -1,3 +1,4 @@
+
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -14,6 +15,7 @@ module Blockchain.Event (
 
 import           Control.Arrow                         ((&&&))
 import           Control.Monad
+import           Control.Monad.Change.Modify           hiding (get, put)
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.State
@@ -30,6 +32,7 @@ import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           MonadUtils
+import qualified Network.Kafka                         as K
 import           System.Random
 import           Text.Printf
 import           UnliftIO.Exception
@@ -39,6 +42,7 @@ import           Blockchain.Context
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Control               (P2PCNC(..))
 import           Blockchain.Data.Enode
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
@@ -61,6 +65,7 @@ import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
+import           Blockapps.Crossmon                    (recordMaxBlockNumber)
 import           Blockchain.Metrics
 
 import           Text.Format
@@ -70,8 +75,6 @@ import           Debug.Trace                           (trace)
 
 setTitleAndProduceBlocks :: ( MonadLogger m
                             , MonadIO m
-                            , RBDB.HasRedisBlockDB m
-                            , MonadState Context m
                             , HasVMEventsSink m
                             ) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
@@ -102,22 +105,29 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
         p2s (Just p) = BS8.unpack . BC16.encode $ pointToBytes p
         p2s _        = ""
 
+yieldR :: Monad m => a -> ConduitT i (Either e a) m ()
+yieldR = yield . Right
+
+yieldL :: Monad m => e -> ConduitT i (Either e a) m ()
+yieldL = yield . Left
+
 handleEvents :: ( MonadIO m
                 , MonadResource m
-                , RBDB.HasRedisBlockDB m
+                , Accessible RBDB.RedisConnection m
                 , SK.HasUnseqSink m
                 , MonadState Context m
                 , MonadLogger m
-                ) => PPeer -> ConduitM Event Message m ()
+                , Modifiable K.KafkaState m
+                ) => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
-    MsgEvt Ping     -> yield Pong
+    MsgEvt Ping     -> yieldR Pong
 
     MsgEvt (Transactions txs) -> do
         stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
-        SK.emitKafkaTransactions txo txs
+        lift $ SK.emitKafkaTransactions txo txs
 
     MsgEvt (NewBlock block' tdiff) -> do
         stampActionTimestamp
@@ -142,7 +152,7 @@ handleEvents peer = awaitForever $ \case
                     syncFetch Forward fetchNumber
                 Just _  -> do
                     lift . void $ setTitleAndProduceBlocks [block']
-                    void $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
+                    void . lift $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
         stampActionTimestamp
@@ -157,24 +167,35 @@ handleEvents peer = awaitForever $ \case
       start' <- case dir of
         Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
         Forward -> return start
-      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
+      mrh <- gets maxReturnedHeaders
+      -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
+      -- 3/4s of the blocks will be dropped when creating the blockheaders
+      -- so we overcompensate here.
+      let count = (1 + skip') * max mrh max'
+      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' count
       when (null chain) $
-        $logInfoS "handleEvents/GetBlockHeaders" $ T.pack $ "Warning: A peer requested blocks starting at #" ++ show start ++ ", but we don't have these in our canonical chain.... I don't know what to do, so I am returning a blank response. This may indicate something unhealthy in the network."
-
-      yield . BlockHeaders . skipEntries skip' $ snd <$> chain
+        $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $
+            ["Warning: A peer requested blocks starting at #"
+            , T.pack $ show start
+            , ", but we don't have these in our canonical chain...."
+            , " I don't know what to do, so I am returning a blank response."
+            , " This may indicate something unhealthy in the network."]
+      yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
       stampActionTimestamp
       maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
       case maybeHeader of
-        Nothing    -> yield (BlockBodies [])
+        Nothing    -> yieldR (BlockBodies [])
         Just head' -> do
           let num = blockHeaderBlockNumber head'
           start' <- case dir of
             Reverse -> return $ if num > fromIntegral max' then num - (fromIntegral max') else 1
             Forward -> return num
-          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
-          yield . BlockHeaders . skipEntries skip' $ snd <$> chain
+          mrh <- gets maxReturnedHeaders
+          let count = (1 + skip') * min mrh (fromIntegral num)
+          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' count
+          yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
         stampActionTimestamp
@@ -201,7 +222,7 @@ handleEvents peer = awaitForever $ \case
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
             let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
-
+            let (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
             --     neededHashes = map headerHash neededHeaders
@@ -212,9 +233,10 @@ handleEvents peer = awaitForever $ \case
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
             --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
 
-            lift $ putBlockHeaders neededHeaders
-            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
-            yield . GetBlockBodies $ headerHash <$> neededHeaders
+            lift $ putBlockHeaders neededHeaders'
+            lift $ putRemainingBHeaders remainingHeaders
+            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
+            yieldR . GetBlockBodies $ headerHash <$> neededHeaders'
             stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
@@ -229,14 +251,16 @@ handleEvents peer = awaitForever $ \case
     -- todo: someone else or us at a later time
     MsgEvt (GetBlockBodies [])   -> do
       stampActionTimestamp
-      yield (BlockBodies []) -- todo parity bans peers when they do this. should we?
-    MsgEvt (GetBlockBodies shas) -> do
+      yieldR (BlockBodies []) -- todo parity bans peers when they do this. should we?
+    MsgEvt (GetBlockBodies shas') -> do
       stampActionTimestamp
+      mrh <- gets maxReturnedHeaders
+      let shas = take mrh shas'
       getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
-          yield . BlockBodies . Prelude.reverse $ map toBody bodies
+          yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
           ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
-          unless (null ptxs) . yield $ Transactions ptxs)
-        where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m)
+          unless (null ptxs) . yieldR $ Transactions ptxs)
+        where getUntilMissing :: (Accessible RBDB.RedisConnection m, MonadIO m)
                               => [SHA] -> [Block] -> [SHA] -> m ([Block],[SHA])
               getUntilMissing []     bodies pshas = return (bodies, pshas)
               getUntilMissing (h:hs) bodies pshas = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
@@ -262,30 +286,33 @@ handleEvents peer = awaitForever $ \case
         let verified = and $ zipWith (\h b -> transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
         unless verified $ error "headers don't match bodies"
         $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
+        recordMaxBlockNumber "p2p_block_bodies" . maximum $ map number headers
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
-        forM_ blocks' $ lift . SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
-        let remainingHeaders = drop (length bodies) headers
-        lift $ putBlockHeaders remainingHeaders
-        if null remainingHeaders
+        lift . forM_ blocks' $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
+        rHeaders <- lift getRemainingBHeaders
+        let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
+        lift $ putBlockHeaders neededHeaders
+        lift $ putRemainingBHeaders remainingHeaders
+        if null neededHeaders
             then when (newCount > 0) $ do
                 mrh <- gets maxReturnedHeaders
-                yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
+                yieldR $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
                 stampActionTimestamp
             else do
-                yield $ GetBlockBodies (map headerHash remainingHeaders)
+                yieldR $ GetBlockBodies (map headerHash neededHeaders)
                 stampActionTimestamp
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
       setPeerAddrIfUnset $ blockstanbulSender wm
-      SK.emitBlockstanbulMsg wm
+      lift $ SK.emitBlockstanbulMsg wm
 
     -- private chains
     MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer cids'
 
     MsgEvt (ChainDetails chpairs) -> do
       stampActionTimestamp
-      mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
+      lift $ mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
     MsgEvt (GetTransactions trHashes) -> do
@@ -295,7 +322,7 @@ handleEvents peer = awaitForever $ \case
       ptrs <- fmap catMaybes . lift . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions trHashes
       mems <- lift . RBDB.withRedisBlockDB $ mapM (RBDB.getChainMembers . fromJust . txChainId) ptrs
       let trMems = zip ptrs mems
-      yield . Transactions . map fst $ filter ((checkPeerIsMember peer) . snd) trMems
+      yieldR . Transactions . map fst $ filter ((checkPeerIsMember peer) . snd) trMems
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
@@ -311,7 +338,7 @@ handleEvents peer = awaitForever $ \case
               $logInfoS "NewSeqEvent.block" . T.pack $ "World TDiff: " ++ show worldTDiff
               when (obTotalDifficulty b >= worldTDiff) $ do
                 $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
-                yield $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
+                yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
       OETx _ tx -> do
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
           let cId = txChainId tx
@@ -328,7 +355,7 @@ handleEvents peer = awaitForever $ \case
             else do
               $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ show cId
               $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
-              yield $ Transactions [otBaseTx tx]
+              yieldR $ Transactions [otBaseTx tx]
       OEGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
         when (shouldSend peer og) $ do
           $logInfoS "NewSeqEvent.genesis" . T.pack $ "yielding new chain: " ++ show cId ++ " with " ++ show uci
@@ -339,11 +366,11 @@ handleEvents peer = awaitForever $ \case
           if match
             then do
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (show cId)
-              yield $ ChainDetails [(cId, cInfo)]
+              yieldR $ ChainDetails [(cId, cInfo)]
             else do
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cId)
-      OEGetChain chainIds -> yield $ GetChainDetails chainIds
-      OEGetTx shas -> yield $ GetTransactions shas
+      OEGetChain chainIds -> yieldR $ GetChainDetails chainIds
+      OEGetTx shas -> yieldR $ GetTransactions shas
       OENewChainMember cId _ _ -> do
         let formatted = format $ SHA cId
         $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "New member added to chain " ++ formatted
@@ -351,28 +378,28 @@ handleEvents peer = awaitForever $ \case
         when (checkPeerIsMember peer mems) $ do
           $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
           mcInfo <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
-          for_ ((cId,) <$> mcInfo) $ yield . ChainDetails . (:[])
+          for_ ((cId,) <$> mcInfo) $ yieldR . ChainDetails . (:[])
       OEBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
-        yield outbound
-      OEAskForBlocks start end p -> do
+        yieldR outbound
+      OEAskForBlocks start _ p -> do
         ss <- shouldSendToPeer p
         when ss $ do
-          let outbound = GetBlockHeaders (BlockNumber start) (fromIntegral $ end - start + 1) 0 Forward
-          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "Outgoing message: " ++ show outbound
-          yield outbound
+          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "syncFetch: " ++ show start
+          syncFetch Forward start
       OEPushBlocks start end p -> do
         ss <- shouldSendToPeer p
         when ss $ do
-          chain <- RBDB.withRedisBlockDB $
-            RBDB.getCanonicalHeaderChain start (fromIntegral $ end - start + 1)
+          mrh <- gets maxReturnedHeaders
+          let count = min mrh . fromIntegral $ end - start + 1
+          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start count
           when (null chain) $
             $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
               "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
           let outbound = BlockHeaders . map snd $ chain
           $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
-          yield outbound
+          yieldR outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
       OEVoteToMake{} -> $logErrorS "handleEvents/OEVoteToMake" "absurd"
@@ -386,28 +413,28 @@ handleEvents peer = awaitForever $ \case
                 maxTime <- gets (fromIntegral . connectionTimeout)
                 liftIO $ setTitle $ "timer: " ++ show (maxTime - diffTime)
                 when (diffTime > maxTime) $ do
-                    yield $ Disconnect UselessPeer
+                    yieldR $ Disconnect UselessPeer
                     liftIO $ setTitle "timer timed out!"
                     error "Peer did not respond"
             Nothing -> do
               $logInfoS "TimerEvt" $ T.pack "Timestamp is not set"
               return ()
+        yieldL TXQueueTimeout
 
     AbortEvt reason -> do
       $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
-      yield $ Disconnect AlreadyConnected
+      yieldR $ Disconnect AlreadyConnected
     event -> liftIO . error $ "unrecognized event: " ++ show event
 
 handleGetChainDetails :: ( MonadIO m
                          , MonadResource m
-                         , RBDB.HasRedisBlockDB m
-                         , SK.HasUnseqSink m
+                         , Accessible RBDB.RedisConnection m
                          , MonadState Context m
                          , MonadLogger m
                          )
                       => PPeer
                       -> [Word256]
-                      -> ConduitM Event Message m ()
+                      -> ConduitM Event (Either P2PCNC Message) m ()
 handleGetChainDetails peer cids' = do
   cids <- case cids' of
             [] -> RBDB.withRedisBlockDB $ RBDB.getIPChains (peerIPAddress peer)
@@ -421,7 +448,7 @@ handleGetChainDetails peer cids' = do
   unless (null filteredPairs) $ do
     cInfos <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo cids
     let finalPairs = map (fmap fromJust) . filter (isJust . snd) $ zip cids cInfos
-    yield $ ChainDetails finalPairs
+    yieldR $ ChainDetails finalPairs
     stampActionTimestamp
     $logInfoS "handleGetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
       (intercalate "\n" $ show <$> finalPairs)
@@ -433,13 +460,13 @@ numFromRedis = \case
 
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
-syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m)
-          => Direction -> Integer -> ConduitM Event Message m ()
+syncFetch :: (MonadIO m, MonadState Context m)
+          => Direction -> Integer -> ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
         mrh <- gets maxReturnedHeaders
-        yield $ GetBlockHeaders (BlockNumber num) mrh 0 d
+        yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
         stampActionTimestamp
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
@@ -473,3 +500,23 @@ checkPeerIsMember peer mems =
 
 peerIPAddress :: PPeer -> IPAddress
 peerIPAddress = readIP . T.unpack . pPeerIp
+
+{- to reduce redundant computations on dividing block chunks under txsLimit
+splitNeededHeaders :: [BlockHeader] -> [[BlockHeader]]
+splitNeededHeaders x =
+  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+      txsLensInLimit =  scanl (\x y -> if ((x+y)>flags_maxHeadersTxsLens) then y else x+y) 0 txsLens
+      indexToSplit :: Int -> [Int] -> [Int] -> [Int] -> [Int]
+      indexToSplit index li (x:xs) (y:ys) =  indexToSplit (index++) li' xs ys
+        where li = case (x==y) of
+          True -> li:index
+          False -> li
+      indexToSplit _ li [] [] = li
+  in splitAt -}
+
+splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
+splitNeededHeaders neededHeaders =
+  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+      txsLensInSums =  scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
+      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
+  in splitAt (length txsLensInLimit) neededHeaders

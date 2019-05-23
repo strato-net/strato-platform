@@ -116,6 +116,7 @@ services:
     - redis
     environment:
     - addBootnodes=${addBootnodes}
+    - averageTxsPerBlock=${averageTxsPerBlock}
     - backupblocks=${backupblocks}
     - blockstanbul=${blockstanbul}
     - blockstanbulAdmins=${blockstanbulAdmins}
@@ -151,9 +152,14 @@ services:
     - redisHost=redis
     - redisPort=6379
     - seqDebugMode=${seqDebugMode}
+    - seqEventsBatchSize=${seqEventsBatchSize}
+    - seqEventsCostHeuristic=${seqEventsCostHeuristic}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
+    - svmTrace=${svmTrace}
+    - sqlDiff=${sqlDiff}
+    - svmDev=${svmDev}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
@@ -239,6 +245,7 @@ services:
       KAFKA_LOG_CLEANER_ENABLE: "false"
       KAFKA_LOG_RETENTION_HOURS: 2147483647
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
+      KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
       KAFKA_MAX_REQUEST_SIZE: 33554432
       KAFKA_MESSAGE_MAX_BYTES: 33554432
     image: wurstmeister/kafka:1.1.0
@@ -247,6 +254,8 @@ services:
     - /var/run/docker.sock:/var/run/docker.sock
   prometheus:
     build: .
+    environment:
+      - NODE_HOST=${NODE_HOST}
     image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
     volumes:
     - prometheusdata:/prometheus

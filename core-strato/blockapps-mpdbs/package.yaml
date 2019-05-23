@@ -25,6 +25,7 @@ dependencies:
   - format
   - leveldb-haskell
   - merkle-patricia-db
+  - monad-alter
   - monad-loops
   - mtl
   - nibblestring

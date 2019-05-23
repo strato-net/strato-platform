@@ -11,6 +11,7 @@ module Blockchain.Data.AddressStateDB (
 ) where
 
 
+import           Data.Default
 import           Data.Maybe                         (maybeToList)
 
 import           Control.DeepSeq
@@ -40,6 +41,8 @@ instance NFData AddressState
 blankAddressState:: AddressState
 blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=EVMCode $ hash "" , addressStateChainId = Nothing}
 
+instance Default AddressState where
+  def = blankAddressState
 
 instance Format AddressState where
   format a =

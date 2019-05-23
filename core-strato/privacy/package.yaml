@@ -6,11 +6,14 @@ dependencies:
   - blockapps-data
   - blockapps-util
   - containers
+  - data-default
   - format
   - lens
+  - monad-alter
   - prometheus-client
   - QuickCheck
   - resourcet
+  - seqevents
   - strato-model
   - text
   - transformers

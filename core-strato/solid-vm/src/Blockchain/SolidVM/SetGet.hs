@@ -1,21 +1,30 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
-module Blockchain.SolidVM.SetGet where
+
+module Blockchain.SolidVM.SetGet (
+  setVar,
+
+  getVar,
+  getInt,
+  getBool,
+  getContract,
+  getAddress,
+  getString,
+
+  deleteVar,
+
+  showSM
+  ) where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Data.Bits ((.&.))
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.HashMap.Strict as HM
 import           Data.IORef
 import           Data.List
 import qualified Data.Map as M
-import           Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import           Data.Word (Word8, Word32)
 import           Text.Printf
 
 import           Blockchain.Data.Address
@@ -24,10 +33,7 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import qualified SolidVM.Model.Storable as MS
-import qualified SolidVM.Solidity.Xabi as Xabi
-import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
-import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 import           Text.Format
 
 {-# INLINE putSolid #-}

@@ -937,7 +937,6 @@ getContractXabiByMetadataId cmId = do
   deserializeXabi xabi'
   where ninth (_,_,_,_,_,_,_,_,x) = x
 
-getContractXabi :: HasCallStack =>
-                   ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Xabi)
+getContractXabi :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Xabi)
 getContractXabi contractName contractId =
   fmap (fmap contractdetailsXabi) . getContractDetails contractName contractId

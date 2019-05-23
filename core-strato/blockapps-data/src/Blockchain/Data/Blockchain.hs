@@ -21,10 +21,8 @@ import           Database.Persist
 import           Database.Persist.Postgresql hiding (get)
 import           Database.Persist.TH
 
-import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output           (runNoLoggingT, LoggingT)
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
 
 import           Blockchain.DB.SQLDB         (runPostgresConn)
@@ -48,9 +46,9 @@ createDB pgConn = do
     let create = "CREATE DATABASE blockchain;"
     runNoLoggingT $ withPostgresqlConn pgConn (runReaderT (rawExecute create []) :: SqlWriteBackend -> LoggingT IO ())
 
-migrateDB :: (MonadBaseControl IO m, MonadIO m, MonadUnliftIO m) => ConnectionString -> m ()
+migrateDB :: MonadUnliftIO m => ConnectionString -> m ()
 migrateDB pgConn = runNoLoggingT . runPostgresConn pgConn $ runMigration migrateAll
 
-insertBlockchain :: (MonadBaseControl IO m, MonadIO m, MonadUnliftIO m) => ConnectionString -> String -> String -> m (Key Blockchain)
+insertBlockchain :: MonadUnliftIO m => ConnectionString -> String -> String -> m (Key Blockchain)
 insertBlockchain pgConn path uuid = runNoLoggingT . runPostgresConn pgConn $
     insert Blockchain { blockchainPath = path, blockchainUuid = uuid }

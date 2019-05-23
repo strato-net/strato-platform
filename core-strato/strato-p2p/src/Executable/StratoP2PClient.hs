@@ -49,7 +49,7 @@ import           Blockchain.TimerSource
 import qualified Text.Colors                           as C
 import           Text.Format
 
-runPeer :: (MonadIO m, MonadLogger m, MonadThrow m, MonadUnliftIO m)
+runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
         => PPeer
         -> PrivateNumber
         -> BC.ByteString -- otherServiceCommHost
@@ -89,7 +89,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
           Right () -> $logDebugS "runPeer" "Peer ran successfully!"
           Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
 
-getPubKeyRunPeer :: (MonadIO m, MonadLogger m, MonadThrow m, MonadUnliftIO m)
+getPubKeyRunPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
                  => PPeer
                  -> BC.ByteString
                  -> CommPort
@@ -109,7 +109,7 @@ getPubKeyRunPeer peer otherServiceCommHost otherServiceCommPort = do
     Just _ -> runPeer peer myPriv otherServiceCommHost otherServiceCommPort
 
 
-runPeerInList :: (MonadIO m, MonadLogger m, MonadThrow m, MonadUnliftIO m)
+runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
               => PPeer
               -> BC.ByteString
               -> CommPort

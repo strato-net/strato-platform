@@ -9,7 +9,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 module Blockchain.Sequencer.Gregor
   (
@@ -24,6 +26,7 @@ module Blockchain.Sequencer.Gregor
 import           Control.Concurrent.Async.Lifted (race_)
 import           Control.Concurrent.STM (orElse, flushTQueue)
 import           Control.Lens               hiding (op)
+import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.Text as T
@@ -77,9 +80,9 @@ runGregorM cfg = runLoggingT
                . runResourceT
                . flip evalStateT (convert cfg)
 
-instance K.HasKafkaState GregorM where
-  getKafkaState = use gregorKafkaState
-  putKafkaState = assign gregorKafkaState
+instance Mod.Modifiable K.KafkaState GregorM where
+  get _ = use gregorKafkaState
+  put _ = assign gregorKafkaState
 
 getKafkaConsumerGroup :: GregorM KP.ConsumerGroup
 getKafkaConsumerGroup = use gregorConsumerGroup

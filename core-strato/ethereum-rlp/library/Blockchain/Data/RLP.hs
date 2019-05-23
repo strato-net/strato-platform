@@ -262,7 +262,7 @@ instance (RLPSerializable a) => RLPSerializable (Maybe a) where
 
 
 -- generic instance for Data.Map
-instance (RLPSerializable k, RLPSerializable v, Ord k, Ord v)
+instance (RLPSerializable k, RLPSerializable v, Ord k)
   => RLPSerializable (M.Map k v) where
   rlpEncode mp = RLPArray $ map rlpEncode (M.toList mp)
   rlpDecode (RLPArray rp) = M.fromList (map rlpDecode rp)

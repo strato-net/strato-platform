@@ -105,5 +105,5 @@ main = do
       . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))
       . run flags_blockstanbul_port
       . prometheus def{ prometheusInstrumentApp = False }
-      . instrumentApp "blockstanbul-votes"
+      . instrumentApp "blockstanbul-admin"
       $ createWebServer chv chr

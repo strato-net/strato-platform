@@ -1,15 +1,21 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module StorageSpec (storageSpec) where
 
 import Control.DeepSeq
 import Control.Lens
 import Control.Monad
+import Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
@@ -18,7 +24,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Database.LevelDB as DB
 import qualified Database.LevelDB.Base as DBB
 import GHC.Generics
-import Prelude hiding (abs)
+import Prelude hiding (abs, lookup)
 import System.Posix.Temp
 import System.Directory
 import Test.Hspec (Spec, describe, it)
@@ -30,7 +36,6 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
-import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
 import Blockchain.Strato.Model.Address
@@ -66,9 +71,19 @@ instance HasMemAddressStateDB StorM where
   getAddressStateBlockDBMap = use abs
   putAddressStateBlockDBMap = assign abs
 
-instance HasStateDB StorM where
-  getStateDB = liftM2 MP.MPDB (use sdb) (use sdbsr)
-  setStateDBStateRoot = assign sdbsr
+instance (Address `Alters` AddressState) StorM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
+
+instance (MP.StateRoot `Alters` MP.NodeData) StorM where
+  lookup _ = MP.genericLookupDB $ use sdb
+  insert _ = MP.genericInsertDB $ use sdb
+  delete _ = MP.genericDeleteDB $ use sdb
+
+instance Mod.Modifiable MP.StateRoot StorM where
+  get _ = use sdbsr
+  put _ = assign sdbsr
 
 instance HasHashDB StorM where
   getHashDB = use hdb
@@ -81,8 +96,7 @@ initialEnv = do
   s <- openDB "/state/"
   h <- openDB "/hash/"
   let st = CS s MP.emptyTriePtr h M.empty M.empty M.empty M.empty
-  fmap (tmpdir,) . runResourceT . flip execStateT st $ do
-    MP.initializeBlank =<< getStateDB
+  fmap (tmpdir,) . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
 runStorM mv = bracket initialEnv
@@ -135,19 +149,19 @@ storageSpec = do
                             ]
 
     it "put 0 should not change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> getAddressState 0x1234
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (0x1234 :: Address)
       want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
       putStorageKeyVal' 0x1234 0x3 0x0
       flushMemStorageDB
-      got <- addressStateContractRoot <$> getAddressState 0x1234
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (0x1234 :: Address)
       want `shouldBe` got
 
 
     it "put 1 should change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> getAddressState 0x222
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (0x222 :: Address)
       putStorageKeyVal' 0x1234 0x3 0x44
       flushMemStorageDB
-      got <- addressStateContractRoot <$> getAddressState 0x1234
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (0x1234 :: Address)
       want `shouldNotBe` got
       got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
 

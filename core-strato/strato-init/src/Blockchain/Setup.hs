@@ -1,8 +1,11 @@
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.Setup (
   oneTimeSetup
@@ -10,6 +13,8 @@ module Blockchain.Setup (
 
 import           Control.Concurrent
 import           Control.Monad
+import qualified Control.Monad.Change.Alter         as A
+import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
@@ -36,6 +41,7 @@ import           System.FilePath
 
 import           Blockchain.APIFiles
 import           Blockchain.Constants
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
 import           Blockchain.GenesisBlock
@@ -83,11 +89,12 @@ defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets t
 
 data SetupDBs =
   SetupDBs {
-    stateDB :: IORef StateDB,
+    stateDB :: StateDB,
+    stateRoot :: IORef MP.StateRoot,
     hashDB  :: HashDB,
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
-    redisDB :: Redis.Connection,
+    redisDB :: RBDB.RedisConnection,
     localStorageTx :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
     localStorageBlock :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
     localAddressStateTx :: IORef (Map.Map Address AddressStateModification),
@@ -95,26 +102,30 @@ data SetupDBs =
     }
 
 type SetupDBM = ReaderT SetupDBs (LoggingT (ResourceT IO))
-instance HasStateDB SetupDBM where
-  getStateDB = (liftIO . readIORef) =<< asks stateDB
-  setStateDBStateRoot sr = do
-    dbref <- asks stateDB
-    liftIO $ atomicModifyIORef' dbref (\s -> (s{MP.stateRoot=sr}, ()))
+
+instance Mod.Modifiable MP.StateRoot SetupDBM where
+  get _    = liftIO . readIORef =<< asks stateRoot
+  put _ sr = do
+    srRef <- asks stateRoot
+    liftIO $ atomicWriteIORef srRef sr
+
+instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
+  lookup _ = MP.genericLookupDB $ asks stateDB
+  insert _ = MP.genericInsertDB $ asks stateDB
+  delete _ = MP.genericDeleteDB $ asks stateDB
 
 instance HasRawStorageDB SetupDBM where
   getRawStorageTxDB = do
-    cxt <- ask --storage and states use the same database!
-    db <- liftIO . readIORef . stateDB $ cxt
+    cxt <- ask
     lst <- liftIO . readIORef .localStorageTx $ cxt
-    return (MP.ldb db, lst)
+    return (stateDB cxt, lst)
   putRawStorageTxMap theMap = do
     lstref <- asks localStorageTx
     liftIO $ atomicWriteIORef lstref theMap
   getRawStorageBlockDB = do
     cxt <- ask
-    db <- liftIO . readIORef . stateDB $ cxt
     lsb <- liftIO . readIORef . localStorageBlock $ cxt
-    return (MP.ldb db, lsb)
+    return (stateDB cxt, lsb)
   putRawStorageBlockMap theMap = do
     lsbref <- asks localStorageBlock
     liftIO $ atomicWriteIORef lsbref theMap
@@ -129,6 +140,11 @@ instance HasMemAddressStateDB SetupDBM where
     lasbref <- asks localAddressStateBlock
     liftIO $ atomicWriteIORef lasbref theMap
 
+instance (Address `A.Alters` AddressState) SetupDBM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
+
 instance HasHashDB SetupDBM where
   getHashDB = asks hashDB
 
@@ -138,8 +154,8 @@ instance HasCodeDB SetupDBM where
 instance HasSQLDB SetupDBM where
   getSQLDB = asks sqlDB
 
-instance RBDB.HasRedisBlockDB SetupDBM where
-  getRedisBlockDB = asks redisDB
+instance Mod.Accessible RBDB.RedisConnection SetupDBM where
+  access _ = asks redisDB
 
 {-
 connStr :: ConnectionString
@@ -460,13 +476,13 @@ oneTimeSetup genesisBlockName = do
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
          [m1, m2] <- liftIO . replicateM 2 . newIORef $ Map.empty
          [m3, m4] <- liftIO . replicateM 2 . newIORef $ Map.empty
-         smpdb <- liftIO . newIORef $ MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateRoot not defined in oneTimeSetup"}
+         srRef <- liftIO . newIORef $ error "stateRoot not defined in oneTimeSetup"
 
          pool <- runNoLoggingT $ createPostgresqlPool connStr 20
 
-         redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+         redisBDBPool <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
-         void . runLoggingT $ flip runReaderT (SetupDBs smpdb hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
+         void . runLoggingT $ flip runReaderT (SetupDBs sdb srRef hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
            void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of

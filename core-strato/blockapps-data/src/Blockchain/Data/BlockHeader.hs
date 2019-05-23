@@ -3,13 +3,17 @@ module Blockchain.Data.BlockHeader (
   BlockHeader(..),
   headerHash,
   blockToBlockHeader,
-  blockToBody
+  blockToBody,
+  extraData2TxsLen,
+  txsLen2ExtraData
   ) where
 
+import           Control.Monad
 import qualified Data.ByteString                    as B
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import           Data.Word
+import           Data.Bits (shiftL, shiftR)
 import           Numeric
 
 import           Blockchain.Data.Address
@@ -151,3 +155,17 @@ blockToBody Block{blockReceiptTransactions=transactions, blockBlockUncles=uncles
 blockDataToBlockHeader::BlockData->BlockHeader
 blockDataToBlockHeader (BlockData ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
   BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
+
+txsLen2ExtraData :: Int -> B.ByteString
+txsLen2ExtraData len = B.singleton len1 <> B.singleton len2 <> B.replicate 30 0
+  where len1 = fromIntegral $ shiftR len 8
+        len2 = fromIntegral len
+
+extraData2TxsLen :: B.ByteString -> Maybe Int
+extraData2TxsLen ed = guard (B.length ed >= 32) >> result
+  where len1 = toInteger $ B.index ed 0
+        len2 = toInteger $ B.index ed 1
+        len = (shiftL len1 8) + len2
+        result = case len of
+          0 -> Nothing
+          x -> Just (fromInteger x :: Int)

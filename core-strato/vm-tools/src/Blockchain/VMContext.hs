@@ -3,9 +3,10 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE StandaloneDeriving    #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
@@ -28,12 +29,15 @@ module Blockchain.VMContext
     , queuePendingVote
     , peekPendingVote
     , clearPendingVote
+    , compactContextM
     ) where
 
-
+import           Control.Arrow                      ((&&&))
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch
+import qualified Control.Monad.Change.Alter         as A
+import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
@@ -42,6 +46,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
 import           Data.Foldable                      (toList)
+import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.Sequence                      as Q
@@ -84,12 +89,13 @@ import qualified Blockchain.Strato.Indexer.Kafka    as IK
 import qualified Blockchain.Strato.Indexer.Model    as IM
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 
-instance NFData Redis.Connection where
-  rnf c = c `seq` ()
+instance NFData RBDB.RedisConnection where
+  rnf (RBDB.RedisConnection c) = c `seq` ()
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show, Generic, NFData)
@@ -107,13 +113,13 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
                        , contextStorageTxMap           :: M.Map (Address, B.ByteString) B.ByteString
                        , contextStorageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
-                       , contextBlockHashRoot          :: MP.StateRoot
-                       , contextGenesisRoot            :: MP.StateRoot
-                       , contextBestBlockRoot          :: MP.StateRoot
+                       , contextBlockHashRoot          :: BlockHashRoot
+                       , contextGenesisRoot            :: GenesisRoot
+                       , contextBestBlockRoot          :: BestBlockRoot
                        , contextBaggerState            :: !BaggerState
                        , contextKafkaState             :: K.KafkaState
                        , contextBestBlockInfo          :: ContextBestBlockInfo
-                       , contextRedisPool              :: Redis.Connection
+                       , contextRedisPool              :: RBDB.RedisConnection
                        , contextTxResultQueue          :: Q.Seq TransactionResult
                        , contextLogDBQueue             :: [LogDB]
                        , contextHasBlockstanbul        :: Bool
@@ -132,12 +138,15 @@ instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
     ctx <- get
     let q = contextTxResultQueue ctx
+    recordTxrEnqueue $ length txrs
     put $ ctx { contextTxResultQueue = q Q.>< Q.fromList txrs }
 
   flushTransactionResults = do
     ctx <- get
-    let toWrite = contextTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toList toWrite)
+    let q = contextTxResultQueue ctx
+        toWrite = chunksOf 2000 $ map IM.TxResult $ toList q
+    recordTxrFlush $ Q.length q
+    mapM_ (K.withKafkaViolently . IK.writeIndexEvents) toWrite
     put $ ctx { contextTxResultQueue = Q.empty }
 
 instance HasMemLogDB ContextM where
@@ -153,66 +162,56 @@ instance HasMemLogDB ContextM where
     put $ ctx { contextLogDBQueue = [] }
 
 
-instance HasStateDB ContextM where
-  getStateDB = contextStateDB <$> get
-  setStateDBStateRoot sr = do
-    cxt <- get
-    put cxt{contextStateDB=(contextStateDB cxt){MP.stateRoot=sr}}
+instance Mod.Modifiable MP.StateRoot ContextM where
+  get _    = gets (MP.stateRoot . contextStateDB)
+  put _ sr = modify $ \c -> c{contextStateDB = (contextStateDB c){MP.stateRoot = sr}}
 
-instance HasChainDB ContextM where
-  getBlockHashRoot = contextBlockHashRoot <$> get
-  putBlockHashRoot sr = do
-    cxt <- get
-    put cxt{contextBlockHashRoot = sr}
-  getGenesisRoot = contextGenesisRoot <$> get
-  putGenesisRoot sr = do
-    cxt <- get
-    put cxt{contextGenesisRoot = sr}
-  getBestBlockRoot = contextBestBlockRoot <$> get
-  putBestBlockRoot sr = do
-    cxt <- get
-    put cxt{contextBestBlockRoot = sr}
+instance Mod.Modifiable BlockHashRoot ContextM where
+  get _     = gets contextBlockHashRoot
+  put _ bhr = modify $ \c -> c{contextBlockHashRoot = bhr}
 
-instance K.HasKafkaState ContextM where
-    getKafkaState = contextKafkaState <$> get
-    putKafkaState ks = do
-        ctx <- get
-        put $ ctx {contextKafkaState = ks}
+instance Mod.Modifiable GenesisRoot ContextM where
+  get _    = gets contextGenesisRoot
+  put _ gr = modify $ \c -> c{contextGenesisRoot = gr}
+
+instance Mod.Modifiable BestBlockRoot ContextM where
+  get _     = gets contextBestBlockRoot
+  put _ bbr = modify $ \c -> c{contextBestBlockRoot = bbr}
+
+instance Mod.Modifiable K.KafkaState ContextM where
+  get _    = gets contextKafkaState
+  put _ ks = modify $ \c -> c{contextKafkaState = ks}
 
 instance HasMemAddressStateDB ContextM where
-  getAddressStateTxDBMap = contextAddressStateTxDBMap <$> get
-  putAddressStateTxDBMap theMap = do
-    cxt <- get
-    put $ cxt{contextAddressStateTxDBMap=theMap}
-  getAddressStateBlockDBMap = contextAddressStateBlockDBMap <$> get
-  putAddressStateBlockDBMap theMap = do
-    cxt <- get
-    put $ cxt{contextAddressStateBlockDBMap=theMap}
+  getAddressStateTxDBMap = gets contextAddressStateTxDBMap
+  putAddressStateTxDBMap theMap = modify $ \c -> c{contextAddressStateTxDBMap=theMap}
+  getAddressStateBlockDBMap = gets contextAddressStateBlockDBMap
+  putAddressStateBlockDBMap theMap = modify $ \c -> c{contextAddressStateBlockDBMap=theMap}
+
+instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
+  lookup _ = MP.genericLookupDB $ gets (MP.ldb . contextStateDB)
+  insert _ = MP.genericInsertDB $ gets (MP.ldb . contextStateDB)
+  delete _ = MP.genericDeleteDB $ gets (MP.ldb . contextStateDB)
+
+instance (Address `A.Alters` AddressState) ContextM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
 instance HasRawStorageDB ContextM where
-  getRawStorageTxDB = do
-    cxt <- get
-    return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
-            contextStorageTxMap cxt)
-  putRawStorageTxMap theMap = do
-    cxt <- get
-    put cxt{contextStorageTxMap=theMap}
-  getRawStorageBlockDB = do
-    cxt <- get
-    return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
-            contextStorageBlockMap cxt)
-  putRawStorageBlockMap theMap = do
-    cxt <- get
-    put cxt{contextStorageBlockMap=theMap}
+  getRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
+  putRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
+  getRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
+  putRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
 
 instance HasHashDB ContextM where
-  getHashDB = contextHashDB <$> get
+  getHashDB = gets contextHashDB
 
 instance HasCodeDB ContextM where
-  getCodeDB = contextCodeDB <$> get
+  getCodeDB = gets contextCodeDB
 
 instance HasBlockSummaryDB ContextM where
-  getBlockSummaryDB = contextBlockSummaryDB <$> get
+  getBlockSummaryDB = gets contextBlockSummaryDB
 
 instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
   getSQLDB = asks configSQLDB
@@ -220,13 +219,13 @@ instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
 
-instance RBDB.HasRedisBlockDB ContextM where
-    getRedisBlockDB = contextRedisPool <$> get
+instance Mod.Accessible RBDB.RedisConnection ContextM where
+  access _ = gets contextRedisPool
 
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
-runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadMask m,
+runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadMask m,
                     HasStateDB (StateT Context (ReaderT Config (ResourceT m)))) =>
                    StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
@@ -260,22 +259,22 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      M.empty
                      M.empty
                      M.empty
-                     MP.emptyTriePtr
-                     MP.emptyTriePtr
-                     MP.emptyTriePtr
+                     (BlockHashRoot MP.emptyTriePtr)
+                     (GenesisRoot MP.emptyTriePtr)
+                     (BestBlockRoot MP.emptyTriePtr)
                      defaultBaggerState
                      initialKafkaState
                      Unspecified
-                     redisPool
+                     (RBDB.RedisConnection redisPool)
                      Q.empty []
                      False
                      False
                      Q.empty) $ do
-          MP.initializeBlank =<< getStateDB
+          MP.initializeBlank
           setStateDBStateRoot MP.emptyTriePtr
           f
 
-runContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) =>
+runContextM :: (MonadIO m, MonadUnliftIO m) =>
                 StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
@@ -294,7 +293,7 @@ runContextM f = do
           redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
           let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
           runStateT f (Context
-                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
                        hdb
                        cdb
                        blksumdb
@@ -302,13 +301,13 @@ runContextM f = do
                        M.empty
                        M.empty
                        M.empty
-                       MP.emptyTriePtr
-                       MP.emptyTriePtr
-                       MP.emptyTriePtr
+                       (BlockHashRoot MP.emptyTriePtr)
+                       (GenesisRoot MP.emptyTriePtr)
+                       (BestBlockRoot MP.emptyTriePtr)
                        defaultBaggerState
                        initialKafkaState
                        Unspecified
-                       redisPool
+                       (RBDB.RedisConnection redisPool)
                        Q.empty
                        []
                        flags_blockstanbul
@@ -316,28 +315,27 @@ runContextM f = do
                        Q.empty)
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
+evalContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadUnliftIO m, MonadThrow m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
+execContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
 execContextM f = snd <$> runContextM f
 
-incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()
-incrementNonce address = do
-  addressState <- getAddressState address
-  putAddressState address addressState{ addressStateNonce = addressStateNonce addressState + 1 }
+incrementNonce :: (Address `A.Alters` AddressState) f => Address -> f ()
+incrementNonce address = A.adjustWithDefault_ Mod.Proxy address $ \addressState ->
+  pure addressState{ addressStateNonce = addressStateNonce addressState + 1 }
 
-getNewAddress :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m Address
+getNewAddress :: (MonadIO m, (Address `A.Alters` AddressState) m) => Address -> m Address
 getNewAddress address = do
-  addressState <- getAddressState address
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show (addressStateNonce addressState)
-  let newAddress = getNewAddress_unsafe address (addressStateNonce addressState)
+  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy address
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show nonce
+  let newAddress = getNewAddress_unsafe address nonce
   incrementNonce address
   return newAddress
 
 purgeStorageMap :: HasStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  (_, storageMap) <- getRawStorageTxDB
+  storageMap <- snd <$> getRawStorageTxDB
   putRawStorageTxMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo
@@ -383,3 +381,6 @@ clearPendingVote b = do
         Just i -> Q.deleteAt i ctxCoinbaseQ
         Nothing -> ctxCoinbaseQ
   put ctx { contextCoinbaseQueue = newCoinbaseQ}
+
+compactContextM :: ContextM ()
+compactContextM = modify' force

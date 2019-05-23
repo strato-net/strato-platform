@@ -1,8 +1,10 @@
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.GenesisBlock (
   initializeGenesisBlock,
@@ -12,6 +14,8 @@ module Blockchain.GenesisBlock (
 
 import           Control.Monad
 import           Blockchain.Output
+import           Control.Monad.Change.Alter                   (Alters)
+import           Control.Monad.Change.Modify                  (Accessible)
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
@@ -25,7 +29,7 @@ import qualified Data.Text                                    as T
 import           System.Directory
 
 import           Blockchain.BackupBlocks
-import qualified Blockchain.Strato.Model.Action                       as A
+import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
@@ -91,8 +95,14 @@ readSupplementaryAccounts genesisBlockName = do
                                   _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
-getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
-                                         HasStateDB m, HasStorageDB m)
+getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
+                                        , HasCodeDB m
+                                        , HasHashDB m
+                                        , Mem.HasMemAddressStateDB m
+                                        , HasStateDB m
+                                        , HasStorageDB m
+                                        , (Ad.Address `Alters` AddressState) m
+                                        )
                                      => String
                                      -> [Ad.Address]
                                      -> m ([(AccountInfo, CodeInfo)], Block)
@@ -113,11 +123,12 @@ data BackupType = NoBackup | BlockBackup | MPBackup
 initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
                           , Mem.HasMemAddressStateDB m
-                          , RBDB.HasRedisBlockDB m
+                          , Accessible RBDB.RedisConnection m
                           , HasSQLDB m
                           , HasStateDB m
                           , HasStorageDB m
                           , MonadLogger m
+                          , (Ad.Address `Alters` AddressState) m
                           )
                        => BackupType
                        -> String

@@ -18,6 +18,7 @@ import Blockchain.Context
 import Blockchain.Data.ArbitraryInstances()
 import qualified Blockchain.Data.Blockchain as DataBlock
 import qualified Blockchain.Data.DataDefs as DataDefs
+import Blockchain.Data.Control
 import Blockchain.Data.Wire
 import Blockchain.Event
 import Blockchain.Output
@@ -49,9 +50,10 @@ testContext = do
   return ( ch
          , Config conn
          , Context { actionTimestamp = Nothing
-                   , contextRedisBlockDB = redisBDBPool
+                   , contextRedisBlockDB = RBDB.RedisConnection redisBDBPool
                    , contextKafkaState = error "no kafka state available"
                    , blockHeaders=[]
+                   , remainingBlockHeaders=[]
                    , unseqSink=atomically . writeTMChan ch
                    , vmEventsSink=const (return ())
                    , vmTrace=[]
@@ -97,11 +99,11 @@ spec = do
   describe "handleEvents" $ do
     it "should pong a ping" $
       runTestPeer . const $ do
-        runConduit $ yield (MsgEvt Ping) .| handleEvents testPeer .| sinkList `L.shouldReturn` [Pong]
+        runConduit $ yield (MsgEvt Ping) .| handleEvents testPeer .| sinkList `L.shouldReturn` [Right Pong]
     it "should return empty BlockBodies to empty BlockHeaders" $
       runTestPeer . const $ do
         runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents testPeer .| sinkList
-          `L.shouldReturn` [GetBlockBodies []]
+          `L.shouldReturn` [Right $ GetBlockBodies []]
     it "should forward blockstanbul messages" $ property $ \wm ->
       let addr = blockstanbulSender wm
       in addr /= 0 && addr /= 0xa ==> runTestPeer $ \ch -> do
@@ -123,6 +125,13 @@ spec = do
         runConduit $ yield (NewSeqEvent (OEBlockstanbul wm))
                       .| handleEvents testPeer
                       .| sinkList
-            `L.shouldReturn` [Blockstanbul wm]
+            `L.shouldReturn` [Right $ Blockstanbul wm]
         -- We should not mistake internal messages as the peers
         shouldSendToPeer 0xa `L.shouldReturn` True
+
+    it "should forward a timer to a TXQueue timeout" $ do
+      runTestPeer . const $ do
+        runConduit $ yield TimerEvt
+                      .| handleEvents testPeer
+                      .| sinkList
+            `L.shouldReturn` [Left TXQueueTimeout]
