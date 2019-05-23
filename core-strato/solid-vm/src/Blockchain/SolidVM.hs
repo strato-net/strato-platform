@@ -269,7 +269,6 @@ getCodeAndCollection address' = do
 logFunctionCall :: Xabi.ArgList -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
 logFunctionCall args address contract functionName f = do
   onTraced $ do
-    let argStrings = map (unparseExpression . snd) args
     let shownFunc = unparseExpression $ Xabi.FunctionCall (Xabi.Variable functionName) args
     liftIO $ putStrLn $ box $ concat $ map (wrap 150)
       ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ shownFunc]
