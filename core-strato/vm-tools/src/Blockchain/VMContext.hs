@@ -72,6 +72,7 @@ import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs           (LogDB, TransactionResult)
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
@@ -222,8 +223,10 @@ instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
 
-instance HasBlockSummaryDB ContextM where
-  getBlockSummaryDB = gets contextBlockSummaryDB
+instance (SHA `A.Alters` BlockSummary) ContextM where
+  lookup _ = genericLookupBlockSummaryDB $ gets contextBlockSummaryDB
+  insert _ = genericInsertBlockSummaryDB $ gets contextBlockSummaryDB
+  delete _ = genericDeleteBlockSummaryDB $ gets contextBlockSummaryDB
 
 instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
   getSQLDB = asks configSQLDB
@@ -267,7 +270,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "must set stateroot for test context"}
                      (HashDB hdb)
                      (CodeDB cdb)
-                     blksumdb
+                     (BlockSummaryDB blksumdb)
                      M.empty
                      M.empty
                      M.empty
@@ -311,7 +314,7 @@ runContextM f = do
                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
                        (HashDB hdb)
                        (CodeDB cdb)
-                       blksumdb
+                       (BlockSummaryDB blksumdb)
                        M.empty
                        M.empty
                        M.empty

@@ -58,6 +58,7 @@ import           MonadUtils
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -137,8 +138,10 @@ instance (SHA `A.Alters` DBCode) VMM where
   insert _ = genericInsertCodeDB $ lift $ gets $ contextCodeDB . dbs
   delete _ = genericDeleteCodeDB $ lift $ gets $ contextCodeDB . dbs
 
-instance HasBlockSummaryDB VMM where
-    getBlockSummaryDB = lift $ fmap (contextBlockSummaryDB . dbs) get
+instance (SHA `A.Alters` BlockSummary) VMM where
+  lookup _ = genericLookupBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
+  insert _ = genericInsertBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
+  delete _ = genericDeleteBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
 
 class Word256Storable a where
   fromWord256::Word256->a
