@@ -31,6 +31,7 @@ import           Data.Foldable                               (for_)
 import           Data.List
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as M
+import           Data.Maybe                                  (fromMaybe)
 import           Data.Traversable                            (for)
 import qualified Database.LevelDB                            as DB
 
@@ -78,8 +79,11 @@ getAllRawStorageKeyVals' = getAllRawStorageKeyValsMC
 putRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> RawStorageValue -> m ()
 putRawStorageKeyValMC = A.insert (A.Proxy @RawStorageValue)
 
+-- TODO: can't use lookupWithDefault or lookupWithMempty because RawStorageValues are already
+-- RLP serialized, and an empty bytestring is invalid RLP (rlpSplit bottoms out when given one).
+-- We'll need a newtype to make this distinction, but for now, just use fromMaybe
 getRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> m RawStorageValue
-getRawStorageKeyValMC = A.lookupWithMempty (A.Proxy @RawStorageValue)
+getRawStorageKeyValMC key = fromMaybe blankVal <$> A.lookup (A.Proxy @RawStorageValue) key
 
 genericLookupRawStorageDB :: ( HasMemRawStorageDB m
                              , (Address `A.Alters` AddressState) m
