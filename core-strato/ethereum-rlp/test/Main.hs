@@ -8,27 +8,8 @@ import Test.Hspec
 import Test.HUnit
 
 import qualified Data.ByteString as B
-import Data.Word
 
 import Blockchain.Data.RLP
-
-rlpSerialize_list::RLPObject->B.ByteString
-rlpSerialize_list = B.pack . rlp2Bytes
-
-rlp2Bytes::RLPObject->[Word8]
-rlp2Bytes (RLPScalar val) = [fromIntegral val]
-rlp2Bytes (RLPString s) | B.length s <= 55 = 0x80 + fromIntegral (B.length s):B.unpack s
-rlp2Bytes (RLPString s) =
-  [0xB7 + fromIntegral (length lengthAsBytes)] ++ lengthAsBytes ++ B.unpack s
-  where
-    lengthAsBytes = int2Bytes $ B.length s
-rlp2Bytes (RLPArray innerObjects) =
-  if length innerBytes <= 55
-  then 0xC0 + fromIntegral (length innerBytes):innerBytes
-  else let lenBytes = int2Bytes $ length innerBytes
-       in [0xF7 + fromIntegral (length lenBytes)] ++ lenBytes ++ innerBytes
-  where
-    innerBytes = concat $ rlp2Bytes <$> innerObjects
 
 testNumber::Assertion
 testNumber = do
@@ -37,7 +18,7 @@ testNumber = do
 
 testConsistent :: RLPObject -> Expectation
 testConsistent obj =
-  let oldEnc = rlpSerialize_list obj
+  let oldEnc = rlpSerialize_safe obj
       newEnc = rlpSerialize obj
   in newEnc `shouldBe` oldEnc
 
@@ -49,4 +30,6 @@ main =
   , testCase "test numbers" . mapM_ (testConsistent . RLPScalar) $ [0..255]
   , testCase "test strings" . mapM_ (testConsistent . RLPString . flip B.replicate 0xfa) $
         [0, 10, 55, 56, 1024, 1024 * 1024]
+  , testCase "test array of strings" . testConsistent $ RLPArray [RLPString "hello", RLPString "world", RLPString "!"]
+  , testCase "test array of a long string" . testConsistent $ RLPArray [RLPString $ B.replicate 55 0xcc]
   ] mempty

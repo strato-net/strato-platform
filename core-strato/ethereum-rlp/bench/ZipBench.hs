@@ -15,7 +15,8 @@ main = do
   let rlps = map (rlpDeserialize . fst . B16.decode)
            . filter (not . C8.null)
            $ C8.split '\n' input
-  defaultMain [ bench "bytestring based rlp" $ nf (map rlpSerialize) rlps
-              , bench "length " $ nf length rlps
+  defaultMain [ bench "bytestring based rlp" $ nf (map rlpSerialize_safe) rlps
+              , bench "reverse post order traversal rlp" $ nf (map rlpSerialize) rlps
+              , bench "getting buffer length" $ nf (map finalLength) rlps
+              , bench "input list length" $ nf length rlps
               ]
-

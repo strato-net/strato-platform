@@ -50,7 +50,7 @@ main = do
   let nstacks = map (\x -> (x, 4, stack 4 x)) [0, 4, 16, 64, 256, 1024]
   let wstacks = map (\x -> (x, 1024, stack 1024 x)) [0, 4, 16, 64, 256, 1024]
 
-  let funcs = [("Bytestring", rlpSerialize)]
+  let funcs = [("Bytestring", rlpSerialize_safe), ("Reverse post order", rlpSerialize)]
   defaultMain $ concat [ liftM2 benchString funcs strings
                        , liftM2 benchOneLevel funcs arrays
                        , liftM2 benchMP funcs fullNodes

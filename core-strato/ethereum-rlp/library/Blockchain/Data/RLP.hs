@@ -11,22 +11,30 @@ module Blockchain.Data.RLP (
   RLPSerializable(..),
   rlpSplit,
   rlpSerialize,
+  rlpSerialize_safe, -- For testing
   rlpDeserialize,
-  int2Bytes
+  finalLength -- For testing
   ) where
 
 import           Control.DeepSeq
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
+import qualified Data.ByteString.Internal as BI
 import           Data.ByteString.Internal
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
 import           Data.Word
+import           Foreign.ForeignPtr
+import           Foreign.Ptr
+import           Foreign.Storable
 import           GHC.Generics
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 import           Numeric
+import           System.IO.Unsafe
 
 import           Blockchain.Data.Util
 
@@ -123,8 +131,83 @@ rlpDeserialize s =
 --
 -- Full serialization of an object can be obtained using @rlpSerialize . rlpEncode@.
 
+log256 :: Int -> Int
+log256 val | val < 0x100 = 1
+log256 val | val < 0x10000 = 2
+log256 val | val < 0x1000000 = 3
+log256 val | val < 0x100000000 = 4
+log256 val | val < 0x10000000000 = 5
+log256 val = error $ "log256 not defined for val=" ++ show val
+
+finalLength :: RLPObject -> Int
+finalLength (RLPScalar{}) = 1
+finalLength (RLPString s) = let sub = B.length s in 1 + log256 sub + sub
+finalLength (RLPArray cs) = let sub = sum . map finalLength $ cs
+                            in 1 + log256 sub + sub
+
+{-
+ - This algorithm does two passes over the RLP. The first calculates the
+ - length, which a buffer is allocated for.  The second does a reverse post
+ - order tree traversal (children first, from right to left) and writes to the buffer
+ - from right to left. The change in pointer position is then used to calculate
+ - the total payload length of a node and written into the RLP header.
+ -}
 rlpSerialize :: RLPObject -> B.ByteString
-rlpSerialize = \case
+rlpSerialize (s@RLPScalar{}) = rlpSerialize_safe s
+rlpSerialize (s@RLPString{}) = rlpSerialize_safe s
+rlpSerialize rlp = let maxLen = finalLength rlp
+                   in fst . unsafePerformIO $ BI.createAndTrim' maxLen $ \p0 -> do
+  let pEnd = p0 `plusPtr` maxLen
+  pStart <- execStateT (loop rlp) pEnd
+  return (pStart `minusPtr` p0, pEnd `minusPtr` pStart, ())
+
+  where loop :: RLPObject -> StateT (Ptr Word8) IO ()
+        loop (RLPScalar x) = do
+          p <- gets (`plusPtr` (-1))
+          liftIO $ poke p x
+          put p
+        loop (RLPString (BI.PS fsrc off len)) = do
+          pPayloadStart <- gets (`plusPtr` (-len))
+          liftIO $ withForeignPtr fsrc $ \src -> BI.memcpy pPayloadStart (src `plusPtr` off) (fromIntegral len)
+          if len <= 55
+            then do
+              let pHeaderStart = pPayloadStart `plusPtr` (-1)
+              liftIO . poke pHeaderStart $ 0x80 + fromIntegral len
+              put pHeaderStart
+            else do
+              put pPayloadStart
+              intLoop len
+              pLenStart <- get
+              let pHeaderStart = pLenStart `plusPtr` (-1)
+              liftIO . poke pHeaderStart $ 0xb7 + (fromIntegral $ pPayloadStart `minusPtr` pLenStart)
+              put pHeaderStart
+        loop (RLPArray xs) = do
+          pPayloadEnd <- get
+          mapM_ loop $ reverse xs
+          pPayloadStart <- get
+          let len = pPayloadEnd `minusPtr` pPayloadStart
+          if len <= 55
+            then do
+              let pHeaderStart = pPayloadStart `plusPtr` (-1)
+              liftIO . poke pHeaderStart $ 0xc0 + fromIntegral len
+              put pHeaderStart
+            else do
+              intLoop len
+              pLenStart <- get
+              let pHeaderStart = pLenStart `plusPtr` (-1)
+              liftIO . poke pHeaderStart $ 0xf7 + (fromIntegral $ pPayloadStart `minusPtr` pLenStart)
+              put pHeaderStart
+
+        intLoop :: Int -> StateT (Ptr Word8) IO ()
+        intLoop 0 = return ()
+        intLoop n = do
+          p <- gets (`plusPtr` (-1))
+          liftIO $ poke p $ fromIntegral n
+          put p
+          intLoop (n `shiftR` 8)
+
+rlpSerialize_safe :: RLPObject -> B.ByteString
+rlpSerialize_safe = \case
   RLPScalar val -> B.singleton val
   RLPString s ->
     let l = B.length s
@@ -134,7 +217,7 @@ rlpSerialize = \case
                   ll = length ibs
               in (B.pack $ 0xb7 + fromIntegral ll:ibs) <> s
   RLPArray innerObjects -> do
-    let innerBytes = B.concat . map rlpSerialize $ innerObjects
+    let innerBytes = B.concat . map rlpSerialize_safe $ innerObjects
         l = B.length innerBytes
     if l <= 55
       then B.cons (0xc0 + fromIntegral l) innerBytes
@@ -142,7 +225,6 @@ rlpSerialize = \case
         let ibs = int2Bytes . fromIntegral $ l
             ll = length ibs
         in (B.pack $ 0xf7 + fromIntegral ll:ibs) <> innerBytes
-
 
 instance RLPSerializable Integer where
   rlpEncode 0             = RLPString B.empty

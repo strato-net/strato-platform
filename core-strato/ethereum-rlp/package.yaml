@@ -58,6 +58,7 @@ dependencies:
   - deepseq
   - binary
   - text
+  - transformers
 
 library:
   source-dirs: library/
@@ -83,6 +84,7 @@ benchmarks:
       - ethereum-rlp
       - criterion
       - random-bytestring
+
   zipbench:
     source-dirs: bench/
     main: ZipBench.hs
