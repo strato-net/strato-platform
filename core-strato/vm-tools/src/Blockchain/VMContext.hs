@@ -198,6 +198,11 @@ instance (Address `A.Alters` AddressState) ContextM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
+instance (SHA `A.Alters` DBCode) ContextM where
+  lookup _ = genericLookupCodeDB $ gets contextCodeDB
+  insert _ = genericInsertCodeDB $ gets contextCodeDB
+  delete _ = genericDeleteCodeDB $ gets contextCodeDB
+
 instance HasRawStorageDB ContextM where
   getRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
   putRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
@@ -206,9 +211,6 @@ instance HasRawStorageDB ContextM where
 
 instance HasHashDB ContextM where
   getHashDB = gets contextHashDB
-
-instance HasCodeDB ContextM where
-  getCodeDB = gets contextCodeDB
 
 instance HasBlockSummaryDB ContextM where
   getBlockSummaryDB = gets contextBlockSummaryDB
@@ -253,7 +255,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
         flip runStateT (Context
                      MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "must set stateroot for test context"}
                      hdb
-                     cdb
+                     (CodeDB cdb)
                      blksumdb
                      M.empty
                      M.empty
@@ -295,7 +297,7 @@ runContextM f = do
           runStateT f (Context
                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
                        hdb
-                       cdb
+                       (CodeDB cdb)
                        blksumdb
                        M.empty
                        M.empty

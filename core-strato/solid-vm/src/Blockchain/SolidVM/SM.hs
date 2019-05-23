@@ -168,9 +168,6 @@ instance Mod.Modifiable MP.StateRoot SM where
 instance HasHashDB SM where
   getHashDB = hashDB <$> get
 
-instance HasCodeDB SM where
-  getCodeDB = codeDB <$> get
-
 instance (Address `A.Alters` AddressState) SM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
@@ -180,6 +177,11 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) SM where
   lookup _ = MP.genericLookupDB $ gets (MP.ldb . stateDB)
   insert _ = MP.genericInsertDB $ gets (MP.ldb . stateDB)
   delete _ = MP.genericDeleteDB $ gets (MP.ldb . stateDB)
+
+instance (SHA `A.Alters` DBCode) SM where
+  lookup _ = genericLookupCodeDB $ gets codeDB
+  insert _ = genericInsertCodeDB $ gets codeDB
+  delete _ = genericDeleteCodeDB $ gets codeDB
 
 runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
 runSM maybeCode env f = do

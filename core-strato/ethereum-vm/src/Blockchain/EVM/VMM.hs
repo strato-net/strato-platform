@@ -124,8 +124,10 @@ instance HasRawStorageDB VMM where
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
 
-instance HasCodeDB VMM where
-    getCodeDB = lift $ fmap (contextCodeDB . dbs) get
+instance (SHA `A.Alters` DBCode) VMM where
+  lookup _ = genericLookupCodeDB $ lift $ gets $ contextCodeDB . dbs
+  insert _ = genericInsertCodeDB $ lift $ gets $ contextCodeDB . dbs
+  delete _ = genericDeleteCodeDB $ lift $ gets $ contextCodeDB . dbs
 
 instance HasBlockSummaryDB VMM where
     getBlockSummaryDB = lift $ fmap (contextBlockSummaryDB . dbs) get

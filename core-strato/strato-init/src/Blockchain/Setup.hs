@@ -56,6 +56,7 @@ import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
 import           Blockchain.PrivateKeyConf
+import           Blockchain.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
 
@@ -145,11 +146,13 @@ instance (Address `A.Alters` AddressState) SetupDBM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
+instance (SHA `A.Alters` DBCode) SetupDBM where
+  lookup _ = genericLookupCodeDB $ asks codeDB
+  insert _ = genericInsertCodeDB $ asks codeDB
+  delete _ = genericDeleteCodeDB $ asks codeDB
+
 instance HasHashDB SetupDBM where
   getHashDB = asks hashDB
-
-instance HasCodeDB SetupDBM where
-  getCodeDB = asks codeDB
 
 instance HasSQLDB SetupDBM where
   getSQLDB = asks sqlDB
@@ -472,7 +475,7 @@ oneTimeSetup genesisBlockName = do
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
          hdb <- DB.open (dbDir "h" ++ hashDBPath)
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-         cdb <- DB.open (dbDir "h" ++ codeDBPath)
+         cdb <- CodeDB <$> DB.open (dbDir "h" ++ codeDBPath)
                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
          [m1, m2] <- liftIO . replicateM 2 . newIORef $ Map.empty
          [m3, m4] <- liftIO . replicateM 2 . newIORef $ Map.empty
