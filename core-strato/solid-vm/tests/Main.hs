@@ -10,7 +10,7 @@ import Executable.EVMFlags() -- for HFlags
 import qualified Spec
 
 predicate :: Path -> Bool
-predicate (_, "can pass arrays by reference to functions") = True
+predicate ("Parser":_, _) = True
 predicate _ = False
 
 main :: IO ()
