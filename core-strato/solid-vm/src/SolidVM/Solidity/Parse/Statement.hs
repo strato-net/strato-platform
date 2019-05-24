@@ -94,12 +94,11 @@ expression :: SolidityParser Expression
 expression =
   buildExpressionParser
   [
-    -- [postfix memberAccess],
+    [postfix functionCall ],
     [Postfix $ do
       idxs <- many1 . brackets $ optionMaybe expression
-      return $ \x -> foldl IndexAccess x idxs,
-      postfix memberAccess],
-    -- [postfix functionCall],
+      return $ \x -> foldl IndexAccess x idxs],
+    [postfix memberAccess],
     [Postfix (do { reservedOp "++"; return PlusPlus})],
     [Postfix (reservedOp "--" >> return MinusMinus)],
     [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
