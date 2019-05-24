@@ -33,7 +33,6 @@ module Blockchain.SolidVM.SM (
   markDiffForAction
   ) where
 
-import Debug.Trace
 import           Control.Applicative ((<|>))
 import           Control.Exception
 import           Control.Lens
@@ -283,7 +282,7 @@ getVariableOfName name = do
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
       vars = localVariables currentCallInfo
-      t s v = traceShow ('x':s, v) `seq` v
+      t s v = ('x':s, v) `seq` v
   maybeLocalValue <-
     -- TODO(tim): consult memory map for locals instead of storage
     case M.lookup name vars of
