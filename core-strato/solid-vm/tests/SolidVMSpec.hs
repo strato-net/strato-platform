@@ -2032,7 +2032,7 @@ contract qq {
   S s;
   constructor() public {
     s = S({y: 87, z: "goodbye", x: 33});
-  }12
+  }
 }|]
     getAll [ [Field "s", Field "x"]
            , [Field "s", Field "y"]
@@ -2040,6 +2040,7 @@ contract qq {
            ] `shouldReturn` [BInteger 33, BInteger 87, BString "goodbye"]
 
   it "should be able to adjust arrayed structs" . runTest $ do
+    liftIO $ pendingWith "References into an array"
     runBS [r|
 contract qq {
   struct X {

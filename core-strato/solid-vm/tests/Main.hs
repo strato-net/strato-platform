@@ -10,7 +10,7 @@ import Executable.EVMFlags() -- for HFlags
 import qualified Spec
 
 predicate :: Path -> Bool
-predicate ("Parser":_, _) = True
+predicate (_, _) = True
 predicate _ = False
 
 main :: IO ()
