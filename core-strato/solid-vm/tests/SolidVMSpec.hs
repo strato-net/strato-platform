@@ -2040,7 +2040,6 @@ contract qq {
            ] `shouldReturn` [BInteger 33, BInteger 87, BString "goodbye"]
 
   it "should be able to adjust arrayed structs" . runTest $ do
-    liftIO $ pendingWith "References into an array"
     runBS [r|
 contract qq {
   struct X {
@@ -2052,4 +2051,4 @@ contract qq {
     xs[0].x *= 2;
   }
 }|]
-    getAll [ [Field "xs", Field "x" ]] `shouldReturn` [BInteger 110]
+    getAll [ [Field "xs", ArrayIndex 0, Field "x" ]] `shouldReturn` [BInteger 110]
