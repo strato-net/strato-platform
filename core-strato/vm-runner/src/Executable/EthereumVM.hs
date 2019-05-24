@@ -21,7 +21,7 @@ import           Data.List
 import           Data.Proxy
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
-import           Data.Maybe                            (isNothing, fromMaybe)
+import           Data.Maybe                            (catMaybes, isNothing, fromMaybe)
 import qualified Data.Set                              as S
 import           Data.Time.Clock.POSIX
 import qualified Network.Kafka.Protocol                as KP
@@ -68,7 +68,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
 import           Blockchain.Timing
-import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
+import           Blockchain.Util
 
 import           Text.Format                           (format)
 
@@ -88,7 +88,6 @@ ethereumVM = void . execContextM $ do
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
-    let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
     forever $ loopTimeit "one full loop" $ do
         recordBaggerMetrics =<< gets contextBaggerState
         cpOffset <- getCheckpointNoMetadata
@@ -97,85 +96,7 @@ ethereumVM = void . execContextM $ do
 
         logEventSummaries seqEvents
 
-        !currentMicrotime <- liftIO getCurrentMicrotime
-        $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
-
-        insertNewChains seqEvents
-
-        mapM_ (uncurry3 queuePendingVote) [(r, d, s) | VmVoteToMake r d s <- seqEvents]
-        let newCommands = [c | VmJsonRpcCommand c <- seqEvents]
-        forM_ newCommands runJsonRpcCommand
-
-        let txPairs = [(ts,t) | VmTx ts t <- seqEvents]
-            allTxs = map (uncurry VmTx) txPairs
-            blocks = [b | VmBlock b <- seqEvents]
-        when (not $ null txPairs) . void
-                                  . K.withKafkaViolently
-                                  . writeIndexEvents
-                                  $ map (uncurry IndexTransaction) txPairs
-
-        let ptxs = [IndexPrivateTx t | VmPrivateTx t <- seqEvents]
-        when (not $ null ptxs) . void
-                               . K.withKafkaViolently
-                               $ writeIndexEvents ptxs
-
-        let (bLen, tLen) = (length blocks, length allTxs)
-        recordSeqEventCount bLen tLen
-
-        $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
-        let allNewTxs = [(ts, t) | VmTx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
-        forM_ allNewTxs $ \(ts, _) ->
-            $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
-        let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
-        $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
-        unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
-
-        $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
-        forM_ blocks $ \b -> do
-            let number = blockDataNumber . obBlockData $ b
-                txCount = length . obReceiptTransactions $ b
-            recordMaxBlockNumber "vm_seqevents" number
-            $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
-            clearPendingVote (outputBlockToBlock b)
-            writeBlockSummary b
-        actions <- addBlocks blocks
-
-        contextBlockRequested ||= (VmCreateBlockCommand `elem` seqEvents)
-        -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
-        -- todo: which may fail
-        isCaughtUp <- shouldProcessNewTransactions
-        state <- Bagger.getBaggerState
-        pbft <- gets contextHasBlockstanbul
-        reqd <- use contextBlockRequested
-        let pending = B.pending state
-            priv = DL.toList . B.privateHashes $ B.miningCache state
-            hasTxs = not (null poolableNewTxs) || not (M.null pending) || not (null priv)
-            shouldOutputBlocks = isCaughtUp && (
-              if pbft
-                then reqd && hasTxs
-                else not makeLazyBlocks || hasTxs)
-        $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
-            (length poolableNewTxs) (M.size pending)
-        $logInfoS "evm/loop/newBlock" . T.pack $ "Decision making for block creation: " ++
-            "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
-             (isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks)
-        when (pbft && shouldOutputBlocks) $
-          contextBlockRequested .= False
-        $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
-        $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
-        when shouldOutputBlocks $ do
-            $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-            newBlock <- --loopTimeit "Bagger.makeNewBlock"
-                        Bagger.makeNewBlock
-            $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
-            loopTimeit "produceUnminedBlocksM" $ K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
-
-        -- todo: is this the best place to put this?
-        loopTimeit "flushLogEntries" $ flushLogEntries
-        loopTimeit "flushEventEntries" $ flushEventEntries
-        loopTimeit "flushTransactionResults" $ flushTransactionResults
-        loopTimeit "writeActionJSONToKafka" $ void . K.withKafkaViolently $ writeActionJSONToKafka actions
-        loopTimeit "compactContextM" $ compactContextM
+        handleOutputEvents makeLazyBlocks seqEvents
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
@@ -183,11 +104,95 @@ ethereumVM = void . execContextM $ do
         withChainroot <- checkpointData . Just . unBlockHashRoot <$> Mod.get Proxy
         setCheckpoint newOffset withChainroot
 
-insertNewChains :: [VmEvent] -> ContextM ()
-insertNewChains events = do
-  let newChainInfos = [c | VmGenesis (OutputGenesis _ c) <- events]
+microtimeCutoff :: Microtime
+microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
+{-# NOINLINE microtimeCutoff #-}
 
-  newChains <- forM newChainInfos $ \(cId, cInfo) -> do
+handleOutputEvents :: Bool -> [VmEvent] -> ContextM ()
+handleOutputEvents makeLazyBlocks events = do
+  !currentMicrotime <- liftIO getCurrentMicrotime
+  $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
+
+  insertNewChains [og | VmGenesis og <- events]
+  mapM_ (uncurry3 queuePendingVote) [(r, d, s) | VmVoteToMake r d s <- events]
+  mapM_ runJsonRpcCommand [c | VmJsonRpcCommand c <- events]
+
+  let txPairs = [(ts,t) | VmTx ts t <- events]
+      allTxs = map (uncurry VmTx) txPairs
+      blocks = [b | VmBlock b <- events]
+  when (not $ null txPairs) . void
+                            . K.withKafkaViolently
+                            . writeIndexEvents
+                            $ map (uncurry IndexTransaction) txPairs
+
+  let ptxs = [IndexPrivateTx t | VmPrivateTx t <- seqEvents]
+  when (not $ null ptxs) . void
+                         . K.withKafkaViolently
+                         $ writeIndexEvents ptxs
+
+  let (bLen, tLen) = (length blocks, length allTxs)
+  recordSeqEventCount bLen tLen
+
+  $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
+  let allNewTxs = [(ts, t) | VmTx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
+
+  forM_ allNewTxs $ \(ts, _) ->
+      $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
+  let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
+  $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
+  unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
+
+  $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
+  forM_ blocks $ \b -> do
+      let number = blockDataNumber . obBlockData $ b
+          txCount = length . obReceiptTransactions $ b
+      recordMaxBlockNumber "vm_seqevents" number
+      $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
+      clearPendingVote (outputBlockToBlock b)
+      writeBlockSummary b
+  actions <- addBlocks blocks
+
+  contextBlockRequested ||= (VmCreateBlockCommand `elem` events)
+  -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
+  -- todo: which may fail
+  isCaughtUp <- shouldProcessNewTransactions
+  state <- Bagger.getBaggerState
+  pbft <- gets contextHasBlockstanbul
+  reqd <- use contextBlockRequested
+  let pending = B.pending state
+      priv = DL.toList . B.privateHashes $ B.miningCache state
+      hasTxs = not (null poolableNewTxs) || not (M.null pending) || not (null priv)
+      shouldOutputBlocks = isCaughtUp && (
+        if pbft
+          then reqd && hasTxs
+          else not makeLazyBlocks || hasTxs)
+  $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
+      (length poolableNewTxs) (M.size pending)
+  $logInfoS "evm/loop/newBlock" . T.pack $ "Decision making for block creation: " ++
+      "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
+       (isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks)
+  when (pbft && shouldOutputBlocks) $
+    contextBlockRequested .= False
+  $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
+  $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
+  when shouldOutputBlocks $ do
+      $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
+      newBlock <- --loopTimeit "Bagger.makeNewBlock"
+                  Bagger.makeNewBlock
+      $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
+      loopTimeit "produceUnminedBlocksM" $ K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
+
+  -- todo: is this the best place to put this?
+  loopTimeit "flushLogEntries" $ flushLogEntries
+  loopTimeit "flushEventEntries" $ flushEventEntries
+  loopTimeit "flushTransactionResults" $ flushTransactionResults
+  loopTimeit "writeActionJSONToKafka" $ void . K.withKafkaViolently $ writeActionJSONToKafka actions
+  loopTimeit "compactContextM" $ compactContextM
+
+insertNewChains :: [OutputGenesis] -> ContextM ()
+insertNewChains ogs = do
+  newChains <- fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
+    let (cId, cInfo) = ogGenesisInfo
     $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
     $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
     let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
@@ -204,13 +209,13 @@ insertNewChains events = do
     case mGSR of
       Just gsr -> do
         $logInfoS "insertNewChains" $ T.pack $ "We already have a genesis state root for this chain. It's " ++ format gsr
-        return []
+        return Nothing
       Nothing -> do
         $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
-        putChainGenesisInfo cId (SHA 0) sr >> return [(cId, cInfo)]
+        Just (cId, cInfo) <$ putChainGenesisInfo cId (SHA 0) sr
 
-  void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains
+  void . K.withKafkaViolently . writeIndexEvents $ map (uncurry NewChainInfo) newChains
 
 
 
@@ -395,7 +400,7 @@ shouldProcessNewTransactions =
 
 
 
-logEventSummaries :: [VmEvent] -> ContextM ()
+logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
 logEventSummaries events = do
   let names = map getNames events
       numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
