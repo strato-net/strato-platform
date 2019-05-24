@@ -11,7 +11,7 @@ const config = require('../config/app.config');
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-queryHealthStatus();
+setTimeout(queryHealthStatus, config.healthCheck.initialDatabaseTimout);
 setInterval(queryHealthStatus, config.healthCheck.progressWindow);
 
 
@@ -159,6 +159,17 @@ async function updateStallStat(blocksValid, blocksPending){
         blockCount: blocksPending,
         timestamp: currentTime
     });
+}
+
+async function initialCreate(){
+  let currentTime = Date.now();
+  await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
+      latestHealthStatus: true,
+      latestCheckTimestamp: currentTime,
+      lastFailureTimestamp: currentTime,   //default first time marked as failure
+      isBlocksValidInc: false,
+      isLastPending: false
+    }})
 }
 
 module.exports = {

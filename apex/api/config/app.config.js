@@ -34,6 +34,7 @@ module.exports = {
       dbPollFrequency: 1 * 1000
   },
   healthCheck: {
+      initialDatabaseTimout: 20 * 1000,
       requestTimeout: 1 * 1000,
       pollFrequency: 15 * 1000,
       pollTimeoutsForUnhealthy: 3, // number of timed out polls in a row to consider node unhealthy

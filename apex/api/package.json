@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "start:prod": "npm-run-all -p start:prod:main start:prod:node-health start:prod:stall-check start:prod:db-cleaner",
-    "start:prod:main": "PORT=3001 NODE_HOST=${NODE_HOST} NODE_ENV=production node ./bin/www --config config-prod.yaml",
+    "start:prod:main": "npm-run-all start:prod:init-db start:prod:migrate start:prod:www",
+    "start:prod:init-db": "NODE_ENV=production node -e 'require(\"./migrations/init-script/initdb.js\").initdb()'",
+    "start:prod:migrate": "NODE_ENV=production ./node_modules/.bin/sequelize db:migrate",
+    "start:prod:www": "PORT=3001 NODE_HOST=${NODE_HOST} NODE_ENV=production node ./bin/www --config config-prod.yaml",
     "start:prod:node-health": "NODE_ENV=production node daemons/node-health-check.js",
     "start:prod:stall-check": "NODE_ENV=production node daemons/stall-check.js",
     "start:prod:db-cleaner": "NODE_ENV=production node daemons/db-cleaner.js",
