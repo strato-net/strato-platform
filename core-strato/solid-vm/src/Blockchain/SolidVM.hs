@@ -286,7 +286,9 @@ logFunctionCall args address contract functionName f = do
 argsToVals :: Contract -> Xabi.Func -> Xabi.ArgList -> SM ValList
 argsToVals ctract fn args =
   case args of
-    Xabi.OrderedArgs xs -> OrderedVals <$> zipWithM eval orderedTypes xs
+    Xabi.OrderedArgs xs -> do
+      when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
+      OrderedVals <$> zipWithM eval orderedTypes xs
     Xabi.NamedArgs xs -> NamedVals . M.toList <$> do
       let strTypes = M.mapKeys T.unpack $ Xabi.funcArgs fn
       M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
@@ -1048,6 +1050,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.contracts . at contractName'
       argPairs = M.toList . fromMaybe M.empty . fmap Xabi.funcArgs $ contract' ^. constructor
+      argCount = length argPairs
       argTypeNames = map fst $ sortWith snd $
         [ ((t, T.unpack n), i) |
           (n, Xabi.IndexedType{Xabi.indexedTypeType=t, Xabi.indexedTypeIndex=i}) <- argPairs]
@@ -1055,13 +1058,16 @@ runTheConstructors from to hsh cc contractName' argExps = do
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
   argVals <- case argExps of
-                  (Xabi.OrderedArgs []) -> return $ OrderedVals []
-                  (Xabi.NamedArgs []) -> return $ NamedVals []
+                  (Xabi.OrderedArgs []) -> do
+                    when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
+                    return $ OrderedVals []
+                  (Xabi.NamedArgs []) -> do
+                    when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
+                    return $ NamedVals []
                   _ -> argsToVals contract'
                                   (fromMaybe (error "arguments provided for missing constructor")
                                         $ _constructor contract')
                                   argExps
-
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
       zipped = case argVals of
                   OrderedVals vs -> zipWith (\(t, n) v -> (n, (t, coerceType contract' t v))) argTypeNames vs
@@ -1083,6 +1089,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
              . fromMaybe []
              $ M.lookup parent =<< (fmap Xabi.funcConstructorCalls $ contract'^.constructor)
     runTheConstructors from to hsh cc parent args
+
 
   _ <-
     case contract'^.constructor of

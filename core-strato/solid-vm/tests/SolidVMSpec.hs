@@ -96,8 +96,8 @@ runTest f = do
 runFile :: FilePath -> ContextM ()
 runFile fp = void $ runBS =<< liftIO (B.readFile fp)
 
-runFileArgs :: FilePath -> T.Text -> ContextM ()
-runFileArgs fp args = void $ runArgs args =<< liftIO (B.readFile fp)
+runFileArgs :: T.Text -> FilePath -> ContextM ()
+runFileArgs args fp = void $ runArgs args =<< liftIO (B.readFile fp)
 
 runBS :: B.ByteString -> ContextM ()
 runBS = void . runBS'
@@ -241,8 +241,7 @@ spec :: Spec
 spec = do
   describe "Ballot" $ do
     it "can be created" . runTest $ do
-      liftIO $ pendingWith "Enable"
-      runFile "testdata/Ballot.sol"
+      runFileArgs [r|(["a","b","c"])|] "testdata/Ballot.sol"
 
   describe "Create" $ do
     it "should be able to run an empty contract" . runTest $ do
@@ -1238,7 +1237,6 @@ contract qq {
 
 
   it "can assign to tuples" . runTest $ do
-    liftIO $ pendingWith "tuple assignment"
     runBS [r|
 contract qq {
   uint x;
@@ -2052,3 +2050,16 @@ contract qq {
   }
 }|]
     getAll [ [Field "xs", ArrayIndex 0, Field "x" ]] `shouldReturn` [BInteger 110]
+
+  it "can resolve variables for named arguments" . runTest $ do
+    void $ runArgs "(\"stref\")" [r|
+contract qq {
+  struct X {
+    string n;
+  }
+  X[] public names;
+  constructor(string input_name) public {
+    names.push(X({n: input_name}));
+  }
+}|]
+    getAll [ [Field "names", ArrayIndex 0, Field "n"] ] `shouldReturn` [BString "stref"]
