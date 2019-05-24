@@ -275,7 +275,6 @@ toMaybe False _ = Nothing
 
 getVariableOfName :: String -> SM Variable
 getVariableOfName name = do
-  runLoggingT $ $logInfoLS "getVariableOfName" name
   sstate <- get
   let currentCallInfo =
         case callStack sstate of
