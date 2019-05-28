@@ -26,7 +26,8 @@ import {
   BLOCKS_FREQUENCY,
   TRANSACTIONS_TYPE,
   GET_NODE_UPTINE,
-  GET_HEALTH
+  GET_HEALTH,
+  GET_SYSTEM_INFO
 } from '../../sockets/rooms'
 import {sec2Date} from "../../lib/formatSeconds";
 
@@ -62,6 +63,7 @@ class Dashboard extends Component {
     this.props.subscribeRoom(TRANSACTIONS_TYPE)
     this.props.subscribeRoom(GET_HEALTH)
     this.props.subscribeRoom(GET_NODE_UPTINE)
+    this.props.subscribeRoom(GET_SYSTEM_INFO)
 
     mixpanelWrapper.track('dashboard_page_load');
   }
@@ -77,6 +79,7 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(TRANSACTIONS_TYPE)
     this.props.unSubscribeRoom(GET_HEALTH)
     this.props.unSubscribeRoom(GET_NODE_UPTINE)
+    this.props.unSubscribeRoom(GET_SYSTEM_INFO)
   }
 
   render() {
@@ -87,6 +90,8 @@ class Dashboard extends Component {
     const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
     const uptime = this.props.dashboard.uptime;
     const health = this.props.dashboard.healthStatus;
+    const systemHealth = this.props.dashboard.systemStatus;
+    const systemWarnings = this.props.dashboard.systemWarnings;
     let connection = true;
 
     socket.on('disconnect', e => {
@@ -106,7 +111,7 @@ class Dashboard extends Component {
               number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
               description= {connection ? (sec2Date(uptime)):"No Connection"}
               mode={health ? 'success':'warning' }
-              iconClass={health ? 'fa-check-circle' : 'fa-exclamation-circle'}
+              iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />
           </div>
           <div className="col-sm-3">
