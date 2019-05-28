@@ -686,6 +686,8 @@ expToVar' (Xabi.MemberAccess expr name) = do
       (SAddress addr, itemName) -> return $ SContractItem addr itemName
 
       (SContract contractName' a, funcName) -> return $ SContractFunction contractName' a funcName
+      (SReference p, "push") -> return $ SPush p
+      (SReference p, itemName) -> return . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
       (SString s, "length") -> return . SInteger . fromIntegral $ length s
       _ -> error $ "invalid constant: " ++ show c
 
@@ -838,6 +840,18 @@ expToVar' (Xabi.FunctionCall e args) = do
   var <- expToVar e
   argVals <- for args $ \(Nothing, arg) -> getVar =<< expToVar arg --TODO- add support for named arguments
   case var of
+    Constant (SReference (AddressedPath address (MS.StoragePath pieces))) -> do
+      liftIO $ putStrLn $ "################## " ++ show pieces
+      val' <- getSolid address (MS.StoragePath $ init pieces)
+      case (val', last pieces) of
+        (MS.BContract _ toAddress, MS.Field funcName) -> do
+          fromAddress <- getCurrentAddress
+          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
+          case res of
+            Just v -> return $ Constant $ v
+            Nothing -> return $ Constant SNULL
+        x -> error $ "poppy: " ++ show x
+
     Constant (SBuiltinFunction name o) -> fmap Constant $ callBuiltin name argVals o
     Constant (SFunction name) -> do
       contract' <- getCurrentContract

@@ -12,6 +12,8 @@ module Blockchain.SolidVM.SetGet (
   getAddress,
   getString,
 
+  getSolid,
+  
   deleteVar,
 
   showSM

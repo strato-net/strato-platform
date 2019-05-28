@@ -336,7 +336,7 @@ getVariableOfName name = do
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
-        then Just . StorageItem $ AddressedPath
+        then Just . Constant . SReference $ AddressedPath
                 (Right $ currentAddress currentCallInfo)
                 (MS.singleton $ BC.pack name)
         else Nothing
