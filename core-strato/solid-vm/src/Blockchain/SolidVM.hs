@@ -612,6 +612,8 @@ expToVar' (Xabi.BoolLiteral b) = return $ Constant $ SBool b
 expToVar' (Xabi.Variable "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
 expToVar' (Xabi.Variable "bytes") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
+expToVar' (Xabi.Variable "now") =
+  Constant . SInteger . round . utcTimeToPOSIXSeconds . blockDataTimestamp . Env.blockHeader <$> getEnv
 expToVar' (Xabi.Variable name) = do
   getVariableOfName name
 

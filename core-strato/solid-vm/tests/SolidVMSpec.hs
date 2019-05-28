@@ -512,12 +512,14 @@ contract qq {
     it "should be able to return the time from the header" . runTest $ do
       runBS [r|
 contract qq {
- uint ts;
+ uint ts1;
+ uint ts2;
  constructor() {
-   ts = block.timestamp;
+   ts1 = block.timestamp;
+   ts2 = now;
  }
 }|]
-      getAll [ [Field "ts"] ] `shouldReturn` [BInteger 0x4000]
+      getFields ["ts1", "ts2"] `shouldReturn` [BInteger 0x4000, BInteger 0x4000]
 
     it "can parse one specific assembly block" . runTest $ do
       runBS [r|

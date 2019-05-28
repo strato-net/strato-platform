@@ -210,4 +210,5 @@ showSM (SMap _ m) = do
 showSM (SContract name address) = do
   return $ "Contract: " ++ name ++ "/" ++ format address
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
+showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
 showSM x = todo "showSM called for unsupported value: " x

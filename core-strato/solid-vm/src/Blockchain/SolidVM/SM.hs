@@ -310,7 +310,7 @@ getVariableOfName name = do
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
-      maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx", "super"]) $
+      maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx", "super", "now"]) $
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
