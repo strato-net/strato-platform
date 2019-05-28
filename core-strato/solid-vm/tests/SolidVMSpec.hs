@@ -2092,3 +2092,13 @@ contract qq {
   }
 }|]
     getFields ["xs"] `shouldReturn` [BString "\x00\x00\x00"]
+
+  it "overrides addressToAsciiString" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  string xs;
+  constructor() public {
+    xs = addressToAsciiString(this);
+  }
+}|]
+    getFields ["xs"] `shouldReturn` [BString "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe"]

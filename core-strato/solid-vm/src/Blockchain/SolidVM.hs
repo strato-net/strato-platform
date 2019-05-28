@@ -610,6 +610,7 @@ expToVar' (Xabi.NumberLiteral v Nothing) = return . Constant $ SInteger v
 expToVar' (Xabi.StringLiteral s) = return $ Constant $ SString s
 expToVar' (Xabi.BoolLiteral b) = return $ Constant $ SBool b
 expToVar' (Xabi.Variable "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
+expToVar' (Xabi.Variable "addressToAsciiString") = return $ Constant SAddressToAscii
 expToVar' (Xabi.Variable "bytes") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
 expToVar' (Xabi.Variable "now") =
@@ -953,17 +954,13 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant SHexDecodeAndTrim ->
         case argVals of
+          -- bytes should already be hex decoded when appropriate
           OrderedVals [s@SString{}] -> return $ Constant s
-          -- [SString s] -> return . Constant . SString $
-          --   case B16.decode (BC.pack s) of
-          --     (b32, "") -> BC.unpack . B.takeWhile (/= 0) $ b32
-          --     -- TODO(tim): This is a hack, to deal with the assymmetry created
-          --     -- between bytes32 literals (that need no conversion)
-          --     -- and bytes32 external arguments (that need decoding and trimming). It
-          --     -- would be cleaner to decode arguments in `call`, using `id`
-          --     -- on strings and `B16.decode` on bytes32
-          --     _ -> s
           _ -> typeError "bytes32ToString with incorrect arguments" argVals
+    Constant SAddressToAscii ->
+      case argVals of
+        OrderedVals [SAddress a] -> return . Constant . SString $ show a
+        _ -> typeError "addressToAsciiString with incorrect arguments" argVals
 
     -- It would be nice to reinterpret two element paths as a function.
     -- How can we get a to resolve to a local variable instead of a path?
