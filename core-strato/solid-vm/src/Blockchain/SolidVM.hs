@@ -326,7 +326,7 @@ callWrapper from to mContract functionName argExps = do
           Just _ -> do
             --TODO- this should only exist if the storage variable is declared
             -- "public", right now I just ignore this and allow anything to be called as a getter
-            fmap Just $ getVar $ StorageItem $ AddressedPath (Right to) . MS.singleton $ BC.pack functionName
+            fmap Just $ getVar $ Constant $ SReference $ AddressedPath (Right to) . MS.singleton $ BC.pack functionName
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
@@ -370,12 +370,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
       onTraced $ liftIO $ putStrLn $ "Array copy to " ++ show p1
       let p2 = case v2 of
                   StorageItem p2' -> p2'
+                  (Constant (SReference p2')) -> p2'
                   _ -> todo "unhandled array copy" v2
-      len <- getInt . StorageItem $ p2 `apSnoc` MS.Field "length"
+      len <- getInt . Constant . SReference $ p2 `apSnoc` MS.Field "length"
       setVar (p1 `apSnoc` MS.Field "length") $ SInteger len
       forM_ [0..len-1] $ \i -> do
         let idx = MS.ArrayIndex $ fromIntegral i
-        rhs' <- getVar . StorageItem $ p2 `apSnoc` idx
+        rhs' <- getVar . Constant . SReference $ p2 `apSnoc` idx
         setVar (p1 `apSnoc` idx) rhs'
     _ -> do
       !value <- getVar v2
@@ -531,6 +532,7 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
     parvar <- expToVar parent
     case parvar of
       StorageItem apt -> return apt
+      Constant (SReference apt) -> return apt
       _ -> expToPath parent
 
   idxType <- getIndexType parPath
@@ -699,7 +701,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
         SReference apt -> do
-          return . StorageItem . apSnoc apt . MS.Field $ BC.pack name
+          return . Constant . SReference . apSnoc apt . MS.Field $ BC.pack name
         _ -> todo "access member of variable" (val', name)
     StorageItem apt -> case name of
       -- TODO(tim): This will not work correctly with struct fields named push
@@ -710,9 +712,9 @@ expToVar' (Xabi.MemberAccess expr name) = do
           TString -> do
             SString s <- getVar var
             return . Constant . SInteger . fromIntegral $ length s
-          _ -> return . StorageItem . apSnoc apt $ MS.Field "length"
+          _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
       _ -> do
-          val' <- getVar $ StorageItem apt
+          val' <- getVar $ Constant $ SReference apt
           case val' of
             SAddress addr -> return . Constant $ SContractItem addr name
             SContract _ addr -> return . Constant $ SContractItem addr name
@@ -721,7 +723,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
                 $ M.lookup name theMap
             _ -> todo "access member of storage item" (val', name, apt)
 
-expToVar' x@(Xabi.IndexAccess{}) = StorageItem <$> expToPath x
+expToVar' x@(Xabi.IndexAccess{}) = Constant . SReference <$> expToPath x
 
 expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar' (Xabi.Binary "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
@@ -900,7 +902,7 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant (SPush apt) -> do
       let lenPath = apt `apSnoc` MS.Field "length"
-      len' <- getInt $ StorageItem lenPath
+      len' <- getInt $ Constant $ SReference lenPath
       let len :: Int = fromIntegral len'
           newLen = SInteger $ fromIntegral $ len + 1
           idxPath = apt `apSnoc` MS.ArrayIndex len
@@ -1101,7 +1103,7 @@ runTheCall address' contract' hsh cc theFunction argVals = do
   val <- runStatements commands
   let findNamedReturns = do
         let paths = map (AddressedPath (Left LocalVar) . MS.singleton . BC.pack . fst) returns
-        rs <- mapM (getVar . StorageItem) paths
+        rs <- mapM (getVar . Constant . SReference) paths
         case rs of
           [] -> return Nothing
           [x] -> return $ Just x

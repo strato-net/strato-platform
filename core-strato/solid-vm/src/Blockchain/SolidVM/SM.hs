@@ -287,15 +287,15 @@ getVariableOfName name = do
     case M.lookup name vars of
       Nothing -> return Nothing
       Just (_, var) -> Just <$> case var of
-        Constant (SReference ap) -> return $ StorageItem ap
+        Constant (SReference ap) -> return $ Constant $ SReference ap
         Variable v -> do
           val <- liftIO $ readIORef v
           case val of
-            SReference ap -> return $ StorageItem ap
-            _ -> return . StorageItem . AddressedPath (Left LocalVar)
+            SReference ap -> return $ Constant $ SReference ap
+            _ -> return . Constant . SReference . AddressedPath (Left LocalVar)
                         . MS.singleton $ BC.pack name
         s@StorageItem{} -> return s
-        Constant{} -> return . StorageItem . AddressedPath (Left LocalVar)
+        Constant{} -> return . Constant . SReference . AddressedPath (Left LocalVar)
                              . MS.singleton $ BC.pack name
 
   let maybeContractFunction :: Maybe Variable
