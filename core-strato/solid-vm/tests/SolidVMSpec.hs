@@ -2083,3 +2083,12 @@ contract qq {
 }|]
     getFields ["x", "y"] `shouldReturn` [BInteger 0x42, BString "ok"]
 
+  it "can create new bytes" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  bytes xs;
+  constructor() public {
+    xs = new bytes(3);
+  }
+}|]
+    getFields ["xs"] `shouldReturn` [BString "\x00\x00\x00"]

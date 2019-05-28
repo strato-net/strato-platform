@@ -856,6 +856,14 @@ expToVar' (Xabi.Ternary condition expr1 expr2) = do
   c <- getBool =<< expToVar condition
   expToVar $ if c then expr1 else expr2
 
+expToVar' (Xabi.FunctionCall (Xabi.NewExpression Xabi.Bytes{}) (Xabi.OrderedArgs args)) = do
+  case args of
+    [a] -> do
+      len <- getInt =<< expToVar a
+      return . Constant . SString $ replicate (fromIntegral len) '\NUL'
+    _ -> arityMismatch "newBytes" 1 (length args)
+expToVar' x@(Xabi.FunctionCall (Xabi.NewExpression Xabi.Bytes{}) (Xabi.NamedArgs{})) =
+  typeError "cannot create new bytes with named arguments" x
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array {Xabi.entry=t})) (Xabi.OrderedArgs args)) = do
   ctract <- getCurrentContract
   case args of
