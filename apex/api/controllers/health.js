@@ -27,7 +27,7 @@ module.exports = {
         raw: true,
       });
 
-      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus;
+      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus, warningMessages, systemInfoBody;
 
       const healthInfo = await models.CurrentHealth.findOne({
         where: {
@@ -81,6 +81,9 @@ module.exports = {
         healthAI = healthInfo.additionalInfo;
         systemInfoAI = systemInfo.additionalInfo;
         systemInfoStatus = systemInfo.latestHealthStatus;
+        warningMessages = systemInfoAI.split('"Alerts":')[1].split('}')[0];
+        systemInfoBody = systemInfoAI.split('"Alerts":')[0] + '}"'
+
       } else {
         let err = new Error("Not Doing Health Check");
         err.status = 500;
@@ -97,17 +100,18 @@ module.exports = {
             nonce: lastBlock.nonce,
           },
           healthInfo: {
-            uptime: uptime/1000,
+            uptime: uptime / 1000,
             isHealthy: healthStatus,
             isNotStalled: stallStatus,
             isValidBlocksInc: isInc || false,
             isLastPending: isPending,
             unhealthyProcess: healthAI
           },
-          warning: {
-            systemHealth: systemInfoStatus,
-            systemInfo: systemInfoAI
-          }
+          warnings: {
+            warningsActive: !systemInfoStatus,
+            messages: warningMessages
+          },
+          systemInfo: systemInfoBody
         }
       )
     } catch (error) {
