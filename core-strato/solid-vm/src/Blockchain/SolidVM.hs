@@ -4,7 +4,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-
 module Blockchain.SolidVM
     (
       call
@@ -999,7 +998,8 @@ intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
 intBuiltin [SString hex] =
   case B16.decode (BC.pack hex) of
-    (l, "") -> SInteger . fromIntegral . bytesToWord256 $ l
+    (l, "") -> let zeros = 32 - B.length l
+               in SInteger . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
     _ -> typeError "numeric cast - not a hex string" hex
 intBuiltin args = typeError "numeric cast - invalid args" args
 

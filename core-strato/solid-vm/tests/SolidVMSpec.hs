@@ -2102,3 +2102,13 @@ contract qq {
   }
 }|]
     getFields ["xs"] `shouldReturn` [BString "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe"]
+
+  it "can cast empty bytes32 to int" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint public x;
+  constructor() public {
+    x = uint(bytes(""));
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0x0]
