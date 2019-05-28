@@ -168,27 +168,30 @@ unparseStatement (AssemblyStatement (MloadAdd32 dst src)) = printf "assembly { %
 --unparseStatement x = show x
 unparseStatement x = error $ "missing case in call to unparseStatement: " ++ show x
 
+unparseVarDefEntry :: VarDefEntry -> String
+unparseVarDefEntry BlankEntry = ""
+unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName) =
+  let typeString = case maybeType of
+                       Nothing -> "var" -- TODO: This isn't exactly correct to put "var" inside a tuple
+                       Just theType -> unparseVarType theType
+      locString = case maybeLoc of
+                      Nothing -> " "
+                      Just Memory -> " memory "
+                      Just Storage -> " storage "
+  in typeString ++ locString ++ theName
+
+
+
 unparseSimpleStatement :: SimpleStatement -> String
-unparseSimpleStatement (VariableDefinition maybeType maybeLoc names maybeVal) =
-  let typeString =
-        case maybeType of
-          Nothing -> "var"
-          Just theType -> unparseVarType theType
-      locString =
-        case maybeLoc of
-          Nothing -> " "
-          Just Memory -> " memory "
-          Just Storage -> " storage "
-      nameString =
-        case names of
-          [Just n] -> n
-          _ -> "(" ++ List.intercalate ", " (map (fromMaybe "") names) ++ ")"
+unparseSimpleStatement (VariableDefinition entries maybeVal) =
+  let entriesString = case entries of
+                        [e] -> unparseVarDefEntry e
+                        _ -> "(" ++ List.intercalate ", " (map unparseVarDefEntry entries) ++ ")"
       assignmentString =
         case maybeVal of
           Nothing -> ""
           Just e -> " = " ++ unparseExpression e
-  in
-    typeString ++ locString ++ nameString ++ assignmentString
+  in entriesString ++ assignmentString
 unparseSimpleStatement (ExpressionStatement e) = unparseExpression e
 
 -- TODO- deal with parenthesis properly....  this is a bit difficult to do

@@ -407,27 +407,34 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
-runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType maybeLoc varNames maybeExpression)) = do
-  -- todo: use maybeLoc to determine whether to store this locally or create a reference
-  let theType = fromMaybe (todo "type inference not implemented" s) maybeType
+runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression)) = do
+  let maybeLoc = case entries of
+                      [e] -> Xabi.vardefLocation e
+                      es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
+                              -- It is possible to supply locations in tuple definitions, but
+                              -- I'm not sure what that exactly looks like when its not memory.
+                              then todo "storage was not anticipated in a tuple entry" s
+                              else Nothing
+  let singleType = case entries of
+                      [e] -> fromMaybe (todo "type inference not implemented" s) $ Xabi.vardefType e
+                      _ -> todo "could not evaluate expression without tuple type" s
   !value <-
     case maybeExpression of
-      Nothing ->
-        case varNames of
-           [Just _] -> do
-              ctract <- getCurrentContract
-              return $ defaultValue ctract theType
-           _ -> internalError "no single name for variable definition" varNames
+      Nothing -> do
+        ctract <- getCurrentContract
+        return $ defaultValue ctract singleType
       Just e -> do
         rhs <- expToVar e
 
         let getRef = SReference <$> expToPath e
             getValue = getVar =<< expToVar e
-        case (rhs, theType) of
+        case (rhs, singleType) of
           -- Don't use `getVar` here to avoid infinite recurions
           -- on intended references.
           (Constant c, _) -> return c
           (Variable v, _) -> liftIO $ readIORef v
+          -- Tuples cannot be stored, so its ok to be strict in singleType
+          -- past this point.
           (_, Xabi.Array{}) -> getValue
           (_, Xabi.Label name) -> do
             ty <- getTypeOfName name
@@ -439,17 +446,24 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType maybeLoc
 
   onTraced $ do
     valueString <- showSM value
-    liftIO $ putStrLn $ "             creating and setting variables: (" ++ intercalate ", " (map (fromMaybe "") varNames) ++ ")"
-    liftIO $ putStrLn $ "             to: " ++ valueString
+    let toName :: Xabi.VarDefEntry -> String
+        toName Xabi.BlankEntry = ""
+        toName vde = Xabi.vardefName vde
+    liftIO $ printf "             creating and setting variables: (%s)" $
+        intercalate ", " (map toName entries)
+    liftIO $ printf "             to: %s" valueString
+  let ensureType :: Maybe Xabi.Type -> Xabi.Type
+      ensureType = fromMaybe (todo "type inference not implemented" s)
 
-  case (varNames, value) of
-    ([Just name], _) -> do
-      addLocalVariable theType name value
+  case (entries, value) of
+    ([Xabi.VarDefEntry mType _ name], _) -> addLocalVariable (ensureType mType) name value
+    ([Xabi.BlankEntry], _) -> parseError "cannot declare single nameless variable" s
     (_, STuple variables) -> do
-      checkArity "var declaration tuple" (V.length variables) (length varNames)
-      forM_ [(n, v) | (Just n, v) <- zip varNames $ V.toList variables] $ \(name', variable') -> do
+      checkArity "var declaration tuple" (V.length variables) (length entries)
+      let nonBlanks = [(ensureType t, n, v) | (Xabi.VarDefEntry t _ n, v) <- zip entries $ V.toList variables]
+      forM_ nonBlanks $ \(theType', name', variable') -> do
         value' <- getVar variable'
-        addLocalVariable theType name' value'
+        addLocalVariable theType' name' value'
 
     _ -> typeError "VariableDefinition expected a tuple" value
 

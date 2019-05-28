@@ -2063,3 +2063,21 @@ contract qq {
   }
 }|]
     getAll [ [Field "names", ArrayIndex 0, Field "n"] ] `shouldReturn` [BString "stref"]
+
+  it "can declare types for a tuple" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  string y;
+  function f() returns (uint, string) {
+    return (0x42, "ok");
+  }
+
+  constructor() public {
+    (uint _x, string _y) = f();
+    x = _x;
+    y = _y;
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 0x42, BString "ok"]
+

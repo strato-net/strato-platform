@@ -23,8 +23,14 @@ data Statement =
 
 data Location = Memory | Storage deriving (Show, Read, Eq, Generic, NFData, Binary)
 
+data VarDefEntry = BlankEntry
+                 | VarDefEntry { vardefType :: Maybe Type
+                               , vardefLocation :: Maybe Location
+                               , vardefName :: String
+                               } deriving (Show, Read, Eq, Generic, NFData, Binary)
+
 data SimpleStatement =
-  VariableDefinition (Maybe Type) (Maybe Location) [Maybe String] (Maybe Expression) -- Nothing type indicates "var" keyword
+  VariableDefinition [VarDefEntry] (Maybe Expression) -- Nothing type indicates "var" keyword
   | ExpressionStatement Expression deriving (Show, Read, Eq, Generic, NFData, Binary)
 
 -- Currently, the only supported inline assembly is:
@@ -33,8 +39,6 @@ data SimpleStatement =
 -- }
 -- Anything else is a parse error.
 data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Read, Eq, Generic, NFData, Binary)
-
-
 
 
 

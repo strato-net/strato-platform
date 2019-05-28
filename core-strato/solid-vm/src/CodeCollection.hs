@@ -162,7 +162,7 @@ expressionCrawler = \case
 simpleStatementCrawler :: Xabi.SimpleStatement -> [T.Text]
 simpleStatementCrawler = \case
   Xabi.ExpressionStatement expr -> expressionCrawler expr
-  Xabi.VariableDefinition _ _ _ mExpr -> maybe [] expressionCrawler mExpr
+  Xabi.VariableDefinition _ mExpr -> maybe [] expressionCrawler mExpr
 
 funcCrawler :: Xabi.Func -> [T.Text]
 funcCrawler = maybe [] (concatMap statementCrawler) . Xabi.funcContents

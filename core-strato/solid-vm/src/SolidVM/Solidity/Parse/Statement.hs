@@ -12,6 +12,7 @@ import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
 import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Solidity.Xabi.Type
 
 
 
@@ -80,15 +81,26 @@ forStatement = do
 
 --ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
 
+location :: SolidityParser (Maybe Location)
+location = optionMaybe $ asum [ reserved "memory" >> return Memory
+                              , reserved "storage" >> return Storage
+                              ]
+
+varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
+varDefEntry tpar = liftM3 VarDefEntry tpar location identifier
+
 variableDefinitionStatement :: SolidityParser SimpleStatement
 variableDefinitionStatement = do
-  theType <- ((reserved "var" >> return Nothing) <|> Just <$> simpleTypeExpression)
-  mLoc <- optionMaybe $ asum [ reserved "memory" >> return Memory
-                             , reserved "storage" >> return Storage
-                             ]
-  names <- fmap ((:[]) . Just) identifier <|> parens (commaSep1 $ optionMaybe $ identifier)
-  expr <- optionMaybe (reservedOp "=" >> expression)
-  return $ VariableDefinition theType mLoc names expr
+  -- If "var", parse a standalone vardef or a type free tuple
+  -- If there's a type, this must not be a tuple
+  -- Otherwise, we have a tuple that needs to have a type on each entry
+  vardefs <- choice $ map try
+      [ reserved "var" >> fmap (:[]) (varDefEntry (return Nothing))
+      , reserved "var" >> parens (commaSep1 $ varDefEntry (return Nothing))
+      , (:[]) <$> varDefEntry (Just <$> simpleTypeExpression)
+      , parens (commaSep1 $ varDefEntry (Just <$> simpleTypeExpression))
+      ]
+  VariableDefinition vardefs <$> optionMaybe (reservedOp "=" >> expression)
 
 expression :: SolidityParser Expression
 expression =
