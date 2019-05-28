@@ -841,7 +841,6 @@ expToVar' (Xabi.FunctionCall e args) = do
   argVals <- for args $ \(Nothing, arg) -> getVar =<< expToVar arg --TODO- add support for named arguments
   case var of
     Constant (SReference (AddressedPath address (MS.StoragePath pieces))) -> do
-      liftIO $ putStrLn $ "################## " ++ show pieces
       val' <- getSolid address (MS.StoragePath $ init pieces)
       case (val', last pieces) of
         (MS.BContract _ toAddress, MS.Field funcName) -> do
