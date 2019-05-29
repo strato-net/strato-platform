@@ -522,6 +522,9 @@ getXabiValueType (AddressedPath loc path) = do
            MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
            MS.ArrayIndex{} -> return v
            _ -> typeError "non-length or array index attribute of array" x
+         Xabi.String{} -> case x of
+           MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
+           _ -> typeError "non-length attribute of string" x
          Xabi.Label s -> do
            t' <- getTypeOfName s
            case (x, t') of

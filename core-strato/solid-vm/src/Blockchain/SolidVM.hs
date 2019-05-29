@@ -677,8 +677,16 @@ expToVar' (Xabi.MemberAccess expr name) = do
 
       (SContract contractName' a, funcName) -> return $ SContractFunction contractName' a funcName
       (SReference p, "push") -> return $ SPush p
-      (SReference p, itemName) -> return . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
       (SString s, "length") -> return . SInteger . fromIntegral $ length s
+      (SReference apt, "length") -> do
+        ty <- getValueType apt
+        case ty of
+          TString -> do
+            SString s <- getVar var
+            return . SInteger . fromIntegral $ length s
+          _ -> return . SReference . apSnoc apt $ MS.Field "length"
+        
+      (SReference p, itemName) -> return . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
       _ -> error $ "invalid constant: " ++ show c
 
     Variable vref -> do
