@@ -53,7 +53,7 @@ async function getHealthStatus() {
 
   if (systemInfo) {
     systemInfoStatus = systemInfo.latestHealthStatus;
-    systemInfoMessages = systemInfo.additionalInfo.split('"Alerts":')[1].split('}')[0];
+    systemInfoMessages = systemInfoStatus ? "" : systemInfo.additionalInfo.split('"Alerts":')[1].split('}')[0];
   }
   emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
   emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, uptimeDur / 1000);
