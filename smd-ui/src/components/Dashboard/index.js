@@ -92,7 +92,17 @@ class Dashboard extends Component {
     const health = this.props.dashboard.healthStatus;
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
+    let isHovering = this.props.dashboard.ifHovering;
     let connection = true;
+    //this.handleMouseHover = this.handleMouseHover.bind(this);
+
+    const handleMouseHover = () => {
+      this.setState(toggleHoverState);
+    }
+
+    const toggleHoverState = () => {
+      isHovering = !isHovering
+    }
 
     socket.on('disconnect', e => {
       connection = false;
@@ -106,13 +116,17 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-3">
+          <div className="col-sm-3"
+               onMouseEnter={handleMouseHover}
+               onMouseLeave={handleMouseHover}
+          >
             <NumberCard
               number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
               description= {connection ? (sec2Date(uptime)):"No Connection"}
               mode={health ? 'success':'warning' }
               iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />
+            {isHovering && <div> systemWarnings </div>}
           </div>
           <div className="col-sm-3">
             <Link to="/blocks">

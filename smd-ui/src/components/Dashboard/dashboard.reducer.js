@@ -30,7 +30,8 @@ const initialState = {
   healthStatus: false,
   uptime: 0,
   systemStatus:false,
-  systemWarnings: ""
+  systemWarnings: "",
+  ifHovering:false
 };
 
 const reducer = function (state = initialState, action) {
