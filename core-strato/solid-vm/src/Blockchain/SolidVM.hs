@@ -840,6 +840,12 @@ expToVar' (Xabi.FunctionCall e args) = do
           case res of
             Just v -> return $ Constant $ v
             Nothing -> return $ Constant SNULL
+        (MS.BAddress toAddress, MS.Field funcName) -> do
+          fromAddress <- getCurrentAddress
+          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
+          case res of
+            Just v -> return $ Constant $ v
+            Nothing -> return $ Constant SNULL
         x -> error $ "poppy: " ++ show x
 
     Constant (SBuiltinFunction name o) -> fmap Constant $ callBuiltin name argVals o
