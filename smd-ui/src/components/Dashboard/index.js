@@ -52,6 +52,13 @@ const tourSteps = [
 
 class Dashboard extends Component {
 
+  constructor(props) {
+    super(props);
+    this.handleMouseHover = this.handleMouseHover.bind(this);
+    this.state = {
+      isHovering: false,
+    }
+  }
   componentDidMount() {
     this.props.subscribeRoom(LAST_BLOCK_NUMBER)
     this.props.subscribeRoom(USERS_COUNT)
@@ -82,6 +89,12 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(GET_SYSTEM_INFO)
   }
 
+  handleMouseHover (){
+    this.setState({
+      isHovering: !this.state.isHovering
+    });
+  };
+
   render() {
     const difficultyData = this.props.dashboard.blockDifficulty;
     const txCount = this.props.dashboard.transactionsCount;
@@ -92,17 +105,9 @@ class Dashboard extends Component {
     const health = this.props.dashboard.healthStatus;
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
-    let isHovering = this.props.dashboard.ifHovering;
     let connection = true;
     //this.handleMouseHover = this.handleMouseHover.bind(this);
 
-    const handleMouseHover = () => {
-      this.setState(toggleHoverState);
-    }
-
-    const toggleHoverState = () => {
-      isHovering = !isHovering
-    }
 
     socket.on('disconnect', e => {
       connection = false;
@@ -117,8 +122,8 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3"
-               onMouseEnter={handleMouseHover}
-               onMouseLeave={handleMouseHover}
+               onMouseEnter={this.handleMouseHover}
+               onMouseLeave={this.handleMouseHover}
           >
             <NumberCard
               number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
@@ -126,7 +131,7 @@ class Dashboard extends Component {
               mode={health ? 'success':'warning' }
               iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />
-            {isHovering && <div> systemWarnings </div>}
+            {this.state.isHovering && <div> Warnings: {systemWarnings} </div>}
           </div>
           <div className="col-sm-3">
             <Link to="/blocks">
