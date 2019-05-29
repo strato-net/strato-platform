@@ -369,7 +369,8 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
     Xabi.Array{} -> do
       onTraced $ liftIO $ putStrLn $ "Array copy to " ++ show p1
       let p2 = case v2 of
-                  StorageItem p2' -> p2'
+                  StorageItem _ -> error "StorageItem is deprecated" -- p2'
+--                  StorageItem p2' -> p2'
                   (Constant (SReference p2')) -> p2'
                   _ -> todo "unhandled array copy" v2
       len <- getInt . Constant . SReference $ p2 `apSnoc` MS.Field "length"
@@ -531,7 +532,8 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
     parvar <- expToVar parent
     case parvar of
-      StorageItem apt -> return apt
+      StorageItem _ -> error "StorageItem is deprecated"
+--      StorageItem apt -> return apt
       Constant (SReference apt) -> return apt
       _ -> expToPath parent
 
@@ -562,7 +564,7 @@ expToPath (Xabi.MemberAccess parent field) = do
   apt <- do
     parvar <- expToVar parent
     case parvar of
-      StorageItem p -> return p
+--      StorageItem p -> return p
       _ -> expToPath parent
   return . apSnoc apt . MS.Field $ BC.pack field
 
@@ -703,6 +705,8 @@ expToVar' (Xabi.MemberAccess expr name) = do
         SReference apt -> do
           return . Constant . SReference . apSnoc apt . MS.Field $ BC.pack name
         _ -> todo "access member of variable" (val', name)
+    StorageItem _ -> error "StorageItem is deprecated"
+{-      
     StorageItem apt -> case name of
       -- TODO(tim): This will not work correctly with struct fields named push
       "push" -> return . Constant $ SPush apt
@@ -721,7 +725,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
             SStruct _ theMap -> return
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
-            _ -> todo "access member of storage item" (val', name, apt)
+            _ -> todo "access member of storage item" (val', name, apt) -}
 
 expToVar' x@(Xabi.IndexAccess{}) = Constant . SReference <$> expToPath x
 
