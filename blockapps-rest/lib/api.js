@@ -1,6 +1,4 @@
-import {
-  BigNumber,
-} from 'bignumber.js'
+import { BigNumber } from "bignumber.js";
 import {
   Endpoint,
   constructMetadata,
@@ -9,48 +7,46 @@ import {
   post,
   postue,
   getNodeUrl,
-  setAuthHeaders,
-} from './util/api.util'
-import {
-  TxPayloadType,
-} from './constants'
+  setAuthHeaders
+} from "./util/api.util";
+import { TxPayloadType } from "./constants";
 
 async function getUsers(args, options) {
-  const url = getNodeUrl(options)
-  const endpoint = constructEndpoint(Endpoint.USERS, options)
-  return get(url, endpoint, options)
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.USERS, options);
+  return get(url, endpoint, options);
 }
 
 async function getUser(args, options) {
-  const url = getNodeUrl(options)
+  const url = getNodeUrl(options);
   const urlParams = {
-    username: args.username,
-  }
-  const endpoint = constructEndpoint(Endpoint.USER, options, urlParams)
-  return get(url, endpoint, options)
+    username: args.username
+  };
+  const endpoint = constructEndpoint(Endpoint.USER, options, urlParams);
+  return get(url, endpoint, options);
 }
 
 async function createUser(args, options) {
-  const url = getNodeUrl(options)
+  const url = getNodeUrl(options);
   const data = {
-    password: args.password,
-  }
+    password: args.password
+  };
   const urlParams = {
-    username: args.username,
-  }
-  const endpoint = constructEndpoint(Endpoint.USER, options, urlParams)
-  return postue(url, endpoint, data, options)
+    username: args.username
+  };
+  const endpoint = constructEndpoint(Endpoint.USER, options, urlParams);
+  return postue(url, endpoint, data, options);
 }
 
 async function fill(user, options) {
-  const body = {}
-  const url = getNodeUrl(options)
+  const body = {};
+  const url = getNodeUrl(options);
   const urlParams = {
     username: user.username,
-    address: user.address,
-  }
-  const endpoint = constructEndpoint(Endpoint.FILL, options, urlParams)
-  return postue(url, endpoint, body, options)
+    address: user.address
+  };
+  const endpoint = constructEndpoint(Endpoint.FILL, options, urlParams);
+  return postue(url, endpoint, body, options);
 }
 
 async function createContractBloc(user, contract, options) {
@@ -59,15 +55,15 @@ async function createContractBloc(user, contract, options) {
     contract: contract.name,
     src: contract.source,
     args: contract.args,
-    metadata: constructMetadata(options, contract.name),
-  }
-  const url = getNodeUrl(options)
+    metadata: constructMetadata(options, contract.name)
+  };
+  const url = getNodeUrl(options);
   const urlParams = {
     username: user.username,
-    address: user.address,
-  }
-  const endpoint = constructEndpoint(Endpoint.CONTRACT, options, urlParams)
-  return post(url, endpoint, body, options)
+    address: user.address
+  };
+  const endpoint = constructEndpoint(Endpoint.CONTRACT, options, urlParams);
+  return post(url, endpoint, body, options);
 }
 
 async function createContractAuth(user, contract, options) {
@@ -75,16 +71,18 @@ async function createContractAuth(user, contract, options) {
     contract: contract.name,
     src: contract.source,
     args: contract.args,
-    metadata: constructMetadata(options, contract.name),
-  }
+    metadata: constructMetadata(options, contract.name)
+  };
   const body = {
-    txs: [{
-      payload,
-      type: TxPayloadType.CONTRACT,
-    }],
-  }
-  const pendingTxResult = await sendTransactions(user, body, options)
-  return pendingTxResult
+    txs: [
+      {
+        payload,
+        type: TxPayloadType.CONTRACT
+      }
+    ]
+  };
+  const pendingTxResult = await sendTransactions(user, body, options);
+  return pendingTxResult;
 }
 
 async function createContractListAuth(user, contracts, options) {
@@ -93,210 +91,193 @@ async function createContractListAuth(user, contracts, options) {
       contract: contract.name,
       src: contract.source,
       args: contract.args,
-      metadata: constructMetadata(options, contract.name),
-    }
+      metadata: constructMetadata(options, contract.name)
+    };
     const tx = {
       payload,
-      type: TxPayloadType.CONTRACT,
-    }
-    return tx
-  })
+      type: TxPayloadType.CONTRACT
+    };
+    return tx;
+  });
   const body = {
-    txs,
-  }
-  const pendingTxResultList = await sendTransactions(user, body, options)
-  return pendingTxResultList
+    txs
+  };
+  const pendingTxResultList = await sendTransactions(user, body, options);
+  return pendingTxResultList;
 }
 
-async function blocResults(hashes, options) { // TODO untested code
-  const url = getNodeUrl(options)
-  const endpoint = constructEndpoint(Endpoint.TXRESULTS, options)
-  return post(url, endpoint, hashes, options)
+async function blocResults(hashes, options) {
+  // TODO untested code
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.TXRESULTS, options);
+  return post(url, endpoint, hashes, options);
 }
 
 async function getState(contract, options) {
-  const url = getNodeUrl(options)
+  const url = getNodeUrl(options);
   const urlParams = {
     name: contract.name,
-    address: contract.address,
-  }
-  const endpoint = constructEndpoint(Endpoint.STATE, options, urlParams)
-  return get(url, endpoint, options)
+    address: contract.address
+  };
+  const endpoint = constructEndpoint(Endpoint.STATE, options, urlParams);
+  return get(url, endpoint, options);
 }
 
 async function callBloc(user, callMethodArgs, options) {
-  const {
-    contract,
-    method,
-    args,
-    value,
-  } = callMethodArgs
-  const valueFixed = (value instanceof BigNumber) ? value.toFixed(0) : value
+  const { contract, method, args, value } = callMethodArgs;
+  const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
   const body = {
     password: user.password,
     method,
     args,
     value: valueFixed,
-    metadata: constructMetadata(options, contract.name),
-  }
-  const url = getNodeUrl(options)
+    metadata: constructMetadata(options, contract.name)
+  };
+  const url = getNodeUrl(options);
   const urlParams = {
     username: user.username,
     address: user.address,
     contractName: contract.name,
-    contractAddress: contract.address,
-  }
-  const endpoint = constructEndpoint(Endpoint.CALL, options, urlParams)
-  return post(url, endpoint, body, options)
+    contractAddress: contract.address
+  };
+  const endpoint = constructEndpoint(Endpoint.CALL, options, urlParams);
+  return post(url, endpoint, body, options);
 }
 
 async function callAuth(user, callMethodArgs, options) {
-  const {
-    contract,
-    method,
-    args,
-    value,
-  } = callMethodArgs
-  const valueFixed = (value instanceof BigNumber) ? value.toFixed(0) : value
+  const { contract, method, args, value } = callMethodArgs;
+  const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
   const payload = {
     contractName: contract.name,
     contractAddress: contract.address,
     value: valueFixed,
     method,
     args,
-    metadata: constructMetadata(options, contract.name),
-  }
+    metadata: constructMetadata(options, contract.name)
+  };
   const tx = {
     payload,
-    type: TxPayloadType.FUNCTION,
-  }
+    type: TxPayloadType.FUNCTION
+  };
   const body = {
-    txs: [tx],
-  }
-  const pendingTxResult = await sendTransactions(user, body, options)
-  return pendingTxResult
+    txs: [tx]
+  };
+  const pendingTxResult = await sendTransactions(user, body, options);
+  return pendingTxResult;
 }
 
 async function callListAuth(user, callListArgs, options) {
   const txs = callListArgs.map(callArgs => {
-    const {
-      contract,
-      method,
-      args,
-      value,
-    } = callArgs
-    const valueFixed = (value instanceof BigNumber) ? value.toFixed(0) : value
+    const { contract, method, args, value } = callArgs;
+    const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
     const payload = {
       contractName: contract.name,
       contractAddress: contract.address,
       value: valueFixed,
       method,
       args,
-      metadata: constructMetadata(options, contract.name),
-    }
+      metadata: constructMetadata(options, contract.name)
+    };
     const tx = {
       payload,
-      type: TxPayloadType.FUNCTION,
-    }
-    return tx
-  })
+      type: TxPayloadType.FUNCTION
+    };
+    return tx;
+  });
   const body = {
-    txs,
-  }
-  const pendingTxResultList = await sendTransactions(user, body, options)
-  return pendingTxResultList
+    txs
+  };
+  const pendingTxResultList = await sendTransactions(user, body, options);
+  return pendingTxResultList;
 }
 
 async function callListBloc(user, callListArgs, options) {
-  let nonce = 1
+  // let nonce = 1
   const txs = callListArgs.map(callArgs => {
-    const {
-      contract,
-      method,
-      args,
-      value,
-    } = callArgs
-    const valueFixed = (value instanceof BigNumber) ? value.toFixed(0) : value
+    const { contract, method, args, value } = callArgs;
+    const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
     const tx = {
       contractName: contract.name,
       contractAddress: contract.address,
       methodName: method,
       args,
       value: valueFixed,
-      txParams: {
-        nonce,
-      },
-      metadata: constructMetadata(options, contract.name),
-    }
-    nonce += 1
-    return tx
-  })
+      // txParams: {
+      //   // nonce,
+      // },
+      metadata: constructMetadata(options, contract.name)
+    };
+    // nonce += 1
+    return tx;
+  });
   const body = {
     password: user.password,
     txs,
-    resolve: !options.isAsync,
-  }
-  const url = getNodeUrl(options)
+    resolve: !options.isAsync
+  };
+  const url = getNodeUrl(options);
   const urlParams = {
     username: user.username,
-    address: user.address,
-  }
-  const endpoint = constructEndpoint(Endpoint.CALL_LIST, options, urlParams)
-  return post(url, endpoint, body, options)
+    address: user.address
+  };
+  const endpoint = constructEndpoint(Endpoint.CALL_LIST, options, urlParams);
+  return post(url, endpoint, body, options);
 }
 
 async function sendTransactions(user, body, options) {
-  const url = getNodeUrl(options)
-  const endpoint = constructEndpoint(Endpoint.SEND, options)
-  return post(url, endpoint, body, setAuthHeaders(user, options))
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.SEND, options);
+  return post(url, endpoint, body, setAuthHeaders(user, options));
 }
 
 async function send(user, sendTx, options) {
   const body = {
-    txs: [{
-      payload: sendTx,
-      type: TxPayloadType.TRANSFER,
-    }],
-  }
-  return sendTransactions(user, body, options)
+    txs: [
+      {
+        payload: sendTx,
+        type: TxPayloadType.TRANSFER
+      }
+    ]
+  };
+  return sendTransactions(user, body, options);
 }
 
 async function getKey(user, options) {
-  const url = getNodeUrl(options)
-  const endpoint = constructEndpoint(Endpoint.KEY, options)
-  return get(url, endpoint, setAuthHeaders(user, options))
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.KEY, options);
+  return get(url, endpoint, setAuthHeaders(user, options));
 }
 
 async function createKey(user, options) {
-  const url = getNodeUrl(options)
-  const endpoint = constructEndpoint(Endpoint.KEY, options)
-  const body = {}
-  return post(url, endpoint, body, setAuthHeaders(user, options))
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.KEY, options);
+  const body = {};
+  return post(url, endpoint, body, setAuthHeaders(user, options));
 }
 
 async function search(contract, options) {
   const url = getNodeUrl(options);
   const urlParams = {
-    name: contract.name,
-  }
-  const endpoint = constructEndpoint(Endpoint.SEARCH, options, urlParams)
-  return get(url, endpoint, options)
+    name: contract.name
+  };
+  const endpoint = constructEndpoint(Endpoint.SEARCH, options, urlParams);
+  return get(url, endpoint, options);
 }
 
 // TODO: check options.params and options.headers in axoos wrapper.
 async function getChains(chainIds, options) {
-  const url = getNodeUrl(options)
+  const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.CHAIN, {
     config: options.config,
-    chainIds,
-  })
-  return get(url, endpoint, options)
+    chainIds
+  });
+  return get(url, endpoint, options);
 }
 
 async function createChain(body, options) {
-  const url = getNodeUrl(options)
-  const endpoint = constructEndpoint(Endpoint.CHAIN, options)
-  return await post(url, endpoint, body, options)
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.CHAIN, options);
+  return await post(url, endpoint, body, options);
 }
 
 export default {
@@ -319,5 +300,5 @@ export default {
   createKey,
   search,
   getChains,
-  createChain,
-}
+  createChain
+};
