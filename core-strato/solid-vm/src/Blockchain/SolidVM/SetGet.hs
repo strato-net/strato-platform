@@ -157,7 +157,6 @@ getVar' mTypeHint (Constant c) = do
     SReference apt -> getStorageItem mTypeHint apt
     STuple vs -> STuple <$> V.mapM (fmap Constant . getVar' Nothing) vs
     _ -> return c
-getVar' _ (StorageItem _) = error "StorageItem is deprecated"
 
 
 

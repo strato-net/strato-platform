@@ -369,8 +369,6 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
     Xabi.Array{} -> do
       onTraced $ liftIO $ putStrLn $ "Array copy to " ++ show p1
       let p2 = case v2 of
-                  StorageItem _ -> error "StorageItem is deprecated" -- p2'
---                  StorageItem p2' -> p2'
                   (Constant (SReference p2')) -> p2'
                   _ -> todo "unhandled array copy" v2
       len <- getInt . Constant . SReference $ p2 `apSnoc` MS.Field "length"
@@ -398,20 +396,11 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition maybeType varNames
       Just e -> do
         rhs <- expToVar e
 
-        let getRef = SReference <$> expToPath e
-            getValue = getVar =<< expToVar e
         case (rhs, theType) of
           -- Don't use `getVar` here to avoid infinite recurions
           -- on intended references.
           (Constant c, _) -> return c
           (Variable v, _) -> liftIO $ readIORef v
-          (_, Xabi.Array{}) -> getValue
-          (_, Xabi.Label name) -> do
-            ty <- getTypeOfName name
-            case ty of
-              StructTypo{} -> getRef
-              _ -> getValue
-          _ -> getValue
 
       Nothing ->
         case varNames of
@@ -532,8 +521,6 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
     parvar <- expToVar parent
     case parvar of
-      StorageItem _ -> error "StorageItem is deprecated"
---      StorageItem apt -> return apt
       Constant (SReference apt) -> return apt
       _ -> expToPath parent
 
@@ -564,7 +551,6 @@ expToPath (Xabi.MemberAccess parent field) = do
   apt <- do
     parvar <- expToVar parent
     case parvar of
---      StorageItem p -> return p
       _ -> expToPath parent
   return . apSnoc apt . MS.Field $ BC.pack field
 
@@ -705,7 +691,6 @@ expToVar' (Xabi.MemberAccess expr name) = do
         SReference apt -> do
           return . Constant . SReference . apSnoc apt . MS.Field $ BC.pack name
         _ -> todo "access member of variable" (val', name)
-    StorageItem _ -> error "StorageItem is deprecated"
 {-      
     StorageItem apt -> case name of
       -- TODO(tim): This will not work correctly with struct fields named push

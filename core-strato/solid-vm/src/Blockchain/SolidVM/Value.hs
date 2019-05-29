@@ -53,12 +53,10 @@ instance Show AddressedPath where
 
 data Variable = Variable (IORef Value)
   | Constant Value
-  | StorageItem AddressedPath
 
 instance Show Variable where
   show (Variable _) = "<variable>"
   show (Constant v) = "Constant: " ++ show v
-  show (StorageItem apt) = printf "<storage %s>" (show apt)
 
 --TODO- we need to figure out this ambiguity on the Address types....
 --Sometimes address is and integer (solidity can treat an integer as an address),

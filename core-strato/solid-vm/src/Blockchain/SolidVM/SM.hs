@@ -294,7 +294,6 @@ getVariableOfName name = do
             SReference ap -> return $ Constant $ SReference ap
             _ -> return . Constant . SReference . AddressedPath (Left LocalVar)
                         . MS.singleton $ BC.pack name
-        StorageItem{} -> error "StorageItem is deprecated" -- return s
         Constant{} -> return . Constant . SReference . AddressedPath (Left LocalVar)
                              . MS.singleton $ BC.pack name
 
