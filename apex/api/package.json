@@ -23,7 +23,7 @@
     "aws-sdk": "2.254.1",
     "bcrypt": "1.0.3",
     "big-integer": "^1.6.26",
-    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#develop",
+    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#v6.4.1",
     "body-parser": "1.18.2",
     "chai": "4.1.2",
     "chai-http": "3.0.0",
