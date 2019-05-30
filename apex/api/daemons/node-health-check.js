@@ -266,7 +266,7 @@ async function checkSystemInfo() {
         console.log(info.total);
         winston.warn(info.free / info.total)
       }
-    }
+    })
     return [ifHealthy, sysInfoCollected];
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
