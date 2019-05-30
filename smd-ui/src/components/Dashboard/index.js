@@ -106,7 +106,6 @@ class Dashboard extends Component {
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
     let connection = true;
-    //this.handleMouseHover = this.handleMouseHover.bind(this);
 
 
     socket.on('disconnect', e => {
@@ -128,7 +127,7 @@ class Dashboard extends Component {
             <NumberCard
               number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
               description= {connection ? (sec2Date(uptime)):"No Connection"}
-              mode={health ? 'success':'warning' }
+              mode={(health && systemHealth) ? 'success':'warning' }
               iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />
             {this.state.isHovering && <div> Warnings: {systemWarnings} </div>}

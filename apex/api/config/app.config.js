@@ -40,6 +40,6 @@ module.exports = {
       cleanFrequency: 5 * 60 * 1000, //clean db every 5 mins
       retention_hours: 1 * 24,
       progressWindow: 10 * 60 * 1000,
-      memoryUsageBound: 0.02 // Alert when mem.free/mem.total < 2%
+      memoryUsageBound: 0.05 // Alert when mem.free/mem.total < 5%
   }
 };
