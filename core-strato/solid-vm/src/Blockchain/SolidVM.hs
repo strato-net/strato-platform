@@ -333,10 +333,10 @@ callWrapper from to mContract functionName argExps = do
 
 printFullStackTrace :: SM ()
 printFullStackTrace = do
-  theCallStackVariables <- fmap (map localByPath) $ gets callStack
-  forM_ theCallStackVariables $ \localVars -> do
-    liftIO $ putStrLn "---------------------"
-    forM_ (HM.toList localVars) $ \(name, value) -> do
+  theCallStack <- gets callStack
+  forM_ theCallStack $ \slice -> do
+    liftIO $ putStrLn $ "-----[variables for " ++ format (currentAddress slice) ++ "/" ++ currentFunctionName slice ++ "]----------------"
+    forM_ (HM.toList $ localByPath slice) $ \(name, value) -> do
       liftIO $ putStrLn $ "    \"" ++ format name ++ "\": " ++ format value
 
 
