@@ -349,14 +349,10 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
       $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
       let canUseCache = chainId == Nothing
       -- TODO: Run the checks Bagger does reject invalid transactions for private chains
-      actions <- addTransactions canUseCache bd (blockDataGasLimit $ obBlockData b) txs
-      flushMemAddressStateTxToBlockDB
-
-
+      (actions, asm) <- addTransactions canUseCache bd (blockDataGasLimit $ obBlockData b) txs
       when (not flags_sqlDiff) $ timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $ do
-        asm <- getAddressStateBlockDBMap
-        lift $ updateSQLBalanceAndNonce $ [((theAddress, chainId), (addressStateBalance asMod, addressStateNonce asMod)) | (theAddress, ASModification asMod) <- M.toList asm]
---        lift $ updateSQLBalanceAndNonce $ map (fmap (\(ASModification x) -> (addressStateBalance x, addressStateNonce x))) $ M.toList asm
+        lift $ updateSQLBalanceAndNonce $ [((theAddress, chainId), (addressStateBalance asMod, addressStateNonce asMod))
+                                        | (theAddress, ASModification asMod) <- M.toList asm]
 
       timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
       timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
@@ -365,7 +361,7 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "New chain state root: " ++ format sr'
       return actions
 
-addTransactions :: Bool -> BlockData -> Integer -> [OutputTx] -> ContextM [Action]
+addTransactions :: Bool -> BlockData -> Integer -> [OutputTx] -> ContextM ([Action], M.Map Address AddressStateModification)
 addTransactions canCache blockData blockGas0 txs = timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
   mtrrs <- if canCache
             then Bagger.getCachedRunResults blockData
@@ -382,7 +378,8 @@ addTransactions canCache blockData blockGas0 txs = timeit ("addTransactions, " +
       Mod.put Proxy cachedSR
       return cachedTRRs
   otrs <- mapM (outputTransactionResult blockData blockHeaderHash) trrs
-  return $ catMaybes otrs
+  let asms = M.unions . reverse $ map trrAfterMap trrs
+  return (catMaybes otrs, asms)
 
   where
     go _ [] trrs = return $ reverse trrs
