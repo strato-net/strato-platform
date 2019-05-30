@@ -176,7 +176,7 @@ instance Bagger.MonadBagger ContextM where
                                        , transactionResultKind             = Nothing
                                        }
 
-    cacheRunResults bd (sr, gasRemaining, trrs) = do
+    cacheRunResults bd (sr, gasRemaining, trrs) = when flags_cacheTransactionResults $ do
       -- Private run results should not be cached, as on the second run
       -- the hydrated transaction will reach a different stateroot.
       -- Filtering them out makes the assumption that the inclusion of the unhydrated
@@ -188,19 +188,22 @@ instance Bagger.MonadBagger ContextM where
       cache <- State.gets contextTxRunResultsCache
       liftIO $ TRC.insert cache bhash (sr, gasRemaining, publicTrrs)
 
-    getCachedRunResults bd = do
-      cache <- State.gets contextTxRunResultsCache
-      let pHash = blockHeaderPartialHash bd
-      mres <- liftIO $ TRC.lookup cache pHash
-      case mres of
-        Nothing -> do
-          $logInfoLS "getCachedRunResults/cache_miss" . T.pack $ format pHash
-          $logDebugLS "getCacheRunResults/cache_miss" bd
-          return Nothing
-        Just (sr, gasRemaining, trrs) -> do
-          $logInfoLS "getCachedRunResults/cache_hit" . T.pack $ format pHash
-          let trrs' = map (rewriteBlockHash (blockHeaderHash bd)) trrs
-          return $ Just (sr, gasRemaining, trrs')
+    getCachedRunResults bd =
+      if not flags_cacheTransactionResults
+        then return Nothing
+        else do
+          cache <- State.gets contextTxRunResultsCache
+          let pHash = blockHeaderPartialHash bd
+          mres <- liftIO $ TRC.lookup cache pHash
+          case mres of
+            Nothing -> do
+              $logInfoLS "getCachedRunResults/cache_miss" . T.pack $ format pHash
+              $logDebugLS "getCacheRunResults/cache_miss" bd
+              return Nothing
+            Just (sr, gasRemaining, trrs) -> do
+              $logInfoLS "getCachedRunResults/cache_hit" . T.pack $ format pHash
+              let trrs' = map (rewriteBlockHash (blockHeaderHash bd)) trrs
+              return $ Just (sr, gasRemaining, trrs')
 
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, SHA) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
