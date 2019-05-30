@@ -187,6 +187,8 @@ const run = async function () {
 
       const signinUri = oauth.getSigninURL()
 
+      console.log(`Open sign-in URL in your browser to sign-in with OAuth and fetch token: ${signinUri}`);
+      
       // launch browser
       await open(signinUri)
 
