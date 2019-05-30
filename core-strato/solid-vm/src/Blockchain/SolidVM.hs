@@ -130,7 +130,7 @@ create' creator ch cc contractName' argExps = do
 
   -- Add Storage
 
-  addCallInfo newAddress contract' ch cc M.empty
+  addCallInfo newAddress contract' (contractName' ++ " constructor") ch cc M.empty
 
   forM_ (M.toList $ contract'^.storageDefs) $ \(n, (Xabi.VariableDecl theType _ maybeExpression)) -> do
     let def = defaultValue contract' theType
@@ -326,13 +326,13 @@ callWrapper from to mContract functionName argExps = do
     case M.lookup functionName $ contract^.functions of
       Just theFunction -> do
         args <- argsToVals contract' theFunction argExps
-        (if from == to then id else pushSender from) $ runTheCall to contract hsh cc theFunction args
+        (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args
       _ -> do --Maybe the function is actually a getter
         case M.lookup functionName $ contract^.storageDefs of
           Just _ -> do
             --TODO- this should only exist if the storage variable is declared
             -- "public", right now I just ignore this and allow anything to be called as a getter
-            fmap Just $ getVar $ StorageItem $ AddressedPath (Right to) . MS.singleton $ BC.pack functionName
+            fmap Just $ getVar $ Constant $ SReference $ AddressedPath (Right to) . MS.singleton $ BC.pack functionName
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
@@ -340,7 +340,9 @@ runStatements :: [Xabi.Statement] -> SM (Maybe Value)
 runStatements [] = return Nothing
 runStatements (s:rest) = do
   onTraced $ do
-    liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
+    funcName <- getCurrentFunctionName
+    liftIO $ putStrLn $ C.green $ funcName ++ "> " ++ unparseStatement s
+
   ret <- runStatement s
   case ret of
     Nothing -> runStatements rest
@@ -384,13 +386,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" e1
             Xabi.Array{} -> do
               onTraced $ liftIO $ putStrLn $ "Array copy to " ++ show p
               let p2 = case var of
-                          StorageItem p2' -> p2'
+                          Constant (SReference p2') -> p2'
                           _ -> todo "unhandled array copy" var
-              len <- getInt . StorageItem $ p2 `apSnoc` MS.Field "length"
+              len <- getInt . Constant . SReference $ p2 `apSnoc` MS.Field "length"
               setVar (p `apSnoc` MS.Field "length") $ SInteger len
               forM_ [0..len-1] $ \i -> do
                 let idx = MS.ArrayIndex $ fromIntegral i
-                rhs' <- getVar . StorageItem $ p2 `apSnoc` idx
+                rhs' <- getVar . Constant . SReference $ p2 `apSnoc` idx
                 setVar (p `apSnoc` idx) rhs'
             _ -> do
               !value <- getVar var
@@ -407,13 +409,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   return Nothing -- just throw away the return value
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression)) = do
-  let maybeLoc = case entries of
-                      [e] -> Xabi.vardefLocation e
-                      es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
-                              -- It is possible to supply locations in tuple definitions, but
-                              -- I'm not sure what that exactly looks like when its not memory.
-                              then todo "storage was not anticipated in a tuple entry" s
-                              else Nothing
+  -- let maybeLoc = case entries of
+  --                     [e] -> Xabi.vardefLocation e
+  --                     es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
+  --                             -- It is possible to supply locations in tuple definitions, but
+  --                             -- I'm not sure what that exactly looks like when its not memory.
+  --                             then todo "storage was not anticipated in a tuple entry" s
+  --                             else Nothing
   let singleType = case entries of
                       [e] -> fromMaybe (todo "type inference not implemented" s) $ Xabi.vardefType e
                       _ -> todo "could not evaluate expression without tuple type" s
@@ -424,24 +426,24 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
         return $ defaultValue ctract singleType
       Just e -> do
         rhs <- expToVar e
-
-        let getRef = SReference <$> expToPath e
-            getValue = getVar =<< expToVar e
         case (rhs, singleType) of
           -- Don't use `getVar` here to avoid infinite recurions
           -- on intended references.
           (Constant c, _) -> return c
           (Variable v, _) -> liftIO $ readIORef v
+        -- let getRef = SReference <$> expToPath e
+        --     getValue = getVar =<< expToVar e
           -- Tuples cannot be stored, so its ok to be strict in singleType
           -- past this point.
-          (_, Xabi.Array{}) -> getValue
-          (_, Xabi.Label name) -> do
-            ty <- getTypeOfName name
-            case (maybeLoc, ty) of
-              (Just Xabi.Memory, _) -> getValue
-              (_, StructTypo{}) -> getRef
-              _ -> getValue
-          _ -> getValue
+          -- Locality should be important?
+          -- (_, Xabi.Array{}) -> getValue
+          -- (_, Xabi.Label name) -> do
+          --   ty <- getTypeOfName name
+          --   case (maybeLoc, ty) of
+          --     (Just Xabi.Memory, _) -> getValue
+          --     (_, StructTypo{}) -> getRef
+          --     _ -> getValue
+          -- _ -> getValue
 
   onTraced $ do
     valueString <- showSM value
@@ -563,7 +565,7 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
     parvar <- expToVar parent
     case parvar of
-      StorageItem apt -> return apt
+      Constant (SReference apt) -> return apt
       _ -> expToPath parent
 
   idxType <- getIndexType parPath
@@ -593,7 +595,6 @@ expToPath (Xabi.MemberAccess parent field) = do
   apt <- do
     parvar <- expToVar parent
     case parvar of
-      StorageItem p -> return p
       _ -> expToPath parent
   return . apSnoc apt . MS.Field $ BC.pack field
 
@@ -723,7 +724,17 @@ expToVar' (Xabi.MemberAccess expr name) = do
       (SAddress addr, itemName) -> return $ SContractItem addr itemName
 
       (SContract contractName' a, funcName) -> return $ SContractFunction contractName' a funcName
+      (SReference p, "push") -> return $ SPush p
       (SString s, "length") -> return . SInteger . fromIntegral $ length s
+      (SReference apt, "length") -> do
+        ty <- getValueType apt
+        case ty of
+          TString -> do
+            SString s <- getVar var
+            return . SInteger . fromIntegral $ length s
+          _ -> return . SReference . apSnoc apt $ MS.Field "length"
+
+      (SReference p, itemName) -> return . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
       _ -> error $ "invalid constant: " ++ show c
 
     Variable vref -> do
@@ -734,8 +745,9 @@ expToVar' (Xabi.MemberAccess expr name) = do
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
         SReference apt -> do
-          return . StorageItem . apSnoc apt . MS.Field $ BC.pack name
+          return . Constant . SReference . apSnoc apt . MS.Field $ BC.pack name
         _ -> todo "access member of variable" (val', name)
+{-
     StorageItem apt -> case name of
       -- TODO(tim): This will not work correctly with struct fields named push
       "push" -> return . Constant $ SPush apt
@@ -745,19 +757,19 @@ expToVar' (Xabi.MemberAccess expr name) = do
           TString -> do
             SString s <- getVar var
             return . Constant . SInteger . fromIntegral $ length s
-          _ -> return . StorageItem . apSnoc apt $ MS.Field "length"
+          _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
       _ -> do
-          val' <- getVar $ StorageItem apt
+          val' <- getVar $ Constant $ SReference apt
           case val' of
             SAddress addr -> return . Constant $ SContractItem addr name
             SContract _ addr -> return . Constant $ SContractItem addr name
             SStruct _ theMap -> return
                 $ fromMaybe (error $ "fetched a struct field that doesn't exist: " ++ name)
                 $ M.lookup name theMap
-            _ -> todo "access member of storage item" (val', name, apt)
+            _ -> todo "access member of storage item" (val', name, apt) -}
 
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
-expToVar' x@(Xabi.IndexAccess{}) = StorageItem <$> expToPath x
+expToVar' x@(Xabi.IndexAccess{}) = Constant . SReference <$> expToPath x
 
 expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar' (Xabi.Binary "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
@@ -889,16 +901,34 @@ expToVar' (Xabi.FunctionCall e args) = do
                  Xabi.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
                  Xabi.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
   case var of
+    Constant (SReference (AddressedPath address (MS.StoragePath pieces))) -> do
+      val' <- getSolid address (MS.StoragePath $ init pieces)
+      case (val', last pieces) of
+        (MS.BContract _ toAddress, MS.Field funcName) -> do
+          fromAddress <- getCurrentAddress
+          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
+          case res of
+            Just v -> return $ Constant $ v
+            Nothing -> return $ Constant SNULL
+        (MS.BAddress toAddress, MS.Field funcName) -> do
+          fromAddress <- getCurrentAddress
+          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
+          case res of
+            Just v -> return $ Constant $ v
+            Nothing -> return $ Constant SNULL
+        x -> todo "expToVar'/FunctionCall" x
+
     Constant (SBuiltinFunction name o) -> case argVals of
       OrderedVals vs -> Constant <$> callBuiltin name vs o
       NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
 
-    Constant (SFunction name) -> do
+
+    Constant (SFunction funcName func) -> do
       contract' <- getCurrentContract
       address <- getCurrentAddress
       (hsh, cc) <- getCurrentCodeCollection
 
-      res <- runTheCall address contract' hsh cc name argVals
+      res <- runTheCall address contract' funcName hsh cc func argVals
       return . Constant . fromMaybe SNULL $ res
 
     Constant (SStructDef structName) -> do
@@ -941,7 +971,7 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant (SPush apt) -> do
       let lenPath = apt `apSnoc` MS.Field "length"
-      len' <- getInt $ StorageItem lenPath
+      len' <- getInt $ Constant $ SReference lenPath
       let len :: Int = fromIntegral len'
           newLen = SInteger $ fromIntegral $ len + 1
           idxPath = apt `apSnoc` MS.ArrayIndex len
@@ -1102,7 +1132,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                     in  map snd . sortWith fst
                       . map (\(n, (Xabi.IndexedType i t, v)) -> (i, (n, (t, coerceType contract' t v))))
                       $ M.toList typeAndVal
-  addCallInfo to contract' hsh cc . fmap (fmap Constant) $ M.fromList zipped
+  addCallInfo to contract' (contractName' ++ " constructer") hsh cc . fmap (fmap Constant) $ M.fromList zipped
   mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
@@ -1140,9 +1170,8 @@ addLocalVariable theType name value = do
           {callStack = currentSlice{localVariables=M.insert name (theType, newVariable) $ localVariables currentSlice}:rest}
 
 
-runTheCall :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> ValList -> SM (Maybe Value)
-runTheCall address' contract' hsh cc theFunction argVals = do
-  --
+runTheCall :: Address -> Contract -> String -> SHA -> CodeCollection -> Xabi.Func -> ValList -> SM (Maybe Value)
+runTheCall address' contract' funcName hsh cc theFunction argVals = do
   let returnMeta = map (\(n, Xabi.IndexedType _ t) -> (T.unpack n, t)) .  M.toList $ Xabi.funcVals theFunction
       returns = map (\(n, t) -> (n, (t, defaultValue contract' t))) returnMeta
       args = case argVals of
@@ -1168,14 +1197,14 @@ runTheCall address' contract' hsh cc theFunction argVals = do
   onTraced $ liftIO $ putStrLn $ "            args: " ++ show (map fst args)
   onTraced $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
-  addCallInfo address' contract' hsh cc $ M.fromList [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  addCallInfo address' contract' funcName hsh cc $ M.fromList [(n, (t, Constant v)) | (n, (t, v)) <- locals]
   forM_ locals $ \(n, (_, v)) -> do
     initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
   let Just commands = Xabi.funcContents theFunction
   val <- runStatements commands
   let findNamedReturns = do
         let paths = map (AddressedPath (Left LocalVar) . MS.singleton . BC.pack . fst) returns
-        rs <- mapM (getVar . StorageItem) paths
+        rs <- mapM (getVar . Constant . SReference) paths
         case rs of
           [] -> return Nothing
           [x] -> return $ Just x

@@ -12,6 +12,8 @@ module Blockchain.SolidVM.SetGet (
   getAddress,
   getString,
 
+  getSolid,
+  
   deleteVar,
 
   showSM
@@ -93,12 +95,12 @@ setVar dst@(AddressedPath loc key) val = do
         t <- getXabiValueType src
         case t of
           Xabi.Array{} -> do
-            len <- getInt (StorageItem $ src `apSnoc` MS.Field "length")
+            len <- getInt (Constant $ SReference $ src `apSnoc` MS.Field "length")
             setVar (dst `apSnoc` MS.Field "length") $ SInteger len
             forM_ [0..len-1] $ \i -> do
               let i' = fromIntegral i
               setVar (dst `apSnoc` MS.ArrayIndex i') =<<
-                getVar (StorageItem $ src `apSnoc` MS.ArrayIndex i')
+                getVar (Constant $ SReference $ src `apSnoc` MS.ArrayIndex i')
           _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
     SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
         let suffix = MS.Field $ BC.pack f
@@ -148,14 +150,19 @@ getVar' :: Maybe BasicType -> Variable -> SM Value
 getVar' mTypeHint (Variable ioRef) = do
   val <- liftIO $ readIORef ioRef
   case val of
-    SReference apt -> getVar' mTypeHint $ StorageItem apt
+    SReference apt -> getStorageItem mTypeHint apt
     _ -> return val
 getVar' mTypeHint (Constant c) = do
   case c of
-    SReference apt -> getVar' mTypeHint $ StorageItem apt
+    SReference apt -> getStorageItem mTypeHint apt
     STuple vs -> STuple <$> V.mapM (fmap Constant . getVar' Nothing) vs
     _ -> return c
-getVar' mTypeHint (StorageItem apt@(AddressedPath loc key)) = do
+
+
+
+    
+getStorageItem :: Maybe BasicType -> AddressedPath -> SM Value
+getStorageItem mTypeHint apt@(AddressedPath loc key) = do
   raw <- getSolid loc key
   if raw /= MS.BDefault
     then return $ fromBasic raw
@@ -166,11 +173,10 @@ getVar' mTypeHint (StorageItem apt@(AddressedPath loc key)) = do
       case typeHint of
         TStruct name fieldHints -> SStruct name . M.fromList <$> do
           forM fieldHints $ \(l, t') -> do
-            fieldValue <- getVar' (Just t') . StorageItem $ apt `apSnoc` MS.Field l
+            fieldValue <- getVar' (Just t') . Constant . SReference $ apt `apSnoc` MS.Field l
             return (BC.unpack l, Constant fieldValue)
         TComplex -> return $ SReference apt
         _ -> return $ findDefault typeHint
-
 
 showSM :: Value -> SM String
 showSM SNULL = return "NULL"
