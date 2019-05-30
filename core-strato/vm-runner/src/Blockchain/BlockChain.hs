@@ -373,7 +373,7 @@ addTransactions canCache blockData blockGas0 txs = timeit ("addTransactions, " +
     Nothing -> go blockGas0 txs []
     Just (cachedSR, _, cachedTRRs) -> do
       let cachedTXs = map trrTransaction cachedTRRs
-      unless (txs == cachedTXs) $ do
+      when (flags_debug && txs /= cachedTXs) $ do
         $logErrorS "addTransactions" "Invalid transaction cache entry"
         $logErrorLS "addTransactions/cached" cachedTXs
         $logErrorLS "addTransactions/from_block" txs
