@@ -1,56 +1,60 @@
-import RestStatus from 'http-status-codes'
-import queryString from 'query-string'
-import ax from '../axios-wrapper'
-import { RestError } from './rest.util'
+import RestStatus from "http-status-codes";
+import queryString from "query-string";
+import ax from "../axios-wrapper";
+import { RestError } from "./rest.util";
 
 const Endpoint = {
-  USERS: '/bloc/v2.2/users',
-  USER: '/bloc/v2.2/users/:username',
-  FILL: '/bloc/v2.2/users/:username/:address/fill',
-  CONTRACT: '/bloc/v2.2/users/:username/:address/contract',
-  CALL: '/bloc/v2.2/users/:username/:address/contract/:contractName/:contractAddress/call',
-  CALL_LIST: '/bloc/v2.2/users/:username/:address/callList',
-  STATE: '/bloc/v2.2/contracts/:name/:address/state',
-  TXRESULTS: '/bloc/v2.2/transactions/results',
-  SEND: '/strato/v2.3/transaction',
-  KEY: '/strato/v2.3/key',
-  SEARCH: '/cirrus/search/:name',
-  CHAIN: '/bloc/v2.2/chain',
-}
+  USERS: "/bloc/v2.2/users", // needs oauth
+  USER: "/bloc/v2.2/users/:username", // needs oauth
+  FILL: "/bloc/v2.2/users/:username/:address/fill", // needs oauth
+  CONTRACT: "/bloc/v2.2/users/:username/:address/contract", //remove
+  CALL:
+    "/bloc/v2.2/users/:username/:address/contract/:contractName/:contractAddress/call", // remove
+  CALL_LIST: "/bloc/v2.2/users/:username/:address/callList", // remove
+  STATE: "/bloc/v2.2/contracts/:name/:address/state", // needs oauth
+  TXRESULTS: "/bloc/v2.2/transactions/results", //needs oauth
+  SEND: "/strato/v2.3/transaction",
+  KEY: "/strato/v2.3/key", // verify oauth
+  SEARCH: "/cirrus/search/:name", // needs oauth
+  CHAIN: "/bloc/v2.2/chain" //neds oauth
+};
 
 function constructEndpoint(endpointTemplate, options = {}, params = {}) {
   // expand template
   const endpoint = Object.getOwnPropertyNames(params).reduce((acc, key) => {
-    return acc.replace(`:${key}`, encodeURIComponent(params[key]))
-  }, endpointTemplate)
+    return acc.replace(`:${key}`, encodeURIComponent(params[key]));
+  }, endpointTemplate);
   // concat query patameters
-  const query = endpointTemplate === Endpoint.SEARCH ? constructQuerySearch(options) : constructQuery(options)
-  return `${endpoint}${query}`
+  const query =
+    endpointTemplate === Endpoint.SEARCH
+      ? constructQuerySearch(options)
+      : constructQuery(options);
+  return `${endpoint}${query}`;
 }
 
 function constructQuerySearch(options) {
   if (options === undefined) {
-    return ''
+    return "";
   }
   const queryObject = Object.assign(
     { chainid: options.chainIds },
-    options.query,
-  )
-  const query = `?${queryString.stringify(queryObject)}`
-  return query
+    options.query
+  );
+  const query = `?${queryString.stringify(queryObject)}`;
+  return query;
 }
 
 function constructQuery(options) {
   if (options === undefined) {
-    return ''
+    return "";
   }
   const queryObject = Object.assign(
     { resolve: !options.isAsync, chainid: options.chainIds },
     options.stateQuery,
-    options.query,
-  )
-  const query = `?${queryString.stringify(queryObject)}`
-  return query
+    options.query
+  );
+  const query = `?${queryString.stringify(queryObject)}`;
+  return query;
 }
 
 /**
@@ -61,83 +65,93 @@ function constructQuery(options) {
  * @returns{()} metadata
  */
 function constructMetadata(options, contractName) {
-  const metadata = {}
-  if (options === {}) return metadata
+  const metadata = {};
+  if (options === {}) return metadata;
 
   // history flag (default: off)
   if (options.enableHistory) {
-    metadata.history = contractName
+    metadata.history = contractName;
   }
-  if (options.hasOwnProperty('history')) {
-    const newContracts = options.history.filter(contract => contract !== contractName).join()
-    metadata.history = `${options.history},${newContracts}`
+  if (options.hasOwnProperty("history")) {
+    const newContracts = options.history
+      .filter(contract => contract !== contractName)
+      .join();
+    metadata.history = `${options.history},${newContracts}`;
   }
 
   // index flag (default: on)
-  if (options.hasOwnProperty('enableIndex') && !options.enableIndex) {
-    metadata.noindex = contractName
+  if (options.hasOwnProperty("enableIndex") && !options.enableIndex) {
+    metadata.noindex = contractName;
   }
-  if (options.hasOwnProperty('noindex')) {
-    const newContracts = options.noindex.filter(contract => contract !== contractName).join()
-    metadata.noindex = `${options.noindex},${newContracts}`
+  if (options.hasOwnProperty("noindex")) {
+    const newContracts = options.noindex
+      .filter(contract => contract !== contractName)
+      .join();
+    metadata.noindex = `${options.noindex},${newContracts}`;
   }
   // VM
-  if (options.hasOwnProperty('VM')) {
-    if (!(['EVM', 'SolidVM'].includes(options.VM))) {
-      throw new RestError(RestStatus.BAD_REQUEST, `Illegal VM type ${options.VM}`, { options })
+  if (options.hasOwnProperty("VM")) {
+    if (!["EVM", "SolidVM"].includes(options.VM)) {
+      throw new RestError(
+        RestStatus.BAD_REQUEST,
+        `Illegal VM type ${options.VM}`,
+        { options }
+      );
     }
-    metadata.VM = options.VM
+    metadata.VM = options.VM;
   }
 
   // TODO: construct the "nohistory" and "index" fields for metadata if needed
   // The current implementation only constructs "history" and "noindex"
 
-  return metadata
+  return metadata;
 }
 
 function setAuthHeaders(user, _options) {
-  const options = Object.assign({}, _options)
-  options.headers = Object.assign({}, _options.headers, { Authorization: `Bearer ${user.token}` })
-  return options
+  const options = Object.assign({}, _options);
+  options.headers = Object.assign({}, _options.headers, {
+    Authorization: `Bearer ${user.token}`
+  });
+  return options;
 }
 
 /*
   get the url for the node by node id#
  */
 function getNodeUrl(options) {
-  const nodeId = options.node || 0
-  const nodeObject = options.config.nodes[nodeId]
-  return nodeObject.url
+  const nodeId = options.node || 0;
+  const nodeObject = options.config.nodes[nodeId];
+  return nodeObject.url;
 }
 
 async function post(url, endpoint, _body, options) {
   function createBody(_body, options) {
     // array
-    if (Array.isArray(_body)) return _body
+    if (Array.isArray(_body)) return _body;
     // object
-    const body = Object.assign({}, _body)
-    const configTxParams = (options.config) ? options.config.txParams : undefined
+    const body = Object.assign({}, _body);
+    const configTxParams = options.config ? options.config.txParams : undefined;
     // in order of priority: 1:body, 2:options, 3:config, 4:default
     body.txParams = Object.assign(
       { gasLimit: 32100000000, gasPrice: 1 },
       configTxParams,
       options.txParams,
-      _body.txParams,
-    )
-    return body
+      _body.txParams
+    );
+    return body;
   }
 
-  const body = createBody(_body, options)
-  return ax.post(url, endpoint, body, options)
+  const body = createBody(_body, options);
+  return ax.post(url, endpoint, body, options);
 }
 
 async function get(host, endpoint, options = {}) {
-  return ax.get(host, endpoint, options)
+  return ax.get(host, endpoint, options);
 }
 
 async function postue(host, endpoint, data, options) {
   // TODO - @samrit do we need txParams here
-  return ax.postue(host, endpoint, data, options)
+  return ax.postue(host, endpoint, data, options);
 }
 
 export {
@@ -148,5 +162,5 @@ export {
   getNodeUrl,
   post,
   postue,
-  setAuthHeaders,
-}
+  setAuthHeaders
+};
