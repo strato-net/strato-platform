@@ -93,6 +93,7 @@ pipeline {
               cd ../../blockapps-rest
               if [ $(git tag --list v${BA_REST_VERSION}) ]; then
                 echo "Version ${BA_REST_VERSION} was already released previously. Please check the version tag in package.json"
+                exit 1
               fi
               
               git add *
