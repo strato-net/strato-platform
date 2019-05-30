@@ -74,7 +74,7 @@ data Value =
   | STuple (Vector Variable)
   | SArray Xabi.Type (Vector Variable)
   | SMap Xabi.Type (Map Value Variable)
-  | SFunction Xabi.Func
+  | SFunction String Xabi.Func
   | SBuiltinFunction String (Maybe Value)
   | SBuiltinVariable String
   | SSetterGetter String (Maybe Value)

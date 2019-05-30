@@ -129,7 +129,7 @@ create' creator ch cc contractName' argExps = do
 
   -- Add Storage
 
-  addCallInfo newAddress contract' ch cc M.empty
+  addCallInfo newAddress contract' (contractName' ++ " constructor") ch cc M.empty
 
   forM_ (M.toList $ contract'^.storageDefs) $ \(n, (Xabi.VariableDecl theType _ maybeExpression)) -> do
     let def = defaultValue contract' theType
@@ -320,7 +320,7 @@ callWrapper from to mContract functionName argExps = do
     case M.lookup functionName $ contract^.functions of
       Just theFunction -> do
         args <- argsToVals contract' theFunction argExps
-        (if from == to then id else pushSender from) $ runTheCall to contract hsh cc theFunction args
+        (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args
       _ -> do --Maybe the function is actually a getter
         case M.lookup functionName $ contract^.storageDefs of
           Just _ -> do
@@ -333,8 +333,10 @@ callWrapper from to mContract functionName argExps = do
 runStatements :: [Xabi.Statement] -> SM (Maybe Value)
 runStatements [] = return Nothing
 runStatements (s:rest) = do
-  onTraced $
-    liftIO $ putStrLn $ C.green $ "statement> " ++ unparseStatement s
+  onTraced $ do
+    funcName <- getCurrentFunctionName
+    liftIO $ putStrLn $ C.green $ funcName ++ "> " ++ unparseStatement s
+    
   ret <- runStatement s
   case ret of
     Nothing -> runStatements rest
@@ -857,12 +859,12 @@ expToVar' (Xabi.FunctionCall e args) = do
         x -> error $ "poppy: " ++ show x
 
     Constant (SBuiltinFunction name o) -> fmap Constant $ callBuiltin name argVals o
-    Constant (SFunction name) -> do
+    Constant (SFunction funcName func) -> do
       contract' <- getCurrentContract
       address <- getCurrentAddress
       (hsh, cc) <- getCurrentCodeCollection
 
-      res <- runTheCall address contract' hsh cc name argVals
+      res <- runTheCall address contract' funcName hsh cc func argVals
       case res of
         Just v -> return $ Constant $ v
         Nothing -> return $ Constant SNULL
@@ -1049,7 +1051,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                                   $ map (Nothing,) argExps
 
   let zipped = zipWith (\(t, n) v -> (n, (t, coerceType contract' t v))) argTypeNames argVals
-  addCallInfo to contract' hsh cc . fmap (fmap Constant) $ M.fromList zipped
+  addCallInfo to contract' (contractName' ++ " constructor") hsh cc . fmap (fmap Constant) $ M.fromList zipped
   mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
@@ -1085,8 +1087,8 @@ addLocalVariable theType name value = do
           {callStack = currentSlice{localVariables=M.insert name (theType, newVariable) $ localVariables currentSlice}:rest}
 
 
-runTheCall :: Address -> Contract -> SHA -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
-runTheCall address' contract' hsh cc theFunction argVals = do
+runTheCall :: Address -> Contract -> String -> SHA -> CodeCollection -> Xabi.Func -> [Value] -> SM (Maybe Value)
+runTheCall address' contract' funcName hsh cc theFunction argVals = do
   --
   let returnMeta = map (\(n, Xabi.IndexedType _ t) -> (T.unpack n, t)) .  M.toList $ Xabi.funcVals theFunction
       returns = map (\(n, t) -> (n, (t, defaultValue contract' t))) returnMeta
@@ -1099,7 +1101,7 @@ runTheCall address' contract' hsh cc theFunction argVals = do
   onTraced $ liftIO $ putStrLn $ "            args: " ++ show (map fst args)
   onTraced $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
-  addCallInfo address' contract' hsh cc $ M.fromList [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  addCallInfo address' contract' funcName hsh cc $ M.fromList [(n, (t, Constant v)) | (n, (t, v)) <- locals]
   forM_ locals $ \(n, (_, v)) -> do
     initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
   let Just commands = Xabi.funcContents theFunction

@@ -23,6 +23,7 @@ module Blockchain.SolidVM.SM (
   setLocal,
   getCurrentCallInfo,
   getCurrentContract,
+  getCurrentFunctionName,
   getCurrentCodeCollection,
   getEnv,
   getVariableOfName,
@@ -90,6 +91,7 @@ import CodeCollection
 
 data CallInfo =
   CallInfo {
+    currentFunctionName :: String,
     currentAddress :: Address,
     currentContract :: Contract,
     codeCollection :: CodeCollection,
@@ -298,7 +300,7 @@ getVariableOfName name = do
                              . MS.singleton $ BC.pack name
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
+      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "byte", "string", "keccak256"
@@ -391,11 +393,12 @@ getTypeOfName s = do
 
 
 
-addCallInfo :: Address -> Contract -> SHA -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
-addCallInfo a c hsh cc initialLocalVariables = do
+addCallInfo :: Address -> Contract -> String -> SHA -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
+addCallInfo a c fn hsh cc initialLocalVariables = do
   sstate <- get
   let newCallInfo =
         CallInfo {
+          currentFunctionName=fn,
           currentAddress=a,
           currentContract=c,
           codeCollection=cc,
@@ -433,7 +436,14 @@ getCurrentAddress = do
   cs <- fmap callStack get
   case cs of
     (currentCallInfo:_) -> return $ currentAddress currentCallInfo
-    _ -> internalError "getCurrentContract called with an empty stack" ()
+    _ -> internalError "getCurrentAddress called with an empty stack" ()
+
+getCurrentFunctionName :: SM String
+getCurrentFunctionName = do
+  cs <- fmap callStack get
+  case cs of
+    (currentCallInfo:_) -> return $ currentFunctionName currentCallInfo
+    _ -> internalError "getCurrentFunctionName called with an empty stack" ()
 
 
 getLocal :: MS.StoragePath -> SM MS.BasicValue
