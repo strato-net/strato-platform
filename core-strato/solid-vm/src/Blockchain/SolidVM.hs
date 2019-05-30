@@ -21,6 +21,7 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
+import qualified Data.HashMap.Strict as HM
 import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
@@ -330,10 +331,20 @@ callWrapper from to mContract functionName argExps = do
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
+printFullStackTrace :: SM ()
+printFullStackTrace = do
+  theCallStackVariables <- fmap (map localByPath) $ gets callStack
+  forM_ theCallStackVariables $ \localVars -> do
+    liftIO $ putStrLn "---------------------"
+    forM_ (HM.toList localVars) $ \(name, value) -> do
+      liftIO $ putStrLn $ "    \"" ++ format name ++ "\": " ++ format value
+
+
 runStatements :: [Xabi.Statement] -> SM (Maybe Value)
 runStatements [] = return Nothing
 runStatements (s:rest) = do
   onTraced $ do
+    when False printFullStackTrace -- Too verbose, only turn on by hand when needed
     funcName <- getCurrentFunctionName
     liftIO $ putStrLn $ C.green $ funcName ++ "> " ++ unparseStatement s
     
