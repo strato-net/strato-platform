@@ -23,6 +23,7 @@ import qualified Data.Map.Ordered                   as OMap
 import           Data.Proxy
 import qualified Data.Text                          as T
 import           Data.Time.Clock
+import           Data.Time.Clock.POSIX              (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
 import qualified Data.Set                           as S
 import           Data.Word
 import           Numeric                            (readHex)
@@ -68,7 +69,12 @@ class ( Monad m
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
-    {-# MINIMAL isBlockstanbul, getBaggerState, peekPendingVote, clearPendingVote, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
+
+    -- Would it make more sense to expand the MiningCache than to introduce a separate cache?
+    cacheRunResults :: DD.BlockData -> (StateRoot, Integer, [TxRunResult]) -> m ()
+    getCachedRunResults :: DD.BlockData -> m (Maybe (StateRoot, Integer, [TxRunResult]))
+    {-# MINIMAL isBlockstanbul, getBaggerState, peekPendingVote, clearPendingVote, putBaggerState,
+        runFromStateRoot, rewardCoinbases, txsDroppedCallback, cacheRunResults, getCachedRunResults #-}
 
     getCheckpointableState :: m (SHA, DD.BlockData)
     getCheckpointableState = do
@@ -107,7 +113,9 @@ class ( Monad m
         existingStateDbStateRoot <- Mod.get (Proxy @StateRoot)
         let thisStateRoot = DD.blockDataStateRoot bd
         state <- getBaggerState
-        time  <- liftIO getCurrentTime
+        -- This will be rounded in RLPEncode, but just for consistency.
+        -- Really, it should just be Int and then we wouldn't need to worry about leap seconds.
+        time  <- posixSecondsToUTCTime . fromInteger . round . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
         let pHashes = B.privateHashes $ B.miningCache state
             hashMap = OMap.fromList $ map (\a -> (a,a)) txShas -- why is this not a standard function?
         let newMiningCache = B.MiningCache { B.bestBlockSHA          = bh
@@ -414,6 +422,8 @@ buildFromMiningCache = do
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
     recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
+    when isPBFT $
+      cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff
                        , obBlockUncles = uncles
@@ -462,7 +472,7 @@ buildRewardedBlockHeader bd uncles = do
   previousStateRoot <- Mod.get (Proxy @StateRoot)
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
-  rewardedStateRoot <- rewardCoinbases  (DD.blockDataStateRoot bd) (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
+  rewardedStateRoot <- rewardCoinbases (DD.blockDataStateRoot bd) (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
   setStateDBStateRoot previousStateRoot
   return bd{DD.blockDataStateRoot = rewardedStateRoot}
