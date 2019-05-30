@@ -11,11 +11,8 @@ module Blockchain.SolidVM.SetGet (
   getContract,
   getAddress,
   getString,
-
   getSolid,
-  
   deleteVar,
-
   showSM
   ) where
 
@@ -160,7 +157,7 @@ getVar' mTypeHint (Constant c) = do
 
 
 
-    
+
 getStorageItem :: Maybe BasicType -> AddressedPath -> SM Value
 getStorageItem mTypeHint apt@(AddressedPath loc key) = do
   raw <- getSolid loc key

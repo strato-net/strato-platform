@@ -409,13 +409,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   return Nothing -- just throw away the return value
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression)) = do
-  -- let maybeLoc = case entries of
-  --                     [e] -> Xabi.vardefLocation e
-  --                     es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
-  --                             -- It is possible to supply locations in tuple definitions, but
-  --                             -- I'm not sure what that exactly looks like when its not memory.
-  --                             then todo "storage was not anticipated in a tuple entry" s
-  --                             else Nothing
+  let maybeLoc = case entries of
+                      [e] -> Xabi.vardefLocation e
+                      es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
+                              -- It is possible to supply locations in tuple definitions, but
+                              -- I'm not sure what that exactly looks like when its not memory.
+                              then todo "storage was not anticipated in a tuple entry" s
+                              else Nothing
   let singleType = case entries of
                       [e] -> fromMaybe (todo "type inference not implemented" s) $ Xabi.vardefType e
                       _ -> todo "could not evaluate expression without tuple type" s
@@ -426,24 +426,24 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
         return $ defaultValue ctract singleType
       Just e -> do
         rhs <- expToVar e
+        let getRef = SReference <$> expToPath e
+            getValue = getVar =<< expToVar e
         case (rhs, singleType) of
           -- Don't use `getVar` here to avoid infinite recurions
           -- on intended references.
+            -- Tuples cannot be stored, so it is hopefully okay to be strict on the second argument here
+          (Constant (SReference{}), Xabi.Label name) -> do
+            ty <- getTypeOfName name
+            case (maybeLoc, ty) of
+              (Just Xabi.Memory, _) -> getValue
+              (_, StructTypo{}) -> do
+                ref <- getRef
+                p <- expToPath e
+                return ref
+              _ -> getValue
+          (Constant (SReference{}), _) -> getValue
           (Constant c, _) -> return c
           (Variable v, _) -> liftIO $ readIORef v
-        -- let getRef = SReference <$> expToPath e
-        --     getValue = getVar =<< expToVar e
-          -- Tuples cannot be stored, so its ok to be strict in singleType
-          -- past this point.
-          -- Locality should be important?
-          -- (_, Xabi.Array{}) -> getValue
-          -- (_, Xabi.Label name) -> do
-          --   ty <- getTypeOfName name
-          --   case (maybeLoc, ty) of
-          --     (Just Xabi.Memory, _) -> getValue
-          --     (_, StructTypo{}) -> getRef
-          --     _ -> getValue
-          -- _ -> getValue
 
   onTraced $ do
     valueString <- showSM value
@@ -1212,6 +1212,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
   val' <- case val of
              Nothing -> findNamedReturns
              Just SNULL -> findNamedReturns
+             Just (SReference apt@(AddressedPath (Left LocalVar) _)) -> internalError "runTheCall/local reference to expired stack frame" apt
              Just{} -> return val
   popCallInfo
 

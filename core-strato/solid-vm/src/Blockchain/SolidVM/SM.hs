@@ -439,6 +439,7 @@ getCurrentAddress = do
     (currentCallInfo:_) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentAddress called with an empty stack" ()
 
+
 getCurrentFunctionName :: SM String
 getCurrentFunctionName = do
   cs <- fmap callStack get
