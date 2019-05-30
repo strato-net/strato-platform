@@ -5,6 +5,11 @@ const rp = require('request-promise');
 const env = process.env.NODE_ENV || 'development';
 const moment = require('moment');
 const si = require('systeminformation');
+const disk = require('diskusage');
+const os = require('os');
+
+let path = os.platform() === 'win32' ? 'c:' : '/';
+
 
 const config = require('../config/app.config');
 
@@ -201,7 +206,10 @@ async function checkSystemInfo() {
     await si.mem().then(data => {
       sysInfoCollected.mem_active = data.active;
       sysInfoCollected.mem_free = data.free;
+
       winston.warn("free/total", data.free / data.total)
+      winston.warn("available/total", data.available / data.total)
+
       if (data.free / data.total < config.healthCheck.memoryUsageBound) {
         ifHealthy = false;
         additional_info.push("Memory low")
@@ -248,6 +256,17 @@ async function checkSystemInfo() {
 
     winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)
 
+    // Callbacks
+    disk.check(path, function(err, info) {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log(info.available);
+        console.log(info.free);
+        console.log(info.total);
+        winston.warn(info.free / info.total)
+      }
+    }
     return [ifHealthy, sysInfoCollected];
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
