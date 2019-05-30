@@ -26,12 +26,14 @@ newtype Cache = Cache (IORef (LRU.LRU SHA CacheValue))
 instance NFData Cache where
   rnf = rwhnf
 
+{-# NOINLINE resultsCacheSize #-}
 resultsCacheSize :: Vector T.Text Gauge
 resultsCacheSize = unsafeRegister
                  . vector "kind"
                  . gauge
                  $ Info "vm_results_cache_size" "Sizes of the results cache"
 
+{-# NOINLINE resultsCacheStats #-}
 resultsCacheStats :: Vector T.Text Counter
 resultsCacheStats = unsafeRegister
                   . vector "event"
