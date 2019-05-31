@@ -25,9 +25,13 @@ data Location = Memory | Storage deriving (Show, Read, Eq, Generic, NFData, Bina
 
 data VarDefEntry = BlankEntry
                  | VarDefEntry { vardefType :: Maybe Type
-                               , vardefLocation :: Maybe Location
+                               , _vardefLocation :: Maybe Location
                                , vardefName :: String
                                } deriving (Show, Read, Eq, Generic, NFData, Binary)
+
+vardefLocation :: VarDefEntry -> Maybe Location
+vardefLocation BlankEntry = Nothing
+vardefLocation (VarDefEntry _ mLoc _) = mLoc
 
 data SimpleStatement =
   VariableDefinition [VarDefEntry] (Maybe Expression) -- Nothing type indicates "var" keyword

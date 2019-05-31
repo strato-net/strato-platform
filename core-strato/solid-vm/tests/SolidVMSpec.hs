@@ -2139,3 +2139,17 @@ contract qq {
 }
 |]
     getAll [[Field "outer", Field "inner", Field "value"]] `shouldReturn` [BInteger 0x732]
+
+  it "can not declare part of a tuple" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  function ab() returns (uint, uint) {
+    return (71, 833);
+  }
+  constructor() public {
+    var (_, b) = ab();
+    x = b;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 833]
