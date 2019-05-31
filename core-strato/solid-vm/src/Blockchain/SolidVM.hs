@@ -440,7 +440,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
         toName vde = Xabi.vardefName vde
     liftIO $ printf "             creating and setting variables: (%s)\n" $
         intercalate ", " (map toName entries)
-    liftIO $ printf "             to: %s" valueString
+    liftIO $ printf "             to: %s\n" valueString
   let ensureType :: Maybe Xabi.Type -> Xabi.Type
       ensureType = fromMaybe (todo "type inference not implemented" s)
 
@@ -1223,9 +1223,9 @@ logAssigningVariable v = do
   onTraced $ liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
 
 logVals :: (Show a, Show b) => a -> b -> SM ()
-logVals val1 val2 = onTraced . liftIO . putStrLn $ printf
+logVals val1 val2 = onTraced . liftIO $ printf
   "            %%%% val1 = %s\n\
-  \            %%%% val2 = %s" (show val1) (show val2)
+  \            %%%% val2 = %s\n" (show val1) (show val2)
 
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: Value -> SM ByteString
