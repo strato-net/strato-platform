@@ -20,6 +20,7 @@ module SolidVM.Solidity.Parse.Lexer (
   commaSep1,
   commaSep,
   semi,
+  colon,
   comma,
   braces,
   solidityLanguage,
@@ -47,6 +48,7 @@ commaSep = P.commaSep solidityLexer
 commaSep1 = P.commaSep1 solidityLexer
 dot = P.dot solidityLexer
 semi = P.semi solidityLexer
+colon = P.colon solidityLexer
 --semiSep = P.semiSep solidityLexer
 --semiSep1 = P.semiSep1 solidityLexer
 stringLiteral :: SolidityParser String
@@ -69,11 +71,11 @@ solidityLanguage = javaStyle {
      "if", "else", "while", "for", "break", "continue",
      "call", "callcode", "length", "sha3", "sha256", "ripemd160", "ecrecover",
      "suicide", "this",
-     "block", --"coinbase", "difficulty", "gaslimit", "number", "blockhash", "timestamp",
+     "block", --"coinbase", "difficulty", "gaslimit", "number", "blockhash", "timestamp", "now"
      "msg", --"data", "gas", "sender", "value",
      "tx", --"gasprice", "origin",
      "wei", "finney", "szabo", "ether",
-     "now", "seconds", "minutes", "hours", "days", "weeks", "years"
+     "seconds", "minutes", "hours", "days", "weeks", "years"
      ],
   P.reservedOpNames = [
     "!", "&&", "||", "==", "!=",

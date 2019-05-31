@@ -5,6 +5,7 @@ module Blockchain.VM.SolidException
   , checkArity
   , arityMismatch
   , internalError
+  , invalidArguments
   , missingField
   , missingType
   , parseError
@@ -23,6 +24,7 @@ import Text.Printf (printf)
 
 data SolidException = TypeError String String
                     | InternalError String String
+                    | InvalidArguments String String
                     | TODO String String
                     | MissingField String String
                     | MissingType String String
@@ -37,6 +39,7 @@ data SolidException = TypeError String String
 instance Show SolidException where
   show (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
   show (InternalError m v) = printf "internal error: %s: %s" m v
+  show (InvalidArguments m v) = printf "invalid arguments: %s %s" m v
   show (MissingField m v) = printf "missing field: %s: %s" m v
   show (MissingType m v) = printf "missing type: %s: %s" m v
   show (ParseError m v) = printf "parse error: %s: %s" m v
@@ -59,6 +62,9 @@ todo = toThrower TODO
 
 internalError :: (Show v) => String -> v -> a
 internalError = toThrower InternalError
+
+invalidArguments :: (Show v) => String -> v -> a
+invalidArguments = toThrower InvalidArguments
 
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField

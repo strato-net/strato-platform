@@ -21,8 +21,20 @@ data Statement =
   | SimpleStatement SimpleStatement
   deriving (Show, Read, Eq, Generic, NFData, Binary)
 
+data Location = Memory | Storage deriving (Show, Read, Eq, Generic, NFData, Binary)
+
+data VarDefEntry = BlankEntry
+                 | VarDefEntry { vardefType :: Maybe Type
+                               , _vardefLocation :: Maybe Location
+                               , vardefName :: String
+                               } deriving (Show, Read, Eq, Generic, NFData, Binary)
+
+vardefLocation :: VarDefEntry -> Maybe Location
+vardefLocation BlankEntry = Nothing
+vardefLocation (VarDefEntry _ mLoc _) = mLoc
+
 data SimpleStatement =
-  VariableDefinition (Maybe Type) [Maybe String] (Maybe Expression) -- Nothing type indicates "var" keyword
+  VariableDefinition [VarDefEntry] (Maybe Expression) -- Nothing type indicates "var" keyword
   | ExpressionStatement Expression deriving (Show, Read, Eq, Generic, NFData, Binary)
 
 -- Currently, the only supported inline assembly is:
@@ -34,24 +46,23 @@ data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Read, Eq, Generic
 
 
 
-
-
 data Expression =
   PlusPlus Expression
   | MinusMinus Expression
   | NewExpression Type
   | IndexAccess Expression (Maybe Expression)
   | MemberAccess Expression String -- ie- "x.y"
-  | FunctionCall Expression [(Maybe String, Expression)]
+  | FunctionCall Expression ArgList
   | Unitary String Expression
   | Binary String Expression Expression
   | Ternary Expression Expression Expression
   | BoolLiteral Bool
   | NumberLiteral Integer (Maybe NumberUnit)
   | StringLiteral String
-  | TupleExpression [Expression]
+  | TupleExpression [Maybe Expression]
   | ArrayExpression [Expression]
   | Variable String deriving (Show, Read, Eq, Generic, NFData, Binary)
 
+data ArgList = OrderedArgs [Expression] | NamedArgs [(String, Expression)] deriving (Show, Read, Eq, Generic, NFData, Binary)
 
 data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Read, Eq, Generic, NFData, Binary)
