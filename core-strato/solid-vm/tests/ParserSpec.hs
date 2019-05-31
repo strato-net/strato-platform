@@ -90,6 +90,9 @@ spec = do
                       $ Binary "=" (TupleExpression $ [Just $ Variable "z", Nothing])
                                    (TupleExpression $ map (Just . Variable) ["q", "r"]))
                  , ("eq = ne;", SimpleStatement $ ExpressionStatement $ Binary "=" (Variable "eq") (Variable "ne"))
+                 , ("var (a, b, , );", SimpleStatement $
+                      VariableDefinition [VarDefEntry Nothing Nothing "a", VarDefEntry Nothing Nothing "b", BlankEntry, BlankEntry]
+                      Nothing)
                  ]
     forM_ scases $ \(input, want) -> do
         it ("can parse " ++ input) $ parseStatement input `shouldBe` Right want

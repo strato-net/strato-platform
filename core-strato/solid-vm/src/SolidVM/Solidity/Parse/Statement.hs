@@ -96,7 +96,7 @@ variableDefinitionStatement = do
   -- Otherwise, we have a tuple that needs to have a type on each entry
   vardefs <- choice $ map try
       [ reserved "var" >> fmap (:[]) (varDefEntry (return Nothing))
-      , reserved "var" >> parens (commaSep1 $ varDefEntry (return Nothing))
+      , reserved "var" >> parens (commaSep1 $ option BlankEntry $ varDefEntry (return Nothing))
       , (:[]) <$> varDefEntry (Just <$> simpleTypeExpression)
       , parens (commaSep1 $ varDefEntry (Just <$> simpleTypeExpression))
       ]
