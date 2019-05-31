@@ -8,8 +8,6 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 
 
---{-# OPTIONS -fno-warn-unused-top-binds  #-}
-
 module Blockchain.SolidVM.SM (
   CallInfo(..),
   SState(..),
@@ -218,7 +216,9 @@ runSM maybeCode env f = do
     Left se -> do
       $logErrorLS "runSM/error" se
       if flags_svmDev
-        then throw se
+        then do
+          $logErrorLS "runSM/error_code" maybeCode
+          throw se
         else return $ Left se
     Right (value, sstateAfter) -> do
       vmcontext' <- get
@@ -283,7 +283,7 @@ getVariableOfName name = do
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
       vars = localVariables currentCallInfo
-      t s v = ('x':s) `seq` v
+      t s v = ('x':s, v) `seq` v
   maybeLocalValue <-
     -- TODO(tim): consult memory map for locals instead of storage
     case M.lookup name vars of
@@ -303,14 +303,15 @@ getVariableOfName name = do
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "byte", "string", "keccak256"
+      maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "int", "byte", "bytes"
+                                                  , "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
-      maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx", "super"]) $
+      maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx", "super", "now"]) $
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
@@ -437,6 +438,7 @@ getCurrentAddress = do
   case cs of
     (currentCallInfo:_) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentAddress called with an empty stack" ()
+
 
 getCurrentFunctionName :: SM String
 getCurrentFunctionName = do

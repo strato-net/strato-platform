@@ -88,6 +88,7 @@ data Value =
                               -- can be canonicalized
   | SHexDecodeAndTrim -- Hack to implement blockapps-sol's bytes32ToString without
                       -- supporting indexing into bytes32s.
+  | SAddressToAscii -- Hack to implement addressToAsciiString without supporting indexing into bytes
   | SMappingSentinel
   deriving (Show)
 
@@ -216,3 +217,8 @@ data BasicType = TInteger | TString | TBool | TAddress
                | TComplex
                | Todo String
                deriving (Show, Eq)
+
+-- Evaluated ArgLists
+data ValList = OrderedVals [Value]
+             | NamedVals [(String, Value)]
+             deriving (Show, Eq)
