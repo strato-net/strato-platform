@@ -14,8 +14,8 @@ nodes:
       appTokenCookieName: "ba_rest_test_session"
       scope: 'email openid'
       appTokenCookieMaxAge: 7776000000 # 90 days: 90 * 24 * 60 * 60 * 1000
-      clientId: "PLACEHOLDER"
-      clientSecret: "PLACEHOLDER"
-      openIdDiscoveryUrl: "PLACEHOLDER"
+      clientId: "localhost-80-infinite"
+      clientSecret: "adac9a89-ee8b-4683-b043-084ae14ef776"
+      openIdDiscoveryUrl: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration"
       redirectUri: "http://localhost/callback"
       logoutRedirectUri: "http://localhost"
