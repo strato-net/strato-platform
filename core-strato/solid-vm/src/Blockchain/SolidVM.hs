@@ -438,7 +438,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
     let toName :: Xabi.VarDefEntry -> String
         toName Xabi.BlankEntry = ""
         toName vde = Xabi.vardefName vde
-    liftIO $ printf "             creating and setting variables: (%s)" $
+    liftIO $ printf "             creating and setting variables: (%s)\n" $
         intercalate ", " (map toName entries)
     liftIO $ printf "             to: %s" valueString
   let ensureType :: Maybe Xabi.Type -> Xabi.Type
