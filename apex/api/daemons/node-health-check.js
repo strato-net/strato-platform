@@ -206,15 +206,24 @@ async function checkSystemInfo() {
     await si.mem().then(data => {
       sysInfoCollected.mem_active = data.active;
       sysInfoCollected.mem_free = data.free;
+      sysInfoCollected.mem_available = data.available;
 
-      winston.warn("free/total", data.free / data.total)
-      winston.warn("available/total", data.available / data.total)
-
-      if (data.free / data.total < config.healthCheck.memoryUsageBound) {
+      if (data.available / data.total < config.healthCheck.diskUsageBound) {
         ifHealthy = false;
-        additional_info.push("Memory low")
+        additional_info.push("Low Memory")
       }
-
+    })
+    disk.check(path, function(err, info) {
+      if (err) {
+        winston.warn("Error when checking for disk usage", err);
+      } else {
+        const diskUsageRatio = info.free / info.total;
+        sysInfoCollected.disk_usage = diskUsageRatio;
+        if (diskUsageRatio < config.healthCheck.memoryUsageBound) {
+          ifHealthy = false;
+          additional_info.push("Low Disk Space")
+        }
+      }
     })
     await si.currentLoad().then(data => {
       sysInfoCollected.currentLoad = data.currentload;
@@ -255,18 +264,6 @@ async function checkSystemInfo() {
     }
 
     winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)
-
-    // Callbacks
-    disk.check(path, function(err, info) {
-      if (err) {
-        console.log(err);
-      } else {
-        console.log(info.available);
-        console.log(info.free);
-        console.log(info.total);
-        winston.warn(info.free / info.total)
-      }
-    })
     return [ifHealthy, sysInfoCollected];
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
