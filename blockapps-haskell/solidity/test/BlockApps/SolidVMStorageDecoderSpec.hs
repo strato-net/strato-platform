@@ -4,7 +4,7 @@
 
 module BlockApps.SolidVMStorageDecoderSpec where
 
-import Data.Aeson
+import Data.Aeson as Ae
 import Data.Aeson.QQ
 import Data.Bifunctor
 import qualified Data.ByteString as B
@@ -13,6 +13,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import Test.Hspec
+import Text.RawString.QQ
 
 import BlockApps.SolidVMStorageDecoder
 import BlockApps.Solidity.SolidityValue
@@ -227,6 +228,16 @@ spec = do
            },
            "str": "Hello, World!"
          }|]
+
+    it "can encode a map of strings" $ do
+      let input = map toInput
+                [ (singleton "strMap", BMappingSentinel)
+                , (fromList [Field "strMap", MapIndex (IText "ok")], BInteger 17)
+                , (fromList [Field "strMap", MapIndex (IText "\x76\x90\x00\x90")], BInteger 81)
+                ]
+          got = decodeSolidVMValues input
+      got `shouldBe` [("strMap", SolidityObject [ ("ok", SolidityValueAsString "17")
+                                                , ([r|v\144\NUL\144|], SolidityValueAsString "81")])]
 
     it "can deal with array lengths" $ do
       let Success input = rawInput
