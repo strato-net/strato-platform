@@ -90,6 +90,7 @@ import qualified Blockchain.Strato.Indexer.Kafka    as IK
 import qualified Blockchain.Strato.Indexer.Model    as IM
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+import qualified Blockchain.TxRunResultCache        as TRC
 import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
@@ -126,6 +127,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextHasBlockstanbul        :: Bool
                        , _contextBlockRequested        :: Bool
                        , contextCoinbaseQueue          :: Q.Seq ((Address,Word64), Address)
+                       , contextTxRunResultsCache      :: TRC.Cache
                        } deriving (Generic, NFData)
 makeLenses ''Context
 
@@ -255,6 +257,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
         }
         let initialKafkaState = K.mkKafkaState (K.KString "fake_client")
                                                (K.Host (K.KString "localhost"), K.Port 1234132)
+        cache <- liftIO $ TRC.new 64
         flip runStateT (Context
                      MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "must set stateroot for test context"}
                      (HashDB hdb)
@@ -274,7 +277,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      Q.empty []
                      False
                      False
-                     Q.empty) $ do
+                     Q.empty
+                     cache) $ do
           MP.initializeBlank
           setStateDBStateRoot MP.emptyTriePtr
           f
@@ -297,6 +301,7 @@ runContextM f = do
           blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
           redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
           let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
+          cache <- liftIO $ TRC.new 64
           runStateT f (Context
                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
                        (HashDB hdb)
@@ -317,7 +322,8 @@ runContextM f = do
                        []
                        flags_blockstanbul
                        False
-                       Q.empty)
+                       Q.empty
+                       cache)
 
 
 evalContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a

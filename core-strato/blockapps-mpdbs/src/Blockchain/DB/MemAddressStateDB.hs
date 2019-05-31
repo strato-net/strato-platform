@@ -30,7 +30,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.Strato.Model.Address
 import           Text.Format
 
-data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show, Generic)
+data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show, Eq, Generic)
 
 instance NFData AddressStateModification
 
