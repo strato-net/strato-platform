@@ -5,6 +5,7 @@
 module Blockchain.SolidVM.SetGet (
   setVar,
 
+  weakGetVar,
   getVar,
   getInt,
   getBool,
@@ -99,15 +100,8 @@ setVar dst@(AddressedPath loc key) val = do
               setVar (dst `apSnoc` MS.ArrayIndex i') =<<
                 getVar (Constant $ SReference $ src `apSnoc` MS.ArrayIndex i')
           _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
-    SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
-        let suffix = MS.Field $ BC.pack f
-            srcKey = MS.singleton (BC.pack name) `MS.snoc` suffix
-            dstKey = key `MS.snoc` suffix
-        !val' <- case var of
-          Constant x -> do
-            return $ toBasic x
-          _ -> getSolid loc srcKey
-        putSolid loc dstKey val'
+    SStruct _ fs -> forM_ (M.toList fs) $ \(f, var) -> do
+        setVar (dst `apSnoc` MS.Field (BC.pack f)) =<< weakGetVar var
     _ -> putSolid loc key $! toBasic val
 
 deleteVar :: AddressedPath -> SM ()
@@ -138,22 +132,22 @@ getContract :: String -> Variable -> SM Value
 getContract contractName = getVar' (Just $ TContract contractName)
 
 
+weakGetVar :: Variable -> SM Value
+weakGetVar (Constant c) = return c
+weakGetVar (Variable v) = liftIO $ readIORef v
+
 getVar :: Variable -> SM Value
 getVar v = do
   val <- getVar' Nothing v
   return val
 
 getVar' :: Maybe BasicType -> Variable -> SM Value
-getVar' mTypeHint (Variable ioRef) = do
-  val <- liftIO $ readIORef ioRef
+getVar' mTypeHint var = do
+  val <- weakGetVar var
   case val of
     SReference apt -> getStorageItem mTypeHint apt
-    _ -> return val
-getVar' mTypeHint (Constant c) = do
-  case c of
-    SReference apt -> getStorageItem mTypeHint apt
     STuple vs -> STuple <$> V.mapM (fmap Constant . getVar' Nothing) vs
-    _ -> return c
+    _ -> return val
 
 
 

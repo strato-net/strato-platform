@@ -69,8 +69,10 @@ import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           CodeCollection
 
+
 onTraced :: Monad m => m () -> m ()
 onTraced = when flags_svmTrace
+
 
 create :: Bool
        -> Bool
@@ -425,25 +427,11 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
         ctract <- getCurrentContract
         return $ defaultValue ctract singleType
       Just e -> do
-        rhs <- expToVar e
-        let getRef = SReference <$> expToPath e
-            getValue = getVar =<< expToVar e
-        case (rhs, singleType) of
-          -- Don't use `getVar` here to avoid infinite recurions
-          -- on intended references.
-            -- Tuples cannot be stored, so it is hopefully okay to be strict on the second argument here
-          (Constant (SReference{}), Xabi.Label name) -> do
-            ty <- getTypeOfName name
-            case (maybeLoc, ty) of
-              (Just Xabi.Memory, _) -> getValue
-              (_, StructTypo{}) -> do
-                ref <- getRef
-                p <- expToPath e
-                return ref
-              _ -> getValue
-          (Constant (SReference{}), _) -> getValue
-          (Constant c, _) -> return c
-          (Variable v, _) -> liftIO $ readIORef v
+        rhs <- weakGetVar =<< expToVar e
+        case (maybeLoc, rhs) of
+          (Just Xabi.Storage, SReference{}) -> return rhs
+          (_, SReference{}) -> getVar $ Constant rhs
+          (_, c) -> return c
 
   onTraced $ do
     valueString <- showSM value
@@ -557,10 +545,13 @@ expToPath :: Xabi.Expression -> SM AddressedPath
 expToPath (Xabi.Variable x) = do
   callInfo <- getCurrentCallInfo
   let path = MS.singleton $ BC.pack x
-      hasLocalName = x `M.member` localVariables callInfo
-  if hasLocalName
-    then return $ AddressedPath (Left LocalVar) path
-    else return $ AddressedPath (Right $ currentAddress callInfo) path
+  case x `M.lookup` localVariables callInfo of
+    Just (_, var) -> do
+      val <- weakGetVar var
+      case val of
+        SReference apt -> return apt
+        _ -> return $ AddressedPath (Left LocalVar) path
+    Nothing -> return $ AddressedPath (Right $ currentAddress callInfo) path
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
     parvar <- expToVar parent

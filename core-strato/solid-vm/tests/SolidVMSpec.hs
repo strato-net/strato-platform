@@ -2114,7 +2114,6 @@ contract qq {
     getFields ["x"] `shouldReturn` [BInteger 0x0]
 
   it "can store nested structs" . runTest $ do
-    liftIO $ pendingWith "TODO(tim): ht3 blocker"
     void $ runBS [r|
 contract qq {
   struct Inner {
