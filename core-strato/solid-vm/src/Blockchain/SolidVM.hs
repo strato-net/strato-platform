@@ -1230,6 +1230,7 @@ logVals val1 val2 = onTraced . liftIO . putStrLn $ printf
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: Value -> SM ByteString
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
+encodeForReturn (SEnumVal _ _ v) = return . word256ToBytes . fromIntegral $ v
 encodeForReturn (SAddress a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b

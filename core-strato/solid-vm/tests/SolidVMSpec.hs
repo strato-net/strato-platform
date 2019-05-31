@@ -1514,6 +1514,15 @@ contract qq {
   }
 }|] `shouldReturn` Just (SB.toShort want)
 
+  it "can return an enum" . runTest $ do
+    runCall "a" "()" [r|
+contract qq {
+  enum Letter { a, b, c }
+  function a() public returns (Letter) {
+    return Letter.c;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
   it "will initialize contracts as such" . runTest $ do
     runBS [r|
 contract X {}
