@@ -49,3 +49,5 @@ dist
 .env
 
 package-lock.json
+
+config.yaml

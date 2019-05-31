@@ -34,6 +34,7 @@ dependencies:
   - hflags
   - lens
   - leveldb-haskell
+  - lrucache
   - merkle-patricia-db
   - monad-alter
   - mtl
@@ -66,6 +67,7 @@ library:
     - Blockchain.Data.ExecResults
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
+    - Blockchain.TxRunResultCache
     - Blockchain.VMContext
     - Blockchain.VMOptions
     - Blockchain.VM.SolidException

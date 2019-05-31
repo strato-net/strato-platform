@@ -1,6 +1,7 @@
 module Blockchain.Bagger.Transactions where
 
 import           Control.DeepSeq
+import           Control.Lens.Setter                (set)
 import qualified Data.Map                           as M
 import           Data.Time.Clock
 
@@ -9,9 +10,11 @@ import           GHC.Generics
 import           Blockchain.DB.MemAddressStateDB
 
 import           Blockchain.Data.Address
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Data.TransactionResultStatus
+import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
@@ -23,7 +26,16 @@ data TxRunResult = TxRunResult { trrTransaction :: OutputTx
                                , trrTime        :: NominalDiffTime
                                , trrBeforeMap   :: M.Map Address AddressStateModification
                                , trrAfterMap    :: M.Map Address AddressStateModification
-                               } deriving (Show, Generic)
+                               , trrNewAddresses :: [Address]
+                               } deriving (Show, Eq, Generic)
+
+-- When we use a cached TxRunResult, the blockHash does not account for consensus values added.
+rewriteBlockHash :: SHA -> TxRunResult -> TxRunResult
+rewriteBlockHash hsh (TxRunResult otx res t before after new) =
+  TxRunResult otx{otOrigin = BlockHash hsh} res' t before after new
+  where res' = case res of
+                  Left{} -> res
+                  Right er@ExecResults {erAction=mAction}-> Right er{erAction = set actionBlockHash hsh <$> mAction}
 
 instance NFData TxRunResult
 

@@ -6,7 +6,7 @@ import           Data.Text                       (Text)
 import           Data.Time
 import           Data.Word
 
-import           Blockchain.Blockstanbul.Model.Authentication (scrubCommitmentSeals)
+import           Blockchain.Blockstanbul.Model.Authentication (scrubCommitmentSeals, scrubConsensus)
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
@@ -68,21 +68,9 @@ class RLPSerializable h => BlockHeaderLike h where
                     . rlpEncode
                     . blockHeaderModifyExtra scrubCommitmentSeals
 
+    -- This is a PBFT style partial hash. PoW style partial hash should remove the nonce instead.
     blockHeaderPartialHash :: h -> SHA
-    blockHeaderPartialHash h = superProprietaryStratoSHAHash . rlpSerialize $ RLPArray
-      [ rlpEncode $ blockHeaderParentHash       h
-      , rlpEncode $ blockHeaderOmmersHash       h
-      , rlpEncode $ blockHeaderBeneficiary      h
-      --, rlpEncode $ blockHeaderStateRoot        h
-      --, rlpEncode $ blockHeaderTransactionsRoot h
-      --, rlpEncode $ blockHeaderReceiptsRoot     h
-      , rlpEncode $ blockHeaderDifficulty       h
-      , rlpEncode $ blockHeaderBlockNumber      h
-      , rlpEncode $ blockHeaderGasLimit         h
-      , rlpEncode $ blockHeaderGasUsed          h
-      -- , rlpEncode (round $ utcTimeToPOSIXSeconds (blockHeaderTimestamp h)::Integer)
-      , rlpEncode $ blockHeaderExtraData        h
-      ]
+    blockHeaderPartialHash = blockHeaderHash . blockHeaderModifyExtra scrubConsensus
 
     blockHeaderOrdering :: h -> Integer
     blockHeaderOrdering = blockHeaderBlockNumber
