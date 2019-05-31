@@ -1,8 +1,10 @@
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
 
@@ -21,6 +23,7 @@ module Blockchain.SolidVM.SM (
   setLocal,
   getCurrentCallInfo,
   getCurrentContract,
+  getCurrentFunctionName,
   getCurrentCodeCollection,
   getEnv,
   getVariableOfName,
@@ -36,6 +39,8 @@ module Blockchain.SolidVM.SM (
 import           Control.Applicative ((<|>))
 import           Control.Exception
 import           Control.Lens
+import qualified Control.Monad.Change.Alter as A
+import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
@@ -48,10 +53,12 @@ import           Data.List (foldl')
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
+import qualified Data.NibbleString as N
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
@@ -84,6 +91,7 @@ import CodeCollection
 
 data CallInfo =
   CallInfo {
+    currentFunctionName :: String,
     currentAddress :: Address,
     currentContract :: Contract,
     codeCollection :: CodeCollection,
@@ -156,17 +164,29 @@ instance HasRawStorageDB SM where
     cxt <- get
     put cxt{storageBlockMap=theMap}
 
-instance HasStateDB SM where
-  getStateDB = stateDB <$> get
-  setStateDBStateRoot sr = do
-    cxt <- get
-    put cxt{stateDB=(stateDB cxt){MP.stateRoot=sr}}
+instance Mod.Modifiable MP.StateRoot SM where
+  get _    = gets (MP.stateRoot . stateDB)
+  put _ sr = get >>= \c -> put c{stateDB = (stateDB c){MP.stateRoot = sr}}
 
-instance HasHashDB SM where
-  getHashDB = hashDB <$> get
+instance (Address `A.Alters` AddressState) SM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
-instance HasCodeDB SM where
-  getCodeDB = codeDB <$> get
+instance (MP.StateRoot `A.Alters` MP.NodeData) SM where
+  lookup _ = MP.genericLookupDB $ gets (MP.ldb . stateDB)
+  insert _ = MP.genericInsertDB $ gets (MP.ldb . stateDB)
+  delete _ = MP.genericDeleteDB $ gets (MP.ldb . stateDB)
+
+instance (SHA `A.Alters` DBCode) SM where
+  lookup _ = genericLookupCodeDB $ gets codeDB
+  insert _ = genericInsertCodeDB $ gets codeDB
+  delete _ = genericDeleteCodeDB $ gets codeDB
+
+instance (N.NibbleString `A.Alters` N.NibbleString) SM where
+  lookup _ = genericLookupHashDB $ gets hashDB
+  insert _ = genericInsertHashDB $ gets hashDB
+  delete _ = genericDeleteHashDB $ gets hashDB
 
 runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
 runSM maybeCode env f = do
@@ -269,19 +289,18 @@ getVariableOfName name = do
     case M.lookup name vars of
       Nothing -> return Nothing
       Just (_, var) -> Just <$> case var of
-        Constant (SReference ap) -> return $ StorageItem ap
+        Constant (SReference ap) -> return $ Constant $ SReference ap
         Variable v -> do
           val <- liftIO $ readIORef v
           case val of
-            SReference ap -> return $ StorageItem ap
-            _ -> return . StorageItem . AddressedPath (Left LocalVar)
+            SReference ap -> return $ Constant $ SReference ap
+            _ -> return . Constant . SReference . AddressedPath (Left LocalVar)
                         . MS.singleton $ BC.pack name
-        s@StorageItem{} -> return s
-        Constant{} -> return . StorageItem . AddressedPath (Left LocalVar)
+        Constant{} -> return . Constant . SReference . AddressedPath (Left LocalVar)
                              . MS.singleton $ BC.pack name
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (t "constant function" . Constant . SFunction) $ M.lookup name $ currentContract currentCallInfo^.functions
+      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "byte", "string", "keccak256"
@@ -318,7 +337,7 @@ getVariableOfName name = do
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
-        then Just . StorageItem $ AddressedPath
+        then Just . Constant . SReference $ AddressedPath
                 (Right $ currentAddress currentCallInfo)
                 (MS.singleton $ BC.pack name)
         else Nothing
@@ -374,11 +393,12 @@ getTypeOfName s = do
 
 
 
-addCallInfo :: Address -> Contract -> SHA -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
-addCallInfo a c hsh cc initialLocalVariables = do
+addCallInfo :: Address -> Contract -> String -> SHA -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
+addCallInfo a c fn hsh cc initialLocalVariables = do
   sstate <- get
   let newCallInfo =
         CallInfo {
+          currentFunctionName=fn,
           currentAddress=a,
           currentContract=c,
           codeCollection=cc,
@@ -416,7 +436,14 @@ getCurrentAddress = do
   cs <- fmap callStack get
   case cs of
     (currentCallInfo:_) -> return $ currentAddress currentCallInfo
-    _ -> internalError "getCurrentContract called with an empty stack" ()
+    _ -> internalError "getCurrentAddress called with an empty stack" ()
+
+getCurrentFunctionName :: SM String
+getCurrentFunctionName = do
+  cs <- fmap callStack get
+  case cs of
+    (currentCallInfo:_) -> return $ currentFunctionName currentCallInfo
+    _ -> internalError "getCurrentFunctionName called with an empty stack" ()
 
 
 getLocal :: MS.StoragePath -> SM MS.BasicValue
@@ -505,6 +532,9 @@ getXabiValueType (AddressedPath loc path) = do
            MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
            MS.ArrayIndex{} -> return v
            _ -> typeError "non-length or array index attribute of array" x
+         Xabi.String{} -> case x of
+           MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
+           _ -> typeError "non-length attribute of string" x
          Xabi.Label s -> do
            t' <- getTypeOfName s
            case (x, t') of

@@ -64,7 +64,7 @@ initFilter = atomically . tryPutTMVar globalBloomFilter . DBF.newFilter
 
 -- SQL writer daemon --
 
-storageWorker :: (MonadUnliftIO m, MonadIO m) => TQueue QueueElem -> ReaderT SqlBackend m ()
+storageWorker :: MonadUnliftIO m => TQueue QueueElem -> ReaderT SqlBackend m ()
 storageWorker q = forever $ do
   datum <- atomically $ readTQueue q
   recordKeys datum
@@ -98,7 +98,7 @@ deserialize (Just (ColdStorage _ _ bvs)) =
 -- API --
 
 -- | Migrates tables, and starts a background thread for writing cache entries to the database
-initStorage :: (MonadUnliftIO m, MonadIO m, MonadResource m)
+initStorage :: (MonadUnliftIO m, MonadResource m)
             => Int -> ReaderT SqlBackend m (Bool, Handle)
 initStorage cacheSize = do
   void $ runMigrationSilent migrateStore
@@ -110,7 +110,7 @@ initStorage cacheSize = do
   return $! (ourBloom, Handle queue sql)
 
 -- | Check postgres for an entry about this account's values
-readStorage :: (MonadUnliftIO m, MonadIO m)
+readStorage :: MonadUnliftIO m
             => Handle -> Address -> Maybe ChainId -> m (Either Text [(Text, Value)])
 readStorage FakeHandle _ _ = recordStorageResult $! Left "fake handle"
 readStorage (Handle _ sql) addr mci = recordStorageResult =<< do

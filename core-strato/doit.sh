@@ -127,13 +127,16 @@ function newnode {
   if [-n "${seqEventsCostHeuristic}" ]; then
       sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
   fi
+  if [-n "${cacheTransactionResults}"] ; then
+      ctrFlag="--cacheTransactionResults=${cacheTransactionResults}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
-                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
+                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" \
+                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
@@ -292,7 +295,8 @@ setEnv minQuorumSize 1
 setEnv maxConn 20
 setEnv difficultyBomb false
 
-setEnv sqlDiff true
+setEnv sqlDiff ${sqlDiff:-true}
+setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
 
 setEnv backupLocation /var/lib/strato/backup_strato_block
@@ -303,6 +307,7 @@ setEnv evmTraceMode false
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 
+mkdir -p /var/lib/strato
 cd /var/lib/strato
 
 if [[ -n $genesisBlock ]]

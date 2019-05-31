@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromSource, codeCollectionFromHash) where
 
 import           Control.Exception
@@ -37,7 +38,7 @@ compileSource initCode =
             _contracts=M.fromList namedContracts
           }
 
-codeCollectionFromSource :: (HasCodeDB m) => B.ByteString -> m (SHA, CodeCollection)
+codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (SHA, CodeCollection)
 codeCollectionFromSource initCode = do
   let hsh = hash initCode
   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
@@ -54,7 +55,7 @@ codeCollectionFromSource initCode = do
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
       return $ assert (hsh == hsh') (hsh, cc)
 
-codeCollectionFromHash :: HasCodeDB m => SHA -> m CodeCollection
+codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => SHA -> m CodeCollection
 codeCollectionFromHash hsh = do
   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
   case M.lookup hsh codeMap of

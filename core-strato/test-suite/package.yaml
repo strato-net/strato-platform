@@ -41,6 +41,7 @@ dependencies:
   - lens-family-th
   - leveldb-haskell
   - merkle-patricia-db
+  - monad-alter
   - mtl
   - network
   - nibblestring

@@ -127,6 +127,7 @@ services:
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
+    - cacheTransactionResults=${cacheTransactionResults}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
@@ -157,6 +158,8 @@ services:
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
+    - svmTrace=${svmTrace}
+    - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
@@ -243,6 +246,7 @@ services:
       KAFKA_LOG_CLEANER_ENABLE: "false"
       KAFKA_LOG_RETENTION_HOURS: 2147483647
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
+      KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
       KAFKA_MAX_REQUEST_SIZE: 33554432
       KAFKA_MESSAGE_MAX_BYTES: 33554432
     image: wurstmeister/kafka:1.1.0

@@ -131,7 +131,7 @@ getAccFilter (accStateRef) ("address", v)    = accStateRef E.^. AddressStateRefA
 
 getAccFilter (accStateRef) ("code", v)       = accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)
 getAccFilter (accStateRef) ("codeHash", v)   = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (toSHA v)
-getAccFilter (accStateRef) ("chainid", v)    = ((accStateRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
+getAccFilter (accStateRef) ("chainid", v)    = ((accStateRef E.^. AddressStateRefChainId) E.==. (E.val (fromHexText v)))
 
 getAccFilter _             _                 = P.error ("no match in getAccFilter"::String)
 
@@ -197,7 +197,7 @@ getStorageFilter (storage, addrStRef) (k, v) = case k of
   "maxvalue" -> storage E.^. StorageValue E.<=. E.val (toHex v)
   -- Note: a join is done in StorageInfo
   "address" -> addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
-  "chainid" -> ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val (fromHexText v)))
+  "chainid" -> ((addrStRef E.^. AddressStateRefChainId) E.==. (E.val (fromHexText v)))
   _ -> P.error ("no match in getStorageFilter"::String)
 
 getLogFilter :: (E.Esqueleto query expr backend) => expr (Entity LogDB) -> (Text, Text) -> expr (E.Value Bool)

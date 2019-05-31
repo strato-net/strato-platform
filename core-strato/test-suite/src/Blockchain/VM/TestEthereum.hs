@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Blockchain.VM.TestEthereum
     ( runAllTests
@@ -11,6 +12,7 @@ module Blockchain.VM.TestEthereum
     ) where
 
 import           Control.Monad
+import qualified Control.Monad.Change.Alter                  as A
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Reader
@@ -76,7 +78,7 @@ populateAndConvertAddressState cid owner addressState' = do
   forM_ (M.toList $ storage' addressState') $
     \(key, val) -> putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
 
-  addressState <- getAddressState owner
+  addressState <- A.lookupWithDefault (A.Proxy @AddressState) owner
 
   return $
     AddressState
@@ -105,10 +107,9 @@ getDataAndRevertAddressState _ addressState = do
   -- since that function requires an unhashed owner.
   -- This piece of code really should be in the lib somewhere
   storage <- do
-    dbs' <- get
-    let mpdb = (contextStateDB dbs'){stateRoot=addressStateContractRoot addressState}
-    kvs <- lift $ unsafeGetKeyVals mpdb ""
-    let toInt = fromInteger . rlpDecode . rlpDeserialize . rlpDecode
+    let sr = addressStateContractRoot addressState
+        toInt = fromInteger . rlpDecode . rlpDeserialize . rlpDecode
+    kvs <- unsafeGetKeyVals sr ""
     return $ map (fmap toInt) kvs :: ContextM [(Key, Integer)]
 
   return $
@@ -159,7 +160,7 @@ runTest test = do
     liftIO . print $ test
   let cid = Nothing
 
-  MP.initializeBlank =<< getStateDB
+  MP.initializeBlank
   setStateDBStateRoot emptyTriePtr
 
   forM_ (M.toList $ pre test) $

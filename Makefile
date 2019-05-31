@@ -15,6 +15,10 @@ $(info REPO_URL is "${REPO_URL}" (${REPO}))
 
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 TMPDIR=/tmp/$(shell whoami)/strato-docker-dummy
+FAKEROOT=$(shell pwd)/.docker-work
+BLOCDIR=${FAKEROOT}/bloc
+STRATODIR=${FAKEROOT}/strato
+VAULTDIR=${FAKEROOT}/vault-wrapper
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -33,15 +37,11 @@ all: build_all docker-compose
 
 build_all: bloc strato apex dappstore nginx postgrest prometheus smd vault-wrapper
 
-.PHONY: bloc strato apex dappstore nginx postgrest prometheus smd vault-wrapper
+.PHONY: bloc strato apex dappstore nginx postgrest prometheus smd vault-wrapper get_solcs build_buildbase build_common build_common_profiled
 
 apex:
 	@echo Now building apex...
 	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} make --directory=apex/
-
-bloc: build_buildbase build_deploybase
-	@echo Now building bloc...
-	BASIL_DOCKER_TAG=${REPO_URL}bloc:${VERSION} make --directory=blockapps-haskell/
 
 dappstore:
 	@echo Now building dappstore...
@@ -63,13 +63,55 @@ smd:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/
 
-strato: build_buildbase build_deploybase
-	@echo Now building core-strato...
-	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=core-strato/
+get_solcs:
+	mkdir -p ${TMPDIR} ${FAKEROOT}/usr/local/bin
+	# One copy for the buildbase and one copy for the deploybase for tests and production respectively
+	blockapps-haskell/pull_solc.sh 0.4.25 ${TMPDIR}/solc-0.4 ${TMPDIR}/license-solc-0.4
+	blockapps-haskell/pull_solc.sh 0.5.2 ${TMPDIR}/solc-0.5 ${TMPDIR}/license-solc-0.5
+	cp ${TMPDIR}/solc-0.4 ${FAKEROOT}/usr/local/bin
+	cp ${TMPDIR}/solc-0.5 ${FAKEROOT}/usr/local/bin
+	cp -fr ${TMPDIR}/license* ${FAKEROOT}
+	ln -f ${TMPDIR}/solc-0.4 ${TMPDIR}/solc
+	ln -f ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/usr/local/bin/solc
 
-vault-wrapper: build_buildbase build_deploybase
+build_buildbase: get_solcs
+	cp -f Dockerfile.buildbase ${TMPDIR}
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
+
+build_common: get_solcs build_buildbase
+	@echo building haskell libraries and creating directories
+	mkdir -p ${FAKEROOT}/bloc
+	mkdir -p ${FAKEROOT}/strato
+	mkdir -p ${FAKEROOT}/vault-wrapper
+	stack build \
+		--test --no-run-tests \
+		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+
+build_common_profiled: get_solcs build_buildbase
+	@echo building haskell libraries and creating directories
+	mkdir -p ${FAKEROOT}/bloc
+	mkdir -p ${FAKEROOT}/strato
+	mkdir -p ${FAKEROOT}/vault-wrapper
+	stack build \
+		--profile --work-dir .stack-work-profile \
+		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+
+bloc: build_common
+	@echo Now building bloc...
+	cp -fr blockapps-haskell/licenses ${BLOCDIR}
+	cp blockapps-haskell/doit.sh ${BLOCDIR}
+	docker build --target bloc --tag ${REPO_URL}bloc:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+
+strato: build_common
+	@echo Now building core-strato...
+	cp -fr core-strato/licenses ${STRATODIR}
+	cp core-strato/doit.sh ${STRATODIR}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+
+vault-wrapper: build_common
 	@echo Now building vault-wrapper...
-	BASIL_DOCKER_TAG=${REPO_URL}vault-wrapper:${VERSION} make --directory=blockapps-haskell/vault-wrapper/
+	cp blockapps-haskell/vault-wrapper/doit.sh ${VAULTDIR}
+	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 docker-compose:
 	@echo Now generating docker-compose yml files...
@@ -78,18 +120,9 @@ docker-compose:
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 
-build_buildbase:
-	mkdir -p $(TMPDIR)
-	blockapps-haskell/pull_solc.sh 0.4.25 $(TMPDIR)/solc-0.4 $(TMPDIR)/license
-	blockapps-haskell/pull_solc.sh 0.5.2 $(TMPDIR)/solc-0.5 $(TMPDIR)/license
-	ln -f $(TMPDIR)/solc-0.4 $(TMPDIR)/solc
-	cp -f Dockerfile.buildbase $(TMPDIR)
-	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
-
-build_deploybase:
-	mkdir -p $(TMPDIR)
-	cp -f Dockerfile.deploybase $(TMPDIR)
-	docker build --tag=blockapps-deploybase:latest -f $(TMPDIR)/Dockerfile.deploybase $(TMPDIR)
 
 test:
 	@echo ${VERSION}
+
+docker-clean:
+	rm -rf ${FAKEROOT}

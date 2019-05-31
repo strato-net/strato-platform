@@ -23,6 +23,7 @@ dependencies:
   - bytestring
   - containers
   - cross-monitoring
+  - data-default
   - deepseq
   - directory
   - ethereum-rlp
@@ -33,8 +34,11 @@ dependencies:
   - hflags
   - lens
   - leveldb-haskell
+  - lrucache
   - merkle-patricia-db
+  - monad-alter
   - mtl
+  - nibblestring
   - ordered-containers
   - persistent-postgresql
   - persistent-sqlite
@@ -63,6 +67,7 @@ library:
     - Blockchain.Data.ExecResults
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
+    - Blockchain.TxRunResultCache
     - Blockchain.VMContext
     - Blockchain.VMOptions
     - Blockchain.VM.SolidException

@@ -50,7 +50,7 @@ testContext = do
   return ( ch
          , Config conn
          , Context { actionTimestamp = Nothing
-                   , contextRedisBlockDB = redisBDBPool
+                   , contextRedisBlockDB = RBDB.RedisConnection redisBDBPool
                    , contextKafkaState = error "no kafka state available"
                    , blockHeaders=[]
                    , remainingBlockHeaders=[]

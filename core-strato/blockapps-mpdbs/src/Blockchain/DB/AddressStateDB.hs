@@ -16,6 +16,7 @@
 
 module Blockchain.DB.AddressStateDB (
   getAddressState,
+  getAddressStateMaybe,
   getAllAddressStates,
   putAddressState,
   deleteAddressState,
@@ -45,7 +46,7 @@ import           Control.Monad                               (liftM)
 
 import qualified Data.NibbleString                           as N
 
-getAddressState :: (HasStateDB m, HasHashDB m) => Address -> m AddressState
+getAddressState :: HasStateDB m => Address -> m AddressState
 getAddressState address = do
     db <- getStateDB
     states <- MP.getKeyVal db $ addressAsNibbleString address
@@ -58,6 +59,12 @@ getAddressState address = do
         return b
         where b = blankAddressState
       Just s -> return $ (rlpDecode . rlpDeserialize . rlpDecode) s
+
+getAddressStateMaybe :: HasStateDB m => Address -> m (Maybe AddressState)
+getAddressStateMaybe address = do
+  db <- getStateDB
+  mState <- MP.getKeyVal db $ addressAsNibbleString address
+  return $ rlpDecode . rlpDeserialize . rlpDecode <$> mState
 
 getAllAddressStates::(HasHashDB m, HasStateDB m) => m [(Address, AddressState)]
 getAllAddressStates = do
@@ -84,14 +91,14 @@ putAddressState address newState = do
   hashDBPut addrNibbles
   db <- getStateDB
   db' <- MP.putKeyVal db addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
-  setStateDBStateRoot (MP.stateRoot db')
+  setStateDBStateRoot db'
   where addrNibbles = addressAsNibbleString address
 
 deleteAddressState :: HasStateDB m => Address -> m ()
 deleteAddressState address = do
   db <- getStateDB
   db' <- MP.deleteKey db (addressAsNibbleString address)
-  setStateDBStateRoot $ MP.stateRoot db'
+  setStateDBStateRoot db'
 
 addressStateExists :: HasStateDB m => Address -> m Bool
 addressStateExists address = do

@@ -23,6 +23,7 @@ module Blockchain.Stream.VMEvent (
 ) where
 
 import           Conduit
+import           Control.Monad.Change.Modify (Modifiable)
 import           Control.Monad.State
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
@@ -70,7 +71,7 @@ vmEventToBytes = BL.toStrict . Binary.encode
 class HasVMEventsSink k where
   getVMEventsSink :: k ([VMEvent] -> k ())
 
-produceVMEventsM :: (HasKafkaState m, MonadIO m) => [VMEvent] -> m Offset
+produceVMEventsM :: (Modifiable KafkaState m, MonadIO m) => [VMEvent] -> m Offset
 produceVMEventsM vmEvents = do
     x <- withKafkaViolently . produceMessages $
         map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents

@@ -8,14 +8,18 @@ dependencies:
 - blockapps-util
 - bytestring
 - conduit
+- containers
+- data-default
 - ethereum-rlp
 - format
 - leveldb-haskell
 - merkle-patricia-db
+- monad-alter
 - monad-loops
 - nibblestring
 - resourcet
 - strato-model
+- transformers
 
 library:
   source-dirs:         src

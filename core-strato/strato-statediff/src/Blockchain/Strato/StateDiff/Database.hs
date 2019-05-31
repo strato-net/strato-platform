@@ -80,7 +80,7 @@ createAccount chainId blockNumber addressDiffs = do
             SolidVMCode _ ch -> ch
             EVMCode ch -> ch,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
-      addressStateRefChainId = chainId
+      addressStateRefChainId = fromMaybe 0 chainId
       }
     theError :: Address -> String -> a
     theError address name = error $
@@ -172,7 +172,7 @@ getAddressStateSQL :: MonadIO m
                    -> SqlDbM m (Maybe (SQL.Key AddressStateRef))
 getAddressStateSQL chainId addr' = do
   addrIDs <- SQL.selectKeysList
-              [ AddressStateRefAddress SQL.==. addr' , AddressStateRefChainId SQL.==. chainId ] [ LimitTo 1 ]
+              [ AddressStateRefAddress SQL.==. addr' , AddressStateRefChainId SQL.==. fromMaybe 0 chainId ] [ LimitTo 1 ]
   return $ listToMaybe addrIDs
 
 getStorageKeySQL :: MonadIO m

@@ -4,6 +4,7 @@ module State (doit) where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader                  (runReaderT)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                             as B
 import           Data.Default
@@ -28,7 +29,7 @@ nibbleStringToByteString _                      = error "nibbleStringToByteStrin
 showVals :: DB.DB -> MP.StateRoot -> ResourceT IO ()
 showVals sdb sr = do
   db <- DB.open (".ethereumH" </> "hash") def
-  kvs <- MP.unsafeGetKeyVals MP.MPDB{MP.ldb=sdb, MP.stateRoot=sr} ""
+  kvs <- runReaderT (MP.unsafeGetKeyVals sr "") sdb
   liftIO $ putStrLn $ "Number of items: " ++ show (length kvs) ++ "\n------------------------"
   forM_ (filter (isNecessary . fst ) kvs) $ \(key, val) -> do
     unhashed <- DB.get db def $ nibbleStringToByteString key

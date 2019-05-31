@@ -21,6 +21,8 @@ dependencies:
   - format
   - hedis
   - hflags
+  - lens
+  - monad-alter
   - persistent
   - persistent-postgresql
   - resourcet

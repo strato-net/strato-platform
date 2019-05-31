@@ -1,8 +1,8 @@
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE RankNTypes           #-}
+{-# LANGUAGE TemplateHaskell      #-}
 
 module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
@@ -12,6 +12,7 @@ module Blockchain.CommunicationConduit
     ) where
 
 import           Blockchain.Output
+import           Control.Monad.Change.Modify           (Accessible)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -96,7 +97,7 @@ mkCanarySource = do
   -- Wait forever on nothing
   return $ sourceTQueue q
 
-mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
+mkEthP2PEventConduit :: (MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
                      -> ConduitM (Either P2PCNC Message) BC.ByteString m ()
@@ -120,7 +121,7 @@ debounceTxSends = do
 
 handleMsgClientConduit :: ( MonadIO (StateT Context m)
                           , MonadResource m
-                          , RBDB.HasRedisBlockDB (StateT Context m)
+                          , Accessible RBDB.RedisConnection (StateT Context m)
                           , WrapsSQLDB (StateT Context) m
                           , MonadLogger (StateT Context m)
                           )
@@ -169,7 +170,7 @@ handleMsgClientConduit myId peer = do
 
 handleMsgServerConduit :: (MonadIO (StateT Context m)
                          , MonadResource m
-                         , RBDB.HasRedisBlockDB (StateT Context m)
+                         , Accessible RBDB.RedisConnection (StateT Context m)
                          , WrapsSQLDB (StateT Context) m
                          , MonadLogger (StateT Context m)
                          )

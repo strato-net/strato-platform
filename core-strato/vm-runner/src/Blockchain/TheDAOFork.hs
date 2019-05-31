@@ -1,14 +1,14 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 
 module Blockchain.TheDAOFork where
 
 import           Control.Monad
+import           Control.Monad.Change.Alter
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.HashDB
-import           Blockchain.DB.StateDB
-
 
 addresses::[Address]
 addresses = map Address
@@ -131,20 +131,16 @@ addresses = map Address
     0x807640a13483f8ac783c557fcdf27be11ea4ac7a
   ]
 
-
-
-
-runTheDAOFork::(HasStateDB m, HasHashDB m)=>m ()
+runTheDAOFork :: (Monad m, HasHashDB m, (Address `Alters` AddressState) m) => m ()
 runTheDAOFork = do
   values <-
     forM addresses $ \a -> do
-      addressState <- getAddressState a
-      putAddressState a addressState{addressStateBalance=0}
-      return $ addressStateBalance addressState
+      balance <- addressStateBalance <$> lookupWithDefault Proxy a
+      adjustWithDefault_ Proxy a $ \addressState ->
+        pure addressState{addressStateBalance=0}
+      return balance
 
   let recipAddr = Address 0xbf4ed7b27f1d666546e30d74d50d173d20bca754
 
-  recipAddressState <- getAddressState recipAddr
-  putAddressState recipAddr recipAddressState{addressStateBalance=addressStateBalance recipAddressState + sum values}
-
-  return ()
+  adjustWithDefault_ Proxy recipAddr $ \recipAddressState ->
+    pure recipAddressState{addressStateBalance=addressStateBalance recipAddressState + sum values}
