@@ -49,23 +49,6 @@ async function fill(user, options) {
   return postue(url, endpoint, body, options);
 }
 
-async function createContractBloc(user, contract, options) {
-  const body = {
-    password: user.password,
-    contract: contract.name,
-    src: contract.source,
-    args: contract.args,
-    metadata: constructMetadata(options, contract.name)
-  };
-  const url = getNodeUrl(options);
-  const urlParams = {
-    username: user.username,
-    address: user.address
-  };
-  const endpoint = constructEndpoint(Endpoint.CONTRACT, options, urlParams);
-  return post(url, endpoint, body, options);
-}
-
 async function createContractAuth(user, contract, options) {
   const payload = {
     contract: contract.name,
@@ -123,27 +106,6 @@ async function getState(contract, options) {
   return get(url, endpoint, options);
 }
 
-async function callBloc(user, callMethodArgs, options) {
-  const { contract, method, args, value } = callMethodArgs;
-  const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
-  const body = {
-    password: user.password,
-    method,
-    args,
-    value: valueFixed,
-    metadata: constructMetadata(options, contract.name)
-  };
-  const url = getNodeUrl(options);
-  const urlParams = {
-    username: user.username,
-    address: user.address,
-    contractName: contract.name,
-    contractAddress: contract.address
-  };
-  const endpoint = constructEndpoint(Endpoint.CALL, options, urlParams);
-  return post(url, endpoint, body, options);
-}
-
 async function callAuth(user, callMethodArgs, options) {
   const { contract, method, args, value } = callMethodArgs;
   const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
@@ -189,39 +151,6 @@ async function callListAuth(user, callListArgs, options) {
   };
   const pendingTxResultList = await sendTransactions(user, body, options);
   return pendingTxResultList;
-}
-
-async function callListBloc(user, callListArgs, options) {
-  // let nonce = 1
-  const txs = callListArgs.map(callArgs => {
-    const { contract, method, args, value } = callArgs;
-    const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
-    const tx = {
-      contractName: contract.name,
-      contractAddress: contract.address,
-      methodName: method,
-      args,
-      value: valueFixed,
-      // txParams: {
-      //   // nonce,
-      // },
-      metadata: constructMetadata(options, contract.name)
-    };
-    // nonce += 1
-    return tx;
-  });
-  const body = {
-    password: user.password,
-    txs,
-    resolve: !options.isAsync
-  };
-  const url = getNodeUrl(options);
-  const urlParams = {
-    username: user.username,
-    address: user.address
-  };
-  const endpoint = constructEndpoint(Endpoint.CALL_LIST, options, urlParams);
-  return post(url, endpoint, body, options);
 }
 
 async function sendTransactions(user, body, options) {
@@ -284,16 +213,13 @@ export default {
   getUsers,
   getUser,
   createUser,
-  createContractBloc,
   createContractAuth,
   createContractListAuth,
   fill,
   blocResults,
   getState,
-  callBloc,
   callAuth,
   callListAuth,
-  callListBloc,
   send,
   sendTransactions,
   getKey,

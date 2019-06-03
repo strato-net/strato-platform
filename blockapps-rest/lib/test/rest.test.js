@@ -9,14 +9,7 @@ import dotenv from "dotenv";
 
 const config = factory.getTestConfig();
 const fixtures = factory.getTestFixtures();
-const testAuth = config.nodes[0].oauth != undefined;
 const logger = console;
-
-// Load tokens if oauth is being used
-if (testAuth) {
-  const loadEnv = dotenv.config();
-  assert.isUndefined(loadEnv.error);
-}
 
 describe("rest_7", function() {
   this.timeout(config.timeout);
@@ -24,8 +17,7 @@ describe("rest_7", function() {
   const options = { config, logger };
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -217,13 +209,14 @@ describe("rest_7", function() {
     let user2;
 
     before(async () => {
-      const uid = util.uid();
-      const user2Args = testAuth ? { token: process.env.USER2_TOKEN } : { uid };
+      const user2Args = { token: process.env.USER2_TOKEN };
+      console.log("lllllll", user2Args)
       user2 = await factory.createAdmin(user2Args, options);
     });
 
     it("send - sync", async () => {
       const sendTxArgs = factory.createSendTxArgs(user2.address);
+      console.log("Asssss", admin)
       const result = await rest.send(admin, sendTxArgs, options);
 
       assert.equal(sendTxArgs.toAddress, result.to, "address");
@@ -305,8 +298,7 @@ describe("search until", function() {
   let admin, contract;
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -377,8 +369,7 @@ describe("search query", function() {
   let admin;
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -552,8 +543,7 @@ describe("chain", function() {
   }
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 

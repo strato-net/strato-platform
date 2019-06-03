@@ -9,14 +9,7 @@ import factory from "./factory";
 const config = factory.getTestConfig();
 
 const fixtures = factory.getTestFixtures();
-const testAuth = config.nodes[0].oauth != undefined;
 const logger = console;
-
-// Load tokens if oauth is being used
-if (testAuth) {
-  const loadEnv = dotenv.config();
-  assert.isUndefined(loadEnv.error);
-}
 
 describe("contracts", function() {
   this.timeout(config.timeout);
@@ -24,9 +17,9 @@ describe("contracts", function() {
   const options = { config, logger };
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
+    console.log("admin ", admin)
   });
 
   it("create contract - async", async () => {
@@ -107,8 +100,7 @@ describe("state", function() {
   const options = { config, logger };
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -206,8 +198,7 @@ describe("call", function() {
   const var2 = 5678;
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -281,45 +272,7 @@ describe("call", function() {
   });
 });
 
-describe("bloc user", function() {
-  if (testAuth) return;
-
-  this.timeout(config.timeout);
-  const options = { config, logger };
-  const password = "1234";
-
-  it("get all bloc users", async () => {
-    const args = {};
-    const result = await rest.getUsers(args, options);
-    assert.equal(Array.isArray(result), true, "return value is an array");
-  });
-
-  it("create bloc user", async () => {
-    const uid = util.uid();
-    const username = `user_${uid}`;
-    const args = { username, password };
-    const user = await rest.createUser(args, options);
-    const isAddress = util.isAddress(user.address);
-    assert.equal(isAddress, true, "user is valid eth address");
-    assert.equal(user.username, args.username, "username");
-    assert.equal(user.password, args.password, "password");
-  });
-
-  it("get user", async () => {
-    // create a new user
-    const uid = util.uid();
-    const username = `user_${uid}`;
-    const args = { username, password };
-    const user = await rest.createUser(args, options);
-    // get the user
-    const args2 = { username };
-    const address = await rest.getUser(args2, options);
-    assert.equal(address, user.address, "user is valid eth address");
-  });
-});
-
 describe("auth user", function() {
-  if (!testAuth) return;
 
   this.timeout(config.timeout);
   const options = { config, logger };

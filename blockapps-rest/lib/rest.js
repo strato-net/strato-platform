@@ -72,19 +72,7 @@ async function getUser(args, options) {
 }
 
 async function createUser(args, options) {
-  return args.token
-    ? createUserAuth(args, options)
-    : createUserBloc(args, options);
-}
-
-async function createUserBloc(args, options) {
-  const address = await api.createUser(args, options);
-  const user = Object.assign(args, { address });
-  // async - do not resolve
-  if (options.isAsync) return user;
-  // otherwise - block for faucet fill call
-  const txResult = await fill(user, options);
-  return user; // TODO flow user object
+  return createUserAuth(args, options)
 }
 
 async function createUserAuth(args, options) {
@@ -103,14 +91,7 @@ async function fill(user, options) {
 // =====================================================================
 
 async function createContract(user, contract, options) {
-  return user.token
-    ? createContractAuth(user, contract, options)
-    : createContractBloc(user, contract, options);
-}
-
-async function createContractBloc(user, contract, options) {
-  const pendingTxResult = await api.createContractBloc(user, contract, options);
-  return createContractResolve(pendingTxResult, options);
+  return createContractAuth(user, contract, options)
 }
 
 async function createContractAuth(user, contract, options) {
@@ -145,13 +126,7 @@ async function createContractResolve(pendingTxResult, options) {
 // =====================================================================
 
 async function createContractList(user, contract, options) {
-  return user.token
-    ? createContractListAuth(user, contract, options)
-    : createContractListBloc(user, contract, options);
-}
-
-async function createContractListBloc(user, contract, options) {
-  throw new RestError(RestStatus.NOT_IMPLEMENTED, "createContractListBloc");
+  return createContractListAuth(user, contract, options)
 }
 
 async function createContractListAuth(user, contract, options) {
@@ -243,18 +218,11 @@ async function getArray(contract, name, options) {
 // =====================================================================
 
 async function call(user, callArgs, options) {
-  return user.token
-    ? callAuth(user, callArgs, options)
-    : callBloc(user, callArgs, options);
+  return callAuth(user, callArgs, options)
 }
 
 async function callAuth(user, callArgs, options) {
   const [pendingTxResult] = await api.callAuth(user, callArgs, options);
-  return callResolve(pendingTxResult, options);
-}
-
-async function callBloc(user, callArgs, options) {
-  const pendingTxResult = await api.callBloc(user, callArgs, options);
   return callResolve(pendingTxResult, options);
 }
 
@@ -278,22 +246,11 @@ async function callResolve(pendingTxResult, options) {
 // =====================================================================
 
 async function callList(user, callListArgs, options) {
-  return user.token
-    ? callListAuth(user, callListArgs, options)
-    : callListBloc(user, callListArgs, options);
+  return callListAuth(user, callListArgs, options)
 }
 
 async function callListAuth(user, callListArgs, options) {
   const pendingTxResultList = await api.callListAuth(
-    user,
-    callListArgs,
-    options
-  );
-  return callListResolve(pendingTxResultList, options);
-}
-
-async function callListBloc(user, callListArgs, options) {
-  const pendingTxResultList = await api.callListBloc(
     user,
     callListArgs,
     options
