@@ -7,10 +7,7 @@ const moment = require('moment');
 const si = require('systeminformation');
 const disk = require('diskusage');
 const os = require('os');
-
 let path = os.platform() === 'win32' ? 'c:' : '/';
-
-
 const config = require('../config/app.config');
 
 const neededJobs = {
@@ -263,10 +260,9 @@ async function checkSystemInfo() {
       sysInfoCollected.networkStats = nwStats;
     })
 
-    if (additional_info.toString() !== ""){
+    if (additional_info){
       sysInfoCollected.Alerts = additional_info
     }
-
     winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)
     return [ifHealthy, sysInfoCollected];
   } catch (e) {

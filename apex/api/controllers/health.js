@@ -37,13 +37,15 @@ module.exports = {
         isInc = stallInfo.isBlocksValidInc;
         isPending = stallInfo.isLastPending;
         healthAI = healthInfo.additionalInfo;
-        systemInfoAI = systemInfo.additionalInfo;
+        systemInfoAI = JSON.parse(systemInfo.additionalInfo);
         systemInfoStatus = systemInfo.latestHealthStatus;
-        warningMessages = systemInfoStatus ? "" : systemInfoAI.split('"Alerts":')[1].split('}')[0];
-        systemInfoBody = systemInfoStatus ? systemInfoAI : systemInfoAI.split('"Alerts":')[0] + '}"'
-
+        warningMessages = systemInfoStatus ? "" : systemInfoAI.Alerts;
+        systemInfoBody = systemInfoAI
+        if (systemInfoStatus) {
+          delete systemInfoBody.Alerts
+        }
       } else {
-        winston.warn(`Health table has no entires; Health endpoint is called too soon`)
+        winston.warn(`Health table has no entries; Health endpoint is called too soon`)
       }
 
       res.status(200).json(
