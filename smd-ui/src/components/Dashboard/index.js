@@ -130,7 +130,7 @@ class Dashboard extends Component {
               mode={(health && systemHealth) ? 'success':'warning' }
               iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />
-            {this.state.isHovering && <div> Warnings: {systemWarnings} </div>}
+            {(this.state.isHovering && !systemHealth) && <div> Warnings: {systemWarnings} </div>}
           </div>
           <div className="col-sm-3">
             <Link to="/blocks">

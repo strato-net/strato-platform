@@ -208,7 +208,7 @@ async function checkSystemInfo() {
       sysInfoCollected.mem_free = data.free;
       sysInfoCollected.mem_available = data.available;
 
-      if (data.available / data.total < config.healthCheck.diskUsageBound) {
+      if (data.available / data.total * 100 < config.healthCheck.diskUsageBound) {
         ifHealthy = false;
         additional_info.push("Low Memory")
       }
@@ -217,7 +217,7 @@ async function checkSystemInfo() {
       if (err) {
         winston.warn("Error when checking for disk usage", err);
       } else {
-        const diskUsageRatio = info.free / info.total;
+        const diskUsageRatio = info.free / info.total *100;
         sysInfoCollected.disk_usage = diskUsageRatio;
         if (diskUsageRatio < config.healthCheck.memoryUsageBound) {
           ifHealthy = false;
@@ -239,6 +239,10 @@ async function checkSystemInfo() {
         fsDetails.fsSize_used = fs.used;
         fsDetails.fsSize_size = fs.size;
         fss.push(fsDetails)
+        if (fsDetails.fsSize_use < config.healthCheck.diskUsageBound) {
+          ifHealthy = false;
+          additional_info.push(`Low Disk Space on ${fsDetails.name}`)
+        }
       })
       sysInfoCollected.fsSize = fss;
     })

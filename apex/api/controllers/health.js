@@ -39,8 +39,8 @@ module.exports = {
         healthAI = healthInfo.additionalInfo;
         systemInfoAI = systemInfo.additionalInfo;
         systemInfoStatus = systemInfo.latestHealthStatus;
-        warningMessages = systemInfoAI.split('"Alerts":')[1].split('}')[0];
-        systemInfoBody = systemInfoAI.split('"Alerts":')[0] + '}"'
+        warningMessages = systemInfoStatus ? "" : systemInfoAI.split('"Alerts":')[1].split('}')[0];
+        systemInfoBody = systemInfoStatus ? systemInfoAI : systemInfoAI.split('"Alerts":')[0] + '}"'
 
       } else {
         winston.warn(`Health table has no entires; Health endpoint is called too soon`)

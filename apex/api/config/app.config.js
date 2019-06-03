@@ -40,7 +40,7 @@ module.exports = {
     cleanFrequency: 5 * 60 * 1000, //clean db every 5 mins
     retention_hours: 1 * 24,
     progressWindow: 10 * 60 * 1000,
-    memoryUsageBound: 0.2, // Alert when available space / total space < 20%
-    diskUsageBound: 0.2
+    memoryUsageBound: 20, // Alert when available space / total space < 20%
+    diskUsageBound: 20
   }
 };
