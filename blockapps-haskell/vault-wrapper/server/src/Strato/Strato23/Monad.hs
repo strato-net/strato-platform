@@ -17,6 +17,7 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import           Data.Foldable
+import           Data.IORef
 import           Data.Profunctor.Product.Default
 import           Data.String
 import           Data.Text                       (Text)
@@ -86,8 +87,9 @@ instance MonadBaseControl IO VaultM where
   restoreM = VaultM . restoreM
 
 data VaultWrapperEnv = VaultWrapperEnv
-  { httpManager  :: Manager
-  , dbPool       :: Pool Connection
+  { httpManager         :: Manager
+  , dbPool              :: Pool Connection
+  , superSecretPassword :: IORef (Maybe Text)
   }
 
 data VaultWrapperError
