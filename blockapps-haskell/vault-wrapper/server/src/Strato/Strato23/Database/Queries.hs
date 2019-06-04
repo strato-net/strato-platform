@@ -13,8 +13,10 @@ module Strato.Strato23.Database.Queries where
 
 import           BlockApps.Ethereum
 import           Control.Arrow
+import           Control.Monad                   (void)
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
+import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as C8
 import           Data.Int                        (Int32)
 import           Data.Maybe                      (fromMaybe, listToMaybe)
@@ -42,7 +44,7 @@ postUserKeyQuery userName KeyStore{..} conn = do
   case listToMaybe userIds of
     Just _ -> return False
     Nothing -> do
-      _ <- runInsertMany conn usersTable [
+      void $ runInsertMany conn usersTable [
         ( Nothing
         , constant userName
         , constant keystoreSalt
@@ -50,6 +52,24 @@ postUserKeyQuery userName KeyStore{..} conn = do
         , constant keystoreAcctEncSecKey
         , constant keystoreAcctEncSecKey
         , constant keystoreAcctAddress
+        )]
+      return True
+
+getMessageQuery :: Query (Column PGBytea)
+getMessageQuery = proc () -> do
+  (id', enc_msg) <- queryTable messageTable -< ()
+  restrict -< id' .== constant (1 :: Int)
+  returnA -< enc_msg
+
+postMessageQuery :: ByteString -> Connection -> IO Bool
+postMessageQuery message conn = do
+  (msg :: [ByteString]) <- runQuery conn getMessageQuery
+  case listToMaybe msg of
+    Just _ -> return False
+    Nothing -> do
+      void $ runInsertMany conn messageTable [
+        ( Nothing
+        , constant message
         )]
       return True
 

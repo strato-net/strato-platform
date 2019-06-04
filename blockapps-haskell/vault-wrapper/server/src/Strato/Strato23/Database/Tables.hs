@@ -41,3 +41,15 @@ usersTable = Table "users" $ p7
   , required "enc_sec_prv_key"
   , required "address"
   )
+
+messageTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGBytea
+  )
+  ( Column PGInt4
+  , Column PGBytea
+  )
+messageTable = Table "message" $ p2
+  ( optional "id"
+  , required "enc_msg"
+  )

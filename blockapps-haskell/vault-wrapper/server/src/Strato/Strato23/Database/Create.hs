@@ -26,8 +26,17 @@ CREATE TABLE IF NOT EXISTS users(
 );
 |]
 
+messageTable :: Query
+messageTable = [sql|
+CREATE TABLE IF NOT EXISTS message(
+  id serial PRIMARY KEY,
+  enc_msg bytea NOT NULL UNIQUE
+);
+|]
+
 createTables :: Query
 createTables = mconcat
   [ schemaVersionTable
   , usersTable
+  , messageTable
   ]
