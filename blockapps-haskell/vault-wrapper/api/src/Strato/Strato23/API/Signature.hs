@@ -15,6 +15,5 @@ import           Strato.Strato23.API.Types
 --------------------------------------------------------------------------------
 type PostSignature = "signature"
                    :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-                   :> Header' '[Required, Strict] "X-USER-ID" Text
                    :> ReqBody '[JSON] UserData
                    :> Post '[JSON] SignatureDetails

@@ -22,12 +22,12 @@ import           Data.Profunctor.Product.Default
 import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
-import           Database.PostgreSQL.Simple      (Connection,
-                                                  withTransaction)
+import           Database.PostgreSQL.Simple      (Connection, withTransaction)
 import           GHC.Stack
 import           Network.HTTP.Client
 import           Opaleye
 import           Servant
+import           Strato.Strato23.Crypto
 
 import           BlockApps.Logging
 
@@ -154,6 +154,14 @@ enterVaultWrapper env x
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Vault Wrapper logs.)"
                    ]}
+
+withPassword :: (Password -> VaultM a) -> VaultM a
+withPassword f = do
+  pwioref <- asks superSecretPassword
+  password <- liftIO $ readIORef pwioref
+  case password of
+    Nothing -> vaultWrapperError $ AnError "Server misconfigured"
+    Just pw -> f (textPassword pw)
 
 formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"
