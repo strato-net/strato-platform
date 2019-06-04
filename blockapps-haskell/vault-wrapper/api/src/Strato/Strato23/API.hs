@@ -10,6 +10,7 @@ module Strato.Strato23.API
 
 import           Servant
 import           Strato.Strato23.API.Key
+import           Strato.Strato23.API.Password
 import           Strato.Strato23.API.Ping
 import           Strato.Strato23.API.Signature
 import           Strato.Strato23.API.Types
@@ -18,4 +19,5 @@ type VaultWrapperAPI = GetPing
                   :<|> GetKey
                   :<|> PostKey
                   :<|> PostSignature
+                  :<|> PostPassword
 
