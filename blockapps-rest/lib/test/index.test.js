@@ -19,7 +19,6 @@ describe("contracts", function() {
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
-    console.log("admin ", admin)
   });
 
   it("create contract - async", async () => {

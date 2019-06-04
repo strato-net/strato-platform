@@ -210,13 +210,11 @@ describe("rest_7", function() {
 
     before(async () => {
       const user2Args = { token: process.env.USER2_TOKEN };
-      console.log("lllllll", user2Args)
       user2 = await factory.createAdmin(user2Args, options);
     });
 
     it("send - sync", async () => {
       const sendTxArgs = factory.createSendTxArgs(user2.address);
-      console.log("Asssss", admin)
       const result = await rest.send(admin, sendTxArgs, options);
 
       assert.equal(sendTxArgs.toAddress, result.to, "address");
