@@ -11,7 +11,7 @@ import           Data.Maybe                        (maybe, listToMaybe)
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Simple.SqlQQ
 
-import           Strato.Strato23.Database.Create  (createTables)
+import           Strato.Strato23.Database.Create  (createTables, messageTable)
 
 data MigrationErrorBehavior = Throw | Catch
 
@@ -32,6 +32,7 @@ migrations :: [(MigrationErrorBehavior, Query)]
 migrations = [ (Throw, createTables)
              , (Throw, insertSchemaVersion)
              , (Throw, insertAddress)
+             , (Throw, messageTable)
              ]
 
 getSchemaVersion :: Query

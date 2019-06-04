@@ -7,6 +7,7 @@
 module Strato.Strato23.Crypto where
 
 import           BlockApps.Ethereum                hiding (deriveAddress)
+import           Control.Monad                     ((<=<))
 import           Control.Monad.IO.Class
 import qualified Crypto.KDF.Scrypt                 as Scrypt
 import           Crypto.Random.Entropy
@@ -62,8 +63,8 @@ decryptSecKey
   -> SecretBox.Nonce
   -> ByteString -- encrypted secret key
   -> Maybe SecKey
-decryptSecKey pw salt nonce encSecKey = do
-  secKey =<< decrypt pw salt nonce encSecKey
+decryptSecKey pw salt nonce = secKey <=< d
+  where d = decrypt pw salt nonce
 
 encrypt
   :: Password
