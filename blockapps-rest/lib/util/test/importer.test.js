@@ -12,8 +12,8 @@ describe('imports', () => {
   const options = { config }
 
   before(async () => {
-    const uid = util.uid()
-    admin = await factory.createAdmin(uid, options)
+    const userArgs = { token: process.env.USER_TOKEN };
+    admin = await factory.createAdmin(userArgs, options);
   })
 
   it('combines', async () => {
