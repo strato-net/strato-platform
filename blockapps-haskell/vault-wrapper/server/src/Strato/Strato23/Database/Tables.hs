@@ -45,11 +45,17 @@ usersTable = Table "users" $ p7
 messageTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
   )
-messageTable = Table "message" $ p2
+messageTable = Table "message" $ p4
   ( optional "id"
+  , required "salt"
+  , required "nonce"
   , required "enc_msg"
   )

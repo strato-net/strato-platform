@@ -55,23 +55,27 @@ postUserKeyQuery userName KeyStore{..} conn = do
         )]
       return True
 
-getMessageQuery :: Query (Column PGBytea)
+getMessageQuery :: Query (Column PGBytea, Column PGBytea, Column PGBytea)
 getMessageQuery = proc () -> do
-  (id', enc_msg) <- queryTable messageTable -< ()
+  (id', salt, nonce, enc_msg) <- queryTable messageTable -< ()
   restrict -< id' .== constant (1 :: Int)
-  returnA -< enc_msg
+  returnA -< (salt, nonce, enc_msg)
 
-postMessageQuery :: ByteString -> Connection -> IO Bool
-postMessageQuery message conn = do
-  (msg :: [ByteString]) <- runQuery conn getMessageQuery
-  case listToMaybe msg of
-    Just _ -> return False
-    Nothing -> do
-      void $ runInsertMany conn messageTable [
-        ( Nothing
-        , constant message
-        )]
-      return True
+postMessageQuery :: ByteString
+                 -> SecretBox.Nonce
+                 -> ByteString
+                 -> Connection
+                 -> IO Bool
+postMessageQuery salt nonce message conn = do
+  (msg :: [(ByteString, SecretBox.Nonce, ByteString)]) <- runQuery conn getMessageQuery
+  case msg of
+    (_:_) -> return False
+    [] -> True <$ runInsertMany conn messageTable [
+                    ( Nothing
+                    , constant salt
+                    , constant nonce
+                    , constant message
+                    )]
 
 instance QueryRunnerColumnDefault PGBytea Address where
   queryRunnerColumnDefault = queryRunnerColumn id

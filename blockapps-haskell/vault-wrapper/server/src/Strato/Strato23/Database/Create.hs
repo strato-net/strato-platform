@@ -30,6 +30,8 @@ messageTable :: Query
 messageTable = [sql|
 CREATE TABLE IF NOT EXISTS message(
   id serial PRIMARY KEY,
+  salt bytea NOT NULL,
+  nonce bytea NOT NULL,
   enc_msg bytea NOT NULL UNIQUE
 );
 |]
