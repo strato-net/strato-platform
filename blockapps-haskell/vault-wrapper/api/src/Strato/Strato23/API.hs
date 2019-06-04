@@ -3,6 +3,7 @@
 module Strato.Strato23.API
   ( VaultWrapperAPI
   , module Strato.Strato23.API.Key
+  , module Strato.Strato23.API.Password
   , module Strato.Strato23.API.Ping
   , module Strato.Strato23.API.Signature
   , module Strato.Strato23.API.Types
