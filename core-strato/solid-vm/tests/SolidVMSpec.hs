@@ -96,6 +96,9 @@ runTest f = do
 runFile :: FilePath -> ContextM ()
 runFile fp = void $ runBS =<< liftIO (B.readFile fp)
 
+runFileArgs :: T.Text -> FilePath -> ContextM ()
+runFileArgs args fp = void $ runArgs args =<< liftIO (B.readFile fp)
+
 runBS :: B.ByteString -> ContextM ()
 runBS = void . runBS'
 
@@ -238,8 +241,7 @@ spec :: Spec
 spec = do
   describe "Ballot" $ do
     it "can be created" . runTest $ do
-      liftIO $ pendingWith "storage vs memory, struct kwargs"
-      runFile "testdata/Ballot.sol"
+      runFileArgs [r|(["a","b","c"])|] "testdata/Ballot.sol"
 
   describe "Create" $ do
     it "should be able to run an empty contract" . runTest $ do
@@ -510,12 +512,14 @@ contract qq {
     it "should be able to return the time from the header" . runTest $ do
       runBS [r|
 contract qq {
- uint ts;
+ uint ts1;
+ uint ts2;
  constructor() {
-   ts = block.timestamp;
+   ts1 = block.timestamp;
+   ts2 = now;
  }
 }|]
-      getAll [ [Field "ts"] ] `shouldReturn` [BInteger 0x4000]
+      getFields ["ts1", "ts2"] `shouldReturn` [BInteger 0x4000, BInteger 0x4000]
 
     it "can parse one specific assembly block" . runTest $ do
       runBS [r|
@@ -1235,7 +1239,6 @@ contract qq {
 
 
   it "can assign to tuples" . runTest $ do
-    liftIO $ pendingWith "tuple assignment"
     runBS [r|
 contract qq {
   uint x;
@@ -1360,7 +1363,6 @@ contract qq is A, B {
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xb)
 
   it "selects the correct super when parents are missing methods" . runTest $ do
-    liftIO $ pendingWith "TODO: ADL in MRO"
     runCall "value" "()" [r|
 contract A {
   function value() public returns (uint) {
@@ -1375,7 +1377,6 @@ contract qq is A, B {
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xa)
 
   it "can determine super instance by function name" . runTest $ do
-    liftIO $ pendingWith "MRO by ADL"
     runBS [r|
 contract A {
   function a() public pure returns (uint) { return 0xaaaa;}
@@ -1512,6 +1513,15 @@ contract qq {
     return msg.sender;
   }
 }|] `shouldReturn` Just (SB.toShort want)
+
+  it "can return an enum" . runTest $ do
+    runCall "a" "()" [r|
+contract qq {
+  enum Letter { a, b, c }
+  function a() public returns (Letter) {
+    return Letter.c;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
 
   it "will initialize contracts as such" . runTest $ do
     runBS [r|
@@ -1812,3 +1822,334 @@ contract qq {
 
   it "catches missing function errors" $
     (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc
+
+  it "can cast to int" . runTest $ do
+    runBS [r|
+contract qq {
+  int z;
+  constructor() public {
+    z = int(123456);
+  }
+}|]
+    getFields ["z"] `shouldReturn` [BInteger 123456]
+
+  it "can create storage references to structs" . runTest $ do
+    runBS [r|
+contract qq {
+  struct Nom {
+    string id;
+    uint nomType;
+  }
+  Nom[] noms;
+
+  constructor() public {
+    noms.push(Nom("239847", 7777));
+    Nom storage n = noms[0];
+    n.nomType = 13;
+  }
+}|]
+    getAll [ [Field "noms", Field "length"]
+           , [Field "noms", ArrayIndex 0, Field "id" ]
+           , [Field "noms", ArrayIndex 0, Field "nomType" ]
+           ] `shouldReturn` [BInteger 1, BString "239847", BInteger 13]
+
+  it "can create memory copies of structs" . runTest $ do
+    runBS [r|
+contract qq {
+  struct Nom {
+    string id;
+    uint nomType;
+  }
+  Nom[] noms;
+  uint newType;
+
+  constructor() public {
+    noms.push(Nom("ok", 41));
+    Nom memory n = noms[0];
+    n.nomType = 92;
+    newType = n.nomType;
+  }
+}|]
+    getAll [ [Field "noms", Field "length"]
+           , [Field "noms", ArrayIndex 0, Field "id"]
+           , [Field "noms", ArrayIndex 0, Field "nomType"]
+           , [Field "newType"]
+           ] `shouldReturn` [BInteger 1, BString "ok", BInteger 41, BInteger 92]
+
+  it "can multiply return" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  string y;
+  function f() public returns (uint, string) {
+    return (24, "hello");
+  }
+  constructor() public {
+    (x, y) = f();
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 24, BString "hello"]
+
+  it "can set local vars" . runTest $ do
+    runBS [r|
+contract Rest {
+  enum Status {
+    OK,
+    NOT_FOUND
+  }
+}
+
+contract qq is Rest {
+  uint sum;
+  struct Permit {
+    uint p;
+  }
+  function f() public returns (uint, uint) {
+    Permit memory perm;
+    perm.p = 400;
+    return (uint(Status.OK), perm.p);
+  }
+  constructor() public {
+    var (a, b) = f();
+    sum = a + b;
+  }
+}
+|]
+    getFields ["sum"] `shouldReturn` [BInteger 400]
+
+  it "does stuff after an if" . runTest $ do
+    liftIO $ pendingWith "loop control fix"
+    runBS [r|
+contract qq {
+  uint x = 40;
+  constructor() public {
+    x++;
+    if (true) {
+    } else {
+    }
+    x++;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 42]
+
+  it "can parse a singleton tuple" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    var (z) = 247;
+    x = z;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 247]
+
+  it "doesn't need var for variables in scope" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  uint y;
+  constructor() public {
+    (x, y) = (10, 20);
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 10, BInteger 20]
+
+  it "can array convert for index" . runTest $ do
+    liftIO $ pendingWith "TODO: creating references into strings"
+    runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    string txt = "hello, world";
+    x = bytes(txt)[3];
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0x6c]
+
+  it "can increment array members" . runTest $ do
+    runBS [r|
+contract qq {
+    uint[] xs = [1,1,3];
+    constructor() public {
+        xs[1]++;
+    }
+}|]
+    getAll [ [Field "xs", Field "length"]
+           , [Field "xs", ArrayIndex 0]
+           , [Field "xs", ArrayIndex 1]
+           , [Field "xs", ArrayIndex 2]
+           ] `shouldReturn` [BInteger 3, BInteger 1, BInteger 2, BInteger 3]
+
+  it "can reference characters" . runTest $ do
+    liftIO $ pendingWith "TODO: something"
+    runBS [r|
+contract qq {
+    string public xs = "ok";
+    constructor() public {
+      bytes(xs)[0] = 't';
+      bytes(xs)[1] = 'y';
+    }
+}|]
+    getFields ["xs"] `shouldReturn` [BString "ty"]
+
+  it "can parse named arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    x = f({y: 99});
+  }
+
+  function f(uint y) public returns (uint) {
+    return y + 2;
+  }
+}
+|]
+    getFields ["x"] `shouldReturn` [BInteger 101]
+
+  it "can call named argument constructors" . runTest $ do
+    runBS [r|
+contract X {
+  uint public y;
+  string public z;
+
+  constructor(uint _y, string _z) public {
+    y = _y;
+    z = _z;
+  }
+}
+
+contract qq {
+  X public x;
+  constructor() public {
+    x = new X({_z: "ok", _y: 0x777777});
+  }
+}|]
+    let recursiveAddr = getNewAddress_unsafe uploadAddress 1
+    getFields ["x"] `shouldReturn` [BContract "X" recursiveAddr]
+    mapM (getSolidStorageKeyVal' recursiveAddr) [MS.singleton "y", MS.singleton "z"]
+      `shouldReturn` [BInteger 0x777777, BString "ok"]
+
+  it "can cast a struct from named arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  struct S {
+    uint x;
+    uint y;
+    string z;
+  }
+  S s;
+  constructor() public {
+    s = S({y: 87, z: "goodbye", x: 33});
+  }
+}|]
+    getAll [ [Field "s", Field "x"]
+           , [Field "s", Field "y"]
+           , [Field "s", Field "z"]
+           ] `shouldReturn` [BInteger 33, BInteger 87, BString "goodbye"]
+
+  it "should be able to adjust arrayed structs" . runTest $ do
+    runBS [r|
+contract qq {
+  struct X {
+    uint x;
+  }
+  X[] xs;
+  constructor() public {
+    xs.push(X({x: 55}));
+    xs[0].x *= 2;
+  }
+}|]
+    getAll [ [Field "xs", ArrayIndex 0, Field "x" ]] `shouldReturn` [BInteger 110]
+
+  it "can resolve variables for named arguments" . runTest $ do
+    void $ runArgs "(\"stref\")" [r|
+contract qq {
+  struct X {
+    string n;
+  }
+  X[] public names;
+  constructor(string input_name) public {
+    names.push(X({n: input_name}));
+  }
+}|]
+    getAll [ [Field "names", ArrayIndex 0, Field "n"] ] `shouldReturn` [BString "stref"]
+
+  it "can declare types for a tuple" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  string y;
+  function f() returns (uint, string) {
+    return (0x42, "ok");
+  }
+
+  constructor() public {
+    (uint _x, string _y) = f();
+    x = _x;
+    y = _y;
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 0x42, BString "ok"]
+
+  it "can create new bytes" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  bytes xs;
+  constructor() public {
+    xs = new bytes(3);
+  }
+}|]
+    getFields ["xs"] `shouldReturn` [BString "\x00\x00\x00"]
+
+  it "overrides addressToAsciiString" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  string xs;
+  constructor() public {
+    xs = addressToAsciiString(this);
+  }
+}|]
+    getFields ["xs"] `shouldReturn` [BString "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe"]
+
+  it "can cast empty bytes32 to int" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint public x;
+  constructor() public {
+    x = uint(bytes(""));
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0x0]
+
+  it "can store nested structs" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  struct Inner {
+    uint value;
+  }
+  struct Outer {
+    Inner inner;
+  }
+  Outer public outer;
+  constructor() public {
+    Inner memory inner = Inner({value: 0x732});
+    outer = Outer(inner);
+  }
+}
+|]
+    getAll [[Field "outer", Field "inner", Field "value"]] `shouldReturn` [BInteger 0x732]
+
+  it "can not declare part of a tuple" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  function ab() returns (uint, uint) {
+    return (71, 833);
+  }
+  constructor() public {
+    var (_, b) = ab();
+    x = b;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 833]

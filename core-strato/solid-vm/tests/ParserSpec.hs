@@ -10,6 +10,7 @@ import Text.Parsec
 import Text.RawString.QQ
 
 import SolidVM.Solidity.Xabi.Statement
+import SolidVM.Solidity.Xabi.Type
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.Statement
 import SolidVM.Solidity.Parse.UnParser
@@ -40,6 +41,14 @@ spec = do
                                        (Just $ Variable "a"))
                                      (Just $ Variable "b"))
                                    (Just $ Variable "c"))
+                , ("int(8824)", FunctionCall (Variable "int") $ OrderedArgs [NumberLiteral 8824 Nothing])
+                , ("int32(8824)", FunctionCall (Variable "int32") $ OrderedArgs [NumberLiteral 8824 Nothing])
+                , ("int(x)[y]", IndexAccess (FunctionCall (Variable "int") $ OrderedArgs [Variable "x"])
+                                            $ Just $ Variable "y")
+                , ("xs[y].z", MemberAccess
+                                (IndexAccess (Variable "xs") (Just $ Variable "y"))
+                                "z")
+                , ("x.f()", FunctionCall (MemberAccess (Variable "x") "f") $ OrderedArgs [])
                 ]
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want
@@ -49,12 +58,15 @@ spec = do
 
     it "can parse function calls" $ do
       let f = FunctionCall (Variable "f")
-          true = [(Nothing, BoolLiteral True)]
-          ok = [(Nothing, StringLiteral "ok")]
+          true = OrderedArgs [BoolLiteral True]
+          ok = OrderedArgs [StringLiteral "ok"]
           fcases = [ ("f(true)", f true)
                    , ("f(true\n)", f true)
                    , ("f(\"ok\")", f ok)
                    , ("f(\"ok\"\n)", f ok)
+                   , ("f({})", f $ NamedArgs [])
+                   , ("f({ x : y})", f $ NamedArgs [("x", Variable "y")])
+                   , ("f ( { x : y , q : z } )", f $ NamedArgs [("x", Variable "y"), ("q", Variable "z")])
                    ]
       forM_ fcases $ \(input, want) -> do
         assertEqual input (Right want) (parseExpr input)
@@ -64,6 +76,23 @@ spec = do
         scases = [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus $ Variable "x")
                  , ("assembly { dst := mload(add(src, 32)) }",
                       AssemblyStatement $ MloadAdd32 "dst" "src")
+                 , ("Nom storage nom = ns[10];", SimpleStatement $
+                      VariableDefinition [VarDefEntry (Just $ Label "Nom") (Just Storage) "nom"] $ Just $
+                      IndexAccess (Variable "ns") (Just $ NumberLiteral 10 Nothing))
+                 , ("var (x, y) = (7, 3);", SimpleStatement $
+                      VariableDefinition [VarDefEntry Nothing Nothing "x",
+                                          VarDefEntry Nothing Nothing "y"] $ Just $
+                      TupleExpression $ map (\n -> Just (NumberLiteral n Nothing)) [7, 3])
+                 , ("(z, w) = (q, r);", SimpleStatement $ ExpressionStatement
+                      $ Binary "=" (TupleExpression $ map (Just . Variable) ["z", "w"])
+                                   (TupleExpression $ map (Just . Variable) ["q", "r"]))
+                 , ("(z, ) = (q, r);", SimpleStatement $ ExpressionStatement
+                      $ Binary "=" (TupleExpression $ [Just $ Variable "z", Nothing])
+                                   (TupleExpression $ map (Just . Variable) ["q", "r"]))
+                 , ("eq = ne;", SimpleStatement $ ExpressionStatement $ Binary "=" (Variable "eq") (Variable "ne"))
+                 , ("var (a, b, , );", SimpleStatement $
+                      VariableDefinition [VarDefEntry Nothing Nothing "a", VarDefEntry Nothing Nothing "b", BlankEntry, BlankEntry]
+                      Nothing)
                  ]
     forM_ scases $ \(input, want) -> do
         it ("can parse " ++ input) $ parseStatement input `shouldBe` Right want
