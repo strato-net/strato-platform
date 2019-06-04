@@ -45,3 +45,6 @@ updateSchemaVersion = [sql| UPDATE vault_wrapper_schema_version SET schema_versi
 
 insertAddress :: Query
 insertAddress = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS address bytea; |]
+
+insertSecPrvKey :: Query
+insertSecPrvKey = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS enc_sec_prv_key bytea; |]

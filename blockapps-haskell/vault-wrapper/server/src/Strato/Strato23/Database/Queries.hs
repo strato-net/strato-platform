@@ -29,14 +29,14 @@ import           Strato.Strato23.Database.Tables
 
 getUserKeyQuery :: Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserKeyQuery username = proc () -> do
-  (_, name, salt, nonce, encSecKey, address) <- queryTable usersTable -< ()
+  (_, name, salt, nonce, _, encSecPrvKey, address) <- queryTable usersTable -< ()
   restrict -< name .== constant username
-  returnA -< (salt, nonce, encSecKey, address)
+  returnA -< (salt, nonce, encSecPrvKey, address)
 
 postUserKeyQuery :: Text -> KeyStore -> Connection -> IO Bool
 postUserKeyQuery userName KeyStore{..} conn = do
   (userIds :: [Int32]) <- runQuery conn $ proc () -> do
-    (userId,name,_,_,_,_) <- queryTable usersTable -< ()
+    (userId,name,_,_,_,_,_) <- queryTable usersTable -< ()
     restrict -< name .== constant userName
     returnA -< userId
   case listToMaybe userIds of
@@ -47,6 +47,7 @@ postUserKeyQuery userName KeyStore{..} conn = do
         , constant userName
         , constant keystoreSalt
         , constant keystoreAcctNonce
+        , constant keystoreAcctEncSecKey
         , constant keystoreAcctEncSecKey
         , constant keystoreAcctAddress
         )]
