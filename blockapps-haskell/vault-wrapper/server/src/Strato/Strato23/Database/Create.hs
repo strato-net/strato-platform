@@ -20,8 +20,19 @@ CREATE TABLE IF NOT EXISTS users(
   x_user_unique_name varchar(512) NOT NULL UNIQUE,
   salt bytea NOT NULL,
   nonce bytea NOT NULL,
-  enc_sec_key bytea NOT NULL,
+  enc_sec_key bytea,
+  enc_sec_prv_key bytea NOT NULL,
   address bytea NOT NULL
+);
+|]
+
+messageTable :: Query
+messageTable = [sql|
+CREATE TABLE IF NOT EXISTS message(
+  id serial PRIMARY KEY,
+  salt bytea NOT NULL,
+  nonce bytea NOT NULL,
+  enc_msg bytea NOT NULL UNIQUE
 );
 |]
 
@@ -29,4 +40,5 @@ createTables :: Query
 createTables = mconcat
   [ schemaVersionTable
   , usersTable
+  , messageTable
   ]

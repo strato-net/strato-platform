@@ -65,10 +65,10 @@ getContractsContract
 getContractsContract = client (Proxy @ GetContractsContract)
 
 getContractsState
-  :: ContractName 
-  -> MaybeNamed Address 
+  :: ContractName
+  -> MaybeNamed Address
   -> Maybe ChainId
-  -> Maybe Text 
+  -> Maybe Text
   -> Maybe Integer
   -> Maybe Integer
   -> Bool
@@ -185,7 +185,6 @@ getChainInfo = client (Proxy @ GetChainInfo)
 
 postBlocTransaction
   :: Maybe Text
-  -> Maybe Text
   -> Maybe ChainId
   -> Bool
   -> PostBlocTransactionRequest

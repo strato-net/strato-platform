@@ -11,20 +11,19 @@ import           Strato.Strato23.Crypto
 import           Strato.Strato23.Monad
 import           Strato.Strato23.Database.Queries
 
-getKey :: Text -> Text -> Maybe Text -> VaultM StatusAndAddress
-getKey headerUserName userId queryParamUserName = do
+getKey :: Text -> Maybe Text -> VaultM StatusAndAddress
+getKey headerUserName queryParamUserName = do
   let userName = fromMaybe headerUserName queryParamUserName
   (salt, nonce, encKey, addr) <- toUserError ("User " <> userName <> " doesn't exist")
                                . vaultQuery1 $ getUserKeyQuery userName
   if isJust queryParamUserName          -- decrypt and derive the address if query param
     then return $ StatusAndAddress addr -- not specified, to guarantee correctness
-    else case decryptSecKey (textPassword userId) salt nonce encKey of
-      Nothing -> vaultWrapperError $ UserError "X-USER-ID does not match entry for X-USER-UNIQUE-NAME"
+    else withPassword $ \pw -> case decryptSecKey pw salt nonce encKey of
+      Nothing -> vaultWrapperError $ UserError "Server misconfigured"
       Just pKey -> return . StatusAndAddress $ deriveAddress pKey
 
-postKey :: Text -> Text -> VaultM StatusAndAddress
-postKey userName userId = do
-  let pw = textPassword userId
+postKey :: Text -> VaultM StatusAndAddress
+postKey userName = withPassword $ \pw -> do
   keyStore@KeyStore{..} <- newKeyStore pw
   created <- vaultModify $ postUserKeyQuery userName keyStore
   if not created
