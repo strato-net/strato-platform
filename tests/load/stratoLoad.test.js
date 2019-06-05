@@ -82,7 +82,7 @@ describe('Strato Load Test', function() {
             return console.log(err);
         }
 
-        //console.log("The file was saved!");
+        console.log("The file was saved!");
         });
     fs.appendFile("graph_PERFORMANCE_multinode_strato_load.csv", "\n", function(err) {
         if(err) {
