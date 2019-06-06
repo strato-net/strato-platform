@@ -127,13 +127,16 @@ function newnode {
   if [-n "${seqEventsCostHeuristic}" ]; then
       sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
   fi
+  if [-n "${cacheTransactionResults}"] ; then
+      ctrFlag="--cacheTransactionResults=${cacheTransactionResults}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" \
+                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"

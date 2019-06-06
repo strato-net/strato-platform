@@ -5,15 +5,15 @@
 module Blockchain.SolidVM.SetGet (
   setVar,
 
+  weakGetVar,
   getVar,
   getInt,
   getBool,
   getContract,
   getAddress,
   getString,
-
+  getSolid,
   deleteVar,
-
   showSM
   ) where
 
@@ -93,22 +93,15 @@ setVar dst@(AddressedPath loc key) val = do
         t <- getXabiValueType src
         case t of
           Xabi.Array{} -> do
-            len <- getInt (StorageItem $ src `apSnoc` MS.Field "length")
+            len <- getInt (Constant $ SReference $ src `apSnoc` MS.Field "length")
             setVar (dst `apSnoc` MS.Field "length") $ SInteger len
             forM_ [0..len-1] $ \i -> do
               let i' = fromIntegral i
               setVar (dst `apSnoc` MS.ArrayIndex i') =<<
-                getVar (StorageItem $ src `apSnoc` MS.ArrayIndex i')
+                getVar (Constant $ SReference $ src `apSnoc` MS.ArrayIndex i')
           _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
-    SStruct name fs -> forM_ (M.toList fs) $ \(f, var) -> do
-        let suffix = MS.Field $ BC.pack f
-            srcKey = MS.singleton (BC.pack name) `MS.snoc` suffix
-            dstKey = key `MS.snoc` suffix
-        !val' <- case var of
-          Constant x -> do
-            return $ toBasic x
-          _ -> getSolid loc srcKey
-        putSolid loc dstKey val'
+    SStruct _ fs -> forM_ (M.toList fs) $ \(f, var) -> do
+        setVar (dst `apSnoc` MS.Field (BC.pack f)) =<< weakGetVar var
     _ -> putSolid loc key $! toBasic val
 
 deleteVar :: AddressedPath -> SM ()
@@ -139,23 +132,28 @@ getContract :: String -> Variable -> SM Value
 getContract contractName = getVar' (Just $ TContract contractName)
 
 
+weakGetVar :: Variable -> SM Value
+weakGetVar (Constant c) = return c
+weakGetVar (Variable v) = liftIO $ readIORef v
+
 getVar :: Variable -> SM Value
 getVar v = do
   val <- getVar' Nothing v
   return val
 
 getVar' :: Maybe BasicType -> Variable -> SM Value
-getVar' mTypeHint (Variable ioRef) = do
-  val <- liftIO $ readIORef ioRef
+getVar' mTypeHint var = do
+  val <- weakGetVar var
   case val of
-    SReference apt -> getVar' mTypeHint $ StorageItem apt
-    _ -> return val
-getVar' mTypeHint (Constant c) = do
-  case c of
-    SReference apt -> getVar' mTypeHint $ StorageItem apt
+    SReference apt -> getStorageItem mTypeHint apt
     STuple vs -> STuple <$> V.mapM (fmap Constant . getVar' Nothing) vs
-    _ -> return c
-getVar' mTypeHint (StorageItem apt@(AddressedPath loc key)) = do
+    _ -> return val
+
+
+
+
+getStorageItem :: Maybe BasicType -> AddressedPath -> SM Value
+getStorageItem mTypeHint apt@(AddressedPath loc key) = do
   raw <- getSolid loc key
   if raw /= MS.BDefault
     then return $ fromBasic raw
@@ -166,11 +164,10 @@ getVar' mTypeHint (StorageItem apt@(AddressedPath loc key)) = do
       case typeHint of
         TStruct name fieldHints -> SStruct name . M.fromList <$> do
           forM fieldHints $ \(l, t') -> do
-            fieldValue <- getVar' (Just t') . StorageItem $ apt `apSnoc` MS.Field l
+            fieldValue <- getVar' (Just t') . Constant . SReference $ apt `apSnoc` MS.Field l
             return (BC.unpack l, Constant fieldValue)
         TComplex -> return $ SReference apt
         _ -> return $ findDefault typeHint
-
 
 showSM :: Value -> SM String
 showSM SNULL = return "NULL"
@@ -210,4 +207,5 @@ showSM (SMap _ m) = do
 showSM (SContract name address) = do
   return $ "Contract: " ++ name ++ "/" ++ format address
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
+showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
 showSM x = todo "showSM called for unsupported value: " x

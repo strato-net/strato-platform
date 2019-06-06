@@ -49,7 +49,6 @@ transactionType (BlocFunction _) = FUNCTION
 
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
-  :> S.Header "X-USER-ID" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest

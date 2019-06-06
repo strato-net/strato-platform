@@ -127,6 +127,7 @@ services:
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
+    - cacheTransactionResults=${cacheTransactionResults}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}

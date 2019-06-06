@@ -9,6 +9,7 @@ module Main where
 
 import           Control.Monad
 import           Database.PostgreSQL.Simple
+import           Data.IORef
 import           Data.Pool
 import           HFlags
 import           Network.HTTP.Client                    hiding (Proxy)
@@ -59,7 +60,8 @@ main = do
 
   pool <- createPool (connect dbConnectInfo) close 5 3 5
   mgr <- newManager defaultManagerSettings
-  let env = Strato23.VaultWrapperEnv mgr pool
+  password <- newIORef Nothing
+  let env = Strato23.VaultWrapperEnv mgr pool password
   run flags_port (appVaultWrapper env)
 
 appVaultWrapper :: Strato23.VaultWrapperEnv -> Application
