@@ -1,9 +1,7 @@
 FROM node:8.15-stretch-slim
 RUN apt-get update && \
     mkdir -p /usr/share/man/man1 /usr/share/man/man7 && \
-    apt-get install -y git postgresql-client zip && \
-    apt-get install -y python && \
-    apt-get install -y build-essential && \
+    apt-get install -y git postgresql-client zip python build-essential && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/src/app

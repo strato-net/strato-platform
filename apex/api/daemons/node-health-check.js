@@ -6,8 +6,6 @@ const env = process.env.NODE_ENV || 'development';
 const moment = require('moment');
 const si = require('systeminformation');
 const disk = require('diskusage');
-const os = require('os');
-let path = os.platform() === 'win32' ? 'c:' : '/';
 const config = require('../config/app.config');
 
 const neededJobs = {
@@ -34,7 +32,7 @@ function queryHealthStatus() {
     return new Promise(async (resolve, _void) => {
         try {
             const metricsResult = await getHealthPrometheus();
-            await checkLatest()
+            await checkLatest();
             const healthStatus = await compareTimeStamp(metricsResult);
             const overallStatus = await updateHealthStat(healthStatus);
             await updateCurrentHealth(overallStatus);
@@ -199,25 +197,25 @@ async function checkSystemInfo() {
   try {
     let additional_info = [];
     let sysInfoCollected = {}
-    let ifHealthy = true;
+    let isHealthy = true;
     await si.mem().then(data => {
       sysInfoCollected.mem_active = data.active;
       sysInfoCollected.mem_free = data.free;
       sysInfoCollected.mem_available = data.available;
 
       if (data.available / data.total * 100 < config.healthCheck.diskUsageBound) {
-        ifHealthy = false;
+        isHealthy = false;
         additional_info.push("Low Memory")
       }
     })
-    disk.check(path, function(err, info) {
+    disk.check('/', function(err, info) {
       if (err) {
         winston.warn("Error when checking for disk usage", err);
       } else {
         const diskUsageRatio = info.free / info.total *100;
         sysInfoCollected.disk_usage = diskUsageRatio;
         if (diskUsageRatio < config.healthCheck.memoryUsageBound) {
-          ifHealthy = false;
+          isHealthy = false;
           additional_info.push("Low Disk Space")
         }
       }
@@ -237,7 +235,7 @@ async function checkSystemInfo() {
         fsDetails.fsSize_size = fs.size;
         fss.push(fsDetails)
         if (fsDetails.fsSize_use < config.healthCheck.diskUsageBound) {
-          ifHealthy = false;
+          isHealthy = false;
           additional_info.push(`Low Disk Space on ${fsDetails.name}`)
         }
       })
@@ -264,7 +262,7 @@ async function checkSystemInfo() {
       sysInfoCollected.Alerts = additional_info
     }
     winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)
-    return [ifHealthy, sysInfoCollected];
+    return [isHealthy, sysInfoCollected];
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
   }
