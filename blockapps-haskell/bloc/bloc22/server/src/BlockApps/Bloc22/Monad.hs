@@ -181,7 +181,7 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           VaultWrapperError (FailureResponse Response{..}) | responseStatusCode == status503 ->
-            err503{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
+            err503{errBody = responseBody}
                                                            | statusIsClientError responseStatusCode ->
             err400{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           VaultWrapperError (ConnectionError _) ->
