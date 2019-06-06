@@ -1,5 +1,9 @@
 ## RELEASE NOTES
 
+### Version 7.5
+
+-   Refactor ba-rest to only use oauth
+
 ### Version 7.4.3
 
 -   Refactor ba-rest to use ES6
