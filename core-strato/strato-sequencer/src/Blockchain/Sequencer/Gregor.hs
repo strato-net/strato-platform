@@ -19,6 +19,7 @@ module Blockchain.Sequencer.Gregor
   , runTheGregor
   , runGregorM
   , assertTopicCreation
+  , initializeCheckpoint
   , writeSeqP2pEvents
   , writeSeqVmEvents
   ) where
@@ -29,9 +30,11 @@ import           Control.Lens               hiding (op)
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
+import           Data.Default
 import qualified Data.Text as T
 import qualified Prometheus as P
 import           UnliftIO.STM
+import           Blockchain.Blockstanbul (Checkpoint, decodeCheckpoint, encodeCheckpoint)
 import qualified Blockchain.EthConf                        as EC
 import qualified Blockchain.MilenaTools     as K
 import           Blockchain.Output
@@ -109,13 +112,22 @@ assertTopicCreation :: GregorM ()
 assertTopicCreation = void $ K.withKafkaViolently SK.assertTopicCreation
 
 getNextIngestedOffset :: GregorM KP.Offset
-getNextIngestedOffset = do
+getNextIngestedOffset = fst <$> getNextOffsetAndMetadata
+
+encodeMeta :: Checkpoint -> KP.Metadata
+encodeMeta = KP.Metadata . KP.KString . encodeCheckpoint
+
+decodeMeta :: KP.Metadata -> Either String Checkpoint
+decodeMeta (KP.Metadata (KP.KString bs)) = decodeCheckpoint bs
+
+getNextOffsetAndMetadata :: GregorM (KP.Offset, KP.Metadata)
+getNextOffsetAndMetadata = do
   group  <- getKafkaConsumerGroup
   ret <- K.withKafkaRetry1s (K.fetchSingleOffset group SK.unseqEventsTopicName 0) >>= \case
     Left KP.UnknownTopicOrPartition -> -- we've never committed an Offset
-        setNextIngestedOffset 0 >> getNextIngestedOffset
+        setNextIngestedOffset 0 >> getNextOffsetAndMetadata
     Left err -> error $ "Unexpected response when fetching offset for " ++ show SK.unseqEventsTopicName ++ ": " ++ show err
-    Right (ofs, _) -> return ofs
+    Right om -> return om
   P.incCounter gregorKafkaCheckpointReads
   return ret
 
@@ -134,6 +146,17 @@ setNextIngestedOffset newOffset = do
 runTheGregor :: GregorConfig -> IO ()
 runTheGregor cfg = race_ (runGregorM cfg unseqReader)
                          (runGregorM cfg seqWriters)
+
+initializeCheckpoint :: GregorM Checkpoint
+initializeCheckpoint = do
+  meta <- snd <$> getNextOffsetAndMetadata
+  case decodeMeta meta of
+       Left err -> do
+         $logErrorS "initializeCheckpoint" . T.pack $
+             "unable to decode pbft checkpoint " ++ show err
+         return def
+       Right kafkaCkpt -> return kafkaCkpt
+
 
 unseqReader :: GregorM ()
 unseqReader = forever . timeAction gregorUnseqTiming $ do
@@ -174,12 +197,6 @@ blockFlushTQueue ch = do
   return $ first:rest
 
 {-
-getKafkaCheckpoint :: GregorM (Offset, CheckpointContent)
-getKafkaCheckpoint = withKafkaRetry1s (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
-    Left UnknownTopicOrPartition -> error "seqCheckpointContent was never initialized in strato-setup!"
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right (ofs, Metadata (KString md'))  -> return (ofs, reCPC . read $ S8.unpack md')
-
 setKafkaCheckpoint :: Offset -> CheckpointContent -> GregorM ()
 setKafkaCheckpoint ofs md = do
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ show md
@@ -194,10 +211,4 @@ setKafkaCheckpoint' ofs md =
         cpc = Metadata . KString . S8.pack . show $  md
     in
       commitSingleOffset group targetTopicName 0 ofs cpc
-
-getSeqCheckpointContent :: IContextM CheckpointContent
-getSeqCheckpointContent = use _gregorCPC
-
-putSeqCheckpointContent :: CheckpointContent -> IContextM ()
-putSeqCheckpointContent new = assign _gregorCPC new
 -}

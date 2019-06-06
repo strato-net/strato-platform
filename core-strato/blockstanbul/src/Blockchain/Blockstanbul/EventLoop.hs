@@ -95,8 +95,8 @@ debugShowCtx = do
   debugLog "showctx/roundChanged" roundChanged show
   debugLog "showctx/admins" authSenders show
 
-newContext :: View -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
-newContext v as senderlist pk =
+newContext :: Checkpoint -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
+newContext (Checkpoint v pendingVotes) as senderlist pk =
   let valSet = S.fromList as
       prop = fromMaybe 0x0 . S.lookupMin $ valSet
   in BlockstanbulContext
@@ -112,7 +112,7 @@ newContext v as senderlist pk =
      , _hasCommitted = False
      , _pendingRound = Nothing
      , _roundChanged = M.empty
-     , _voted = M.empty
+     , _voted = pendingVotes
      , _prvkey = pk
      , _blockLock = Nothing
      , _lockSender = Nothing
