@@ -42,7 +42,7 @@ instance Arbitrary ExtraData where
 
 
 truncateExtra :: Block -> Block
-truncateExtra = over extraLens $ B.take 32
+truncateExtra = over extraLens scrubConsensus
 
 addValidators :: S.Set Address -> Block -> Block
 addValidators vs = over extraLens $

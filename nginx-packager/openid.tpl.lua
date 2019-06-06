@@ -24,7 +24,6 @@ local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
 local unique_name = ''
-local user_id = ''
 
 local verify_opts = {
   discovery = "<OAUTH_DISCOVERY_URL>",
@@ -66,8 +65,6 @@ if ngx.req.get_headers()["Authorization"] then
     unique_name = verify_res.appid
   end
 
-  user_id = verify_res.sub
-
 else
   -- Else - use the openidc authenticate flow
 
@@ -106,8 +103,6 @@ else
     unique_name = authenticate_res.id_token.appid
   end
 
-  user_id = authenticate_res.id_token.sub
-
   -- set the username cookie on client
   if not ngx.var['cookie_strato_user_name'] or ngx.var['cookie_strato_user_name'] ~= unique_name then
     ngx.header['Set-Cookie'] = string.format('strato_user_name=%s; path=/', unique_name)
@@ -116,6 +111,5 @@ end
 
 -- set request headers to forward to APIs
 ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
-ngx.req.set_header("X-USER-ID", user_id)
 -- removing the Authorization header FROM REQUEST to prevent Postgrest's built-in JWT permissioning to trigger
 ngx.req.clear_header("Authorization")
