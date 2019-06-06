@@ -95,6 +95,8 @@ data VaultWrapperEnv = VaultWrapperEnv
 data VaultWrapperError
   = DBError Text
   | UserError Text
+  | NoPasswordError
+  | IncorrectPasswordError
   | CouldNotFind Text
   | AnError Text
   | Unimplemented Text
@@ -125,34 +127,45 @@ enterVaultWrapper env x
             err500{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "Something is broken in the Vault Wrapper Server database.",
-                     "Please contact your network administrator to have this problem fixed.",
-                     "(More information can be found in the Vault Wrapper logs.)"
+                     "Something is broken in the STRATO database.",
+                     "Please contact your network administrator to have this problem fixed."
                    ]}
           UserError err -> err400{errBody = fromString $ show err}
+          NoPasswordError ->
+            err503{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "STRATO has not been initialized properly.",
+                     "Please contact your network administrator to have this problem fixed."
+                   ]}
+          IncorrectPasswordError ->
+            err503{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "STRATO has not been initialized properly.",
+                     "Please contact your network administrator to have this problem fixed."
+                   ]}
           AlreadyExists err -> err409{errBody = fromString $ show err}
           CouldNotFind err -> err404{errBody = fromString $ show err}
           AnError _ ->
             err500{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "Something is broken in the Vault Wrapper Server.",
-                     "Please contact your network administrator to have this problem fixed.",
-                     "(More information can be found in the Vault Wrapper logs.)"
+                     "Something is broken in STRATO.",
+                     "Please contact your network administrator to have this problem fixed."
                    ]}
           Unimplemented err ->
             err501{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "You are using a feature of the Vault Wrapper Server that has not yet been implemented.",
+                     "You are using a feature that has not yet been implemented.",
                      Text.unpack err
                    ]}
           RuntimeError _ -> err500{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "Something wrong has happened inside of Vault Wrapper.",
-                     "Please contact your network administrator to have this problem fixed.",
-                     "(More information can be found in the Vault Wrapper logs.)"
+                     "Something wrong has happened inside of STRATO.",
+                     "Please contact your network administrator to have this problem fixed."
                    ]}
 
 withPassword :: (Password -> VaultM a) -> VaultM a
@@ -160,7 +173,7 @@ withPassword f = do
   pwioref <- asks superSecretPassword
   password <- liftIO $ readIORef pwioref
   case password of
-    Nothing -> vaultWrapperError $ AnError "Server misconfigured"
+    Nothing -> vaultWrapperError NoPasswordError
     Just pw -> f (textPassword pw)
 
 formatTopLocation::[(String, SrcLoc)]->String

@@ -28,7 +28,7 @@ postSignature userName (UserData (Hex msgHash)) = do
         . vaultQuery1
         $ getUserKeyQuery userName
   withPassword $ \pw -> case decryptSecKey pw salt nonce pKey of
-    Nothing -> vaultWrapperError $ UserError "Incorrect password"
+    Nothing -> vaultWrapperError IncorrectPasswordError
     Just prvKey -> case msg (word256ToByteString msgHash) of
       Nothing -> vaultWrapperError $ AnError "Message was not 32 bytes long"
       Just msg' -> do
