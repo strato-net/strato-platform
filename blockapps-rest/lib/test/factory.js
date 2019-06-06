@@ -33,15 +33,7 @@ function getTestFixtures() {
   users
  */
 async function createAdmin(_args, options) {
-  // OAuth
-  if (_args.token !== undefined) {
-    return rest.createUser(_args, options);
-  }
-  // Bloc
-  const username = `admin_${_args.uid}`;
-  const args = { username, password: _args.password || "1234" };
-  const user = await rest.createUser(args, options);
-  return user;
+  return rest.createUser(_args, options);
 }
 
 function createContractArgs(uid, args = {}) {

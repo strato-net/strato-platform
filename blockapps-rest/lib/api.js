@@ -14,7 +14,7 @@ import { TxPayloadType } from "./constants";
 async function getUsers(args, options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.USERS, options);
-  return get(url, endpoint, options);
+  return get(url, endpoint, setAuthHeaders(args, options));
 }
 
 async function getUser(args, options) {
@@ -23,7 +23,7 @@ async function getUser(args, options) {
     username: args.username
   };
   const endpoint = constructEndpoint(Endpoint.USER, options, urlParams);
-  return get(url, endpoint, options);
+  return get(url, endpoint, setAuthHeaders(args, options));
 }
 
 async function createUser(args, options) {
@@ -46,10 +46,10 @@ async function fill(user, options) {
     address: user.address
   };
   const endpoint = constructEndpoint(Endpoint.FILL, options, urlParams);
-  return postue(url, endpoint, body, options);
+  return postue(url, endpoint, body, setAuthHeaders(user, options));
 }
 
-async function createContractAuth(user, contract, options) {
+async function createContract(user, contract, options) {
   const payload = {
     contract: contract.name,
     src: contract.source,
@@ -68,7 +68,7 @@ async function createContractAuth(user, contract, options) {
   return pendingTxResult;
 }
 
-async function createContractListAuth(user, contracts, options) {
+async function createContractList(user, contracts, options) {
   const txs = contracts.map(contract => {
     const payload = {
       contract: contract.name,
@@ -89,24 +89,51 @@ async function createContractListAuth(user, contracts, options) {
   return pendingTxResultList;
 }
 
-async function blocResults(hashes, options) {
+async function blocResults(user, hashes, options) {
   // TODO untested code
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.TXRESULTS, options);
-  return post(url, endpoint, hashes, options);
+  return post(url, endpoint, hashes, setAuthHeaders(user, options));
 }
 
-async function getState(contract, options) {
+async function getAccounts(user, options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.ACCOUNT, options);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function getBalance(user, options) {
+  let address = user.address;
+  if (!address) {
+    const response = await getKey(user, options);
+    address = response.address;
+  }
+  const accounts = await getAccounts(user, {
+    ...options,
+    // this endpoint does not accept the resolve flag
+    isAsync: true,
+    query: {
+      address
+    }
+  });
+  if (accounts.length == 0) {
+    return new BigNumber(0);
+  }
+
+  return new BigNumber(accounts[0].balance);
+}
+
+async function getState(user, contract, options) {
   const url = getNodeUrl(options);
   const urlParams = {
     name: contract.name,
     address: contract.address
   };
   const endpoint = constructEndpoint(Endpoint.STATE, options, urlParams);
-  return get(url, endpoint, options);
+  return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function callAuth(user, callMethodArgs, options) {
+async function call(user, callMethodArgs, options) {
   const { contract, method, args, value } = callMethodArgs;
   const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
   const payload = {
@@ -128,7 +155,7 @@ async function callAuth(user, callMethodArgs, options) {
   return pendingTxResult;
 }
 
-async function callListAuth(user, callListArgs, options) {
+async function callList(user, callListArgs, options) {
   const txs = callListArgs.map(callArgs => {
     const { contract, method, args, value } = callArgs;
     const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
@@ -184,13 +211,13 @@ async function createKey(user, options) {
   return post(url, endpoint, body, setAuthHeaders(user, options));
 }
 
-async function search(contract, options) {
+async function search(user, contract, options) {
   const url = getNodeUrl(options);
   const urlParams = {
     name: contract.name
   };
   const endpoint = constructEndpoint(Endpoint.SEARCH, options, urlParams);
-  return get(url, endpoint, options);
+  return get(url, endpoint, setAuthHeaders(user, options));
 }
 
 // TODO: check options.params and options.headers in axoos wrapper.
@@ -210,16 +237,18 @@ async function createChain(body, options) {
 }
 
 export default {
+  getAccounts,
+  getBalance,
   getUsers,
   getUser,
   createUser,
-  createContractAuth,
-  createContractListAuth,
+  createContract,
+  createContractList,
   fill,
   blocResults,
   getState,
-  callAuth,
-  callListAuth,
+  call,
+  callList,
   send,
   sendTransactions,
   getKey,

@@ -3,20 +3,22 @@ import queryString from "query-string";
 import ax from "../axios-wrapper";
 import { RestError } from "./rest.util";
 
+const blocUrl = "/bloc/v2.2";
+const strato12Url = "/strato-api/eth/v1.2";
+const strato23Url = "/strato/v2.3";
+const cirrusUrl = "/cirrus/search";
+
 const Endpoint = {
-  USERS: "/bloc/v2.2/users", // needs oauth
-  USER: "/bloc/v2.2/users/:username", // needs oauth
-  FILL: "/bloc/v2.2/users/:username/:address/fill", // needs oauth
-  CONTRACT: "/bloc/v2.2/users/:username/:address/contract", //remove
-  CALL:
-    "/bloc/v2.2/users/:username/:address/contract/:contractName/:contractAddress/call", // remove
-  CALL_LIST: "/bloc/v2.2/users/:username/:address/callList", // remove
-  STATE: "/bloc/v2.2/contracts/:name/:address/state", // needs oauth
-  TXRESULTS: "/bloc/v2.2/transactions/results", //needs oauth
-  SEND: "/strato/v2.3/transaction",
-  KEY: "/strato/v2.3/key", // verify oauth
-  SEARCH: "/cirrus/search/:name", // needs oauth
-  CHAIN: "/bloc/v2.2/chain" //neds oauth
+  ACCOUNT: `${strato12Url}/account`,
+  USERS: `${blocUrl}/users`,
+  USER: `${blocUrl}/users/:username`,
+  FILL: `${blocUrl}/users/:username/:address/fill`,
+  STATE: `${blocUrl}/contracts/:name/:address/state`,
+  TXRESULTS: `${blocUrl}/transactions/results`,
+  SEND: `${strato23Url}/transaction`,
+  KEY: `${strato23Url}/key`,
+  SEARCH: `${cirrusUrl}/:name`,
+  CHAIN: `${blocUrl}/chain`
 };
 
 function constructEndpoint(endpointTemplate, options = {}, params = {}) {
@@ -49,7 +51,8 @@ function constructQuery(options) {
     return "";
   }
   const queryObject = Object.assign(
-    { resolve: !options.isAsync, chainid: options.chainIds },
+    { chainid: options.chainIds },
+    !options.isAsync ? { resolve: true } : {},
     options.stateQuery,
     options.query
   );
@@ -90,15 +93,15 @@ function constructMetadata(options, contractName) {
     metadata.noindex = `${options.noindex},${newContracts}`;
   }
   // VM
-  if (options.hasOwnProperty("VM")) {
-    if (!["EVM", "SolidVM"].includes(options.VM)) {
+  if (options.config.hasOwnProperty("VM")) {
+    if (!["EVM", "SolidVM"].includes(options.config.VM)) {
       throw new RestError(
         RestStatus.BAD_REQUEST,
         `Illegal VM type ${options.VM}`,
         { options }
       );
     }
-    metadata.VM = options.VM;
+    metadata.VM = options.config.VM;
   }
 
   // TODO: construct the "nohistory" and "index" fields for metadata if needed

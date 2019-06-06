@@ -6,6 +6,11 @@ import assert from "../util/assert";
 import util from "../util/util";
 import factory from "./factory";
 
+if (!process.env.USER_TOKEN) {
+  const loadEnv = dotenv.config();
+  assert.isUndefined(loadEnv.error);
+}
+
 const config = factory.getTestConfig();
 
 const fixtures = factory.getTestFixtures();
@@ -32,7 +37,7 @@ describe("contracts", function() {
     );
     assert.isOk(util.isHash(pendingTxResult.hash), "hash");
     // must resolve the tx before continuing to the next test
-    await rest.resolveResult(pendingTxResult, options);
+    await rest.resolveResult(admin, pendingTxResult, options);
   });
 
   it("create contract", async () => {
@@ -111,7 +116,7 @@ describe("state", function() {
       constructorArgs
     );
     const contract = await rest.createContract(admin, contractArgs, options);
-    const state = await rest.getState(contract, options);
+    const state = await rest.getState(admin, contract, options);
     assert.equal(state.var_uint, constructorArgs.arg_uint);
   });
 
@@ -119,7 +124,7 @@ describe("state", function() {
     const uid = util.uid();
     await assert.restStatus(
       async () => {
-        return rest.getState({ name: uid, address: 0 }, options);
+        return rest.getState(admin, { name: uid, address: 0 }, options);
       },
       RestStatus.BAD_REQUEST,
       /Couldn't find/
@@ -141,19 +146,19 @@ describe("state", function() {
     const contract = await rest.createContract(admin, contractArgs, options);
     {
       options.stateQuery = { name };
-      const state = await rest.getState(contract, options);
+      const state = await rest.getState(admin, contract, options);
       assert.isDefined(state[options.stateQuery.name]);
       assert.equal(state.array.length, MAX_SEGMENT_SIZE);
     }
     {
       options.stateQuery = { name, length: true };
-      const state = await rest.getState(contract, options);
+      const state = await rest.getState(admin, contract, options);
       assert.isDefined(state[options.stateQuery.name]);
       assert.equal(state.array, SIZE, "array size");
     }
     {
       options.stateQuery = { name, length: true };
-      const state = await rest.getState(contract, options);
+      const state = await rest.getState(admin, contract, options);
       const length = state[options.stateQuery.name];
       const all = [];
       for (let segment = 0; segment < length / MAX_SEGMENT_SIZE; segment++) {
@@ -162,7 +167,7 @@ describe("state", function() {
           offset: segment * MAX_SEGMENT_SIZE,
           count: MAX_SEGMENT_SIZE
         };
-        const state = await rest.getState(contract, options);
+        const state = await rest.getState(admin, contract, options);
         all.push(...state[options.stateQuery.name]);
       }
       assert.equal(all.length, length, "array size");
@@ -182,7 +187,7 @@ describe("state", function() {
       constructorArgs
     );
     const contract = await rest.createContract(admin, contractArgs, options);
-    const result = await rest.getArray(contract, name, options);
+    const result = await rest.getArray(admin, contract, name, options);
     assert.equal(result.length, SIZE, "array size");
     const mismatch = result.filter((entry, index) => entry != index);
     assert.equal(mismatch.length, 0, "no mismatches");
@@ -272,7 +277,6 @@ describe("call", function() {
 });
 
 describe("auth user", function() {
-
   this.timeout(config.timeout);
   const options = { config, logger };
   const user = { token: process.env.USER_TOKEN };
