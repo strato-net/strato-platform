@@ -3122,7 +3122,6 @@ Object {
 
 exports[`Dashboard: index render component with values 1`] = `
 ShallowWrapper {
-  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <Dashboard
     dashboard={
@@ -3338,6 +3337,8 @@ ShallowWrapper {
         >
           <div
             className="col-sm-3"
+            onMouseEnter={[Function]}
+            onMouseLeave={[Function]}
           >
             <withRouter(Connect(NumberCard))
               description="Uptime  NaN:NaN:NaN"
@@ -3695,6 +3696,8 @@ ShallowWrapper {
           "children": Array [
             <div
               className="col-sm-3"
+              onMouseEnter={[Function]}
+              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -3757,29 +3760,37 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <withRouter(Connect(NumberCard))
-                description="Uptime  NaN:NaN:NaN"
-                iconClass="fa-exclamation-circle"
-                mode="warning"
-                number="UNHEALTHY"
-              />,
+              "children": Array [
+                <withRouter(Connect(NumberCard))
+                  description="Uptime  NaN:NaN:NaN"
+                  iconClass="fa-exclamation-circle"
+                  mode="warning"
+                  number="UNHEALTHY"
+                />,
+                false,
+              ],
               "className": "col-sm-3",
+              "onMouseEnter": [Function],
+              "onMouseLeave": [Function],
             },
             "ref": null,
-            "rendered": Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "function",
-              "props": Object {
-                "description": "Uptime  NaN:NaN:NaN",
-                "iconClass": "fa-exclamation-circle",
-                "mode": "warning",
-                "number": "UNHEALTHY",
+            "rendered": Array [
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "function",
+                "props": Object {
+                  "description": "Uptime  NaN:NaN:NaN",
+                  "iconClass": "fa-exclamation-circle",
+                  "mode": "warning",
+                  "number": "UNHEALTHY",
+                },
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
               },
-              "ref": null,
-              "rendered": null,
-              "type": [Function],
-            },
+              false,
+            ],
             "type": "div",
           },
           Object {
@@ -4729,6 +4740,8 @@ ShallowWrapper {
           >
             <div
               className="col-sm-3"
+              onMouseEnter={[Function]}
+              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -5086,6 +5099,8 @@ ShallowWrapper {
             "children": Array [
               <div
                 className="col-sm-3"
+                onMouseEnter={[Function]}
+                onMouseLeave={[Function]}
               >
                 <withRouter(Connect(NumberCard))
                   description="Uptime  NaN:NaN:NaN"
@@ -5148,29 +5163,37 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <withRouter(Connect(NumberCard))
-                  description="Uptime  NaN:NaN:NaN"
-                  iconClass="fa-exclamation-circle"
-                  mode="warning"
-                  number="UNHEALTHY"
-                />,
+                "children": Array [
+                  <withRouter(Connect(NumberCard))
+                    description="Uptime  NaN:NaN:NaN"
+                    iconClass="fa-exclamation-circle"
+                    mode="warning"
+                    number="UNHEALTHY"
+                  />,
+                  false,
+                ],
                 "className": "col-sm-3",
+                "onMouseEnter": [Function],
+                "onMouseLeave": [Function],
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "description": "Uptime  NaN:NaN:NaN",
-                  "iconClass": "fa-exclamation-circle",
-                  "mode": "warning",
-                  "number": "UNHEALTHY",
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "function",
+                  "props": Object {
+                    "description": "Uptime  NaN:NaN:NaN",
+                    "iconClass": "fa-exclamation-circle",
+                    "mode": "warning",
+                    "number": "UNHEALTHY",
+                  },
+                  "ref": null,
+                  "rendered": null,
+                  "type": [Function],
                 },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
+                false,
+              ],
               "type": "div",
             },
             Object {
@@ -6076,16 +6099,27 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
+        "legacyContextMode": "parent",
+        "lifecycles": Object {
+          "componentDidUpdate": Object {
+            "prevContext": true,
+          },
+          "getChildContext": Object {
+            "calledByRenderer": true,
+          },
+        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
+    Symbol(enzyme.__providerValues__): undefined,
   },
+  Symbol(enzyme.__providerValues__): Map {},
+  Symbol(enzyme.__childContext__): null,
 }
 `;
 
 exports[`Dashboard: index render component without values 1`] = `
 ShallowWrapper {
-  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <Dashboard
     dashboard={
@@ -6160,6 +6194,8 @@ ShallowWrapper {
         >
           <div
             className="col-sm-3"
+            onMouseEnter={[Function]}
+            onMouseLeave={[Function]}
           >
             <withRouter(Connect(NumberCard))
               description="Uptime  NaN:NaN:NaN"
@@ -6368,6 +6404,8 @@ ShallowWrapper {
           "children": Array [
             <div
               className="col-sm-3"
+              onMouseEnter={[Function]}
+              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -6430,29 +6468,37 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <withRouter(Connect(NumberCard))
-                description="Uptime  NaN:NaN:NaN"
-                iconClass="fa-exclamation-circle"
-                mode="warning"
-                number="UNHEALTHY"
-              />,
+              "children": Array [
+                <withRouter(Connect(NumberCard))
+                  description="Uptime  NaN:NaN:NaN"
+                  iconClass="fa-exclamation-circle"
+                  mode="warning"
+                  number="UNHEALTHY"
+                />,
+                false,
+              ],
               "className": "col-sm-3",
+              "onMouseEnter": [Function],
+              "onMouseLeave": [Function],
             },
             "ref": null,
-            "rendered": Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "function",
-              "props": Object {
-                "description": "Uptime  NaN:NaN:NaN",
-                "iconClass": "fa-exclamation-circle",
-                "mode": "warning",
-                "number": "UNHEALTHY",
+            "rendered": Array [
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "function",
+                "props": Object {
+                  "description": "Uptime  NaN:NaN:NaN",
+                  "iconClass": "fa-exclamation-circle",
+                  "mode": "warning",
+                  "number": "UNHEALTHY",
+                },
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
               },
-              "ref": null,
-              "rendered": null,
-              "type": [Function],
-            },
+              false,
+            ],
             "type": "div",
           },
           Object {
@@ -6965,6 +7011,8 @@ ShallowWrapper {
           >
             <div
               className="col-sm-3"
+              onMouseEnter={[Function]}
+              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -7173,6 +7221,8 @@ ShallowWrapper {
             "children": Array [
               <div
                 className="col-sm-3"
+                onMouseEnter={[Function]}
+                onMouseLeave={[Function]}
               >
                 <withRouter(Connect(NumberCard))
                   description="Uptime  NaN:NaN:NaN"
@@ -7235,29 +7285,37 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <withRouter(Connect(NumberCard))
-                  description="Uptime  NaN:NaN:NaN"
-                  iconClass="fa-exclamation-circle"
-                  mode="warning"
-                  number="UNHEALTHY"
-                />,
+                "children": Array [
+                  <withRouter(Connect(NumberCard))
+                    description="Uptime  NaN:NaN:NaN"
+                    iconClass="fa-exclamation-circle"
+                    mode="warning"
+                    number="UNHEALTHY"
+                  />,
+                  false,
+                ],
                 "className": "col-sm-3",
+                "onMouseEnter": [Function],
+                "onMouseLeave": [Function],
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "description": "Uptime  NaN:NaN:NaN",
-                  "iconClass": "fa-exclamation-circle",
-                  "mode": "warning",
-                  "number": "UNHEALTHY",
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "function",
+                  "props": Object {
+                    "description": "Uptime  NaN:NaN:NaN",
+                    "iconClass": "fa-exclamation-circle",
+                    "mode": "warning",
+                    "number": "UNHEALTHY",
+                  },
+                  "ref": null,
+                  "rendered": null,
+                  "type": [Function],
                 },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
+                false,
+              ],
               "type": "div",
             },
             Object {
@@ -7726,9 +7784,21 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
+        "legacyContextMode": "parent",
+        "lifecycles": Object {
+          "componentDidUpdate": Object {
+            "prevContext": true,
+          },
+          "getChildContext": Object {
+            "calledByRenderer": true,
+          },
+        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
+    Symbol(enzyme.__providerValues__): undefined,
   },
+  Symbol(enzyme.__providerValues__): Map {},
+  Symbol(enzyme.__childContext__): null,
 }
 `;

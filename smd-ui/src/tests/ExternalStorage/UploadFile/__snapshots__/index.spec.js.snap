@@ -20,26 +20,10 @@ Object {
 }
 `;
 
-exports[`UploadFile: index render component (enterprise mode) with values 1`] = `
-"<Blueprint.Dialog isOpen={true} onClose={[Function: onClose]} iconName=\\"saved\\" title=\\"URI Upload Success\\" className=\\"pt-dark upload-dialog\\" canOutsideClickClose={true}>
-  <UploadData result={{...}} closeModal={[Function: closeModal]} />
-</Blueprint.Dialog>"
-`;
+exports[`UploadFile: index render component (enterprise mode) with values 1`] = `""`;
 
-exports[`UploadFile: index render component (enterprise mode) without values 1`] = `
-"<Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"pt-icon-upload\\" title=\\"Upload & attest\\" className=\\"pt-dark upload-dialog\\" canOutsideClickClose={true}>
-  <withRouter(Connect(ReduxForm)) />
-</Blueprint.Dialog>"
-`;
+exports[`UploadFile: index render component (enterprise mode) without values 1`] = `""`;
 
-exports[`UploadFile: index render component (public mode) with values 1`] = `
-"<Blueprint.Dialog isOpen={true} onClose={[Function: onClose]} iconName=\\"saved\\" title=\\"URI Upload Success\\" className=\\"pt-dark upload-dialog\\" canOutsideClickClose={true}>
-  <UploadData result={{...}} closeModal={[Function: closeModal]} />
-</Blueprint.Dialog>"
-`;
+exports[`UploadFile: index render component (public mode) with values 1`] = `""`;
 
-exports[`UploadFile: index render component (public mode) without values 1`] = `
-"<Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"pt-icon-upload\\" title=\\"Upload & attest\\" className=\\"pt-dark upload-dialog\\" canOutsideClickClose={true}>
-  <withRouter(Connect(ReduxForm)) />
-</Blueprint.Dialog>"
-`;
+exports[`UploadFile: index render component (public mode) without values 1`] = `""`;

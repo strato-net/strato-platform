@@ -128,7 +128,7 @@ exports[`Verify: index render component (enterprise mode) without values 1`] = `
   <form>
     <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"pt-icon-tick\\" title=\\"Attest\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body upload-form\\">
-        <undefined>
+        <Component>
           <div className=\\"row\\">
             <div className=\\"col-sm-3 text-right\\">
               <label className=\\"pt-label smd-pad-4\\">
@@ -256,7 +256,7 @@ exports[`Verify: index render component (enterprise mode) without values 1`] = `
               <span className=\\"error-text\\" />
             </div>
           </div>
-        </undefined>
+        </Component>
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
@@ -326,7 +326,7 @@ exports[`Verify: index render component (public mode) without values 1`] = `
   <form>
     <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"pt-icon-tick\\" title=\\"Attest\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body upload-form\\">
-        <undefined>
+        <Component>
           <div className=\\"row\\">
             <div className=\\"col-sm-3 text-right\\">
               <label className=\\"pt-label smd-pad-4\\">
@@ -454,7 +454,7 @@ exports[`Verify: index render component (public mode) without values 1`] = `
               <span className=\\"error-text\\" />
             </div>
           </div>
-        </undefined>
+        </Component>
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">

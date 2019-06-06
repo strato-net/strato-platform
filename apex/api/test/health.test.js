@@ -48,11 +48,14 @@ describe('Tests - Node-level Health Check', function () {
     entriesAdded.forEach((elem) => {
       assert.equal(elem.dataValues.HealthStatus, false, `${elem.dataValues.processName} Status`);
     })
-    const currentStat = await models.CurrentHealth.findOne({
-      where: {
-        processName: "HealthStat",
-      },
-    });
+    let currentStat;
+    for (let i = 0; i < 2; i++) {
+      currentStat = await models.CurrentHealth.findOne({
+        where: {
+          processName: "HealthStat",
+        },
+      });
+    }
     const currentTime = Date.now();
     assert.equal(currentStat.dataValues.latestHealthStatus, false, `Health Stat`)
     assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp')
