@@ -26,12 +26,14 @@ module Blockchain.Sequencer.Gregor
 
 import           Control.Concurrent.Async.Lifted (race_)
 import           Control.Concurrent.Extra (Lock, withLock, newLock)
+import           Control.Monad.Extra (whenJust)
 import           Control.Concurrent.STM (orElse, flushTQueue)
 import           Control.Lens               hiding (op)
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Default
+import           Data.List (partition)
 import qualified Data.Text as T
 import qualified Prometheus as P
 import           UnliftIO.STM
@@ -188,7 +190,20 @@ seqWriters = forever . timeAction gregorSeqTiming $ do
     Left vmevs -> do
       P.withLabel gregorLoop "seq_vm_events" P.incCounter
       P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
-      writeSeqVmEvents vmevs
+      let isCheckpoint OENewCheckpoint{} = True
+          isCheckpoint _ = False
+          safeLast [] = Nothing
+          safeLast [x] = Just x
+          safeLast (_:xs) = safeLast xs
+          (ckpts, vmevs') = partition isCheckpoint vmevs
+      writeSeqVmEvents vmevs'
+      whenJust (safeLast ckpts) $ \case
+        OENewCheckpoint ckpt -> do
+          $logDebugLS "gregor/seqWriter/checkpoint" ckpt
+          P.incCounter gregorCheckpointsSent
+          updateMetadata_locked $ encodeMeta ckpt
+        oe -> error $ "non-checkpoint partitioned with checkpoints: " ++ show oe -- we untyped now
+
     Right p2pevs -> do
       P.withLabel gregorLoop "seq_p2p_events" P.incCounter
       P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)

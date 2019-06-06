@@ -265,6 +265,7 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
+  yield . NewCheckpoint =<< liftM2 Checkpoint (use view) (use voted)
 
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
@@ -525,3 +526,4 @@ recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCount
     LeadFound{} -> inc "lead_found"
     PendingVote{} -> inc "pending_vote"
     VoteResponse{} -> inc "vote_response"
+    NewCheckpoint{} -> inc "new_checkpoint"

@@ -143,7 +143,7 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               -- the coinbase is modified to hold the vote.
               | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool, pendingVoteSender :: Address}
               | VoteResponse HA.VoteResult
-
+              | NewCheckpoint Checkpoint
               deriving (Eq, Show, Generic)
 
 instance Format OutEvent where
@@ -155,6 +155,7 @@ instance Format OutEvent where
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
   format (PendingVote reci dir s) = "PendingVote " ++ show (reci, dir, s)
   format (VoteResponse resp) = "VoteResponse " ++ show resp
+  format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -187,6 +188,7 @@ outShortLog loc oev = $logInfoS loc . pack $
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
     VoteResponse resp -> CL.blue "VOTE_RESPONSE " ++ show resp
+    NewCheckpoint ckpt -> CL.blue "NEW_CHECKPOINT " ++ show ckpt
 
 instance NFData OutEvent
 
