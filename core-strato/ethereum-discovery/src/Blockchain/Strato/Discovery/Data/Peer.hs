@@ -188,3 +188,5 @@ disableUDPPeerForSeconds peer' seconds = try . withGlobalSQLPool $ \sqldb -> do
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()
 
+resetPeers :: IO ()
+resetPeers = withGlobalSQLPool $ SQL.runSqlPool (SQL.updateWhere [] [PPeerActiveState SQL.=. 0])
