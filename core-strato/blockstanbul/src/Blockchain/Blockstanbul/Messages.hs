@@ -4,13 +4,19 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE RecordWildCards #-}
 module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
 import Control.Lens
-import Blockchain.Output
+import Control.Monad (liftM2)
+import qualified Data.Aeson as Ae
 import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as LB
+import Data.Default
 import Data.DeriveTH
+import qualified Data.Map as M
 import Data.Text
 import GHC.Generics
 import Test.QuickCheck
@@ -22,6 +28,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
+import Blockchain.Output
 import Blockchain.Strato.Model.SHA
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Text.Colors as CL
@@ -34,6 +41,12 @@ data View = View {
   _sequence :: SequenceNumber
 } deriving (Eq, Show, Ord, Generic, Binary, NFData)
 makeLenses ''View
+
+instance Ae.ToJSON View where
+  toJSON View{..} = Ae.object ["round" Ae..= _round, "sequence" Ae..= _sequence]
+
+instance Ae.FromJSON View where
+  parseJSON = Ae.withObject "View" $ \v -> liftM2 View (v Ae..: "round") (v Ae..: "sequence")
 
 instance Format View where
   format (View r s) = printf "View (round = %d, sequence = %d)" r s
@@ -265,3 +278,18 @@ instance RLPSerializable OutEvent where
   rlpEncode x = error $ "cannot rlpencode non-message OutEvent: " ++ show x
 
 data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
+
+data Checkpoint = Checkpoint
+                { checkpointView :: View
+                , checkpointVoteRecord :: M.Map Address (M.Map Address Bool)
+                } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON)
+
+instance Default Checkpoint where
+  def = Checkpoint (View 0 0) M.empty
+
+-- JSON was chosen to allow manual inspection and override during outages
+encodeCheckpoint :: Checkpoint -> B.ByteString
+encodeCheckpoint = LB.toStrict . Ae.encode
+
+decodeCheckpoint :: B.ByteString -> Either String Checkpoint
+decodeCheckpoint = Ae.eitherDecode . LB.fromStrict

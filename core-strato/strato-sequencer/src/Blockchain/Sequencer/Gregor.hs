@@ -32,8 +32,6 @@ import           Control.Monad.Trans.Resource
 import qualified Data.Text as T
 import qualified Prometheus as P
 import           UnliftIO.STM
-import           Blockchain.Blockstanbul.Messages
-import           Blockchain.Data.DataDefs        (BlockDataRef, Key (BlockDataRefKey))
 import qualified Blockchain.EthConf                        as EC
 import qualified Blockchain.MilenaTools     as K
 import           Blockchain.Output
@@ -59,7 +57,6 @@ data GregorContext = GregorContext
                      , _gregorUnseq :: TQueue IngestEvent
                      , _gregorSeqP2P :: TQueue OutputEvent
                      , _gregorSeqVM :: TQueue OutputEvent
-                     , _gregorCPC :: CheckpointContent
                      }
 makeLenses ''GregorContext
 
@@ -127,7 +124,6 @@ setNextIngestedOffset newOffset = do
     group  <- getKafkaConsumerGroup
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
     P.incCounter gregorKafkaCheckpointWrites
-    setKafkaCheckPoint nextOffset <= getSeqCheckpointContent
     P.setGauge gregorUnseqOffset (fromIntegral newOffset)
     op <- K.withKafkaViolently $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset ""
     op & \case
@@ -177,15 +173,12 @@ blockFlushTQueue ch = do
   rest <- flushTQueue ch
   return $ first:rest
 
+{-
 getKafkaCheckpoint :: GregorM (Offset, CheckpointContent)
 getKafkaCheckpoint = withKafkaRetry1s (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
     Left UnknownTopicOrPartition -> error "seqCheckpointContent was never initialized in strato-setup!"
     Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (ofs, Metadata (KString md'))  -> return (ofs, reCPC . read $ S8.unpack md')
-
-data CheckpointContent = CheckpointContent {
-  pbftView :: View
-  }
 
 setKafkaCheckpoint :: Offset -> CheckpointContent -> GregorM ()
 setKafkaCheckpoint ofs md = do
@@ -202,14 +195,9 @@ setKafkaCheckpoint' ofs md =
     in
       commitSingleOffset group targetTopicName 0 ofs cpc
 
-unCPC :: CheckpointContent -> Int64
-unCPC (CheckpointContent (BlockDataRefKey k)) = fromIntegral k
-
-reCPC :: Int64 -> CheckpointContent
-reCPC = CheckpointContent . BlockDataRefKey . fromIntegral
-
 getSeqCheckpointContent :: IContextM CheckpointContent
 getSeqCheckpointContent = use _gregorCPC
 
 putSeqCheckpointContent :: CheckpointContent -> IContextM ()
 putSeqCheckpointContent new = assign _gregorCPC new
+-}
