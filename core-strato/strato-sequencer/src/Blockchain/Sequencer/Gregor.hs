@@ -25,6 +25,7 @@ module Blockchain.Sequencer.Gregor
   ) where
 
 import           Control.Concurrent.Async.Lifted (race_)
+import           Control.Concurrent.Extra (Lock, withLock, newLock)
 import           Control.Concurrent.STM (orElse, flushTQueue)
 import           Control.Lens               hiding (op)
 import qualified Control.Monad.Change.Modify as Mod
@@ -44,6 +45,7 @@ import qualified Blockchain.Sequencer.Kafka as SK
 import           Blockchain.Sequencer.Metrics
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Protocol     as KP
+import           System.IO.Unsafe
 import           Text.Format
 
 data GregorConfig = GregorConfig
@@ -78,9 +80,12 @@ convert GregorConfig{..} =
                    }
 
 runGregorM :: GregorConfig -> GregorM a -> IO a
-runGregorM cfg = runLoggingT
-               . runResourceT
-               . flip evalStateT (convert cfg)
+runGregorM cfg = runGregorM' (convert cfg)
+
+runGregorM' :: GregorContext -> GregorM a -> IO a
+runGregorM' ctx = runLoggingT
+                . runResourceT
+                . flip evalStateT ctx
 
 instance Mod.Modifiable K.KafkaState GregorM where
   get _ = use gregorKafkaState
@@ -125,19 +130,19 @@ getNextOffsetAndMetadata = do
   group  <- getKafkaConsumerGroup
   ret <- K.withKafkaRetry1s (K.fetchSingleOffset group SK.unseqEventsTopicName 0) >>= \case
     Left KP.UnknownTopicOrPartition -> -- we've never committed an Offset
-        setNextIngestedOffset 0 >> getNextOffsetAndMetadata
+        setNextOffsetAndMetadata 0 (encodeMeta def) >> getNextOffsetAndMetadata
     Left err -> error $ "Unexpected response when fetching offset for " ++ show SK.unseqEventsTopicName ++ ": " ++ show err
     Right om -> return om
   P.incCounter gregorKafkaCheckpointReads
   return ret
 
-setNextIngestedOffset :: KP.Offset -> GregorM ()
-setNextIngestedOffset newOffset = do
+setNextOffsetAndMetadata :: KP.Offset -> KP.Metadata -> GregorM ()
+setNextOffsetAndMetadata newOffset newMeta = do
     group  <- getKafkaConsumerGroup
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
     P.incCounter gregorKafkaCheckpointWrites
     P.setGauge gregorUnseqOffset (fromIntegral newOffset)
-    op <- K.withKafkaViolently $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset ""
+    op <- K.withKafkaViolently $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset newMeta
     op & \case
         Left err ->
             error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
@@ -170,7 +175,7 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
   P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length inEvents))
   unless (null inEvents) $ do
     let ofs = maximum . map fst $ inEvents
-    setNextIngestedOffset ofs
+    updateOffset_locked ofs
 
 seqWriters :: GregorM ()
 seqWriters = forever . timeAction gregorSeqTiming $ do
@@ -196,19 +201,24 @@ blockFlushTQueue ch = do
   rest <- flushTQueue ch
   return $ first:rest
 
-{-
-setKafkaCheckpoint :: Offset -> CheckpointContent -> GregorM ()
-setKafkaCheckpoint ofs md = do
-    $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ show md
-    op <- withKafkaViolently (setKafkaCheckpoint' ofs md)
-    case op of
-        Left err -> error $ "Client error: " ++ show err
-        Right _  -> return ()
+{-# NOINLINE unseqEventsLock #-}
+unseqEventsLock :: Lock
+unseqEventsLock = unsafePerformIO newLock
 
-setKafkaCheckpoint' :: (Kafka k) => Offset -> CheckpointContent -> k (Either KafkaError ())
-setKafkaCheckpoint' ofs md =
-    let group     = snd kafkaClientIds
-        cpc = Metadata . KString . S8.pack . show $  md
-    in
-      commitSingleOffset group targetTopicName 0 ofs cpc
--}
+updateOffset_locked :: KP.Offset -> GregorM ()
+updateOffset_locked off = do
+  ctx <- get
+  -- This is unsafe in that the state changes made in the runGregorM' will be discarded.
+  -- For now, only the KafkaState would be mutated and that is okay.
+  liftIO . withLock unseqEventsLock . runGregorM' ctx $ do
+    (_, meta) <- getNextOffsetAndMetadata
+    setNextOffsetAndMetadata off meta
+
+updateMetadata_locked :: KP.Metadata -> GregorM ()
+updateMetadata_locked meta = do
+  ctx <- get
+  -- This is unsafe in that the state changes made in the runGregorM' will be discarded.
+  -- For now, only the KafkaState would be mutated and that is okay.
+  liftIO . withLock unseqEventsLock . runGregorM' ctx $ do
+    (off, _) <- getNextOffsetAndMetadata
+    setNextOffsetAndMetadata off meta

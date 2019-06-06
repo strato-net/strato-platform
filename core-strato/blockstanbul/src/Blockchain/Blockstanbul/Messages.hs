@@ -287,6 +287,8 @@ data Checkpoint = Checkpoint
 instance Default Checkpoint where
   def = Checkpoint (View 0 0) M.empty
 
+derive makeArbitrary ''Checkpoint
+
 -- JSON was chosen to allow manual inspection and override during outages
 encodeCheckpoint :: Checkpoint -> B.ByteString
 encodeCheckpoint = LB.toStrict . Ae.encode
