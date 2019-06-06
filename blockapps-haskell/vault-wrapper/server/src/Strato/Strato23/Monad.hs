@@ -11,8 +11,6 @@
 module Strato.Strato23.Monad where
 
 import           Control.Exception.Lifted        hiding (Handler, handle)
-import           Data.IORef                      (readIORef)
-import           Data.Maybe                      (fromMaybe)
 import           Data.Pool                       (Pool, withResource)
 import           Control.Monad.Base
 import           Control.Monad.Except
@@ -56,12 +54,8 @@ instance MonadError VaultWrapperError VaultM where
                "Password has not been set. Please set password by calling POST /strato/v2.3/password for node to function properly"
     VaultM $ throwError NoPasswordError
   throwError IncorrectPasswordError = do
-    pw <- liftIO . readIORef =<< asks superSecretPassword
-    $logErrorS "throwError/IncorrectPasswordError" $
-      Text.concat [ "The password has been set incorrectly to "
-                  , fromMaybe "Nothing" pw
-                  , ". Please restart the node and supply the correct password."
-                  ]
+    $logErrorS "throwError/IncorrectPasswordError"
+      "The password has been set incorrectly. Please restart the node and supply the correct password."
     VaultM $ throwError IncorrectPasswordError
   throwError err@(RuntimeError _) = do
     $logErrorS "throwError/RuntimeError" . Text.pack
