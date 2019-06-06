@@ -26,17 +26,19 @@ module Blockchain.Sequencer.Gregor
 
 import           Control.Concurrent.Async.Lifted (race_)
 import           Control.Concurrent.Extra (Lock, withLock, newLock)
-import           Control.Monad.Extra (whenJust)
 import           Control.Concurrent.STM (orElse, flushTQueue)
 import           Control.Lens               hiding (op)
 import qualified Control.Monad.Change.Modify as Mod
+import           Control.Monad.Extra (whenJust)
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Default
 import           Data.List (partition)
 import qualified Data.Text as T
 import qualified Prometheus as P
+import           System.IO.Unsafe
 import           UnliftIO.STM
+
 import           Blockchain.Blockstanbul (Checkpoint, decodeCheckpoint, encodeCheckpoint)
 import qualified Blockchain.EthConf                        as EC
 import qualified Blockchain.MilenaTools     as K
@@ -47,7 +49,6 @@ import qualified Blockchain.Sequencer.Kafka as SK
 import           Blockchain.Sequencer.Metrics
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Protocol     as KP
-import           System.IO.Unsafe
 import           Text.Format
 
 data GregorConfig = GregorConfig
@@ -96,14 +97,14 @@ instance Mod.Modifiable K.KafkaState GregorM where
 getKafkaConsumerGroup :: GregorM KP.ConsumerGroup
 getKafkaConsumerGroup = use gregorConsumerGroup
 
-readUnseqEvents' :: GregorM [(KP.Offset, IngestEvent)]
+readUnseqEvents' :: GregorM (KP.Offset, [IngestEvent])
 readUnseqEvents' = do
     offset <- getNextIngestedOffset
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-    -- its really [(nextOffset, eventAtThisOffset)]
-    ret <- zip [(offset+1)..] <$> K.withKafkaRetry1s (SK.readUnseqEvents offset)
-    P.unsafeAddCounter gregorUnseqRead (fromIntegral (length ret))
-    return ret
+    ret <- K.withKafkaRetry1s $ SK.readUnseqEvents offset
+    let count = length ret
+    P.unsafeAddCounter gregorUnseqRead $ fromIntegral count
+    return (offset + fromIntegral count, ret)
 
 writeSeqVmEvents :: [OutputEvent] -> GregorM ()
 writeSeqVmEvents events = do
@@ -167,17 +168,20 @@ initializeCheckpoint = do
 
 unseqReader :: GregorM ()
 unseqReader = forever . timeAction gregorUnseqTiming $ do
-  inEvents <- readUnseqEvents'
+  (nextOff, inEvents) <- readUnseqEvents'
   P.withLabel gregorLoop "unseq_events" P.incCounter
   $logInfoS "gregor" . T.pack $ "Fetched " ++ show (length inEvents) ++ " unseq events"
   ch <- use gregorUnseq
-  atomically . forM_ inEvents $ writeTQueue ch . snd
+  atomically . forM_ inEvents $ writeTQueue ch
   hd <- atomically $ tryPeekTQueue ch
   $logDebugS "gregor/unseqchHead" $ maybe "empty" (T.pack . format) hd
   P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length inEvents))
-  unless (null inEvents) $ do
-    let ofs = maximum . map fst $ inEvents
-    updateOffset_locked ofs
+  -- TODO: This should only really be set by the writer, i.e. once
+  -- the results are committed to seq_.*_events. The reader should use
+  -- an internal offset to detirmine the read start. However, with
+  -- asynchronous readers and writers its difficult to correlate offsets
+  -- with the events that `seqWriters` processes.
+  updateOffset_locked nextOff
 
 seqWriters :: GregorM ()
 seqWriters = forever . timeAction gregorSeqTiming $ do
