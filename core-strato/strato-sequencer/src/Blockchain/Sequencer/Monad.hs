@@ -1,3 +1,4 @@
+{-# LANGUAGE DefaultSignatures             #-}
 {-# LANGUAGE FlexibleContexts              #-}
 {-# LANGUAGE FlexibleInstances             #-}
 {-# LANGUAGE LambdaCase                    #-}
@@ -150,23 +151,27 @@ instance Mod.Accessible LDB.DB SequencerM where
 
 class HasNamespace a where
   type NSKey a
+  namespace :: Mod.Proxy a -> BL.ByteString
+
   namespaced :: Mod.Proxy a -> NSKey a -> B.ByteString
+  default namespaced :: Binary (NSKey a) => Mod.Proxy a -> NSKey a -> B.ByteString
+  namespaced p = BL.toStrict . BL.append (namespace p) . encode
 
 instance HasNamespace OutputBlock where
   type NSKey OutputBlock = SHA
-  namespaced _ = BL.toStrict . BL.append "bh:" . encode
+  namespace _ = "bh:"
 
 instance HasNamespace OutputTx where
   type NSKey OutputTx = SHA
-  namespaced _ = BL.toStrict . BL.append "th:" . encode
+  namespace _ = "th:"
 
 instance HasNamespace ChainHashEntry where
   type NSKey ChainHashEntry = SHA
-  namespaced _ = BL.toStrict . BL.append "ch:" . encode
+  namespace _ = "ch:"
 
 instance HasNamespace ChainIdEntry where
   type NSKey ChainIdEntry = Word256
-  namespaced _ = BL.toStrict . BL.append "ci:" . encode
+  namespace _ = "ci:"
 
 lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
             => Mod.Proxy a -> NSKey a -> m (Maybe a)
