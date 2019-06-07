@@ -45,17 +45,17 @@ pipeline {
           docker ps
           counter=0
           # Few quick tests
-          until curl --silent --output /dev/null --fail --location http://localhost/bloc/v2.2/users/
+          until curl --silent --output /dev/null --fail --location http://localhost/health
           do
             if [[ "$counter" -gt 120 ]]; then
-              echo "bloc took longer than 2 minutes to initialize! aborting."
+              echo "STRATO took longer than 2 minutes to initialize! aborting."
               exit 73
             fi
-            echo "waiting for bloc to be available through nginx"
+            echo "waiting for STRATO to be available through nginx"
             counter=$((counter+1))
             sleep 1
           done
-          echo "bloc is available through nginx - node is running"
+          echo "STRATO is available through nginx - node is running"
         '''
       }
     }
