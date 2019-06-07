@@ -16,6 +16,7 @@ module Blockchain.Sequencer.Monad (
   , SequencerM
   , getChainsDB
   , getTransactionsDB
+  , prunePrivacyDBs
   , runSequencerM
   , pairToOETx
   , markForVM
@@ -83,14 +84,13 @@ import qualified Database.LevelDB                          as LDB
 data Modification a = Modification a | Deletion
 
 data SequencerContext = SequencerContext
-<<<<<<< 397e1bd78459a1e78ef0e35c06151b7cc3924bba
   { _dependentBlockDB    :: DependentBlockDB
   , _seenTransactionDB   :: SeenTransactionDB
   , _dbeRegistry         :: Map SHA DependentBlockEntry
-  , _blockHashRegistry   :: Map SHA OutputBlock
-  , _txHashRegistry      :: Map SHA OutputTx
-  , _chainHashRegistry   :: Map SHA ChainHashEntry
-  , _chainIdRegistry     :: Map Word256 ChainIdEntry
+  , _blockHashRegistry   :: Map SHA (Modification OutputBlock)
+  , _txHashRegistry      :: Map SHA (Modification OutputTx)
+  , _chainHashRegistry   :: Map SHA (Modification ChainHashEntry)
+  , _chainIdRegistry     :: Map Word256 (Modification ChainIdEntry)
   , _getChainsDB         :: GetChainsDB
   , _getTransactionsDB   :: GetTransactionsDB
   , _ldbBatchOps         :: Q.Seq LDB.BatchOp
@@ -100,23 +100,6 @@ data SequencerContext = SequencerContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
   }
-=======
-                      { _dependentBlockDB    :: DependentBlockDB
-                      , _seenTransactionDB   :: SeenTransactionDB
-                      , _blockHashRegistry   :: Map SHA (Modification OutputBlock)
-                      , _txHashRegistry      :: Map SHA (Modification OutputTx)
-                      , _chainHashRegistry   :: Map SHA (Modification ChainHashEntry)
-                      , _chainIdRegistry     :: Map Word256 (Modification ChainIdEntry)
-                      , _getChainsDB         :: S.Set Word256
-                      , _getTransactionsDB   :: S.Set SHA
-                      , _ldbBatchOps         :: Q.Seq LDB.BatchOp
-                      , _vmEvents            :: Q.Seq OutputEvent
-                      , _p2pEvents           :: Q.Seq OutputEvent
-                      , _blockstanbulContext :: Maybe BlockstanbulContext
-                      , _loopTimeout         :: TMChan ()
-                      , _latestRoundNumber   :: IORef RoundNumber
-                      }
->>>>>>> Add presistence layer to SequencerM privacy DBs
 makeLenses ''SequencerContext
 
 data SequencerConfig = SequencerConfig
@@ -285,6 +268,16 @@ instance (SHA `A.Alters` ()) SequencerM where
 instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = assign (blockstanbulContext . _Just)
+
+prunePrivacyDBs :: SequencerM ()
+prunePrivacyDBs = do
+  prune blockHashRegistry
+  prune txHashRegistry
+  prune chainHashRegistry
+  prune chainIdRegistry
+  where prune = flip (%=) . M.mapMaybe $ \case
+          Modification a -> Just $ Modification a
+          Deletion       -> Nothing
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
