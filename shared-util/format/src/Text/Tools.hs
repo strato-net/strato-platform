@@ -5,10 +5,16 @@ module Text.Tools where
 import Text.Colors as C
 
 box :: [String] -> String
-box strings = unlines $
-  [C.magenta ("╔" ++ replicate (width - 2) '═' ++ "╗")]
-  ++ map (\s -> C.magenta "║ " ++ C.white s ++ replicate (width - printedLength s - 4) ' ' ++ C.magenta " ║") strings
-  ++ [C.magenta ("╚" ++ replicate (width - 2) '═' ++ "╝")]
+box = boxWithProperty C.magenta
+
+grayBox :: [String] -> String
+grayBox = boxWithProperty (C.dim . C.white)
+
+boxWithProperty :: (String->String) -> [String] -> String
+boxWithProperty property strings = unlines $
+  [property ("╔" ++ replicate (width - 2) '═' ++ "╗")]
+  ++ map (\s -> property "║ " ++ C.white s ++ replicate (width - printedLength s - 4) ' ' ++ property " ║") strings
+  ++ [property ("╚" ++ replicate (width - 2) '═' ++ "╝")]
   where width = maximum (map printedLength strings) + 4
 
 

@@ -81,8 +81,8 @@ data Value =
   | SContractDef String
   | SContractItem Address String
   | SContract String Address
-  | SContractFunction String Address String -- contractName, address, functionName
-  | SPush AddressedPath -- The array function
+  | SContractFunction (Maybe String) Address String -- contractName, address, functionName
+  | SPush Value -- The array function
   | SNULL
   | SReference AddressedPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized

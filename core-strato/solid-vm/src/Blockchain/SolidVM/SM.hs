@@ -45,8 +45,7 @@ import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import           Data.IORef
-import qualified Data.HashMap.Strict as HM
+--import           Data.IORef
 import           Data.List (foldl')
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -94,8 +93,7 @@ data CallInfo =
     currentContract :: Contract,
     codeCollection :: CodeCollection,
     collectionHash :: SHA,
-    localVariables :: Map String (Xabi.Type, Variable),
-    localByPath :: HM.HashMap MS.StoragePath MS.BasicValue
+    localVariables :: Map String (Xabi.Type, Variable)
     } deriving (Show)
 
 {-
@@ -284,20 +282,8 @@ getVariableOfName name = do
           (x:_) -> x
       vars = localVariables currentCallInfo
       t s v = ('x':s, v) `seq` v
-  maybeLocalValue <-
-    -- TODO(tim): consult memory map for locals instead of storage
-    case M.lookup name vars of
-      Nothing -> return Nothing
-      Just (_, var) -> Just <$> case var of
-        Constant (SReference ap) -> return $ Constant $ SReference ap
-        Variable v -> do
-          val <- liftIO $ readIORef v
-          case val of
-            SReference ap -> return $ Constant $ SReference ap
-            _ -> return . Constant . SReference . AddressedPath (Left LocalVar)
-                        . MS.singleton $ BC.pack name
-        Constant{} -> return . Constant . SReference . AddressedPath (Left LocalVar)
-                             . MS.singleton $ BC.pack name
+
+  let maybeLocalValue = fmap snd $ M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.functions
@@ -404,8 +390,7 @@ addCallInfo a c fn hsh cc initialLocalVariables = do
           currentContract=c,
           codeCollection=cc,
           collectionHash=hsh,
-          localVariables=initialLocalVariables,
-          localByPath=HM.empty
+          localVariables=initialLocalVariables
         }
 
   put sstate{callStack = newCallInfo:callStack sstate}
@@ -448,23 +433,23 @@ getCurrentFunctionName = do
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
 
 
-getLocal :: MS.StoragePath -> SM MS.BasicValue
-getLocal path = do
-  locals <- gets (map localByPath . callStack)
-  return . fromMaybe MS.BDefault . foldl' (<|>) Nothing . map (HM.lookup path) $ locals
+getLocal :: String -> SM (Maybe Variable)
+getLocal name = do
+  currentCallInfo <- getCurrentCallInfo
+  return $ fmap snd $ M.lookup name $ localVariables currentCallInfo
 
-setLocal :: MS.StoragePath -> MS.BasicValue -> SM ()
-setLocal path val = do
+setLocal :: String -> Variable -> SM ()
+setLocal name val = do
   sstate <- get
   let stack = callStack sstate
       (info, rest) = case stack of
                 (ci:r) -> (ci,r)
                 [] -> internalError "setLocal stack underflow" ()
-      locals = localByPath info
-      newLocals = case val of
-                    MS.BDefault -> HM.delete path locals
-                    _ -> HM.insert path val locals
-  put sstate{callStack=info{localByPath=newLocals}:rest}
+      locals = localVariables info
+      (theType, _) = fromMaybe (error $ "setLocal called for variable that doesn't exist: " ++ name)
+                     $ M.lookup name locals
+      newVariables = M.insert name (theType, val) locals
+  put sstate{callStack=info{localVariables=newVariables}:rest}
 
 
 getCurrentCodeCollection :: SM (SHA, CodeCollection)
