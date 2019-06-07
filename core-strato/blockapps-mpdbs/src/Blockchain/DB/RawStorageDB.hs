@@ -23,7 +23,6 @@ module Blockchain.DB.RawStorageDB
 
 import           Control.Arrow                               ((***))
 import qualified Control.Monad.Change.Alter                  as A
-import           Control.Monad.Change.Modify                 (Outputs)
 import           Control.Monad.Loops
 import           Control.Monad.State
 import           Data.ByteString                             (ByteString)
@@ -43,6 +42,7 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
+import           Blockchain.Output
 import qualified Data.NibbleString                           as N
 
 import BatchMerge
@@ -130,7 +130,7 @@ flushMemRawStorageTxDBToBlockDB = do
   putMemRawStorageBlockMap $ txMap `M.union` blkMap
   putMemRawStorageTxMap M.empty
 
-flushMemRawStorageDB :: (FullRawStorage m, m `Outputs` String) => m ()
+flushMemRawStorageDB :: (MonadLogger m, FullRawStorage m) => m ()
 flushMemRawStorageDB = do
   flushMemRawStorageTxDBToBlockDB
   theMap <- fmap snd getMemRawStorageBlockDB
@@ -158,7 +158,7 @@ blankVal :: RawStorageValue
 blankVal = rlpSerialize $ RLPString ""
 
 
-putAllRawStorageKeyValForAddress :: (FullRawStorage m, m `Outputs` String) =>
+putAllRawStorageKeyValForAddress :: (MonadLogger m, FullRawStorage m) =>
                                     Address -> [(ByteString, RawStorageValue)] -> m ()
 putAllRawStorageKeyValForAddress owner rawChanges = do
   let changes :: [(MP.Key, MP.Val)]

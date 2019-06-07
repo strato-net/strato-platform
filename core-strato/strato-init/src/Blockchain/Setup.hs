@@ -162,9 +162,6 @@ instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   insert _ = genericInsertHashDB $ asks hashDB
   delete _ = genericDeleteHashDB $ asks hashDB
 
-instance SetupDBM `Mod.Outputs` String where
-  output = Mod.genericOutputsStringIO
-
 instance HasSQLDB SetupDBM where
   getSQLDB = asks sqlDB
 

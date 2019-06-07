@@ -137,9 +137,6 @@ type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 instance Show Context where
   show = const "<context>"
 
-instance ContextM `Mod.Outputs` String where
-  output = Mod.genericOutputsStringIO
-
 instance HasMemTXResultDB ContextM where
   enqueueTransactionResults txrs = do
     ctx <- get

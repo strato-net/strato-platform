@@ -14,7 +14,6 @@ module Blockchain.DB.SolidStorageDB (
   ) where
 
 import           Control.Monad.Change.Alter                  (Alters)
-import           Control.Monad.Change.Modify                 (Outputs)
 import           Data.Bifunctor                              (second)
 
 import           Blockchain.Data.AddressStateDB
@@ -24,6 +23,7 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
+import           Blockchain.Output
 import           Blockchain.Strato.Model.Address
 import           SolidVM.Model.Storable
 
@@ -63,5 +63,5 @@ getAllSolidStorageKeyVals' addr = map (second fromVal) <$> getAllRawStorageKeyVa
 flushMemSolidStorageTxDBToBlockDB :: FullSolidStorage m => m ()
 flushMemSolidStorageTxDBToBlockDB = flushMemRawStorageTxDBToBlockDB
 
-flushMemSolidStorageDB :: (FullSolidStorage m, m `Outputs` String) => m ()
+flushMemSolidStorageDB :: (MonadLogger m, FullSolidStorage m) => m ()
 flushMemSolidStorageDB = flushMemRawStorageDB

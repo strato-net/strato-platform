@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
 
@@ -8,13 +9,14 @@ module Blockchain.JsonRpcCommand (
   ) where
 
 import           Prelude                         hiding (id)
+import           Control.Monad                   ((<=<))
 import qualified Control.Monad.Change.Alter      as A
-import           Control.Monad.Change.Modify     (Outputs(..))
 import           Control.Monad.IO.Class
 import           Data.Binary
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy            as BL
+import qualified Data.Text                       as T
 import           Network.Kafka
 import           Network.Kafka.Producer
 
@@ -51,22 +53,33 @@ runJsonRpcCommand :: ( MonadLogger (t m)
                      , HasCodeDB (t m)
                      , HasStorageDB (t m)
                      , (Address `A.Alters` AddressState) (t m)
-                     , (t m) `Outputs` String
                      , MonadIO (t m)
                      )
                   => JsonRpcCommand -> t m ()
-runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
-  output $ "running command: " ++ show c
-  bestBlock <- runWithSQL getBestBlock
+runJsonRpcCommand = liftIO . uncurry produceResponse
+                <=< runJsonRpcCommand' (runWithSQL getBestBlock)
+
+runJsonRpcCommand' :: ( MonadLogger m
+                      , HasStateDB m
+                      , HasCodeDB m
+                      , HasStorageDB m
+                      , (Address `A.Alters` AddressState) m
+                      )
+                   => m BlockDataRef
+                   -> JsonRpcCommand
+                   -> m (String, B.ByteString)
+runJsonRpcCommand' mBestBlock c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
+  $logInfoS "runJsonRpcCommand.JRCGetBalance" . T.pack $ "running command: " ++ show c
+  bestBlock <- mBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   response <- show . addressStateBalance <$>
     A.lookupWithDefault (A.Proxy @AddressState) address
-  liftIO $ produceResponse id $ BC.pack response
-  output response
+  $logInfoS "runJsonRpcCommand'.JRCGetBalance" $ T.pack response
+  return (id, BC.pack response)
 
-runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
-  output $ "running command: " ++ show c
-  bestBlock <- runWithSQL getBestBlock
+runJsonRpcCommand' mBestBlock c@JRCGetCode{jrcAddress=address, jrcId=id} = do
+  $logInfoS "runJsonRpcCommand'.JRCGetCode" . T.pack $ "running command: " ++ show c
+  bestBlock <- mBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   codeHash <- addressStateCodeHash <$>
     A.lookupWithDefault (A.Proxy @AddressState) address
@@ -74,22 +87,22 @@ runJsonRpcCommand c@JRCGetCode{jrcAddress=address, jrcId=id} = do
                case codeHash of
                  EVMCode ch -> ch
                  _ -> error "runJsonRpcCommand currently only supported for the EVM"
-  liftIO $ produceResponse id code
+  return (id, code)
 
-runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
-  output $ "running command: " ++ show c
-  bestBlock <- runWithSQL getBestBlock
+runJsonRpcCommand' mBestBlock c@JRCGetTransactionCount{jrcAddress=address, jrcId=id} = do
+  $logInfoS "runJsonRpcCommand'.JRCGetTransactionCount" . T.pack $ "running command: " ++ show c
+  bestBlock <- mBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   response <- show . addressStateNonce <$>
     A.lookupWithDefault (A.Proxy @AddressState) address
-  liftIO $ produceResponse id $ BC.pack response
-  output response
+  $logInfoS "runJsonRpcCommand'.JRCGetTransactionCount" $ T.pack response
+  return (id, BC.pack response)
 
-runJsonRpcCommand c@JRCGetStorageAt{jrcAddress=address, jrcKey=key, jrcId=id} = do
-  output $ "running command: " ++ show c
-  bestBlock <- runWithSQL getBestBlock
+runJsonRpcCommand' mBestBlock c@JRCGetStorageAt{jrcAddress=address, jrcKey=key, jrcId=id} = do
+  $logInfoS "runJsonRpcCommand'.JRCGetStorageAt" . T.pack $ "running command: " ++ show c
+  bestBlock <- mBestBlock
   setStateDBStateRoot $ blockDataRefStateRoot bestBlock
   value <- getStorageKeyVal' address $ bytesToWord256 $ key
-  liftIO $ produceResponse id $ word256ToBytes value
-  output $ show value
-runJsonRpcCommand (JRCCall _ _ _) = error "unsupported RPC command call"
+  $logInfoS "runJsonRpcCommand'.JRCGetStorageAt" . T.pack $ show value
+  return (id, word256ToBytes value)
+runJsonRpcCommand' _ (JRCCall _ _ _) = error "unsupported RPC command call"

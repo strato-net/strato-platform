@@ -38,6 +38,7 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
+import Blockchain.Output
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA
 import qualified Data.NibbleString as N
@@ -57,10 +58,7 @@ data CachedStorage = CS
   } deriving (Generic, NFData)
 makeLenses ''CachedStorage
 
-type StorM = StateT CachedStorage (ResourceT IO)
-
-instance StorM `Mod.Outputs` String where
-  output = Mod.genericOutputsStringIO
+type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
 
 instance HasMemRawStorageDB StorM where
   getMemRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
@@ -106,12 +104,12 @@ initialEnv = do
   s <- openDB "/state/"
   h <- HashDB <$> openDB "/hash/"
   let st = CS s MP.emptyTriePtr h M.empty M.empty M.empty M.empty
-  fmap (tmpdir,) . runResourceT $ execStateT MP.initializeBlank st
+  fmap (tmpdir,) . runLoggingT . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
 runStorM mv = bracket initialEnv
                        (removePathForcibly . fst)
-                       (runResourceT . evalStateT mv . snd)
+                       (runLoggingT . runResourceT . evalStateT mv . snd)
 
 storageSpec :: Spec
 storageSpec = do
