@@ -1,7 +1,11 @@
 {-# LANGUAGE FlexibleContexts              #-}
 {-# LANGUAGE FlexibleInstances             #-}
+{-# LANGUAGE LambdaCase                    #-}
 {-# LANGUAGE MultiParamTypeClasses         #-}
+{-# LANGUAGE RankNTypes                    #-}
 {-# LANGUAGE TemplateHaskell               #-}
+{-# LANGUAGE TypeFamilies                  #-}
+{-# LANGUAGE TypeApplications              #-}
 {-# LANGUAGE TypeOperators                 #-}
 {-# LANGUAGE OverloadedStrings             #-}
 {-# OPTIONS_GHC -fno-warn-orphans          #-}
@@ -43,6 +47,9 @@ import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 import           Control.Monad.State
 
+import           Data.Binary
+import qualified Data.ByteString                           as B
+import qualified Data.ByteString.Lazy                      as BL
 import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue
 import           Data.Foldable                             (toList)
@@ -73,7 +80,10 @@ import           Text.Format
 
 import qualified Database.LevelDB                          as LDB
 
+data Modification a = Modification a | Deletion
+
 data SequencerContext = SequencerContext
+<<<<<<< 397e1bd78459a1e78ef0e35c06151b7cc3924bba
   { _dependentBlockDB    :: DependentBlockDB
   , _seenTransactionDB   :: SeenTransactionDB
   , _dbeRegistry         :: Map SHA DependentBlockEntry
@@ -90,6 +100,23 @@ data SequencerContext = SequencerContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
   }
+=======
+                      { _dependentBlockDB    :: DependentBlockDB
+                      , _seenTransactionDB   :: SeenTransactionDB
+                      , _blockHashRegistry   :: Map SHA (Modification OutputBlock)
+                      , _txHashRegistry      :: Map SHA (Modification OutputTx)
+                      , _chainHashRegistry   :: Map SHA (Modification ChainHashEntry)
+                      , _chainIdRegistry     :: Map Word256 (Modification ChainIdEntry)
+                      , _getChainsDB         :: S.Set Word256
+                      , _getTransactionsDB   :: S.Set SHA
+                      , _ldbBatchOps         :: Q.Seq LDB.BatchOp
+                      , _vmEvents            :: Q.Seq OutputEvent
+                      , _p2pEvents           :: Q.Seq OutputEvent
+                      , _blockstanbulContext :: Maybe BlockstanbulContext
+                      , _loopTimeout         :: TMChan ()
+                      , _latestRoundNumber   :: IORef RoundNumber
+                      }
+>>>>>>> Add presistence layer to SequencerM privacy DBs
 makeLenses ''SequencerContext
 
 data SequencerConfig = SequencerConfig
@@ -135,26 +162,103 @@ instance HasPrivateHashDB SequencerM where
   requestChain = insertGetChainsDB
   requestTransaction = insertGetTransactionsDB
 
-    -- TODO: Add persistence layer
+instance Mod.Accessible LDB.DB SequencerM where
+  access _ = use dependentBlockDB
+
+class HasNamespace a where
+  type NSKey a
+  namespaced :: Mod.Proxy a -> NSKey a -> B.ByteString
+
+instance HasNamespace OutputBlock where
+  type NSKey OutputBlock = SHA
+  namespaced _ = BL.toStrict . BL.append "bh:" . encode
+
+instance HasNamespace OutputTx where
+  type NSKey OutputTx = SHA
+  namespaced _ = BL.toStrict . BL.append "th:" . encode
+
+instance HasNamespace ChainHashEntry where
+  type NSKey ChainHashEntry = SHA
+  namespaced _ = BL.toStrict . BL.append "ch:" . encode
+
+instance HasNamespace ChainIdEntry where
+  type NSKey ChainIdEntry = Word256
+  namespaced _ = BL.toStrict . BL.append "ci:" . encode
+
+lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
+            => Mod.Proxy a -> NSKey a -> m (Maybe a)
+lookupInLDB p k = Mod.access Mod.Proxy >>= \db ->
+  fmap (decode . BL.fromStrict) <$> LDB.get db LDB.defaultReadOptions (namespaced p k)
+
+insertInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
+            => Mod.Proxy a -> NSKey a -> a -> m ()
+insertInLDB p k v = Mod.access Mod.Proxy >>= \db ->
+  LDB.put db LDB.defaultWriteOptions (namespaced p k) (BL.toStrict $ encode v)
+
+batchInsertInLDB :: (Binary a, HasNamespace a) => Mod.Proxy a -> NSKey a -> a -> LDB.BatchOp
+batchInsertInLDB p k v = LDB.Put (namespaced p k) (BL.toStrict $ encode v)
+
+deleteInLDB :: (HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
+            => Mod.Proxy a -> NSKey a -> m ()
+deleteInLDB p k = Mod.access Mod.Proxy >>= \db ->
+  LDB.delete db LDB.defaultWriteOptions (namespaced p k)
+
+batchDeleteInLDB :: HasNamespace a
+                 => Mod.Proxy a -> NSKey a -> LDB.BatchOp
+batchDeleteInLDB p k = LDB.Del (namespaced p k)
+
+genericLookupSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
+                       => Lens' SequencerContext (Map (NSKey a) (Modification a))
+                       -> Mod.Proxy a
+                       -> NSKey a
+                       -> SequencerM (Maybe a)
+genericLookupSequencer registry p k = use (registry . at k) >>= \case
+  Just Deletion -> return Nothing
+  Just (Modification a) -> return $ Just a
+  Nothing -> lookupInLDB p k >>= \case
+    Nothing -> return Nothing
+    Just a -> do
+      registry . at k ?= Modification a
+      return $ Just a
+
+genericInsertSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
+                       => Lens' SequencerContext (Map (NSKey a) (Modification a))
+                       -> Mod.Proxy a
+                       -> NSKey a
+                       -> a
+                       -> SequencerM ()
+genericInsertSequencer registry p k a = do
+  registry . at k ?= Modification a
+  addLdbBatchOps . (:[]) $ batchInsertInLDB p k a
+
+genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
+                       => Lens' SequencerContext (Map (NSKey a) (Modification a))
+                       -> Mod.Proxy a
+                       -> NSKey a
+                       -> SequencerM ()
+genericDeleteSequencer registry p k = do
+  registry . at k ?= Deletion
+  addLdbBatchOps . (:[]) $ batchDeleteInLDB p k
+
 instance (SHA `A.Alters` OutputBlock) SequencerM where
-  lookup _ bh    = use $ blockHashRegistry . at bh
-  insert _ bh ob = blockHashRegistry . at bh ?= ob
-  delete _ bh    = blockHashRegistry . at bh .= Nothing
+  lookup = genericLookupSequencer blockHashRegistry
+  insert = genericInsertSequencer blockHashRegistry
+  delete = genericDeleteSequencer blockHashRegistry
 
 instance (SHA `A.Alters` OutputTx) SequencerM where
-  lookup _ th     = use $ txHashRegistry . at th
-  insert _ th otx = txHashRegistry . at th ?= otx
-  delete _ th     = txHashRegistry . at th .= Nothing
+  lookup = genericLookupSequencer txHashRegistry
+  insert = genericInsertSequencer txHashRegistry
+  delete = genericDeleteSequencer txHashRegistry
 
 instance (SHA `A.Alters` ChainHashEntry) SequencerM where
-  lookup _ ch     = use $ chainHashRegistry . at ch
-  insert _ ch che = chainHashRegistry . at ch ?= che
-  delete _ ch     = chainHashRegistry . at ch .= Nothing
+  lookup = genericLookupSequencer chainHashRegistry
+  insert = genericInsertSequencer chainHashRegistry
+  delete = genericDeleteSequencer chainHashRegistry
 
 instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
-  lookup _ cid     = use $ chainIdRegistry . at cid
-  insert _ cid cie = chainIdRegistry . at cid ?= cie
-  delete _ cid     = chainIdRegistry . at cid .= Nothing
+  lookup = genericLookupSequencer chainIdRegistry
+  insert = genericInsertSequencer chainIdRegistry
+  delete = genericDeleteSequencer chainIdRegistry
 
 instance (SHA `A.Alters` DependentBlockEntry) SequencerM where
   lookup _ k = do

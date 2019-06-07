@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass         #-}
+{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE StrictData             #-}
 {-# LANGUAGE TemplateHaskell        #-}
 
@@ -8,17 +10,19 @@ import           Blockchain.ExtWord            (Word256)
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Control.Lens
+import           Data.Binary
 import           Data.Default
 import           Data.Function                 (on)
 import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
+import           GHC.Generics
 
 data CircularBuffer a = CircularBuffer
   { _capacity :: Int
   , _size     :: Int
   , _queue    :: Q.Seq a
-  } deriving (Show)
+  } deriving (Show, Generic, Binary)
 makeLenses ''CircularBuffer
 
 maxBufferCapacity :: Int
@@ -34,7 +38,7 @@ data ChainHashEntry = ChainHashEntry
   { _used         :: Bool
   , _onChainId    :: Maybe Word256
   , _inBlocks     :: Q.Seq SHA
-  } deriving (Show)
+  } deriving (Show, Generic, Binary)
 makeLenses ''ChainHashEntry
 
 blankChainHashEntry :: ChainHashEntry
@@ -55,7 +59,7 @@ chainHashEntryInBlock bHash = ChainHashEntry True Nothing (Q.singleton bHash)
 data BlockInfo = BlockInfo
   { _bhash     :: SHA
   , _bordering :: Integer
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic, Binary)
 makeLenses ''BlockInfo
 
 instance Ord BlockInfo where
@@ -65,7 +69,7 @@ data ChainIdEntry = ChainIdEntry
   { _chainIdInfo :: ChainInfo
   , _chainHashes :: CircularBuffer SHA
   , _blocksToRun :: Set BlockInfo
-  } deriving (Show)
+  } deriving (Show, Generic, Binary)
 makeLenses ''ChainIdEntry
 
 chainIdEntry :: ChainInfo -> ChainIdEntry
