@@ -127,7 +127,14 @@ setVal (SReference dst) (SArray _ fs) = do
     setVal (SReference $ dst `apSnoc` MS.ArrayIndex i') elementVal
 
 
-
+setVal (STuple dstVector) (STuple srcVector) = 
+  if V.length dstVector /= V.length srcVector
+  then error $ "you are trying to set the value of a tuple to another tuple of the wrong length:\n" ++ show dstVector ++ "\n" ++ show srcVector
+  else do
+    forM_ (V.zip dstVector srcVector) $ \(dstItem, srcItemVar) -> do
+      srcItemVal <- getVar srcItemVar
+      setVar dstItem srcItemVal
+    
 
 
 
@@ -179,10 +186,13 @@ getVar (Constant (SReference addressedPath@(AddressedPath (Right addr) key))) = 
     MS.BDefault -> do
       typeHint <- getValueType addressedPath
       case typeHint of
+        {-
         TStruct name fieldHints -> SStruct name . M.fromList <$> do
           forM fieldHints $ \(l, _) -> do
             fieldValue <- getVar . Constant . SReference $ addressedPath `apSnoc` MS.Field l
-            return (BC.unpack l, Constant fieldValue) 
+            return (BC.unpack l, Constant fieldValue)
+        -}
+        TStruct _ _ -> return $ SReference addressedPath
         TComplex -> return $ SReference addressedPath
         _ -> return $ findDefault typeHint
     _ -> return $ fromBasic theValue
