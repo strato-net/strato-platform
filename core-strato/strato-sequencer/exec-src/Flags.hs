@@ -24,6 +24,8 @@ defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to
 defineFlag "blockstanbul" (False :: Bool) "Whether to run blockstanbul"
 defineFlag "validators" ("[]" :: String) "JSON encoded addresses of validators"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
+defineFlag "blockstanbul_initial_round" (0 :: Integer) "Starting point for the round number"
+defineFlag "blockstanbul_initial_sequence" (0 :: Integer) "Starting point for the sequence number"
 defineFlag "blockstanbul_round_period_s" (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
 defineFlag "blockstanbul_port" (8050:: Int) "The port serving blockstanbul's admin server"

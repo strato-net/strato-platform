@@ -47,8 +47,10 @@ main = do
       eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
       validators = fromRight (error "invalid validators") eValidators
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
-      authSenders = fromRight (error "invalid validators") eAuthSenders
-      ctx = newContext (View 0 0) validators authSenders
+      !authSenders = fromRight (error "invalid admins") eAuthSenders
+      initView = View (fromIntegral flags_blockstanbul_initial_round)
+                      (fromIntegral flags_blockstanbul_initial_sequence)
+      ctx = newContext initView validators authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
   mCtx <- if not flags_blockstanbul
              then do

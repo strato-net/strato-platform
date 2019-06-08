@@ -11,11 +11,16 @@ function newnode {
   initialize=false
 
   mkdir -p logs/rotation
-
+  MAX_NUM=0
   if [[ ! -d .ethereumH ]]
   then initialize=true
        cleanupDB
        doInit
+  else
+    db_conn_params="-U ${pgUser} -h ${pgHost}"
+    DBNAME=$(PGPASSWORD=$pgPass psql ${db_conn_params} -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d '[:space:]')
+    MAX_NUM=$(PGPASSWORD=$pgPass psql ${db_conn_params} -t -d "${DBNAME}" -c "select max(number) from block_data_ref;"| tr -d '[:space:]')
+    echo $MAX_NUM
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
@@ -87,7 +92,7 @@ function newnode {
   fi
   NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
-    --minLogLevel=$seqMinLogLevel &>> logs/strato-sequencer
+    --minLogLevel=$seqMinLogLevel --blockstanbul_initial_sequence=${MAX_NUM} &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
