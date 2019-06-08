@@ -49,7 +49,7 @@ import           Blockchain.DBM
 import           Blockchain.EthConf
 import           Blockchain.Options
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
-import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
+import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, UnseqSink)
 
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent             (HasVMEventsSink(..), VMEvent, produceVMEventsM)
@@ -93,8 +93,11 @@ instance (MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
 
-instance (MonadState Context m, MonadIO m, Mod.Modifiable K.KafkaState m) => HasUnseqSink m where
-  getUnseqSink = gets unseqSink
+instance ( MonadState Context m
+         , MonadIO m
+         , Mod.Modifiable K.KafkaState m
+         ) => Mod.Accessible (UnseqSink m) m where
+  access _ = gets unseqSink
 
 instance (MonadState Context m, MonadIO m, Mod.Modifiable K.KafkaState m) => HasVMEventsSink m where
   getVMEventsSink = gets vmEventsSink
