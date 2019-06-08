@@ -1,11 +1,25 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.SolidVM.Value where
+module Blockchain.SolidVM.Value (
+  Variable(..),
+  Value(..),
+  BasicType(..),
+  LocalVar(..),
+  AddressedPath(..),
+  Typo(..),
+  ValList(..),
+  IndexType(..),
+  coerceType,
+  apSnoc,
+  defaultValue,
+  valEquals
+  ) where
 
 
 import           Control.Monad
-import           Data.ByteString (ByteString)
+--import           Control.Monad.IO.Class
+--import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
@@ -190,7 +204,7 @@ defaultValue _ x = todo "defaultValue" x
 
 
 
-
+{-
 byteStringToValue :: ByteString -> Maybe Value
 byteStringToValue x | x == B.singleton 128 = Nothing
 byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
@@ -198,7 +212,7 @@ byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 castToInt :: Value -> Integer
 castToInt (SInteger i) = i
 castToInt s = typeError "castToInt" s
-
+-}
 
 -- Typos are the possible values that a Xabi.Label
 -- is able to resolve to
