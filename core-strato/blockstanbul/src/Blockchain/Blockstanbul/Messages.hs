@@ -284,10 +284,12 @@ data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
 data Checkpoint = Checkpoint
                 { checkpointView :: View
                 , checkpointVoteRecord :: M.Map Address (M.Map Address Bool)
+                , checkpointValidators :: [Address]
+                , checkpointAdmins :: [Address]
                 } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON)
 
 instance Default Checkpoint where
-  def = Checkpoint (View 0 0) M.empty
+  def = Checkpoint (View 0 0) M.empty [] []
 
 derive makeArbitrary ''Checkpoint
 

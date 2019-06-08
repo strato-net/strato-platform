@@ -95,8 +95,8 @@ debugShowCtx = do
   debugLog "showctx/roundChanged" roundChanged show
   debugLog "showctx/admins" authSenders show
 
-newContext :: Checkpoint -> [Address] -> [Address] -> HK.PrvKey -> BlockstanbulContext
-newContext (Checkpoint v pendingVotes) as senderlist pk =
+newContext :: Checkpoint -> HK.PrvKey -> BlockstanbulContext
+newContext (Checkpoint v pendingVotes as senderlist) pk =
   let valSet = S.fromList as
       prop = fromMaybe 0x0 . S.lookupMin $ valSet
   in BlockstanbulContext
@@ -265,7 +265,10 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
-  yield . NewCheckpoint =<< liftM2 Checkpoint (use view) (use voted)
+  yield . NewCheckpoint =<< liftM4 Checkpoint (use view)
+                                              (use voted)
+                                              (uses validators S.toList)
+                                              (uses authSenders M.keys)
 
 eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do

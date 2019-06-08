@@ -39,7 +39,7 @@ import qualified Prometheus as P
 import           System.IO.Unsafe
 import           UnliftIO.STM
 
-import           Blockchain.Blockstanbul (Checkpoint, decodeCheckpoint, encodeCheckpoint)
+import           Blockchain.Blockstanbul (Checkpoint(..), decodeCheckpoint, encodeCheckpoint)
 import qualified Blockchain.EthConf                        as EC
 import qualified Blockchain.MilenaTools     as K
 import           Blockchain.Output
@@ -47,6 +47,7 @@ import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka as SK
 import           Blockchain.Sequencer.Metrics
+import           Blockchain.Strato.Model.Address
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Protocol     as KP
 import           Text.Format
@@ -155,14 +156,16 @@ runTheGregor :: GregorConfig -> IO ()
 runTheGregor cfg = race_ (runGregorM cfg unseqReader)
                          (runGregorM cfg seqWriters)
 
-initializeCheckpoint :: GregorM Checkpoint
-initializeCheckpoint = do
+-- When a checkpoint already exists, the arguments are ignored. They might
+-- be stale if the validator pool has expanded.
+initializeCheckpoint :: [Address] -> [Address] -> GregorM Checkpoint
+initializeCheckpoint vals admins = do
   meta <- snd <$> getNextOffsetAndMetadata
   case decodeMeta meta of
        Left err -> do
          $logErrorS "initializeCheckpoint" . T.pack $
              "unable to decode pbft checkpoint " ++ show err
-         return def
+         return def{checkpointValidators=vals, checkpointAdmins=admins}
        Right kafkaCkpt -> return kafkaCkpt
 
 

@@ -54,13 +54,13 @@ main = do
         , kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId'
         , cablePackage = pkg
         }
-  ckpt <- runGregorM gregorCfg initializeCheckpoint
   let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
       !validators = fromRight (error "invalid validators") eValidators
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
       !authSenders = fromRight (error "invalid admins") eAuthSenders
+  ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
+  putStrLn $ "Checkpoint: " ++ show ckpt
       -- TODO(tim): checkpoint validators, authSenders
-      ctx = newContext ckpt validators authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
   mCtx <- if not flags_blockstanbul
              then do
@@ -84,7 +84,7 @@ main = do
                     $ "--blockstanbul_block_period_ms must be nonnegative"
                 unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
                     $ "--blockstanbul_round_period_s must be positive"
-                return . Just . ctx $ pkey
+                return . Just . newContext ckpt $ pkey
   chr <- atomically newTQueue
   chv <- atomically newTQueue
   cht <- atomically newTMChan
