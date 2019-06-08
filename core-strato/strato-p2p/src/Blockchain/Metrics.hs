@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Blockchain.Metrics ( recordEvent
                           , recordMessage
@@ -7,14 +8,18 @@ module Blockchain.Metrics ( recordEvent
                           , recordGossipFinal
                           , addCanary
                           , killCanary
+                          , recordException
                           ) where
 
+import Control.Exception
 import Control.Monad.IO.Class
 import Data.Text
+import Data.Typeable
 import Prometheus
 
 import Blockchain.EventModel
 import Blockchain.Data.Wire
+import Blockchain.Strato.Discovery.Data.Peer (PPeer(..))
 import qualified Blockchain.Blockstanbul as PBFT
 
 -- TODO(tim): Add peer to labels
@@ -102,3 +107,16 @@ addCanary = liftIO $ incGauge canaryCount
 
 killCanary :: MonadIO m => m ()
 killCanary = liftIO $ decGauge canaryCount
+
+{-# NOINLINE exceptionCount #-}
+exceptionCount :: Vector (Text, Text, Text) Counter
+exceptionCount = unsafeRegister
+               . vector ("ip", "port", "type")
+               . counter
+               $ Info "p2p_peer_exceptions" "Counters for exceptions thrown by peer connections"
+
+recordException :: (Exception e, MonadIO m) => PPeer -> e -> m ()
+recordException PPeer{..} e =
+  let ty = pack . show $ typeOf e
+      port = pack $ show pPeerTcpPort
+  in liftIO $ withLabel exceptionCount (pPeerIp, port, ty) incCounter

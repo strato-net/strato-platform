@@ -38,6 +38,7 @@ import           Blockchain.ECIES
 import           Blockchain.EthConf                    hiding (genesisHash, port)
 import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
+import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.Output
 import           Blockchain.P2PRPC
@@ -115,7 +116,7 @@ runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
               -> CommPort
               -> m ()
 runPeerInList thePeer otherServiceHost otherServicePort = do
-  eErr <- liftIO $ disablePeerForSeconds thePeer 10 --don't connect to a peer more than once per minute, out of politeness
+  eErr <- liftIO $ nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   whenLeft eErr $ \err -> do
       $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
       $logErrorS "runPeerInList" "Simulating disable..."
@@ -153,24 +154,20 @@ stratoP2PClient = do
               liftIO (SSem.signal sem)
               handleRunPeerResult p result
 
-      disablePeerForHours :: (MonadIO m, MonadLogger m) => PPeer -> Int -> m ()
-      disablePeerForHours thePeer s = do
-        eErr <- liftIO . disablePeerForSeconds thePeer . (60*60*) $ s
-        whenLeft eErr $ \err -> do
-            $logErrorS "stratoP2PClient/disablePeerForHours" . T.pack $
-                        "Unable to disable peer: " ++ show err
-            $logErrorS "stratoP2PClient/disablePeerForHours" "Will disable next time they misbehave"
-
       handleRunPeerResult :: (MonadLogger m, MonadIO m) => PPeer -> Either SomeException a -> m ()
       handleRunPeerResult thePeer = \case
         Left e | Just (ErrorCall x) <- fromException e -> error x
         Left e -> do
           $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
-          case e of
-           e' | Just TimeoutException  <- fromException e' -> disablePeerForHours thePeer 4
-           e' | Just WrongGenesisBlock <- fromException e' -> disablePeerForHours thePeer (24*7)
-           e' | Just HeadMacIncorrect  <- fromException e' -> disablePeerForHours thePeer 24
-           _  -> return ()
+          recordException thePeer e
+          eErr <- liftIO $ case e of
+                   e' | Just TimeoutException  <- fromException e' -> lengthenPeerDisable thePeer
+                   e' | Just WrongGenesisBlock <- fromException e' -> lengthenPeerDisable thePeer
+                   e' | Just HeadMacIncorrect  <- fromException e' -> lengthenPeerDisable thePeer
+                   _  -> return $ Right ()
+          whenLeft eErr $ \err -> do
+            $logErrorLS "stratoP2PClient/handleRunPeerResult" err
+
         Right _ -> return ()
 
       osch = "localhost"

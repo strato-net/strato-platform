@@ -222,6 +222,8 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
                          , pPeerBondState = 0
                          , pPeerActiveState = 0
                          , pPeerVersion = T.pack "61" -- fix
+                         , pPeerNextDisableWindowSeconds=5
+                         , pPeerDisableExpiration=posixSecondsToUTCTime 0
                          }
         void $ addPeer peer
   where addPeer' = do
@@ -243,6 +245,8 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
                           ,  pPeerBondState = 0
                           ,  pPeerActiveState = 0
                           ,  pPeerVersion = T.pack "61" -- fix
+                          , pPeerNextDisableWindowSeconds=5
+                          , pPeerDisableExpiration=posixSecondsToUTCTime 0
                           }
           void $ addPeer peer
 
