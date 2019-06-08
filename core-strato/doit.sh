@@ -19,7 +19,7 @@ function newnode {
   else
     db_conn_params="-U ${pgUser} -h ${pgHost}"
     DBNAME=$(PGPASSWORD=$pgPass psql ${db_conn_params} -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d '[:space:]')
-    PGPASSWORD=$pgPass psql ${db_conn_params} -f /var/lib/copy_tables.sql -d "${DBNAME}"
+    PGPASSWORD=$pgPass psql ${db_conn_params} -v ON_ORRER_STOP=1 --single-transaction -f /var/lib/copy_tables.sql -d "${DBNAME}"
   fi
 
 
