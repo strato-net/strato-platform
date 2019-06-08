@@ -320,8 +320,7 @@ expandBlock = awaitForever $ \sb -> do
       yield $ Left sb
     (ReadyToEmit totalPastDifficulty) -> do
       -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
-      (ldbOps, dryChain) <- lift . fmap unzip $ buildEmissionChain sb totalPastDifficulty
-      lift . addLdbBatchOps . catMaybes $ ldbOps
+      dryChain <- lift $ buildEmissionChain sb totalPastDifficulty
       if dryChain /= []
         then do
           $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."

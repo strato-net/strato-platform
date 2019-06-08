@@ -152,6 +152,11 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
   insert _ cid cie = chainIdRegistry . at cid ?= cie
   delete _ cid     = chainIdRegistry . at cid .= Nothing
 
+instance (SHA `A.Alters` DependentBlockEntry) SequencerM where
+  lookup _ = genericLookupDependentBlockDB
+  insert _ k v = addLdbBatchOps . (:[]) $ genericBatchInsertDependentBlockDB k v
+  delete _ = addLdbBatchOps . (:[]) . genericBatchDeleteDependentBlockDB
+
 instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = use seenTransactionDB
     putSeenTransactionDB = assign seenTransactionDB
