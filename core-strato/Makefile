@@ -36,6 +36,7 @@ build_deploybase: prebuild
 build_docker: build_deploybase build_haskell
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f doit.sh $(LIBHOME)
+	cp -f copy_tables.sql $(LIBHOME)
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
 
 clean:
