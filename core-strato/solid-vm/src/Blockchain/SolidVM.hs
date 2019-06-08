@@ -1137,6 +1137,12 @@ runTheConstructors from to hsh cc contractName' argExps = do
   addCallInfo to contract' (contractName' ++ " constructer") hsh cc . fmap (fmap Constant) $ M.fromList zipped
 --  mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
+
+
+  forM_ [(n, e) | (n, Xabi.VariableDecl _ _ (Just e)) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do
+    v <- expToVar e
+    setVar (Constant (SReference (AddressedPath (Right to) $ MS.StoragePath [MS.Field $ BC.pack n]))) =<< getVar v
+
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = Xabi.OrderedArgs
              . fromMaybe []
