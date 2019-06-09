@@ -34,6 +34,7 @@ import           Control.Concurrent                        (forkIO, threadDelay)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
+import           Control.Monad                             (join)
 import qualified Control.Monad.Change.Alter                as A
 import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
@@ -71,66 +72,66 @@ import           Text.Format
 import qualified Database.LevelDB                          as LDB
 
 data SequencerContext = SequencerContext
-                      { _dependentBlockDB    :: DependentBlockDB
-                      , _seenTransactionDB   :: SeenTransactionDB
-                      , _blockHashRegistry   :: Map SHA OutputBlock
-                      , _txHashRegistry      :: Map SHA OutputTx
-                      , _chainHashRegistry   :: Map SHA ChainHashEntry
-                      , _chainIdRegistry     :: Map Word256 ChainIdEntry
-                      , _getChainsDB         :: S.Set Word256
-                      , _getTransactionsDB   :: S.Set SHA
-                      , _ldbBatchOps         :: Q.Seq LDB.BatchOp
-                      , _vmEvents            :: Q.Seq OutputEvent
-                      , _p2pEvents           :: Q.Seq OutputEvent
-                      , _blockstanbulContext :: Maybe BlockstanbulContext
-                      , _loopTimeout         :: TMChan ()
-                      , _latestRoundNumber   :: IORef RoundNumber
-                      }
+  { _dependentBlockDB    :: DependentBlockDB
+  , _seenTransactionDB   :: SeenTransactionDB
+  , _blockHashRegistry   :: Map SHA OutputBlock
+  , _txHashRegistry      :: Map SHA OutputTx
+  , _chainHashRegistry   :: Map SHA ChainHashEntry
+  , _chainIdRegistry     :: Map Word256 ChainIdEntry
+  , _getChainsDB         :: S.Set Word256
+  , _getTransactionsDB   :: S.Set SHA
+  , _ldbBatchOps         :: Q.Seq LDB.BatchOp
+  , _vmEvents            :: Q.Seq OutputEvent
+  , _p2pEvents           :: Q.Seq OutputEvent
+  , _blockstanbulContext :: Maybe BlockstanbulContext
+  , _loopTimeout         :: TMChan ()
+  , _latestRoundNumber   :: IORef RoundNumber
+  }
 makeLenses ''SequencerContext
 
 
-data SequencerConfig =
-     SequencerConfig { depBlockDBCacheSize     :: Int
-                     , depBlockDBPath          :: String
-                     , seenTransactionDBSize   :: Int
-                     , syncWrites              :: Bool
-                     , blockstanbulBlockPeriod :: NominalDiffTime
-                     , blockstanbulRoundPeriod :: NominalDiffTime
-                     , blockstanbulBeneficiary :: TQueue CandidateReceived
-                     , blockstanbulVoteResps   :: TQueue VoteResult
-                     , blockstanbulTimeouts    :: TMChan RoundNumber
-                     , cablePackage            :: CablePackage
-                     , maxEventsPerIter        :: Int
-                     , maxUsPerIter            :: Int
-                     }
+data SequencerConfig = SequencerConfig
+  { depBlockDBCacheSize     :: Int
+  , depBlockDBPath          :: String
+  , seenTransactionDBSize   :: Int
+  , syncWrites              :: Bool
+  , blockstanbulBlockPeriod :: NominalDiffTime
+  , blockstanbulRoundPeriod :: NominalDiffTime
+  , blockstanbulBeneficiary :: TQueue CandidateReceived
+  , blockstanbulVoteResps   :: TQueue VoteResult
+  , blockstanbulTimeouts    :: TMChan RoundNumber
+  , cablePackage            :: CablePackage
+  , maxEventsPerIter        :: Int
+  , maxUsPerIter            :: Int
+  }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (ResourceT (LoggingT IO)))
 
 instance HasDependentBlockDB SequencerM where
-    getDependentBlockDB = use dependentBlockDB
-    getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
-    getReadOptions      = return LDB.defaultReadOptions
+  getDependentBlockDB = use dependentBlockDB
+  getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
+  getReadOptions      = return LDB.defaultReadOptions
 
 instance Mod.Modifiable (S.Set Word256) SequencerM where
-    get _ = use getChainsDB
-    put _ = assign getChainsDB
+  get _ = use getChainsDB
+  put _ = assign getChainsDB
 
 instance Mod.Modifiable (S.Set SHA) SequencerM where
-    get _ = use getTransactionsDB
-    put _ = assign getTransactionsDB
+  get _ = use getTransactionsDB
+  put _ = assign getTransactionsDB
 
 instance HasPrivateHashDB SequencerM where
-    getChainId = return . hash . rlpSerialize . rlpEncode
-    generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
-    generateChainHashes tx =
-      let r = txSigR tx
-          s = txSigS tx
-          rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
-          sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
-       in return [rs,sr]
+  getChainId = return . hash . rlpSerialize . rlpEncode
+  generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
+  generateChainHashes tx =
+    let r = txSigR tx
+        s = txSigS tx
+        rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
+        sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
+     in return [rs,sr]
 
-    requestChain = insertGetChainsDB
-    requestTransaction = insertGetTransactionsDB
+  requestChain = insertGetChainsDB
+  requestTransaction = insertGetTransactionsDB
 
     -- TODO: Add persistence layer
 instance (SHA `A.Alters` OutputBlock) SequencerM where
@@ -168,8 +169,8 @@ instance (SHA `A.Alters` One) SequencerM where
   delete _ = genericDeleteSeenTransactionDB
 
 instance HasBlockstanbulContext SequencerM where
-    getBlockstanbulContext = use blockstanbulContext
-    putBlockstanbulContext = assign (blockstanbulContext . _Just)
+  getBlockstanbulContext = use blockstanbulContext
+  putBlockstanbulContext = assign (blockstanbulContext . _Just)
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
@@ -241,11 +242,10 @@ createNewTimer rn = do
 
 drainTMChan :: TMChan a -> STM [a]
 drainTMChan ch = do
-  mmx <- tryReadTMChan ch
-  case mmx of
+  mx <- join <$> tryReadTMChan ch
+  case mx of
     Nothing -> return []
-    Just Nothing -> return []
-    Just (Just x) -> (x:) <$> drainTMChan ch
+    Just x  -> (x:) <$> drainTMChan ch
 
 drainTimeouts :: SequencerM [RoundNumber]
 drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
