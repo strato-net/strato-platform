@@ -35,6 +35,7 @@ import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
 import qualified Control.Monad.Change.Alter                as A
+import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 import           Control.Monad.State
 
@@ -157,9 +158,14 @@ instance (SHA `A.Alters` DependentBlockEntry) SequencerM where
   insert _ k v = addLdbBatchOps . (:[]) $ genericBatchInsertDependentBlockDB k v
   delete _ = addLdbBatchOps . (:[]) . genericBatchDeleteDependentBlockDB
 
-instance HasSeenTransactionDB SequencerM where
-    getSeenTransactionDB = use seenTransactionDB
-    putSeenTransactionDB = assign seenTransactionDB
+instance Mod.Modifiable SeenTransactionDB SequencerM where
+  get _ = use seenTransactionDB
+  put _ = assign seenTransactionDB
+
+instance (SHA `A.Alters` One) SequencerM where
+  lookup _ = genericLookupSeenTransactionDB
+  insert _ = genericInsertSeenTransactionDB
+  delete _ = genericDeleteSeenTransactionDB
 
 instance HasBlockstanbulContext SequencerM where
     getBlockstanbulContext = use blockstanbulContext
