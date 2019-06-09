@@ -215,7 +215,12 @@ getBool p = do
     _ -> typeError "getBool" (p, v)
 
 deleteVar :: Variable -> SM ()
-deleteVar _ = error "deleteVar not yet supported"
+deleteVar (Constant (SReference (AddressedPath (Right addr) path))) = do
+  markDiffForAction addr path $ MS.BDefault
+  putSolidStorageKeyVal' addr path $ MS.BDefault
+
+
+deleteVar _ = error "deleteVar not yet supported for local variables"
 
 
 {-
