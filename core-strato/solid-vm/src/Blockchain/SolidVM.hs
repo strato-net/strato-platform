@@ -429,7 +429,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
     case maybeExpression of
       Nothing -> do
         ctract <- getCurrentContract
-        return $ defaultValue ctract singleType
+        createDefaultValue ctract singleType
       Just e -> do
         rhs <- weakGetVar =<< expToVar e
         case (maybeLoc, rhs) of
