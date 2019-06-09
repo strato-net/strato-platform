@@ -115,9 +115,9 @@ instance Mod.Modifiable (S.Set Word256) SequencerM where
     get _ = use getChainsDB
     put _ = assign getChainsDB
 
-instance HasGetTransactionsDB SequencerM where
-    getGetTransactionsDB = use getTransactionsDB
-    putGetTransactionsDB = assign getTransactionsDB
+instance Mod.Modifiable (S.Set SHA) SequencerM where
+    get _ = use getTransactionsDB
+    put _ = assign getTransactionsDB
 
 instance HasPrivateHashDB SequencerM where
     getChainId = return . hash . rlpSerialize . rlpEncode
