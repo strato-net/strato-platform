@@ -89,7 +89,6 @@ data SequencerContext = SequencerContext
   }
 makeLenses ''SequencerContext
 
-
 data SequencerConfig = SequencerConfig
   { depBlockDBCacheSize     :: Int
   , depBlockDBPath          :: String
