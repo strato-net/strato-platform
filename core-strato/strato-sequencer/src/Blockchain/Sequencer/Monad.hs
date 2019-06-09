@@ -111,9 +111,9 @@ instance HasDependentBlockDB SequencerM where
     getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
     getReadOptions      = return LDB.defaultReadOptions
 
-instance HasGetChainsDB SequencerM where
-    getGetChainsDB = use getChainsDB
-    putGetChainsDB = assign getChainsDB
+instance Mod.Modifiable (S.Set Word256) SequencerM where
+    get _ = use getChainsDB
+    put _ = assign getChainsDB
 
 instance HasGetTransactionsDB SequencerM where
     getGetTransactionsDB = use getTransactionsDB
