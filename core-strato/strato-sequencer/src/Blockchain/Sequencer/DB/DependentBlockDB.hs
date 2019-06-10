@@ -70,11 +70,6 @@ genericBatchDeleteDependentBlockDB k = LDB.Del (B.toStrict $ encode k)
 
 bootstrapGenesisBlock :: (SHA `Alters` DependentBlockEntry) m => SHA -> Integer -> m ()
 bootstrapGenesisBlock hash' = insert Proxy hash' . Emitted
---  db           <- getDependentBlockDB
---  writeOptions <- getWriteOptions
---  encodedHash  <- return . B.toStrict . encode $ hash'
---  encodedEmit  <- return . B.toStrict . encode $ Emitted difficulty
---  LDB.put db writeOptions encodedHash encodedEmit
 
 appendDependentBlock :: (SHA `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
 appendDependentBlock b = --do
@@ -86,26 +81,8 @@ appendDependentBlock b = --do
         Just (DependentBlocks existingDeps) ->
           insert Proxy parentHash $ DependentBlocks (b : existingDeps)
 
---    let parentHash = parentHashBS b
---    db                  <- getDependentBlockDB
---    readOptions         <- getReadOptions
---    writeOptions        <- getWriteOptions
---    maybeExistingParent <- LDB.get db readOptions parentHash
---    case (decode . B.fromStrict) <$> maybeExistingParent of -- if emitted or already queued, nothing to do
---        Just (Emitted _) -> return ()
---        Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return ()
---        Nothing ->
---            LDB.put db writeOptions parentHash $ B.toStrict . encode $ DependentBlocks [b]
---        Just (DependentBlocks existingDeps) ->
---            LDB.put db writeOptions parentHash $ B.toStrict . encode $ DependentBlocks (b:existingDeps)
-
 existingParent :: (SHA `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
-existingParent = lookup Proxy . blockDataParentHash . sbBlockData -- b = do
---    let parentHash = parentHashBS b
---    db                  <- getDependentBlockDB
---    readOptions         <- getReadOptions
---    maybeExistingParent <- LDB.get db readOptions parentHash
---    return $ decode . B.fromStrict <$> maybeExistingParent
+existingParent = lookup Proxy . blockDataParentHash . sbBlockData
 
 readyToEmit :: (SHA `Alters` DependentBlockEntry) m => SequencedBlock -> m Bool
 readyToEmit b = do
@@ -125,20 +102,6 @@ enqueueIfParentNotEmitted b = existingParent b >>= \case
   Nothing -> do
     insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks [b]
     return NotReadyToEmit
---    let parentHash = parentHashBS b
---    db                  <- getDependentBlockDB
---    writeOptions        <- getWriteOptions
---    ep <- existingParent b
---    case ep of
---        Just (Emitted totalDifficulty') ->
---            return $ ReadyToEmit totalDifficulty'
---        Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return NotReadyToEmit -- case of duplicate seen
---        Just (DependentBlocks existingDeps) -> do
---            LDB.put db writeOptions parentHash $ B.toStrict . encode $ DependentBlocks (b:existingDeps)
---            return NotReadyToEmit
---        Nothing -> do
---            LDB.put db writeOptions parentHash $ B.toStrict . encode $ DependentBlocks [b]
---            return NotReadyToEmit
 
 buildEmissionChain :: (SHA `Alters` DependentBlockEntry) m
                    => SequencedBlock
@@ -153,18 +116,3 @@ buildEmissionChain b lastTotalDifficulty = lookup Proxy (sbHash b) >>= \case
     return $ theBlock : join subChains
   where totalDifficulty' = lastTotalDifficulty + sequencedBlockDifficulty b
         theBlock = sequencedBlockToOutputBlock b totalDifficulty'
---    db           <- getDependentBlockDB
---    readOptions  <- getReadOptions
---    children     <- LDB.get db readOptions thisBlockHash
---    case (decode . B.fromStrict) <$> children of
---        Nothing -> return [theRet]
---        Just (Emitted _) -> return []
---        Just (DependentBlocks blocks') -> do
---            subChains <- sequence $ flip buildEmissionChain totalDifficulty' <$> blocks'
---            return $ theRet : join subChains
---    where
---        thisBlockHash    = blockHashBS b
---        totalDifficulty' = lastTotalDifficulty + sequencedBlockDifficulty b
---        thePutOperation  = Just . LDB.Put thisBlockHash . B.toStrict . encode $ Emitted totalDifficulty'
---        theBlock         = sequencedBlockToOutputBlock b totalDifficulty'
---        theRet           = (thePutOperation, theBlock)
