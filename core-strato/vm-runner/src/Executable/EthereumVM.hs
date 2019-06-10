@@ -291,7 +291,7 @@ getUnprocessedKafkaEvents offset = do
 shouldProcessNewTransactions :: ContextM Bool -- todo: probably shouldn't do it by number, but tdiff.
 shouldProcessNewTransactions =
     if flags_useSyncMode then do
-        worldBestBlock <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
+        worldBestBlock <- fmap unWorldBestBlock <$> RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
         case worldBestBlock of
             Nothing -> do
                 $logInfoS "shouldProcessNewTransactions" "got Nothing from worldBestBlockInfo, playing it safe and not mining Txs"

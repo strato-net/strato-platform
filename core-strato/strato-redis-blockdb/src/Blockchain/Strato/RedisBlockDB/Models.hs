@@ -105,6 +105,10 @@ data RedisBestBlock = RedisBestBlock { bestBlockHash            :: SHA
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
                                      , bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty
                                      } deriving (Eq, Read, Show)
+newtype WorldBestBlock = WorldBestBlock { unWorldBestBlock :: RedisBestBlock }
+newtype Canonical a = Canonical { heretical :: a }
+newtype Private a = Private { public :: a }
+type ChainMembers = RedisChainMembers
 
 instance RedisDBValuable RedisBestBlock where
     toValue = rlpSerialize . wrap
