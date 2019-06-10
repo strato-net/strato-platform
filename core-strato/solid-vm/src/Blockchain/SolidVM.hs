@@ -327,7 +327,7 @@ callWrapper from to mContract functionName argExps = do
           Just _ -> do
             --TODO- this should only exist if the storage variable is declared
             -- "public", right now I just ignore this and allow anything to be called as a getter
-            fmap Just $ getVar $ Constant $ SReference $ AddressedPath (Right to) . MS.singleton $ BC.pack functionName
+            fmap Just $ getVar $ Constant $ SReference $ AddressedPath to . MS.singleton $ BC.pack functionName
           Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
 
@@ -559,8 +559,8 @@ expToPath (Xabi.Variable x) = do
       val <- weakGetVar var
       case val of
         SReference apt -> return apt
-        _ -> return $ AddressedPath (Left LocalVar) path
-    Nothing -> return $ AddressedPath (Right $ currentAddress callInfo) path
+        _ -> error "expToPath should never be called for a local variable"
+    Nothing -> return $ AddressedPath (currentAddress callInfo) path
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
     parvar <- expToVar parent
@@ -1141,7 +1141,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   forM_ [(n, e) | (n, Xabi.VariableDecl _ _ (Just e)) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do
     v <- expToVar e
-    setVar (Constant (SReference (AddressedPath (Right to) $ MS.StoragePath [MS.Field $ BC.pack n]))) =<< getVar v
+    setVar (Constant (SReference (AddressedPath to $ MS.StoragePath [MS.Field $ BC.pack n]))) =<< getVar v
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = Xabi.OrderedArgs
@@ -1229,7 +1229,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
   val' <- case val of
              Nothing -> findNamedReturns
              Just SNULL -> findNamedReturns
-             Just (SReference apt@(AddressedPath (Left LocalVar) _)) -> internalError "runTheCall/local reference to expired stack frame" apt
              Just{} -> return val
   popCallInfo
 

@@ -46,7 +46,6 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 --import           Data.IORef
-import           Data.List (foldl')
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
@@ -325,7 +324,7 @@ getVariableOfName name = do
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
         then Just . Constant . SReference $ AddressedPath
-                (Right $ currentAddress currentCallInfo)
+                (currentAddress currentCallInfo)
                 (MS.singleton $ BC.pack name)
         else Nothing
 
@@ -478,29 +477,19 @@ hintFromType = \case
  Xabi.Array{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
-getXabiType :: Either LocalVar Address -> B.ByteString -> SM (Maybe Xabi.Type)
-getXabiType loc field = do
+getXabiType :: Address -> B.ByteString -> SM (Maybe Xabi.Type)
+getXabiType addr field = do
   -- This field might have been defined in e.g. a caller contract.
   -- We search from the top down for the home of this data
-  case loc of
-    Left LocalVar -> do
-      -- Reading the entire stack of locals solves the problem of passing
-      -- local arrays as arguments to functions. The parameter is a reference
-      -- to the argument, so the parent or higher must be consulted to resolve it.
-      -- This solution has the downside of potentially resolving variables that are not in scope:
-      -- function called() { return x; }, function caller() { uint x = 200; uint y = called(); }
-      locals_stack <- gets (map localVariables . callStack)
-      return . foldl' (<|>) Nothing $ map (fmap fst . M.lookup (BC.unpack field)) locals_stack
-    Right addr -> do
-      stack <- gets callStack
-      case filter ((== addr) . currentAddress) stack of
-        [] -> internalError "address not found in call stack" (addr, stack)
-        (callInfo:_) -> return
-                      . M.lookup (BC.unpack field)
-                      . fmap Xabi.varType
-                      . _storageDefs
-                      . currentContract
-                      $ callInfo
+  stack <- gets callStack
+  case filter ((== addr) . currentAddress) stack of
+    [] -> internalError "address not found in call stack" (addr, stack)
+    (callInfo:_) -> return
+                    . M.lookup (BC.unpack field)
+                    . fmap Xabi.varType
+                    . _storageDefs
+                    . currentContract
+                    $ callInfo
 
 getXabiValueType :: AddressedPath -> SM Xabi.Type
 getXabiValueType (AddressedPath loc path) = do

@@ -5,7 +5,6 @@ module Blockchain.SolidVM.Value (
   Variable(..),
   Value(..),
   BasicType(..),
-  LocalVar(..),
   AddressedPath(..),
   Typo(..),
   ValList(..),
@@ -51,11 +50,9 @@ import qualified SolidVM.Solidity.Xabi.VarDef     as Xabi
 
 data IndexType = ArrayIndex | MapBoolIndex | MapAddressIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
 
-data LocalVar = LocalVar deriving (Show, Eq)
-
 
 data AddressedPath = AddressedPath
-  { apAddress :: Either LocalVar Address
+  { apAddress :: Address
   , apPath :: MS.StoragePath
   } deriving (Eq)
 

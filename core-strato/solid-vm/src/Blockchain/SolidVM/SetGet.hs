@@ -138,7 +138,7 @@ setVal (STuple dstVector) (STuple srcVector) =
 
 
 
-setVal (SReference (AddressedPath (Right addr) path)) src = do
+setVal (SReference (AddressedPath addr path)) src = do
   markDiffForAction addr path $ toBasic src
   putSolidStorageKeyVal' addr path $ toBasic src
 setVal dst src = error $ "unknown case called in setVal:\nsrc = " ++ show src ++ "\ndst = " ++ show dst
@@ -180,7 +180,7 @@ weakGetVar (Variable v) = liftIO $ readIORef v
 
 getVar :: Variable -> SM Value
 --getVar x | trace ("getVar called: " ++ show x) $  False = undefined
-getVar (Constant (SReference addressedPath@(AddressedPath (Right addr) key))) = do
+getVar (Constant (SReference addressedPath@(AddressedPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
   case theValue of
     MS.BDefault -> do
@@ -215,7 +215,7 @@ getBool p = do
     _ -> typeError "getBool" (p, v)
 
 deleteVar :: Variable -> SM ()
-deleteVar (Constant (SReference (AddressedPath (Right addr) path))) = do
+deleteVar (Constant (SReference (AddressedPath addr path))) = do
   markDiffForAction addr path $ MS.BDefault
   putSolidStorageKeyVal' addr path $ MS.BDefault
 
