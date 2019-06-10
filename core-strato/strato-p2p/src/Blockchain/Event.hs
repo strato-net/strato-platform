@@ -433,11 +433,12 @@ handleGetChainDetails :: ( MonadIO m
                       => PPeer
                       -> [Word256]
                       -> ConduitM Event (Either P2PCNC Message) m ()
-handleGetChainDetails peer cids' = do
-  cids' <- case cids' of
+handleGetChainDetails peer requestedCids = do
+  unfilteredCids <- case requestedCids of
             [] -> RBDB.withRedisBlockDB $ RBDB.getIPChains (peerIPAddress peer)
-            xs -> return xs
-  let cids = S.toList $ S.fromList cids'
+            _ -> return requestedCids
+  let cids = S.toList $ S.fromList unfilteredCids
+  recordChainDetailsSizes (length requestedCids) (length unfilteredCids) (length cids)
   stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
   mems <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainMembers cids

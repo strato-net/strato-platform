@@ -7,8 +7,10 @@ module Blockchain.Metrics ( recordEvent
                           , recordGossipFinal
                           , addCanary
                           , killCanary
+                          , recordChainDetailsSizes
                           ) where
 
+import Control.Monad
 import Control.Monad.IO.Class
 import Data.Text
 import Prometheus
@@ -102,3 +104,18 @@ addCanary = liftIO $ incGauge canaryCount
 
 killCanary :: MonadIO m => m ()
 killCanary = liftIO $ decGauge canaryCount
+
+{-# NOINLINE chainIdSizes #-}
+chainIdSizes :: Vector Text Counter
+chainIdSizes = unsafeRegister
+             . vector "id_list"
+             . counter
+             $ Info "p2p_chain_id_requests" "Count of chain ids"
+
+recordChainDetailsSizes :: MonadIO m => Int -> Int -> Int -> m ()
+recordChainDetailsSizes start middle out = liftIO $ do
+  let rec ::Text -> Int -> IO ()
+      rec lab num = withLabel chainIdSizes lab $ \c -> void $ addCounter c (fromIntegral num)
+  rec "requested" start
+  rec "unfiltered_response" middle
+  rec "filtered_respones" out
