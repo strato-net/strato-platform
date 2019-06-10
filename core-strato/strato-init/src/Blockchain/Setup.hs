@@ -162,8 +162,8 @@ instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   insert _ = genericInsertHashDB $ asks hashDB
   delete _ = genericDeleteHashDB $ asks hashDB
 
-instance HasSQLDB SetupDBM where
-  getSQLDB = asks sqlDB
+instance Mod.Accessible SQLDB SetupDBM where
+  access _ = asks sqlDB
 
 instance Mod.Accessible RBDB.RedisConnection SetupDBM where
   access _ = asks redisDB

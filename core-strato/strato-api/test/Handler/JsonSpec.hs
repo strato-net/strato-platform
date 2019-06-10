@@ -79,7 +79,7 @@ setNum :: Integer -> Block -> Block
 setNum n b = let bd = blockBlockData b
              in b { blockBlockData = bd { blockDataNumber = n} }
 
-insertRandomBlocks :: (HasSQLDB m) => Integer -> Int -> m [Key BlockDataRef]
+insertRandomBlocks :: HasSQLDB m => Integer -> Int -> m [Key BlockDataRef]
 insertRandomBlocks start size = do
         blocks <- liftIO . generate . vectorOf size $ (arbitrary :: Gen Block)
         let numberedBlocks = zipWith setNum [start..] blocks

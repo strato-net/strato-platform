@@ -1,14 +1,18 @@
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.Data.AddressStateRef where
 
 import           Control.Monad
+import           Control.Monad.Change.Modify        (Accessible(..), Proxy(..))
 import           Data.Maybe
-import qualified Database.Persist.Postgresql                 as SQL hiding (Update, get)
+import qualified Database.Persist.Postgresql        as SQL hiding (Update, get)
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
-import qualified Blockchain.Database.MerklePatricia      as MP
+import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.SHA
 
@@ -17,7 +21,7 @@ import Blockchain.Strato.Model.ExtendedWord
 updateSQLBalanceAndNonce :: HasSQLDB m =>
                             [((Address, Maybe Word256), (Integer, Integer))] -> m ()
 updateSQLBalanceAndNonce vals = do
-  pool <- getSQLDB
+  pool <- access (Proxy @SQLDB)
   flip SQL.runSqlPool pool $ do
     forM_ vals $ \((a, c), (v, n)) -> do
       let asr =

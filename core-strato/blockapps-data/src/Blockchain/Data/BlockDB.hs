@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
@@ -42,6 +43,7 @@ import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 
 
 import           Control.Lens
+import           Control.Monad.Change.Modify        (Accessible(..), Proxy(..))
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 
@@ -67,8 +69,11 @@ import           Text.Format
 instance Pretty B.ByteString where
   pretty = blue . text . BC.unpack . B16.encode
 
-blk2BlkDataRef :: (HasSQLDB m) =>
-                  M.Map SHA Integer->(Block, SHA)->Bool->m BlockDataRef
+blk2BlkDataRef :: HasSQLDB m
+               => M.Map SHA Integer
+               -> (Block, SHA)
+               -> Bool
+               -> m BlockDataRef
 blk2BlkDataRef dm (b, hash') makeHashOne = do
   let difficulty' = fromMaybe (error $ "missing value in difficulty map: " ++ format hash') $
                    M.lookup hash' dm --  <- calcTotalDifficulty b blkId
@@ -93,10 +98,11 @@ blk2BlkDataRef dm (b, hash') makeHashOne = do
       nc = blockDataNonce bd
       mH = blockDataMixHash bd
 
-getBlock::(HasSQLDB m)=>
-          SHA->m (Maybe BlockDataRef)
+getBlock :: HasSQLDB m
+         => SHA
+         -> m (Maybe BlockDataRef)
 getBlock h = do
-  db <- getSQLDB
+  db <- access (Proxy @SQLDB)
   entBlkL <- runResourceT $
     SQL.runSqlPool actions db
 
@@ -137,9 +143,11 @@ homesteadNextDifficulty useDiffBomb _useTestnet parentNumber oldDifficulty oldTi
         then 2^(periodCount - 2)
         else 0
 
-getDifficulties::HasSQLDB m=>[SHA]->m [(SHA, Integer)]
+getDifficulties :: HasSQLDB m
+                => [SHA]
+                -> m [(SHA, Integer)]
 getDifficulties hashes = do
-  db <- getSQLDB
+  db <- access (Proxy @SQLDB)
   blocks <-
     runResourceT $
     flip SQL.runSqlPool db $
@@ -161,8 +169,10 @@ addDifficulties dm ((hash', blockDifficulty, parentHash'):rest) =
       dm' = M.insert hash' (parentDifficulty + blockDifficulty) dm
   in addDifficulties dm' rest
 
-getDifficultyMap::HasSQLDB m=>
-                  [(SHA, Integer)]->[(Block, SHA)]->m (M.Map SHA Integer)
+getDifficultyMap :: HasSQLDB m
+                 => [(SHA, Integer)]
+                 -> [(Block, SHA)]
+                 -> m (M.Map SHA Integer)
 getDifficultyMap difficultyBase blocksAndHashes = do
   let hashes = S.fromList $ map snd blocksAndHashes
       parents = S.fromList $ map (blockDataParentHash . blockBlockData . fst) blocksAndHashes
@@ -177,11 +187,15 @@ getDifficultyMap difficultyBase blocksAndHashes = do
          ) blocksAndHashes)
 
 
-putBlocks::(HasSQLDB m)=> [(SHA, Integer)]->[Block]->Bool->m [Key BlockDataRef]
+putBlocks :: HasSQLDB m
+          => [(SHA, Integer)]
+          -> [Block]
+          -> Bool
+          -> m [Key BlockDataRef]
 putBlocks difficultyBase blocks makeHashOne = do
   let blocksAndHashes = map (\b -> (b, blockHash b)) blocks
   dm <- getDifficultyMap difficultyBase blocksAndHashes
-  db <- getSQLDB
+  db <- access (Proxy @SQLDB)
   runResourceT $
     flip SQL.runSqlPool db $
     forM blocksAndHashes $ \(b, hash') -> do

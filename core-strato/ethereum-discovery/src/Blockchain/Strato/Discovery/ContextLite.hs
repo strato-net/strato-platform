@@ -1,8 +1,11 @@
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts               #-}
+{-# LANGUAGE FlexibleInstances              #-}
+{-# LANGUAGE GADTs                          #-}
+{-# LANGUAGE MultiParamTypeClasses          #-}
+{-# LANGUAGE TypeApplications               #-}
+{-# LANGUAGE TypeOperators                  #-}
+{-# LANGUAGE TypeSynonymInstances           #-}
+{-# LANGUAGE UndecidableInstances           #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.Discovery.ContextLite
   ( ContextLite -- (..)
@@ -14,6 +17,7 @@ module Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Control.Monad.Change.Modify           (Accessible(..), Proxy(..))
 import           Control.Monad.Reader
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Resource
@@ -23,8 +27,8 @@ import qualified Database.Persist.Postgresql           as SQL
 newtype ContextLite =
   ContextLite { liteSQLDB::SQLDB }
 
-instance  MonadUnliftIO m  => HasSQLDB (ReaderT ContextLite m) where
-  getSQLDB = asks liteSQLDB
+instance Monad m => Accessible SQLDB (ReaderT ContextLite m) where
+  access _ = asks liteSQLDB
 
 initContextLite :: MonadUnliftIO m => m ContextLite
 initContextLite = do
@@ -33,7 +37,7 @@ initContextLite = do
 
 addPeer :: HasSQLDB m =>PPeer->m (SQL.Key PPeer)
 addPeer peer = do
-  db <- getSQLDB
+  db <- access (Proxy @SQLDB)
   maybePeer <- getPeerByIP (T.unpack $ pPeerIp peer)
   runResourceT $
     SQL.runSqlPool (actions maybePeer) db
@@ -45,7 +49,7 @@ addPeer peer = do
 
 getPeerByIP :: HasSQLDB m =>String->m (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = do
-  db <- getSQLDB
+  db <- access (Proxy @SQLDB)
   entPeer <- runResourceT $ SQL.runSqlPool actions db
 
   case entPeer of

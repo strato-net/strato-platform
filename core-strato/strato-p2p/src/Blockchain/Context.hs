@@ -1,15 +1,16 @@
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE LambdaCase           #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE Rank2Types           #-}
-{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# OPTIONS -fno-warn-orphans #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# OPTIONS -fno-warn-orphans      #-}
 module Blockchain.Context
     ( Context(..)
     , Config(..)
@@ -87,16 +88,13 @@ instance Monad m => Mod.Modifiable K.KafkaState (StateT Context m) where
 instance MonadState Context m => Mod.Accessible RBDB.RedisConnection m where
   access _ = gets contextRedisBlockDB
 
-instance (MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
-  getSQLDB = asks configSQLDB
+instance MonadReader Config m => Mod.Accessible SQLDB m where
+  access _ = asks configSQLDB
 
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
 
-instance ( MonadState Context m
-         , MonadIO m
-         , Mod.Modifiable K.KafkaState m
-         ) => Mod.Accessible (UnseqSink m) m where
+instance (MonadIO m, MonadState Context m, Mod.Modifiable K.KafkaState m) => Mod.Accessible (UnseqSink m) m where
   access _ = gets unseqSink
 
 instance (MonadState Context m, MonadIO m, Mod.Modifiable K.KafkaState m) => HasVMEventsSink m where
@@ -177,7 +175,7 @@ getPeerByIP :: WrapsSQLDB t m
             => String
             -> (t m) (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = runWithSQL $ do
-    db <- getSQLDB
+    db <- Mod.access (Mod.Proxy @SQLDB)
     SQL.runSqlPool actions db >>= \case
         [] -> return Nothing
         lst -> return . Just $ head lst

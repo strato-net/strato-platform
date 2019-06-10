@@ -228,8 +228,8 @@ instance (SHA `A.Alters` BlockSummary) ContextM where
   insert _ = genericInsertBlockSummaryDB $ gets contextBlockSummaryDB
   delete _ = genericDeleteBlockSummaryDB $ gets contextBlockSummaryDB
 
-instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
-  getSQLDB = asks configSQLDB
+instance MonadReader Config m => Mod.Accessible SQLDB m where
+  access _ = asks configSQLDB
 
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
