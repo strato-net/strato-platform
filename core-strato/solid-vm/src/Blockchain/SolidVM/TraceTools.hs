@@ -1,32 +1,39 @@
 
 module Blockchain.SolidVM.TraceTools where
 
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import qualified Data.Map                       as M
 
 import           Blockchain.SolidVM.SM
+import           Blockchain.SolidVM.SetGet
 import           Text.Format
 import           Text.Tools
 
 
 
-showVariables :: CallInfo -> [String]
-showVariables ci = 
-  map (\(name, value) -> "    \"" ++ name ++ "\": " ++ show (snd value))
-  $ M.toList $ localVariables ci
+showVariables :: CallInfo -> SM [String]
+showVariables ci = do
+  forM (M.toList $ localVariables ci) $ \(name, (_, var)) -> do
+    val <- getVar var
+    valueString <- showSM val
+    return $ "    \"" ++ name ++ "\": " ++ valueString
+
   
-getFullStackTrace :: [CallInfo] -> [String]
-getFullStackTrace theCallStack = 
-  concat $ map
+getFullStackTrace :: [CallInfo] -> SM [String]
+getFullStackTrace theCallStack = do
+  sliceStrings <- 
+    forM theCallStack $ \slice -> do
+      varString <- showVariables slice
   
-  (\slice ->
-    ("-----[variables for " ++ format (currentAddress slice) ++ "/" ++ currentFunctionName slice ++ "]----------------")
-    : showVariables slice)
-  
-  theCallStack
+      return $ ("-----[variables for " ++ format (currentAddress slice) ++ "/" ++ currentFunctionName slice ++ "]----------------")
+        : varString
+
+  return $ concat sliceStrings
   
 printFullStackTrace :: SM ()
 printFullStackTrace = do
   theCallStack <- gets callStack
-  liftIO $ putStrLn $ grayBox $ concat $ map (wrap 150) $ getFullStackTrace theCallStack
+  fullStackTrace <- getFullStackTrace theCallStack
+  liftIO $ putStrLn $ grayBox $ concat $ map (wrap 150) fullStackTrace
