@@ -88,7 +88,7 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"/prometheus/consoles/index.html.example\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Prometheus Graphs
         </button>
@@ -167,7 +167,7 @@ exports[`MenuBar: index renders enterprise mode component without values 1`] = `
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"/prometheus/consoles/index.html.example\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Prometheus Graphs
         </button>
@@ -261,7 +261,7 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
-      <a href=\\"/prometheus/consoles/index.html.example\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
+      <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Prometheus Graphs
         </button>
