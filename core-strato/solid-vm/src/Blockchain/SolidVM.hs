@@ -1121,24 +1121,36 @@ runTheConstructors from to hsh cc contractName' argExps = do
                                         $ _constructor contract')
                                   argExps
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
-      zipped = case argVals of
-                  OrderedVals vs -> zipWith (\(t, n) v -> (n, (t, coerceType contract' t v))) argTypeNames vs
-                  NamedVals ns ->
-                    let argTypes =
-                          M.fromList
-                          $ map (\(maybeName, t) -> (fromMaybe "" maybeName, t)) 
-                          $ maybe einval Xabi.funcArgs $ contract' ^. constructor
-                        typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
-                                             (M.mapMissing (curry $ invalidArguments "extra argument"))
-                                             (M.zipWithMatched $ \_k t v -> (t, v))
-                                             (M.mapKeys T.unpack argTypes)
-                                             $ M.fromList ns
-                    in  map snd . sortWith fst
-                      . map (\(n, (Xabi.IndexedType i t, v)) -> (i, (n, (t, coerceType contract' t v))))
-                      $ M.toList typeAndVal
-  addCallInfo to contract' (contractName' ++ " constructer") hsh cc . fmap (fmap Constant) $ M.fromList zipped
---  mapM_ (\(n, (_, v)) -> initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v) zipped
 
+  zipped <-
+    case argVals of
+      OrderedVals vals -> 
+        forM (zip argTypeNames vals) $ \((t, n), v) -> do
+          let correctedVal = coerceType contract' t v
+          var <- createVar correctedVal
+          return (n, (t, var))
+
+      NamedVals ns -> do
+        let argTypes =
+              M.fromList
+              $ map (\(k, v) -> (T.unpack . fromMaybe "" $ k, v))
+              $ maybe einval Xabi.funcArgs $ contract' ^. constructor
+              
+            typeAndVal =
+              M.merge
+                (M.mapMissing (curry $ invalidArguments "missing argument"))
+                (M.mapMissing (curry $ invalidArguments "extra argument"))
+                (M.zipWithMatched $ \_k t v -> (t, v))
+                argTypes
+                (M.fromList ns)
+                         
+        forM (M.toList typeAndVal) $ \(n, (Xabi.IndexedType _ t, v)) -> do
+          let correctedVal = coerceType contract' t v
+          var <- createVar correctedVal
+          return (n, (t, var))
+
+
+  addCallInfo to contract' (contractName' ++ " constructer") hsh cc $ M.fromList zipped
 
 
   forM_ [(n, e) | (n, Xabi.VariableDecl _ _ (Just e)) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do

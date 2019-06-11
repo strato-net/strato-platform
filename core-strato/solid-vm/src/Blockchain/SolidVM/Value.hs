@@ -9,6 +9,7 @@ module Blockchain.SolidVM.Value (
   Typo(..),
   ValList(..),
   IndexType(..),
+  createVar,
   coerceType,
   apSnoc,
   defaultValue,
@@ -177,6 +178,11 @@ valEquals ct lhs rhs = case (lhs, rhs) of
   _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
 
 
+
+createVar :: MonadIO m => Value -> m Variable
+createVar val = liftIO $ fmap Variable $ newIORef val
+
+
 --TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
 defaultValue :: Contract -> Xabi.Type -> Value
 defaultValue _ (Xabi.Array valType _) = SArray valType V.empty
@@ -215,7 +221,7 @@ createDefaultValue ctract (Xabi.Label name) =
       items <- 
         forM sdef $ \(n, itemType) -> do
           itemVal <- createDefaultValue ctract $ Xabi.fieldTypeType itemType
-          itemVar <- liftIO $ fmap Variable $ newIORef itemVal
+          itemVar <- createVar itemVal
           return (T.unpack n, itemVar)
       return $ SStruct name $ M.fromList items
     _ -> return $ SContract name 0x0
