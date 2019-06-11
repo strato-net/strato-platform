@@ -128,8 +128,8 @@ instance ToSchema StateMutability where
     & mapped.schema.example ?~ toJSON View
 
 data Func = Func
-  { funcArgs :: Map Text Xabi.IndexedType
-  , funcVals :: Map Text Xabi.IndexedType
+  { funcArgs :: [(Maybe Text, Xabi.IndexedType)]
+  , funcVals :: [(Maybe Text, Xabi.IndexedType)]
   , funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.

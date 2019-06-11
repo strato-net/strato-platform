@@ -284,7 +284,7 @@ argsToVals ctract fn args =
       when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
       OrderedVals <$> zipWithM eval orderedTypes xs
     Xabi.NamedArgs xs -> NamedVals . M.toList <$> do
-      let strTypes = M.mapKeys T.unpack $ Xabi.funcArgs fn
+      let strTypes = M.mapKeys (T.unpack . fromMaybe "") $ M.fromList $ Xabi.funcArgs fn
       M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                (M.mapMissing $ curry $ invalidArguments "extra argument")
                (M.zipWithAMatched $ \_k t x -> eval (Xabi.indexedTypeType t) x)
@@ -293,8 +293,7 @@ argsToVals ctract fn args =
 
   where orderedTypes :: [Xabi.Type]
         orderedTypes = map Xabi.indexedTypeType
-                     . sortOn Xabi.indexedTypeIndex
-                     . M.elems $ Xabi.funcArgs fn
+                     . map snd $ Xabi.funcArgs fn
 
         eval :: Xabi.Type -> Xabi.Expression -> SM Value
         eval t x = case x of
@@ -1102,10 +1101,10 @@ runTheConstructors from to hsh cc contractName' argExps = do
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.contracts . at contractName'
-      argPairs = M.toList . fromMaybe M.empty . fmap Xabi.funcArgs $ contract' ^. constructor
+      argPairs = fromMaybe [] . fmap Xabi.funcArgs $ contract' ^. constructor
       argCount = length argPairs
       argTypeNames = map fst $ sortWith snd $
-        [ ((t, T.unpack n), i) |
+        [ ((t, T.unpack $ fromMaybe "" n), i) |
           (n, Xabi.IndexedType{Xabi.indexedTypeType=t, Xabi.indexedTypeIndex=i}) <- argPairs]
   onTraced $ liftIO $ putStrLn $ box
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
@@ -1125,7 +1124,10 @@ runTheConstructors from to hsh cc contractName' argExps = do
       zipped = case argVals of
                   OrderedVals vs -> zipWith (\(t, n) v -> (n, (t, coerceType contract' t v))) argTypeNames vs
                   NamedVals ns ->
-                    let argTypes = maybe einval Xabi.funcArgs $ contract' ^. constructor
+                    let argTypes =
+                          M.fromList
+                          $ map (\(maybeName, t) -> (fromMaybe "" maybeName, t)) 
+                          $ maybe einval Xabi.funcArgs $ contract' ^. constructor
                         typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
                                              (M.mapMissing (curry $ invalidArguments "extra argument"))
                                              (M.zipWithMatched $ \_k t v -> (t, v))
@@ -1180,15 +1182,14 @@ addLocalVariable theType name value = do
 
 runTheCall :: Address -> Contract -> String -> SHA -> CodeCollection -> Xabi.Func -> ValList -> SM (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals = do
-  let returnMeta = map (\(n, Xabi.IndexedType _ t) -> (T.unpack n, t)) .  M.toList $ Xabi.funcVals theFunction
-      returns = map (\(n, t) -> (n, (t, defaultValue contract' t))) returnMeta
+  let returns = [(T.unpack n, (t, defaultValue contract' t)) | (Just n, Xabi.IndexedType _ t) <- Xabi.funcVals theFunction]
       args = case argVals of
-        OrderedVals vs -> let argMeta = map fst . sortWith snd
-                                      . map (\(n, Xabi.IndexedType i t) -> ((T.unpack n, t), i))
-                                      . M.toList $ Xabi.funcArgs theFunction
+        OrderedVals vs -> let argMeta = 
+                                map (\(n, Xabi.IndexedType _ t) -> (T.unpack $ fromMaybe "" n, t))
+                                $ Xabi.funcArgs theFunction
                           in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
         NamedVals ns ->
-          let strTypes = M.mapKeys T.unpack $ Xabi.funcArgs theFunction
+          let strTypes = M.mapKeys T.unpack $ M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ Xabi.funcArgs theFunction
               typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
                                    (M.mapMissing (curry $ invalidArguments "extra argument"))
                                    (M.zipWithMatched $ \_k t v -> (t, v))
