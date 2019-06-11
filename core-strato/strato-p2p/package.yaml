@@ -63,6 +63,7 @@ dependencies:
   - stm-conduit
   - streaming-commons
   - strato-conf
+  - these
   - text
   - time
   - transformers

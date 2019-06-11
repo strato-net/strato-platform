@@ -1,15 +1,21 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-module Blockchain.Data.Block (
-  Block(..),
-  blockDataLens,
-  extraLens,
-  setBlockNo
+module Blockchain.Data.Block
+  ( Block(..)
+  , BestBlock(..)
+  , WorldBestBlock(..)
+  , Canonical(..)
+  , Private(..)
+  , blockDataLens
+  , extraLens
+  , setBlockNo
   ) where
 
 import Control.DeepSeq
 import Data.Binary
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Transaction
+import Blockchain.Strato.Model.SHA
 import GHC.Generics
 
 import Control.Lens
@@ -33,3 +39,13 @@ setBlockNo n blk = blk{blockBlockData = (blockBlockData blk){blockDataNumber = n
 
 instance Binary Block where
 instance NFData Block
+
+data BestBlock = BestBlock
+  { bestBlockHash            :: SHA
+  , bestBlockNumber          :: Integer
+  , bestBlockTotalDifficulty :: Integer
+  } deriving (Eq, Show)
+
+newtype WorldBestBlock = WorldBestBlock { unWorldBestBlock :: BestBlock } deriving (Eq, Show)
+newtype Canonical a = Canonical { unCanonical :: a } deriving (Functor)
+newtype Private a = Private { unPrivate :: a } deriving (Functor)

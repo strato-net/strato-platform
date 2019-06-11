@@ -646,8 +646,8 @@ worldBestBlockKey :: S8.ByteString
 worldBestBlockKey = "<worldbest>"
 {-# INLINE worldBestBlockKey #-}
 
-getWorldBestBlockInfo :: Redis (Maybe WorldBestBlock)
-getWorldBestBlockInfo = fmap WorldBestBlock <$> getBestBlockInfo' worldBestBlockKey
+getWorldBestBlockInfo :: Redis (Maybe RedisBestBlock)
+getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
 
 updateWorldBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Bool)
 updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
@@ -662,7 +662,7 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                       withRetryCount $ theRetryCount + 1
                   Right lockID -> do
                       liftLog $ $logDebugS "updateWorldBestBlockInfo" "Acquired lock"
-                      maybeExistingWBBI <- fmap unWorldBestBlock <$> getWorldBestBlockInfo
+                      maybeExistingWBBI <- getWorldBestBlockInfo
                       case maybeExistingWBBI of
                           Nothing -> do
                               liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"

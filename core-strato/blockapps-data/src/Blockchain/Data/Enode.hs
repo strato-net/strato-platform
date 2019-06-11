@@ -5,29 +5,38 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
-module Blockchain.Data.Enode (
-  Enode(..),
-  IPAddress(..),
-  showEnode,
-  readEnode,
-  showIP,
-  readIP
+module Blockchain.Data.Enode
+  ( Enode(..)
+  , IPAddress(..)
+  , ChainMembers(..)
+  , ChainTxsInBlock(..)
+  , IPChains(..)
+  , showEnode
+  , readEnode
+  , showIP
+  , readIP
   ) where
 
 
-import                  Control.DeepSeq
-import                  Data.Bits
-import                  Data.Binary
-import qualified        Data.ByteString             as B
-import qualified        Data.ByteString.Char8       as C8
-import qualified        Data.ByteString.Base16      as B16
-import                  Data.List
-import qualified        Data.Text                   as T
-import                  Data.Aeson
-import qualified        GHC.Generics                as GHCG
-import                  Network.Socket.Internal
+import           Control.DeepSeq
+import           Data.Bits
+import           Data.Binary
+import qualified Data.ByteString         as B
+import qualified Data.ByteString.Char8   as C8
+import qualified Data.ByteString.Base16  as B16
+import           Data.Default
+import           Data.List
+import qualified Data.Map.Strict         as M
+import qualified Data.Set                as S
+import qualified Data.Text               as T
+import           Data.Aeson
+import qualified GHC.Generics            as GHCG
+import           Network.Socket.Internal
 
-import                  Blockchain.Data.RLP
+import           Blockchain.Data.Address
+import           Blockchain.Data.RLP
+import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.SHA
 
 
 data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary)
@@ -42,6 +51,14 @@ data Enode = Enode
   , tcpPort    :: Int
   , udpPort    :: Maybe Int
   } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary)
+
+newtype ChainMembers = ChainMembers { unChainMembers :: M.Map Address Enode }
+newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [SHA] }
+newtype IPChains = IPChains { unIPChains :: S.Set Word256 }
+
+instance Default ChainMembers    where def = ChainMembers M.empty
+instance Default ChainTxsInBlock where def = ChainTxsInBlock M.empty
+instance Default IPChains        where def = IPChains S.empty
 
 instance RLPSerializable Enode where
   rlpEncode (Enode pk ip tp up) =

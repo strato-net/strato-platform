@@ -80,6 +80,26 @@ makeLenses ''Context
 
 type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 
+--handleMsgServerConduit :: ( MonadIO m
+--                          , MonadResource m
+--                          , MonadLogger m
+--                          , Mod.Accessible (SK.UnseqSink m) m
+--                          , MonadState Context m
+--                          , Mod.Modifiable K.KafkaState m
+--                          , (SHA `A.Alters` BlockData) m
+--                          , Mod.Modifiable BestBlock m
+--                          , Mod.Modifiable WorldBestBlock m
+--                          , (Integer `A.Alters` Canonical BlockHeader) m
+--                          , (SHA `A.Alters` BlockHeader) m
+--                          , (IPAddress `A.Alters` IPChains) m
+--                          , (SHA `A.Alters` ChainTxsInBlock) m
+--                          , (Word256 `A.Alters` ChainMembers) m
+--                          , (Word256 `A.Alters` ChainInfo) m
+--                          , (SHA `A.Alters` Private Transaction) m
+--                          , (SHA `A.Alters` Block) m
+--                          , Mod.Accessible GenesisBlockHash m
+--                          )
+
 instance Monad m => Mod.Modifiable K.KafkaState (StateT Context m) where
   get _   = gets contextKafkaState
   put _ k = get >>= \c -> put c{contextKafkaState = k}

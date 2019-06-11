@@ -25,14 +25,16 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import           Data.Foldable                         (for_)
-import           Data.List
-import           Data.Map.Strict                       (Map)
+import           Data.List                             hiding (lookup)
+import           Data.Map.Internal                     (WhenMissing(..), WhenMatched(..))
+import           Data.Map.Merge.Strict
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
+import           Data.These
 import           Data.Time.Clock
 import           MonadUtils
 import qualified Network.Kafka                         as K
@@ -43,6 +45,7 @@ import           UnliftIO.Exception
 
 import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Context
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
@@ -64,9 +67,7 @@ import           Blockchain.Verification
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
 import           Blockapps.Crossmon                    (recordMaxBlockNumber)
 import           Blockchain.Metrics
@@ -121,10 +122,16 @@ handleEvents :: ( MonadIO m
                 , MonadLogger m
                 , Modifiable K.KafkaState m
                 , (SHA `Alters` BlockData) m
-                , Modifiable RedisBestBlock m
+                , Modifiable BestBlock m
                 , Modifiable WorldBestBlock m
-                , (Integer `Alters` Canonical BlockData) m
+                , (Integer `Alters` Canonical BlockHeader) m
                 , (SHA `Alters` BlockHeader) m
+                , (IPAddress `Alters` IPChains) m
+                , (SHA `Alters` ChainTxsInBlock) m
+                , (Word256 `Alters` ChainMembers) m
+                , (Word256 `Alters` ChainInfo) m
+                , (SHA `Alters` Private Transaction) m
+                , (SHA `Alters` Block) m
                 ) => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
@@ -143,17 +150,18 @@ handleEvents peer = awaitForever $ \case
         let header      = blockHeader block'
         let num         = blockHeaderBlockNumber header
         let parentHash' = blockHeaderParentHash header
-        Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $ RedisBestBlock sha num tdiff
+        lift . Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $
+          BestBlock sha num tdiff
         --eResult <- RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo sha num tdiff)
         --case eResult of
         --  Left  _     -> $logInfoS "handleEvents/NewBlock" $ T.pack "Failed to update WorldBestBlockInfo"
         --  Right False -> $logInfoS "handleEvents/NewBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
         --  Right True  -> do
-        parentHeader <- lookup (Proxy @BlockData) parentHash'
+        parentHeader <- lift $ lookup (Proxy @BlockData) parentHash'
         case parentHeader of
           Nothing -> do
-            bestBlock <- Mod.get (Proxy @RedisBestBlock)
-            let bestBlockNum = numFromRedis bestBlock
+            bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+            let bestBlockNum = numberFromBestBlock bestBlock
             let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
             $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
             $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
@@ -164,8 +172,8 @@ handleEvents peer = awaitForever $ \case
 
     MsgEvt (NewBlockHashes _) -> do
         stampActionTimestamp
-        bestBlock <- Mod.get (Proxy @RedisBestBlock)
-        let bestBlockNum = numFromRedis bestBlock
+        bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+        let bestBlockNum = numberFromBestBlock bestBlock
         let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
         $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
         syncFetch Forward fetchNumber
@@ -180,7 +188,7 @@ handleEvents peer = awaitForever $ \case
       -- 3/4s of the blocks will be dropped when creating the blockheaders
       -- so we overcompensate here.
       let count = (1 + skip') * max mrh max'
-      chain <- fmap M.toList . lookupMany (Proxy @(Canonical BlockData)) $ take count [start'..]
+      chain <- fmap M.toList . lift . lookupMany (Proxy @(Canonical BlockHeader)) $ take count [start'..]
       when (null chain) $
         $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $
             ["Warning: A peer requested blocks starting at #"
@@ -188,11 +196,11 @@ handleEvents peer = awaitForever $ \case
             , ", but we don't have these in our canonical chain...."
             , " I don't know what to do, so I am returning a blank response."
             , " This may indicate something unhealthy in the network."]
-      yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
+      yieldR . BlockHeaders . skipEntries skip' $ unCanonical .  snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
       stampActionTimestamp
-      maybeHeader <- lookup (Proxy @BlockHeader) start
+      maybeHeader <- lift $ lookup (Proxy @BlockHeader) start
       case maybeHeader of
         Nothing    -> yieldR (BlockBodies [])
         Just head' -> do
@@ -202,8 +210,8 @@ handleEvents peer = awaitForever $ \case
             Forward -> return num
           mrh <- gets maxReturnedHeaders
           let count = (1 + skip') * min mrh (fromIntegral num)
-          chain <- fmap M.toList . lookupMany (Proxy @(Canonical BlockData)) $ take count [start'..]
-          yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
+          chain <- fmap M.toList . lift . lookupMany (Proxy @(Canonical BlockHeader)) $ take count [start'..]
+          yieldR . BlockHeaders . skipEntries skip' $ unCanonical . snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
         stampActionTimestamp
@@ -214,23 +222,23 @@ handleEvents peer = awaitForever $ \case
             --     allNeeded = headerHashes `S.union` parentHashes
 
             -- check if blockheaders we recieved have parents.
-            parentsInDB <- fmap M.toList . lookupMany (Proxy @BlockHeader) $ parentHash <$> headers
-            let existingParents = [(sha, x) | (sha, Just x) <- parentsInDB]
-            let missingParents  = [sha | (sha, Nothing) <- parentsInDB, sha /= SHA 0]
-            unless (null missingParents) $ do
-                 bestBlock <- Mod.get (Proxy @RedisBestBlock)
-                 let fetchNumber = numFromRedis bestBlock + 1
+            let parents = map parentHash headers
+            existingParents <- lift $ lookupMany (Proxy @BlockHeader) parents
+            let missingParents = S.fromList parents S.\\ M.keysSet existingParents
+            unless (S.null missingParents) $ do
+                 bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+                 let fetchNumber = numberFromBestBlock bestBlock + 1
                  $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-                 let lastParent = case length existingParents of
-                                      0 -> fetchNumber
-                                      _ -> head . sort $ blockHeaderBlockNumber . snd <$> existingParents
-                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents)
+                 let lastParent = if M.null existingParents
+                                      then fetchNumber
+                                      else head . sort $ blockHeaderBlockNumber <$> M.elems existingParents
+                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
                  syncFetch Reverse lastParent
 
-            -- todo: try with (&&&)
-            headersInDB <- fmap M.toList . lookupMany (Proxy @BlockHeader) $ headerHash <$> headers
-            let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
-            let (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
+            let headerHashes = M.fromList $ map (headerHash &&& id) headers
+            headersInDB <- lift . lookupMany (Proxy @BlockHeader) $ M.keys headerHashes
+            let neededHeaders = M.elems $ headerHashes M.\\ headersInDB
+                (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
             --     neededHashes = map headerHash neededHeaders
@@ -264,24 +272,30 @@ handleEvents peer = awaitForever $ \case
       stampActionTimestamp
       mrh <- gets maxReturnedHeaders
       let shas = take mrh shas'
-      getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
+      lift (getUntilMissing shas [] []) >>= (\(bodies, pshas) -> do
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
-          ptxs <- catMaybes . M.toList <$> lookupMany (Proxy @(Private Transaction)) pshas
-          unless (null ptxs) . yieldR $ Transactions ptxs)
-        where getUntilMissing :: ( SHA `Alters` ChainTxsInBlock
-                                 , SHA `Alters` ChainMembers
+          ptxs <- fmap M.elems . lift $ lookupMany (Proxy @(Private Transaction)) pshas
+          unless (null ptxs) . yieldR $ Transactions $ unPrivate <$> ptxs)
+        where getUntilMissing :: ( (SHA `Alters` ChainTxsInBlock) m
+                                 , (Word256 `Alters` ChainMembers) m
+                                 , (SHA `Alters` Block) m
                                  )
                               => [SHA] -> [Block] -> [SHA] -> m ([Block],[SHA])
               getUntilMissing []     bodies pshas = return (bodies, pshas)
               getUntilMissing (h:hs) bodies pshas = lookup (Proxy @Block) h >>= \case
                   Nothing   -> return (bodies, pshas)
                   Just body -> do
-                    cIdTxsMap <- lookup (Proxy @ChainTxsInBlock) h
-                    let kvs = M.assocs cIdTxsMap
-                    mems <- lookupMany (Proxy @ChainMembers) $ map fst kvs
-                    let trMems = zip kvs mems
-                        pshas' = concat . map (snd . fst) $
-                                  filter ((checkPeerIsMember peer) . snd) trMems
+                    cIdTxsMap <- unChainTxsInBlock <$> lookupWithDefault (Proxy @ChainTxsInBlock) h
+                    mems <- lookupMany (Proxy @ChainMembers) $ M.keys cIdTxsMap
+                    let whenMissing f = WhenMissing (pure . M.map f) (\_ x -> (pure . Just $ f x))
+                    let trMems = merge (whenMissing This)
+                                       (whenMissing That)
+                                       (WhenMatched $ \_ x y -> pure . Just $ These x y)
+                                       cIdTxsMap
+                                       mems
+                        filtered = flip M.filter trMems $
+                          mergeTheseWith (const False) (checkPeerIsMember peer) (||)
+                        pshas' = M.foldr ((++) . these id (const []) const) [] filtered
                     getUntilMissing hs (body:bodies) (pshas ++ pshas')
 
               toBody :: Block -> ([Transaction], [BlockHeader])
@@ -318,7 +332,7 @@ handleEvents peer = awaitForever $ \case
       lift $ SK.emitBlockstanbulMsg wm
 
     -- private chains
-    MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer cids'
+    MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer . IPChains $ S.fromList cids'
 
     MsgEvt (ChainDetails chpairs) -> do
       stampActionTimestamp
@@ -329,10 +343,12 @@ handleEvents peer = awaitForever $ \case
       stampActionTimestamp
       $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: "
         ++ (intercalate "\n" (show <$> trHashes))
-      ptrs <- catMaybes . M.toList <$> lookupMany (Proxy @(Private Transaction)) trHashes
-      mems <- lookupMany (Proxy @ChainMembers) $ map (fromJust . txChainId) ptrs
-      let trMems = zip ptrs mems
-      yieldR . Transactions . map fst $ filter ((checkPeerIsMember peer) . snd) trMems
+      ptrs <- fmap (map unPrivate . M.elems) . lift $ lookupMany (Proxy @(Private Transaction)) trHashes
+      mems <- lift . lookupMany (Proxy @ChainMembers) $ map (fromJust . txChainId) ptrs
+      let isMember tx = maybe False (checkPeerIsMember peer)
+                      $ flip M.lookup mems
+                      =<< txChainId tx
+      yieldR . Transactions $ filter isMember ptrs
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
@@ -341,24 +357,19 @@ handleEvents peer = awaitForever $ \case
     NewSeqEvent oe -> case oe of
       OEBlock b  -> do
         when (shouldSend peer $ obOrigin b) $ do
-          worldBestBlock <- unWorldBestBlock <$> Mod.get (Proxy @WorldBestBlock)
-          case worldBestBlock of
-            Nothing -> return ()
-            Just (RedisBestBlock _ _ worldTDiff) -> do
-              $logInfoS "NewSeqEvent.block" . T.pack $ "World TDiff: " ++ show worldTDiff
-              when (obTotalDifficulty b >= worldTDiff) $ do
-                $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
-                yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
+          (BestBlock _ _ worldTDiff) <- fmap unWorldBestBlock . lift $ Mod.get (Proxy @WorldBestBlock)
+          $logInfoS "NewSeqEvent.block" . T.pack $ "World TDiff: " ++ show worldTDiff
+          when (obTotalDifficulty b >= worldTDiff) $ do
+            $logInfoS "NewSeqEvent.block" . T.pack $
+              "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
+            yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
       OETx _ tx -> do
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
           let cId = txChainId tx
           match <- case cId of
             Nothing -> return True
-            Just cid' -> do
-              mems <- lookup (Proxy @ChainMembers) cid'
-              let pIp = readIP $ T.unpack (pPeerIp peer)
-                  ipSet = S.fromList . map ipAddress $ M.elems mems
-              return $ pIp `S.member` ipSet
+            Just cid' -> fmap (maybe False (checkPeerIsMember peer)) . lift $
+              lookup (Proxy @ChainMembers) cid'
 
           if not match
             then $logInfoS "handleEvents/OETx" $ T.pack $ "peer is not authorized for chainID " ++ show cId
@@ -384,11 +395,11 @@ handleEvents peer = awaitForever $ \case
       OENewChainMember cId _ _ -> do
         let formatted = format $ SHA cId
         $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "New member added to chain " ++ formatted
-        mems <- lookup (Proxy @ChainMembers) cId
+        mems <- lift $ lookupWithDefault (Proxy @ChainMembers) cId
         when (checkPeerIsMember peer mems) $ do
           $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
-          mems <- lookup (Proxy @ChainInfo) cId
-          for_ ((cId,) <$> mcInfo) $ yieldR . ChainDetails . (:[])
+          mcInfo <- fmap (fmap ((,) cId)) . lift $ lookup (Proxy @ChainInfo) cId
+          for_ mcInfo $ yieldR . ChainDetails . (:[])
       OEBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
@@ -403,11 +414,11 @@ handleEvents peer = awaitForever $ \case
         when ss $ do
           mrh <- gets maxReturnedHeaders
           let count = min mrh . fromIntegral $ end - start + 1
-          chain <- fmap M.toList . lookupMany (Proxy @(Canonical BlockData)) $ take count [start'..]
+          chain <- fmap M.toList . lift . lookupMany (Proxy @(Canonical BlockHeader)) $ take count [start..]
           when (null chain) $
             $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
               "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
-          let outbound = BlockHeaders . map snd $ chain
+          let outbound = BlockHeaders . map (unCanonical . snd) $ chain
           $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
           yieldR outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
@@ -440,35 +451,31 @@ handleGetChainDetails :: ( MonadIO m
                          , MonadResource m
                          , MonadState Context m
                          , MonadLogger m
-                         , IPAddress `Alters` [Word256]
-                         , Word256 `Alters` ChainMembers
-                         , Word256 `Alters` ChainInfo
+                         , (IPAddress `Alters` IPChains) m
+                         , (Word256 `Alters` ChainMembers) m
+                         , (Word256 `Alters` ChainInfo) m
                          )
                       => PPeer
-                      -> [Word256]
+                      -> IPChains
                       -> ConduitM Event (Either P2PCNC Message) m ()
 handleGetChainDetails peer cids' = do
-  cids <- case cids' of
-            [] -> lookup (Proxy @[Word256]) $ peerIPAddress peer
-            xs -> return xs
+  cids <- S.toList . unIPChains <$> if S.null $ unIPChains cids'
+            then lift . lookupWithDefault (Proxy @IPChains) $ peerIPAddress peer
+            else return cids'
   stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
-  mems <- lookupMany (Proxy @ChainMembers) cids
-  let pairs = zip cids mems
-      filteredPairs = map fst $ filter ((checkPeerIsMember peer) . snd) pairs
+  mems <- lift $ lookupMany (Proxy @ChainMembers) cids
+  let filteredPairs = M.keys $ M.filter (checkPeerIsMember peer) mems
 
   unless (null filteredPairs) $ do
-    cInfos <- lookupMany (Proxy @ChainInfo) cids
-    let finalPairs = map (fmap fromJust) . filter (isJust . snd) $ zip cids cInfos
-    yieldR $ ChainDetails finalPairs
+    cInfos <- fmap M.toList . lift $ lookupMany (Proxy @ChainInfo) cids
+    yieldR $ ChainDetails cInfos
     stampActionTimestamp
-    $logInfoS "handleGetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
-      (intercalate "\n" $ show <$> finalPairs)
+    $logInfoS "handleGetChainDetails" $ T.pack $ "the following ChainIds were returned " ++
+      (intercalate "\n" $ format . SHA . fst <$> cInfos)
 
-numFromRedis :: Maybe RedisBestBlock -> Integer
-numFromRedis = \case
-    Nothing                     -> 0
-    Just (RedisBestBlock _ n _) -> n
+numberFromBestBlock :: BestBlock -> Integer
+numberFromBestBlock (BestBlock _ n _) = n
 
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
@@ -505,9 +512,9 @@ shouldSendGossip peer txo = recordGossipFinal
 
 -- check that the peer is authorized to receive these chain details, by verifying that their
 -- IPaddress is associated with one of the Enodes in the chain's member list
-checkPeerIsMember :: PPeer -> Map Address Enode -> Bool
+checkPeerIsMember :: PPeer -> ChainMembers -> Bool
 checkPeerIsMember peer mems =
-  let ips = S.fromList . map ipAddress $ M.elems mems
+  let ips = S.fromList . map ipAddress . M.elems $ unChainMembers mems
    in S.member (peerIPAddress peer) ips
 
 peerIPAddress :: PPeer -> IPAddress
