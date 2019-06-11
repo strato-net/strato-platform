@@ -11,11 +11,13 @@ module Control.Monad.Change.Modify
   , Inputs(..)
   , inputs
   , Outputs(..)
+  , genericOutputsStringIO
   , module Data.Proxy
   ) where
 
 import           Control.Lens
 import           Control.Monad                    (void)
+import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State        (execStateT, StateT)
 import           Data.Proxy
 
@@ -67,3 +69,6 @@ inputs f = f <$> input
 
 class Outputs f a where
   output :: a -> f ()
+
+genericOutputsStringIO :: MonadIO m => String -> m ()
+genericOutputsStringIO = liftIO . putStrLn

@@ -388,7 +388,7 @@ addTransactions canCache blockData blockGas0 txs = timeit ("addTransactions, " +
     go _ [] trrs = return $ reverse trrs
     go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs = do
       flushMemAddressStateTxToBlockDB
-      flushStorageTxDBToBlockDB
+      flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction False blockData blockGas t
       afterMap <- getAddressStateTxDBMap
@@ -415,7 +415,7 @@ mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> Cont
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     flushMemAddressStateTxToBlockDB
-    flushStorageTxDBToBlockDB
+    flushMemStorageTxDBToBlockDB
     beforeMap <- getAddressStateTxDBMap
     (!time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateTxDBMap
