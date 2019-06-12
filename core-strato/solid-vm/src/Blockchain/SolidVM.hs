@@ -260,10 +260,19 @@ getCodeAndCollection address' = do
 
     return (contract', ch, cc)
 
-logFunctionCall :: Xabi.ArgList -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
+logFunctionCall :: ValList -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
 logFunctionCall args address contract functionName f = do
   onTraced $ do
-    let shownFunc = unparseExpression $ Xabi.FunctionCall (Xabi.Variable functionName) args
+    argStrings <-
+      case args of
+        OrderedVals argList -> fmap (intercalate ", ") $ forM argList showSM
+        NamedVals argMap ->
+          fmap (intercalate ", ") $ 
+          forM argMap $ \(n, v) -> do
+            valString <- showSM v
+            return $ n ++ ": " ++ valString
+        
+    let shownFunc = functionName ++ "(" ++ argStrings ++ ")"
     liftIO $ putStrLn $ box $ concat $ map (wrap 150)
       ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ shownFunc]
 
@@ -316,19 +325,25 @@ callWrapper from to mContract functionName argExps = do
   (contract', hsh, cc) <- getCodeAndCollection to
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
   initializeAction to (_contractName contract) hsh
-  logFunctionCall argExps to contract functionName $
-    case M.lookup functionName $ contract^.functions of
-      Just theFunction -> do
-        args <- argsToVals contract' theFunction argExps
-        (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args
-      _ -> do --Maybe the function is actually a getter
-        case M.lookup functionName $ contract^.storageDefs of
-          Just _ -> do
-            --TODO- this should only exist if the storage variable is declared
-            -- "public", right now I just ignore this and allow anything to be called as a getter
-            fmap Just $ getVar $ Constant $ SReference $ AddressedPath to . MS.singleton $ BC.pack functionName
-          Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
+
+  (f, args) <-
+        case M.lookup functionName $ contract^.functions of
+          Just theFunction -> do
+            args' <- argsToVals contract' theFunction argExps
+            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args'
+            return (f', args')
+          _ -> do --Maybe the function is actually a getter
+            case M.lookup functionName $ contract^.storageDefs of
+              Just _ -> do
+                --TODO- this should only exist if the storage variable is declared
+                -- "public", right now I just ignore this and allow anything to be called as a getter
+                return (fmap Just $ getVar $ Constant $ SReference $ AddressedPath to . MS.singleton $ BC.pack functionName, OrderedVals [])
+              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
+
+
+
+  logFunctionCall args to contract functionName f
 
 
 runStatements :: [Xabi.Statement] -> SM (Maybe Value)
@@ -371,6 +386,10 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" ds
 
   setVar dstVar srcVal
   
+  onTraced $ do
+    valString <- showSM srcVal
+    liftIO $ putStrLn $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
+              
   return Nothing
 
 {-  
@@ -463,6 +482,12 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
   conditionResult <- getBool =<< expToVar condition
+  
+  onTraced $ do
+    if conditionResult
+      then liftIO $ putStrLn "       if condition succeeded, running internal code"
+      else liftIO $ putStrLn "       if condition failed, skipping internal code"
+    
   if conditionResult
     then runStatements code'
     else case maybeElseCode of
@@ -1215,8 +1240,9 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
           in sortedArgs
       locals = args ++ returns
 
-  onTraced $ liftIO $ putStrLn $ "            args: " ++ show (map fst args)
-  onTraced $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
+  onTraced $ do
+    liftIO $ putStrLn $ "            args: " ++ show (map fst args)
+    when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
   localVars <- 
     forM locals $ \(n, (t, v)) -> do
