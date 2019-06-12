@@ -236,6 +236,14 @@ async function createChain(body, options) {
   return await post(url, endpoint, body, options);
 }
 
+async function pingOauth(user, options){
+  const url = getNodeUrl(options)
+  const endpoint = constructEndpoint(Endpoint.KEY, options)
+  const result = await get(url, endpoint, setAuthHeaders(user, options))
+  console.log("result", result)
+  return result
+}
+
 export default {
   getAccounts,
   getBalance,
@@ -255,5 +263,6 @@ export default {
   createKey,
   search,
   getChains,
-  createChain
-};
+  createChain,
+  pingOauth
+}
