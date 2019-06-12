@@ -2,6 +2,7 @@
 
 exports[`WalkThrough: index changing steps step 1: renders createUser 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <WalkThrough
     currentUser={
@@ -218,27 +219,16 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
 exports[`WalkThrough: index changing steps step 2: renders verifyAccount 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <WalkThrough
     currentUser={
@@ -455,27 +445,16 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
 exports[`WalkThrough: index changing steps step 3: renders create password 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <WalkThrough
     currentUser={
@@ -693,27 +672,16 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
 exports[`WalkThrough: index changing steps step 3: renders password creation successful 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <WalkThrough
     currentUser={
@@ -948,27 +916,16 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
 exports[`WalkThrough: index changing steps step 4: renders CLI 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <WalkThrough
     currentUser={
@@ -1203,22 +1160,10 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
@@ -1236,6 +1181,7 @@ Object {
 
 exports[`WalkThrough: index render component when modal is closed 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <WalkThrough
     isWalkThroughOpen={false}
@@ -1445,27 +1391,16 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
 exports[`WalkThrough: index render component when modal is open 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <WalkThrough
     isWalkThroughOpen={true}
@@ -1675,21 +1610,9 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;

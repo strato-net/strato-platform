@@ -58,6 +58,7 @@ exports[`Applications: index component with (enterprise mode) without values 1`]
 
 exports[`Applications: index component with (public mode) application data 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <Applications
     applications={
@@ -406,22 +407,10 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
@@ -474,6 +463,7 @@ exports[`Applications: index component with (public mode) without values 1`] = `
 
 exports[`Applications: index componentWillUnmount 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <Applications
     applications={
@@ -822,22 +812,10 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 

@@ -3163,6 +3163,7 @@ exports[`ContractQuery: index Table:  render with TruncatedFormat column 3`] = `
 
 exports[`ContractQuery: index componentWillReceiveProps:  invoke with falsy statement 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <ContractQuery
     addQueryFilter={[Function]}
@@ -6475,27 +6476,16 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
 exports[`ContractQuery: index componentWillReceiveProps:  invoke with truthy statement 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <ContractQuery
     addQueryFilter={[Function]}
@@ -9809,22 +9799,10 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
@@ -9941,6 +9919,7 @@ Object {
 
 exports[`ContractQuery: index renders with empty values 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <ContractQuery
     addQueryFilter={[Function]}
@@ -12190,27 +12169,16 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
 exports[`ContractQuery: index renders with query result, vars and filter tags 1`] = `
 ShallowWrapper {
+  "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <ContractQuery
     addQueryFilter={[Function]}
@@ -15648,22 +15616,10 @@ ShallowWrapper {
   Symbol(enzyme.__options__): Object {
     "adapter": ReactFifteenAdapter {
       "options": Object {
-        "legacyContextMode": "parent",
-        "lifecycles": Object {
-          "componentDidUpdate": Object {
-            "prevContext": true,
-          },
-          "getChildContext": Object {
-            "calledByRenderer": true,
-          },
-        },
         "supportPrevContextArgumentOfComponentDidUpdate": true,
       },
     },
-    Symbol(enzyme.__providerValues__): undefined,
   },
-  Symbol(enzyme.__providerValues__): Map {},
-  Symbol(enzyme.__childContext__): null,
 }
 `;
 
