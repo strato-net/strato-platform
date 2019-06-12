@@ -64,9 +64,6 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Util
 
-newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: SHA }
-newtype BestBlockNumber = BestBlockNumber Integer
-
 ethVersion :: Int
 ethVersion = 62
 {-# INLINE ethVersion #-}

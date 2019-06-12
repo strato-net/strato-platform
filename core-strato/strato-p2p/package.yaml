@@ -12,6 +12,7 @@ description:
 github: blockapps/strato-platform/core-strato/strato-p2p
 
 dependencies:
+  - ansi-wl-pprint
   - array
   - async
   - base >= 4 && < 5
@@ -20,7 +21,10 @@ dependencies:
   - aeson
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-haskoin
+  - blockapps-milena
   - blockapps-util
+  - blockstanbul
   - bytestring
   - classy-prelude
   - conduit
@@ -31,6 +35,7 @@ dependencies:
   - cryptohash
   - crypto-pubkey
   - crypto-pubkey-types
+  - data-default
   - dns
   - either
   - esqueleto
@@ -40,17 +45,17 @@ dependencies:
   - exceptions
   - format
   - ghc
-  - blockapps-haskoin
+  - hedis
   - hflags
   - iproute
   - json-rpc-server
   - json-rpc-client
   - lens
+  - lifted-async
   - lifted-base
   - monad-alter
   - monad-control
   - monadIO
-  - blockapps-milena
   - mtl
   - network
   - persistent
@@ -58,28 +63,23 @@ dependencies:
   - random
   - resourcet
   - SafeSemaphore
+  - seqevents
   - split
   - stm
   - stm-conduit
   - streaming-commons
   - strato-conf
-  - these
+  - strato-model
+  - strato-redis-blockdb
   - text
+  - these
   - time
   - transformers
   - transformers-base
+  - unliftio
+  - unliftio-core
   - wai-middleware-prometheus
   - warp
-  - ansi-wl-pprint
-  - strato-conf
-  - seqevents
-  - strato-model
-  - strato-redis-blockdb
-  - hedis
-  - lifted-async
-  - blockstanbul
-  - unliftio-core
-  - unliftio
 
 ghc-options: -Wall -threaded
 

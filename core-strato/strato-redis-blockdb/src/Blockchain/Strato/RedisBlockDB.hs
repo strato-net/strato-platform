@@ -24,7 +24,8 @@ module Blockchain.Strato.RedisBlockDB
     , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
     , getChildren
     , getGenesisHash
-    , putHeader, putHeaders, putBlock, putBlocks
+    , putHeader, putHeaders, insertHeader, insertHeaders, deleteHeader, deleteHeaders
+    , putBlock, putBlocks, insertBlock, insertBlocks, deleteBlock, deleteBlocks
     , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo
     , withRedisBlockDB
     , commonAncestorHelper
@@ -434,9 +435,19 @@ getBlocksByNumbers = zipMapM getBlocksByNumber
 putHeader :: (BlockHeaderLike h)
           => h
           -> Redis (Either Reply Status)
-putHeader h = do
-    let sha       = blockHeaderHash h
-        parent    = blockHeaderParentHash h
+putHeader = uncurry insertHeader . (blockHeaderHash &&& id)
+
+putHeaders :: (Traversable f, BlockHeaderLike h)
+           => f h
+           -> Redis (f (Either Reply Status))
+putHeaders = mapM putHeader
+
+insertHeader :: (BlockHeaderLike h)
+          => SHA
+          -> h
+          -> Redis (Either Reply Status)
+insertHeader sha h = do
+    let parent    = blockHeaderParentHash h
         number'    = blockHeaderBlockNumber h
         storeHead = morphBlockHeader h :: RedisHeader
         inNS'     = flip inNamespace sha
@@ -448,20 +459,41 @@ putHeader h = do
         sadd (inNamespace Numbers number') [toValue sha]
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Error" ++ e)
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Error" ++ e)
 
-putHeaders :: (Traversable f, BlockHeaderLike h)
-           => f h
+insertHeaders :: BlockHeaderLike h
+           => M.Map SHA h
+           -> Redis (M.Map SHA (Either Reply Status))
+insertHeaders = sequenceA . M.mapWithKey insertHeader
+
+deleteHeader :: SHA
+             -> Redis (Either Reply Status)
+deleteHeader _ = pure . Left $ SingleLine (S8.pack $ "deleteHeader - Not Implemented")
+
+deleteHeaders :: Traversable f
+           => f SHA
            -> Redis (f (Either Reply Status))
-putHeaders = mapM putHeader
+deleteHeaders = mapM deleteHeader
 
 putBlock :: (BlockLike h t b)
          => b
          -> Redis (Either Reply Status)
-putBlock b = do
+putBlock b =
     let sha     = blockHash b
-        header  = blockHeader b
+     in insertBlock sha b
+
+putBlocks :: (Traversable f, BlockLike h t b)
+          => f b
+          -> Redis (f (Either Reply Status))
+putBlocks = mapM putBlock
+
+insertBlock :: (BlockLike h t b)
+            => SHA
+            -> b
+            -> Redis (Either Reply Status)
+insertBlock sha b = do
+    let header  = blockHeader b
         number' = blockHeaderBlockNumber header
         parent  = blockHeaderParentHash header
         header' = morphBlockHeader header :: RedisHeader
@@ -490,10 +522,19 @@ putBlock b = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack e)
 
-putBlocks :: (Traversable f, BlockLike h t b)
-          => f b
-          -> Redis (f (Either Reply Status))
-putBlocks = mapM putBlock
+insertBlocks :: BlockLike h t b
+          => M.Map SHA b
+          -> Redis (M.Map SHA (Either Reply Status))
+insertBlocks = sequenceA . M.mapWithKey insertBlock
+
+deleteBlock :: SHA
+             -> Redis (Either Reply Status)
+deleteBlock _ = pure . Left $ SingleLine (S8.pack $ "deleteBlock - Not Implemented")
+
+deleteBlocks :: Traversable f
+           => f SHA
+           -> Redis (f (Either Reply Status))
+deleteBlocks = mapM deleteBlock
 
 putBestBlockInfo :: SHA
                  -> Integer

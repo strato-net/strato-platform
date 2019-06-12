@@ -52,9 +52,9 @@ data Enode = Enode
   , udpPort    :: Maybe Int
   } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary)
 
-newtype ChainMembers = ChainMembers { unChainMembers :: M.Map Address Enode }
-newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [SHA] }
-newtype IPChains = IPChains { unIPChains :: S.Set Word256 }
+newtype ChainMembers = ChainMembers { unChainMembers :: M.Map Address Enode } deriving (Eq)
+newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [SHA] } deriving (Eq)
+newtype IPChains = IPChains { unIPChains :: S.Set Word256 } deriving (Eq)
 
 instance Default ChainMembers    where def = ChainMembers M.empty
 instance Default ChainTxsInBlock where def = ChainTxsInBlock M.empty

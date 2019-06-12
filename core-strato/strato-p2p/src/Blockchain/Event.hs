@@ -124,13 +124,13 @@ handleEvents :: ( MonadIO m
                 , (SHA `Alters` BlockData) m
                 , Modifiable BestBlock m
                 , Modifiable WorldBestBlock m
-                , (Integer `Alters` Canonical BlockHeader) m
+                , (Integer `Selectable` Canonical BlockHeader) m
                 , (SHA `Alters` BlockHeader) m
-                , (IPAddress `Alters` IPChains) m
-                , (SHA `Alters` ChainTxsInBlock) m
-                , (Word256 `Alters` ChainMembers) m
-                , (Word256 `Alters` ChainInfo) m
-                , (SHA `Alters` Private Transaction) m
+                , (IPAddress `Selectable` IPChains) m
+                , (SHA `Selectable` ChainTxsInBlock) m
+                , (Word256 `Selectable` ChainMembers) m
+                , (Word256 `Selectable` ChainInfo) m
+                , (SHA `Selectable` Private Transaction) m
                 , (SHA `Alters` Block) m
                 ) => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
@@ -152,11 +152,6 @@ handleEvents peer = awaitForever $ \case
         let parentHash' = blockHeaderParentHash header
         lift . Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $
           BestBlock sha num tdiff
-        --eResult <- RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo sha num tdiff)
-        --case eResult of
-        --  Left  _     -> $logInfoS "handleEvents/NewBlock" $ T.pack "Failed to update WorldBestBlockInfo"
-        --  Right False -> $logInfoS "handleEvents/NewBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
-        --  Right True  -> do
         parentHeader <- lift $ lookup (Proxy @BlockData) parentHash'
         case parentHeader of
           Nothing -> do
@@ -285,8 +280,8 @@ handleEvents peer = awaitForever $ \case
               getUntilMissing (h:hs) bodies pshas = lookup (Proxy @Block) h >>= \case
                   Nothing   -> return (bodies, pshas)
                   Just body -> do
-                    cIdTxsMap <- unChainTxsInBlock <$> lookupWithDefault (Proxy @ChainTxsInBlock) h
-                    mems <- lookupMany (Proxy @ChainMembers) $ M.keys cIdTxsMap
+                    cIdTxsMap <- unChainTxsInBlock <$> selectWithDefault (Proxy @ChainTxsInBlock) h
+                    mems <- selectMany (Proxy @ChainMembers) $ M.keys cIdTxsMap
                     let whenMissing f = WhenMissing (pure . M.map f) (\_ x -> (pure . Just $ f x))
                     let trMems = merge (whenMissing This)
                                        (whenMissing That)
@@ -343,8 +338,8 @@ handleEvents peer = awaitForever $ \case
       stampActionTimestamp
       $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: "
         ++ (intercalate "\n" (show <$> trHashes))
-      ptrs <- fmap (map unPrivate . M.elems) . lift $ lookupMany (Proxy @(Private Transaction)) trHashes
-      mems <- lift . lookupMany (Proxy @ChainMembers) $ map (fromJust . txChainId) ptrs
+      ptrs <- fmap (map unPrivate . M.elems) . lift $ selectMany (Proxy @(Private Transaction)) trHashes
+      mems <- lift . selectMany (Proxy @ChainMembers) $ map (fromJust . txChainId) ptrs
       let isMember tx = maybe False (checkPeerIsMember peer)
                       $ flip M.lookup mems
                       =<< txChainId tx
@@ -369,7 +364,7 @@ handleEvents peer = awaitForever $ \case
           match <- case cId of
             Nothing -> return True
             Just cid' -> fmap (maybe False (checkPeerIsMember peer)) . lift $
-              lookup (Proxy @ChainMembers) cid'
+              select (Proxy @ChainMembers) cid'
 
           if not match
             then $logInfoS "handleEvents/OETx" $ T.pack $ "peer is not authorized for chainID " ++ show cId
@@ -395,10 +390,10 @@ handleEvents peer = awaitForever $ \case
       OENewChainMember cId _ _ -> do
         let formatted = format $ SHA cId
         $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "New member added to chain " ++ formatted
-        mems <- lift $ lookupWithDefault (Proxy @ChainMembers) cId
+        mems <- lift $ selectWithDefault (Proxy @ChainMembers) cId
         when (checkPeerIsMember peer mems) $ do
           $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
-          mcInfo <- fmap (fmap ((,) cId)) . lift $ lookup (Proxy @ChainInfo) cId
+          mcInfo <- fmap (fmap ((,) cId)) . lift $ select (Proxy @ChainInfo) cId
           for_ mcInfo $ yieldR . ChainDetails . (:[])
       OEBlockstanbul msg -> do
         let outbound = Blockstanbul msg
@@ -414,7 +409,7 @@ handleEvents peer = awaitForever $ \case
         when ss $ do
           mrh <- gets maxReturnedHeaders
           let count = min mrh . fromIntegral $ end - start + 1
-          chain <- fmap M.toList . lift . lookupMany (Proxy @(Canonical BlockHeader)) $ take count [start..]
+          chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start..]
           when (null chain) $
             $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
               "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
@@ -451,24 +446,24 @@ handleGetChainDetails :: ( MonadIO m
                          , MonadResource m
                          , MonadState Context m
                          , MonadLogger m
-                         , (IPAddress `Alters` IPChains) m
-                         , (Word256 `Alters` ChainMembers) m
-                         , (Word256 `Alters` ChainInfo) m
+                         , (IPAddress `Selectable` IPChains) m
+                         , (Word256 `Selectable` ChainMembers) m
+                         , (Word256 `Selectable` ChainInfo) m
                          )
                       => PPeer
                       -> IPChains
                       -> ConduitM Event (Either P2PCNC Message) m ()
 handleGetChainDetails peer cids' = do
   cids <- S.toList . unIPChains <$> if S.null $ unIPChains cids'
-            then lift . lookupWithDefault (Proxy @IPChains) $ peerIPAddress peer
+            then lift . selectWithDefault (Proxy @IPChains) $ peerIPAddress peer
             else return cids'
   stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
-  mems <- lift $ lookupMany (Proxy @ChainMembers) cids
+  mems <- lift $ selectMany (Proxy @ChainMembers) cids
   let filteredPairs = M.keys $ M.filter (checkPeerIsMember peer) mems
 
   unless (null filteredPairs) $ do
-    cInfos <- fmap M.toList . lift $ lookupMany (Proxy @ChainInfo) cids
+    cInfos <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) cids
     yieldR $ ChainDetails cInfos
     stampActionTimestamp
     $logInfoS "handleGetChainDetails" $ T.pack $ "the following ChainIds were returned " ++

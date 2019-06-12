@@ -14,6 +14,8 @@ module Blockchain.Context
     ( Context(..)
     , Config(..)
     , ContextM
+    , GenesisBlockHash(..)
+    , BestBlockNumber(..)
     , initContext
     , runContextM
     , getDebugMsg
@@ -35,30 +37,49 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Lens                          hiding (Context)
+import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Data.Default
+import qualified Data.Map.Strict                       as M
+import           Data.Maybe
+import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
+import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Enode
+import           Blockchain.Data.TransactionDef
+import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import           Blockchain.ExtWord
 import           Blockchain.Options
 import           Blockchain.Sequencer.Event            (IngestEvent (..))
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, HasUnseqSink(..))
 
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Stream.VMEvent             (HasVMEventsSink(..), VMEvent, produceVMEventsM)
+import           Blockchain.Strato.Model.SHA
+import           Blockchain.Stream.VMEvent             ( HasVMEventsSink(..)
+                                                       , VMEvent
+                                                       , getBestKafkaBlockNumber
+                                                       , produceVMEventsM
+                                                       )
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
+import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
+import           Blockchain.Util                       (toMaybe)
 
 newtype Config = Config { configSQLDB :: SQLDB }
 
@@ -78,33 +99,95 @@ data Context = Context
 
 makeLenses ''Context
 
+newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: SHA }
+newtype BestBlockNumber = BestBlockNumber { unBestBlockNumber :: Integer }
+
 type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 
---handleMsgServerConduit :: ( MonadIO m
---                          , MonadResource m
---                          , MonadLogger m
---                          , Mod.Accessible (SK.UnseqSink m) m
---                          , MonadState Context m
---                          , Mod.Modifiable K.KafkaState m
---                          , (SHA `A.Alters` BlockData) m
---                          , Mod.Modifiable BestBlock m
---                          , Mod.Modifiable WorldBestBlock m
---                          , (Integer `A.Alters` Canonical BlockHeader) m
---                          , (SHA `A.Alters` BlockHeader) m
---                          , (IPAddress `A.Alters` IPChains) m
---                          , (SHA `A.Alters` ChainTxsInBlock) m
---                          , (Word256 `A.Alters` ChainMembers) m
---                          , (Word256 `A.Alters` ChainInfo) m
---                          , (SHA `A.Alters` Private Transaction) m
---                          , (SHA `A.Alters` Block) m
---                          , Mod.Accessible GenesisBlockHash m
---                          )
+instance (SHA `A.Alters` BlockData) ContextM where
+  lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
+  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
+  delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
+  lookupMany _ = fmap (M.fromList . catMaybes . map sequenceA)
+               . RBDB.withRedisBlockDB . RBDB.getHeaders
+  insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertHeaders
+  deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeaders
+
+instance Mod.Modifiable WorldBestBlock ContextM where
+  get _ = RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
+    Nothing -> WorldBestBlock $ BestBlock (SHA 0) (-1) 0
+    Just (RedisBestBlock s n d) -> WorldBestBlock $ BestBlock s n d
+  put _ (WorldBestBlock (BestBlock s n d)) =
+    RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n d) >>= \case
+      Left  _ -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "Failed to update WorldBestBlockInfo"
+      Right False -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
+      Right True  -> return ()
+
+instance Mod.Modifiable BestBlock ContextM where
+  get _ = RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
+    Nothing -> BestBlock (SHA 0) (-1) 0
+    Just (RedisBestBlock s n d) -> BestBlock s n d
+  put _ (BestBlock s n d) =
+    RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n d) >>= \case
+      Left  _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
+      Right _ -> return ()
+
+instance A.Selectable Integer (Canonical BlockHeader) ContextM where
+  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
+
+instance (SHA `A.Alters` BlockHeader) ContextM where
+  lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
+  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
+  delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
+  lookupMany _ = fmap (M.fromList . catMaybes . map sequenceA)
+               . RBDB.withRedisBlockDB . RBDB.getHeaders
+  insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertHeaders
+  deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeaders
+
+instance A.Selectable IPAddress IPChains ContextM where
+  select p ip = A.selectWithDefault p ip <&> toMaybe def
+  selectWithDefault _ = fmap (IPChains . S.fromList)
+                      . RBDB.withRedisBlockDB
+                      . RBDB.getIPChains
+
+instance A.Selectable SHA ChainTxsInBlock ContextM where
+  select p sha = A.selectWithDefault p sha <&> toMaybe def
+  selectWithDefault _ = fmap ChainTxsInBlock
+                      . RBDB.withRedisBlockDB
+                      . RBDB.getChainTxsInBlock
+
+instance A.Selectable Word256 ChainMembers ContextM where
+  select p cid = A.selectWithDefault p cid <&> toMaybe def
+  selectWithDefault _ = fmap ChainMembers
+                      . RBDB.withRedisBlockDB
+                      . RBDB.getChainMembers
+
+instance A.Selectable Word256 ChainInfo ContextM where
+  select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
+
+instance A.Selectable SHA (Private Transaction) ContextM where
+  select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
+
+instance (SHA `A.Alters` Block) ContextM where
+  lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
+  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
+  delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteBlock
+  lookupMany _ = fmap (M.fromList . catMaybes . map sequenceA)
+               . RBDB.withRedisBlockDB . RBDB.getBlocks
+  insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
+  deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
+
+instance Mod.Accessible GenesisBlockHash ContextM where
+  access _ = GenesisBlockHash <$> runWithSQL getGenesisBlockHash
+
+instance Mod.Accessible BestBlockNumber ContextM where
+  access _ = BestBlockNumber <$> liftIO getBestKafkaBlockNumber
 
 instance Monad m => Mod.Modifiable K.KafkaState (StateT Context m) where
   get _   = gets contextKafkaState
-  put _ k = get >>= \c -> put c{contextKafkaState = k}
+  put _ k = modify $ \c -> c{contextKafkaState = k}
 
-instance MonadState Context m => Mod.Accessible RBDB.RedisConnection m where
+instance Mod.Accessible RBDB.RedisConnection ContextM where
   access _ = gets contextRedisBlockDB
 
 instance (MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
