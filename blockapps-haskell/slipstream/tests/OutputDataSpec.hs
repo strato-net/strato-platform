@@ -142,7 +142,7 @@ spec = do
             }]
       g <- newGlobals fakeHandle
       addToHistoryList g cHash
-      [contractInsert, vehicleCreate, historyCreate, vehicleInsert, historyInsert]
+      [contractInsert, vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
         <- runLoggingT . runConduit $ createInserts g input .| sinkList
 
       contractInsert `shouldBe`
@@ -167,15 +167,20 @@ spec = do
   PRIMARY KEY (address, "chainId") );|]
 
       historyCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "history@Vehicle" (address text,
-    "chainId" text,
-    block_hash text,
+          [r|CREATE TABLE IF NOT EXISTS "history@Vehicle" (address text NOT NULL,
+    "chainId" text NOT NULL,
+    block_hash text NOT NULL,
     block_timestamp text,
     block_number text,
-    transaction_hash text,
+    transaction_hash text NOT NULL,
     transaction_sender text,
     transaction_function_name text,
     "owners" jsonb);|]
+
+      historyIndex `shouldBe`
+          [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle"
+  ON "history@Vehicle" (address, "chainId", block_hash, transaction_hash);
+ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle";|]
 
       vehicleInsert `shouldBe`
           [r|INSERT INTO "Vehicle" ("address",
@@ -225,7 +230,8 @@ spec = do
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add',
     '',
-    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]');|]
+    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
+  ON CONFLICT DO NOTHING;|]
 
   describe "String escaping" $ do
     it "should create JSON entries with quotes escaped" $ do
