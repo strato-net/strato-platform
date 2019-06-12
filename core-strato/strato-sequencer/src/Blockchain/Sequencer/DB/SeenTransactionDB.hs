@@ -17,38 +17,15 @@ import qualified Data.Sequence                as Q
 import qualified Data.Set                     as S
 import           Prelude                      hiding (and, or, not, lookup)
 
-type One = ()
+fromBool :: Bool -> Maybe ()
+fromBool b = if b then Just () else Nothing
 
-one :: One
-one = ()
-
-type Boolean = Maybe One
-
-true :: Boolean
-true = Just one
-
-false :: Boolean
-false = Nothing
-
---and :: Boolean -> Boolean -> Boolean
---and = liftA2 const
---
---or :: Boolean -> Boolean -> Boolean
---or = (<|>)
---
---not :: Boolean -> Boolean
---not = maybe true $ const false
-
-boolean :: Maybe a -> Boolean
-boolean = fmap $ const one
-
-fromBool :: Bool -> Boolean
-fromBool b = if b then true else false
-
-toBool :: Boolean -> Bool
+toBool :: Maybe () -> Bool
 toBool = maybe False $ const True
 
-type HasSeenTransactionDB = SHA `Alters` One
+-- TODO: Although this is correct, it looks and feels a little awkward.
+--       Perhaps there could be a better class for Set-like contexts.
+type HasSeenTransactionDB = SHA `Alters` ()
 
 data SeenTransactionDB = SeenTransactionDB
   { _size       :: Int
@@ -66,10 +43,10 @@ mkSeenTxDB dbSize = SeenTransactionDB
   , _seen       = S.empty
   }
 
-genericLookupSeenTransactionDB :: Modifiable SeenTransactionDB m => SHA -> m Boolean
+genericLookupSeenTransactionDB :: Modifiable SeenTransactionDB m => SHA -> m (Maybe ())
 genericLookupSeenTransactionDB sha = fromBool . S.member sha . _seen <$> get Proxy
 
-genericInsertSeenTransactionDB :: Modifiable SeenTransactionDB m => SHA -> One -> m ()
+genericInsertSeenTransactionDB :: Modifiable SeenTransactionDB m => SHA -> () -> m ()
 genericInsertSeenTransactionDB sha = const $ modify_ Proxy $ pure . witnessTransactionHash' sha
 
 genericDeleteSeenTransactionDB :: Modifiable SeenTransactionDB m => SHA -> m ()
@@ -82,10 +59,10 @@ wasTransactionWitnessed :: (Witnessable t, HasSeenTransactionDB m) => t -> m Boo
 wasTransactionWitnessed = fmap toBool . lookup Proxy . witnessableHash
 
 witnessTransaction :: (Witnessable t, HasSeenTransactionDB m) => t -> m ()
-witnessTransaction t = insert Proxy (witnessableHash t) one
+witnessTransaction t = insert Proxy (witnessableHash t) ()
 
 witnessTransactionHash :: HasSeenTransactionDB m => SHA -> m ()
-witnessTransactionHash sha = insert Proxy sha one
+witnessTransactionHash sha = insert Proxy sha ()
 
 witnessTransactionHash' :: SHA -> SeenTransactionDB -> SeenTransactionDB
 witnessTransactionHash' sha stxdb =

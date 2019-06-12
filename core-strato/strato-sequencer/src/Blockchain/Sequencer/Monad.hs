@@ -172,7 +172,7 @@ instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = assign seenTransactionDB
 
-instance (SHA `A.Alters` One) SequencerM where
+instance (SHA `A.Alters` ()) SequencerM where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
   delete _ = genericDeleteSeenTransactionDB
