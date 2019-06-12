@@ -60,7 +60,7 @@ import           Text.Format
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
 -- replace with this when debugging tests
--- logFF str msg = void . return $! traceShowId $! trace (T.unpack str) msg
+--logFF str msg = void . return $! traceShowId $! trace (T.unpack str) msg
 
 sequencer :: SequencerM ()
 sequencer = do
@@ -92,7 +92,10 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   return src'
 
 clearAll :: SequencerM ()
-clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
+clearAll = clearDBERegistry
+        >> clearLdbBatchOps
+        >> clearGetChainsDB
+        >> clearGetTransactionsDB
 
 readEventsInBufferedWindow :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (SealedConduitT () SeqLoopEvent SequencerM (), [SeqLoopEvent])
 readEventsInBufferedWindow src = do

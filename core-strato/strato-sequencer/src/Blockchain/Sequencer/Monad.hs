@@ -18,6 +18,7 @@ module Blockchain.Sequencer.Monad (
   , addLdbBatchOps
   , drainP2P
   , drainVM
+  , clearDBERegistry
   , createFirstTimer
   , createNewTimer
   , drainTMChan
@@ -74,6 +75,7 @@ import qualified Database.LevelDB                          as LDB
 data SequencerContext = SequencerContext
   { _dependentBlockDB    :: DependentBlockDB
   , _seenTransactionDB   :: SeenTransactionDB
+  , _dbeRegistry         :: Map SHA DependentBlockEntry
   , _blockHashRegistry   :: Map SHA OutputBlock
   , _txHashRegistry      :: Map SHA OutputTx
   , _chainHashRegistry   :: Map SHA ChainHashEntry
@@ -154,9 +156,17 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
   delete _ cid     = chainIdRegistry . at cid .= Nothing
 
 instance (SHA `A.Alters` DependentBlockEntry) SequencerM where
-  lookup _ = genericLookupDependentBlockDB
-  insert _ k v = addLdbBatchOps . (:[]) $ genericBatchInsertDependentBlockDB k v
-  delete _ = addLdbBatchOps . (:[]) . genericBatchDeleteDependentBlockDB
+  lookup _ k = do
+    mv <- use $ dbeRegistry . at k
+    case mv of
+      Just v -> return $ Just v
+      Nothing -> genericLookupDependentBlockDB k
+  insert _ k v = do
+    dbeRegistry . at k ?= v
+    addLdbBatchOps . (:[]) $ genericBatchInsertDependentBlockDB k v
+  delete _ k = do
+    dbeRegistry . at k .= Nothing
+    addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
@@ -184,6 +194,7 @@ runSequencerM c mbc m = do
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenTransactionDB   = mkSeenTxDB stxSize
+            , _dbeRegistry         = M.empty
             , _blockHashRegistry   = M.empty
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
@@ -213,6 +224,9 @@ drainP2P = fmap toList $ p2pEvents <<.= Q.empty
 
 drainVM :: SequencerM [OutputEvent]
 drainVM = fmap toList $ vmEvents <<.= Q.empty
+
+clearDBERegistry :: SequencerM ()
+clearDBERegistry = dbeRegistry .= M.empty
 
 createFirstTimer :: SequencerM ()
 createFirstTimer = do
