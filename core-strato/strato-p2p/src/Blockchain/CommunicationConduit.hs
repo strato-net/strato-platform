@@ -135,13 +135,13 @@ handleMsgClientConduit :: ( MonadIO m
                           , (SHA `A.Alters` BlockData) m
                           , Mod.Modifiable BestBlock m
                           , Mod.Modifiable WorldBestBlock m
-                          , (Integer `A.Alters` Canonical BlockHeader) m
+                          , (Integer `A.Selectable` Canonical BlockHeader) m
                           , (SHA `A.Alters` BlockHeader) m
-                          , (IPAddress `A.Alters` IPChains) m
-                          , (SHA `A.Alters` ChainTxsInBlock) m
-                          , (Word256 `A.Alters` ChainMembers) m
-                          , (Word256 `A.Alters` ChainInfo) m
-                          , (SHA `A.Alters` Private Transaction) m
+                          , (IPAddress `A.Selectable` IPChains) m
+                          , (SHA `A.Selectable` ChainTxsInBlock) m
+                          , (Word256 `A.Selectable` ChainMembers) m
+                          , (Word256 `A.Selectable` ChainInfo) m
+                          , (SHA `A.Selectable` Private Transaction) m
                           , (SHA `A.Alters` Block) m
                           , Mod.Accessible GenesisBlockHash m
                           , Mod.Accessible BestBlockNumber m
@@ -163,7 +163,7 @@ handleMsgClientConduit myId peer = do
     awaitMsg >>= \case
         Just Hello{} ->
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
-              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash) -- . runWithSQL $ getGenesisBlockHash
+              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               return $ Right Status {
                   protocolVersion = fromIntegral ethVersion,
                   networkID       = computeNetworkID,
@@ -174,11 +174,11 @@ handleMsgClientConduit myId peer = do
         other -> assertHandshake other
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
-                genHash <- fmap unGenesisBlockHash . lift $ Mod.access (Mod.Proxy @GenesisBlockHash) -- . runWithSQL $ getGenesisBlockHash
+                genHash <- fmap unGenesisBlockHash . lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-                (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber) -- liftIO getBestKafkaBlockNumber
+                (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
                 Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
                 mrh <- gets maxReturnedHeaders
                 yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
@@ -197,13 +197,13 @@ handleMsgServerConduit :: ( MonadIO m
                           , (SHA `A.Alters` BlockData) m
                           , Mod.Modifiable BestBlock m
                           , Mod.Modifiable WorldBestBlock m
-                          , (Integer `A.Alters` Canonical BlockHeader) m
+                          , (Integer `A.Selectable` Canonical BlockHeader) m
                           , (SHA `A.Alters` BlockHeader) m
-                          , (IPAddress `A.Alters` IPChains) m
-                          , (SHA `A.Alters` ChainTxsInBlock) m
-                          , (Word256 `A.Alters` ChainMembers) m
-                          , (Word256 `A.Alters` ChainInfo) m
-                          , (SHA `A.Alters` Private Transaction) m
+                          , (IPAddress `A.Selectable` IPChains) m
+                          , (SHA `A.Selectable` ChainTxsInBlock) m
+                          , (Word256 `A.Selectable` ChainMembers) m
+                          , (Word256 `A.Selectable` ChainInfo) m
+                          , (SHA `A.Selectable` Private Transaction) m
                           , (SHA `A.Alters` Block) m
                           , Mod.Accessible GenesisBlockHash m
                           )
@@ -227,8 +227,8 @@ handleMsgServerConduit myPubkey peer = do
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
-            yield =<< lift (Mod.get (A.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
-              genHash <- unGenesisBlockHash <$> Mod.access (Mod.Proxy @GenesisBlockHash) -- . runWithSQL $ getGenesisBlockHash
+            yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
+              genHash <- unGenesisBlockHash <$> Mod.access (Mod.Proxy @GenesisBlockHash)
               when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
               -- we set to 0 cause we dont necessarily know the number yet
               Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD

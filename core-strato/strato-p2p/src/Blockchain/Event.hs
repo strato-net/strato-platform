@@ -183,7 +183,7 @@ handleEvents peer = awaitForever $ \case
       -- 3/4s of the blocks will be dropped when creating the blockheaders
       -- so we overcompensate here.
       let count = (1 + skip') * max mrh max'
-      chain <- fmap M.toList . lift . lookupMany (Proxy @(Canonical BlockHeader)) $ take count [start'..]
+      chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start'..]
       when (null chain) $
         $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $
             ["Warning: A peer requested blocks starting at #"
@@ -205,7 +205,7 @@ handleEvents peer = awaitForever $ \case
             Forward -> return num
           mrh <- gets maxReturnedHeaders
           let count = (1 + skip') * min mrh (fromIntegral num)
-          chain <- fmap M.toList . lift . lookupMany (Proxy @(Canonical BlockHeader)) $ take count [start'..]
+          chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start'..]
           yieldR . BlockHeaders . skipEntries skip' $ unCanonical . snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
@@ -269,10 +269,10 @@ handleEvents peer = awaitForever $ \case
       let shas = take mrh shas'
       lift (getUntilMissing shas [] []) >>= (\(bodies, pshas) -> do
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
-          ptxs <- fmap M.elems . lift $ lookupMany (Proxy @(Private Transaction)) pshas
+          ptxs <- fmap M.elems . lift $ selectMany (Proxy @(Private Transaction)) pshas
           unless (null ptxs) . yieldR $ Transactions $ unPrivate <$> ptxs)
-        where getUntilMissing :: ( (SHA `Alters` ChainTxsInBlock) m
-                                 , (Word256 `Alters` ChainMembers) m
+        where getUntilMissing :: ( (SHA `Selectable` ChainTxsInBlock) m
+                                 , (Word256 `Selectable` ChainMembers) m
                                  , (SHA `Alters` Block) m
                                  )
                               => [SHA] -> [Block] -> [SHA] -> m ([Block],[SHA])

@@ -104,7 +104,7 @@ newtype BestBlockNumber = BestBlockNumber { unBestBlockNumber :: Integer }
 
 type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 
-instance (SHA `A.Alters` BlockData) ContextM where
+instance MonadIO m => (SHA `A.Alters` BlockData) (StateT Context m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
   delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
@@ -113,7 +113,7 @@ instance (SHA `A.Alters` BlockData) ContextM where
   insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertHeaders
   deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeaders
 
-instance Mod.Modifiable WorldBestBlock ContextM where
+instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (StateT Context m) where
   get _ = RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
     Nothing -> WorldBestBlock $ BestBlock (SHA 0) (-1) 0
     Just (RedisBestBlock s n d) -> WorldBestBlock $ BestBlock s n d
@@ -123,7 +123,7 @@ instance Mod.Modifiable WorldBestBlock ContextM where
       Right False -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
       Right True  -> return ()
 
-instance Mod.Modifiable BestBlock ContextM where
+instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (StateT Context m) where
   get _ = RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
     Nothing -> BestBlock (SHA 0) (-1) 0
     Just (RedisBestBlock s n d) -> BestBlock s n d
@@ -132,10 +132,10 @@ instance Mod.Modifiable BestBlock ContextM where
       Left  _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
       Right _ -> return ()
 
-instance A.Selectable Integer (Canonical BlockHeader) ContextM where
+instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (StateT Context m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
 
-instance (SHA `A.Alters` BlockHeader) ContextM where
+instance MonadIO m => (SHA `A.Alters` BlockHeader) (StateT Context m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
   delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
@@ -144,31 +144,31 @@ instance (SHA `A.Alters` BlockHeader) ContextM where
   insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertHeaders
   deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeaders
 
-instance A.Selectable IPAddress IPChains ContextM where
+instance MonadIO m => A.Selectable IPAddress IPChains (StateT Context m) where
   select p ip = A.selectWithDefault p ip <&> toMaybe def
   selectWithDefault _ = fmap (IPChains . S.fromList)
                       . RBDB.withRedisBlockDB
                       . RBDB.getIPChains
 
-instance A.Selectable SHA ChainTxsInBlock ContextM where
+instance MonadIO m => A.Selectable SHA ChainTxsInBlock (StateT Context m) where
   select p sha = A.selectWithDefault p sha <&> toMaybe def
   selectWithDefault _ = fmap ChainTxsInBlock
                       . RBDB.withRedisBlockDB
                       . RBDB.getChainTxsInBlock
 
-instance A.Selectable Word256 ChainMembers ContextM where
+instance MonadIO m => A.Selectable Word256 ChainMembers (StateT Context m) where
   select p cid = A.selectWithDefault p cid <&> toMaybe def
   selectWithDefault _ = fmap ChainMembers
                       . RBDB.withRedisBlockDB
                       . RBDB.getChainMembers
 
-instance A.Selectable Word256 ChainInfo ContextM where
+instance MonadIO m => A.Selectable Word256 ChainInfo (StateT Context m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
 
-instance A.Selectable SHA (Private Transaction) ContextM where
+instance MonadIO m => A.Selectable SHA (Private Transaction) (StateT Context m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
 
-instance (SHA `A.Alters` Block) ContextM where
+instance MonadIO m => (SHA `A.Alters` Block) (StateT Context m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
   delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteBlock
@@ -177,17 +177,20 @@ instance (SHA `A.Alters` Block) ContextM where
   insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
   deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
 
-instance Mod.Accessible GenesisBlockHash ContextM where
+instance ( MonadIO m
+         , MonadUnliftIO m
+         , MonadReader Config m
+         ) => Mod.Accessible GenesisBlockHash (StateT Context m) where
   access _ = GenesisBlockHash <$> runWithSQL getGenesisBlockHash
 
-instance Mod.Accessible BestBlockNumber ContextM where
+instance MonadIO m => Mod.Accessible BestBlockNumber (StateT Context m) where
   access _ = BestBlockNumber <$> liftIO getBestKafkaBlockNumber
 
 instance Monad m => Mod.Modifiable K.KafkaState (StateT Context m) where
   get _   = gets contextKafkaState
   put _ k = modify $ \c -> c{contextKafkaState = k}
 
-instance Mod.Accessible RBDB.RedisConnection ContextM where
+instance MonadIO m => Mod.Accessible RBDB.RedisConnection (StateT Context m) where
   access _ = gets contextRedisBlockDB
 
 instance (MonadUnliftIO m, MonadReader Config m, MonadIO m) => HasSQLDB m where
