@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric    #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.EthConf (
       EthConf(..),
@@ -167,6 +168,7 @@ mkConfiguredKafkaState cid = mkKafkaState cid (kh, kp)
           kp = fromIntegral $ kafkaPort k
 
 lookupConsumerGroup :: KafkaClientId -> KP.ConsumerGroup
+lookupConsumerGroup "slipstream" = KP.ConsumerGroup "slipstream"
 lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ kStr `B8.append` nodeId
     where kStr   = KP._kString kcid
           nodeId = B8.pack $ "_" ++ peerId (ethUniqueId ethConf)

@@ -19,12 +19,12 @@ import qualified Network.Kafka                   as K
 import qualified Blockchain.MilenaTools          as K
 import qualified Network.Kafka.Protocol          as KP
 
-import qualified Blockchain.Sequencer.Constants  as SeqConst
-import qualified Blockchain.Sequencer.Kafka      as SeqKafka
+import qualified Blockchain.Sequencer.Constants         as SeqConst
+import qualified Blockchain.Sequencer.Kafka             as SeqKafka
+import qualified Blockchain.Strato.Indexer.Kafka        as IdxKafka
+import qualified Blockchain.Strato.StateDiff.Kafka      as DiffKafka
 
-import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
-
-data CheckpointService   = Sequencer | EVM | ApiIndexer | P2PIndexer | NullService deriving (Eq, Ord, Enum, Data)
+data CheckpointService   = Sequencer | EVM | ApiIndexer | P2PIndexer | Slipstream | NullService deriving (Eq, Ord, Enum, Data)
 data CheckpointOperation = Get | Put | NullOperation deriving (Eq, Ord, Enum, Data)
 
 -- have to manually do these cause theres no way to lowercase them for glorious lowercase cli
@@ -49,6 +49,7 @@ instance Read CheckpointService where
             "evm"         -> return EVM
             "apiindexer"  -> return ApiIndexer
             "p2pindexer"  -> return P2PIndexer
+            "slipstream"  -> return Slipstream
             "NullService" -> return NullService
             _             -> P.pfail
 
@@ -57,6 +58,7 @@ instance Show CheckpointService where
     show EVM         = "evm"
     show ApiIndexer  = "apiindexer"
     show P2PIndexer  = "p2pindexer"
+    show Slipstream  = "slipstream"
     show NullService = "NullService"
 
 type KafkaBits = (K.KafkaClientId, KP.ConsumerGroup, KP.TopicName)
@@ -73,6 +75,8 @@ kafkaBitsForService = \case
         (clientId, lookupConsumerGroup clientId, IdxKafka.indexEventsTopicName)
     P2PIndexer -> let clientId = "strato-p2p-indexer" in
             (clientId, lookupConsumerGroup clientId, IdxKafka.indexEventsTopicName)
+    Slipstream -> let clientId = "slipstream" in
+            (clientId, lookupConsumerGroup clientId, DiffKafka.stateDiffTopicName)
 
 hasCheckpointData :: CheckpointService -> Bool
 hasCheckpointData EVM        = True
@@ -156,7 +160,7 @@ checkpointUsage =
     , "   * " ++ errPutFlagRequirement
     , ""
     , "Flags:"
-    , "  -s --service=SERVICE  The service whose metadata to operate against. One of: sequencer evm apiidx p2pidx"
+    , "  -s --service=SERVICE  The service whose metadata to operate against. One of: sequencer evm apiindexer p2pindexer slipstream"
     , "  -o --op=OP            The operation to perform. One of: get put"
     , "  -i --offset=INT       If -o PUT is specified, set the service's checkpointed Kafka offset"
     , "  -m --metadata=DATA    If -o PUT is specified, set the service-specific metadata in the checkpoint to DATA"
