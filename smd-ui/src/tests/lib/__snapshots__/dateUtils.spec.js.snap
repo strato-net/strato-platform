@@ -1,5 +1,0 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
-
-exports[`Lib: dateUtils parse date from string 1`] = `"2017-12-19 01:46:20 PM"`;
-
-exports[`Lib: dateUtils parse date from timstamp 1`] = `"2018-07-16 01:19:24 AM"`;
