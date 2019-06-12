@@ -91,7 +91,7 @@ putStatediffOffset :: K.Offset -> SlipKafka ()
 putStatediffOffset off = do
     clientid <- use stateName
     corid <- stateCorrelationId <<+= 1
-    let offReq = K.OffsetCommitRequest $ K.OffsetCommitReq ("sliptream", [(lookupTopic, [(lookupPartition, off, protocolTime (LatestTime), K.Metadata "")])])
+    let offReq = K.OffsetCommitRequest $ K.OffsetCommitReq ("slipstream", [(lookupTopic, [(lookupPartition, off, protocolTime (LatestTime), K.Metadata "")])])
         req = K.Request (corid, K.ClientId clientid, offReq)
     resp <- withAnyHandle $ \h -> K.doRequest' corid h req :: SlipKafka (Either String K.OffsetCommitResponse)
     $logInfoLS "putStatediffOffset" resp
@@ -121,7 +121,7 @@ getTheMessages offset = do
 getAndProcessMessages :: BlocEnv -> PGConnection -> IORef Globals -> SlipKafka ()
 getAndProcessMessages env conn cache = do
   let errorCount = 0
-  offset <- getLastOffset LatestTime lookupPartition lookupTopic
+  offset <- getStatediffOffset
   getAndProcessMessages' env conn cache offset errorCount
 
 getAndProcessMessages' :: BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
@@ -141,6 +141,13 @@ getAndProcessMessages' env conn cache offset errorCounter = do
       when (null messages) $
         liftIO $ threadDelay 1000000
       let newOffset = offset + fromIntegral (length messages)
-      putStatediffOffset newOffset
-      getAndProcessMessages' env conn cache (offset + fromIntegral (length messages)) errorCounter
+      currentOffset <- getStatediffOffset
+      -- If the offset has been changed since our last read, assume that we should
+      -- begin to read from there instead.
+      offset' <- if currentOffset /= offset
+                    then return currentOffset
+                    else do
+                        putStatediffOffset newOffset
+                        return newOffset
+      getAndProcessMessages' env conn cache offset' errorCounter
 
