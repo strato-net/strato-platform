@@ -81,6 +81,22 @@ mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
 lookupTopic :: K.TopicName
 lookupTopic = fromString "statediff"
 
+lookupPartition :: K.Partition
+lookupPartition = K.Partition 0
+
+getStatediffOffset :: SlipKafka K.Offset
+getStatediffOffset = getLastOffset LatestTime lookupPartition lookupTopic
+
+putStatediffOffset :: K.Offset -> SlipKafka ()
+putStatediffOffset off = do
+    clientid <- use stateName
+    corid <- stateCorrelationId <<+= 1
+    let offReq = K.OffsetCommitRequest $ K.OffsetCommitReq ("sliptream", [(lookupTopic, [(lookupPartition, off, protocolTime (LatestTime), K.Metadata "")])])
+        req = K.Request (corid, K.ClientId clientid, offReq)
+    resp <- withAnyHandle $ \h -> K.doRequest' corid h req :: SlipKafka (Either String K.OffsetCommitResponse)
+    $logInfoLS "putStatediffOffset" resp
+
+
 getTheMessages :: K.Offset -> SlipKafka [B.ByteString]
 getTheMessages offset = do
   let extract :: K.FetchResponse -> Either String [B.ByteString]
@@ -102,8 +118,14 @@ getTheMessages offset = do
               Left e -> error $ "getTheMessages: " ++ e
               Right bs -> bs
 
-getAndProcessMessages :: BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
-getAndProcessMessages env conn cache offset errorCounter = do
+getAndProcessMessages :: BlocEnv -> PGConnection -> IORef Globals -> SlipKafka ()
+getAndProcessMessages env conn cache = do
+  let errorCount = 0
+  offset <- getLastOffset LatestTime lookupPartition lookupTopic
+  getAndProcessMessages' env conn cache offset errorCount
+
+getAndProcessMessages' :: BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
+getAndProcessMessages' env conn cache offset errorCounter = do
   eMessages <- try $ getTheMessages offset
   case eMessages of
     Left e -> do
@@ -111,11 +133,14 @@ getAndProcessMessages env conn cache offset errorCounter = do
       $logErrorLS "getTheMessages" (e :: KafkaClientError)
       if (errorCounter > exceptionMaxCount )
            then error $ "Slipstream reached exceptionMaxCount."
-           else getAndProcessMessages env conn cache offset (errorCounter + 1)
+           else getAndProcessMessages' env conn cache offset (errorCounter + 1)
     Right messages -> do
       recordKafkaMessages messages
       forceGlobalEval cache
       lift . lift $ processTheMessages env conn cache messages
       when (null messages) $
         liftIO $ threadDelay 1000000
-      getAndProcessMessages env conn cache (offset + fromIntegral (length messages)) errorCounter
+      let newOffset = offset + fromIntegral (length messages)
+      putStatediffOffset newOffset
+      getAndProcessMessages' env conn cache (offset + fromIntegral (length messages)) errorCounter
+
