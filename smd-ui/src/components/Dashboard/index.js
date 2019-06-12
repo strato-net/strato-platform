@@ -4,6 +4,7 @@ import { withRouter, Link } from 'react-router-dom';
 import NodeCard from '../NodeCard';
 import TransactionList from '../TransactionList';
 import NumberCard from '../NumberCard';
+import Popover from '../Popover';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { endTour } from '../Tour/tour.actions';
 // import { callAfterTour } from '../Tour/tour.helpers';
@@ -120,17 +121,23 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-3"
+          <div className="col-sm-3 popover__wrapper"
                onMouseEnter={this.handleMouseHover}
-               onMouseLeave={this.handleMouseHover}
-          >
-            <NumberCard
-              number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
-              description= {connection ? (sec2Date(uptime)):"No Connection"}
-              mode={(health && systemHealth) ? 'success':'warning' }
-              iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
-            />
-            {(this.state.isHovering && !systemHealth) && <div> Warnings: {systemWarnings} </div>}
+               onMouseLeave={this.handleMouseHover}>
+              <NumberCard
+                          className = "popover__title"
+                           number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
+                           description= {connection ? (sec2Date(uptime)):"No Connection"}
+                           mode={(health && systemHealth) ? 'success':'warning' }
+                           iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
+                         />
+
+                       {(this.state.isHovering && !systemHealth) && <Popover
+
+                           warnings = {systemWarnings}
+
+                       />}
+
           </div>
           <div className="col-sm-3">
             <Link to="/blocks">
