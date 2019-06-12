@@ -353,7 +353,6 @@ async function createChain(user, chain, contract, options) {
 
 async function pingOauth(user, options) {
   const response = await api.pingOauth(user, options);
-  console.log( response )
   return response;
 }
 

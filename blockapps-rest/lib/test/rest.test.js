@@ -29,7 +29,7 @@ describe("rest_7", function() {
   describe("oauthPing", function() {
     it("ping - oauth authorized", async () => {
       const result = await rest.pingOauth(admin, options)
-      assert.equal(result.status, "success")
+      assert.equal(result, "success")
     });
   });
 

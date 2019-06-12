@@ -240,8 +240,7 @@ async function pingOauth(user, options){
   const url = getNodeUrl(options)
   const endpoint = constructEndpoint(Endpoint.KEY, options)
   const result = await get(url, endpoint, setAuthHeaders(user, options))
-  console.log("result", result)
-  return result
+  return result.status
 }
 
 export default {
