@@ -3,6 +3,7 @@
 ### Version 7.4
 
 -   Refactor ba-rest to only use oauth
+-   Add pingOauth endpoint
 
 ### Version 7.3.1
 
