@@ -155,7 +155,7 @@ checkForUnseq inEvents = do
     chainIds <- unGetChainsDB <$> use getChainsDB
     unless (S.null chainIds) $
       markForP2P . OEGetChain $ toList chainIds
-    txHashes <- gets _getTransactionsDB
+    txHashes <- unGetTransactionsDB <$> use getTransactionsDB
     unless (S.null txHashes) $
       markForP2P . OEGetTx $ toList txHashes
 

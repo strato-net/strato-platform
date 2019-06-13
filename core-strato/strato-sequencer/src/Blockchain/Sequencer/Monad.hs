@@ -11,6 +11,7 @@ module Blockchain.Sequencer.Monad (
   , SequencerConfig(..)
   , SequencerM
   , getChainsDB
+  , getTransactionsDB
   , runSequencerM
   , pairToOETx
   , markForVM
@@ -49,7 +50,6 @@ import           Data.IORef
 import           Data.Map                                  (Map)
 import qualified Data.Map                                  as M
 import qualified Data.Sequence                             as Q
-import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
 
@@ -82,7 +82,7 @@ data SequencerContext = SequencerContext
   , _chainHashRegistry   :: Map SHA ChainHashEntry
   , _chainIdRegistry     :: Map Word256 ChainIdEntry
   , _getChainsDB         :: GetChainsDB
-  , _getTransactionsDB   :: S.Set SHA
+  , _getTransactionsDB   :: GetTransactionsDB
   , _ldbBatchOps         :: Q.Seq LDB.BatchOp
   , _vmEvents            :: Q.Seq OutputEvent
   , _p2pEvents           :: Q.Seq OutputEvent
@@ -118,7 +118,7 @@ instance Mod.Modifiable GetChainsDB SequencerM where
   get _ = use getChainsDB
   put _ = assign getChainsDB
 
-instance Mod.Modifiable (S.Set SHA) SequencerM where
+instance Mod.Modifiable GetTransactionsDB SequencerM where
   get _ = use getTransactionsDB
   put _ = assign getTransactionsDB
 
@@ -201,7 +201,7 @@ runSequencerM c mbc m = do
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
             , _getChainsDB         = emptyGetChainsDB
-            , _getTransactionsDB   = S.empty
+            , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty
             , _vmEvents            = Q.empty
             , _p2pEvents           = Q.empty

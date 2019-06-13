@@ -9,10 +9,16 @@ import           Blockchain.SHA
 import           Control.Monad.Change.Modify
 import qualified Data.Set                     as S
 
-type HasGetTransactionsDB = Modifiable (S.Set SHA)
+newtype GetTransactionsDB = GetTransactionsDB { unGetTransactionsDB :: S.Set SHA }
+
+type HasGetTransactionsDB = Modifiable GetTransactionsDB
+
+emptyGetTransactionsDB :: GetTransactionsDB
+emptyGetTransactionsDB = GetTransactionsDB S.empty
 
 insertGetTransactionsDB :: HasGetTransactionsDB m => SHA -> m ()
-insertGetTransactionsDB txHash = modify_ Proxy $ pure . S.insert txHash
+insertGetTransactionsDB chainId = modify_ Proxy $
+  pure . GetTransactionsDB . S.insert chainId . unGetTransactionsDB
 
 clearGetTransactionsDB :: HasGetTransactionsDB m => m ()
-clearGetTransactionsDB = put (Proxy @(S.Set SHA)) S.empty
+clearGetTransactionsDB = put (Proxy @GetTransactionsDB) emptyGetTransactionsDB
