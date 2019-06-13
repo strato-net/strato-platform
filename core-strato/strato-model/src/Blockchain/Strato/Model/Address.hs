@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -14,6 +15,7 @@ module Blockchain.Strato.Model.Address
 
 import           Control.DeepSeq
 import           Control.Monad
+import           Data.Data
 import           Data.Maybe                           (fromMaybe)
 import           Numeric
 import           Test.QuickCheck                      (Arbitrary(..))
@@ -55,7 +57,7 @@ instance RLPSerializable Address where
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
   rlpDecode x             = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
-newtype Address = Address Word160 deriving (Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral, Hashable)
+newtype Address = Address Word160 deriving (Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral, Hashable, Data)
 
 instance Show Address where
   show (Address a) = printf "%040x" a

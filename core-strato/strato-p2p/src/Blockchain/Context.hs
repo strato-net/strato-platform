@@ -187,6 +187,5 @@ setPeerAddrIfUnset addr = blockstanbulPeerAddr %= (<|> Just addr)
 
 shouldSendToPeer :: MonadState Context m => Address -> m Bool
 shouldSendToPeer addr = maybe True zeroOrArg <$> use blockstanbulPeerAddr
-        -- TODO(tim): 0x0 may come from a Legacy kafka message, remove
-        -- in a future release
+        -- 0x0 is for a broadcast sync message.
   where zeroOrArg addr' = addr' == 0x0 || addr' == addr
