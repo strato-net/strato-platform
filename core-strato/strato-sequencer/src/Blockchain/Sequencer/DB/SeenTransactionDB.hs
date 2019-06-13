@@ -9,7 +9,6 @@ module Blockchain.Sequencer.DB.SeenTransactionDB where
 import           Blockchain.SHA
 import           Blockchain.Sequencer.DB.Witnessable
 import           Control.Applicative
-import           Control.Arrow                ((&&&))
 import           Control.Lens
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify
@@ -75,7 +74,7 @@ witnessTransactionHash' sha stxdb =
           then withClear
           else withClear -- prevent Int rollover since were comparing to size which is int
                  & operations .~ _size withClear + 1
-   in if uncurry (<) $ (_operations &&& _size) withIntBoundFix
+   in if _operations withIntBoundFix < _size withIntBoundFix
         then withIntBoundFix
         else case Q.viewl (_clearQueue withIntBoundFix) of
                Q.EmptyL    -> withIntBoundFix
