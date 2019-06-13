@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 module Checkpoints where
 
+import           Control.Concurrent              (threadDelay)
 import           Control.Monad                   (forM_, unless, void, when)
 
 import qualified Data.ByteString.Char8           as S8
@@ -10,6 +11,7 @@ import           Data.Data
 import           Data.Maybe
 
 import           GHC.Read
+import           System.IO
 import qualified Text.ParserCombinators.ReadPrec as P
 import qualified Text.Read.Lex                   as L
 
@@ -91,7 +93,10 @@ lookupByBits :: KafkaBits -> IO CPTuple
 lookupByBits bits@(clientId, consumerId, topicName) =
     runKafkaConfigured clientId (K.fetchSingleOffset consumerId topicName 0) >>= \case
         Left err -> error $ "Failed to fetch checkpoint: " ++ show err
-        Right (Left KP.UnknownTopicOrPartition) -> lookupByBits bits
+        Right (Left KP.UnknownTopicOrPartition) -> do
+          hPutStrLn stderr "UnknownTopicOrPartition, retrying..."
+          threadDelay 1000000
+          lookupByBits bits
         Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (Right ret) -> return ret
 
