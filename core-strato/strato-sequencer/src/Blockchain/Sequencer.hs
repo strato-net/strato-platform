@@ -13,6 +13,7 @@ import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
 import           Blockchain.Output
+import           Control.Lens
 import qualified Control.Monad.Change.Alter                as A
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -151,7 +152,7 @@ checkForUnseq inEvents = do
     P.incCounter seqLdbBatchWrites
     P.setGauge seqLdbBatchSize . fromIntegral . length $ pendingLDBWrites
     logF "Applied pending LDB writes"
-    chainIds <- gets _getChainsDB
+    chainIds <- unGetChainsDB <$> use getChainsDB
     unless (S.null chainIds) $
       markForP2P . OEGetChain $ toList chainIds
     txHashes <- gets _getTransactionsDB

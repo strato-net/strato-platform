@@ -10,6 +10,7 @@ module Blockchain.Sequencer.Monad (
     SequencerContext(..)
   , SequencerConfig(..)
   , SequencerM
+  , getChainsDB
   , runSequencerM
   , pairToOETx
   , markForVM
@@ -80,7 +81,7 @@ data SequencerContext = SequencerContext
   , _txHashRegistry      :: Map SHA OutputTx
   , _chainHashRegistry   :: Map SHA ChainHashEntry
   , _chainIdRegistry     :: Map Word256 ChainIdEntry
-  , _getChainsDB         :: S.Set Word256
+  , _getChainsDB         :: GetChainsDB
   , _getTransactionsDB   :: S.Set SHA
   , _ldbBatchOps         :: Q.Seq LDB.BatchOp
   , _vmEvents            :: Q.Seq OutputEvent
@@ -113,7 +114,7 @@ instance HasDependentBlockDB SequencerM where
   getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
   getReadOptions      = return LDB.defaultReadOptions
 
-instance Mod.Modifiable (S.Set Word256) SequencerM where
+instance Mod.Modifiable GetChainsDB SequencerM where
   get _ = use getChainsDB
   put _ = assign getChainsDB
 
@@ -199,7 +200,7 @@ runSequencerM c mbc m = do
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
-            , _getChainsDB         = S.empty
+            , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = S.empty
             , _ldbBatchOps         = Q.empty
             , _vmEvents            = Q.empty

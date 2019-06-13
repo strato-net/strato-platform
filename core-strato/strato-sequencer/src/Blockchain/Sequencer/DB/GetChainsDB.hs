@@ -9,10 +9,16 @@ import           Blockchain.ExtWord           (Word256)
 import           Control.Monad.Change.Modify
 import qualified Data.Set                     as S
 
-type HasGetChainsDB = Modifiable (S.Set Word256)
+newtype GetChainsDB = GetChainsDB { unGetChainsDB :: S.Set Word256 }
+
+type HasGetChainsDB = Modifiable GetChainsDB
+
+emptyGetChainsDB :: GetChainsDB
+emptyGetChainsDB = GetChainsDB S.empty
 
 insertGetChainsDB :: HasGetChainsDB m => Word256 -> m ()
-insertGetChainsDB chainId = modify_ Proxy $ pure . S.insert chainId
+insertGetChainsDB chainId = modify_ Proxy $
+  pure . GetChainsDB . S.insert chainId . unGetChainsDB
 
 clearGetChainsDB :: HasGetChainsDB m => m ()
-clearGetChainsDB = put (Proxy @(S.Set Word256)) S.empty
+clearGetChainsDB = put (Proxy @GetChainsDB) emptyGetChainsDB
