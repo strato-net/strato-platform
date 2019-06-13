@@ -40,6 +40,7 @@ dependencies:
   - strato-index
   - strato-redis-blockdb
   - strato-model
+  - strato-statediff
   - transformers
   - hedis
 
