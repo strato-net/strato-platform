@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 
 module Blockchain.DB.DetailsDB (
   getBestBlockHash,

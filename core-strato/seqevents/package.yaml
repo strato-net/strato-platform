@@ -14,9 +14,11 @@ dependencies:
   - derive
   - ethereum-rlp
   - format
+  - monad-alter
   - strato-conf
   - strato-model
   - QuickCheck
+  - util
 
 library:
   source-dirs: src/

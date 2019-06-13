@@ -13,7 +13,7 @@ module Blockchain.Sequencer.Kafka (
     writeUnseqEvents,
     writeSeqVmEvents,
     writeSeqP2pEvents,
-    HasUnseqSink(..),
+    UnseqSink,
     emitKafkaTransactions,
     emitKafkaBlock,
     emitKafkaChainDetails,
@@ -21,6 +21,7 @@ module Blockchain.Sequencer.Kafka (
 ) where
 
 import           Conduit
+import           Control.Monad.Change.Modify (Accessible(..), Proxy(..))
 import           Data.Binary                (Binary, decode, encode)
 
 import qualified Blockchain.Blockstanbul as PBFT
@@ -95,30 +96,32 @@ readFromTopic' topic offset = do
   --  map (decode . BL.fromStrict) <$> fetchBytes topic offset
 {-# INLINE readFromTopic' #-}
 
-class HasUnseqSink k where
-  getUnseqSink :: k ([IngestEvent] -> k ())
+type UnseqSink k = [IngestEvent] -> k ()
 
-emitKafkaTransactions :: (MonadIO m, HasUnseqSink m) => Origin.TXOrigin -> [Transaction] -> m ()
+emitKafkaTransactions :: (MonadIO m, Accessible (UnseqSink m) m)
+                      => Origin.TXOrigin
+                      -> [Transaction]
+                      -> m ()
 emitKafkaTransactions origin txs = do
     ts <- liftIO getCurrentMicrotime
     let ingestTxs = IETx ts . IngestTx origin <$> txs
-    sink <- getUnseqSink
+    sink <- access Proxy
     sink ingestTxs
 
-emitKafkaBlock :: (Monad m, HasUnseqSink m) => Origin.TXOrigin -> Block -> m ()
+emitKafkaBlock :: (Monad m, Accessible (UnseqSink m) m)
+               => Origin.TXOrigin -> Block -> m ()
 emitKafkaBlock origin baseBlock = do
     let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
-    sink <- getUnseqSink
+    sink <- access Proxy
     sink [ingestBlock]
 
-emitKafkaChainDetails :: (MonadIO m, HasUnseqSink m) => Origin.TXOrigin -> Word256 -> ChainInfo -> m ()
+emitKafkaChainDetails :: (MonadIO m, Accessible (UnseqSink m) m) => Origin.TXOrigin -> Word256 -> ChainInfo -> m ()
 emitKafkaChainDetails origin chainId details = do
     let ingestGenesis = IEGenesis (IngestGenesis origin (chainId, details))
-    sink <- getUnseqSink
+    sink <- access Proxy
     sink [ingestGenesis]
 
-emitBlockstanbulMsg :: (MonadIO m, HasUnseqSink m) => PBFT.WireMessage -> m ()
+emitBlockstanbulMsg :: (MonadIO m, Accessible (UnseqSink m) m) => PBFT.WireMessage -> m ()
 emitBlockstanbulMsg wm = do
-  let iem = IEBlockstanbul wm
-  sink <- getUnseqSink
-  sink [iem]
+  sink <- access Proxy
+  sink [IEBlockstanbul wm]

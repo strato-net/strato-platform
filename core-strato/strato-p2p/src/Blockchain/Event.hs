@@ -114,7 +114,7 @@ yieldL = yield . Left
 handleEvents :: ( MonadIO m
                 , MonadResource m
                 , Accessible RBDB.RedisConnection m
-                , SK.HasUnseqSink m
+                , Accessible (SK.UnseqSink m) m
                 , MonadState Context m
                 , MonadLogger m
                 , Modifiable K.KafkaState m
