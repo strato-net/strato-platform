@@ -60,17 +60,19 @@ runKafka s k = runExceptT $ evalStateT k s
 
 makeKafkaState :: KafkaClientId -> KafkaAddress -> K.MaxBytes -> KafkaState
 makeKafkaState cid addy maxBytes =
-    KafkaState cid
-               defaultRequiredAcks
-               defaultRequestTimeout
-               defaultMinBytes
-               maxBytes
-               defaultMaxWaitTime
-               defaultCorrelationId
-               M.empty
-               M.empty
-               M.empty
-               (addy NE.:| [])
+  let waitTime = 100000 -- 100s
+      minBytes = 1      -- Awaken from sleep only if there is at least one message
+  in KafkaState cid
+                defaultRequiredAcks
+                defaultRequestTimeout
+                minBytes
+                maxBytes
+                waitTime
+                defaultCorrelationId
+                M.empty
+                M.empty
+                M.empty
+                (addy NE.:| [])
 
 mkConfiguredKafkaState :: KafkaClientId -> K.MaxBytes -> KafkaState
 mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
@@ -84,17 +86,25 @@ lookupTopic = fromString "statediff"
 lookupPartition :: K.Partition
 lookupPartition = K.Partition 0
 
+lookupGroup :: K.ConsumerGroup
+lookupGroup = "slipstream"
+
+generateRequestId :: SlipKafka (K.CorrelationId, K.ClientId)
+generateRequestId = liftM2 (,) (stateCorrelationId <<+= 1) (uses stateName K.ClientId)
+
+-- TODO: Use blockapps-milena to get topic stored offsets instead of zookeeper ones.
 getStatediffOffset :: SlipKafka K.Offset
 getStatediffOffset = getLastOffset LatestTime lookupPartition lookupTopic
 
 putStatediffOffset :: K.Offset -> SlipKafka ()
 putStatediffOffset off = do
-    clientid <- use stateName
-    corid <- stateCorrelationId <<+= 1
-    let offReq = K.OffsetCommitRequest $ K.OffsetCommitReq ("slipstream", [(lookupTopic, [(lookupPartition, off, protocolTime (LatestTime), K.Metadata "")])])
-        req = K.Request (corid, K.ClientId clientid, offReq)
-    resp <- withAnyHandle $ \h -> K.doRequest' corid h req :: SlipKafka (Either String K.OffsetCommitResponse)
-    $logInfoLS "putStatediffOffset" resp
+    (corrId, clientId) <- generateRequestId
+    let commitRequest = K.OffsetCommitRequest
+               $ K.OffsetCommitReq (lookupGroup, [(lookupTopic, [(lookupPartition, off, protocolTime LatestTime, K.Metadata "")])])
+        req = K.Request (corrId, clientId, commitRequest)
+    resp <- withAnyHandle $ \h -> K.doRequest' corrId h req :: SlipKafka (Either String K.OffsetCommitResponse)
+    $logInfoLS "putStatediffOffset/req" req
+    $logInfoLS "putStatediffOffset/resp" resp
 
 
 getTheMessages :: K.Offset -> SlipKafka [B.ByteString]
@@ -126,28 +136,29 @@ getAndProcessMessages env conn cache = do
 
 getAndProcessMessages' :: BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
 getAndProcessMessages' env conn cache offset errorCounter = do
+  recordOffset offset
   eMessages <- try $ getTheMessages offset
   case eMessages of
     Left e -> do
-      liftIO $ threadDelay 1000000
       $logErrorLS "getTheMessages" (e :: KafkaClientError)
+      liftIO $ threadDelay 1000000
       if (errorCounter > exceptionMaxCount )
            then error $ "Slipstream reached exceptionMaxCount."
            else getAndProcessMessages' env conn cache offset (errorCounter + 1)
     Right messages -> do
+      $logDebugLS "getAndProcessMessages'" messages
       recordKafkaMessages messages
       forceGlobalEval cache
       lift . lift $ processTheMessages env conn cache messages
-      when (null messages) $
-        liftIO $ threadDelay 1000000
       let newOffset = offset + fromIntegral (length messages)
       currentOffset <- getStatediffOffset
-      -- If the offset has been changed since our last read, assume that we should
-      -- begin to read from there instead.
       offset' <- if currentOffset /= offset
-                    then return currentOffset
+                    then do
+                      $logInfoLS "getAndProcessMessages'/manual_offset" currentOffset
+                      recordOffsetOverride
+                      return currentOffset
                     else do
-                        putStatediffOffset newOffset
-                        return newOffset
-      getAndProcessMessages' env conn cache offset' errorCounter
+                      putStatediffOffset newOffset
+                      return newOffset
 
+      getAndProcessMessages' env conn cache offset' errorCounter
