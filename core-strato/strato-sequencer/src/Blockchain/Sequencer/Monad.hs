@@ -10,6 +10,8 @@ module Blockchain.Sequencer.Monad (
     SequencerContext(..)
   , SequencerConfig(..)
   , SequencerM
+  , getChainsDB
+  , getTransactionsDB
   , runSequencerM
   , pairToOETx
   , markForVM
@@ -18,6 +20,7 @@ module Blockchain.Sequencer.Monad (
   , addLdbBatchOps
   , drainP2P
   , drainVM
+  , clearDBERegistry
   , createFirstTimer
   , createNewTimer
   , drainTMChan
@@ -34,7 +37,9 @@ import           Control.Concurrent                        (forkIO, threadDelay)
 import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
+import           Control.Monad                             (join)
 import qualified Control.Monad.Change.Alter                as A
+import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 import           Control.Monad.State
 
@@ -45,7 +50,6 @@ import           Data.IORef
 import           Data.Map                                  (Map)
 import qualified Data.Map                                  as M
 import qualified Data.Sequence                             as Q
-import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
 
@@ -70,66 +74,66 @@ import           Text.Format
 import qualified Database.LevelDB                          as LDB
 
 data SequencerContext = SequencerContext
-                      { _dependentBlockDB    :: DependentBlockDB
-                      , _seenTransactionDB   :: SeenTransactionDB
-                      , _blockHashRegistry   :: Map SHA OutputBlock
-                      , _txHashRegistry      :: Map SHA OutputTx
-                      , _chainHashRegistry   :: Map SHA ChainHashEntry
-                      , _chainIdRegistry     :: Map Word256 ChainIdEntry
-                      , _getChainsDB         :: S.Set Word256
-                      , _getTransactionsDB   :: S.Set SHA
-                      , _ldbBatchOps         :: Q.Seq LDB.BatchOp
-                      , _vmEvents            :: Q.Seq OutputEvent
-                      , _p2pEvents           :: Q.Seq OutputEvent
-                      , _blockstanbulContext :: Maybe BlockstanbulContext
-                      , _loopTimeout         :: TMChan ()
-                      , _latestRoundNumber   :: IORef RoundNumber
-                      }
+  { _dependentBlockDB    :: DependentBlockDB
+  , _seenTransactionDB   :: SeenTransactionDB
+  , _dbeRegistry         :: Map SHA DependentBlockEntry
+  , _blockHashRegistry   :: Map SHA OutputBlock
+  , _txHashRegistry      :: Map SHA OutputTx
+  , _chainHashRegistry   :: Map SHA ChainHashEntry
+  , _chainIdRegistry     :: Map Word256 ChainIdEntry
+  , _getChainsDB         :: GetChainsDB
+  , _getTransactionsDB   :: GetTransactionsDB
+  , _ldbBatchOps         :: Q.Seq LDB.BatchOp
+  , _vmEvents            :: Q.Seq OutputEvent
+  , _p2pEvents           :: Q.Seq OutputEvent
+  , _blockstanbulContext :: Maybe BlockstanbulContext
+  , _loopTimeout         :: TMChan ()
+  , _latestRoundNumber   :: IORef RoundNumber
+  }
 makeLenses ''SequencerContext
 
-
-data SequencerConfig =
-     SequencerConfig { depBlockDBCacheSize     :: Int
-                     , depBlockDBPath          :: String
-                     , seenTransactionDBSize   :: Int
-                     , syncWrites              :: Bool
-                     , blockstanbulBlockPeriod :: NominalDiffTime
-                     , blockstanbulRoundPeriod :: NominalDiffTime
-                     , blockstanbulBeneficiary :: TQueue CandidateReceived
-                     , blockstanbulVoteResps   :: TQueue VoteResult
-                     , blockstanbulTimeouts    :: TMChan RoundNumber
-                     , cablePackage            :: CablePackage
-                     , maxEventsPerIter        :: Int
-                     , maxUsPerIter            :: Int
-                     }
+data SequencerConfig = SequencerConfig
+  { depBlockDBCacheSize     :: Int
+  , depBlockDBPath          :: String
+  , seenTransactionDBSize   :: Int
+  , syncWrites              :: Bool
+  , blockstanbulBlockPeriod :: NominalDiffTime
+  , blockstanbulRoundPeriod :: NominalDiffTime
+  , blockstanbulBeneficiary :: TQueue CandidateReceived
+  , blockstanbulVoteResps   :: TQueue VoteResult
+  , blockstanbulTimeouts    :: TMChan RoundNumber
+  , cablePackage            :: CablePackage
+  , maxEventsPerIter        :: Int
+  , maxUsPerIter            :: Int
+  }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (ResourceT (LoggingT IO)))
 
 instance HasDependentBlockDB SequencerM where
-    getDependentBlockDB = use dependentBlockDB
-    getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
-    getReadOptions      = return LDB.defaultReadOptions
+  getDependentBlockDB = use dependentBlockDB
+  getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
+  getReadOptions      = return LDB.defaultReadOptions
 
-instance HasGetChainsDB SequencerM where
-    getGetChainsDB = use getChainsDB
-    putGetChainsDB = assign getChainsDB
+instance Mod.Modifiable GetChainsDB SequencerM where
+  get _ = use getChainsDB
+  put _ = assign getChainsDB
 
-instance HasGetTransactionsDB SequencerM where
-    getGetTransactionsDB = use getTransactionsDB
-    putGetTransactionsDB = assign getTransactionsDB
+instance Mod.Modifiable GetTransactionsDB SequencerM where
+  get _ = use getTransactionsDB
+  put _ = assign getTransactionsDB
 
 instance HasPrivateHashDB SequencerM where
-    getChainId = return . hash . rlpSerialize . rlpEncode
-    generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
-    generateChainHashes tx =
-      let r = txSigR tx
-          s = txSigS tx
-          rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
-          sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
-       in return [rs,sr]
+  getChainId = return . hash . rlpSerialize . rlpEncode
+  generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
+  generateChainHashes tx =
+    let r = txSigR tx
+        s = txSigS tx
+        rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
+        sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
+     in return [rs,sr]
 
-    requestChain = insertGetChainsDB
-    requestTransaction = insertGetTransactionsDB
+  requestChain = insertGetChainsDB
+  requestTransaction = insertGetTransactionsDB
 
     -- TODO: Add persistence layer
 instance (SHA `A.Alters` OutputBlock) SequencerM where
@@ -152,13 +156,31 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
   insert _ cid cie = chainIdRegistry . at cid ?= cie
   delete _ cid     = chainIdRegistry . at cid .= Nothing
 
-instance HasSeenTransactionDB SequencerM where
-    getSeenTransactionDB = use seenTransactionDB
-    putSeenTransactionDB = assign seenTransactionDB
+instance (SHA `A.Alters` DependentBlockEntry) SequencerM where
+  lookup _ k = do
+    mv <- use $ dbeRegistry . at k
+    case mv of
+      Just v -> return $ Just v
+      Nothing -> genericLookupDependentBlockDB k
+  insert _ k v = do
+    dbeRegistry . at k ?= v
+    addLdbBatchOps . (:[]) $ genericBatchInsertDependentBlockDB k v
+  delete _ k = do
+    dbeRegistry . at k .= Nothing
+    addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
+
+instance Mod.Modifiable SeenTransactionDB SequencerM where
+  get _ = use seenTransactionDB
+  put _ = assign seenTransactionDB
+
+instance (SHA `A.Alters` ()) SequencerM where
+  lookup _ = genericLookupSeenTransactionDB
+  insert _ = genericInsertSeenTransactionDB
+  delete _ = genericDeleteSeenTransactionDB
 
 instance HasBlockstanbulContext SequencerM where
-    getBlockstanbulContext = use blockstanbulContext
-    putBlockstanbulContext = assign (blockstanbulContext . _Just)
+  getBlockstanbulContext = use blockstanbulContext
+  putBlockstanbulContext = assign (blockstanbulContext . _Just)
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
@@ -173,12 +195,13 @@ runSequencerM c mbc m = do
         runStateT m SequencerContext
             { _dependentBlockDB    = depBlock
             , _seenTransactionDB   = mkSeenTxDB stxSize
+            , _dbeRegistry         = M.empty
             , _blockHashRegistry   = M.empty
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
-            , _getChainsDB         = S.empty
-            , _getTransactionsDB   = S.empty
+            , _getChainsDB         = emptyGetChainsDB
+            , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty
             , _vmEvents            = Q.empty
             , _p2pEvents           = Q.empty
@@ -202,6 +225,9 @@ drainP2P = fmap toList $ p2pEvents <<.= Q.empty
 
 drainVM :: SequencerM [OutputEvent]
 drainVM = fmap toList $ vmEvents <<.= Q.empty
+
+clearDBERegistry :: SequencerM ()
+clearDBERegistry = dbeRegistry .= M.empty
 
 createFirstTimer :: SequencerM ()
 createFirstTimer = do
@@ -230,11 +256,10 @@ createNewTimer rn = do
 
 drainTMChan :: TMChan a -> STM [a]
 drainTMChan ch = do
-  mmx <- tryReadTMChan ch
-  case mmx of
+  mx <- join <$> tryReadTMChan ch
+  case mx of
     Nothing -> return []
-    Just Nothing -> return []
-    Just (Just x) -> (x:) <$> drainTMChan ch
+    Just x  -> (x:) <$> drainTMChan ch
 
 drainTimeouts :: SequencerM [RoundNumber]
 drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
