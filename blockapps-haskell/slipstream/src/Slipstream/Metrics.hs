@@ -13,6 +13,7 @@ module Slipstream.Metrics
   , recordStorageHit
   , recordStorageMiss
   , recordOffset
+  , recordOffsetOverride
   ) where
 
 import Control.Monad

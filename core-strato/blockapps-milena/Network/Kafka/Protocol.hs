@@ -271,9 +271,6 @@ requestBytes x = runPut $ do
     where mr = runPut $ serialize x
 
 apiVersion :: RequestMessage -> ApiVersion
--- TODO(tim): slipstream currently uses the milena abandonware, which only has support for version 0
-apiVersion (OffsetFetchRequest (OffsetFetchReq ("slipstream", _))) = 0
-apiVersion (OffsetCommitRequest (OffsetCommitReq ("slipstream", _, _, _, _))) = 0
 apiVersion OffsetFetchRequest{}  = 1 -- have to be V1 to use kafka storage to allow metadata
 apiVersion OffsetCommitRequest{} = 2 -- use V2 commit to not deal with Timestamps, and get stored in Kafka
 apiVersion _                     = ApiVersion 0 -- everything else is at version 0 right now

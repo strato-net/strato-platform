@@ -30,6 +30,7 @@ import qualified Network.Kafka.Protocol as K hiding (Message)
 
 import BlockApps.Bloc22.Monad (BlocEnv)
 import BlockApps.Logging
+import Blockchain.MilenaTools
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.Options
@@ -89,22 +90,29 @@ lookupPartition = K.Partition 0
 lookupGroup :: K.ConsumerGroup
 lookupGroup = "slipstream"
 
-generateRequestId :: SlipKafka (K.CorrelationId, K.ClientId)
-generateRequestId = liftM2 (,) (stateCorrelationId <<+= 1) (uses stateName K.ClientId)
-
--- TODO: Use blockapps-milena to get topic stored offsets instead of zookeeper ones.
 getStatediffOffset :: SlipKafka K.Offset
-getStatediffOffset = getLastOffset LatestTime lookupPartition lookupTopic
+getStatediffOffset = do
+  resp <- fetchSingleOffset lookupGroup lookupTopic lookupPartition
+  $logDebugLS "getStateDiffOffset/resp" resp
+  case resp of
+    Left K.UnknownTopicOrPartition -> do
+      $logInfoS "getStatediffOffset" "No offset found, creating one from 0"
+      putStatediffOffset 0 >> getStatediffOffset
+    Left err -> do
+      $logErrorLS "getStatediffOffset" err
+      error $ show err
+    Right (off, _) -> return off
 
 putStatediffOffset :: K.Offset -> SlipKafka ()
 putStatediffOffset off = do
-    (corrId, clientId) <- generateRequestId
-    let commitRequest = K.OffsetCommitRequest
-               $ K.OffsetCommitReq (lookupGroup, [(lookupTopic, [(lookupPartition, off, protocolTime LatestTime, K.Metadata "")])])
-        req = K.Request (corrId, clientId, commitRequest)
-    resp <- withAnyHandle $ \h -> K.doRequest' corrId h req :: SlipKafka (Either String K.OffsetCommitResponse)
-    $logInfoLS "putStatediffOffset/req" req
-    $logInfoLS "putStatediffOffset/resp" resp
+    $logInfoLS "putStateDiffOffset/req" off
+    resp <- commitSingleOffset lookupGroup lookupTopic lookupPartition off ""
+    $logDebugLS "putStateDiffOffset/resp" resp
+    case resp of
+      Left err -> do
+        $logErrorLS "putStatediffOffset" err
+        error $ show err
+      Right () -> return ()
 
 
 getTheMessages :: K.Offset -> SlipKafka [B.ByteString]
