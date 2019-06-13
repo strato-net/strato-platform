@@ -42,16 +42,25 @@ main = do
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer validators: " ++ show flags_validators
   putStrLn $ "strato-sequencer authorized beneficiary senders" ++ show flags_blockstanbul_admins
+  pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/=':') flags_kafkaaddress of
                           (_, "") -> Nothing
                           (khost, kport) -> Just ( KP.Host (KP.KString (C8.pack khost))
                                                  , KP.Port (readDef 9092 (drop 1 kport)))
-      eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
+      gregorCfg = GregorConfig
+        { kafkaAddress = mKafkaAddress
+        , kafkaClientId = kafkaClientId'
+        , kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId'
+        , cablePackage = pkg
+        }
+  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
       !validators = fromRight (error "invalid validators") eValidators
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
       !authSenders = fromRight (error "invalid admins") eAuthSenders
-      ctx = newContext (View 0 0) validators authSenders
+  ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
+  putStrLn $ "Checkpoint: " ++ show ckpt
+      -- TODO(tim): checkpoint validators, authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
   mCtx <- if not flags_blockstanbul
              then do
@@ -75,8 +84,7 @@ main = do
                     $ "--blockstanbul_block_period_ms must be nonnegative"
                 unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
                     $ "--blockstanbul_round_period_s must be positive"
-                return . Just . ctx $ pkey
-  pkg <- atomically newCablePackage
+                return . Just . newContext ckpt $ pkey
   chr <- atomically newTQueue
   chv <- atomically newTQueue
   cht <- atomically newTMChan
@@ -94,12 +102,6 @@ main = do
         , cablePackage = pkg
         , maxEventsPerIter = flags_seq_max_events_per_iter
         , maxUsPerIter = flags_seq_max_us_per_iter
-        }
-      gregorCfg = GregorConfig
-        { kafkaAddress          = mKafkaAddress
-        , kafkaClientId         = kafkaClientId'
-        , kafkaConsumerGroup    = EC.lookupConsumerGroup kafkaClientId'
-        , cablePackage = pkg
         }
   race_ (runTheGregor gregorCfg)
       . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))

@@ -98,6 +98,10 @@ gregorUnseqOffset :: Gauge
 gregorUnseqOffset = unsafeRegister . gauge
                   $ Info "gregor_unseq_kafka_offset" "Gauges number of unseq events read"
 
+gregorCheckpointsSent :: Counter
+gregorCheckpointsSent = unsafeRegister . counter
+                      $ Info "gregor_checkpoints_sent" "Number of checkpoints committed from the reader"
+
 timeAction :: (Observer metric, MonadMonitor m, MonadIO m) => metric -> m a -> m a
 timeAction metric act = do
     start <- liftIO $ getTime Monotonic

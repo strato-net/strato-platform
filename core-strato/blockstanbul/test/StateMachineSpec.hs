@@ -38,7 +38,8 @@ import Blockchain.Strato.Model.SHA
 import qualified Network.Haskoin.Crypto as HK
 
 testContext :: BlockstanbulContext
-testContext = newContext (View 20 18) [] [] (fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
+testContext = newContext (Checkpoint (View 20 18) M.empty [] []) (fromMaybe (error "working key now fails")
+            $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5)
 
 runTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
 runTest = runAuthTest . (disableAuth >>)
@@ -125,7 +126,8 @@ spec = parallel $ do
                              }
 
         -- Pretend that in this interval, the block was committed
-        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn` []
+        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn`
+          [ NewCheckpoint (Checkpoint (over sequence (+1) v) M.empty (map sender as) []) ]
         -- The proposer *shouldn't* change, because the round number is the same
         let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
         use proposer `shouldReturn` sender ppr
@@ -157,7 +159,7 @@ spec = parallel $ do
         let omsgs5 = [o | o@(OMsg _ _) <- omsgs5']
             rest5 = omsgs5' \\ omsgs5
         map oMessage omsgs5 `shouldBe` [RoundChange next]
-        rest5 `shouldBe` [ResetTimer 21]
+        rest5 `shouldBe` [ResetTimer 21, NewCheckpoint $ Checkpoint next M.empty (map sender as) []]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
 
@@ -370,7 +372,9 @@ spec = parallel $ do
         use roundChanged `shouldReturn` M.fromList [(sender a1, roundNext), (sender a2, roundNext)]
         use view `shouldReturn` curView
         -- 3 votes will do it
-        sendMessages [IMsg a3 $ RoundChange next] `shouldReturn` [ResetTimer 24]
+        sendMessages [IMsg a3 $ RoundChange next] `shouldReturn`
+          [ResetTimer 24
+          , NewCheckpoint (Checkpoint next M.empty (sort $ map sender [a1, a2, a3]) [])]
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
         use view `shouldReturn` next
@@ -484,7 +488,10 @@ spec = parallel $ do
     it "requests a new block after success" $ property $ \blk ->
       runTest $ do
         setBlock blk
-        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn` [MakeBlockCommand]
+        me <- selfAddr
+        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn`
+          [MakeBlockCommand
+          , NewCheckpoint (Checkpoint (View 20 19) M.empty [me] [])]
 
     it "re-issues the lock after round change" $ property $ \blk sig ->
       runTest $ do
@@ -497,7 +504,9 @@ spec = parallel $ do
             other = resp \\ omsgs
         map oMessage omsgs `shouldBe` [RoundChange roundAndSequencePlus1,
                                        Preprepare roundPlus1 blk]
-        other `shouldBe` [ResetTimer $ _round roundPlus1]
+        other `shouldBe`
+          [ResetTimer $ _round roundPlus1
+          , NewCheckpoint (Checkpoint roundPlus1 M.empty [me] [])]
 
   describe "Authentication" $ do
     let resendLock :: Block -> HK.PrvKey -> HK.PrvKey
