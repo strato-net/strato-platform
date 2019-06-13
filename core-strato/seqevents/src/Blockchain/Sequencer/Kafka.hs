@@ -39,7 +39,6 @@ import qualified Data.ByteString.Lazy       as BL
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Producer     as KW
 import qualified Network.Kafka.Protocol     as KP
-import           Util                       (apMA)
 
 unseqEventsTopicName :: KP.TopicName
 unseqEventsTopicName = lookupTopic "unseqevents"
@@ -106,18 +105,23 @@ emitKafkaTransactions :: (MonadIO m, Accessible (UnseqSink m) m)
 emitKafkaTransactions origin txs = do
     ts <- liftIO getCurrentMicrotime
     let ingestTxs = IETx ts . IngestTx origin <$> txs
-    access Proxy `apMA` ingestTxs
+    sink <- access Proxy
+    sink ingestTxs
 
 emitKafkaBlock :: (Monad m, Accessible (UnseqSink m) m)
                => Origin.TXOrigin -> Block -> m ()
 emitKafkaBlock origin baseBlock = do
     let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
-    access Proxy `apMA` [ingestBlock]
+    sink <- access Proxy
+    sink [ingestBlock]
 
 emitKafkaChainDetails :: (MonadIO m, Accessible (UnseqSink m) m) => Origin.TXOrigin -> Word256 -> ChainInfo -> m ()
 emitKafkaChainDetails origin chainId details = do
     let ingestGenesis = IEGenesis (IngestGenesis origin (chainId, details))
-    access Proxy `apMA` [ingestGenesis]
+    sink <- access Proxy
+    sink [ingestGenesis]
 
 emitBlockstanbulMsg :: (MonadIO m, Accessible (UnseqSink m) m) => PBFT.WireMessage -> m ()
-emitBlockstanbulMsg wm = access Proxy `apMA` [IEBlockstanbul wm]
+emitBlockstanbulMsg wm = do
+  sink <- access Proxy
+  sink [IEBlockstanbul wm]
