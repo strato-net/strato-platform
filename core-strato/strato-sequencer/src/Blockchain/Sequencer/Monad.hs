@@ -75,8 +75,10 @@ import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Metrics
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
+import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
 import           Text.Format
 
@@ -230,23 +232,47 @@ genericDeleteSequencer registry p k = do
 
 instance (SHA `A.Alters` OutputBlock) SequencerM where
   lookup = genericLookupSequencer blockHashRegistry
-  insert = genericInsertSequencer blockHashRegistry
-  delete = genericDeleteSequencer blockHashRegistry
+  insert p k v = do
+    genericInsertSequencer blockHashRegistry p k v
+    sz <- M.size <$> use blockHashRegistry
+    liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
+  delete p k = do
+    genericDeleteSequencer blockHashRegistry p k
+    sz <- M.size <$> use blockHashRegistry
+    liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
 
 instance (SHA `A.Alters` OutputTx) SequencerM where
   lookup = genericLookupSequencer txHashRegistry
-  insert = genericInsertSequencer txHashRegistry
-  delete = genericDeleteSequencer txHashRegistry
+  insert p k v = do
+    genericInsertSequencer txHashRegistry p k v
+    sz <- M.size <$> use txHashRegistry
+    liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
+  delete p k = do
+    genericDeleteSequencer txHashRegistry p k
+    sz <- M.size <$> use txHashRegistry
+    liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
 
 instance (SHA `A.Alters` ChainHashEntry) SequencerM where
   lookup = genericLookupSequencer chainHashRegistry
-  insert = genericInsertSequencer chainHashRegistry
-  delete = genericDeleteSequencer chainHashRegistry
+  insert p k v = do
+    genericInsertSequencer chainHashRegistry p k v
+    sz <- M.size <$> use chainHashRegistry
+    liftIO $ withLabel chainHashRegistrySize "chain_hash_registry" (flip setGauge (fromIntegral sz))
+  delete p k = do
+    genericDeleteSequencer chainHashRegistry p k
+    sz <- M.size <$> use chainHashRegistry
+    liftIO $ withLabel chainHashRegistrySize "chain_hash_registry" (flip setGauge (fromIntegral sz))
 
 instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
   lookup = genericLookupSequencer chainIdRegistry
-  insert = genericInsertSequencer chainIdRegistry
-  delete = genericDeleteSequencer chainIdRegistry
+  insert p k v = do
+    genericInsertSequencer chainIdRegistry p k v
+    sz <- M.size <$> use chainIdRegistry
+    liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
+  delete p k = do
+    genericDeleteSequencer chainIdRegistry p k
+    sz <- M.size <$> use chainIdRegistry
+    liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
 
 instance (SHA `A.Alters` DependentBlockEntry) SequencerM where
   lookup _ k = do

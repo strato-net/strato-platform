@@ -102,6 +102,42 @@ gregorCheckpointsSent :: Counter
 gregorCheckpointsSent = unsafeRegister . counter
                       $ Info "gregor_checkpoints_sent" "Number of checkpoints committed from the reader"
 
+blockHashRegistrySize :: Vector Text Gauge
+blockHashRegistrySize = unsafeRegister
+            . vector "block_hash_registry"
+            . gauge
+            $ Info "block_hash_registry" "Size count for private chain block hash registry"
+
+txHashRegistrySize :: Vector Text Gauge
+txHashRegistrySize = unsafeRegister
+            . vector "tx_hash_registry"
+            . gauge
+            $ Info "tx_hash_registry" "Size count for private chain tx hash registry"
+
+chainHashRegistrySize :: Vector Text Gauge
+chainHashRegistrySize = unsafeRegister
+            . vector "chain_hash_registry"
+            . gauge
+            $ Info "chain_hash_registry" "Size count for private chain chain hash registry"
+
+chainIdRegistrySize :: Vector Text Gauge
+chainIdRegistrySize = unsafeRegister
+            . vector "chain_id_registry"
+            . gauge
+            $ Info "chain_id_registry" "Size count for private chain chain id registry"
+
+getChainsDbSize :: Vector Text Gauge
+getChainsDbSize = unsafeRegister
+            . vector "get_chains_db"
+            . gauge
+            $ Info "get_chains_db" "Size count for private chain get chains db"
+
+getTransactionsDbSize :: Vector Text Gauge
+getTransactionsDbSize = unsafeRegister
+            . vector "get_transactions_db"
+            . gauge
+            $ Info "get_transactions_db" "Size count for private chain get transactions db"
+
 timeAction :: (Observer metric, MonadMonitor m, MonadIO m) => metric -> m a -> m a
 timeAction metric act = do
     start <- liftIO $ getTime Monotonic
