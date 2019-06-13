@@ -161,13 +161,15 @@ runTheGregor cfg = race_ (runGregorM cfg unseqReader)
 initializeCheckpoint :: [Address] -> [Address] -> GregorM Checkpoint
 initializeCheckpoint vals admins = do
   meta <- snd <$> getNextOffsetAndMetadata
+  $logDebugLS "initializeCheckpoint" meta
   case decodeMeta meta of
-       Left err -> do
-         $logErrorS "initializeCheckpoint" . T.pack $
-             "unable to decode pbft checkpoint " ++ show err
-         return def{checkpointValidators=vals, checkpointAdmins=admins}
-       Right kafkaCkpt -> return kafkaCkpt
-
+       Left err -> error $ "corrupt metadata in initializeCheckpoint:" ++ show err
+       Right kafkaCkpt ->
+        if null (checkpointValidators kafkaCkpt)
+          then do
+            $logInfoS "initializeCheckpoin" "No validators in checkpoint -- setting by flags"
+            return kafkaCkpt{checkpointValidators=vals, checkpointAdmins=admins}
+          else return kafkaCkpt
 
 unseqReader :: GregorM ()
 unseqReader = forever . timeAction gregorUnseqTiming $ do
