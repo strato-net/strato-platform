@@ -16,6 +16,7 @@ import           Control.Monad.IO.Unlift
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Crypto.Types.PubKey.ECC
+import           Data.Bits                             (shiftL)
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import           Conduit
@@ -28,6 +29,7 @@ import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Void
+import           Text.Printf
 import           UnliftIO.Concurrent                   hiding (yield)
 import           UnliftIO.Exception
 import           UnliftIO.STM
@@ -263,7 +265,14 @@ bytesToMessages = forever $ do
     objBytes <- getRLPData
     yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
+maxMessageSize :: Int
+maxMessageSize = 1 `shiftL` 24
+
 messageToBytes :: Monad m => ConduitM Message B.ByteString m ()
 messageToBytes = mapC $ \msg ->
   let (theWord, o) = wireMessage2Obj msg
-  in theWord `B.cons` rlpSerialize o
+      bs = theWord `B.cons` rlpSerialize o
+  in if B.length bs >= maxMessageSize
+        then error $ printf "messageToBytes: message (%s...) too large for TCP send (%d >= %d)"
+                            (take 50 $ show msg) (B.length bs) maxMessageSize
+        else bs
