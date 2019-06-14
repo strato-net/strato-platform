@@ -120,24 +120,27 @@ async function updateHealthStat(healthStatus) {
 
 async function updateCurrentHealth(overallStat) {
     let currentTime = Date.now();
-    await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
+    let [stat, created] = await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
             latestHealthStatus: overallStat[0],
             latestCheckTimestamp: currentTime,
             additionalInfo: overallStat[1].toString(),
             lastFailureTimestamp: currentTime  // default first time marked as failure
-        }}).then(([stat, created]) => {
-        if (!created){
-            stat.update(
-                {latestCheckTimestamp: currentTime,
-                    latestHealthStatus: overallStat[0],
-                    additionalInfo: overallStat[1].toString(),
-                    lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
-                }, {where: {processName: 'HealthStat'}})
-            stat;
         }
-    }).catch(err => {
-        winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
-    });
+    })
+    if (!created) {
+      await stat.update(
+          {
+            latestCheckTimestamp: currentTime,
+            latestHealthStatus: overallStat[0],
+            additionalInfo: overallStat[1].toString(),
+            lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
+          },
+          {
+            where: {processName: 'HealthStat'}
+          }
+      );
+    }
+    return
 }
 
 function formatPromethusTimestamp(timestamp) {
