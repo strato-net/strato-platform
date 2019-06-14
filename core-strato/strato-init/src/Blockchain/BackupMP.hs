@@ -29,7 +29,7 @@ import           Blockchain.SHA
 import           Blockchain.Strato.Model.SHA        (keccak256)
 import           Blockchain.Stream.VMEvent
 
-addBlock::(HasSQLDB m)=>BL.ByteString->m ()
+addBlock :: HasSQLDB m => BL.ByteString -> m ()
 addBlock blockData = do
   _ <- produceVMEvents [ChainBlock $ rlpDecode $ rlpDeserialize $ decodeWithCheck $ BL.toStrict blockData]
 --       produceMessages $ map (TopicAndMessage (lookupTopic "block") . makeMessage) [decodeWithCheck $ BL.toStrict blockData]

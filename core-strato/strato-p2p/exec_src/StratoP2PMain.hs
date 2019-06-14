@@ -7,6 +7,7 @@ import           Network.Wai.Middleware.Prometheus
 
 import           Blockchain.Options         ()
 import           Blockchain.Output
+import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
 import           Blockapps.Crossmon
@@ -14,6 +15,7 @@ import           Blockapps.Crossmon
 main :: IO ()
 main = do
   initializeHealthChecks "strato_p2p"
+  resetPeers
   _ <- $initHFlags "Strato P2P"
   race_
     (run 10248 metricsApp)

@@ -97,8 +97,7 @@ main = do
       let state = mkConfiguredKafkaState ("slipstream" :: KafkaClientId) . fromIntegral $ flags_kafkaMaxBytes
 
       gref <- newGlobals handle
-
-      lift . runKafka state $ getAndProcessMessages env conn gref 0 0
+      lift . runKafka state $ getAndProcessMessages env conn gref
     case msg of
       Left e -> liftIO . die $ show e
       Right () -> $logInfoS "main" "completing successfully"

@@ -122,42 +122,43 @@ async function updateCurrentHealth(overallStat) {
     let currentTime = Date.now();
     let [systemInfoStatus, systemInfo] = await checkSystemInfo();
 
-    await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
+    let [stat, created] = await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
             latestHealthStatus: overallStat[0],
             latestCheckTimestamp: currentTime,
             additionalInfo: overallStat[1].toString(),
             lastFailureTimestamp: currentTime  // default first time marked as failure
-        }}).then(([stat, created]) => {
-        if (!created){
-            stat.update(
-                {latestCheckTimestamp: currentTime,
-                    latestHealthStatus: overallStat[0],
-                    additionalInfo: overallStat[1].toString(),
-                    lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
-                }, {where: {processName: 'HealthStat'}})
-            stat;
         }
-    }).catch(err => {
-        winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
-    });
-  await models.CurrentHealth.findOrCreate({where: {processName: 'SystemInfoStat'}, defaults: {
-      latestHealthStatus: systemInfoStatus,
-      latestCheckTimestamp: currentTime,
-      additionalInfo: JSON.stringify(systemInfo),
-      lastFailureTimestamp: currentTime  // default first time marked as failure
-    }}).then(([stat, created]) => {
-    if (!created){
-      stat.update(
+    })
+    if (!created) {
+      await stat.update(
+          {
+            latestCheckTimestamp: currentTime,
+            latestHealthStatus: overallStat[0],
+            additionalInfo: overallStat[1].toString(),
+            lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
+          },
+          {
+            where: {processName: 'HealthStat'}
+          }
+      );
+    }
+    let [statSys, createdSys] = await models.CurrentHealth.findOrCreate({where: {processName: 'SystemInfoStat'}, defaults: {
+          latestHealthStatus: systemInfoStatus,
+          latestCheckTimestamp: currentTime,
+          additionalInfo: JSON.stringify(systemInfo),
+          lastFailureTimestamp: currentTime  // default first time marked as failure
+    }})
+    if (!createdSys){
+      await statSys.update(
           {latestCheckTimestamp: currentTime,
             latestHealthStatus: systemInfoStatus,
             additionalInfo: JSON.stringify(systemInfo),
-            lastFailureTimestamp: systemInfoStatus ? stat.lastFailureTimestamp : currentTime
-          }, {where: {processName: 'SystemInfoStat'}})
-      stat;
+            lastFailureTimestamp: systemInfoStatus ? statSys.lastFailureTimestamp : currentTime
+          },
+          {where: {processName: 'SystemInfoStat'}
+          })
     }
-  }).catch(err => {
-    winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
-  });
+    return
 }
 
 function formatPromethusTimestamp(timestamp) {

@@ -1,5 +1,10 @@
 ## RELEASE NOTES
 
+### Version 7.4
+
+-   Refactor ba-rest to only use oauth
+-   Add pingOauth endpoint
+
 ### Version 7.3.1
 
 -   Output the OAuth sign-in URL to command line when using oauth-client (token-getter)

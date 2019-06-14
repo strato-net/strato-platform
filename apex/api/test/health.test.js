@@ -127,15 +127,11 @@ describe('Tests - Node-level Health Check', function () {
     const checkRes = await stallCheckJs.getCurrentHealth(lastP, lastV, thisV);
     assert.equal(checkRes[0], false, "Unhealthy");
     await stallCheckJs.updateCurrentHealth(checkRes);
-    let currentStat;
-    for (let i = 0; i < 3; i++) {
-      currentStat = await models.CurrentHealth.findOne({
-        where: {
-          processName: "StallStat",
-        },
-      })
-    }
-    ;
+    const currentStat = await models.CurrentHealth.findOne({
+      where: {
+        processName: "StallStat",
+      },
+    });
     assert.equal(currentStat.dataValues.latestHealthStatus, false, 'Current Health')
     assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
     assert.equal(currentStat.dataValues.isLastPending, true, 'isPending')
@@ -154,15 +150,11 @@ describe('Tests - Node-level Health Check', function () {
     const checkRes = await stallCheckJs.getCurrentHealth(lastP, lastV, thisV);
     assert.equal(checkRes[0], true, "Healthy");
     await stallCheckJs.updateCurrentHealth(checkRes);
-    let currentStat;
-    for (let i = 0; i < 3; i++) {
-      currentStat = await models.CurrentHealth.findOne({
-        where: {
-          processName: "StallStat",
-        },
-      })
-    }
-    ;
+    const currentStat = await models.CurrentHealth.findOne({
+      where: {
+        processName: "StallStat",
+      },
+    });
 
     assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
     assert.equal(currentStat.dataValues.isBlocksValidInc, true, 'isInc')
@@ -182,15 +174,11 @@ describe('Tests - Node-level Health Check', function () {
     const checkRes = await stallCheckJs.getCurrentHealth(lastP, lastV, thisV);
     assert.equal(checkRes[0], true, "Healthy");
     await stallCheckJs.updateCurrentHealth(checkRes);
-    let currentStat;
-    for (let i = 0; i < 3; i++) {
-      currentStat = await models.CurrentHealth.findOne({
-        where: {
-          processName: "StallStat",
-        },
-      })
-    }
-    ;
+    const currentStat = await models.CurrentHealth.findOne({
+      where: {
+        processName: "StallStat",
+      },
+    });
     assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
     assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
     assert.equal(currentStat.dataValues.isLastPending, false, 'isPending')

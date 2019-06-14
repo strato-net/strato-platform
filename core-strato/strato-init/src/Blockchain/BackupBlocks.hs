@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.BackupBlocks (
@@ -6,9 +7,9 @@ module Blockchain.BackupBlocks (
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Data.ByteString        as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8  as BC8
+import qualified Data.ByteString             as B
+import qualified Data.ByteString.Base16      as B16
+import qualified Data.ByteString.Char8       as BC8
 import           Network.Kafka
 import           Network.Kafka.Producer
 
@@ -17,8 +18,8 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 
-import qualified Data.IORef             as IORef
-import qualified System.IO.Unsafe       as YOUR_CODE_IS_SHIT
+import qualified Data.IORef                  as IORef
+import qualified System.IO.Unsafe            as YOUR_CODE_IS_SHIT
 
 decodeWithCheck::B.ByteString->B.ByteString
 decodeWithCheck x =
@@ -30,7 +31,7 @@ decodeWithCheck x =
 blockCounter :: IORef.IORef Integer
 blockCounter = YOUR_CODE_IS_SHIT.unsafePerformIO $ IORef.newIORef 1
 
-backupBlocks::HasSQLDB m=>m ()
+backupBlocks :: HasSQLDB m => m ()
 backupBlocks = do
   liftIO $ putStrLn "Start backupBlocks"
   liftIO $ putStrLn "Start backupBlocks => produceUnseqEvents"

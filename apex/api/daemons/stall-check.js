@@ -126,24 +126,28 @@ async function getCurrentHealth(lastP, lastV, thisV){
 
 async function updateCurrentHealth(overallStat){
     let currentTime = Date.now();
-    await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
-            latestHealthStatus: overallStat[0],
-            latestCheckTimestamp: currentTime,
-            lastFailureTimestamp: currentTime,   //default first time marked as failure
-            isBlocksValidInc: overallStat[1],
-            isLastPending: overallStat[2]
-        }}).then(([stat, created]) => {
-            if (!created){
-                stat.update(
-                    {latestCheckTimestamp: currentTime,
-                     latestHealthStatus: overallStat[0],
-                     isBlocksValidInc: overallStat[1],
-                     lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime,
-                     isLastPending:    overallStat[2]
-                    }, {where: {processName: 'StallStat'}})
-        }}).catch(err => {
-        winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
-    });
+    let [stat, created] = await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
+        latestHealthStatus: overallStat[0],
+        latestCheckTimestamp: currentTime,
+        lastFailureTimestamp: currentTime,   //default first time marked as failure
+        isBlocksValidInc: overallStat[1],
+        isLastPending: overallStat[2]
+    }});
+    if (!created){
+        await stat.update(
+            {
+                latestCheckTimestamp: currentTime,
+                latestHealthStatus: overallStat[0],
+                isBlocksValidInc: overallStat[1],
+                lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime,
+                isLastPending: overallStat[2]
+            }, 
+            {
+                where: {processName: 'StallStat'}
+            }
+        );
+    }
+    return
 }
 
 async function updateStallStat(blocksValid, blocksPending){

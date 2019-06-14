@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 
 module Blockchain.Data.Extra
     ( getGenesisHash

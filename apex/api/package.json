@@ -48,7 +48,7 @@
     "multer-s3": "2.7.0",
     "node-diskfree": "^0.1.0",
     "path": "0.12.7",
-    "pg": "7.3.0",
+    "pg": "^6.4.1",
     "pg-hstore": "2.3.2",
     "pgtools": "0.3.0",
     "rand-token": "0.3.0",

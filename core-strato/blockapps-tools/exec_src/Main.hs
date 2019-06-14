@@ -19,6 +19,7 @@ import           DumpKafkaUnSequencer
 import           DumpRedis
 import           FRawMP
 import           Hash
+import           InsertP2P
 import           InsertTX
 import           Psql
 import           Raw
@@ -27,6 +28,8 @@ import           RLP
 import           State
 
 import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.Address
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 import           Data.Int
@@ -53,6 +56,8 @@ data Options = State{root::String, db::String}
              | CanonRedis{ipAddress::String, start::Int, range::Int}
              | Psql{}
              | InsertTX{}
+             | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
+             | PushBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -69,7 +74,7 @@ canonRedisOptions =
     start := def += typ "STARTINGBLOCK" += argPos 1,
     range := def += typ "RANGE" += argPos 2
   ]
-  
+
 redisOptions :: Annotate Ann
 redisOptions =
   record DumpRedis{databaseNumber=undefined} [
@@ -197,6 +202,22 @@ checkpointOptions =
         ]
     where nil = undefined
 
+askOptions :: Annotate Ann
+askOptions =
+  record AskForBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = 0x0}
+         [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block"
+         , endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block"
+         , peer := 0x0 += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
+         ]
+
+pushOptions :: Annotate Ann
+pushOptions =
+  record PushBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = 0x0}
+         [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block"
+         , endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block"
+         , peer := 0x0 += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
+         ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -219,7 +240,10 @@ options = modes_ [blockGoOptions
                 , rawOptions
                 , redisOptions
                 , rlpOptions
-                , stateOptions]
+                , stateOptions
+                , askOptions
+                , pushOptions
+                ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
 
@@ -253,6 +277,8 @@ run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
 run Psql{}                     = psql
 run InsertTX{}                 = insertTX
 run Checkpoints{..}            = case operation of
-    Get           -> doCheckpointGet service
-    Put           -> doCheckpointPut service (fromIntegral <$> offset) cp
-    NullOperation -> doCheckpointUsage
+      Get           -> doCheckpointGet service
+      Put           -> doCheckpointPut service (fromIntegral <$> offset) cp
+      NullOperation -> doCheckpointUsage
+run AskForBlocks{..}           = insertP2P (OEAskForBlocks startBlock endBlock peer)
+run PushBlocks{..}             = insertP2P (OEPushBlocks startBlock endBlock peer)

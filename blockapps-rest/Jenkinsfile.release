@@ -36,25 +36,26 @@ pipeline {
           cd strato-getting-started
           ./strato --compose
           ./strato --pull
-          OAUTH_JWT_VALIDATION_ENABLED=true \
-            OAUTH_STRATO42_FALLBACK=true \
+          OAUTH_ENABLED=true \
+            OAUTH_CLIENT_ID=localhost-80-infinite \
+            OAUTH_CLIENT_SECRET=adac9a89-ee8b-4683-b043-084ae14ef776 \
             OAUTH_JWT_USERNAME_PROPERTY=email \
-            OAUTH_JWT_VALIDATION_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
+            OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
             ./strato --single
           docker ps
           counter=0
           # Few quick tests
-          until curl --silent --output /dev/null --fail --location http://localhost/bloc/v2.2/users/
+          until curl --silent --output /dev/null --fail --location http://localhost/health
           do
             if [[ "$counter" -gt 120 ]]; then
-              echo "bloc took longer than 2 minutes to initialize! aborting."
+              echo "STRATO took longer than 2 minutes to initialize! aborting."
               exit 73
             fi
-            echo "waiting for bloc to be available through nginx"
+            echo "waiting for STRATO to be available through nginx"
             counter=$((counter+1))
             sleep 1
           done
-          echo "bloc is available through nginx - node is running"
+          echo "STRATO is available through nginx - node is running"
         '''
       }
     }

@@ -116,21 +116,26 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
   insert _ = MP.genericInsertDB $ asks stateDB
   delete _ = MP.genericDeleteDB $ asks stateDB
 
-instance HasRawStorageDB SetupDBM where
-  getRawStorageTxDB = do
+instance HasMemRawStorageDB SetupDBM where
+  getMemRawStorageTxDB = do
     cxt <- ask
     lst <- liftIO . readIORef .localStorageTx $ cxt
     return (stateDB cxt, lst)
-  putRawStorageTxMap theMap = do
+  putMemRawStorageTxMap theMap = do
     lstref <- asks localStorageTx
     liftIO $ atomicWriteIORef lstref theMap
-  getRawStorageBlockDB = do
+  getMemRawStorageBlockDB = do
     cxt <- ask
     lsb <- liftIO . readIORef . localStorageBlock $ cxt
     return (stateDB cxt, lsb)
-  putRawStorageBlockMap theMap = do
+  putMemRawStorageBlockMap theMap = do
     lsbref <- asks localStorageBlock
     liftIO $ atomicWriteIORef lsbref theMap
+
+instance (RawStorageKey `A.Alters` RawStorageValue) SetupDBM where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
 
 instance HasMemAddressStateDB SetupDBM where
   getAddressStateTxDBMap = liftIO . readIORef =<< asks localAddressStateTx
@@ -157,8 +162,8 @@ instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   insert _ = genericInsertHashDB $ asks hashDB
   delete _ = genericDeleteHashDB $ asks hashDB
 
-instance HasSQLDB SetupDBM where
-  getSQLDB = asks sqlDB
+instance Mod.Accessible SQLDB SetupDBM where
+  access _ = asks sqlDB
 
 instance Mod.Accessible RBDB.RedisConnection SetupDBM where
   access _ = asks redisDB

@@ -7,12 +7,13 @@ import { TxResultStatus } from "../constants";
 
 import dotenv from "dotenv";
 
-const loadEnv = dotenv.config();
-assert.isUndefined(loadEnv.error);
+if (!process.env.USER_TOKEN) {
+  const loadEnv = dotenv.config();
+  assert.isUndefined(loadEnv.error);
+}
 
 const config = factory.getTestConfig();
 const fixtures = factory.getTestFixtures();
-const testAuth = true;
 const logger = console;
 
 describe("rest_7", function() {
@@ -21,9 +22,15 @@ describe("rest_7", function() {
   const options = { config, logger };
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
+  });
+
+  describe("oauthPing", function() {
+    it("ping - oauth authorized", async () => {
+      const result = await rest.pingOauth(admin, options)
+      assert.equal(result, "success")
+    });
   });
 
   describe("contract call", function() {
@@ -83,7 +90,7 @@ describe("rest_7", function() {
         );
       });
       // must resolve the tx before continuing to the next test
-      await rest.resolveResults(pendingTxResultList, options);
+      await rest.resolveResults(admin, pendingTxResultList, options);
     });
 
     it("callList - async - BAD_REQUEST", async () => {
@@ -153,7 +160,7 @@ describe("rest_7", function() {
         true
       );
       assert.isOk(verifyHashes, "hash");
-      const results = await rest.resolveResults(pendingResults, options);
+      const results = await rest.resolveResults(admin, pendingResults, options);
       const verifyStatus = results.reduce(
         (a, r) => a && r.status !== TxResultStatus.PENDING,
         true
@@ -177,7 +184,7 @@ describe("rest_7", function() {
     });
 
     // when this test fails, the bug has been fixed and the above tests should be reactivated
-    it("create contract list - INTERNAL_SERVER_ERROR 500 - when this test fails, STRATO-1331 was fixed", async () => {
+    it.skip("create contract list - INTERNAL_SERVER_ERROR 500 - when this test fails, STRATO-1331 was fixed", async () => {
       const count = 5;
       const contracts = factory.createContractListArgs(count);
       await assert.restStatus(async () => {
@@ -192,7 +199,10 @@ describe("rest_7", function() {
       const callArgs = factory.createCallArgs(contract, method, { var2 });
       const [result] = await rest.call(admin, callArgs, {
         ...options,
-        VM: "SolidVM"
+        config: {
+          ...options.config,
+          VM: "SolidVM"
+        }
       });
       assert.equal(parseInt(result), var1 * var2, "call results");
     });
@@ -201,7 +211,10 @@ describe("rest_7", function() {
       const callArgs = factory.createCallArgs(contract, method, { var2 });
       await assert.restStatus(
         async () => {
-          return rest.call(admin, callArgs, { ...options, VM: "BAD_VM" });
+          return rest.call(admin, callArgs, {
+            ...options,
+            config: { ...options.config, VM: "BAD_VM" }
+          });
         },
         RestStatus.BAD_REQUEST,
         /BAD_VM/
@@ -214,8 +227,7 @@ describe("rest_7", function() {
     let user2;
 
     before(async () => {
-      const uid = util.uid();
-      const user2Args = testAuth ? { token: process.env.USER2_TOKEN } : { uid };
+      const user2Args = { token: process.env.USER2_TOKEN };
       user2 = await factory.createAdmin(user2Args, options);
     });
 
@@ -237,7 +249,7 @@ describe("rest_7", function() {
       });
       assert.isOk(util.isHash(pendingTxResult.hash), "hash");
       // must resolve the transaction before the next test
-      await rest.resolveResult(pendingTxResult, options);
+      await rest.resolveResult(admin, pendingTxResult, options);
     });
 
     it("sendMany - sync", async () => {
@@ -302,8 +314,7 @@ describe("search until", function() {
   let admin, contract;
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -327,7 +338,7 @@ describe("search until", function() {
     function predicate(data) {
       return data.length > 0;
     }
-    const result = await rest.searchUntil(contract, predicate, options);
+    const result = await rest.searchUntil(admin, contract, predicate, options);
     assert.isArray(result, "should be array");
     assert.lengthOf(result, 1, "array has length of 1");
     assert.equal(result[0].address, contract.address, "address");
@@ -338,7 +349,7 @@ describe("search until", function() {
     function predicate() {}
 
     try {
-      await rest.searchUntil(contract, predicate, options);
+      await rest.searchUntil(admin, contract, predicate, options);
     } catch (err) {
       assert.equal(
         err.message,
@@ -360,7 +371,7 @@ describe("search until", function() {
       return false;
     }
 
-    const result = await rest.searchUntil(contract, predicate, options);
+    const result = await rest.searchUntil(admin, contract, predicate, options);
     assert.isArray(result, "should be array");
     assert.lengthOf(result, 1, "array has length of 1");
     assert.equal(result[0].address, contract.address, "address");
@@ -374,8 +385,7 @@ describe("search query", function() {
   let admin;
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -393,7 +403,12 @@ describe("search query", function() {
       return data.length >= count;
     }
 
-    const results = await rest.searchUntil(contracts[0], predicate, options);
+    const results = await rest.searchUntil(
+      admin,
+      contracts[0],
+      predicate,
+      options
+    );
     assert.isArray(results, "should be array");
     assert.lengthOf(results, count, `array has length of ${count}`);
     // check all
@@ -418,12 +433,12 @@ describe("search query", function() {
       return data.length >= count;
     }
 
-    await rest.searchUntil(contracts[0], predicate, options);
+    await rest.searchUntil(admin, contracts[0], predicate, options);
 
     // search by address
     for (let i = 0; i < count; i++) {
       const contract = contracts[i];
-      const result = await rest.waitForAddress(contract, options);
+      const result = await rest.waitForAddress(admin, contract, options);
       assert.isDefined(result, "Result should be defined");
       assert.isDefined(result.address, "Result.address should be defined");
       assert.equal(result.address, contract.address, "address");
@@ -436,7 +451,7 @@ describe("search query", function() {
       const query = {
         intValue: `eq.${intValue(uid, i)}`
       };
-      const results = await rest.search(contract, { query, ...options });
+      const results = await rest.search(admin, contract, { query, ...options });
       assert.lengthOf(results, 1, "one result");
       const result = results[0];
       assert.equal(result.address, contract.address, "address");
@@ -449,7 +464,7 @@ describe("search query", function() {
       const query = {
         stringValue: `eq.${stringValue(uid, i)}`
       };
-      const results = await rest.search(contract, { query, ...options });
+      const results = await rest.search(admin, contract, { query, ...options });
       assert.lengthOf(results, 1, "one result");
       const result = results[0];
       assert.equal(result.address, contract.address, "address");
@@ -464,7 +479,7 @@ describe("search query", function() {
         stringValue: `eq.${stringValue(uid, i)}`,
         address: `eq.${contract.address}`
       };
-      const results = await rest.search(contract, { query, ...options });
+      const results = await rest.search(admin, contract, { query, ...options });
       assert.lengthOf(results, 1, "one result");
       const result = results[0];
       assert.equal(result.address, contract.address, "address");
@@ -478,14 +493,17 @@ describe("search query", function() {
         intValue: `eq.666`,
         address: `eq.${contract.address}`
       };
-      const results = await rest.search(contract, { query, ...options });
+      const results = await rest.search(admin, contract, { query, ...options });
       assert.lengthOf(results, 0, "no results");
     }
     // search by like
     const query = {
       stringValue: `like._${uid}*`
     };
-    const results = await rest.search(contracts[0], { query, ...options });
+    const results = await rest.search(admin, contracts[0], {
+      query,
+      ...options
+    });
     assert.lengthOf(results, count, "all found");
   });
 
@@ -510,7 +528,7 @@ describe("search query", function() {
       return data.length >= count;
     }
 
-    await rest.searchUntil(contracts[0], predicate, options);
+    await rest.searchUntil(admin, contracts[0], predicate, options);
 
     // search by address
     for (let i = 0; i < count; i++) {
@@ -518,7 +536,7 @@ describe("search query", function() {
       const query = {
         stringValue: `eq.${stringValue(uid, i) + specialCharacters}`
       };
-      const results = await rest.search(contract, { query, ...options });
+      const results = await rest.search(admin, contract, { query, ...options });
       assert.lengthOf(results, 1, "one result");
       const result = results[0];
       assert.equal(result.address, contract.address, "address");
@@ -544,13 +562,12 @@ describe("chain", function() {
     ]);
     const contract = { name };
     chainArgs = chain;
-    const result = await rest.createChain(chain, contract, options);
+    const result = await rest.createChain(admin, chain, contract, options);
     return result;
   }
 
   before(async () => {
-    const uid = util.uid();
-    const userArgs = testAuth ? { token: process.env.USER_TOKEN } : { uid };
+    const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -569,7 +586,7 @@ describe("chain", function() {
     await util.timeout(1000);
 
     // verify chain data
-    const result = await rest.getChain(chainId, options);
+    const result = await rest.getChain(admin, chainId, options);
     assert.equal(result.info.label, chainArgs.label, "chain label");
     assert.equal(result.id, chainId, "chainId");
   });
@@ -580,7 +597,7 @@ describe("chain", function() {
     // This is to wait until data is available on the chain
     await util.timeout(1000);
     // get all chain
-    const result = await rest.getChains([], options);
+    const result = await rest.getChains(admin, [], options);
 
     assert.isArray(result, "should be array");
     assert.isAbove(result.length, 0, "should be greater than 0");
@@ -592,7 +609,7 @@ describe("chain", function() {
     // This is to wait until data is available on the chain
     await util.timeout(1000);
     // get all chain
-    const result = await rest.getChains([chainId], options);
+    const result = await rest.getChains(admin, [chainId], options);
 
     assert.isArray(result, "should be array");
     assert.equal(result.length, 1, "should be 1");
