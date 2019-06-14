@@ -121,23 +121,17 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-3 popover__wrapper"
+          <div className="col-sm-3 popover_wrapper"
                onMouseEnter={this.handleMouseHover}
                onMouseLeave={this.handleMouseHover}>
               <NumberCard
-                          className = "popover__title"
+                          className = "popover_title"
                            number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
                            description= {connection ? (sec2Date(uptime)):"No Connection"}
                            mode={(health && systemHealth) ? 'success':'warning' }
                            iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
                          />
-
-                       {(this.state.isHovering && !systemHealth) && <Popover
-
-                           warnings = {systemWarnings}
-
-                       />}
-
+                       {(this.state.isHovering && !systemHealth) && <Popover warnings = {systemWarnings}/>}
           </div>
           <div className="col-sm-3">
             <Link to="/blocks">
