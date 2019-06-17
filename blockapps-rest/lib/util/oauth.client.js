@@ -6,20 +6,35 @@ import tcpPortUsed from 'tcp-port-used'
 import http from 'http'
 import open from 'open'
 import qs from 'query-string'
+const envPath = '.env'
+//const loadEnv = dotenv.config()
+
+if (!fs.existsSync(envPath)){
+  fs.appendFile(envPath, '', function (err) {
+    if (err) throw err;
+    console.log('.env file is created successfully.');
+  });
+}
+
+const envConfig = fs.readFileSync(envPath)
 
 commander
   .option(
-    '-c, --config [path]', 
-    'Config file', 
+    '-c, --config [path]',
+    'Config file',
     'config.yaml')
   .option(
-    '-p, --port [number]', 
-    'Port on which to run web server for token exchange', 
+    '-p, --port [number]',
+    'Port on which to run web server for token exchange',
     '8000')
   .option(
     '-f, --flow [oauth-flow]',
-    'The oauth flow to user. Valid options are "client-credential" (default) or "authorization-code"', 
+    'The oauth flow to user. Valid options are "client-credential" (default) or "authorization-code"',
     'client-credential')
+  .option(
+    '-e, --env [tokenName]',
+    'Create a .env file to include the specified token'
+  )
   .parse(process.argv)
 
 if (!fs.existsSync(commander.config)) {
@@ -56,7 +71,7 @@ const run = async function () {
   const oauth = oauthUtil.init(config.nodes[0].oauth)
 
   switch(commander.flow) {
-    case 'client-credential': 
+    case 'client-credential':
       if(config.nodes[0].oauth.clientId === undefined
         || config.nodes[0].oauth.clientSecret === undefined
       ) {
@@ -64,6 +79,15 @@ const run = async function () {
         process.exit(5)
       }
       const ccToken = await oauth.getAccessTokenByClientSecret()
+      //process.env[commander.env] = ccToken.token.access_token;
+      envConfig[commander.env] = ccToken.token.access_token;
+      fs.writeFile(envPath, (envConfig), function(err) {
+        if(err) {
+          return console.log(err);
+        }
+        console.log(".env file was saved!");
+      });
+
       console.log('Token obtained by client credential flow is:')
       console.log(JSON.stringify(ccToken,null,2))
       break;
@@ -87,6 +111,14 @@ const run = async function () {
             process.exit(7)
           }
           const acToken = await oauth.getAccessTokenByAuthCode(query.code);
+          envConfig[commander.env] = acToken.token.access_token;
+          fs.writeFile(envPath, JSON.stringify(envConfig), function(err) {
+            if(err) {
+              return console.log(err);
+            }
+            console.log(".env file was saved!");
+          });
+
           console.log('Token obtained by authorization code flow is:')
           console.log(JSON.stringify(acToken,null,2))
           res.writeHead(200,{ 'Content-Type': 'text/html; charset=utf-8'})
@@ -188,14 +220,14 @@ const run = async function () {
       const signinUri = oauth.getSigninURL()
 
       console.log(`Open sign-in URL in your browser to sign-in with OAuth and fetch token: ${signinUri}`);
-      
+
       // launch browser
       await open(signinUri)
 
 
       break;
   }
-  
+
 
 
 }
