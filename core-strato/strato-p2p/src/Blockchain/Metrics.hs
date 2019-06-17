@@ -13,14 +13,17 @@ module Blockchain.Metrics ( recordEvent
                           , recordEmptyQueue
                           , recordWatchdogPet
                           , recordWatchdogWake
+                          , recordTraffic
                           ) where
 
 import Control.Exception
 import Control.Monad.IO.Class
+import qualified Data.ByteString as B
 import Data.Text
 import Data.Typeable
 import Prometheus
 
+import Blockchain.Display (MsgDirection(..))
 import Blockchain.EventModel
 import Blockchain.Data.Wire
 import Blockchain.Strato.Discovery.Data.Peer (PPeer(..))
@@ -149,3 +152,18 @@ recordWatchdogPet = liftIO $ withLabel watchdogActions "pet" incCounter
 
 recordWatchdogWake :: MonadIO m => m ()
 recordWatchdogWake = liftIO $ withLabel watchdogActions "wake" incCounter
+
+
+{-# NOINLINE traffic #-}
+traffic :: Vector (Text, Text) Counter
+traffic = unsafeRegister
+        . vector ("direction", "type")
+        . counter
+        $ Info "p2p_traffic" "Number and lengths of inbound/outbound messages"
+
+
+recordTraffic :: MonadIO m => MsgDirection -> B.ByteString -> m ()
+recordTraffic dir msg = liftIO $ do
+  let dirLabel = if dir == Inbound then "recv" else "send"
+  withLabel traffic (dirLabel, "count") incCounter
+  withLabel traffic (dirLabel, "bytes") $ \c -> unsafeAddCounter c (fromIntegral $ B.length msg)

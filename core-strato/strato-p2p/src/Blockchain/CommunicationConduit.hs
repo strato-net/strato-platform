@@ -82,6 +82,7 @@ mkEthP2PEventSource app inCtx ks = do
   merged <- mergeSourcesByForce (
     [ appSource app
         .| ethDecrypt inCtx
+        .| CL.iterM (recordTraffic Inbound)
         .| bytesToMessages
         .| CL.iterM (displayMessage Inbound (show $ appSockAddr app))
         .| CL.map MsgEvt
@@ -116,6 +117,7 @@ mkEthP2PEventConduit str outCtx = do
         .| CL.iterM (displayMessage Outbound str)
         .| CL.iterM (const $ petWatchdog sendWatchdog)
         .| messageToBytes
+        .| CL.iterM (recordTraffic Outbound)
         .| ethEncrypt outCtx
 
 debounceTxSends :: MonadIO m => ConduitT (Either P2PCNC Message) Message m ()
