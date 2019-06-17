@@ -159,6 +159,9 @@ class HasNamespace a where
   default namespaced :: Binary (NSKey a) => Mod.Proxy a -> NSKey a -> B.ByteString
   namespaced p = BL.toStrict . BL.append (namespace p) . encode
 
+isInNamespace :: HasNamespace a => Mod.Proxy a -> BL.ByteString -> Bool
+isInNamespace = BL.isPrefixOf . namespace
+
 instance HasNamespace OutputBlock where
   type NSKey OutputBlock = SHA
   namespace _ = "bh:"
