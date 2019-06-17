@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module RSVP (rsvp) where
 
-import Control.Exception
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as C8
 import System.Exit
@@ -22,10 +21,8 @@ rsvp chainId member addr = do
       blkHash = SHA 0x7065
       govAddr = 0x100
       bloom = 0x0
-      -- TODO: For now, member has to be an enode address and > 31 bytes. In the
-      -- future, I think this would be the wrong encoding if it was e.g. a VM address as a string.
       memberLen = fromIntegral $ length member
-      payload = assert (memberLen > 31) $ word256ToBytes (fromIntegral addr) <> word256ToBytes 0x0 <> word256ToBytes memberLen <> C8.pack member
+      payload = word256ToBytes (fromIntegral addr) <> word256ToBytes 0x0 <> word256ToBytes memberLen <> C8.pack member
       entry = LogDB blkHash txHash (Just $ chainId) govAddr (Just $ unSHA addTopic) Nothing Nothing Nothing payload bloom
   result <- runKafkaConfigured "queryStrato" $ do
     let req = [LogDBEntry entry]
