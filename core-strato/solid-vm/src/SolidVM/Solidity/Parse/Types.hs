@@ -43,12 +43,14 @@ simpleType =
         string "bytes"
         let sizesS = reverse $ map show [1::Int .. 32]
         size <- read <$> choice (map (try . string) sizesS)
+        space
         return $ Xabitype.Bytes Nothing $ Just size
       )
     intSuffixed base baseType = lexeme $ try $ do
       string base
       let sizesS = reverse $ map show [8::Int, 16 .. 256]
       sizeM <- optionMaybe $ choice $ map (try . string) sizesS
+      space
       return . baseType $ (`quot` 8) . read <$> sizeM -- in bytes
 
 -- | Parses array types, allowing arithmetic expressions to specify the
