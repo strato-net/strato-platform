@@ -164,6 +164,7 @@ const run = async function () {
                 </script>
               </head>
               <body>
+                <button onclick="res.redirect(${ oauth.logOutUrl})"> Logout </button>
                 <div class="container">
                   <div class="row">
                     <div class="offset-sm-1 col-sm-9">
