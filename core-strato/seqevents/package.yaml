@@ -15,9 +15,11 @@ dependencies:
   - ethereum-rlp
   - format
   - monad-alter
+  - prometheus-client
   - strato-conf
   - strato-model
   - QuickCheck
+  - text
   - util
 
 library:

@@ -1,4 +1,6 @@
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -7,6 +9,7 @@ module Blockchain.Sequencer.Event where
 
 import           Control.DeepSeq
 import           Data.Binary
+import           Data.Data
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust)
 import           Data.DeriveTH
@@ -59,7 +62,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IENewChainMember Word256 A.Address Enode
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
-                 deriving (Eq, Show, GHCG.Generic)
+                 deriving (Eq, Show, GHCG.Generic, Data)
 
 data IngestEventType = IETTransaction
                      | IETBlock
@@ -90,17 +93,17 @@ type Timestamp = Microtime
 
 data IngestTx = IngestTx { itOrigin      :: TO.TXOrigin
                          , itTransaction :: TX.Transaction
-                         } deriving (Eq, Read, Show, GHCG.Generic)
+                         } deriving (Eq, Read, Show, GHCG.Generic, Data)
 
 data IngestBlock = IngestBlock { ibOrigin              :: TO.TXOrigin
                                , ibBlockData           :: DD.BlockData
                                , ibReceiptTransactions :: [TX.Transaction]
                                , ibBlockUncles         :: [DD.BlockData]
-                               } deriving (Eq, Read, Show, GHCG.Generic)
+                               } deriving (Eq, Read, Show, GHCG.Generic, Data)
 
 data IngestGenesis = IngestGenesis { igOrigin          :: TO.TXOrigin
                                    , igGenesisInfo     :: (Word256, ChainInfo)
-                                   } deriving (Eq, Show, GHCG.Generic)
+                                   } deriving (Eq, Show, GHCG.Generic, Data)
 
 data SequencedBlock = SequencedBlock { sbOrigin              :: TO.TXOrigin
                                      , sbHash                :: SHA
@@ -115,7 +118,7 @@ data JsonRpcCommand
     | JRCGetTransactionCount { jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String }
     | JRCGetStorageAt { jrcAddress :: A.Address, jrcKey :: BS.ByteString, jrcId :: String, jrcBlockString :: String }
     | JRCCall { jrcCode :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
-    deriving (Eq, Read, Show, GHCG.Generic)
+    deriving (Eq, Read, Show, GHCG.Generic, Data)
 
 data OutputEvent = OETx Timestamp OutputTx
                  | OEBlock OutputBlock
@@ -131,7 +134,7 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
                  | OEVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
                  | OENewCheckpoint PBFT.Checkpoint -- A pseudo out event that shouldn't leave the sequencer
-                 deriving (Eq, Show, GHCG.Generic)
+                 deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format OutputEvent where
   format (OETx ts o)              = show ts ++ " " ++ format o
@@ -147,19 +150,18 @@ data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otHash   :: SHA
                          , otSigner :: A.Address
                          , otBaseTx :: TX.Transaction
-                         } deriving (Eq, Read, Show, GHCG.Generic)
-instance NFData OutputTx
+                         } deriving (Eq, Read, Show, GHCG.Generic, NFData, Data)
 
 data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                , obTotalDifficulty     :: Integer
                                , obBlockData           :: DD.BlockData
                                , obReceiptTransactions :: [OutputTx]
                                , obBlockUncles         :: [DD.BlockData]
-                               } deriving (Eq, Read, Show, GHCG.Generic)
+                               } deriving (Eq, Read, Show, GHCG.Generic, Data)
 
 data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
                                    , ogGenesisInfo     :: (Word256, ChainInfo)
-                                   } deriving (Eq, Show, GHCG.Generic)
+                                   } deriving (Eq, Show, GHCG.Generic, Data)
 
 ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
 ingestGenesisToOutputGenesis (IngestGenesis o g) = OutputGenesis o g

@@ -2,8 +2,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 module Blockchain.Blockstanbul.Messages where
 
@@ -14,6 +15,7 @@ import qualified Data.Aeson as Ae
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
+import Data.Data
 import Data.Default
 import Data.DeriveTH
 import qualified Data.Map as M
@@ -39,7 +41,7 @@ type SequenceNumber = Word256
 data View = View {
   _round :: RoundNumber,
   _sequence :: SequenceNumber
-} deriving (Eq, Show, Ord, Generic, Binary, NFData)
+} deriving (Eq, Show, Ord, Generic, Binary, NFData, Data)
 makeLenses ''View
 
 instance Ae.ToJSON View where
@@ -54,13 +56,13 @@ instance Format View where
 data MsgAuth = MsgAuth {
   sender :: Address,
   signature :: ExtendedSignature
-} deriving (Eq, Show, Generic, Binary, NFData)
+} deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 data TrustedMessage = Preprepare View Block
                     | Prepare View SHA
                     | Commit View SHA ExtendedSignature
                     | RoundChange {roundchangeView :: View }
-                    deriving (Eq, Show, Generic, Binary, NFData)
+                    deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 instance Format TrustedMessage where
   format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
@@ -80,12 +82,12 @@ categorize = \case
 data WireMessage = WireMessage {
   _msgAuth :: MsgAuth,
   _message :: TrustedMessage
-} deriving (Eq, Show, Generic, Binary, NFData)
+} deriving (Eq, Show, Generic, Binary, NFData, Data)
 makeLenses ''WireMessage
 
 -- TODO: Allow changing blockstanbul admins without a restart
 data ForcedConfigChange = ForcedRound RoundNumber
-                        deriving (Eq, Show, Generic, Binary, NFData)
+                        deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 instance Format ForcedConfigChange where
   format = show
@@ -286,7 +288,7 @@ data Checkpoint = Checkpoint
                 , checkpointVoteRecord :: M.Map Address (M.Map Address Bool)
                 , checkpointValidators :: [Address]
                 , checkpointAdmins :: [Address]
-                } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON)
+                } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
 
 instance Default Checkpoint where
   def = Checkpoint (View 0 0) M.empty [] []
