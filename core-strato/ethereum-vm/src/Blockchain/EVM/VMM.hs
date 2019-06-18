@@ -142,6 +142,7 @@ instance (SHA `A.Alters` BlockSummary) VMM where
   lookup _ = genericLookupBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
   insert _ = genericInsertBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
   delete _ = genericDeleteBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
+  exists _ = genericExistsBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
 
 class Word256Storable a where
   fromWord256::Word256->a

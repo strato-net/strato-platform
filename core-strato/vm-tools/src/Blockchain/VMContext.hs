@@ -227,6 +227,7 @@ instance (SHA `A.Alters` BlockSummary) ContextM where
   lookup _ = genericLookupBlockSummaryDB $ gets contextBlockSummaryDB
   insert _ = genericInsertBlockSummaryDB $ gets contextBlockSummaryDB
   delete _ = genericDeleteBlockSummaryDB $ gets contextBlockSummaryDB
+  exists _ = genericExistsBlockSummaryDB $ gets contextBlockSummaryDB
 
 instance MonadReader Config m => Mod.Accessible SQLDB m where
   access _ = asks configSQLDB

@@ -51,6 +51,11 @@ genericDeleteBlockSummaryDB f blockHash = do
   db <- unBlockSummaryDB <$> f
   LDB.delete db LDB.defaultWriteOptions (BL.toStrict $ encode blockHash)
 
+genericExistsBlockSummaryDB :: MonadIO m => m BlockSummaryDB -> SHA -> m Bool
+genericExistsBlockSummaryDB f blockHash = do
+  db <- unBlockSummaryDB <$> f
+  isJust <$> LDB.get db LDB.defaultReadOptions (BL.toStrict $ encode blockHash)
+
 getBSum :: HasBlockSummaryDB m => SHA -> m BlockSummary
 getBSum blockHash =
   fromMaybe (error $ "missing value in block summary DB: " ++ format blockHash) <$>
@@ -60,4 +65,4 @@ putBSum :: HasBlockSummaryDB m => SHA -> BlockSummary -> m ()
 putBSum = A.insert (A.Proxy @BlockSummary)
 
 hasBSum :: HasBlockSummaryDB m => SHA -> m Bool
-hasBSum blockHash = isJust <$> A.lookup (A.Proxy @BlockSummary) blockHash
+hasBSum blockHash = A.exists (A.Proxy @BlockSummary) blockHash
