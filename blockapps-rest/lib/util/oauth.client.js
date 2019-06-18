@@ -7,16 +7,17 @@ import http from 'http'
 import open from 'open'
 import qs from 'query-string'
 const envPath = '.env'
-//const loadEnv = dotenv.config()
+const envfile = require('envfile')
+let envConfig = {};
 
 if (!fs.existsSync(envPath)){
-  fs.appendFile(envPath, '', function (err) {
+  fs.appendFileSync(envPath, '', function (err) {
     if (err) throw err;
     console.log('.env file is created successfully.');
   });
 }
 
-const envConfig = fs.readFileSync(envPath)
+envConfig =  envfile.parseFileSync(envPath)
 
 commander
   .option(
@@ -33,7 +34,8 @@ commander
     'client-credential')
   .option(
     '-e, --env [tokenName]',
-    'Create a .env file to include the specified token'
+    'Create a .env file to include the specified token',
+    null
   )
   .parse(process.argv)
 
@@ -70,6 +72,9 @@ const run = async function () {
 
   const oauth = oauthUtil.init(config.nodes[0].oauth)
 
+  if (!commander.env )
+    throw new Error('--env tokenName required')
+
   switch(commander.flow) {
     case 'client-credential':
       if(config.nodes[0].oauth.clientId === undefined
@@ -79,14 +84,10 @@ const run = async function () {
         process.exit(5)
       }
       const ccToken = await oauth.getAccessTokenByClientSecret()
-      //process.env[commander.env] = ccToken.token.access_token;
       envConfig[commander.env] = ccToken.token.access_token;
-      fs.writeFile(envPath, (envConfig), function(err) {
-        if(err) {
-          return console.log(err);
-        }
-        console.log(".env file was saved!");
-      });
+      const envContent = envfile.stringifySync(envConfig);
+      fs.writeFileSync(envPath, envContent);
+      console.log(".env file was saved!");
 
       console.log('Token obtained by client credential flow is:')
       console.log(JSON.stringify(ccToken,null,2))
@@ -112,12 +113,9 @@ const run = async function () {
           }
           const acToken = await oauth.getAccessTokenByAuthCode(query.code);
           envConfig[commander.env] = acToken.token.access_token;
-          fs.writeFile(envPath, JSON.stringify(envConfig), function(err) {
-            if(err) {
-              return console.log(err);
-            }
-            console.log(".env file was saved!");
-          });
+          const envContent = envfile.stringifySync(envConfig);
+          fs.writeFileSync(envPath, envContent)
+          console.log(".env file was saved!");
 
           console.log('Token obtained by authorization code flow is:')
           console.log(JSON.stringify(acToken,null,2))
