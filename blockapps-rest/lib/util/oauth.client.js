@@ -75,6 +75,7 @@ const run = async function () {
   if (!commander.env )
     throw new Error('--env tokenName required')
 
+  const signinUri = oauth.getSigninURL()
   switch(commander.flow) {
     case 'client-credential':
       if(config.nodes[0].oauth.clientId === undefined
@@ -96,6 +97,11 @@ const run = async function () {
       // start server
       const server = http
         .createServer(async (req, res) => {
+          if(req.url.indexOf('/login') === 0) {
+            res.redirect(signinUri)
+            res.end()
+            return
+          }
           if(req.url.indexOf('/callback?') !== 0) {
             res.writeHead(404, {})
             res.end()
@@ -146,6 +152,9 @@ const run = async function () {
                   body {
                     padding: 24px;
                   }
+                  .padButton {
+                    padding-bottom: 12px;
+                  }
                   textarea {
                     border: none;
                     color: #fff;
@@ -161,11 +170,18 @@ const run = async function () {
                     document.execCommand('copy')
                     document.body.removeChild(textArea);
                   }
+                  function logout(){
+                    window.location.href='${ oauth.logOutUrl}?redirect_uri=http://localhost:${portNumber}/login'
+                  }
                 </script>
               </head>
               <body>
-                <button onclick="res.redirect(${ oauth.logOutUrl})"> Logout </button>
                 <div class="container">
+                  <div class="row">
+                    <div class="offset-sm-10 col-sm-1 text-right padButton">
+                        <button onclick="logout()" class="btn btn-outline-dark btn-sm"> Logout </button>
+                    </div>
+                  </div>
                   <div class="row">
                     <div class="offset-sm-1 col-sm-9">
                       <h4>
@@ -215,8 +231,6 @@ const run = async function () {
           res.end()
         })
         .listen(portNumber)
-
-      const signinUri = oauth.getSigninURL()
 
       console.log(`Open sign-in URL in your browser to sign-in with OAuth and fetch token: ${signinUri}`);
 
