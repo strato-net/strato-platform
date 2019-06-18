@@ -225,6 +225,9 @@ addBlocks :: [OutputBlock] -> ContextM [Action]
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . blockDataNumber . obBlockData) unfiltered
       timerToUse = Just vmBlockInsertionMined
+  unless (null unfiltered) $
+    -- emit all blocks to the indexers
+    timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> unfiltered)
   bbi <- getContextBestBlockInfo
   case (filtered, bbi) of
     ([], _) -> return []
@@ -259,9 +262,6 @@ addBlocks unfiltered = do
       $logDebugLS "addBlocks/srLog" srLog
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
-      unless (null unfiltered) $
-        -- emit all blocks to the indexers
-        timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> unfiltered)
       when (didReplaceBest' || not (S.null ranPrivateTxs')) $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
