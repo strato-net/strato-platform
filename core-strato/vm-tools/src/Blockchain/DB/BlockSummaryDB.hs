@@ -9,6 +9,7 @@ module Blockchain.DB.BlockSummaryDB (
   genericLookupBlockSummaryDB,
   genericInsertBlockSummaryDB,
   genericDeleteBlockSummaryDB,
+  genericExistsBlockSummaryDB,
   putBSum,
   getBSum,
   hasBSum
