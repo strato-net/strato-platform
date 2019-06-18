@@ -134,6 +134,9 @@ class (Ord k, Monad f) => Alters k a f where
   repsert_ :: Proxy a -> k -> (Maybe a -> f a) -> f ()
   repsert_ p k = void . repsert p k
 
+  exists :: Proxy a -> k -> f Bool
+  exists p k = isJust <$> lookup p k
+
 
 
 class Maps k a b where
@@ -153,8 +156,14 @@ instance b `Has` (IM.IntMap a) => (Int `Maps` a) b where
 
 
 
-class Selectable k a f where
+class (Ord k, Monad f) => Selectable k a f where
+  selectMany :: Proxy a -> [k] -> f (Map k a)
+  selectMany p ks = M.fromList . catMaybes <$> forM ks (\k -> fmap (k,) <$> select p k)
+
   select :: Proxy a -> k -> f (Maybe a)
+  select p k = M.lookup k <$> selectMany p [k]
+
+  {-# MINIMAL selectMany | select #-}
 
   selectWithDefault :: (Default a, Functor f) => Proxy a -> k -> f a
   selectWithDefault p k = fromMaybe def <$> select p k
