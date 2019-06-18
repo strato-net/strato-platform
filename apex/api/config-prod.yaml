@@ -1,8 +1,0 @@
-# WARNING - extra strict syntax
-# DO NOT change the nodes order
-# node 0 is the default url for all single node api calls
-nodes:
-  - id: 0
-    stratoUrl: '__stratoUrl__'
-    blocUrl: '__blocUrl__'
-    searchUrl: '__searchUrl__'
