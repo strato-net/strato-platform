@@ -1,6 +1,7 @@
 {-# OPTIONS -fno-warn-missing-methods #-}
 {-# OPTIONS -fno-warn-orphans         #-}
 {-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE DeriveDataTypeable       #-}
 {-# LANGUAGE DeriveGeneric            #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE OverloadedStrings        #-}
@@ -32,6 +33,7 @@ import           Data.Aeson
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as C8
+import           Data.Data
 import qualified Data.JsonStream.Parser               as JS
 import qualified Data.Map.Strict                      as M
 import qualified Data.Text                            as T
@@ -46,7 +48,7 @@ data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
   , codeInfoSource :: T.Text
   , codeInfoName   :: T.Text
-  } deriving (Show, Read, Eq, GHCG.Generic)
+  } deriving (Show, Read, Eq, GHCG.Generic, Data)
 
 instance FromJSON CodeInfo where
   parseJSON (Array v) = do
@@ -80,7 +82,7 @@ instance RLPSerializable CodeInfo where
 data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer SHA
                  | ContractWithStorage Address Integer SHA [(Word256, Word256)]
-   deriving (Show, Eq, Read, GHCG.Generic)
+   deriving (Show, Eq, Read, GHCG.Generic, Data)
 
 instance FromJSON AccountInfo where
   parseJSON (Array v) = do
@@ -145,7 +147,7 @@ data ChainSignature = ChainSignature
   { chainR :: Word256
   , chainS :: Word256
   , chainV :: Word8
-  } deriving (Eq, Show, GHCG.Generic)
+  } deriving (Eq, Show, GHCG.Generic, Data)
 
 instance FromJSON ChainSignature where
   parseJSON (Object o) = do
@@ -184,12 +186,12 @@ data UnsignedChainInfo = UnsignedChainInfo
   , creationBlock  :: SHA
   , chainNonce     :: Word256
   , chainMetadata  :: (M.Map T.Text T.Text)
-  } deriving (Eq, Show, GHCG.Generic)
+  } deriving (Eq, Show, GHCG.Generic, Data)
 
 data ChainInfo = ChainInfo
   { chainInfo      :: UnsignedChainInfo
   , chainSignature :: (Maybe ChainSignature)
-  } deriving (Eq, Show, GHCG.Generic)
+  } deriving (Eq, Show, GHCG.Generic, Data)
 
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do
