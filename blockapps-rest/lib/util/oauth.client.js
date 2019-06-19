@@ -98,7 +98,7 @@ const run = async function () {
       const server = http
         .createServer(async (req, res) => {
           if(req.url.indexOf('/login') === 0) {
-            res.redirect(signinUri)
+            open(signinUri)
             res.end()
             return
           }
