@@ -45,7 +45,6 @@ import           Blockchain.P2PRPC
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.TCPClientWithTimeout
-import           Blockchain.TimerSource
 
 import qualified Text.Colors                           as C
 import           Text.Format
@@ -77,7 +76,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
 
         (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
-        !eventSource <- mkEthP2PEventSource app inCtx (contextKafkaState initState) [timerSource]
+        !eventSource <- mkEthP2PEventSource app inCtx (contextKafkaState initState)
         let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
         attempt :: Either SomeException () <- try . runConduit . evalStateLC initState $
                   transPipe lift eventSource
