@@ -9,6 +9,8 @@ module Blockchain.Metrics ( recordEvent
                           , addCanary
                           , killCanary
                           , recordException
+                          , recordQueuedTxs
+                          , recordEmptyQueue
                           ) where
 
 import Control.Exception
@@ -120,3 +122,15 @@ recordException PPeer{..} e =
   let ty = pack . show $ typeOf e
       port = pack $ show pPeerTcpPort
   in liftIO $ withLabel exceptionCount (pPeerIp, port, ty) incCounter
+
+{-# NOINLINE txQueueDepth #-}
+txQueueDepth :: Gauge
+txQueueDepth = unsafeRegister
+             . gauge
+             $ Info "p2p_queue_depth" "Number of queued transactions to send"
+
+recordQueuedTxs :: MonadIO m => [a] -> m ()
+recordQueuedTxs = liftIO . addGauge txQueueDepth . fromIntegral . Prelude.length
+
+recordEmptyQueue :: MonadIO m => m ()
+recordEmptyQueue = liftIO $ setGauge txQueueDepth 0

@@ -11,7 +11,6 @@ module Blockchain.CommunicationConduit
     , mkEthP2PEventConduit
     ) where
 
-import           Blockchain.Output
 import           Control.Monad.Change.Modify           (Accessible)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
@@ -50,11 +49,13 @@ import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
+import           Blockchain.Output
 import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 import           Blockchain.Stream.VMEvent
+import           Blockchain.TimerSource
 import           Blockchain.Util
 
 ethVersion :: Int
@@ -72,9 +73,8 @@ mkEthP2PEventSource :: ( Monad m
                     => AppData
                     -> EthCryptState
                     -> K.KafkaState
-                    -> [ConduitM () Event m ()]
                     -> m (ConduitM () Event m ())
-mkEthP2PEventSource app inCtx ks extra = do
+mkEthP2PEventSource app inCtx ks = do
   canarySource <- mkCanarySource
   (.| CL.iterM recordEvent) <$> mergeSourcesByForce (
     [ appSource app
@@ -85,7 +85,8 @@ mkEthP2PEventSource app inCtx ks extra = do
     , seqEventNotificationSource ks
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
-    ] ++ extra) 4096 -- 🙏
+    , timerSource
+    ]) 4096 -- 🙏
 
 mkCanarySource :: (MonadLogger m, MonadUnliftIO m, MonadResource m) => m (ConduitM () Void m ())
 mkCanarySource = do
@@ -114,9 +115,11 @@ debounceTxSends = do
   awaitForever $ \case
     Right (W.Transactions txs) -> do
       atomically $ mapM_ (writeTQueue txq) txs
+      recordQueuedTxs txs
     Right other -> yield other
     Left TXQueueTimeout -> do
       txs <- atomically $ flushTQueue txq
+      recordEmptyQueue
       yieldMany . map W.Transactions $ chunksOf 100 txs
 
 handleMsgClientConduit :: ( MonadIO (StateT Context m)
