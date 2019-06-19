@@ -77,11 +77,11 @@ runPeer peer myPriv _ _ = runResourceT $ do
         (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
         !eventSource <- mkEthP2PEventSource app inCtx (contextKafkaState initState)
-        let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
+        !eventSink <- mkEthP2PEventConduit (show $ appSockAddr app) outCtx
         attempt :: Either SomeException () <- try . runConduit . evalStateLC initState $
                   transPipe lift eventSource
                .| handleMsgClientConduit myPublic peer
-               .| eventSink
+               .| transPipe lift eventSink
                .| appSink app
 
         void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Unactive
