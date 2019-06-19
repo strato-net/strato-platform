@@ -5,6 +5,9 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Types where
 
+import           Control.Monad
+import           Data.List
+
 import           Text.Parsec
 
 import           SolidVM.Solidity.Parse.Expression
@@ -40,18 +43,35 @@ simpleType =
       simple "byte" (Xabitype.Bytes Nothing $ Just 1) <|>
       simple "bytes" (Xabitype.Bytes (Just True) Nothing) <|>
       lexeme (try $ do
-        string "bytes"
-        let sizesS = reverse $ map show [1::Int .. 32]
-        size <- read <$> choice (map (try . string) sizesS)
-        space
-        return $ Xabitype.Bytes Nothing $ Just size
+         let base = "bytes"
+         chars <- many1 alphaNum
+         
+         when (not (base `isPrefixOf` chars)) $ fail "missing 'bytes'"
+
+         size <-
+            case reads (drop (length base) chars) of
+              [] -> return Nothing
+              [(number, "")] -> do
+                when (not $ number `elem` [1..32]) $ fail "invalid bytes size"
+                return $ Just number
+              _ ->  fail "invalid bytes size"
+
+         return $ Xabitype.Bytes Nothing size
       )
     intSuffixed base baseType = lexeme $ try $ do
-      string base
-      let sizesS = reverse $ map show [8::Int, 16 .. 256]
-      sizeM <- optionMaybe $ choice $ map (try . string) sizesS
-      space
-      return . baseType $ (`quot` 8) . read <$> sizeM -- in bytes
+      chars <- many1 alphaNum
+
+      when (not (base `isPrefixOf` chars)) $ fail "missing base"
+
+      number <-
+            case reads (drop (length base) chars) of
+              [] -> return Nothing
+              [(number, "")] -> do
+                when (not $ number `elem` [8, 16 .. 256]) $ fail "invalid size"
+                return $ Just $ number `quot` 8 -- in bytes
+              _ ->  fail "invalid size"
+
+      return $ baseType number
 
 -- | Parses array types, allowing arithmetic expressions to specify the
 -- array length so long as they only reference explicit numbers.  Note that
