@@ -87,7 +87,7 @@ ethereumVM = void . execContextM $ do
         seqEvents <- loopTimeit "======>>>> waiting for new events <<<<======" $ getUnprocessedKafkaEvents cpOffset
 
         logEventSummaries seqEvents
-        
+
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
@@ -96,7 +96,7 @@ ethereumVM = void . execContextM $ do
         mapM_ (uncurry3 queuePendingVote) [(r, d, s) | OEVoteToMake r d s <- seqEvents]
         let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
-        
+
         let txPairs = [(ts,t) | OETx ts t <- seqEvents]
             allTxs = map (uncurry OETx) txPairs
             blocks = [b | OEBlock b <- seqEvents]
@@ -335,6 +335,7 @@ logEventSummaries events = do
     getNames (OEPushBlocks _ _ _) = "PushBlocks"
     getNames (OENewChainMember _ _ _) = "OENewChainMember"
     getNames (OEVoteToMake _ _ _) = "OEVoteToMake"
+    getNames OENewCheckpoint{} = "OENewCheckpoint"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x

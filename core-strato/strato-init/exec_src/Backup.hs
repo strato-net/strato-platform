@@ -6,8 +6,8 @@
 
 import           Control.Monad
 import qualified Control.Monad.Change.Alter                  as A
+import           Control.Monad.Change.Modify                 (Accessible(..))
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
 import           Blockchain.Output
 import           Control.Monad.Trans.Reader
 import           Data.Binary                                 hiding (get)
@@ -45,8 +45,8 @@ instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT DBs m) wher
   insert _ = MP.genericInsertDB $ asks (MP.ldb . stateDB)
   delete _ = MP.genericDeleteDB $ asks (MP.ldb . stateDB)
 
-instance MonadUnliftIO m => HasSQLDB (ReaderT DBs m) where
-  getSQLDB = asks sqlDB
+instance Monad m => Accessible SQLDB (ReaderT DBs m) where
+  access _ = asks sqlDB
 
 main :: IO ()
 main = do

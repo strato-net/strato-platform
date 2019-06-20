@@ -54,8 +54,8 @@ type IContextM = StateT IContext IConfigM
 newtype IndexerBestBlockInfo = IndexerBestBlockInfo (SQL.Key BlockDataRef)
     deriving (Eq, Ord, Read, Show)
 
-instance HasSQLDB IConfigM where
-  getSQLDB = asks contextSQLDB
+instance Mod.Accessible SQLDB IConfigM where
+  access _ = asks contextSQLDB
 
 instance Mod.Modifiable KafkaState IContextM where
   get _   = gets contextKafkaState

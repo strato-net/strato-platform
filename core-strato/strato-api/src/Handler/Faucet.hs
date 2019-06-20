@@ -16,7 +16,6 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
-import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
@@ -61,7 +60,7 @@ emitKafkaTransactions txs = do
         Right resps -> $logDebug $ "writeUnseqEventsEnd Kafka commit: " Import.++ T.pack (show resps)
     return ()
 
-emitTransaction :: (MonadIO m, MonadLogger m, HasSQLDB m) => Transaction -> m SHA
+emitTransaction :: (MonadIO m, MonadLogger m) => Transaction -> m SHA
 emitTransaction tx = do
   emitKafkaTransactions [tx]
   return $ txHash tx

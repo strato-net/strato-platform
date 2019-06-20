@@ -114,7 +114,7 @@ yieldL = yield . Left
 handleEvents :: ( MonadIO m
                 , MonadResource m
                 , Accessible RBDB.RedisConnection m
-                , SK.HasUnseqSink m
+                , Accessible (SK.UnseqSink m) m
                 , MonadState Context m
                 , MonadLogger m
                 , Modifiable K.KafkaState m
@@ -403,6 +403,7 @@ handleEvents peer = awaitForever $ \case
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
       OEVoteToMake{} -> $logErrorS "handleEvents/OEVoteToMake" "absurd"
+      OENewCheckpoint{} -> $logErrorS "handleEvents/OENewCheckpoint" "Maybe they should be disjoint types?"
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp

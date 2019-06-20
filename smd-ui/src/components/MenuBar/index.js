@@ -31,7 +31,7 @@ class MenuBar extends Component {
       return (
         <div>
           <span className="pt-navbar-divider" />
-          <a href='/prometheus/consoles/index.html.example' target="_black" rel="noopener noreferrer">
+          <a href='/prometheus' target="_black" rel="noopener noreferrer">
             <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("prometheus_graphs_click") }}>Prometheus Graphs</button>
           </a>
           <a href={env.BLOC_DOC_URL} target="_blank" rel="noopener noreferrer" id="tour-bloc-api-button">

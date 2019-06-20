@@ -7,6 +7,7 @@ module Blockchain.Strato.RedisBlockDB.Models where
 
 import qualified Data.ByteString.Base16        as SB16
 import qualified Data.ByteString.Char8         as S8
+import           Data.List                     (intercalate)
 import qualified Data.Map.Strict               as M
 
 import qualified Blockchain.Data.BlockHeader   as BHD
@@ -18,6 +19,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
+import           Text.Format
 
 data BlockDBNamespace = Headers
                       | Transactions
@@ -112,3 +114,20 @@ instance RedisDBValuable RedisBestBlock where
     fromValue = unwrap . rlpDeserialize
         where unwrap (RLPArray [sha, num, total]) = RedisBestBlock (rlpDecode sha) (rlpDecode num) (rlpDecode total)
               unwrap _                            = error "we are clearly incapable of humane exception handling"
+
+displayForNamespace :: BlockDBNamespace -> S8.ByteString -> String
+displayForNamespace ns input = case ns of
+    Numbers -> readSHA
+    Children -> readSHA
+    Canonical -> readSHA
+    Parent -> readSHA
+    Headers -> let RedisHeader hdr = fromValue input in format hdr
+    Transactions -> let RedisTxs txs = fromValue input in intercalate "\n" [format tx | RedisTx tx <- txs]
+    Uncles -> let RedisUncles us = fromValue input in show us
+    PrivateChainInfo -> let RedisChainInfo info = fromValue input in show info
+    PrivateChainMembers -> let RedisChainMembers mems = fromValue input in show mems
+    PrivateTransactions -> let RedisTx tx = fromValue input in format tx
+    PrivateTxsInBlocks -> let RedisChainTxsInBlocks ctibs = fromValue input in show ctibs
+    PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format ipcs
+  where
+    readSHA = let SHA x = fromValue input in format x

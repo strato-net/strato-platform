@@ -222,15 +222,19 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
 -- todo: lovely!
 
 addBlocks :: [OutputBlock] -> ContextM [Action]
-addBlocks [] = return []
-addBlocks blocks' = do
+addBlocks unfiltered = do
+  let filtered = filter ((/= 0) . blockDataNumber . obBlockData) unfiltered
+      timerToUse = Just vmBlockInsertionMined
+  unless (null unfiltered) $
+    -- emit all blocks to the indexers
+    timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> unfiltered)
   bbi <- getContextBestBlockInfo
-  case bbi of
-    Unspecified -> return [] -- TODO: bootstrap private chains
-    ContextBestBlockInfo (_, oldHeader, _, _, _) -> do
-      let filtered = filter ((/= 0) . blockDataNumber . obBlockData) blocks'
+  case (filtered, bbi) of
+    ([], _) -> return []
+    (_, Unspecified) -> return []
+    (firstBlock:_, ContextBestBlockInfo (_, oldHeader, _, _, _)) -> do
       $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
-                                             (show . blockDataNumber . obBlockData $ head filtered))
+                                             (show . blockDataNumber . obBlockData $ firstBlock))
       didReplaceBest   <- liftIO (newIORef False)
       ranPrivateTxs    <- liftIO (newIORef S.empty)
       replacedBest     <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
@@ -258,7 +262,6 @@ addBlocks blocks' = do
       $logDebugLS "addBlocks/srLog" srLog
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
-      timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
       when (didReplaceBest' || not (S.null ranPrivateTxs')) $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         (theBlock, nbb) <- liftIO (readIORef replacedBest)
@@ -269,9 +272,6 @@ addBlocks blocks' = do
                                      ranPrivateTxs'
                                      theBlock
       return $ concat actions
-
-  where
-    timerToUse = Just vmBlockInsertionMined
 
 setParentStateRoot :: OutputBlock -> ContextM BlockSummary
 setParentStateRoot OutputBlock{..} = do
@@ -388,7 +388,7 @@ addTransactions canCache blockData blockGas0 txs = timeit ("addTransactions, " +
     go _ [] trrs = return $ reverse trrs
     go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs = do
       flushMemAddressStateTxToBlockDB
-      flushStorageTxDBToBlockDB
+      flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction False blockData blockGas t
       afterMap <- getAddressStateTxDBMap
@@ -415,7 +415,7 @@ mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> Cont
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     flushMemAddressStateTxToBlockDB
-    flushStorageTxDBToBlockDB
+    flushMemStorageTxDBToBlockDB
     beforeMap <- getAddressStateTxDBMap
     (!time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateTxDBMap

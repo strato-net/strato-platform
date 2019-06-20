@@ -4,16 +4,17 @@
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Blockchain.DB.SQLDB (
-  HasSQLDB(..),
-  WrapsSQLDB(..),
-  SQLDB,
-  sqlQuery,
-  runPostgresConn,
-  createPostgresqlPool',
-  withGlobalSQLPool
+module Blockchain.DB.SQLDB
+  ( HasSQLDB
+  , WrapsSQLDB(..)
+  , SQLDB
+  , sqlQuery
+  , runPostgresConn
+  , createPostgresqlPool'
+  , withGlobalSQLPool
   ) where
 
+import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output            (MonadLogger, runNoLoggingT)
@@ -31,19 +32,16 @@ import           Blockchain.EthConf           (connStr)
 
 type SQLDB = SQL.ConnectionPool
 
-class (MonadIO m, MonadUnliftIO m) => HasSQLDB m where
-  getSQLDB :: m SQLDB
+type HasSQLDB m = (MonadIO m, MonadUnliftIO m, Accessible SQLDB m)
 
 class HasSQLDB m => WrapsSQLDB t m where
   runWithSQL :: m a -> (t m) a
 
-instance (HasSQLDB m) => WrapsSQLDB IdentityT m where
+instance HasSQLDB m => WrapsSQLDB IdentityT m where
   runWithSQL = lift
 
-sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a->m a
-sqlQuery q = do
-  db <- getSQLDB
-  runResourceT . SQL.runSqlPool q $ db
+sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
+sqlQuery q = runResourceT . SQL.runSqlPool q =<< access Proxy
 
 runPostgresConn :: (MonadUnliftIO m, MonadLogger m, backend ~ SQL.SqlBackend)
                 => PSQL.ConnectionString

@@ -5,11 +5,9 @@ module Blockchain.Privacy.Monad where
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord            (Word256)
-import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Control.Lens
-import           Control.Monad.IO.Class
 import           Data.Default
 import           Data.Function                 (on)
 import qualified Data.Sequence                 as Q
@@ -73,7 +71,7 @@ makeLenses ''ChainIdEntry
 chainIdEntry :: ChainInfo -> ChainIdEntry
 chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
 
-class (MonadIO m, MonadLogger m) => HasPrivateHashDB m where
+class HasPrivateHashDB m where
   getChainId               :: ChainInfo -> m SHA
   generateInitialChainHash :: ChainInfo -> m SHA
   generateChainHashes      :: OutputTx -> m [SHA]

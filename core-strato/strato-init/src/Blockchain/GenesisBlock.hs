@@ -96,11 +96,13 @@ readSupplementaryAccounts genesisBlockName = do
       return . concatMap parseAccounts . lines $ accountInfoString
 
 getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
+                                        , MonadLogger m
                                         , HasCodeDB m
                                         , HasHashDB m
                                         , Mem.HasMemAddressStateDB m
                                         , HasStateDB m
                                         , HasStorageDB m
+                                        , HasMemStorageDB m
                                         , (Ad.Address `Alters` AddressState) m
                                         )
                                      => String
@@ -127,6 +129,7 @@ initializeGenesisBlock :: ( HasCodeDB m
                           , HasSQLDB m
                           , HasStateDB m
                           , HasStorageDB m
+                          , HasMemStorageDB m
                           , MonadLogger m
                           , (Ad.Address `Alters` AddressState) m
                           )

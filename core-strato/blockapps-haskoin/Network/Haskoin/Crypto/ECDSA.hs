@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 -- | ECDSA Signatures
 module Network.Haskoin.Crypto.ECDSA
 ( SecretT
@@ -28,6 +29,7 @@ import Data.Maybe (fromJust, fromMaybe)
 import Data.Binary (Binary, get, put)
 import Data.Binary.Put (putWord8, putByteString)
 import Data.Binary.Get (getWord8)
+import Data.Data
 
 import qualified Data.ByteString as BS
     ( ByteString
@@ -112,7 +114,7 @@ data Signature =
     Signature { sigR :: !FieldN
               , sigS :: !FieldN
               }
-    deriving (Read, Show, Eq)
+    deriving (Read, Show, Eq, Data)
 
 instance NFData Signature where
     rnf (Signature r s) = rnf r `seq` rnf s

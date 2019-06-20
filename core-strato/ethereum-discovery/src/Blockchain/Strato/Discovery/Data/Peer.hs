@@ -46,6 +46,8 @@ PPeer
     bondState Int
     activeState Int
     version T.Text
+    nextDisableWindowSeconds Int
+    disableExpiration UTCTime
     deriving Show Read Eq
 |]
 
@@ -75,7 +77,9 @@ buildPeer (pubKeyMaybe, ip, _) =
         pPeerLastBestBlockHash = SHA 0,
         pPeerBondState=0,
         pPeerActiveState = 0,
-        pPeerVersion = T.pack "61" -- fix
+        pPeerVersion = T.pack "61", -- fix
+        pPeerNextDisableWindowSeconds = 5,
+        pPeerDisableExpiration = jamshidBirth
         }
 
 parseEnode :: String -> Either String (Maybe String, String, Int)
@@ -167,17 +171,13 @@ defaultPeer = PPeer{
   pPeerLastBestBlockHash=SHA 0,
   pPeerBondState=0,
   pPeerActiveState=0,
-  pPeerVersion=""
+  pPeerVersion="",
+  pPeerNextDisableWindowSeconds=5,
+  pPeerDisableExpiration=posixSecondsToUTCTime 0
   }
 
-disablePeerForSeconds::PPeer->Int->IO (Either SomeException ())
-disablePeerForSeconds peer' seconds = try . withGlobalSQLPool $ \sqldb -> do
-  -- TODO(tim): Reenable port selection
-  let peer = peer'{pPeerTcpPort = 30303, pPeerUdpPort=30303}
-  currentTime <- getCurrentTime
-  flip SQL.runSqlPool sqldb $
-    SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
-  return ()
+thisPeer :: PPeer -> [SQL.Filter PPeer]
+thisPeer peer = [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]
 
 disableUDPPeerForSeconds::PPeer->Int->IO (Either SomeException ())
 disableUDPPeerForSeconds peer' seconds = try . withGlobalSQLPool $ \sqldb -> do
@@ -185,6 +185,34 @@ disableUDPPeerForSeconds peer' seconds = try . withGlobalSQLPool $ \sqldb -> do
   let peer = peer'{pPeerTcpPort=30303}
   currentTime <- getCurrentTime
   flip SQL.runSqlPool sqldb $
-    SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
-  return ()
+    SQL.updateWhere (thisPeer peer) [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
 
+resetPeers :: IO ()
+resetPeers = withGlobalSQLPool $ SQL.runSqlPool (SQL.updateWhere [] [PPeerActiveState SQL.=. 0])
+
+nonviolentDisable :: PPeer -> IO (Either SomeException ())
+nonviolentDisable peer' = try . withGlobalSQLPool $ \sqldb -> do
+  let peer = peer'{pPeerTcpPort=30303}
+  currentTime <- getCurrentTime
+  flip SQL.runSqlPool sqldb $
+    SQL.updateWhere (thisPeer peer) [PPeerEnableTime SQL.=. 10 `addUTCTime` currentTime]
+
+-- The first time a peer is disabled, the timeout is five seconds. Every subsequent failure that
+-- window is doubled, but those windows are reset every day. This prevents a mostly healthy node
+-- from building up longer and longer disables, e.g. if it caused an exception once a day
+-- by the end of the month it would be disabled for years.
+lengthenPeerDisable :: PPeer -> IO (Either SomeException ())
+lengthenPeerDisable peer' = try . withGlobalSQLPool $ \sqldb -> do
+  -- TODO(tim): Reenable port selection
+  let peer = peer'{pPeerTcpPort=30303}
+  currentTime <- getCurrentTime
+  let selector = thisPeer peer
+  flip SQL.runSqlPool sqldb $ do
+    if (currentTime < pPeerDisableExpiration peer)
+      then SQL.updateWhere selector [PPeerEnableTime SQL.=. fromIntegral (pPeerNextDisableWindowSeconds peer) `addUTCTime` currentTime
+                                    , PPeerNextDisableWindowSeconds SQL.*=. 2
+                                    ]
+      else SQL.updateWhere selector [ PPeerEnableTime SQL.=. 5 `addUTCTime` currentTime
+                                    , PPeerNextDisableWindowSeconds SQL.=. 5
+                                    , PPeerDisableExpiration SQL.=. (24 * 60 * 60) `addUTCTime` currentTime
+                                    ]

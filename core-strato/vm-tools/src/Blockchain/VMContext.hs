@@ -72,6 +72,7 @@ import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs           (LogDB, TransactionResult)
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
@@ -211,17 +212,24 @@ instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   insert _ = genericInsertHashDB $ gets contextHashDB
   delete _ = genericDeleteHashDB $ gets contextHashDB
 
-instance HasRawStorageDB ContextM where
-  getRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
-  putRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
-  getRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
-  putRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
+instance HasMemRawStorageDB ContextM where
+  getMemRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
+  putMemRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
+  getMemRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
+  putMemRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
 
-instance HasBlockSummaryDB ContextM where
-  getBlockSummaryDB = gets contextBlockSummaryDB
+instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
 
-instance (MonadReader Config m, MonadIO m, MonadUnliftIO m) => HasSQLDB m where
-  getSQLDB = asks configSQLDB
+instance (SHA `A.Alters` BlockSummary) ContextM where
+  lookup _ = genericLookupBlockSummaryDB $ gets contextBlockSummaryDB
+  insert _ = genericInsertBlockSummaryDB $ gets contextBlockSummaryDB
+  delete _ = genericDeleteBlockSummaryDB $ gets contextBlockSummaryDB
+
+instance MonadReader Config m => Mod.Accessible SQLDB m where
+  access _ = asks configSQLDB
 
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
@@ -262,7 +270,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "must set stateroot for test context"}
                      (HashDB hdb)
                      (CodeDB cdb)
-                     blksumdb
+                     (BlockSummaryDB blksumdb)
                      M.empty
                      M.empty
                      M.empty
@@ -306,7 +314,7 @@ runContextM f = do
                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
                        (HashDB hdb)
                        (CodeDB cdb)
-                       blksumdb
+                       (BlockSummaryDB blksumdb)
                        M.empty
                        M.empty
                        M.empty
@@ -344,10 +352,10 @@ getNewAddress address = do
   incrementNonce address
   return newAddress
 
-purgeStorageMap :: HasStorageDB m => Address -> m ()
+purgeStorageMap :: HasMemStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  storageMap <- snd <$> getRawStorageTxDB
-  putRawStorageTxMap $ M.filterWithKey (\(a,_) _ -> a /= address) storageMap
+  storageMap <- snd <$> getMemRawStorageTxDB
+  putMemRawStorageTxMap $ M.filterWithKey (const . (/= address) . fst) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo
 getContextBestBlockInfo = contextBestBlockInfo <$> get

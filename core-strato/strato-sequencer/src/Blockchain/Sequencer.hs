@@ -13,6 +13,7 @@ import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
 import           Blockchain.Output
+import           Control.Lens
 import qualified Control.Monad.Change.Alter                as A
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -60,7 +61,7 @@ import           Text.Format
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
 -- replace with this when debugging tests
--- logFF str msg = void . return $! traceShowId $! trace (T.unpack str) msg
+--logFF str msg = void . return $! traceShowId $! trace (T.unpack str) msg
 
 sequencer :: SequencerM ()
 sequencer = do
@@ -92,7 +93,10 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   return src'
 
 clearAll :: SequencerM ()
-clearAll = clearLdbBatchOps >> clearGetChainsDB >> clearGetTransactionsDB
+clearAll = clearDBERegistry
+        >> clearLdbBatchOps
+        >> clearGetChainsDB
+        >> clearGetTransactionsDB
 
 readEventsInBufferedWindow :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (SealedConduitT () SeqLoopEvent SequencerM (), [SeqLoopEvent])
 readEventsInBufferedWindow src = do
@@ -148,10 +152,10 @@ checkForUnseq inEvents = do
     P.incCounter seqLdbBatchWrites
     P.setGauge seqLdbBatchSize . fromIntegral . length $ pendingLDBWrites
     logF "Applied pending LDB writes"
-    chainIds <- gets _getChainsDB
+    chainIds <- unGetChainsDB <$> use getChainsDB
     unless (S.null chainIds) $
       markForP2P . OEGetChain $ toList chainIds
-    txHashes <- gets _getTransactionsDB
+    txHashes <- unGetTransactionsDB <$> use getTransactionsDB
     unless (S.null txHashes) $
       markForP2P . OEGetTx $ toList txHashes
 
@@ -191,7 +195,10 @@ blockstanbulSend' msg = do
           return . OEBlock $ sequencedBlockToOutputBlock sb 1
       creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
   rBlocks <- fmap catMaybes $ mapM rewriteBlock blocks
-  let vmevs = creates ++ rBlocks ++ [OEVoteToMake r d s| PendingVote r d s <- resp]
+  let vmevs = creates
+           ++ rBlocks
+           ++ [OEVoteToMake r d s| PendingVote r d s <- resp]
+           ++ [OENewCheckpoint ck | NewCheckpoint ck <- resp]
       p2pevs = [OEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [OEAskForBlocks (h+1) l p | GapFound h l p <- resp]
             ++ [OEPushBlocks (l+1) h p | LeadFound h l p <- resp]
@@ -278,20 +285,28 @@ transformFullTransactions pairs = do
                 ]
               let tHash = txHash ptx
               markForP2P $ pairToOETx (ts, ptx)
+              --liftIO $ withLabel txMetrics "private_hash" incCounter
               insertPrivateHash ptx
-              when (otOrigin ptx == TO.API) $ do
-                cHash <- getNewChainHash chainId
-                logF . concat $
-                  [ "Created chain hash "
-                  , format cHash
-                  , " for transaction "
-                  , format tHash
+              when (otOrigin ptx == TO.API) $ getNewChainHash chainId >>= \case
+                Nothing -> error $ concat
+                  [ "transformFullTransactions: "
+                  , "Could not acquire new chain hash for chain ID "
+                  , format (SHA chainId)
+                  , ". This should never happen, "
+                  , " so something is seriously wrong."
                   ]
-                let SHA th' = tHash
-                    SHA ch' = cHash
-                    phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
-                markForVM $ pairToOETx (ts, phtx)
-                markForP2P $ pairToOETx (ts, phtx)
+                Just cHash -> do
+                  logF . concat $
+                    [ "Created chain hash "
+                    , format cHash
+                    , " for transaction "
+                    , format tHash
+                    ]
+                  let SHA th' = tHash
+                      SHA ch' = cHash
+                      phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
+                  markForVM $ pairToOETx (ts, phtx)
+                  markForP2P $ pairToOETx (ts, phtx)
             mapM_ (markForVM . OEBlock) =<< runBlocks chainId
 
 transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
@@ -320,8 +335,7 @@ expandBlock = awaitForever $ \sb -> do
       yield $ Left sb
     (ReadyToEmit totalPastDifficulty) -> do
       -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
-      (ldbOps, dryChain) <- lift . fmap unzip $ buildEmissionChain sb totalPastDifficulty
-      lift . addLdbBatchOps . catMaybes $ ldbOps
+      dryChain <- lift $ buildEmissionChain sb totalPastDifficulty
       if dryChain /= []
         then do
           $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."

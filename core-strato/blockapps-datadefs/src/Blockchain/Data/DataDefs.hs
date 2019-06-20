@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
@@ -26,6 +27,7 @@ import           Database.Persist.TH
 import qualified Data.Binary                             as BIN
 import qualified Data.ByteString                         as BS
 import qualified Data.ByteString.Short                   as BSS
+import           Data.Data
 import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX

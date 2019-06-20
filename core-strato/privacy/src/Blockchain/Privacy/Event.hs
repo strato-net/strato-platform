@@ -8,7 +8,6 @@
 
 module Blockchain.Privacy.Event
   ( lookupSeenChain
-  , insertSeenChain
   , insertTransaction
   , findChainHashUses
   , insertPrivateHash
@@ -18,7 +17,6 @@ module Blockchain.Privacy.Event
   , lookupChainBuffer
   , insertChainBufferEntry
   , getNewChainHash
-  , insertChainInfo
   , checkIfIsMissingTX
   , runPrivateHashTX
   , runBlocks
@@ -40,7 +38,6 @@ import           Control.Arrow                 ((&&&))
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Change.Alter
-import           Control.Monad.IO.Class
 import           Data.Foldable                 (for_, toList)
 import           Data.Maybe
 import qualified Data.Set                      as S
@@ -59,17 +56,10 @@ logFF str = $logInfoS str . T.pack
 lookupSeenChain :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m Bool
 lookupSeenChain chainId = isJust <$> lookup (Proxy @ChainIdEntry) chainId
 
-insertSeenChain :: (MonadIO m, (Word256 `Alters` ChainIdEntry) m)
-                => Word256 -> ChainInfo -> m ()
-insertSeenChain chainId cInfo = do
-  liftIO $ withLabel chainMetrics "seen_chains" incCounter
-  repsert_ Proxy chainId $ return . maybe (chainIdEntry cInfo) (chainIdInfo .~ cInfo)
-
 insertTransaction :: (SHA `Alters` OutputTx) m => OutputTx -> m ()
 insertTransaction = uncurry (insert Proxy) . (txHash &&& id)
 
-findChainHashUses :: ( HasPrivateHashDB m
-                     , (SHA `Alters` OutputBlock) m
+findChainHashUses :: ( (SHA `Alters` OutputBlock) m
                      , (SHA `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
                      )
@@ -81,19 +71,23 @@ findChainHashUses chainId cHashes = do
           . map (toList . maybe Q.empty _inBlocks)
         <$> mapM (lookup (Proxy @ChainHashEntry)) cHashes
   bOrders <- map (fmap blockOrdering) <$> mapM (lookup (Proxy @OutputBlock)) blocks
-  let infos = S.fromList . catMaybes $ zipWith (\b -> fmap (BlockInfo b)) blocks bOrders
+  let infos = S.fromList . catMaybes $ zipWith (fmap . BlockInfo) blocks bOrders
   adjustStatefully_ (Proxy @ChainIdEntry) chainId $ blocksToRun %= S.union infos
 
-insertPrivateHash :: ( HasPrivateHashDB m
+insertPrivateHash :: ( MonadLogger m
+                     , MonadMonitor m
+                     , HasPrivateHashDB m
                      , (SHA `Alters` OutputBlock) m
                      , (SHA `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
                      )
                   => OutputTx -> m ()
 insertPrivateHash tx = case txChainId tx of
-  Nothing -> error "insertPrivateHash: Trying to insert a public transaction"
+  Nothing -> do
+    logFF "insertPrivateHash" $ "Trying to insert the public transaction " ++ show (txHash tx)
+    return ()
   Just chainId -> do
-    liftIO $ withLabel txMetrics "private_hash" incCounter
+    withLabel txMetrics "private_hash" incCounter
     cHashes <- generateChainHashes tx
     mapM_ (flip insertChainHash chainId) cHashes
     mapM_ (insertChainBufferEntry chainId) cHashes
@@ -112,45 +106,41 @@ getChainBuffer chainId = maybe emptyCircularBuffer _chainHashes <$> lookup Proxy
 lookupChainBuffer :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m (CircularBuffer SHA)
 lookupChainBuffer = getChainBuffer
 
-insertChainBufferEntry :: (MonadIO m, (Word256 `Alters` ChainIdEntry) m) => Word256 -> SHA -> m ()
+insertChainBufferEntry :: ( MonadMonitor m
+                          , (Word256 `Alters` ChainIdEntry) m
+                          )
+                       => Word256 -> SHA -> m ()
 insertChainBufferEntry chainId cHash = adjustStatefully_ Proxy chainId $ do
   CircularBuffer cap sz q <- use chainHashes
-  liftIO $ withLabel chainBuffer (fromString (show chainId)) (flip setGauge (fromIntegral sz))
+  withLabel chainBuffer (fromString (show chainId)) (flip setGauge (fromIntegral sz))
   if sz < cap
     then chainHashes .= CircularBuffer cap (sz + 1) (q Q.|> cHash)
     else case Q.viewl q of
            Q.EmptyL -> chainHashes .= CircularBuffer cap 1 (q Q.|> cHash)
            (_ Q.:< q') -> chainHashes .= CircularBuffer cap sz (q' Q.|> cHash)
 
-getNewChainHash :: ( Monad m
+getNewChainHash :: ( MonadLogger m
+                   , HasPrivateHashDB m
                    , (SHA `Alters` ChainHashEntry) m
                    , (Word256 `Alters` ChainIdEntry) m
                    )
-                => Word256 -> m SHA
+                => Word256 -> m (Maybe SHA)
 getNewChainHash chainId = do
   CircularBuffer cap sz q <- getChainBuffer chainId
   case Q.viewl q of
-    Q.EmptyL -> error $ "getNewChainHash: Empty chain buffer for chainId " ++ show chainId
+    Q.EmptyL -> do
+      logFF "getNewChainHash" $ "Empty chain buffer for chainId " ++ format (SHA chainId)
+      traverse (generateInitialChainHash . _chainIdInfo) =<< lookup (Proxy @ChainIdEntry) chainId
     (h Q.:< q') -> do
       adjustStatefully_ (Proxy @ChainIdEntry) chainId $
         chainHashes .= CircularBuffer cap (sz - 1) q'
-      Just used' <- fmap _used <$> lookup (Proxy @ChainHashEntry) h
+      used' <- _used <$> lookupWithDefault (Proxy @ChainHashEntry) h
       if not used'
-        then useChainHash h >> return h
+        then useChainHash h >> return (Just h)
         else getNewChainHash chainId
 
-insertChainInfo :: ( HasPrivateHashDB m
-                   , (SHA `Alters` ChainHashEntry) m
-                   , (Word256 `Alters` ChainIdEntry) m
-                   )
-                => Word256 -> ChainInfo -> m ()
-insertChainInfo chainId cInfo = do
-  h <- generateInitialChainHash cInfo
-  insertSeenChain chainId cInfo
-  insertChainHash h chainId
-  insertChainBufferEntry chainId h
-
-checkIfIsMissingTX :: ( HasPrivateHashDB m
+checkIfIsMissingTX :: ( MonadLogger m
+                      , HasPrivateHashDB m
                       , (SHA `Alters` ChainHashEntry) m
                       )
                    => SHA -> SHA -> m ()
@@ -169,7 +159,8 @@ checkIfIsMissingTX th ch = do
       useChainHash ch
       requestTransaction th
 
-runPrivateHashTX :: ( HasPrivateHashDB m
+runPrivateHashTX :: ( MonadLogger m
+                    , HasPrivateHashDB m
                     , (SHA `Alters` OutputTx) m
                     , (SHA `Alters` ChainHashEntry) m
                     )
@@ -187,7 +178,9 @@ runPrivateHashTX tHash cHash = do
     adjustWithDefaultStatefully_ (Proxy @ChainHashEntry) cHash $ used .= True
   checkIfIsMissingTX tHash cHash
 
-runBlocks :: ( HasPrivateHashDB m
+runBlocks :: ( MonadLogger m
+             , MonadMonitor m
+             , HasPrivateHashDB m
              , (SHA `Alters` OutputBlock) m
              , (SHA `Alters` OutputTx) m
              , (SHA `Alters` ChainHashEntry) m
@@ -217,7 +210,9 @@ accumT s (a:as) run = do
   (bs,s'') <- accumT s' as run
   return (b:bs,s'')
 
-hydratePrivateHashes :: ( HasPrivateHashDB m
+hydratePrivateHashes :: ( MonadLogger m
+                        , MonadMonitor m
+                        , HasPrivateHashDB m
                         , (SHA `Alters` OutputBlock) m
                         , (SHA `Alters` OutputTx) m
                         , (SHA `Alters` ChainHashEntry) m
@@ -302,7 +297,9 @@ hydratePrivateHashes chainF b = do
     then return Nothing
     else return . Just $ buildBlock' (blockHeader b) txs'' (blockUncleHeaders b)
 
-insertNewChainInfo :: ( HasPrivateHashDB m
+insertNewChainInfo :: ( MonadLogger m
+                      , MonadMonitor m
+                      , HasPrivateHashDB m
                       , (SHA `Alters` OutputBlock) m
                       , (SHA `Alters` OutputTx) m
                       , (SHA `Alters` ChainHashEntry) m
@@ -313,7 +310,8 @@ insertNewChainInfo :: ( HasPrivateHashDB m
                    -> m [OutputBlock]
 insertNewChainInfo chainId cInfo = do
   cHash <- generateInitialChainHash cInfo
-  insertSeenChain chainId cInfo
+  repsert_ Proxy chainId $ return . maybe (chainIdEntry cInfo) (chainIdInfo .~ cInfo)
+  withLabel chainMetrics "seen_chains" incCounter
   insertChainHash cHash chainId
   insertChainBufferEntry chainId cHash
   findChainHashUses chainId [cHash]
