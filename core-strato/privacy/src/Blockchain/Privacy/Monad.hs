@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass         #-}
 {-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE RecordWildCards        #-}
 {-# LANGUAGE StrictData             #-}
 {-# LANGUAGE TemplateHaskell        #-}
 
@@ -9,14 +10,17 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord            (Word256)
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
+import           Blockchain.Util
 import           Control.Lens
 import           Data.Binary
 import           Data.Default
+import           Data.Foldable                 (toList)
 import           Data.Function                 (on)
 import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
 import           GHC.Generics
+import           Text.Format
 
 data CircularBuffer a = CircularBuffer
   { _capacity :: Int
@@ -34,6 +38,15 @@ emptyCircularBuffer = CircularBuffer maxBufferCapacity 0 Q.empty
 instance Default (CircularBuffer a) where
   def = emptyCircularBuffer
 
+instance Format a => Format (CircularBuffer a) where
+  format CircularBuffer{..} = unlines
+    [ "CircularBuffer"
+    , "--------------"
+    , tab $ "Capacity: " ++ show _capacity
+    , tab $ "Size:     " ++ show _size
+    , tab $ "Queue:    " ++ format (toList _queue)
+    ]
+
 data ChainHashEntry = ChainHashEntry
   { _used         :: Bool
   , _onChainId    :: Maybe Word256
@@ -46,6 +59,15 @@ blankChainHashEntry = ChainHashEntry False Nothing Q.empty
 
 instance Default ChainHashEntry where
   def = blankChainHashEntry
+
+instance Format ChainHashEntry where
+  format ChainHashEntry{..} = unlines
+    [ "ChainHashEntry"
+    , "--------------"
+    , tab $ "Used:      " ++ show _used
+    , tab $ "On chain:  " ++ format (SHA <$> _onChainId)
+    , tab $ "In blocks: " ++ format (toList _inBlocks)
+    ]
 
 chainHashEntryUsed :: ChainHashEntry
 chainHashEntryUsed = ChainHashEntry True Nothing Q.empty
@@ -62,6 +84,14 @@ data BlockInfo = BlockInfo
   } deriving (Eq, Show, Generic, Binary)
 makeLenses ''BlockInfo
 
+instance Format BlockInfo where
+  format BlockInfo{..} = unlines
+    [ "BlockInfo"
+    , "---------"
+    , tab $ "Block hash:     " ++ format _bhash
+    , tab $ "Block ordering: " ++ show _bordering
+    ]
+
 instance Ord BlockInfo where
   compare = compare `on` _bordering
 
@@ -74,6 +104,16 @@ makeLenses ''ChainIdEntry
 
 chainIdEntry :: ChainInfo -> ChainIdEntry
 chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
+
+instance Format ChainIdEntry where
+  format ChainIdEntry{..} = unlines
+    [ "ChainIdEntry"
+    , "------------"
+    , tab $ "Chain info:"
+    , tab $ format _chainIdInfo
+    , tab $ "Chain hashes:  " ++ format _chainHashes
+    , tab $ "Blocks to run: " ++ format (toList _blocksToRun)
+    ]
 
 class HasPrivateHashDB m where
   getChainId               :: ChainInfo -> m SHA

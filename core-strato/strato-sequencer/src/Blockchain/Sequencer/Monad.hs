@@ -15,6 +15,17 @@ module Blockchain.Sequencer.Monad (
     SequencerContext(..)
   , SequencerConfig(..)
   , SequencerM
+  , HasNamespace(..)
+  , isInNamespace
+  , fromNamespace
+  , lookupInLDB
+  , insertInLDB
+  , batchInsertInLDB
+  , deleteInLDB
+  , batchDeleteInLDB
+  , genericLookupSequencer
+  , genericInsertSequencer
+  , genericDeleteSequencer
   , getChainsDB
   , getTransactionsDB
   , prunePrivacyDBs
@@ -161,6 +172,12 @@ class HasNamespace a where
 
 isInNamespace :: HasNamespace a => Mod.Proxy a -> BL.ByteString -> Bool
 isInNamespace = BL.isPrefixOf . namespace
+
+fromNamespace :: (HasNamespace a, Binary (NSKey a))
+              => Mod.Proxy a -> BL.ByteString -> Maybe (NSKey a)
+fromNamespace p bs = if isInNamespace p bs
+  then Just . decode $ BL.drop (BL.length (namespace p)) bs
+  else Nothing
 
 instance HasNamespace OutputBlock where
   type NSKey OutputBlock = SHA

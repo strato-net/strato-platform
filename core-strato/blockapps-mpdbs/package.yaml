@@ -34,7 +34,7 @@ dependencies:
   - strato-model
   - transformers
 
-ghc-options: -Wall -O2
+ghc-options: -Wall -O2 -ddump-simpl
 
 library:
   source-dirs: src/

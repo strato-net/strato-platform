@@ -57,6 +57,7 @@ data Options = State{root::String, db::String}
              | DumpKafkaStateDiff{startingBlock::Int}
              | DumpRedis{databaseNumber::Integer}
              | CanonRedis{ipAddress::String, start::Int, range::Int}
+             | Privacy{registry :: Registry, operation :: Operation, key :: Maybe String, value :: Maybe String}
              | Psql{}
              | InsertTX{}
              | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
@@ -242,6 +243,17 @@ redisMatchOptions = record RedisMatch {pattern = error "unused pattern"}
                   [ pattern := error "redis <PATTERN>" += typ "PATTERN" += argPos 0
                   ]
 
+privacyOptions :: Annotate Ann
+privacyOptions =
+    record Privacy{registry = nil, operation = nil, key = nil, val = nil}
+        [ registry  := BlockHash += typ "REGISTRY" += explicit += name "r" += name "registry"
+        , operation := Keys      += typ "OP"       += explicit += name "o" += name "operation"
+        , key       := Nothing   += typ "DATA"     += explicit += name "k" += name "key"
+        , value     := Nothing   += typ "DATA"     += explicit += name "v" += name "value"
+        , json      := Nothing   += typ "DATA"     += explicit += name "j" += name "json"
+        ]
+    where nil = undefined
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -260,6 +272,7 @@ options = modes_ [blockGoOptions
                 , fRawMPOptions
                 , hashOptions
                 , insertTXOptions
+                , privacyOptions
                 , psqlOptions
                 , rawMPOptions
                 , rawOptions
@@ -312,3 +325,7 @@ run PushBlocks{..}             = insertP2P (OEPushBlocks startBlock endBlock pee
 run RSVP{..}                   = rsvp chainId memberId address
 run Redis{..}                  = redis $ BC.pack key
 run RedisMatch{..}             = redisMatch $ BC.pack pattern
+run Privacy{..}                = case operation of
+      Keys          -> doCheckpointGet service
+      Put           -> doCheckpointPut service (fromIntegral <$> offset) cp
+      NullOperation -> doCheckpointUsage

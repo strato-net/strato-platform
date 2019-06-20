@@ -19,6 +19,7 @@ dependencies:
   - blockapps-datadefs
   - blockapps-haskoin
   - blockapps-mpdbs
+  - blockapps-privacy
   - blockapps-util
   - bytestring
   - cmdargs
@@ -40,6 +41,7 @@ dependencies:
   - strato-index
   - strato-redis-blockdb
   - strato-model
+  - strato-sequencer
   - strato-statediff
   - transformers
   - hedis
