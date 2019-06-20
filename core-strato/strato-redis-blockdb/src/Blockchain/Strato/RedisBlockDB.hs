@@ -10,7 +10,8 @@
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( RedisConnection(..), inNamespace, getSHAsByNumber
+    ( RedisConnection(..), inNamespace, findNamespace
+    , getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
@@ -92,6 +93,22 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateTransactions -> "pt:"
             PrivateTxsInBlocks  -> "pb:"
             PrivateIPChains     -> "pic:"
+
+findNamespace :: S8.ByteString -> BlockDBNamespace
+findNamespace key = case S8.takeWhile (/= ':') key of
+  "h" -> Headers
+  "t" -> Transactions
+  "n" -> Numbers
+  "u" -> Uncles
+  "p" -> Parent
+  "c" -> Children
+  "q" -> Canonical
+  "x" -> PrivateChainInfo
+  "m" -> PrivateChainMembers
+  "pt" -> PrivateTransactions
+  "pb" -> PrivateTxsInBlocks
+  "pic" -> PrivateIPChains
+  wut -> error $ "unknown namespace: " ++ show wut
 
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)

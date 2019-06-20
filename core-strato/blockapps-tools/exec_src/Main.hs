@@ -24,12 +24,15 @@ import           InsertTX
 import           Psql
 import           Raw
 import           RawMP
+import           Redis
 import           RLP
+import           RSVP
 import           State
 
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 import           Data.Int
@@ -58,6 +61,9 @@ data Options = State{root::String, db::String}
              | InsertTX{}
              | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
              | PushBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
+             | RSVP {chainId :: Word256, memberId :: String, address::Address}
+             | Redis { key :: String }
+             | RedisMatch { pattern :: String }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -75,8 +81,8 @@ canonRedisOptions =
     range := def += typ "RANGE" += argPos 2
   ]
 
-redisOptions :: Annotate Ann
-redisOptions =
+dumpRedisOptions :: Annotate Ann
+dumpRedisOptions =
   record DumpRedis{databaseNumber=undefined} [
     databaseNumber := 0 += typ "INT"
   ]
@@ -218,6 +224,24 @@ pushOptions =
          , peer := 0x0 += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
          ]
 
+
+rsvpOptions :: Annotate Ann
+rsvpOptions = record RSVP { chainId = error "unused chain id", memberId = error "unused member", address = error "unused address"}
+            [ chainId := error "--chain-id required" += typ "NUMBER" += explicit += name "chain-id"
+            , memberId := error "--member required" += typ "MEMBER ID" += explicit += name "member"
+            , address := error "--address required" += typ "ADDRESS" += explicit += name "address"
+            ]
+
+redisOptions :: Annotate Ann
+redisOptions = record Redis {key = error "unused key"}
+             [ key := error "redis <KEY>" += typ "KEY" += argPos 0
+             ]
+
+redisMatchOptions :: Annotate Ann
+redisMatchOptions = record RedisMatch {pattern = error "unused pattern"}
+                  [ pattern := error "redis <PATTERN>" += typ "PATTERN" += argPos 0
+                  ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -232,17 +256,20 @@ options = modes_ [blockGoOptions
                 , dumpKafkaStateDiffOptions
                 , dumpKafkaUnSequencerOptions
                 , dumpKafkaUnminedBlocksOptions
+                , dumpRedisOptions
                 , fRawMPOptions
                 , hashOptions
                 , insertTXOptions
                 , psqlOptions
                 , rawMPOptions
                 , rawOptions
-                , redisOptions
                 , rlpOptions
                 , stateOptions
                 , askOptions
                 , pushOptions
+                , rsvpOptions
+                , redisOptions
+                , redisMatchOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -282,3 +309,6 @@ run Checkpoints{..}            = case operation of
       NullOperation -> doCheckpointUsage
 run AskForBlocks{..}           = insertP2P (OEAskForBlocks startBlock endBlock peer)
 run PushBlocks{..}             = insertP2P (OEPushBlocks startBlock endBlock peer)
+run RSVP{..}                   = rsvp chainId memberId address
+run Redis{..}                  = redis $ BC.pack key
+run RedisMatch{..}             = redisMatch $ BC.pack pattern

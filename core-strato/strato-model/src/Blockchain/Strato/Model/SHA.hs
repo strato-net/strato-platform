@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -22,6 +23,7 @@ import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
 import qualified    Data.ByteString.Char8                as S8
 import qualified    Data.ByteString.Lazy                 as BL
+import              Data.Data
 import              Data.DeriveTH
 import              Data.Hashable                        (Hashable)
 import qualified    Data.Text                            as T
@@ -38,7 +40,7 @@ import              Blockchain.Strato.Model.ExtendedWord
 import qualified    Text.Colors                          as CL
 import              Text.Format
 
-newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
+newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic, Data)
                           deriving anyclass (Hashable)
 
 instance NFData SHA

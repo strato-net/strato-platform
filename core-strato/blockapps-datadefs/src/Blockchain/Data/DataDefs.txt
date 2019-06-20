@@ -14,7 +14,7 @@ BlockData
     extraData BS.ByteString
     nonce Word64
     mixHash SHA
-    deriving Eq Read Show Generic
+    deriving Eq Read Show Generic Data
 
 BlockDataRef
     parentHash SHA
