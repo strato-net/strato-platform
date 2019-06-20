@@ -127,8 +127,8 @@ data SState =
     stateDB                :: MP.MPDB,
     addressStateTxDBMap    :: M.Map Address AddressStateModification,
     addressStateBlockDBMap :: M.Map Address AddressStateModification,
-    storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
-    storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString,
+    storageTxMap           :: M.Map RawStorageKey RawStorageValue,
+    storageBlockMap        :: M.Map RawStorageKey RawStorageValue,
     _action                :: Action
   }
 

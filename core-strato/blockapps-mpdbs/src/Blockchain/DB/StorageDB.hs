@@ -44,10 +44,10 @@ toKey :: Address -> Word256 -> RawStorageKey
 toKey = curry $ fmap word256ToBytes
 
 toVal :: Word256 -> RawStorageValue
-toVal = rlpSerialize  . rlpEncode
+toVal = RawStorageValue . rlpSerialize  . rlpEncode
 
 fromVal :: RawStorageValue -> Word256
-fromVal = rlpDecode . rlpDeserialize
+fromVal = rlpDecode . rlpDeserialize . unRawStorageValue
 
 putStorageKeyVal' :: HasStorageDB m => Address -> Word256 -> Word256 -> m ()
 putStorageKeyVal' addr key val = putRawStorageKeyVal' (toKey addr key) (toVal val)

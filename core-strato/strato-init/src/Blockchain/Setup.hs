@@ -97,8 +97,8 @@ data SetupDBs =
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
     redisDB :: RBDB.RedisConnection,
-    localStorageTx :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
-    localStorageBlock :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
+    localStorageTx :: IORef (Map.Map RawStorageKey RawStorageValue),
+    localStorageBlock :: IORef (Map.Map RawStorageKey RawStorageValue),
     localAddressStateTx :: IORef (Map.Map Address AddressStateModification),
     localAddressStateBlock :: IORef (Map.Map Address AddressStateModification)
     }
@@ -119,7 +119,7 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
 instance HasMemRawStorageDB SetupDBM where
   getMemRawStorageTxDB = do
     cxt <- ask
-    lst <- liftIO . readIORef .localStorageTx $ cxt
+    lst <- liftIO . readIORef . localStorageTx $ cxt
     return (stateDB cxt, lst)
   putMemRawStorageTxMap theMap = do
     lstref <- asks localStorageTx

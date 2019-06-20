@@ -222,7 +222,7 @@ call2 funcName callArgs contractAddress = do
 
 
 
-checkStorage :: ContextM [(MP.Key, B.ByteString)]
+checkStorage :: ContextM [(MP.Key, RawStorageValue)]
 checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
 
 getAll :: [[StoragePathPiece]] -> ContextM [BasicValue]

@@ -18,7 +18,6 @@ import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
-import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Database.LevelDB as DB
@@ -44,7 +43,7 @@ import Blockchain.Strato.Model.SHA
 import qualified Data.NibbleString as N
 import qualified SolidVM.Model.Storable as MS
 
-type SMap = M.Map (Address, B.ByteString) B.ByteString
+type SMap = M.Map RawStorageKey RawStorageValue
 type AMap = M.Map Address AddressStateModification
 
 data CachedStorage = CS
@@ -175,8 +174,8 @@ storageSpec = do
 
   describe "RawStorageDB" $ do
     it "should get its puts" . runStorM $ do
-      putRawStorageKeyVal' (0x888, "aKey") "aValue"
-      getRawStorageKeyVal' (0x888, "aKey") `shouldReturn` "aValue"
+      putRawStorageKeyVal' (0x888, "aKey") $ RawStorageValue "aValue"
+      getRawStorageKeyVal' (0x888, "aKey") `shouldReturn` RawStorageValue "aValue"
 
   describe "SolidStorageDB" $ do
     it "should get its puts" . runStorM $ do

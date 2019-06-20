@@ -44,7 +44,6 @@ import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString                    as B
 import           Data.Foldable                      (toList)
 import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
@@ -114,8 +113,8 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextBlockSummaryDB         :: BlockSummaryDB
                        , contextAddressStateTxDBMap    :: M.Map Address AddressStateModification
                        , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
-                       , contextStorageTxMap           :: M.Map (Address, B.ByteString) B.ByteString
-                       , contextStorageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
+                       , contextStorageTxMap           :: M.Map RawStorageKey RawStorageValue
+                       , contextStorageBlockMap        :: M.Map RawStorageKey RawStorageValue
                        , contextBlockHashRoot          :: BlockHashRoot
                        , contextGenesisRoot            :: GenesisRoot
                        , contextBestBlockRoot          :: BestBlockRoot
@@ -222,6 +221,7 @@ instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance (SHA `A.Alters` BlockSummary) ContextM where
   lookup _ = genericLookupBlockSummaryDB $ gets contextBlockSummaryDB

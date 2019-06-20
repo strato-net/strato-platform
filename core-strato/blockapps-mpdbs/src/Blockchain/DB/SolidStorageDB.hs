@@ -43,10 +43,10 @@ toKey :: Address -> StoragePath -> RawStorageKey
 toKey =  curry $ fmap unparsePath
 
 toVal :: BasicValue -> RawStorageValue
-toVal = rlpSerialize  . rlpEncode
+toVal = RawStorageValue . rlpSerialize  . rlpEncode
 
 fromVal :: RawStorageValue -> BasicValue
-fromVal = rlpDecode . rlpDeserialize
+fromVal = rlpDecode . rlpDeserialize . unRawStorageValue
 
 putSolidStorageKeyVal' :: FullSolidStorage m => Address -> StoragePath -> BasicValue -> m ()
 putSolidStorageKeyVal' addr key val = do
