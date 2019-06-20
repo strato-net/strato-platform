@@ -8,7 +8,7 @@ let healthStatus, uptimeDur, systemInfoStatus, systemInfoMessages;
 
 
 async function getHealthStatus() {
-  const healthInfo = await models.CurrentHealth.findOne({
+  const healthInfoPromise = models.CurrentHealth.findOne({
     where: {
       processName: "HealthStat"
     },
@@ -18,7 +18,7 @@ async function getHealthStatus() {
       'lastFailureTimestamp'
     ]
   })
-  const stallInfo = await models.CurrentHealth.findOne({
+  const stallInfoPromise = models.CurrentHealth.findOne({
     where: {
       processName: "StallStat"
     },
@@ -29,7 +29,7 @@ async function getHealthStatus() {
     ]
   })
 
-  const systemInfo = await models.CurrentHealth.findOne({
+  const systemInfoPromise = models.CurrentHealth.findOne({
     where: {
       processName: "SystemInfoStat"
     },
@@ -42,8 +42,15 @@ async function getHealthStatus() {
       'additionalInfo'
     ],
     raw: true,
-  }).catch(err => next(err));
+  });
 
+  const [healthInfo, stallInfo, systemInfo] = await Promise.all(
+    [
+      healthInfoPromise,
+      stallInfoPromise,
+      systemInfoPromise
+    ]
+  )
   let currentTime = Date.now();
 
   if (healthInfo && stallInfo) {

@@ -190,6 +190,8 @@ async function checkLatest() {
     }
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking and comparing the latest health`)
+    const currentStatus = [false, 'Last Check Not Recent'];
+    await updateCurrentHealth(currentStatus);
   }
 }
 
@@ -212,6 +214,8 @@ async function checkSystemInfo() {
     disk.check('/', function(err, info) {
       if (err) {
         winston.warn("Error when checking for disk usage", err);
+        isHealthy = false;
+        additional_info.push("Low Disk Space")
       } else {
         const diskUsageRatio = info.free / info.total *100;
         sysInfoCollected.disk_usage = diskUsageRatio;
@@ -266,6 +270,8 @@ async function checkSystemInfo() {
     return [isHealthy, sysInfoCollected];
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
+    const currentStatus = [false, ['Error when checking System Information']];
+    await updateCurrentHealth(currentStatus);
   }
 }
 
