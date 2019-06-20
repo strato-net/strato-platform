@@ -75,7 +75,7 @@ describe('Strato Load Test', function() {
     console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);
 
     var TPS = batchSize * batchCount/seconds;
-    var data  = [TPS]; //Alternatively [seconds,blocTime,TPS];
+    var data  = [TPS,]; //Alternatively [seconds,blocTime,TPS];
     const fs = require('fs');
     fs.appendFile("graph_PERFORMANCE_multinode_strato_load.csv", data, function(err) {
         if(err) {
