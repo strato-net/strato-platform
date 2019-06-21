@@ -1,5 +1,6 @@
 module BlockApps.Init ( blockappsInit ) where
 
+import Control.Concurrent
 import Control.Monad
 import Data.List (intercalate)
 import Data.Text hiding (intercalate)
@@ -16,18 +17,22 @@ foreign import ccall unsafe "execvp"
 
 selfExec :: IO ()
 selfExec = do
-  putStrLn "attempting to self exec"
+  tid <- myThreadId
+  putStrLn $ " attempting to self exec " ++ show tid
   cmd <- getProgName
   args <- getArgs
   putStrLn $ "caught sig-hup; self-reexec: " ++ intercalate " " (cmd:args)
   hFlush stdout
   cmdC <- newCString cmd
   argsC <- mapM newCString args
-  withArray argsC $ \argsPC ->
+  withArray (cmdC:argsC) $ \argsPC -> do
     void $ c_execvp cmdC argsPC
+    throwErrno "unable to exec"
 
 blockappsInit :: Text -> IO ()
 blockappsInit self = do
+  tid <- myThreadId
+  putStrLn $ "blockapps-init for " ++ show tid
   initializeHealthChecks self
 
   -- TODO: exec self
