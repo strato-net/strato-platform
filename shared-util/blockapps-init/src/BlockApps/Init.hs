@@ -25,7 +25,7 @@ selfExec = do
   hFlush stdout
   cmdC <- newCString cmd
   argsC <- mapM newCString args
-  withArray0 (cmdC:argsC) $ \argsPC -> do
+  withArray0 nullPtr (cmdC:argsC) $ \argsPC -> do
     void $ c_execvp cmdC argsPC
     throwErrno "unable to exec"
 
