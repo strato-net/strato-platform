@@ -20,8 +20,7 @@ import {
   GET_PEERS,
   GET_COINBASE,
   GET_HEALTH,
-  GET_NODE_UPTINE,
-  GET_SYSTEM_INFO
+  GET_NODE_UPTINE
 } from './rooms';
 import {
   updateBlockNumber,
@@ -41,9 +40,7 @@ import {
   preloadHealth,
   updateHealth,
   preloadNodeUptime,
-  updateNodeUptime,
-  preloadSystemInfo,
-  updateSystemInfo
+  updateNodeUptime
 } from '../components/Dashboard/dashboard.action';
 import {
   updateCoinbase,
@@ -83,7 +80,7 @@ export function subscribe() {
     registerActions(emit, GET_COINBASE, preloadCoinbase, updateCoinbase)
     registerActions(emit, GET_HEALTH, preloadHealth, updateHealth)
     registerActions(emit, GET_NODE_UPTINE, preloadNodeUptime, updateNodeUptime)
-    registerActions(emit, GET_SYSTEM_INFO, preloadSystemInfo, updateSystemInfo)
+
     socket.on('disconnect', e => {
       // TODO: handle
     });

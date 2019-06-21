@@ -16,7 +16,7 @@ import {
   PRELOAD_HEALTH,
   UPDATE_HEALTH,
   PRELOAD_NODE_UPTIME,
-  UPDATE_NODE_UPTIME, PRELOAD_SYSTEM_INFO, UPDATE_SYSTEM_INFO
+  UPDATE_NODE_UPTIME
 } from './dashboard.action'
 
 const initialState = {
@@ -28,10 +28,7 @@ const initialState = {
   blockDifficulty: [],
   transactionTypes: [],
   healthStatus: false,
-  uptime: 0,
-  systemStatus:false,
-  systemWarnings: "",
-  ifHovering:false
+  uptime: 0
 };
 
 const reducer = function (state = initialState, action) {
@@ -142,18 +139,6 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         uptime: action.data
-      }
-
-    case PRELOAD_SYSTEM_INFO:
-      return {
-        ...state,
-        systemStatus: action.data.status
-      }
-
-    case UPDATE_SYSTEM_INFO:
-      return {
-        ...state,
-        systemWarnings: action.data.warnings
       }
 
     default:

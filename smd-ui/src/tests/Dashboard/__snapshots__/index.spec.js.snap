@@ -218,8 +218,6 @@ ShallowWrapper {
         >
           <div
             className="col-sm-3"
-            onMouseEnter={[Function]}
-            onMouseLeave={[Function]}
           >
             <withRouter(Connect(NumberCard))
               description="Uptime  NaN:NaN:NaN"
@@ -577,8 +575,6 @@ ShallowWrapper {
           "children": Array [
             <div
               className="col-sm-3"
-              onMouseEnter={[Function]}
-              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -641,37 +637,29 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": Array [
-                <withRouter(Connect(NumberCard))
-                  description="Uptime  NaN:NaN:NaN"
-                  iconClass="fa-exclamation-circle"
-                  mode="warning"
-                  number="UNHEALTHY"
-                />,
-                false,
-              ],
+              "children": <withRouter(Connect(NumberCard))
+                description="Uptime  NaN:NaN:NaN"
+                iconClass="fa-exclamation-circle"
+                mode="warning"
+                number="UNHEALTHY"
+              />,
               "className": "col-sm-3",
-              "onMouseEnter": [Function],
-              "onMouseLeave": [Function],
             },
             "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "description": "Uptime  NaN:NaN:NaN",
-                  "iconClass": "fa-exclamation-circle",
-                  "mode": "warning",
-                  "number": "UNHEALTHY",
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "function",
+              "props": Object {
+                "description": "Uptime  NaN:NaN:NaN",
+                "iconClass": "fa-exclamation-circle",
+                "mode": "warning",
+                "number": "UNHEALTHY",
               },
-              false,
-            ],
+              "ref": null,
+              "rendered": null,
+              "type": [Function],
+            },
             "type": "div",
           },
           Object {
@@ -1621,8 +1609,6 @@ ShallowWrapper {
           >
             <div
               className="col-sm-3"
-              onMouseEnter={[Function]}
-              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -1980,8 +1966,6 @@ ShallowWrapper {
             "children": Array [
               <div
                 className="col-sm-3"
-                onMouseEnter={[Function]}
-                onMouseLeave={[Function]}
               >
                 <withRouter(Connect(NumberCard))
                   description="Uptime  NaN:NaN:NaN"
@@ -2044,37 +2028,29 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": Array [
-                  <withRouter(Connect(NumberCard))
-                    description="Uptime  NaN:NaN:NaN"
-                    iconClass="fa-exclamation-circle"
-                    mode="warning"
-                    number="UNHEALTHY"
-                  />,
-                  false,
-                ],
+                "children": <withRouter(Connect(NumberCard))
+                  description="Uptime  NaN:NaN:NaN"
+                  iconClass="fa-exclamation-circle"
+                  mode="warning"
+                  number="UNHEALTHY"
+                />,
                 "className": "col-sm-3",
-                "onMouseEnter": [Function],
-                "onMouseLeave": [Function],
               },
               "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {
-                    "description": "Uptime  NaN:NaN:NaN",
-                    "iconClass": "fa-exclamation-circle",
-                    "mode": "warning",
-                    "number": "UNHEALTHY",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "function",
+                "props": Object {
+                  "description": "Uptime  NaN:NaN:NaN",
+                  "iconClass": "fa-exclamation-circle",
+                  "mode": "warning",
+                  "number": "UNHEALTHY",
                 },
-                false,
-              ],
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
               "type": "div",
             },
             Object {
@@ -3362,8 +3338,6 @@ ShallowWrapper {
         >
           <div
             className="col-sm-3"
-            onMouseEnter={[Function]}
-            onMouseLeave={[Function]}
           >
             <withRouter(Connect(NumberCard))
               description="Uptime  NaN:NaN:NaN"
@@ -3721,8 +3695,6 @@ ShallowWrapper {
           "children": Array [
             <div
               className="col-sm-3"
-              onMouseEnter={[Function]}
-              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -3785,37 +3757,29 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": Array [
-                <withRouter(Connect(NumberCard))
-                  description="Uptime  NaN:NaN:NaN"
-                  iconClass="fa-exclamation-circle"
-                  mode="warning"
-                  number="UNHEALTHY"
-                />,
-                false,
-              ],
+              "children": <withRouter(Connect(NumberCard))
+                description="Uptime  NaN:NaN:NaN"
+                iconClass="fa-exclamation-circle"
+                mode="warning"
+                number="UNHEALTHY"
+              />,
               "className": "col-sm-3",
-              "onMouseEnter": [Function],
-              "onMouseLeave": [Function],
             },
             "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "description": "Uptime  NaN:NaN:NaN",
-                  "iconClass": "fa-exclamation-circle",
-                  "mode": "warning",
-                  "number": "UNHEALTHY",
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "function",
+              "props": Object {
+                "description": "Uptime  NaN:NaN:NaN",
+                "iconClass": "fa-exclamation-circle",
+                "mode": "warning",
+                "number": "UNHEALTHY",
               },
-              false,
-            ],
+              "ref": null,
+              "rendered": null,
+              "type": [Function],
+            },
             "type": "div",
           },
           Object {
@@ -4765,8 +4729,6 @@ ShallowWrapper {
           >
             <div
               className="col-sm-3"
-              onMouseEnter={[Function]}
-              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -5124,8 +5086,6 @@ ShallowWrapper {
             "children": Array [
               <div
                 className="col-sm-3"
-                onMouseEnter={[Function]}
-                onMouseLeave={[Function]}
               >
                 <withRouter(Connect(NumberCard))
                   description="Uptime  NaN:NaN:NaN"
@@ -5188,37 +5148,29 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": Array [
-                  <withRouter(Connect(NumberCard))
-                    description="Uptime  NaN:NaN:NaN"
-                    iconClass="fa-exclamation-circle"
-                    mode="warning"
-                    number="UNHEALTHY"
-                  />,
-                  false,
-                ],
+                "children": <withRouter(Connect(NumberCard))
+                  description="Uptime  NaN:NaN:NaN"
+                  iconClass="fa-exclamation-circle"
+                  mode="warning"
+                  number="UNHEALTHY"
+                />,
                 "className": "col-sm-3",
-                "onMouseEnter": [Function],
-                "onMouseLeave": [Function],
               },
               "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {
-                    "description": "Uptime  NaN:NaN:NaN",
-                    "iconClass": "fa-exclamation-circle",
-                    "mode": "warning",
-                    "number": "UNHEALTHY",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "function",
+                "props": Object {
+                  "description": "Uptime  NaN:NaN:NaN",
+                  "iconClass": "fa-exclamation-circle",
+                  "mode": "warning",
+                  "number": "UNHEALTHY",
                 },
-                false,
-              ],
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
               "type": "div",
             },
             Object {
@@ -6208,8 +6160,6 @@ ShallowWrapper {
         >
           <div
             className="col-sm-3"
-            onMouseEnter={[Function]}
-            onMouseLeave={[Function]}
           >
             <withRouter(Connect(NumberCard))
               description="Uptime  NaN:NaN:NaN"
@@ -6418,8 +6368,6 @@ ShallowWrapper {
           "children": Array [
             <div
               className="col-sm-3"
-              onMouseEnter={[Function]}
-              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -6482,37 +6430,29 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": Array [
-                <withRouter(Connect(NumberCard))
-                  description="Uptime  NaN:NaN:NaN"
-                  iconClass="fa-exclamation-circle"
-                  mode="warning"
-                  number="UNHEALTHY"
-                />,
-                false,
-              ],
+              "children": <withRouter(Connect(NumberCard))
+                description="Uptime  NaN:NaN:NaN"
+                iconClass="fa-exclamation-circle"
+                mode="warning"
+                number="UNHEALTHY"
+              />,
               "className": "col-sm-3",
-              "onMouseEnter": [Function],
-              "onMouseLeave": [Function],
             },
             "ref": null,
-            "rendered": Array [
-              Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "description": "Uptime  NaN:NaN:NaN",
-                  "iconClass": "fa-exclamation-circle",
-                  "mode": "warning",
-                  "number": "UNHEALTHY",
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "function",
+              "props": Object {
+                "description": "Uptime  NaN:NaN:NaN",
+                "iconClass": "fa-exclamation-circle",
+                "mode": "warning",
+                "number": "UNHEALTHY",
               },
-              false,
-            ],
+              "ref": null,
+              "rendered": null,
+              "type": [Function],
+            },
             "type": "div",
           },
           Object {
@@ -7025,8 +6965,6 @@ ShallowWrapper {
           >
             <div
               className="col-sm-3"
-              onMouseEnter={[Function]}
-              onMouseLeave={[Function]}
             >
               <withRouter(Connect(NumberCard))
                 description="Uptime  NaN:NaN:NaN"
@@ -7235,8 +7173,6 @@ ShallowWrapper {
             "children": Array [
               <div
                 className="col-sm-3"
-                onMouseEnter={[Function]}
-                onMouseLeave={[Function]}
               >
                 <withRouter(Connect(NumberCard))
                   description="Uptime  NaN:NaN:NaN"
@@ -7299,37 +7235,29 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": Array [
-                  <withRouter(Connect(NumberCard))
-                    description="Uptime  NaN:NaN:NaN"
-                    iconClass="fa-exclamation-circle"
-                    mode="warning"
-                    number="UNHEALTHY"
-                  />,
-                  false,
-                ],
+                "children": <withRouter(Connect(NumberCard))
+                  description="Uptime  NaN:NaN:NaN"
+                  iconClass="fa-exclamation-circle"
+                  mode="warning"
+                  number="UNHEALTHY"
+                />,
                 "className": "col-sm-3",
-                "onMouseEnter": [Function],
-                "onMouseLeave": [Function],
               },
               "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {
-                    "description": "Uptime  NaN:NaN:NaN",
-                    "iconClass": "fa-exclamation-circle",
-                    "mode": "warning",
-                    "number": "UNHEALTHY",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "function",
+                "props": Object {
+                  "description": "Uptime  NaN:NaN:NaN",
+                  "iconClass": "fa-exclamation-circle",
+                  "mode": "warning",
+                  "number": "UNHEALTHY",
                 },
-                false,
-              ],
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
               "type": "div",
             },
             Object {

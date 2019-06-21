@@ -185,8 +185,8 @@ export const unSubscribeRoomMock = [
   ['TRANSACTIONS_COUNT'],
   ['TRANSACTIONS_TYPE'],
   ['GET_HEALTH'],
-  ['GET_NODE_UPTIME'],
-  ['GET_SYSTEM_INFO']
+  ['GET_NODE_UPTIME']
+
 ]
 
 export const subscribeRoomMock = [
@@ -199,6 +199,5 @@ export const subscribeRoomMock = [
   ['TRANSACTIONS_COUNT'],
   ['TRANSACTIONS_TYPE'],
   ['GET_HEALTH'],
-  ['GET_NODE_UPTIME'],
-  ['GET_SYSTEM_INFO']
+  ['GET_NODE_UPTIME']
 ]

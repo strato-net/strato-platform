@@ -26,8 +26,7 @@ import {
   BLOCKS_FREQUENCY,
   TRANSACTIONS_TYPE,
   GET_NODE_UPTINE,
-  GET_HEALTH,
-  GET_SYSTEM_INFO
+  GET_HEALTH
 } from '../../sockets/rooms'
 import {sec2Date} from "../../lib/formatSeconds";
 
@@ -52,13 +51,6 @@ const tourSteps = [
 
 class Dashboard extends Component {
 
-  constructor(props) {
-    super(props);
-    this.handleMouseHover = this.handleMouseHover.bind(this);
-    this.state = {
-      isHovering: false,
-    }
-  }
   componentDidMount() {
     this.props.subscribeRoom(LAST_BLOCK_NUMBER)
     this.props.subscribeRoom(USERS_COUNT)
@@ -70,7 +62,6 @@ class Dashboard extends Component {
     this.props.subscribeRoom(TRANSACTIONS_TYPE)
     this.props.subscribeRoom(GET_HEALTH)
     this.props.subscribeRoom(GET_NODE_UPTINE)
-    this.props.subscribeRoom(GET_SYSTEM_INFO)
 
     mixpanelWrapper.track('dashboard_page_load');
   }
@@ -86,14 +77,7 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(TRANSACTIONS_TYPE)
     this.props.unSubscribeRoom(GET_HEALTH)
     this.props.unSubscribeRoom(GET_NODE_UPTINE)
-    this.props.unSubscribeRoom(GET_SYSTEM_INFO)
   }
-
-  handleMouseHover (){
-    this.setState({
-      isHovering: !this.state.isHovering
-    });
-  };
 
   render() {
     const difficultyData = this.props.dashboard.blockDifficulty;
@@ -103,10 +87,7 @@ class Dashboard extends Component {
     const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
     const uptime = this.props.dashboard.uptime;
     const health = this.props.dashboard.healthStatus;
-    const systemHealth = this.props.dashboard.systemStatus;
-    const systemWarnings = this.props.dashboard.systemWarnings;
     let connection = true;
-
 
     socket.on('disconnect', e => {
       connection = false;
@@ -120,17 +101,13 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-3"
-               onMouseEnter={this.handleMouseHover}
-               onMouseLeave={this.handleMouseHover}
-          >
+          <div className="col-sm-3">
             <NumberCard
               number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
               description= {connection ? (sec2Date(uptime)):"No Connection"}
-              mode={(health && systemHealth) ? 'success':'warning' }
-              iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
+              mode={health ? 'success':'warning' }
+              iconClass={health ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />
-            {(this.state.isHovering && !systemHealth) && <div> Warnings: {systemWarnings} </div>}
           </div>
           <div className="col-sm-3">
             <Link to="/blocks">

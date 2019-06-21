@@ -10,7 +10,7 @@ module.exports = function(sequelize, DataTypes) {
         lastFailureTimestamp : {
             type: DataTypes.DATE, //'TIMESTAMP',
             allowNull: false},
-        additionalInfo: {type: DataTypes.JSONB, allowNull: true},
+        additionalInfo: {type: DataTypes.STRING, allowNull: true},
         isBlocksValidInc: {type: DataTypes.BOOLEAN, allowNull: true},
         isLastPending: {type: DataTypes.BOOLEAN, allowNull: true}
     });
