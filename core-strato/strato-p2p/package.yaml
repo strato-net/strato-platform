@@ -21,6 +21,7 @@ dependencies:
   - aeson
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-init
   - blockapps-util
   - bytestring
   - classy-prelude

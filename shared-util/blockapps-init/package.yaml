@@ -1,0 +1,10 @@
+name: blockapps-init
+
+dependencies:
+  - base
+  - cross-monitoring
+  - text
+  - unix
+
+library:
+  source-dirs: src
