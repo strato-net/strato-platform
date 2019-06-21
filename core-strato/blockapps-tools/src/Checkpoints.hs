@@ -1,10 +1,16 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE OverloadedStrings  #-}
-module Checkpoints where
+module Checkpoints
+  ( doCheckpointPut
+  , doCheckpointGet
+  , doCheckpointUsage
+  , CheckpointService(..)
+  , CheckpointOperation(..)
+  ) where
 
 import           Control.Concurrent              (threadDelay)
-import           Control.Monad                   (forM_, unless, void, when)
+import           Control.Monad                   (forM_, unless, void)
 
 import qualified Data.ByteString.Char8           as S8
 import           Data.Data
@@ -80,15 +86,6 @@ kafkaBitsForService = \case
     Slipstream -> let clientId = "slipstream" in
             (clientId, lookupConsumerGroup clientId, DiffKafka.stateDiffTopicName)
 
-hasCheckpointData :: CheckpointService -> Bool
-hasCheckpointData EVM        = True
-hasCheckpointData ApiIndexer = True
-hasCheckpointData _          = False
-
-makeCheckpointData :: CheckpointService -> KP.Metadata -> String -> KP.Metadata
-makeCheckpointData EVM _ arg = KP.Metadata . KP.KString $ S8.pack arg
-makeCheckpointData _ oldMD _ = oldMD
-
 lookupByBits :: KafkaBits -> IO CPTuple
 lookupByBits bits@(clientId, consumerId, topicName) =
     runKafkaConfigured clientId (K.fetchSingleOffset consumerId topicName 0) >>= \case
@@ -105,16 +102,14 @@ showOffset :: CPTuple -> IO ()
 showOffset = putStrLn . ("Offset is " ++) . show . fst
 
 -- todo:
-showCheckpointData :: CheckpointService -> CPTuple -> IO ()
-showCheckpointData EVM        = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . K._kMetadata . snd
-showCheckpointData ApiIndexer = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . K._kMetadata . snd
-showCheckpointData svc        = error $ "showCheckpointData called for service `" ++ show svc ++ "` which is unsupported"
+showCheckpointData :: CPTuple -> IO ()
+showCheckpointData = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . K._kMetadata . snd
 
 getAndDisplayExistingData :: CheckpointService -> IO CPTuple
 getAndDisplayExistingData service = do
     kafkaData <- lookupByBits (kafkaBitsForService service)
     showOffset kafkaData
-    when (hasCheckpointData service) $ showCheckpointData service kafkaData
+    showCheckpointData kafkaData
     return kafkaData
 
 doCheckpointGet :: CheckpointService -> IO ()
@@ -130,20 +125,16 @@ writeCheckpoint (clientId, consumerId, topicName) (ofs, md) = void $
 doCheckpointPut :: CheckpointService -> Maybe KP.Offset -> Maybe String -> IO ()
 doCheckpointPut service maybeNewOfs maybeNewData = do
     unless (isJust maybeNewOfs || isJust maybeNewData) $ error errPutFlagRequirement
-    when (isJust maybeNewData && not (hasCheckpointData service)) $
-        error $ "Service `" ++ show service ++ "` does not take checkpoint metadata"
 
     putStrLn $ "Existing data for service: " ++ show service
     (oldOfs, oldData) <- getAndDisplayExistingData service
-
     let newCp   = (newOfs, newData)
         newOfs  = fromMaybe oldOfs maybeNewOfs
-        newData = makeCheckpointData service oldData (fromMaybe "" maybeNewData)
-    putStrLn ""
+        newData = maybe oldData (KP.Metadata . KP.KString . S8.pack) maybeNewData
 
     putStrLn $ "Will commit the following checkpoint for service: " ++ show service
     showOffset newCp
-    when (hasCheckpointData service) $ showCheckpointData service newCp
+    showCheckpointData newCp
     putStrLn ""
 
     writeCheckpoint (kafkaBitsForService service) newCp
@@ -151,7 +142,7 @@ doCheckpointPut service maybeNewOfs maybeNewData = do
     putStrLn $ "Verify commit for service: " ++ show service
     verifyCP <- getAndDisplayExistingData service
     showOffset verifyCP
-    when (hasCheckpointData service) $ showCheckpointData service verifyCP
+    showCheckpointData verifyCP
 
 
 errPutFlagRequirement :: String
