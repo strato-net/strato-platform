@@ -3,6 +3,7 @@ ghc-options: -Wall -Werror
 
 dependencies:
   - base
+  - binary
   - blockapps-data
   - blockapps-util
   - containers
