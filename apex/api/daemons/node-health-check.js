@@ -203,11 +203,11 @@ async function checkSystemInfo() {
     let isHealthy = true;
     const memdata = await si.mem();
     sysInfoCollected.mem_active = memdata.active;
-    sysInfoCollected.mem_active = metadata.active;
-    sysInfoCollected.mem_free = metadata.free;
+    sysInfoCollected.mem_active = memdata.active;
+    sysInfoCollected.mem_free = memdata.free;
     sysInfoCollected.mem_available = memdata.available;
 
-    if (metadata.available / memdata.total * 100 < config.healthCheck.diskUsageBound) {
+    if (memdata.available / memdata.total * 100 < config.healthCheck.diskUsageBound) {
       isHealthy = false;
       additional_info.push("Low Memory")
     }
