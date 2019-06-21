@@ -190,7 +190,7 @@ async function checkLatest() {
     }
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking and comparing the latest health`)
-    const currentStatus = [false, 'Last Check Not Recent'];
+    const currentStatus = [false, 'Could not calculate the health status'];
     await updateCurrentHealth(currentStatus);
   }
 }
@@ -201,21 +201,21 @@ async function checkSystemInfo() {
     let additional_info = [];
     let sysInfoCollected = {}
     let isHealthy = true;
-    await si.mem().then(data => {
-      sysInfoCollected.mem_active = data.active;
-      sysInfoCollected.mem_free = data.free;
-      sysInfoCollected.mem_available = data.available;
+    const memdata = await si.mem();
+    sysInfoCollected.mem_active = memdata.active;
+    sysInfoCollected.mem_active = metadata.active;
+    sysInfoCollected.mem_free = metadata.free;
+    sysInfoCollected.mem_available = memdata.available;
 
-      if (data.available / data.total * 100 < config.healthCheck.diskUsageBound) {
-        isHealthy = false;
-        additional_info.push("Low Memory")
-      }
-    })
+    if (metadata.available / memdata.total * 100 < config.healthCheck.diskUsageBound) {
+      isHealthy = false;
+      additional_info.push("Low Memory")
+    }
     disk.check('/', function(err, info) {
       if (err) {
         winston.warn("Error when checking for disk usage", err);
         isHealthy = false;
-        additional_info.push("Low Disk Space")
+        additional_info.push("Could not check disk space")
       } else {
         const diskUsageRatio = info.free / info.total *100;
         sysInfoCollected.disk_usage = diskUsageRatio;
@@ -225,45 +225,41 @@ async function checkSystemInfo() {
         }
       }
     })
-    await si.currentLoad().then(data => {
-      sysInfoCollected.currentLoad = data.currentload;
-    })
+    const metadataLoad = await si.currentLoad();
+    sysInfoCollected.currentLoad = metadataLoad.currentload;
 
     const fss = []
-    await si.fsSize().then(data => {
-      data.forEach(function (fs) {
-        const fsDetails = {}
-        fsDetails.name = fs.fs;
-        fsDetails.fsSize = fs.size;
-        fsDetails.fsSize_use = fs.use;
-        fsDetails.fsSize_used = fs.used;
-        fsDetails.fsSize_size = fs.size;
-        fss.push(fsDetails)
-        if (fsDetails.fsSize_use < config.healthCheck.diskUsageBound) {
-          isHealthy = false;
-          additional_info.push(`Low Disk Space on ${fsDetails.name}`)
-        }
-      })
-      sysInfoCollected.fsSize = fss;
+    const metadataFs = await si.fsSize()
+    metadataFs.forEach(function (fs) {
+      const fsDetails = {}
+      fsDetails.name = fs.fs;
+      fsDetails.fsSize = fs.size;
+      fsDetails.fsSize_use = fs.use;
+      fsDetails.fsSize_used = fs.used;
+      fsDetails.fsSize_size = fs.size;
+      fss.push(fsDetails)
+      if (fsDetails.fsSize_use < config.healthCheck.diskUsageBound) {
+        isHealthy = false;
+        additional_info.push(`Low Disk Space on ${fsDetails.name}`)
+      }
     })
-    await si.fsStats().then(data => {
-      sysInfoCollected.fsStats_rx = data.rx;
-      sysInfoCollected.fsStats_wx = data.wx;
-    })
+    sysInfoCollected.fsSize = fss;
+    const metadataFsStat = await si.fsStats()
+    sysInfoCollected.fsStats_rx = metadataFsStat.rx;
+    sysInfoCollected.fsStats_wx = metadataFsStat.wx;
 
     const nwStats = []
-    await si.networkStats().then(data => {
-      data.forEach(function (ntStat) {
-        const nsStatDetails = {}
-        nsStatDetails.iface = ntStat.iface;
-        nsStatDetails.networkStats_rx_bytes = ntStat.rx_bytes;
-        nsStatDetails.networkStats_tx_bytes = ntStat.tx_bytes;
-        nwStats.push(nsStatDetails)
-      })
-      sysInfoCollected.networkStats = nwStats;
+    const metadataNetwork = await si.networkStats();
+    metadataNetwork.forEach(function (ntStat) {
+      const nsStatDetails = {}
+      nsStatDetails.iface = ntStat.iface;
+      nsStatDetails.networkStats_rx_bytes = ntStat.rx_bytes;
+      nsStatDetails.networkStats_tx_bytes = ntStat.tx_bytes;
+      nwStats.push(nsStatDetails)
     })
+    sysInfoCollected.networkStats = nwStats;
 
-    if (additional_info){
+    if (additional_info) {
       sysInfoCollected.Alerts = additional_info
     }
     winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)
