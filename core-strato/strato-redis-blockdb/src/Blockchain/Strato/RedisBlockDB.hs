@@ -10,7 +10,8 @@
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( RedisConnection(..), inNamespace, getSHAsByNumber
+    ( RedisConnection(..), inNamespace, findNamespace
+    , getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
@@ -48,6 +49,7 @@ import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
+import           Data.Functor                          ((<&>))
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set                              as S
@@ -92,6 +94,22 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateTransactions -> "pt:"
             PrivateTxsInBlocks  -> "pb:"
             PrivateIPChains     -> "pic:"
+
+findNamespace :: S8.ByteString -> BlockDBNamespace
+findNamespace key = case S8.takeWhile (/= ':') key of
+  "h" -> Headers
+  "t" -> Transactions
+  "n" -> Numbers
+  "u" -> Uncles
+  "p" -> Parent
+  "c" -> Children
+  "q" -> Canonical
+  "x" -> PrivateChainInfo
+  "m" -> PrivateChainMembers
+  "pt" -> PrivateTransactions
+  "pb" -> PrivateTxsInBlocks
+  "pic" -> PrivateIPChains
+  wut -> error $ "unknown namespace: " ++ show wut
 
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)
@@ -195,19 +213,18 @@ addChainTxsInBlock bHash cId shas = do
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
 
 getIPChains :: IPAddress
-            -> Redis [Word256]
-getIPChains ip = getInNamespace PrivateIPChains ip >>= \case
-    Left _               -> return []
-    Right Nothing        -> return []
+            -> Redis (S.Set Word256)
+getIPChains ip = getInNamespace PrivateIPChains ip <&> \case
     Right (Just rchains) -> let RedisIPChains chains = fromValue rchains
-                             in return chains
+                             in chains
+    _                    -> S.empty
 
 addIPChain :: IPAddress
            -> Word256
            -> Redis (Either Reply Status)
 addIPChain ip cId = do
     chains <- getIPChains ip
-    let chains' = RedisIPChains (cId:chains)
+    let chains' = RedisIPChains $ S.insert cId chains
     res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
@@ -219,7 +236,7 @@ removeIPChain :: IPAddress
               -> Redis (Either Reply Status)
 removeIPChain ip cId = do
     chains <- getIPChains ip
-    let chains' = RedisIPChains $ filter (/= cId) chains
+    let chains' = RedisIPChains $ S.delete cId chains
     res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok

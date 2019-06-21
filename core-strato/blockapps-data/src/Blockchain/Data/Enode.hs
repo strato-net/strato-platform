@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS -fno-warn-orphans #-}
@@ -21,6 +22,7 @@ import                  Data.Binary
 import qualified        Data.ByteString             as B
 import qualified        Data.ByteString.Char8       as C8
 import qualified        Data.ByteString.Base16      as B16
+import                  Data.Data
 import                  Data.List
 import qualified        Data.Text                   as T
 import                  Data.Aeson
@@ -30,7 +32,7 @@ import                  Network.Socket.Internal
 import                  Blockchain.Data.RLP
 
 
-data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary)
+data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
 instance RLPSerializable IPAddress where
   rlpEncode (IPv4 addy) = rlpEncode $ toInteger addy
@@ -41,7 +43,7 @@ data Enode = Enode
   , ipAddress  :: IPAddress
   , tcpPort    :: Int
   , udpPort    :: Maybe Int
-  } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary)
+  } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
 instance RLPSerializable Enode where
   rlpEncode (Enode pk ip tp up) =

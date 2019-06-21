@@ -31,6 +31,7 @@ import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.KafkaTopics     (lookupTopic)
 import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Kafka.Metrics
 import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Stream.Raw
 import           Blockchain.Util
@@ -56,37 +57,52 @@ assertTopicCreation = do
     K.updateMetadata seqP2pEventsTopicName
 
 readUnseqEvents :: K.Kafka k => KP.Offset -> k [IngestEvent]
-readUnseqEvents = readUnseqEventsFromTopic unseqEventsTopicName
+readUnseqEvents off = do
+  events <- readUnseqEventsFromTopic unseqEventsTopicName off
+  recordEvents unseqReads events
+  return events
 
 readUnseqEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [IngestEvent]
 readUnseqEventsFromTopic = readFromTopic'
 {-# INLINE readUnseqEventsFromTopic #-}
 
 readSeqVmEvents :: K.Kafka k => KP.Offset -> k [OutputEvent]
-readSeqVmEvents = readSeqVmEventsFromTopic seqVmEventsTopicName
+readSeqVmEvents off = do
+  events <- readSeqVmEventsFromTopic seqVmEventsTopicName off
+  recordEvents seqVMReads events
+  return events
 
 readSeqVmEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [OutputEvent]
 readSeqVmEventsFromTopic = readFromTopic'
 {-# INLINE readSeqVmEventsFromTopic #-}
 
 readSeqP2pEvents :: K.Kafka k => KP.Offset -> k [OutputEvent]
-readSeqP2pEvents = readSeqP2pEventsFromTopic seqP2pEventsTopicName
+readSeqP2pEvents off = do
+  events <- readSeqP2pEventsFromTopic seqP2pEventsTopicName off
+  recordEvents seqP2PReads events
+  return events
 
 readSeqP2pEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [OutputEvent]
 readSeqP2pEventsFromTopic = readFromTopic'
 {-# INLINE readSeqP2pEventsFromTopic #-}
 
 writeUnseqEvents :: K.Kafka k => [IngestEvent] -> k [KP.ProduceResponse]
-writeUnseqEvents events = KW.produceMessages $
-    (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+writeUnseqEvents events = do
+  recordEvents unseqWrites events
+  KW.produceMessages $
+      (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 writeSeqVmEvents :: K.Kafka k => [OutputEvent] -> k [KP.ProduceResponse]
-writeSeqVmEvents events = KW.produceMessages $
-    (K.TopicAndMessage seqVmEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+writeSeqVmEvents events = do
+  recordEvents seqVMWrites events
+  KW.produceMessages $
+      (K.TopicAndMessage seqVmEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 writeSeqP2pEvents :: K.Kafka k => [OutputEvent] -> k [KP.ProduceResponse]
-writeSeqP2pEvents events = KW.produceMessages $
-    (K.TopicAndMessage seqP2pEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+writeSeqP2pEvents events = do
+  recordEvents seqP2PWrites events
+  KW.produceMessages $
+      (K.TopicAndMessage seqP2pEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 readFromTopic' :: (Binary b, K.Kafka k) => KP.TopicName -> KP.Offset -> k [b]
 readFromTopic' topic offset = do

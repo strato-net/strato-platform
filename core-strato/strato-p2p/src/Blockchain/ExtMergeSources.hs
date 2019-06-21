@@ -13,10 +13,9 @@ import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Resource
+import           Data.Conduit
 import           Data.Conduit.TMChan          hiding (mergeSources)
 import           Data.Foldable
-
-import           Data.Conduit
 import           UnliftIO.Concurrent
 import           UnliftIO.Exception
 import           UnliftIO.STM
