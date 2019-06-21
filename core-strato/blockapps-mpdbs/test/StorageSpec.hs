@@ -91,6 +91,7 @@ instance (RawStorageKey `Alters` RawStorageValue) StorM where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance Mod.Modifiable MP.StateRoot StorM where
   get _ = use sdbsr

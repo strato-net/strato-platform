@@ -163,6 +163,7 @@ instance (RawStorageKey `A.Alters` RawStorageValue) SM where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance Mod.Modifiable MP.StateRoot SM where
   get _    = gets (MP.stateRoot . stateDB)
