@@ -18,14 +18,14 @@ foreign import ccall unsafe "execvp"
 selfExec :: IO ()
 selfExec = do
   tid <- myThreadId
-  putStrLn $ " attempting to self exec " ++ show tid
+  putStrLn $ "attempting to self exec " ++ show tid
   cmd <- getProgName
   args <- getArgs
   putStrLn $ "caught sig-hup; self-reexec: " ++ intercalate " " (cmd:args)
   hFlush stdout
   cmdC <- newCString cmd
   argsC <- mapM newCString args
-  withArray (cmdC:argsC) $ \argsPC -> do
+  withArray0 (cmdC:argsC) $ \argsPC -> do
     void $ c_execvp cmdC argsPC
     throwErrno "unable to exec"
 
