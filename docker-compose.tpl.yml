@@ -7,6 +7,13 @@ volumes:
     driver: local
   prometheusdata:
     driver: local
+  kafkdata:
+    driver: local
+  redisdata:
+    driver: local
+  stratodata:
+    driver: local
+
 networks:
   static:
     ipam:
