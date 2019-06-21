@@ -117,6 +117,24 @@ describe('Strato Load Test', function() {
     const seconds = endTime.diff(startTime, 'seconds');
     console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);
 
+    var TPS = batchSize * batchCount/seconds;
+    var data  = [TPS,]; //Alternatively [seconds,blocTime,TPS];
+    const fs = require('fs');
+    fs.appendFile("graph_PERFORMANCE_multinode_strato_ECHO_load.csv", data, function(err) {
+        if(err) {
+            return console.log(err);
+        }
+
+        console.log("graph_PERFORMANCE_multinode_strato_ECHO_load.csv has been updated!");
+        });
+    fs.appendFile("graph_PERFORMANCE_multinode_strato_ECHO_load.csv", "\n", function(err) {
+        if(err) {
+            return console.log(err);
+        }
+
+        //console.log("The file was saved!");
+        });
+    
   });
 
 });
