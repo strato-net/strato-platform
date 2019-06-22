@@ -124,7 +124,7 @@ services:
       static:
         ipv4_address: 172.20.20.5
     volumes:
-      - /redisdata:/redis
+      - redisdata:/redis
   vault-wrapper:
     depends_on:
     - postgres
@@ -207,7 +207,7 @@ services:
       static:
         ipv4_address: 172.20.20.7
     volumes:
-      - /stratodata:/var/lib/strato
+      - stratodata:/var/lib/strato
   postgrest:
     depends_on:
     - bloc
@@ -305,7 +305,7 @@ services:
     restart: always
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
-    - /kafkadata:/kafka
+    - kafkadata:/kafka
     networks:
       static:
         ipv4_address: 172.20.20.13
