@@ -23,6 +23,7 @@ import           Network.URI                  (URI (..), URIAuth (..))
 import qualified Network.URI                  as URI
 
 
+import           Blockchain.Data.Enode
 import           Blockchain.Data.PersistTypes ()
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB          (withGlobalSQLPool)
@@ -48,6 +49,7 @@ PPeer
     version T.Text
     nextDisableWindowSeconds Int
     disableExpiration UTCTime
+    ~enode Enode Maybe
     deriving Show Read Eq
 |]
 
@@ -62,9 +64,9 @@ createPeer peerString = buildPeer <$> parseEnode peerString
 
 -- TODO(tim): Reenable port selection
 buildPeer :: (Maybe String, String, Int) -> PPeer
-buildPeer (pubKeyMaybe, ip, _) =
-    PPeer {
-        pPeerPubkey = stringToPoint <$> pubKeyMaybe,
+buildPeer (pubkeyMaybe, ip, _) =
+  let peer = PPeer {
+        pPeerPubkey = stringToPoint <$> pubkeyMaybe,
         pPeerIp = T.pack ip,
         pPeerUdpPort = 30303, --TODO think about this....  Should the UDP port be the same as the TCP port by default?
         pPeerTcpPort = 30303,
@@ -79,8 +81,10 @@ buildPeer (pubKeyMaybe, ip, _) =
         pPeerActiveState = 0,
         pPeerVersion = T.pack "61", -- fix
         pPeerNextDisableWindowSeconds = 5,
-        pPeerDisableExpiration = jamshidBirth
+        pPeerDisableExpiration = jamshidBirth,
+        pPeerEnode = peerToEnode peer
         }
+  in peer
 
 parseEnode :: String -> Either String (Maybe String, String, Int)
 parseEnode enode =
@@ -156,26 +160,6 @@ getUnbondedPeers = withGlobalSQLPool $ \sqldb -> do
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 0, PPeerEnableTime SQL.<. currentTime] []
 
-defaultPeer::PPeer
-defaultPeer = PPeer{
-  pPeerPubkey=Nothing,
-  pPeerIp="",
-  pPeerUdpPort=30303,
-  pPeerTcpPort=30303,
-  pPeerNumSessions=0,
-  pPeerLastMsg="",
-  pPeerLastMsgTime=posixSecondsToUTCTime 0,
-  pPeerEnableTime=posixSecondsToUTCTime 0,
-  pPeerUdpEnableTime=posixSecondsToUTCTime 0,
-  pPeerLastTotalDifficulty=0,
-  pPeerLastBestBlockHash=SHA 0,
-  pPeerBondState=0,
-  pPeerActiveState=0,
-  pPeerVersion="",
-  pPeerNextDisableWindowSeconds=5,
-  pPeerDisableExpiration=posixSecondsToUTCTime 0
-  }
-
 thisPeer :: PPeer -> [SQL.Filter PPeer]
 thisPeer peer = [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]
 
@@ -216,3 +200,10 @@ lengthenPeerDisable peer' = try . withGlobalSQLPool $ \sqldb -> do
                                     , PPeerNextDisableWindowSeconds SQL.=. 5
                                     , PPeerDisableExpiration SQL.=. (24 * 60 * 60) `addUTCTime` currentTime
                                     ]
+
+-- TODO: Allow an empty public key in the Enode type
+peerToEnode :: PPeer -> Maybe Enode
+peerToEnode peer = (\pk -> Enode (pointToBytes pk)
+                                 (readIP . T.unpack $ pPeerIp peer)
+                                 (pPeerTcpPort peer)
+                                 (Just $ pPeerUdpPort peer)) <$> pPeerPubkey peer
