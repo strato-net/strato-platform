@@ -18,17 +18,18 @@ import           Control.Monad
 import           Control.Monad.Trans.Identity
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
-import           Blockchain.Output
 import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
 import           Data.Streaming.Network                (appCloseConnection)
 import qualified Data.Text                             as T
 import qualified Database.Persist.Types                as SQL
+import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           UnliftIO
 
 import           Blockchain.ECIES
 import           Blockchain.EthConf
 import           Blockchain.Options
+import           Blockchain.Output
 import           Blockchain.P2PUtil
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Text.Colors                           as C
@@ -42,7 +43,8 @@ runEthServer myPriv listenPort = do
   let myPubkey = calculatePublic theCurve myPriv
   void . runContextM ctx $ do
     initState <- get
-    lift . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> runResourceT $ do
+    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
+    lift . runGeneralTCPServer settings $ \app -> runResourceT $ do
       let theSockAddr = sockAddrToIP (appSockAddr app)
       ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow theSockAddr
       void $ register ender

@@ -51,6 +51,7 @@ packages:
 - core-strato/privacy/
 - core-strato/fastMP/
 - monad-alter/
+- shared-util/blockapps-init/
 - shared-util/common-log/
 - shared-util/cross-monitoring/
 - shared-util/format
