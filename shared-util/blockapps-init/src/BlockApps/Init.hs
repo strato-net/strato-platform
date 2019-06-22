@@ -6,7 +6,7 @@ import Data.List (intercalate)
 import Data.Text hiding (intercalate)
 import Foreign hiding (void)
 import Foreign.C
-import System.Environment
+import GHC.Environment
 import System.IO
 import System.Posix.Signals
 
@@ -19,14 +19,13 @@ selfExec :: IO ()
 selfExec = do
   tid <- myThreadId
   putStrLn $ "attempting to self exec " ++ show tid
-  cmd <- getProgName
-  args <- getArgs
-  putStrLn $ "caught sig-hup; self-reexec: " ++ intercalate " " (cmd:args)
+  argv@(cmd:_) <- getFullArgs
+  putStrLn $ "caught sig-hup; self-reexec: " ++ intercalate " " argv
   hFlush stdout
   cmdC <- newCString cmd
-  argsC <- mapM newCString args
-  withArray0 nullPtr (cmdC:argsC) $ \argsPC -> do
-    void $ c_execvp cmdC argsPC
+  argvC <- mapM newCString argv
+  withArray0 nullPtr argvC $ \argvPC -> do
+    void $ c_execvp cmdC argvPC
     throwErrno "unable to exec"
 
 blockappsInit :: Text -> IO ()
