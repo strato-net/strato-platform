@@ -16,6 +16,7 @@ dependencies:
   - base >= 4 && < 5
   - aeson
   - base16-bytestring
+  - base64-bytestring
   - binary
   - blockapps-data
   - blockapps-datadefs
@@ -33,6 +34,7 @@ dependencies:
   - entropy
   - ethereum-discovery
   - ethereum-rlp
+  - extra
   - file-embed
   - filepath
   - format
