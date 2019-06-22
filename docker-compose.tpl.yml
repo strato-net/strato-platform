@@ -7,7 +7,7 @@ volumes:
     driver: local
   prometheusdata:
     driver: local
-  kafkdata:
+  kafkadata:
     driver: local
   redisdata:
     driver: local
