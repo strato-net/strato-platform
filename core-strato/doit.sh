@@ -49,6 +49,9 @@ function newnode {
   if [ -n "${averageTxsPerBlock}" ]; then
     atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
   fi
+  if [ -n "${privateChainAuthorizationMode}" ]; then
+    pcamFlag="--privateChainAuthorizationMode=${privateChainAuthorizationMode}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -60,6 +63,7 @@ function newnode {
      --networkID=$networkID \
      ${txgFlag} \
      ${atbFlag} \
+     ${pcamFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
