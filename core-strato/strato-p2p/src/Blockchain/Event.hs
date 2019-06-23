@@ -336,9 +336,9 @@ handleEvents peer = awaitForever $ \case
           case worldBestBlock of
             Nothing -> return ()
             Just (RedisBestBlock _ _ worldTDiff) -> do
-              $logInfoS "NewSeqEvent.block" . T.pack $ "World TDiff: " ++ show worldTDiff
+              $logInfoS "handleEvents/OEBlock" . T.pack $ "World TDiff: " ++ show worldTDiff
               when (obTotalDifficulty b >= worldTDiff) $ do
-                $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
+                $logInfoS "handleEvents/OEBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
       OETx _ tx -> do
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
@@ -348,21 +348,23 @@ handleEvents peer = awaitForever $ \case
             Just cid' -> checkPeerIsMember peer <$> RBDB.withRedisBlockDB (RBDB.getChainMembers cid')
 
           if not match
-            then $logInfoS "handleEvents/OETx" $ T.pack $ "peer is not authorized for chainID " ++ show cId
+            then $logInfoS "handleEvents/OETx" $ T.pack $
+                    printf "peer %s is not authorized for chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (show cId)
             else do
               $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ show cId
-              $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
+              $logDebugS "handleEvents/OETx" . T.pack $ "the transaction was: " ++ format tx
               yieldR $ Transactions [otBaseTx tx]
       OEGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
         when (shouldSend peer og) $ do
-          $logInfoS "NewSeqEvent.genesis" . T.pack $ "yielding new chain: " ++ show cId ++ " with " ++ show uci
-
+          $logInfoS "handleEvents/OEGenesis" . T.pack $ "received new chain: " ++ show cId ++ " with " ++ show uci
           if checkPeerIsMember peer $ members uci
             then do
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (show cId)
               yieldR $ ChainDetails [(cId, cInfo)]
             else do
-              $logInfoS "handleEvents/OEGenesis" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cId)
+              $logInfoS "handleEvents/OEGenesis" $ T.pack $
+                printf "peer %s is not authorized for received chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (show cId)
+              $logDebugLS "handleEvents/OEGenesis/members" $ members uci
       OEGetChain chainIds -> yieldR $ GetChainDetails chainIds
       OEGetTx shas -> yieldR $ GetTransactions shas
       OENewChainMember cId _ _ -> do
