@@ -47,8 +47,8 @@ PPeer
     bondState Int
     activeState Int
     version T.Text
-    nextDisableWindowSeconds Int
-    disableExpiration UTCTime
+    nextDisableWindowSeconds Int default=5
+    disableExpiration UTCTime default=now()
     ~enode Enode Maybe
     deriving Show Read Eq
 |]
