@@ -51,7 +51,7 @@ AddressStateRef
     contractRoot StateRoot
     code BS.ByteString
     codeHash SHA
-    chainId Word256
+    chainId Word256 default=0000000000000000000000000000000000000000000000000000000000000000
     latestBlockDataRefNumber Integer
     UniqueAddress address chainId
     deriving Eq Read Show
