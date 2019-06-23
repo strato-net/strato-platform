@@ -159,11 +159,21 @@ function newnode {
           # Kill all the rest of monitored processes
           for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
             if ps -p ${pid_to_kill} > /dev/null; then
-              echo "killing process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
-              kill -9 ${pid_to_kill} || true
+              echo "Sending SIGTERM to process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
+              kill -TERM ${pid_to_kill} || true
               echo "done"
             fi
           done
+          # Allow 10s for cleanup of processes
+          sleep 10
+          for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
+            if ps -p ${pid_to_kill} > /dev/null; then
+              echo "Sending SIGKILL to process ${MONITORED_PID[${pid_to_kill}]} (pid: ${pid_to_kill})"
+              kill -KILL ${pid_to_kill} || true
+              echo "done"
+            fi
+          done
+
           FILE_NAME="/var/lib/strato/logs/$(echo ${DEAD_PROCESS} | cut -d ' ' -f 1)"
           echo "Tail of logs for crashed process:"
           echo "+tail -n 20 ${FILE_NAME}"
