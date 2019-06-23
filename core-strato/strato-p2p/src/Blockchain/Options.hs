@@ -25,7 +25,7 @@ defineFlag "txGossipFanout" (-1::Int) "Maxmimum number of peers to forward trans
                                       \ applicable for transactions received from peers, not\
                                       \ originating on this node."
 
-defineEQFlag "privateChainAuthorizationMode" [| IPOnly :: AuthorizationMode |] "AUTHORIZATIONMODE"
+defineEQFlag "privateChainAuthorizationMode" [| FlexibleAuth :: AuthorizationMode |] "AUTHORIZATIONMODE"
     "Describes the policy for sharing private chain data. By default, it only checks that the ip address\
     \ of the peer is a member of the chain. It can be configured to only use the public key or to\
     \ enforce both an ip and/or key match. It relies on the ability to send a roundtrip to authenticate\
