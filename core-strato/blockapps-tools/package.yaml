@@ -23,16 +23,20 @@ dependencies:
   - blockapps-util
   - bytestring
   - cmdargs
+  - common-log
   - data-default
+  - ethereum-discovery
   - ethereum-rlp
   - filepath
   - format
+  - hflags
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
   - blockapps-milena
   - monad-loops
   - nibblestring
+  - persistent
   - persistent-postgresql
   - resourcet
   - time
