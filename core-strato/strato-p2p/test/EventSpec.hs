@@ -176,3 +176,8 @@ spec = do
     describe "StrongAuth" $ do
       it "should reject a mismatched ip, key pair" $ StrongAuth `shouldReject` (key3, ip2)
       it "should accept a matching ip, key pair" $ StrongAuth `shouldAccept` (key3, ip3)
+
+    describe "FlexibleAuth" $ do
+      it "should reject a wrong ip and wrong key" $ FlexibleAuth `shouldReject` (key4, ip4)
+      it "should accept a matching ip" $ FlexibleAuth `shouldAccept` (key4, ip1)
+      it "should accept a matching key" $ FlexibleAuth `shouldAccept` (key2, ip4)

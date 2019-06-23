@@ -502,6 +502,7 @@ checkPeerIsMember' mode peer mems =
         IPOnly -> thisIP `elem` ips
         PubkeyOnly -> thisKey `elem` keys
         StrongAuth -> (thisIP, thisKey) `elem` ipkeys
+        FlexibleAuth -> or [thisIP `elem` ips, thisKey `elem` keys]
 
 peerIPAddress :: PPeer -> IPAddress
 peerIPAddress = readIP . T.unpack . pPeerIp
