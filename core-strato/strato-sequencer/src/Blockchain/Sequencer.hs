@@ -391,13 +391,13 @@ transformGenesis chains = forM_ chains $ \ig -> do
   let logF = logFF "transformGenesis"
   let og = ingestGenesisToOutputGenesis ig
       (chainId, cInfo) = ogGenesisInfo og
-  markForP2P (OEGenesis og)
   logF $ "Transforming ChainInfo for chain " ++ format (SHA chainId) ++ " with info " ++ show cInfo
   lookupSeenChain chainId >>= \case
     True -> logF "We've seen this chain before. Not emitting to VM"
     False -> do
-      logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM"
+      logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM, P2P"
       markForVM $ OEGenesis og
+      markForP2P (OEGenesis og)
       mapM_ (markForVM . OEBlock) =<< insertNewChainInfo chainId cInfo
 
 splitEvents :: [IngestEvent] -> SequencerM ()
