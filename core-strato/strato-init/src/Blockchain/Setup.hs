@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
@@ -21,7 +22,9 @@ import           Control.Monad.Trans.Resource
 import qualified Data.Aeson                         as Ae
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Base64             as B64
 import qualified Data.ByteString.Char8              as C
+import           Data.Either.Extra
 import           Data.FileEmbed
 import           Data.IORef
 import           Data.List.Split                    (splitWhen)
@@ -38,6 +41,7 @@ import           Network.Kafka
 import           Network.Kafka.Protocol
 import           System.Directory
 import           System.Entropy
+import           System.Environment
 import           System.FilePath
 
 import           Blockchain.APIFiles
@@ -60,6 +64,7 @@ import           Blockchain.PrivateKeyConf
 import           Blockchain.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery
 
@@ -88,6 +93,8 @@ defineFlag "redisPort" (6379  ::  Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0  ::  Integer) "Redis database number"
 
 defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets to initialize"
+
+defineFlag "singlePrivateKey" (True :: Bool) "Whether to share P2P and PBFT keys"
 
 data SetupDBs =
   SetupDBs {
@@ -387,7 +394,14 @@ oneTimeSetup genesisBlockName = do
 
      {- CONFIG: create database and write default config files, including strato-api -}
 
-      randomPrivKey <- generatePrivKey
+      myPrivKey <-
+        if flags_singlePrivateKey
+          then do
+            !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
+            let !bs = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C.pack $ skey
+            return . PrivKey . fromIntegral $ bytesToWord256 bs
+          else generatePrivKey
+
       let uniqueString = C.unpack . B16.encode $ bytes
           pgCfg = sqlConfig cfg
           pgCfg' = pgCfg { database = "" }
@@ -399,7 +413,7 @@ oneTimeSetup genesisBlockName = do
           kafkaCfg = defaultKafkaConfig { kafkaHost = kafkaHostFlag }
 
           cfg' = cfg {
-                   privKey = randomPrivKey,
+                   privKey = myPrivKey,
                    sqlConfig = pgCfg'',
                    kafkaConfig = kafkaCfg,
                    ethUniqueId = defaultEthUniqueId {

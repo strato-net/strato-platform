@@ -180,6 +180,7 @@ services:
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_user=postgres
+    - privateChainAuthorizationMode=${privateChainAuthorizationMode}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis

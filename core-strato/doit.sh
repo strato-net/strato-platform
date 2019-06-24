@@ -49,6 +49,9 @@ function newnode {
   if [ -n "${averageTxsPerBlock}" ]; then
     atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
   fi
+  if [ -n "${privateChainAuthorizationMode}" ]; then
+    pcamFlag="--privateChainAuthorizationMode=${privateChainAuthorizationMode}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -60,6 +63,7 @@ function newnode {
      --networkID=$networkID \
      ${txgFlag} \
      ${atbFlag} \
+     ${pcamFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
@@ -224,7 +228,7 @@ function doInit {
 
   echo "strato-setup command: $cmd"
   # logging to stdout and log file:
-  $cmd 2>&1 | tee logs/strato-setup
+  NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
   if [ ${PIPESTATUS[0]} -ne 0 ]; then
     echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
     tail -f /dev/null
