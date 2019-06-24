@@ -1182,6 +1182,9 @@ runTheConstructors from to hsh cc contractName' argExps = do
     v <- expToVar e
     setVar (Constant (SReference (AddressedPath to $ MS.StoragePath [MS.Field $ BC.pack n]))) =<< getVar v
 
+  forM_ [n | (n, Xabi.VariableDecl _ _ Nothing) <- M.toList $ contract'^.storageDefs] $ \n -> do
+    markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack n]) MS.BDefault
+
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = Xabi.OrderedArgs
              . fromMaybe []
