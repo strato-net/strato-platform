@@ -3,6 +3,7 @@
 module Strato.Strato23.Client
   ( getPing
   , getKey
+  , getUsers
   , postKey
   , postSignature
   , postPassword
@@ -18,6 +19,9 @@ getPing = client (Proxy @ GetPing)
 
 getKey :: Text -> Maybe Text -> ClientM StatusAndAddress
 getKey = client (Proxy @ GetKey)
+
+getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]
+getUsers = client (Proxy @ GetUsers)
 
 postKey :: Text -> ClientM StatusAndAddress
 postKey = client (Proxy @ PostKey)

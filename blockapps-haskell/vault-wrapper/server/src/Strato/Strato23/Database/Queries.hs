@@ -29,11 +29,30 @@ import           Opaleye                         hiding (not, null, index)
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Tables
 
+countUsers :: Text -> Query (Column PGInt8)
+countUsers username = aggregate countStar $ proc () -> do
+  (_, name, _, _, _, _, _) <- queryTable usersTable -< ()
+  restrict -< name .== constant username
+
+
 getUserKeyQuery :: Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserKeyQuery username = proc () -> do
   (_, name, salt, nonce, _, encSecPrvKey, address) <- queryTable usersTable -< ()
   restrict -< name .== constant username
   returnA -< (salt, nonce, encSecPrvKey, address)
+
+getUserByAddress :: Address -> Query (Column PGText)
+getUserByAddress qaddr = proc () -> do
+  (_, name, _, _, _, _, taddr) <- queryTable usersTable -< ()
+  restrict -< taddr .== constant qaddr
+  returnA -< name
+
+getUserAddresses :: Maybe Int -> Maybe Int -> Query (Column PGText, Column PGBytea)
+getUserAddresses mOffset mLimit = maybe id limit mLimit
+                                . maybe id offset mOffset
+                                $ proc () -> do
+  (_, name, _, _, _, _, addr) <- selectTable usersTable -< ()
+  returnA -< (name, addr)
 
 postUserKeyQuery :: Text -> KeyStore -> Connection -> IO Bool
 postUserKeyQuery userName KeyStore{..} conn = do

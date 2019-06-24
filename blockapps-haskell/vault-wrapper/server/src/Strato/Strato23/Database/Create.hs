@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS users(
   enc_sec_prv_key bytea NOT NULL,
   address bytea NOT NULL
 );
+CREATE INDEX IF NOT EXISTS indexed_address ON users (address);
 |]
 
 messageTable :: Query
