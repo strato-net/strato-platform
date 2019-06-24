@@ -1863,6 +1863,7 @@ contract qq {
            ] `shouldReturn` [BInteger 1, BString "239847", BInteger 13]
 
   it "can create memory copies of structs" . runTest $ do
+    liftIO $ pendingWith "add the memory keyword" --TODO- Jim
     runBS [r|
 contract qq {
   struct Nom {
