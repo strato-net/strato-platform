@@ -23,7 +23,7 @@ import           System.IO.Unsafe
 import           Blockchain.Data.RLP
 import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Address
-
+import           Text.Format
 
 data BasicValue = BInteger !Integer
                 | BString !B.ByteString
@@ -37,6 +37,18 @@ data BasicValue = BInteger !Integer
                 | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable, Binary)
 
+
+instance Format BasicValue where
+  format (BInteger i) = show i
+  format (BString s) = show s
+  format (BBool True) = "true"
+  format (BBool False) = "false"
+  format (BAddress a) = "address(" ++ show a ++ ")"
+  format (BEnumVal n1 n2 _) = T.unpack n1 ++ "." ++ T.unpack n2
+  format (BContract n _) = "contract(" ++ T.unpack n ++ ")"
+  format BMappingSentinel = "<MappingSentinel>"
+  format BDefault = "<unknown>"
+
 data IndexType = INum Integer
                | IText B.ByteString
                | IBool Bool
@@ -48,7 +60,22 @@ data StoragePathPiece = Field B.ByteString
                       | ArrayIndex Int
                       deriving (Eq, Show, Generic, NFData, Hashable)
 
+instance Format StoragePathPiece where
+  format (Field n) = C8.unpack n
+  format (MapIndex i) = "[" ++ show i ++ "]"
+  format (ArrayIndex i) = "[" ++ show i ++ "]"
+
 newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Show, Generic, NFData, Hashable)
+
+instance Format StoragePath where
+  format (StoragePath []) = "<empty path>"
+  format (StoragePath (first:rest)) =
+    format first ++ unwords (map (addConditionalDot . format) rest)
+    where
+      addConditionalDot :: String -> String
+      addConditionalDot w@(c1:_) | isAlpha c1 = "." ++ w
+      addConditionalDot w = w
+
 
 empty :: StoragePath
 empty = StoragePath []

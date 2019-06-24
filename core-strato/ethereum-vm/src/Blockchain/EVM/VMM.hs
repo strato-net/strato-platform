@@ -132,6 +132,7 @@ instance (RawStorageKey `A.Alters` RawStorageValue) VMM where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance (SHA `A.Alters` DBCode) VMM where
   lookup _ = genericLookupCodeDB $ lift $ gets $ contextCodeDB . dbs

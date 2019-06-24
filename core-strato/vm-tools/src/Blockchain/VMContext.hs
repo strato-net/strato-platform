@@ -222,6 +222,7 @@ instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance (SHA `A.Alters` BlockSummary) ContextM where
   lookup _ = genericLookupBlockSummaryDB $ gets contextBlockSummaryDB
