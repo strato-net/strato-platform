@@ -15,7 +15,8 @@
     "test:truchainz": "mocha e2e/createChain.test.js && mocha e2e/governance.test.js",
     "test:multicontract": "mocha e2e/multicontract.test.js",
     "test:uploadOrder": "mocha e2e/uploadOrder.test.js",
-    "test:slipstream": "mocha e2e/slipstream.test.js"
+    "test:slipstream": "mocha e2e/slipstream.test.js",
+    "test:loadecho10k": "mocha load/stratoLoadEcho.test.js --batchCount 164 --batchSize 61"
   },
   "dependencies": {
     "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#6fe2bc46dadb5e5af1a6027ddf5fb52492fa2c4f",
