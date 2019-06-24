@@ -101,7 +101,7 @@ instance Yesod App where
     -- see: https://github.com/yesodweb/yesod/wiki/Overriding-approot
     approot = ApprootMaster $ appRoot . appSettings
 
-    maximumContentLength _ _ = Just (4 * 1024 * 1024 :: Word64) -- 4M
+    maximumContentLength _ _ = Just (1000000 * 1024 * 1024 :: Word64) -- 1000000M
 
     shouldLogIO app _source level = return $
         appShouldLogAll (appSettings app)
