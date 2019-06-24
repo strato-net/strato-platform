@@ -12,6 +12,7 @@ dependencies:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
+  - blockapps-init
   - blockapps-util
   - bytestring
   - classy-prelude

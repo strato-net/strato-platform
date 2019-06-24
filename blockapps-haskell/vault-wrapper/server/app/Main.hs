@@ -23,6 +23,7 @@ import           System.IO                              (BufferMode (..),
                                                         hSetBuffering, stderr,
                                                         stdout)
 
+import           BlockApps.Init
 import           BlockApps.Logging                      (LogLevel(..), flags_minLogLevel)
 import qualified Strato.Strato23.API                    as Strato23
 import qualified Strato.Strato23.Database.Migrations    as Strato23
@@ -33,6 +34,7 @@ import           Options
 
 main :: IO ()
 main = do
+  blockappsInit "blockapps-vault-wrapper-server"
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
   putStrLn . unlines $
     [ "@@@  @@@  @@@@@@  @@@  @@@ @@@    @@@@@@@     @@@  @@@  @@@ @@@@@@@   @@@@@@  @@@@@@@  @@@@@@@  @@@@@@@@ @@@@@@@ "

@@ -24,6 +24,7 @@ import qualified        Data.ByteString.Char8       as C8
 import qualified        Data.ByteString.Base16      as B16
 import                  Data.Data
 import                  Data.List
+import                  Database.Persist.Sql
 import qualified        Data.Text                   as T
 import                  Data.Aeson
 import qualified        GHC.Generics                as GHCG
@@ -113,3 +114,12 @@ readEnode input =
             [] -> Nothing
             _ -> Just (read udp)
      in (Enode (fst $ B16.decode (C8.pack pk)) (readIP ip) (read tcp) up)
+
+
+instance PersistFieldSql Enode where
+  sqlType _ = SqlString
+
+instance PersistField Enode where
+  toPersistValue = PersistText . T.pack . showEnode
+  fromPersistValue (PersistText t) = return . readEnode $ T.unpack t
+  fromPersistValue x = Left . T.pack $ "PersistField Enode: expected PersistText: " ++ show x

@@ -20,6 +20,7 @@ dependencies:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
+  - blockapps-init
   - blockapps-milena
   - blockapps-privacy
   - blockapps-util

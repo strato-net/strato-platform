@@ -32,7 +32,7 @@ import Text.Printf
 import Text.RawString.QQ
 
 import BlockApps.Bloc22.Monad (BlocEnv(..), DeployMode(..))
-import Blockapps.Crossmon
+import BlockApps.Init
 import BlockApps.Logging
 import Slipstream.MessageConsumer
 import Slipstream.Globals
@@ -71,10 +71,10 @@ connectToCirrus = liftIO $ pgConnect cirrusInfo
 main::IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
+  blockappsInit "slipstream_main"
   runLoggingT $ do
     $logInfoS "main" "Welcome to Slipstream!!!!"
     void . liftIO . forkIO . run 10777 $ metricsApp
-    initializeHealthChecks "slipstream_main"
     $logInfoS "main" "Serving metrics on port 10777"
 
     env <- createBlocEnv

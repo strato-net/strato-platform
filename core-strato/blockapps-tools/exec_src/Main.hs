@@ -64,6 +64,7 @@ data Options = State{root::String, db::String}
              | RSVP {chainId :: Word256, memberId :: String, address::Address}
              | Redis { key :: String }
              | RedisMatch { pattern :: String }
+             | Migrate { tables :: String }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -242,6 +243,11 @@ redisMatchOptions = record RedisMatch {pattern = error "unused pattern"}
                   [ pattern := error "redis <PATTERN>" += typ "PATTERN" += argPos 0
                   ]
 
+migrateOptions :: Annotate Ann
+migrateOptions = record Migrate { tables = error "unused tables"}
+               [ tables := error "migrate (data|global|peer|all)" += typ "TABLES" += argPos 0
+               ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -270,6 +276,7 @@ options = modes_ [blockGoOptions
                 , rsvpOptions
                 , redisOptions
                 , redisMatchOptions
+                , migrateOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -312,3 +319,4 @@ run PushBlocks{..}             = insertP2P (OEPushBlocks startBlock endBlock pee
 run RSVP{..}                   = rsvp chainId memberId address
 run Redis{..}                  = redis $ BC.pack key
 run RedisMatch{..}             = redisMatch $ BC.pack pattern
+run Migrate{..}                = migrate tables

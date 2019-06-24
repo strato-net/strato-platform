@@ -27,3 +27,6 @@ instance (Format a, Format b) => Format (a, b) where
 
 instance Format a => Format [a] where
   format = show . map format
+
+instance Format a => Format (Maybe a) where
+  format = maybe "Nothing" format

@@ -5,6 +5,7 @@
 
 module Main where
 
+import           BlockApps.Init
 import qualified BlockApps.Strato.API        as Strato
 import           Control.Lens.Operators
 import           Data.Proxy                  ()
@@ -31,6 +32,7 @@ server = return stratoSwagger
 
 main :: IO ()
 main = do
+    blockappsInit "blockapps-strato-server"
     putStrLn "Running on port 8002"
     run 8002 $ cors (const $ Just policy) $ serve (Proxy :: Proxy SwaggerAPI) server
   where

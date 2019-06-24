@@ -28,6 +28,7 @@ import           Blockchain.MiscJSON()
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
 import           Blockchain.TypeLits
+import           Blockchain.Util
 
 import           Data.Aeson
 import qualified Data.ByteString                      as B
@@ -42,6 +43,8 @@ import qualified Data.Vector                          as V
 import           Data.Word
 
 import qualified GHC.Generics                         as GHCG
+import           Numeric                              (showHex)
+import           Text.Format
 
 
 data CodeInfo = CodeInfo
@@ -49,6 +52,15 @@ data CodeInfo = CodeInfo
   , codeInfoSource :: T.Text
   , codeInfoName   :: T.Text
   } deriving (Show, Read, Eq, GHCG.Generic, Data)
+
+instance Format CodeInfo where
+  format CodeInfo{..} = unlines
+    [ "CodeInfo"
+    , "--------"
+    , tab $ "Name:   " ++ show codeInfoName
+    , tab $ "Source: " ++ show codeInfoSource
+    , tab $ "Code:   " ++ show (decodeUtf8 $ B16.encode codeInfoCode)
+    ]
 
 instance FromJSON CodeInfo where
   parseJSON (Array v) = do
@@ -83,6 +95,29 @@ data AccountInfo = NonContract Address Integer
                  | ContractNoStorage Address Integer SHA
                  | ContractWithStorage Address Integer SHA [(Word256, Word256)]
    deriving (Show, Eq, Read, GHCG.Generic, Data)
+
+instance Format AccountInfo where
+  format (NonContract addr nonce) = unlines
+    [ "AccountInfo - NonContract"
+    , "-------------------------"
+    , tab $ "Address: " ++ format addr
+    , tab $ "Nonce:   " ++ show nonce
+    ]
+  format (ContractNoStorage addr nonce ch) = unlines
+    [ "AccountInfo - ContractNoStorage"
+    , "-------------------------"
+    , tab $ "Address:   " ++ format addr
+    , tab $ "Nonce:     " ++ show nonce
+    , tab $ "Code hash: " ++ format ch
+    ]
+  format (ContractWithStorage addr nonce ch s) = unlines
+    [ "AccountInfo - ContractWithStorage"
+    , "-------------------------"
+    , tab $ "Address:   " ++ format addr
+    , tab $ "Nonce:     " ++ show nonce
+    , tab $ "Code hash: " ++ format ch
+    , tab $ "Storage:   " ++ show s
+    ]
 
 instance FromJSON AccountInfo where
   parseJSON (Array v) = do
@@ -149,6 +184,15 @@ data ChainSignature = ChainSignature
   , chainV :: Word8
   } deriving (Eq, Show, GHCG.Generic, Data)
 
+instance Format ChainSignature where
+  format (ChainSignature r s v) = unlines
+    [ "ChainSignature"
+    , "--------------"
+    , tab $ "r: " ++ format (SHA r)
+    , tab $ "s: " ++ format (SHA s)
+    , tab $ "v: " ++ showHex v "0x"
+    ]
+
 instance FromJSON ChainSignature where
   parseJSON (Object o) = do
     r <- o .: "r"
@@ -188,10 +232,32 @@ data UnsignedChainInfo = UnsignedChainInfo
   , chainMetadata  :: (M.Map T.Text T.Text)
   } deriving (Eq, Show, GHCG.Generic, Data)
 
+instance Format UnsignedChainInfo where
+  format UnsignedChainInfo{..} = unlines
+    [ "UnsignedChainInfo"
+    , "-----------------"
+    , tab $ "Label:          " ++ show chainLabel
+    , tab $ "Account info:   " ++ format accountInfo
+    , tab $ "Code info:      " ++ format codeInfo
+    , tab $ "Members:        " ++ show members
+    , tab $ "Parent chain:   " ++ format (SHA <$> parentChain)
+    , tab $ "Creation block: " ++ format creationBlock
+    , tab $ "Nonce:          " ++ format (SHA chainNonce)
+    , tab $ "Metadata:       " ++ show chainMetadata
+    ]
+
 data ChainInfo = ChainInfo
   { chainInfo      :: UnsignedChainInfo
   , chainSignature :: (Maybe ChainSignature)
   } deriving (Eq, Show, GHCG.Generic, Data)
+
+instance Format ChainInfo where
+  format ChainInfo{..} = unlines
+    [ "ChainInfo"
+    , "-----------------"
+    , tab $ format chainSignature
+    , tab $ format chainInfo
+    ]
 
 instance FromJSON ChainInfo where
   parseJSON (Object o) = do

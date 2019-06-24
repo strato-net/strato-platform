@@ -10,6 +10,7 @@ dependencies:
   - base
   - blockapps-bloc22-api
   - blockapps-bloc22-server
+  - blockapps-init
   - blockapps-strato-api
   - blockapps-strato-client
   - common-log

@@ -21,6 +21,7 @@ dependencies:
   - aeson
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-init
   - blockapps-util
   - bytestring
   - classy-prelude
@@ -103,7 +104,7 @@ tests:
       - QuickCheck
       - hspec
       - hspec-expectations-lifted
-      - persistent-sqlite
+      - persistent-postgresql
       - stm-chans
       - stm-conduit
       - strato-p2p
