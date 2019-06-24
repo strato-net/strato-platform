@@ -103,7 +103,7 @@ spec = do
       runTestPeer . const $ do
         runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents testPeer .| sinkList
           `L.shouldReturn` [Right $ GetBlockBodies []]
-    it "should forward blockstanbul messages" $ property $ \wm ->
+    it "should forward blockstanbul messages" $ property $ withMaxSuccess 10 $ \wm ->
       let addr = blockstanbulSender wm
       in addr /= 0 && addr /= 0xa ==> runTestPeer $ \ch -> do
         -- Without "proof" of which peer this is, assume it could be addr
@@ -119,7 +119,7 @@ spec = do
         shouldSendToPeer addr `L.shouldReturn` True
         shouldSendToPeer 0xa `L.shouldReturn` False
 
-    it "should broadcast blockstanbul messages" $ property $ \wm ->
+    it "should broadcast blockstanbul messages" $ property $ withMaxSuccess 10 $ \wm ->
       runTestPeer . const $ do
         runConduit $ yield (NewSeqEvent (OEBlockstanbul wm))
                       .| handleEvents testPeer
