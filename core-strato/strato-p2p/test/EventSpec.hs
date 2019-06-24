@@ -8,11 +8,9 @@ import Conduit
 import Control.Monad.Trans.Reader
 import Data.Conduit.TMChan
 import Database.Persist.Sql
+import Database.Persist.Postgresql
 import qualified Data.Map                              as M
-import qualified Data.Text                             as T
-import qualified Database.Persist.Sqlite               as Lite
 import qualified Database.Redis                        as Redis
-import System.IO.Temp                        (emptySystemTempFile)
 import Text.Printf
 
 import Blockchain.Blockstanbul               (blockstanbulSender)
@@ -40,19 +38,16 @@ import Test.QuickCheck
 -- Kafka, postgres, or ethconf. It does need redis, but targets
 -- a test instance.
 testContext :: (MonadIO m, MonadUnliftIO m)
-            => m (TMChan [IngestEvent], Config, Context)
-testContext = do
+            => ConnectionPool -> m (TMChan [IngestEvent], Config, Context)
+testContext pool = do
   redisBDBPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
         Redis.connectHost           = "localhost",
         Redis.connectPort           = Redis.PortNumber 2023,
         Redis.connectDatabase       = 0
     }
-  -- TODO(tim): cleanup the sqlite_db files, or use :memory: and withSqlitePool
-  file <- liftIO $ emptySystemTempFile "p2p.sqlite_db"
-  conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack file) 20
   ch <- atomically newTMChan
   return ( ch
-         , Config conn
+         , Config pool
          , Context { actionTimestamp = Nothing
                    , contextRedisBlockDB = RBDB.RedisConnection redisBDBPool
                    , contextKafkaState = error "no kafka state available"
@@ -81,10 +76,10 @@ migrateAll = do
 
 runTestPeer :: (TMChan [IngestEvent] -> ContextM a) -> IO ()
 runTestPeer mv = do
-  (ch, cfg, ctx) <- testContext
-  let pool = configSQLDB cfg
-  liftSqlPersistMPool migrateAll pool
-  runNoLoggingT (runContextM (cfg, ctx) (mv ch))
+  runNoLoggingT $ withPostgresqlPool "host=localhost port=2345 user=postgres" 4 $ \pool -> do
+    (ch, cfg, ctx) <- testContext pool
+    liftSqlPersistMPool migrateAll pool
+    runContextM (cfg, ctx) (mv ch)
 
 spec :: Spec
 spec = do
