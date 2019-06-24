@@ -104,7 +104,7 @@ tests:
       - QuickCheck
       - hspec
       - hspec-expectations-lifted
-      - persistent-sqlite
+      - persistent-postgresql
       - stm-chans
       - stm-conduit
       - strato-p2p
