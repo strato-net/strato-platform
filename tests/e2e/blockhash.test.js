@@ -6,26 +6,26 @@ const common = ba.common;
 const config = common.config;
 const util = common.util;
 const assert = common.assert;
-const nodes = config.nodes;
-const moment = require('moment');
-const constants = common.constants;
-const path = require('path');
+
+const source = `
+pragma solidity ^0.4.24;
+
+contract Random {
+  bytes32 value;
+
+  constructor() {
+    value = blockhash(block.number - 1);
+  }
+}
+`;
 
 describe('Using blockhash', function () {
-
-  this.timeout(config.timeout);
-  const contractRandomName = 'Random';
-  const contractRandomFilename = path.join(config.contractsPath, 'Random.sol');
-  let admin;
-  let contract;
-
-  before(function * () {
-    admin = yield rest.createUser('admin','1234');
-  });
-
-  it('should upload a contract that uses blockhash', function * () {
-    contract = yield rest.uploadContract(admin, contractRandomName, contractRandomFilename, {}, false);
-    const state = yield rest.getStateVar(contract,'value');
+  it('should upload a contract that uses blockhash', async () => {
+    const username = 'random_' + util.uid();
+    const admin = await co.wrap(rest.createUser)(username, '1234');
+    const contract = await co.wrap(rest.uploadContractString)(admin, 'Random', source);
+    const state = await co.wrap(rest.getStateVar)(contract,'value');
+    console.log(`Random state: ${JSON.stringify(state, null, 2)}`);
     assert.notEqual(state.value, 0, "Variable value did not match expected state");
-  })
+  }).timeout(config.timeout);
 });
