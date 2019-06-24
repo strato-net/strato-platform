@@ -124,7 +124,7 @@ services:
       static:
         ipv4_address: 172.20.20.5
     volumes:
-      - redisdata:/redis
+      - redisdata:/data
   vault-wrapper:
     depends_on:
     - postgres
@@ -296,6 +296,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_LOG_CLEANER_ENABLE: "false"
+      KAFKA_LOG_DIR: '/kafka/kafka-logs'
       KAFKA_LOG_RETENTION_HOURS: 2147483647
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
       KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
