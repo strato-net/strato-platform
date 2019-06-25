@@ -49,6 +49,7 @@ import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
+import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
@@ -147,7 +148,8 @@ putChainMembers cId mems = do
 
     res <- multiExec $ setnx (inNamespace PrivateChainMembers cId) (toValue rmems)
     case res of
-        TxSuccess _ -> pure $ Right Ok
+        TxSuccess _ -> fmap (foldl' (>>) (Right Ok)) . forM (M.elems mems) $
+          flip addIPChain cId .  ipAddress
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
 
