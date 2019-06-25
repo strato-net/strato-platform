@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Blockchain.SolidVM.SetGet (
   setVar,
@@ -95,11 +97,11 @@ toBasic = \case
   SMappingSentinel -> MS.BMappingSentinel
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
-setVar :: Variable -> Value -> SM ()
+setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
 setVar (Variable var) val = liftIO $ writeIORef var val
 
-setVal :: Value -> Value -> SM ()
+setVal :: MonadSM m => Value -> Value -> m ()
 -- If val is a simple value, assign it. If it
 -- is deeper, read the subfields and assign to their adjustment
 
@@ -164,11 +166,11 @@ getBool p = do
     _ -> typeError "getBool" (p, v)
 -}
 
-getAddress :: Variable -> SM Value
+getAddress :: MonadSM m => Variable -> m Value
 getAddress = getVar
 
 
-getString :: Variable -> SM Value
+getString :: MonadSM m => Variable -> m Value
 getString = getVar
 
 {-
@@ -176,11 +178,11 @@ getContract :: String -> Variable -> SM Value
 getContract contractName = getVar' (Just $ TContract contractName)
 -}
 
-weakGetVar :: Variable -> SM Value
+weakGetVar :: MonadSM m => Variable -> m Value
 weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
 
-getVar :: Variable -> SM Value
+getVar :: MonadSM m => Variable -> m Value
 --getVar x | trace ("getVar called: " ++ show x) $  False = undefined
 getVar (Constant (SReference addressedPath@(AddressedPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
@@ -202,21 +204,21 @@ getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
 
 
-getInt :: Variable -> SM Integer
+getInt :: MonadSM m => Variable -> m Integer
 getInt p = do
   v <- getVar p
   case v of
     SInteger s -> return s
     _ -> typeError "getInt" (p, v)
 
-getBool :: Variable -> SM Bool
+getBool :: MonadSM m => Variable -> m Bool
 getBool p = do
   v <- getVar p
   case v of
     SBool b -> return b
     _ -> typeError "getBool" (p, v)
 
-deleteVar :: Variable -> SM ()
+deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference a@(AddressedPath addr path))) = do
   xType <- getXabiValueType a
   case xType of
@@ -230,7 +232,6 @@ deleteVar (Constant (SReference a@(AddressedPath addr path))) = do
     _ -> do -- TODO: handle other types
       markDiffForAction addr path $ MS.BDefault
       putSolidStorageKeyVal' addr path $ MS.BDefault
-
 
 deleteVar _ = error "deleteVar not yet supported for local variables"
 
@@ -263,7 +264,7 @@ getStorageItem mTypeHint apt@(AddressedPath loc key) = do
 -}
 
 
-showSM :: Value -> SM String
+showSM :: MonadSM m => Value -> m String
 showSM SNULL = return "NULL"
 showSM (SInteger v) = return $ show v
 showSM (SString v) = return v
