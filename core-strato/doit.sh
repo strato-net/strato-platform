@@ -16,6 +16,8 @@ function newnode {
   then initialize=true
        cleanupDB
        doInit
+  else
+       sleep 10
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."

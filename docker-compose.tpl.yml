@@ -308,6 +308,7 @@ services:
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - kafkadata:/kafka
+    hostname: fixed-hostname-so-kafka-reads-the-logs
     networks:
       static:
         ipv4_address: 172.20.20.13
