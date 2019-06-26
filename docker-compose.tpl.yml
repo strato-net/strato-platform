@@ -287,7 +287,7 @@ services:
   zookeeper:
     image: wurstmeister/zookeeper:3.4.6
     restart: always
-    volume:
+    volumes:
       - zookeeperdata:/opt/zookeeper-3.4.6/data
     networks:
       static:
