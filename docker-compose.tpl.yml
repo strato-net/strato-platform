@@ -13,6 +13,8 @@ volumes:
     driver: local
   stratodata:
     driver: local
+  zookeeperdata:
+    driver: local
 
 networks:
   static:
@@ -285,6 +287,8 @@ services:
   zookeeper:
     image: wurstmeister/zookeeper:3.4.6
     restart: always
+    volume:
+      - zookeeperdata:/opt/zookeeper-3.4.6/data
     networks:
       static:
         ipv4_address: 172.20.20.12
@@ -297,7 +301,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_LOG_CLEANER_ENABLE: "false"
-      KAFKA_LOG_DIR: '/kafka/kafka-logs'
+      KAFKA_LOG_DIRS: '/kafka/kafka-logs'
       KAFKA_LOG_RETENTION_HOURS: 2147483647
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
       KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
@@ -308,7 +312,6 @@ services:
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - kafkadata:/kafka
-    hostname: fixed-hostname-so-kafka-reads-the-logs
     networks:
       static:
         ipv4_address: 172.20.20.13
