@@ -17,14 +17,10 @@ module Blockchain.SolidVM.Value (
   ) where
 
 
-import           Control.Monad
-import           Control.Monad.IO.Class
---import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import           Data.Foldable (asum)
-import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, listToMaybe)
@@ -63,7 +59,7 @@ apSnoc (AddressedPath loc path) piece = AddressedPath loc $! path `MS.snoc` piec
 instance Show AddressedPath where
   show (AddressedPath a p) = printf "%s//%s" (show a) (show p)
 
-data Variable = Variable (IORef Value)
+data Variable = Variable Value
   | Constant Value
 
 instance Show Variable where
@@ -178,8 +174,8 @@ valEquals ct lhs rhs = case (lhs, rhs) of
 
 
 
-createVar :: MonadIO m => Value -> m Variable
-createVar val = liftIO $ fmap Variable $ newIORef val
+createVar :: Value -> Variable
+createVar = Variable
 
 
 --TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
@@ -204,26 +200,24 @@ defaultValue ctract (Xabi.Label name) = fromMaybe (SContract name 0x0) $ asum
 
 defaultValue _ x = todo "defaultValue" x
 
-createDefaultValue :: MonadIO m =>
-                      Contract -> Xabi.Type -> m Value
-createDefaultValue _ (Xabi.Array valType _) = return $ SArray valType V.empty
-createDefaultValue _ (Xabi.Mapping _ _ valType) = return $ SMap valType $ M.empty
-createDefaultValue _ (Xabi.Int _ _) = return $ SInteger 0
-createDefaultValue _ Xabi.Bool = return $ SBool False
-createDefaultValue _ (Xabi.Address) = return $ SAddress $ Address 0
-createDefaultValue _ (Xabi.String _) = return $ SString ""
-createDefaultValue _ (Xabi.Bytes _ _) = return $ SString ""
+createDefaultValue :: Contract -> Xabi.Type -> Value
+createDefaultValue _ (Xabi.Array valType _) = SArray valType V.empty
+createDefaultValue _ (Xabi.Mapping _ _ valType) = SMap valType $ M.empty
+createDefaultValue _ (Xabi.Int _ _) = SInteger 0
+createDefaultValue _ Xabi.Bool = SBool False
+createDefaultValue _ (Xabi.Address) = SAddress $ Address 0
+createDefaultValue _ (Xabi.String _) = SString ""
+createDefaultValue _ (Xabi.Bytes _ _) = SString ""
 createDefaultValue ctract (Xabi.Label name) =
   case (M.lookup name $ _enums ctract, M.lookup name $ _structs ctract) of
-    (Just (val:_), _) -> return $ SEnumVal name val 0x0
-    (Nothing, Just sdef) -> do
-      items <- 
-        forM sdef $ \(n, itemType) -> do
-          itemVal <- createDefaultValue ctract $ Xabi.fieldTypeType itemType
-          itemVar <- createVar itemVal
-          return (T.unpack n, itemVar)
-      return $ SStruct name $ M.fromList items
-    _ -> return $ SContract name 0x0
+    (Just (val:_), _) -> SEnumVal name val 0x0
+    (Nothing, Just sdef) ->
+      let items = flip map sdef $ \(n, itemType) ->
+          let itemVal = createDefaultValue ctract $ Xabi.fieldTypeType itemType
+              itemVar = createVar itemVal
+           in (T.unpack n, itemVar)
+       in SStruct name $ M.fromList items
+    _ -> SContract name 0x0
 
 createDefaultValue _ x = todo "createDefaultValue" x
 

@@ -415,20 +415,20 @@ getVariableOfName name = do
       , unknownVariable "getVariableOfName" name
       ]
 
-
-
-getTypeOfName :: MonadSM m => String -> m Typo
-getTypeOfName s = do
+getTypeOfName' :: String -> CodeCollection -> Typo
+getTypeOfName' s (CodeCollection ccs) =
   let lookInContract :: Contract -> [Typo]
       lookInContract (Contract{..}) = catMaybes
         [ fmap StructTypo (M.lookup s _structs)
         , fmap EnumTypo (M.lookup s _enums)
         ]
-  CodeCollection ccs <- fmap codeCollection getCurrentCallInfo
-  let ctrs = map ContractTypo $ M.keys ccs
-  case concatMap lookInContract ccs ++ ctrs of
-    [] -> internalError "getTypeOfName" s
-    (typo:_) -> return typo
+      ctrs = map ContractTypo $ M.keys ccs
+   in case concatMap lookInContract ccs ++ ctrs of
+        [] -> internalError "getTypeOfName" s
+        (typo:_) -> typo
+
+getTypeOfName :: MonadSM m => String -> m Typo
+getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 
 
@@ -535,55 +535,61 @@ hintFromType = \case
  Xabi.Array{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
-getXabiType :: MonadSM m => Address -> B.ByteString -> m (Maybe Xabi.Type)
-getXabiType addr field = do
+getXabiType' :: B.ByteString -> CallInfo -> Maybe Xabi.Type
+getXabiType' field callInfo = M.lookup (BC.unpack field)
+                            . fmap Xabi.varType
+                            . _storageDefs
+                            . currentContract
+                            $ callInfo
+
+getCallInfoForAddress :: Mod.Modifiable [CallInfo] m => Address -> m CallInfo
+getCallInfoForAddress addr = do
   -- This field might have been defined in e.g. a caller contract.
   -- We search from the top down for the home of this data
   stack <- Mod.get (Mod.Proxy @[CallInfo])
   case filter ((== addr) . currentAddress) stack of
     [] -> internalError "address not found in call stack" (addr, stack)
-    (callInfo:_) -> return
-                    . M.lookup (BC.unpack field)
-                    . fmap Xabi.varType
-                    . _storageDefs
-                    . currentContract
-                    $ callInfo
+    (callInfo:_) -> return callInfo
+
+getXabiType :: Mod.Modifiable [CallInfo] m => Address -> B.ByteString -> m (Maybe Xabi.Type)
+getXabiType addr field = getXabiType' field =<< getCallInfoForAddress addr
 
 getXabiValueType :: MonadSM m => AddressedPath -> m Xabi.Type
 getXabiValueType (AddressedPath loc path) = do
+  ccs' <- codeCollection <$> getCurrentCallInfo
   let field = MS.getField path
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> loop (tail $ MS.toList path) v
- where loop :: MonadSM m => [MS.StoragePathPiece] -> Xabi.Type -> m Xabi.Type
-       loop [] = return
-       loop [x] = \case
+    Just v -> return $ loop ccs' (tail $ MS.toList path) v
+ where loop :: CodeCollection -> [MS.StoragePathPiece] -> Xabi.Type -> Xabi.Type
+       loop _ [] = id
+       loop ccs [x] = \case
          Xabi.Mapping{Xabi.value=v} -> case x of
-           MS.MapIndex{} -> return v
+           MS.MapIndex{} -> v
            _ -> typeError "non map index attribute of mapping" x
          Xabi.Array{Xabi.entry=v} -> case x of
-           MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
-           MS.ArrayIndex{} -> return v
+           MS.Field "length" -> Xabi.Int{signed=Just True, bytes=Nothing}
+           MS.ArrayIndex{} -> v
            _ -> typeError "non-length or array index attribute of array" x
          Xabi.String{} -> case x of
-           MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
+           MS.Field "length" -> Xabi.Int{signed=Just True, bytes=Nothing}
            _ -> typeError "non-length attribute of string" x
-         Xabi.Label s -> do
-           t' <- getTypeOfName s
-           case (x, t') of
-             (MS.Field n, StructTypo fs) -> do
-               let mt'' = lookup (decodeUtf8 n) fs
-               case mt'' of
-                Just t'' -> return $ Xabi.fieldTypeType t''
-                Nothing -> error $ "field not present in struct definition: " ++ show (n, fs)
-             (_, StructTypo{}) -> typeError "non field access to struct" x
-             (_, ContractTypo{}) -> todo "getValueType/contract access" t'
-             (_, EnumTypo{}) -> todo "getValueType/enum acess" t'
+         Xabi.Label s ->
+           let t' = getTypeOfName' s ccs
+            in case (x, t') of
+                 (MS.Field n, StructTypo fs) ->
+                   let mt'' = lookup (decodeUtf8 n) fs
+                    in case mt'' of
+                        Just t'' -> Xabi.fieldTypeType t''
+                        Nothing -> error $ "field not present in struct definition: " ++ show (n, fs)
+                 (_, StructTypo{}) -> typeError "non field access to struct" x
+                 (_, ContractTypo{}) -> todo "getValueType/contract access" t'
+                 (_, EnumTypo{}) -> todo "getValueType/enum acess" t'
          t'' -> todo "atomic type does not have value type" t''
-       loop (_:rs) = \case
-          Xabi.Mapping{Xabi.value=t'} -> loop rs t'
-          Xabi.Array{Xabi.entry=t'} -> loop rs t'
+       loop ccs (_:rs) = \case
+          Xabi.Mapping{Xabi.value=t'} -> loop ccs rs t'
+          Xabi.Array{Xabi.entry=t'} -> loop ccs rs t'
           t -> todo "getXabiValueType/loopnext unsupported type" t
 
 getValueType :: MonadSM m => AddressedPath -> m BasicType
