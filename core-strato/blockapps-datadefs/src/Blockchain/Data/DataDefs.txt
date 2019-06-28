@@ -14,7 +14,7 @@ BlockData
     extraData BS.ByteString
     nonce Word64
     mixHash SHA
-    deriving Eq Read Show Generic
+    deriving Eq Read Show Generic Data
 
 BlockDataRef
     parentHash SHA
@@ -51,7 +51,7 @@ AddressStateRef
     contractRoot StateRoot
     code BS.ByteString
     codeHash SHA
-    chainId Word256
+    chainId Word256 default=0000000000000000000000000000000000000000000000000000000000000000
     latestBlockDataRefNumber Integer
     UniqueAddress address chainId
     deriving Eq Read Show

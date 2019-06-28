@@ -33,6 +33,7 @@ import qualified BlockApps.Bloc22.Database.Create as Bloc22
 import qualified BlockApps.Bloc22.Database.Migration as Bloc22
 import qualified BlockApps.Bloc22.Monad as Bloc22
 import qualified BlockApps.Bloc22.Server as Bloc22
+import           BlockApps.Init
 import           BlockApps.Logging (LogLevel(..), flags_minLogLevel)
 
 import           Options
@@ -42,6 +43,7 @@ import           Options
 
 main :: IO ()
 main = do
+  blockappsInit "blockapps-bloc"
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
   putStrLn . unlines $
     [ "██████╗ ██╗      ██████╗  ██████╗"

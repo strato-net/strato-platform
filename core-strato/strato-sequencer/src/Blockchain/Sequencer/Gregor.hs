@@ -161,14 +161,18 @@ runTheGregor cfg = race_ (runGregorM cfg unseqReader)
 initializeCheckpoint :: [Address] -> [Address] -> GregorM Checkpoint
 initializeCheckpoint vals admins = do
   meta <- snd <$> getNextOffsetAndMetadata
+  let overrideVals c = c{checkpointValidators=vals, checkpointAdmins=admins}
   $logDebugLS "initializeCheckpoint" meta
-  case decodeMeta meta of
-       Left err -> error $ "corrupt metadata in initializeCheckpoint:" ++ show err
-       Right kafkaCkpt ->
+  case (meta, decodeMeta meta) of
+    ("", _) -> do
+      $logInfoS "initializeCheckpoint" "No checkpoint found -- starting from (0, 0)"
+      return $ overrideVals def
+    (_, Left err) -> error $ "corrupt metadata in initializeCheckpoint:" ++ show err
+    (_, Right kafkaCkpt) ->
         if null (checkpointValidators kafkaCkpt)
           then do
             $logInfoS "initializeCheckpoin" "No validators in checkpoint -- setting by flags"
-            return kafkaCkpt{checkpointValidators=vals, checkpointAdmins=admins}
+            return $ overrideVals kafkaCkpt
           else return kafkaCkpt
 
 unseqReader :: GregorM ()

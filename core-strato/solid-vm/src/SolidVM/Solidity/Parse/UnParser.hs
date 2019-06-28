@@ -117,7 +117,7 @@ unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
 unparseFuncWithoutName :: Func -> Text
 unparseFuncWithoutName Func{..} =
        "("
-    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
+    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" maybeName , v)) funcArgs))
     <> ") "
     <> case funcStateMutability of
         Just sm -> tShow sm <> " "
@@ -132,11 +132,11 @@ unparseFuncWithoutName Func{..} =
         Just [] -> ""
         Just xs -> Text.pack $ List.intercalate " " xs <> " "
         _ -> ""
-    <> case Map.toList funcVals of
+    <> case funcVals of
         [] -> ""
         vals ->
               "returns ("
-          <> Text.intercalate ", " (List.map unparseVals vals)
+          <> Text.intercalate ", " (List.map unparseVals $ map (\(maybeName, v) -> (fromMaybe "" maybeName , v)) vals)
           <> ") "
     <> "{\n        "
     <> case funcContents of

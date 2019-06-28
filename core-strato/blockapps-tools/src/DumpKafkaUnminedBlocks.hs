@@ -6,7 +6,6 @@ import           Control.Monad.IO.Class
 import           Network.Kafka.Protocol
 
 import           Blockchain.EthConf
-import           Blockchain.Stream.Raw          (setDefaultKafkaState)
 import           Blockchain.Stream.UnminedBlock
 
 import           Text.Format
@@ -19,7 +18,6 @@ dumpKafkaUnminedBlocks startingBlock = do
     Right _ -> return ()
   where
     doConsume' offset = do
-      setDefaultKafkaState
       blocks <- fetchUnminedBlocks offset
       liftIO . putStrLn . unlines $ format <$> blocks
       doConsume' (offset + fromIntegral (length blocks))

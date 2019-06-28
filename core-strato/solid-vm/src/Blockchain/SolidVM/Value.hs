@@ -1,11 +1,26 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.SolidVM.Value where
+module Blockchain.SolidVM.Value (
+  Variable(..),
+  Value(..),
+  BasicType(..),
+  AddressedPath(..),
+  Typo(..),
+  ValList(..),
+  IndexType(..),
+  createVar,
+  coerceType,
+  apSnoc,
+  defaultValue,
+  createDefaultValue,
+  valEquals
+  ) where
 
 
 import           Control.Monad
-import           Data.ByteString (ByteString)
+import           Control.Monad.IO.Class
+--import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
@@ -36,11 +51,9 @@ import qualified SolidVM.Solidity.Xabi.VarDef     as Xabi
 
 data IndexType = ArrayIndex | MapBoolIndex | MapAddressIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
 
-data LocalVar = LocalVar deriving (Show, Eq)
-
 
 data AddressedPath = AddressedPath
-  { apAddress :: Either LocalVar Address
+  { apAddress :: Address
   , apPath :: MS.StoragePath
   } deriving (Eq)
 
@@ -81,8 +94,8 @@ data Value =
   | SContractDef String
   | SContractItem Address String
   | SContract String Address
-  | SContractFunction String Address String -- contractName, address, functionName
-  | SPush AddressedPath -- The array function
+  | SContractFunction (Maybe String) Address String -- contractName, address, functionName
+  | SPush Value -- The array function
   | SNULL
   | SReference AddressedPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
@@ -166,6 +179,11 @@ valEquals ct lhs rhs = case (lhs, rhs) of
 
 
 
+createVar :: MonadIO m => Value -> m Variable
+createVar val = liftIO $ fmap Variable $ newIORef val
+
+
+--TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
 defaultValue :: Contract -> Xabi.Type -> Value
 defaultValue _ (Xabi.Array valType _) = SArray valType V.empty
 defaultValue _ (Xabi.Mapping _ _ valType) = SMap valType $ M.empty
@@ -187,10 +205,33 @@ defaultValue ctract (Xabi.Label name) = fromMaybe (SContract name 0x0) $ asum
 
 defaultValue _ x = todo "defaultValue" x
 
+createDefaultValue :: MonadIO m =>
+                      Contract -> Xabi.Type -> m Value
+createDefaultValue _ (Xabi.Array valType _) = return $ SArray valType V.empty
+createDefaultValue _ (Xabi.Mapping _ _ valType) = return $ SMap valType $ M.empty
+createDefaultValue _ (Xabi.Int _ _) = return $ SInteger 0
+createDefaultValue _ Xabi.Bool = return $ SBool False
+createDefaultValue _ (Xabi.Address) = return $ SAddress $ Address 0
+createDefaultValue _ (Xabi.String _) = return $ SString ""
+createDefaultValue _ (Xabi.Bytes _ _) = return $ SString ""
+createDefaultValue ctract (Xabi.Label name) =
+  case (M.lookup name $ _enums ctract, M.lookup name $ _structs ctract) of
+    (Just (val:_), _) -> return $ SEnumVal name val 0x0
+    (Nothing, Just sdef) -> do
+      items <- 
+        forM sdef $ \(n, itemType) -> do
+          itemVal <- createDefaultValue ctract $ Xabi.fieldTypeType itemType
+          itemVar <- createVar itemVal
+          return (T.unpack n, itemVar)
+      return $ SStruct name $ M.fromList items
+    _ -> return $ SContract name 0x0
+
+createDefaultValue _ x = todo "createDefaultValue" x
 
 
 
 
+{-
 byteStringToValue :: ByteString -> Maybe Value
 byteStringToValue x | x == B.singleton 128 = Nothing
 byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
@@ -198,7 +239,7 @@ byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 castToInt :: Value -> Integer
 castToInt (SInteger i) = i
 castToInt s = typeError "castToInt" s
-
+-}
 
 -- Typos are the possible values that a Xabi.Label
 -- is able to resolve to

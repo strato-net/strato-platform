@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -13,6 +15,7 @@ import           Control.Arrow                ((***))
 import           Control.DeepSeq
 import           Data.Binary
 import qualified Data.ByteString              as B
+import           Data.Data
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (listToMaybe, maybeToList)
@@ -64,9 +67,7 @@ data Transaction =
   PrivateHashTX {
     transactionTxHash    :: Word256,
     transactionChainHash :: Word256
-    } deriving (Show, Read, Eq, Ord, Generic)
-
-instance NFData Transaction
+    } deriving (Show, Read, Eq, Ord, Generic, Data, NFData)
 
 instance Binary Transaction where
   put = put . rlpSerialize . rlpEncode
@@ -191,12 +192,12 @@ instance RLPSerializable Transaction where
 
 
 instance ShortDescription Transaction where
-  shortDescription t | isMessageTX t = shorten 90 $ 
+  shortDescription t | isMessageTX t = shorten 90 $
     case (M.lookup "funcName" =<< transactionMetadata t, M.lookup "args" =<< transactionMetadata t, transactionData t) of
       (Just n, Just a, _) -> "calling " ++ format (transactionTo t) ++ "/" ++ T.unpack n ++ T.unpack a
       (_, _, "") -> "Value transfer of " ++ show (transactionValue t) ++ " to " ++ shortDescription (transactionTo t)
       _ -> "MessageTX to " ++ format (transactionTo t)
-  shortDescription t = shorten 40 $ 
+  shortDescription t = shorten 40 $
     case (M.lookup "name" =<< transactionMetadata t, M.lookup "args" =<< transactionMetadata t) of
       (Just n, Just "") -> "Create Contract " ++ T.unpack n
       (Just n, Just a) -> "Create Contract " ++ T.unpack n ++ T.unpack a

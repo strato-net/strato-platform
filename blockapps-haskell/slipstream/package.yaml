@@ -27,6 +27,7 @@ dependencies:
   - blockapps-bloc22-api
   - blockapps-bloc22-server
   - blockapps-ethereum
+  - blockapps-init
   - blockapps-milena
   - blockapps-solidity
   - blockapps-strato-client

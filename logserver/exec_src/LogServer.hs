@@ -13,6 +13,8 @@ import Network.Wai.Middleware.Prometheus
 import Network.Wai.Middleware.RequestLogger
 import WaiAppStatic.Types
 
+import BlockApps.Init
+
 defineFlag "d:directory" ("/var/lib/strato/logs" :: String) "Directory to serve the files from"
 defineFlag "u:uri_root" ("/logs/strato/" :: T.Text) "Prefix to add in front of any URIs"
 $(return [])
@@ -39,6 +41,7 @@ jsonList pieces (Folder elems) = do
 
 main :: IO ()
 main = do
+  blockappsInit "logserver"
   unknown <- $initHFlags "Strato Log Server"
   unless (null unknown) . putStrLn $ "Unknown flags: " ++ show unknown
   let settings = defaultFileServerSettings flags_directory

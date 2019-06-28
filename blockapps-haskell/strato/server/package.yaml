@@ -19,6 +19,7 @@ dependencies:
   - aeson-casing
   - binary
   - blockapps-ethereum
+  - blockapps-init
   - blockapps-solidity
   - blockapps-strato-api
   - containers

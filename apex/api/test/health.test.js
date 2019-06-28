@@ -35,15 +35,11 @@ describe('Tests - Node-level Health Check', function () {
     await nodeHealthCheckJs.updateCurrentHealth(stat);
     assert.equal(stat[0], false, "Unhealthy");
     assert.equal(stat[1].sort().toString(), Object.values(nodeHealthCheckJs.neededJobs).sort().toString(), 'Errored Processes')
-    let entriesAdded;
-    for (let i = 0; i < 2; i++) {
-      entriesAdded = await models.HealthStat.findAll({
-        attributes: ['processName', 'HealthStatus'],
-        limit: 4,
-        order: [['createdAt', 'DESC']],
-      })
-    }
-    ;
+    const entriesAdded = await models.HealthStat.findAll({
+      attributes: ['processName', 'HealthStatus'],
+      limit: 4,
+      order: [['createdAt', 'DESC']],
+    })
 
     entriesAdded.forEach((elem) => {
       assert.equal(elem.dataValues.HealthStatus, false, `${elem.dataValues.processName} Status`);
@@ -52,7 +48,7 @@ describe('Tests - Node-level Health Check', function () {
       where: {
         processName: "HealthStat",
       },
-    });
+    })
     const currentTime = Date.now();
     assert.equal(currentStat.dataValues.latestHealthStatus, false, `Health Stat`)
     assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp')
@@ -72,15 +68,14 @@ describe('Tests - Node-level Health Check', function () {
     await nodeHealthCheckJs.updateCurrentHealth(stat);
     assert.equal(stat[0], false, "Unhealthy");
     assert.equal(stat[1].sort().toString(), Object.values(nodeHealthCheckJs.neededJobs).sort().toString(), 'Errored Processes')
-    let entriesAdded;
-    for (let i = 0; i < 2; i++) {
-      entriesAdded = await models.HealthStat.findAll({
+    const entriesAdded = await models.HealthStat.findAll({
         attributes: ['processName', 'HealthStatus'],
         limit: 4,
         order: [['createdAt', 'DESC']],
       })
-    };
-
+    entriesAdded.forEach((elem) => {
+      assert.equal(elem.dataValues.HealthStatus, false, `${elem.dataValues.processName} Status`);
+    })
   })
 
   it('HealthStat update - SUCCESS', async function () {
@@ -94,14 +89,10 @@ describe('Tests - Node-level Health Check', function () {
     await nodeHealthCheckJs.updateCurrentHealth(stat);
     assert.equal(stat[0], true, "Healthy");
     assert.equal(stat[1].concat().toString(), [].toString(), "Errored Processes")
-    let entriesAdded;
-    for (let i = 0; i < 2; i++) {
-      entriesAdded = await models.HealthStat.findAll({
+    const entriesAdded = await models.HealthStat.findAll({
         limit: 4,
         order: [['createdAt', 'DESC']],
       })
-    }
-    ;
     entriesAdded.forEach((elem) => {
       assert.equal(elem.dataValues.HealthStatus, true, `${elem.dataValues.processName} Status`);
     })

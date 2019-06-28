@@ -25,38 +25,52 @@ module.exports = {
         raw: true,
       });
 
-      let healthStatus, stallStatus, uptime, isInc, isPending;
+      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus, warningMessages, systemInfoBody;
 
       const currentTime = Date.now();
 
-      const [healthInfo, stallInfo] = await getLatestHealth();
+      const [healthInfo, stallInfo, systemInfo] = await getLatestHealth();
       if (healthInfo && stallInfo) {
         healthStatus = healthInfo.latestHealthStatus;
         stallStatus = stallInfo.latestHealthStatus;
         uptime = (healthStatus) ? currentTime - healthInfo.lastFailureTimestamp : 0;
         isInc = stallInfo.isBlocksValidInc;
         isPending = stallInfo.isLastPending;
+        healthAI = healthInfo.additionalInfo;
+        systemInfoAI = JSON.parse(systemInfo.additionalInfo);
+        systemInfoStatus = systemInfo.latestHealthStatus;
+        warningMessages = systemInfoStatus ? "" : systemInfoAI.Alerts;
+        systemInfoBody = systemInfoAI
+        if (systemInfoStatus) {
+          delete systemInfoBody.Alerts
+        }
       } else {
-        winston.warn(`Health table has no entires; Health endpoint is called too soon`)
+        winston.warn(`Health table has no entries; Health endpoint is called too soon`)
       }
 
       res.status(200).json(
-          {
-            lastBlock: {
-              number: lastBlock.number,
-              hash: lastBlock.hash,
-              parentHash: lastBlock.parent_hash,
-              totalDifficulty: lastBlock.total_difficulty,
-              nonce: lastBlock.nonce,
-            },
-            healthInfo: {
-              uptime: uptime / 1000,
-              isHealthy: healthStatus,
-              isNotStalled: stallStatus,
-              isValidBlocksInc: isInc ,
-              isLastPending: isPending
-            }
-          }
+        {
+          lastBlock: {
+            number: lastBlock.number,
+            hash: lastBlock.hash,
+            parentHash: lastBlock.parent_hash,
+            totalDifficulty: lastBlock.total_difficulty,
+            nonce: lastBlock.nonce,
+          },
+          healthInfo: {
+            uptime: uptime / 1000,
+            isHealthy: healthStatus,
+            isNotStalled: stallStatus,
+            isValidBlocksInc: isInc,
+            isLastPending: isPending,
+            unhealthyProcess: healthAI
+          },
+          warnings: {
+            warningsActive: !systemInfoStatus,
+            messages: warningMessages
+          },
+          systemInfo: systemInfoBody
+        }
       )
     } catch (error) {
       return next(new Error('could not get data from database: ' + error));
@@ -109,10 +123,10 @@ async function getLatestHealth() {
     attributes: [
       'latestHealthStatus',
       'latestCheckTimestamp',
-      'lastFailureTimestamp'
+      'lastFailureTimestamp',
+      'additionalInfo'
     ],
-
-    raw: true,
+    raw:true,
   }).catch(err => next(err));
 
   const stallInfo = await models.CurrentHealth.findOne({
@@ -130,5 +144,20 @@ async function getLatestHealth() {
     raw: true,
   }).catch(err => next(err));
 
-  return [healthInfo, stallInfo]
+  const systemInfo = await models.CurrentHealth.findOne({
+    where: {
+      processName: "SystemInfoStat"
+    },
+    attributes: [
+      'latestHealthStatus',
+      'latestCheckTimestamp',
+      'lastFailureTimestamp',
+      'isBlocksValidInc',
+      'isLastPending',
+      'additionalInfo'
+    ],
+    raw:true,
+  }).catch(err => next(err));
+
+  return [healthInfo, stallInfo, systemInfo]
 }

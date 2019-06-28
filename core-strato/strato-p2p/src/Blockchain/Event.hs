@@ -10,7 +10,8 @@ module Blockchain.Event (
   module Blockchain.EventModel,
   handleEvents,
   handleGetChainDetails,
-  getBestKafkaBlockNumber
+  getBestKafkaBlockNumber,
+  checkPeerIsMember' -- For testing
   ) where
 
 import           Control.Arrow                         ((&&&))
@@ -335,40 +336,35 @@ handleEvents peer = awaitForever $ \case
           case worldBestBlock of
             Nothing -> return ()
             Just (RedisBestBlock _ _ worldTDiff) -> do
-              $logInfoS "NewSeqEvent.block" . T.pack $ "World TDiff: " ++ show worldTDiff
+              $logInfoS "handleEvents/OEBlock" . T.pack $ "World TDiff: " ++ show worldTDiff
               when (obTotalDifficulty b >= worldTDiff) $ do
-                $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
+                $logInfoS "handleEvents/OEBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
       OETx _ tx -> do
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
           let cId = txChainId tx
           match <- case cId of
             Nothing -> return True
-            Just cid' -> do
-              mems <- RBDB.withRedisBlockDB $ RBDB.getChainMembers cid'
-              let pIp = readIP $ T.unpack (pPeerIp peer)
-                  ipSet = S.fromList . map ipAddress $ M.elems mems
-              return $ pIp `S.member` ipSet
+            Just cid' -> checkPeerIsMember peer <$> RBDB.withRedisBlockDB (RBDB.getChainMembers cid')
 
           if not match
-            then $logInfoS "handleEvents/OETx" $ T.pack $ "peer is not authorized for chainID " ++ show cId
+            then $logInfoS "handleEvents/OETx" $ T.pack $
+                    printf "peer %s is not authorized for chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (show cId)
             else do
               $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ show cId
-              $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
+              $logDebugS "handleEvents/OETx" . T.pack $ "the transaction was: " ++ format tx
               yieldR $ Transactions [otBaseTx tx]
       OEGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
         when (shouldSend peer og) $ do
-          $logInfoS "NewSeqEvent.genesis" . T.pack $ "yielding new chain: " ++ show cId ++ " with " ++ show uci
-          let pIp = readIP $ T.unpack (pPeerIp peer)
-              ipSet = S.fromList . map ipAddress . M.elems $ members uci
-              match = pIp `S.member` ipSet
-
-          if match
+          $logInfoS "handleEvents/OEGenesis" . T.pack $ "received new chain: " ++ show cId ++ " with " ++ show uci
+          if checkPeerIsMember peer $ members uci
             then do
               $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (show cId)
               yieldR $ ChainDetails [(cId, cInfo)]
             else do
-              $logInfoS "handleEvents/OEGenesis" $ T.pack $ "peer requesting chain details is not authorized for chainID " ++ (show cId)
+              $logInfoS "handleEvents/OEGenesis" $ T.pack $
+                printf "peer %s is not authorized for received chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (show cId)
+              $logDebugLS "handleEvents/OEGenesis/members" $ members uci
       OEGetChain chainIds -> yieldR $ GetChainDetails chainIds
       OEGetTx shas -> yieldR $ GetTransactions shas
       OENewChainMember cId _ _ -> do
@@ -437,9 +433,9 @@ handleGetChainDetails :: ( MonadIO m
                       -> [Word256]
                       -> ConduitM Event (Either P2PCNC Message) m ()
 handleGetChainDetails peer cids' = do
-  cids <- case cids' of
+  cids <- S.toList <$> case cids' of
             [] -> RBDB.withRedisBlockDB $ RBDB.getIPChains (peerIPAddress peer)
-            xs -> return xs
+            xs -> return $ S.fromList xs
   stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
   mems <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainMembers cids
@@ -492,12 +488,23 @@ shouldSendGossip peer txo = recordGossipFinal
       recordGossipRNG $! rangeEnd <= flags_txGossipFanout || rng <= flags_txGossipFanout
     _ -> return True
 
--- check that the peer is authorized to receive these chain details, by verifying that their
--- IPaddress is associated with one of the Enodes in the chain's member list
+
 checkPeerIsMember :: PPeer -> Map Address Enode -> Bool
-checkPeerIsMember peer mems =
-  let ips = S.fromList . map ipAddress $ M.elems mems
-   in S.member (peerIPAddress peer) ips
+checkPeerIsMember = checkPeerIsMember' flags_privateChainAuthorizationMode
+
+checkPeerIsMember' :: AuthorizationMode -> PPeer -> Map Address Enode -> Bool
+checkPeerIsMember' mode peer mems =
+  let elems = M.elems mems
+      ips = map ipAddress elems
+      keys = map (Just . pubKey) elems
+      ipkeys = map (ipAddress &&& (Just . pubKey)) elems
+      thisIP = peerIPAddress peer
+      thisKey = pointToBytes <$> pPeerPubkey peer
+  in case mode of
+        IPOnly -> thisIP `elem` ips
+        PubkeyOnly -> thisKey `elem` keys
+        StrongAuth -> (thisIP, thisKey) `elem` ipkeys
+        FlexibleAuth -> or [thisIP `elem` ips, thisKey `elem` keys]
 
 peerIPAddress :: PPeer -> IPAddress
 peerIPAddress = readIP . T.unpack . pPeerIp

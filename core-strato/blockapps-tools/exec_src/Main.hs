@@ -24,6 +24,7 @@ import           InsertTX
 import           Psql
 import           Raw
 import           RawMP
+import           Redis
 import           RLP
 import           RSVP
 import           State
@@ -61,6 +62,9 @@ data Options = State{root::String, db::String}
              | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
              | PushBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
              | RSVP {chainId :: Word256, memberId :: String, address::Address}
+             | Redis { key :: String }
+             | RedisMatch { pattern :: String }
+             | Migrate { tables :: String }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -78,8 +82,8 @@ canonRedisOptions =
     range := def += typ "RANGE" += argPos 2
   ]
 
-redisOptions :: Annotate Ann
-redisOptions =
+dumpRedisOptions :: Annotate Ann
+dumpRedisOptions =
   record DumpRedis{databaseNumber=undefined} [
     databaseNumber := 0 += typ "INT"
   ]
@@ -229,6 +233,21 @@ rsvpOptions = record RSVP { chainId = error "unused chain id", memberId = error 
             , address := error "--address required" += typ "ADDRESS" += explicit += name "address"
             ]
 
+redisOptions :: Annotate Ann
+redisOptions = record Redis {key = error "unused key"}
+             [ key := error "redis <KEY>" += typ "KEY" += argPos 0
+             ]
+
+redisMatchOptions :: Annotate Ann
+redisMatchOptions = record RedisMatch {pattern = error "unused pattern"}
+                  [ pattern := error "redis <PATTERN>" += typ "PATTERN" += argPos 0
+                  ]
+
+migrateOptions :: Annotate Ann
+migrateOptions = record Migrate { tables = error "unused tables"}
+               [ tables := error "migrate (data|global|peer|all)" += typ "TABLES" += argPos 0
+               ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -243,18 +262,21 @@ options = modes_ [blockGoOptions
                 , dumpKafkaStateDiffOptions
                 , dumpKafkaUnSequencerOptions
                 , dumpKafkaUnminedBlocksOptions
+                , dumpRedisOptions
                 , fRawMPOptions
                 , hashOptions
                 , insertTXOptions
                 , psqlOptions
                 , rawMPOptions
                 , rawOptions
-                , redisOptions
                 , rlpOptions
                 , stateOptions
                 , askOptions
                 , pushOptions
                 , rsvpOptions
+                , redisOptions
+                , redisMatchOptions
+                , migrateOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -295,3 +317,6 @@ run Checkpoints{..}            = case operation of
 run AskForBlocks{..}           = insertP2P (OEAskForBlocks startBlock endBlock peer)
 run PushBlocks{..}             = insertP2P (OEPushBlocks startBlock endBlock peer)
 run RSVP{..}                   = rsvp chainId memberId address
+run Redis{..}                  = redis $ BC.pack key
+run RedisMatch{..}             = redisMatch $ BC.pack pattern
+run Migrate{..}                = migrate tables

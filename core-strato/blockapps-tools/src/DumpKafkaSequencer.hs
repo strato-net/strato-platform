@@ -8,7 +8,6 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.EthConf
 import           Blockchain.Sequencer.Kafka
-import           Blockchain.Stream.Raw      (setDefaultKafkaState)
 
 dumpKafkaSequencer :: Offset -> IO ()
 dumpKafkaSequencer ofs = do
@@ -28,7 +27,6 @@ dumpKafkaSequencerVM startingBlock = do
     Right _ -> return ()
   where
     doConsume' offset = do
-      setDefaultKafkaState
       seqEvents <- readSeqVmEvents offset
       liftIO . putStrLn . unlines $ show <$> seqEvents
       doConsume' (offset + fromIntegral (length seqEvents))
@@ -41,7 +39,6 @@ dumpKafkaSequencerP2P startingBlock = do
     Right _ -> return ()
   where
     doConsume' offset = do
-      setDefaultKafkaState
       seqEvents <- readSeqP2pEvents offset
       liftIO . putStrLn . unlines $ show <$> seqEvents
       doConsume' (offset + fromIntegral (length seqEvents))

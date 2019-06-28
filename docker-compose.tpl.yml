@@ -7,6 +7,20 @@ volumes:
     driver: local
   prometheusdata:
     driver: local
+  kafkadata:
+    driver: local
+  redisdata:
+    driver: local
+  stratodata:
+    driver: local
+  zookeeperdata:
+    driver: local
+
+networks:
+  static:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 services:
   smd:
     depends_on:
@@ -27,6 +41,9 @@ services:
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.1
   apex:
     depends_on:
     - bloc
@@ -56,6 +73,9 @@ services:
     volumes:
     - dapps:/usr/src/app/apps
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.2
   dappstore:
     depends_on:
     - bloc
@@ -67,6 +87,9 @@ services:
     build: .
     image: ${DAPPSTORE_IMAGE:-<REPO_URL>dappstore:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.3
   bloc:
     depends_on:
     - postgres
@@ -92,10 +115,18 @@ services:
     build: .
     image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.4
   redis:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.5
+    volumes:
+      - redisdata:/data
   vault-wrapper:
     depends_on:
     - postgres
@@ -109,6 +140,9 @@ services:
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.6
   strato:
     depends_on:
     - kafka
@@ -148,6 +182,7 @@ services:
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_user=postgres
+    - privateChainAuthorizationMode=${privateChainAuthorizationMode}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
@@ -171,6 +206,11 @@ services:
     - 30303:30303
     - 30303:30303/udp
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.7
+    volumes:
+      - stratodata:/var/lib/strato
   postgrest:
     depends_on:
     - bloc
@@ -185,6 +225,9 @@ services:
     build: .
     image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.8
   postgres:
     environment:
     - POSTGRES_PASSWORD=${postgres_password:-api}
@@ -192,6 +235,9 @@ services:
     volumes:
     - pgdata:/var/lib/postgresql/data
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.9
   nginx:
     depends_on:
     - apex
@@ -227,14 +273,25 @@ services:
     volumes:
     - ./ssl:/tmp/ssl:ro
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.10
   docs:
     environment:
     - API_URL=/strato-api/eth/v1.2/swagger.json
     image: swaggerapi/swagger-ui:v3.22.1
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.11
   zookeeper:
     image: wurstmeister/zookeeper:3.4.6
     restart: always
+    volumes:
+      - zookeeperdata:/opt/zookeeper-3.4.6/data
+    networks:
+      static:
+        ipv4_address: 172.20.20.12
   kafka:
     depends_on:
     - zookeeper
@@ -244,6 +301,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_LOG_CLEANER_ENABLE: "false"
+      KAFKA_LOG_DIRS: '/kafka/kafka-logs'
       KAFKA_LOG_RETENTION_HOURS: 2147483647
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
       KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
@@ -253,6 +311,10 @@ services:
     restart: always
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
+    - kafkadata:/kafka
+    networks:
+      static:
+        ipv4_address: 172.20.20.13
   prometheus:
     build: .
     environment:
@@ -261,3 +323,6 @@ services:
     volumes:
     - prometheusdata:/prometheus
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.14

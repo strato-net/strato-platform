@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.DB.RawStorageDB
   ( RawStorageKey
@@ -14,6 +15,7 @@ module Blockchain.DB.RawStorageDB
   , genericLookupRawStorageDB
   , genericInsertRawStorageDB
   , genericDeleteRawStorageDB
+  , genericLookupWithDefaultRawStorageDB
   , putRawStorageKeyVal'
   , getRawStorageKeyVal'
   , getAllRawStorageKeyVals'
@@ -26,11 +28,11 @@ import qualified Control.Monad.Change.Alter                  as A
 import           Control.Monad.Loops
 import           Control.Monad.State
 import           Data.ByteString                             (ByteString)
+import           Data.Default
 import           Data.Foldable                               (for_)
 import           Data.List
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as M
-import           Data.Maybe                                  (fromMaybe)
 import           Data.Traversable                            (for)
 import qualified Database.LevelDB                            as DB
 
@@ -46,6 +48,9 @@ import           Blockchain.Output
 import qualified Data.NibbleString                           as N
 
 import BatchMerge
+
+instance Default ByteString where
+  def = blankVal
 
 type RawStorageKey = (Address, ByteString)
 type RawStorageValue = ByteString
@@ -79,11 +84,8 @@ getAllRawStorageKeyVals' = getAllRawStorageKeyValsMC
 putRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> RawStorageValue -> m ()
 putRawStorageKeyValMC = A.insert (A.Proxy @RawStorageValue)
 
--- TODO: can't use lookupWithDefault or lookupWithMempty because RawStorageValues are already
--- RLP serialized, and an empty bytestring is invalid RLP (rlpSplit bottoms out when given one).
--- We'll need a newtype to make this distinction, but for now, just use fromMaybe
 getRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> m RawStorageValue
-getRawStorageKeyValMC key = fromMaybe blankVal <$> A.lookup (A.Proxy @RawStorageValue) key
+getRawStorageKeyValMC key = A.lookupWithDefault (A.Proxy @RawStorageValue) key
 
 genericLookupRawStorageDB :: ( HasMemRawStorageDB m
                              , (Address `A.Alters` AddressState) m
@@ -100,10 +102,31 @@ genericLookupRawStorageDB key = do
      case M.lookup key theBMap of
        Just val' -> return $ Just val'
        Nothing -> do
-         mVal <- getRawStorageKeyValDB key
+         mVal <- getRawStorageKeyValDBMaybe key
          --put in the TX cache for fast future lookups
          for_ mVal $ \v -> putMemRawStorageTxMap $ M.insert key v theMap
          return mVal
+
+genericLookupWithDefaultRawStorageDB
+  :: ( HasMemRawStorageDB m
+     , (Address `A.Alters` AddressState) m
+     , (MP.StateRoot `A.Alters` MP.NodeData) m
+     )
+  => RawStorageKey
+  -> m RawStorageValue
+genericLookupWithDefaultRawStorageDB key = do
+  theMap <- snd <$> getMemRawStorageTxDB
+  case M.lookup key theMap of
+   Just val -> return val
+   Nothing  -> do
+     theBMap <- snd <$> getMemRawStorageBlockDB
+     case M.lookup key theBMap of
+       Just val' -> return val'
+       Nothing -> do
+         v <- getRawStorageKeyValDB key
+         --put in the TX cache for fast future lookups
+         putMemRawStorageTxMap $ M.insert key v theMap
+         return v
 
 genericInsertRawStorageDB :: HasMemRawStorageDB m
                           => RawStorageKey
@@ -196,13 +219,21 @@ putRawStorageKeyValDB sr (key, val) = MP.putKeyVal sr key val
 deleteRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> MP.Key -> m MP.StateRoot
 deleteRawStorageKeyValDB sr key = MP.deleteKey sr key
 
+getRawStorageKeyValDBMaybe :: ( (Address `A.Alters` AddressState) m
+                              , (MP.StateRoot `A.Alters` MP.NodeData) m
+                              )
+                           => RawStorageKey -> m (Maybe RawStorageValue)
+getRawStorageKeyValDBMaybe (owner, key) = do
+  mContractRoot <- fmap addressStateContractRoot <$> A.lookup (A.Proxy @AddressState) owner
+  fmap (fmap rlpDecode . join) . for mContractRoot $ \cr -> MP.getKeyVal cr (N.EvenNibbleString key)
+
 getRawStorageKeyValDB :: ( (Address `A.Alters` AddressState) m
                          , (MP.StateRoot `A.Alters` MP.NodeData) m
                          )
-                      => RawStorageKey -> m (Maybe RawStorageValue)
+                      => RawStorageKey -> m RawStorageValue
 getRawStorageKeyValDB (owner, key) = do
-  mContractRoot <- fmap addressStateContractRoot <$> A.lookup (A.Proxy @AddressState) owner
-  fmap (fmap rlpDecode . join) . for mContractRoot $ \cr -> MP.getKeyVal cr (N.EvenNibbleString key)
+  contractRoot <- addressStateContractRoot <$> A.lookupWithDefault (A.Proxy @AddressState) owner
+  maybe def rlpDecode <$> MP.getKeyVal contractRoot (N.EvenNibbleString key)
 
 getAllRawStorageKeyValsDB :: FullRawStorage m => Address -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyValsDB owner = do

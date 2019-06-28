@@ -19,19 +19,24 @@ dependencies:
   - blockapps-datadefs
   - blockapps-haskoin
   - blockapps-mpdbs
+  - blockapps-privacy
   - blockapps-util
   - bytestring
   - cmdargs
+  - common-log
   - data-default
+  - ethereum-discovery
   - ethereum-rlp
   - filepath
   - format
+  - hflags
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
   - blockapps-milena
   - monad-loops
   - nibblestring
+  - persistent
   - persistent-postgresql
   - resourcet
   - time
@@ -40,6 +45,7 @@ dependencies:
   - strato-index
   - strato-redis-blockdb
   - strato-model
+  - strato-sequencer
   - strato-statediff
   - transformers
   - hedis

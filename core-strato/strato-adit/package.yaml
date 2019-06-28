@@ -13,6 +13,7 @@ dependencies:
   - ansi-wl-pprint
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-init
   - blockapps-milena
   - blockapps-util
   - bytestring

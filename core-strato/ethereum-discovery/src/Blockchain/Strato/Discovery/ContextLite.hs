@@ -44,7 +44,9 @@ addPeer peer = do
   where actions mp = case mp of
             Nothing -> SQL.insert peer
             Just peer'-> do
-              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.pPeerPubkey peer]
+              SQL.update (SQL.entityKey peer') [ PPeerPubkey SQL.=. pPeerPubkey peer
+                                               , PPeerEnode SQL.=. pPeerEnode peer
+                                               ]
               return (SQL.entityKey peer')
 
 getPeerByIP :: HasSQLDB m =>String->m (Maybe (SQL.Entity PPeer))
