@@ -398,7 +398,8 @@ oneTimeSetup genesisBlockName = do
         if flags_singlePrivateKey
           then do
             !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-            let !bs = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C.pack $ skey
+            let !bs = fromRight (error $ "Invalid base64 NODEKEY: " ++ show skey) . B64.decode . C.pack $ skey
+            when (C.length bs /= 32) $ error $ "The private key decoded from NODEKEY is the wrong length: NODEKEY: " ++ show skey ++ ", decoded: '" ++ C.unpack (B16.encode bs) ++ "'"
             return . PrivKey . fromIntegral $ bytesToWord256 bs
           else generatePrivKey
 
