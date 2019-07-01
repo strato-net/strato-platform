@@ -101,7 +101,7 @@ if (!fs.existsSync(commander.config)) {
 }
 
 const portNumber = Number.parseInt(commander.port, 10);
-console.log("This is the PORTNUMBER",portNumber);
+
 if (isNaN(portNumber)) {
   console.error("Could not parse port number or missing --port option");
   process.exit(2);
