@@ -9,6 +9,7 @@ module Blockchain.Blockstanbul.BenchmarkLib
 import Data.Aeson
 import Data.Bits
 import qualified Data.ByteString as BS
+import qualified Data.Map as M
 import Data.Maybe
 
 import qualified Network.Haskoin.Crypto as HK
@@ -47,7 +48,7 @@ benchContext :: BlockstanbulContext
 benchContext =
   let mKey = HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5
       pk = fromMaybe (error "working key now fails") mKey
-  in  newContext (View 200 40) [prvKey2Address pk] [] pk
+  in  newContext (Checkpoint (View 200 40) M.empty [prvKey2Address pk] []) pk
 
 makeBlock :: Int -> Int -> Block
 makeBlock txcount txsize = setBlockNo 41

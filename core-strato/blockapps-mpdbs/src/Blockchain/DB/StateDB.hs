@@ -1,21 +1,26 @@
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 
-module Blockchain.DB.StateDB (
-  StateDB,
-  HasStateDB(..),
-  getStateRoot
-  ) where
-
-import           Control.Monad.IO.Class
+module Blockchain.DB.StateDB where
 
 import qualified Blockchain.Database.MerklePatricia as MP
+import           Control.DeepSeq
+import           Control.Monad.Change
+import qualified Database.LevelDB                   as DB
 
-type StateDB = MP.MPDB
+type StateDB = DB.DB
 
-class MonadIO m => HasStateDB m where
-  getStateDB :: m MP.MPDB
-  setStateDBStateRoot :: MP.StateRoot -> m ()
+instance NFData StateDB where
+  rnf db = db `seq` ()
 
+type HasStateDB m = ((MP.StateRoot `Alters` MP.NodeData) m, Modifiable MP.StateRoot m)
 
-getStateRoot :: HasStateDB m => m MP.StateRoot
-getStateRoot = MP.stateRoot <$> getStateDB
+getStateDB :: HasStateDB m => m MP.StateRoot
+getStateDB = get (Proxy @MP.StateRoot)
 
+setStateDBStateRoot :: HasStateDB m => MP.StateRoot -> m ()
+setStateDBStateRoot = put (Proxy @MP.StateRoot)

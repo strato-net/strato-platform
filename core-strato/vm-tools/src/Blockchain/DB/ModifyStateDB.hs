@@ -1,35 +1,31 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.DB.ModifyStateDB (
   addToBalance,
   pay
 ) where
 
-import           Blockchain.Output
-import           Control.Monad.Trans
+import           Control.Monad                   (void)
+import qualified Control.Monad.Change.Alter      as A
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.DB.HashDB
-import           Blockchain.DB.MemAddressStateDB
-import           Blockchain.DB.StateDB
 
-addToBalance :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m) =>
+addToBalance :: (Monad m, (Address `A.Alters` AddressState) m) =>
               Address -> Integer -> m Bool
 addToBalance address val = do
-  addressState <- getAddressState address
+  A.lookupWithDefault (A.Proxy @AddressState) address >>= \addressState ->
+    let newVal = addressStateBalance addressState + val
+     in if newVal < 0
+          then return False
+          else True <$ A.insert A.Proxy address addressState{addressStateBalance = newVal}
 
-  let newVal = addressStateBalance addressState + val
-
-  if newVal < 0
-    then return False
-    else do
-    putAddressState address addressState{addressStateBalance = newVal}
-    return True
-
-pay :: (HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m) =>
-     String -> Address -> Address -> Integer -> m Bool
+pay :: (Monad m, (Address `A.Alters` AddressState) m)
+    => String -> Address -> Address -> Integer -> m Bool
 pay _description fromAddr toAddr val = do
   -- TODO - figure out why the next lines create infinite loops when run in pizza app (with debug flag on)
   -- until this is resolved, I am commenting this out.
@@ -44,10 +40,10 @@ pay _description fromAddr toAddr val = do
         $logDebugS "pay" "insufficient funds"
   -}
 
-  fromAddressState <- getAddressState fromAddr
-  if addressStateBalance fromAddressState < val
+  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy :: A.Proxy AddressState) fromAddr
+  if balance < val
     then return False
     else do
-    _ <- addToBalance fromAddr (-val)
-    _ <- addToBalance toAddr val
+    void $ addToBalance fromAddr (-val)
+    void $ addToBalance toAddr val
     return True

@@ -1,0 +1,1 @@
+.releaseignore|node_modules|.editorconfig|.env|.eslint*|.oauth*|Jenkins*|dist|.vscode|package-lock.json|.dockerignore|Dockerfile.test

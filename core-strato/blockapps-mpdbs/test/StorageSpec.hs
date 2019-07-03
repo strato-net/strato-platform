@@ -1,15 +1,21 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module StorageSpec (storageSpec) where
 
 import Control.DeepSeq
 import Control.Lens
 import Control.Monad
+import Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
@@ -18,7 +24,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Database.LevelDB as DB
 import qualified Database.LevelDB.Base as DBB
 import GHC.Generics
-import Prelude hiding (abs)
+import Prelude hiding (abs, lookup)
 import System.Posix.Temp
 import System.Directory
 import Test.Hspec (Spec, describe, it)
@@ -30,9 +36,9 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
-import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
+import Blockchain.Output
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA
 import qualified Data.NibbleString as N
@@ -52,13 +58,13 @@ data CachedStorage = CS
   } deriving (Generic, NFData)
 makeLenses ''CachedStorage
 
-type StorM = StateT CachedStorage (ResourceT IO)
+type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
 
-instance HasRawStorageDB StorM where
-  getRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
-  putRawStorageTxMap = assign stx
-  getRawStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
-  putRawStorageBlockMap = assign sbs
+instance HasMemRawStorageDB StorM where
+  getMemRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
+  putMemRawStorageTxMap = assign stx
+  getMemRawStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
+  putMemRawStorageBlockMap = assign sbs
 
 instance HasMemAddressStateDB StorM where
   getAddressStateTxDBMap = use atx
@@ -66,12 +72,29 @@ instance HasMemAddressStateDB StorM where
   getAddressStateBlockDBMap = use abs
   putAddressStateBlockDBMap = assign abs
 
-instance HasStateDB StorM where
-  getStateDB = liftM2 MP.MPDB (use sdb) (use sdbsr)
-  setStateDBStateRoot = assign sdbsr
+instance (Address `Alters` AddressState) StorM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
-instance HasHashDB StorM where
-  getHashDB = use hdb
+instance (MP.StateRoot `Alters` MP.NodeData) StorM where
+  lookup _ = MP.genericLookupDB $ use sdb
+  insert _ = MP.genericInsertDB $ use sdb
+  delete _ = MP.genericDeleteDB $ use sdb
+
+instance (N.NibbleString `Alters` N.NibbleString) StorM where
+  lookup _ = genericLookupHashDB $ use hdb
+  insert _ = genericInsertHashDB $ use hdb
+  delete _ = genericDeleteHashDB $ use hdb
+
+instance (RawStorageKey `Alters` RawStorageValue) StorM where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
+
+instance Mod.Modifiable MP.StateRoot StorM where
+  get _ = use sdbsr
+  put _ = assign sdbsr
 
 initialEnv :: IO (FilePath, CachedStorage)
 initialEnv = do
@@ -79,15 +102,14 @@ initialEnv = do
   let ldbOptions = DB.defaultOptions { DB.createIfMissing = True }
       openDB b = DBB.open (tmpdir ++ b) ldbOptions
   s <- openDB "/state/"
-  h <- openDB "/hash/"
+  h <- HashDB <$> openDB "/hash/"
   let st = CS s MP.emptyTriePtr h M.empty M.empty M.empty M.empty
-  fmap (tmpdir,) . runResourceT . flip execStateT st $ do
-    MP.initializeBlank =<< getStateDB
+  fmap (tmpdir,) . runLoggingT . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
 runStorM mv = bracket initialEnv
                        (removePathForcibly . fst)
-                       (runResourceT . evalStateT mv . snd)
+                       (runLoggingT . runResourceT . evalStateT mv . snd)
 
 storageSpec :: Spec
 storageSpec = do
@@ -99,7 +121,7 @@ storageSpec = do
 
     it "gets its puts after a partial flush" . runStorM $ do
       putStorageKeyVal' 0x1 0x2 0x3
-      flushStorageTxDBToBlockDB
+      flushMemStorageTxDBToBlockDB
       use stx `shouldReturn` M.empty
       getStorageKeyVal' 0x1 0x2 `shouldReturn` 0x3
       putStorageKeyVal' 0x1 0x2 0x77777
@@ -135,26 +157,26 @@ storageSpec = do
                             ]
 
     it "put 0 should not change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> getAddressState 0x1234
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (0x1234 :: Address)
       want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
       putStorageKeyVal' 0x1234 0x3 0x0
       flushMemStorageDB
-      got <- addressStateContractRoot <$> getAddressState 0x1234
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (0x1234 :: Address)
       want `shouldBe` got
 
 
     it "put 1 should change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> getAddressState 0x222
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (0x222 :: Address)
       putStorageKeyVal' 0x1234 0x3 0x44
       flushMemStorageDB
-      got <- addressStateContractRoot <$> getAddressState 0x1234
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (0x1234 :: Address)
       want `shouldNotBe` got
       got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
 
   describe "RawStorageDB" $ do
     it "should get its puts" . runStorM $ do
-      putRawStorageKeyVal' 0x888 "aKey" "aValue"
-      getRawStorageKeyVal' 0x888 "aKey" `shouldReturn` "aValue"
+      putRawStorageKeyVal' (0x888, "aKey") "aValue"
+      getRawStorageKeyVal' (0x888, "aKey") `shouldReturn` "aValue"
 
   describe "SolidStorageDB" $ do
     it "should get its puts" . runStorM $ do

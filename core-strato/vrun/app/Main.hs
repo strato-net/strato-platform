@@ -78,7 +78,7 @@ main = do
   let signedTransaction = txToOutputTx signedTransaction'
 
   (result, _) <- runLoggingT $ runTestContextM $ do
-    MP.initializeBlank =<< getStateDB
+    MP.initializeBlank
     setStateDBStateRoot MP.emptyTriePtr
 
     let addr = Address 0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed

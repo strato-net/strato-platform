@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -14,6 +15,7 @@ module Blockchain.Strato.Model.Address
 
 import           Control.DeepSeq
 import           Control.Monad
+import           Data.Data
 import           Data.Maybe                           (fromMaybe)
 import           Numeric
 import           Test.QuickCheck                      (Arbitrary(..))
@@ -45,6 +47,8 @@ import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
 import           Blockchain.Strato.Model.Util
 import qualified Text.Colors       as CL
 import           Text.Format
+import           Text.ShortDescription
+import           Text.Tools                           (shorten)
 
 import           GHC.Generics
 
@@ -53,7 +57,7 @@ instance RLPSerializable Address where
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
   rlpDecode x             = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
-newtype Address = Address Word160 deriving (Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral, Hashable)
+newtype Address = Address Word160 deriving (Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral, Hashable, Data)
 
 instance Show Address where
   show (Address a) = printf "%040x" a
@@ -116,6 +120,9 @@ instance Lei.Pretty Address where
 
 instance Format Address where
   format = CL.yellow . formatAddress
+
+instance ShortDescription Address where
+  shortDescription x = CL.yellow . shorten 12 . padZeros 40 $ showHex x ""
 
 instance Binary Address where
   put (Address x) = sequence_ $ fmap put $ word160ToBytes $ fromIntegral x

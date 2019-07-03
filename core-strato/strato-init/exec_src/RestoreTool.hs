@@ -4,6 +4,7 @@
 {-# OPTIONS -fno-warn-unused-imports #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
+import           Control.Monad.Change.Modify  (Accessible(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
@@ -15,8 +16,8 @@ import qualified Blockchain.BackupBlocks
 import qualified Blockchain.DB.SQLDB          as SQLDB
 import           Blockchain.EthConf
 
-instance MonadUnliftIO m => SQLDB.HasSQLDB (ReaderT SQLDB.SQLDB m) where
-  getSQLDB = ask
+instance Monad m => Accessible SQLDB.SQLDB (ReaderT SQLDB.SQLDB m) where
+  access _ = ask
 
 main :: IO ()
 main = do

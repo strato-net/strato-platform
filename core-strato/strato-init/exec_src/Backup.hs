@@ -1,10 +1,13 @@
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeOperators         #-}
 
 import           Control.Monad
+import qualified Control.Monad.Change.Alter                  as A
+import           Control.Monad.Change.Modify                 (Accessible(..))
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
 import           Blockchain.Output
 import           Control.Monad.Trans.Reader
 import           Data.Binary                                 hiding (get)
@@ -21,6 +24,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Extra
 import           Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia          as MP
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.NodeData
 import           Blockchain.DB.SQLDB
@@ -36,8 +40,13 @@ data DBs =
     sqlDB   :: SQLDB
     }
 
-instance MonadUnliftIO m => HasSQLDB (ReaderT DBs m) where
-  getSQLDB = asks sqlDB
+instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT DBs m) where
+  lookup _ = MP.genericLookupDB $ asks (MP.ldb . stateDB)
+  insert _ = MP.genericInsertDB $ asks (MP.ldb . stateDB)
+  delete _ = MP.genericDeleteDB $ asks (MP.ldb . stateDB)
+
+instance Monad m => Accessible SQLDB (ReaderT DBs m) where
+  access _ = asks sqlDB
 
 main :: IO ()
 main = do
@@ -63,8 +72,8 @@ main = do
         SHA genesisHash' <- getGenesisHash
         liftIO $ putStrLn $ "g" ++ showHex genesisHash' ""
         let stateRoot' = blockDataStateRoot $ blockBlockData backupBlock
-        nodeData <- getNodeData (stateDB dbs) $ PtrRef stateRoot'
-        dumpNodeData dbs handleAddressStateValue nodeData
+        nodeData <- getNodeData $ PtrRef stateRoot'
+        dumpNodeData handleAddressStateValue nodeData
 
         i <- LDB.iterOpen hashDB' LDB.defaultReadOptions
         LDB.iterFirst i
@@ -97,52 +106,53 @@ dumpAllHashes i = do
     else return ()
 
 
-handleAddressStateValue :: MonadIO m=>DBs->RLPObject->m ()
-handleAddressStateValue dbs (RLPString o) = do
+handleAddressStateValue :: MonadIO m => RLPObject -> ReaderT DBs m ()
+handleAddressStateValue (RLPString o) = do
   let addressState = rlpDecode $ rlpDeserialize o
   --liftIO $ putStrLn $ "Value: " ++ show addressState
-  dumpAddressState dbs addressState
-handleAddressStateValue _ x =
+  dumpAddressState addressState
+handleAddressStateValue x =
       error $ "unexpected value in call to dumpNodeData: " ++ show x
 
-handleWordValue :: MonadIO m=>DBs->RLPObject->m ()
-handleWordValue _ _ = return ()
+handleWordValue :: MonadIO m => RLPObject -> ReaderT DBs m ()
+handleWordValue _ = return ()
 
-dumpAddressState :: MonadIO m=>DBs->AddressState->m ()
-dumpAddressState dbs AddressState{addressStateContractRoot=sr, addressStateCodeHash=c} = do
-  when (sr /= emptyTriePtr) $ dumpNodeRef dbs handleWordValue $ PtrRef sr
-  dumpCode dbs $
+dumpAddressState :: MonadIO m => AddressState -> ReaderT DBs m ()
+dumpAddressState AddressState{addressStateContractRoot=sr, addressStateCodeHash=c} = do
+  when (sr /= emptyTriePtr) $ dumpNodeRef handleWordValue $ PtrRef sr
+  dumpCode $
     case c of
       EVMCode c' -> c'
       SolidVMCode _ c' -> c'
 
-dumpCode :: MonadIO m=>DBs->SHA->m ()
+dumpCode :: MonadIO m => SHA -> ReaderT DBs m ()
 --dumpCode _ codeHash | codeHash == hash "" = do
 --  liftIO $ putStrLn "<blank code>"
-dumpCode DBs{codeDB=codeDB'} codeHash = do
+dumpCode codeHash = do
+  codeDB' <- asks codeDB
   Just code <- LDB.get codeDB' LDB.defaultReadOptions (BL.toStrict $ encode $ sha2StateRoot codeHash)
   liftIO $ putStrLn $ "c" ++ BC.unpack (B16.encode code)
 
 -------------
 
-dumpNodeData :: MonadIO m=>DBs->(DBs->RLPObject->m ())->NodeData->m ()
-dumpNodeData _ _ nd@EmptyNodeData = do
+dumpNodeData :: MonadIO m => (RLPObject -> ReaderT DBs m ()) -> NodeData -> ReaderT DBs m ()
+dumpNodeData _ nd@EmptyNodeData = do
   liftIO $ putStrLn $ BC.unpack (B16.encode $ rlpSerialize $ rlpEncode nd)
-dumpNodeData dbs handleValue nd@FullNodeData {choices=ch, nodeVal = maybeV} = do
+dumpNodeData handleValue nd@FullNodeData {choices=ch, nodeVal = maybeV} = do
   liftIO $ putStrLn $ "s" ++ BC.unpack (B16.encode $ rlpSerialize $ rlpEncode nd)
-  forM_ ch $ dumpNodeRef dbs handleValue
+  forM_ ch $ dumpNodeRef handleValue
   case maybeV of
        Nothing -> return ()
-       Just v  -> handleValue dbs v
-dumpNodeData dbs handleValue nd@ShortcutNodeData {nextVal=nv} = do
+       Just v  -> handleValue v
+dumpNodeData handleValue nd@ShortcutNodeData {nextVal=nv} = do
   liftIO $ putStrLn $ "s" ++ BC.unpack (B16.encode $ rlpSerialize $ rlpEncode nd)
   case nv of
-   Left nr -> dumpNodeRef dbs handleValue nr
-   Right v -> handleValue dbs v
+   Left nr -> dumpNodeRef handleValue nr
+   Right v -> handleValue v
 
 
-dumpNodeRef :: MonadIO m=>DBs->(DBs->RLPObject->m ())->NodeRef->m ()
-dumpNodeRef dbs handleValue (PtrRef sr) = do
-  nodeData <- getNodeData (stateDB dbs) $ PtrRef sr
-  dumpNodeData dbs handleValue nodeData
-dumpNodeRef _ _ (SmallRef _) = return ()
+dumpNodeRef :: MonadIO m => (RLPObject -> ReaderT DBs m ()) -> NodeRef -> ReaderT DBs m ()
+dumpNodeRef handleValue (PtrRef sr) = do
+  nodeData <- getNodeData $ PtrRef sr
+  dumpNodeData handleValue nodeData
+dumpNodeRef _ (SmallRef _) = return ()

@@ -306,7 +306,7 @@ instance ToJSON AddressStateRef' where
                   "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
                   "contractRoot" .= cr, "code" .= c, "codeHash" .= ch,
                   "latestBlockNum" .= bNum]
-                  ++ (("chainId" .=) <$> (maybeToList cid))
+                  ++ (("chainId" .=) <$> (if cid == 0 then [] else [cid]))
 
 instance FromJSON AddressStateRef' where
     parseJSON (Object s) = do
@@ -320,7 +320,7 @@ instance FromJSON AddressStateRef' where
                 <*> s .: "contractRoot"
                 <*> s .: "code"
                 <*> s .: "codeHash"
-                <*> s .:? "chainId"
+                <*> s .:? "chainId" .!= 0
                 <*> s .: "latestBlockNum"
               )
     parseJSON _ = fail "JSON not an object"

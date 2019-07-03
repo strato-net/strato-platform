@@ -17,6 +17,7 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-init
   - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
@@ -32,6 +33,7 @@ dependencies:
   - hflags
   - lens
   - merkle-patricia-db
+  - monad-alter
   - mtl
   - ordered-containers
   - prometheus-client

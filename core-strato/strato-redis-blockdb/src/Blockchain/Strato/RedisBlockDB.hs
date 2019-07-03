@@ -5,10 +5,13 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( inNamespace, getSHAsByNumber
+    ( RedisConnection(..), inNamespace, findNamespace
+    , getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
@@ -24,7 +27,7 @@ module Blockchain.Strato.RedisBlockDB
     , getGenesisHash
     , putHeader, putHeaders, putBlock, putBlocks
     , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo
-    , HasRedisBlockDB(..), withRedisBlockDB
+    , withRedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
@@ -42,15 +45,19 @@ import           Blockchain.Util                       (partitionWith)
 
 import           Control.Arrow                         ((&&&), second)
 import           Control.Concurrent                    (threadDelay)
+import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
+import           Data.Functor                          ((<&>))
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
 import           System.Random                         (randomIO)
+
+newtype RedisConnection = RedisConnection { unRedisConnection :: Connection }
 
 -- todo: move this somewhere?
 zipMapM :: (Traversable t, Monad m)
@@ -62,14 +69,11 @@ zipMapM f = mapM (\x -> (,) x <$> f x)
 liftLog :: LoggingT m a -> m a
 liftLog = runLoggingT
 
-class (Monad m) => HasRedisBlockDB m where
-    getRedisBlockDB :: m Connection
-
-withRedisBlockDB :: (MonadIO m, HasRedisBlockDB m)
+withRedisBlockDB :: (MonadIO m, Accessible RedisConnection m)
                  => Redis a
                  -> m a
 withRedisBlockDB m = do
-    db <- getRedisBlockDB
+    db <- unRedisConnection <$> access (Proxy @RedisConnection)
     liftIO $ runRedis db m
 
 inNamespace :: RedisDBKeyable k
@@ -90,6 +94,22 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateTransactions -> "pt:"
             PrivateTxsInBlocks  -> "pb:"
             PrivateIPChains     -> "pic:"
+
+findNamespace :: S8.ByteString -> BlockDBNamespace
+findNamespace key = case S8.takeWhile (/= ':') key of
+  "h" -> Headers
+  "t" -> Transactions
+  "n" -> Numbers
+  "u" -> Uncles
+  "p" -> Parent
+  "c" -> Children
+  "q" -> Canonical
+  "x" -> PrivateChainInfo
+  "m" -> PrivateChainMembers
+  "pt" -> PrivateTransactions
+  "pb" -> PrivateTxsInBlocks
+  "pic" -> PrivateIPChains
+  wut -> error $ "unknown namespace: " ++ show wut
 
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)
@@ -193,19 +213,18 @@ addChainTxsInBlock bHash cId shas = do
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
 
 getIPChains :: IPAddress
-            -> Redis [Word256]
-getIPChains ip = getInNamespace PrivateIPChains ip >>= \case
-    Left _               -> return []
-    Right Nothing        -> return []
+            -> Redis (S.Set Word256)
+getIPChains ip = getInNamespace PrivateIPChains ip <&> \case
     Right (Just rchains) -> let RedisIPChains chains = fromValue rchains
-                             in return chains
+                             in chains
+    _                    -> S.empty
 
 addIPChain :: IPAddress
            -> Word256
            -> Redis (Either Reply Status)
 addIPChain ip cId = do
     chains <- getIPChains ip
-    let chains' = RedisIPChains (cId:chains)
+    let chains' = RedisIPChains $ S.insert cId chains
     res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
@@ -217,7 +236,7 @@ removeIPChain :: IPAddress
               -> Redis (Either Reply Status)
 removeIPChain ip cId = do
     chains <- getIPChains ip
-    let chains' = RedisIPChains $ filter (/= cId) chains
+    let chains' = RedisIPChains $ S.delete cId chains
     res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
@@ -454,7 +473,7 @@ putHeaders :: (Traversable f, BlockHeaderLike h)
            -> Redis (f (Either Reply Status))
 putHeaders = mapM putHeader
 
-putBlock :: (BlockLike h t b, BlockHeaderLike h, TransactionLike t)
+putBlock :: (BlockLike h t b)
          => b
          -> Redis (Either Reply Status)
 putBlock b = do
@@ -488,7 +507,7 @@ putBlock b = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack e)
 
-putBlocks :: (Traversable f, BlockLike h t b, BlockHeaderLike h, TransactionLike t)
+putBlocks :: (Traversable f, BlockLike h t b)
           => f b
           -> Redis (f (Either Reply Status))
 putBlocks = mapM putBlock
@@ -577,11 +596,11 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 --validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
-forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
+forceBestBlockInfo :: RedisCtx m f => SHA -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
         forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
-forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> RedisBestBlock -> m (f Status)
+forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
 forceBestBlockInfo' key = set key . toValue
 
 getBestBlockInfo :: Redis (Maybe RedisBestBlock)

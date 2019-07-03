@@ -12,6 +12,7 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-init
   - blockapps-milena
   - blockapps-util
   - bytestring
@@ -21,6 +22,8 @@ dependencies:
   - format
   - hedis
   - hflags
+  - lens
+  - monad-alter
   - persistent
   - persistent-postgresql
   - resourcet

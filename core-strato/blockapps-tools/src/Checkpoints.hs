@@ -1,15 +1,23 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE OverloadedStrings  #-}
-module Checkpoints where
+module Checkpoints
+  ( doCheckpointPut
+  , doCheckpointGet
+  , doCheckpointUsage
+  , CheckpointService(..)
+  , CheckpointOperation(..)
+  ) where
 
-import           Control.Monad                   (forM_, unless, void, when)
+import           Control.Concurrent              (threadDelay)
+import           Control.Monad                   (forM_, unless, void)
 
 import qualified Data.ByteString.Char8           as S8
 import           Data.Data
 import           Data.Maybe
 
 import           GHC.Read
+import           System.IO
 import qualified Text.ParserCombinators.ReadPrec as P
 import qualified Text.Read.Lex                   as L
 
@@ -19,12 +27,12 @@ import qualified Network.Kafka                   as K
 import qualified Blockchain.MilenaTools          as K
 import qualified Network.Kafka.Protocol          as KP
 
-import qualified Blockchain.Sequencer.Constants  as SeqConst
-import qualified Blockchain.Sequencer.Kafka      as SeqKafka
+import qualified Blockchain.Sequencer.Constants         as SeqConst
+import qualified Blockchain.Sequencer.Kafka             as SeqKafka
+import qualified Blockchain.Strato.Indexer.Kafka        as IdxKafka
+import qualified Blockchain.Strato.StateDiff.Kafka      as DiffKafka
 
-import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
-
-data CheckpointService   = Sequencer | EVM | ApiIndexer | P2PIndexer | NullService deriving (Eq, Ord, Enum, Data)
+data CheckpointService   = Sequencer | EVM | ApiIndexer | P2PIndexer | Slipstream | NullService deriving (Eq, Ord, Enum, Data)
 data CheckpointOperation = Get | Put | NullOperation deriving (Eq, Ord, Enum, Data)
 
 -- have to manually do these cause theres no way to lowercase them for glorious lowercase cli
@@ -49,6 +57,7 @@ instance Read CheckpointService where
             "evm"         -> return EVM
             "apiindexer"  -> return ApiIndexer
             "p2pindexer"  -> return P2PIndexer
+            "slipstream"  -> return Slipstream
             "NullService" -> return NullService
             _             -> P.pfail
 
@@ -57,6 +66,7 @@ instance Show CheckpointService where
     show EVM         = "evm"
     show ApiIndexer  = "apiindexer"
     show P2PIndexer  = "p2pindexer"
+    show Slipstream  = "slipstream"
     show NullService = "NullService"
 
 type KafkaBits = (K.KafkaClientId, KP.ConsumerGroup, KP.TopicName)
@@ -73,21 +83,17 @@ kafkaBitsForService = \case
         (clientId, lookupConsumerGroup clientId, IdxKafka.indexEventsTopicName)
     P2PIndexer -> let clientId = "strato-p2p-indexer" in
             (clientId, lookupConsumerGroup clientId, IdxKafka.indexEventsTopicName)
-
-hasCheckpointData :: CheckpointService -> Bool
-hasCheckpointData EVM        = True
-hasCheckpointData ApiIndexer = True
-hasCheckpointData _          = False
-
-makeCheckpointData :: CheckpointService -> KP.Metadata -> String -> KP.Metadata
-makeCheckpointData EVM _ arg = KP.Metadata . KP.KString $ S8.pack arg
-makeCheckpointData _ oldMD _ = oldMD
+    Slipstream -> let clientId = "slipstream" in
+            (clientId, lookupConsumerGroup clientId, DiffKafka.stateDiffTopicName)
 
 lookupByBits :: KafkaBits -> IO CPTuple
 lookupByBits bits@(clientId, consumerId, topicName) =
     runKafkaConfigured clientId (K.fetchSingleOffset consumerId topicName 0) >>= \case
         Left err -> error $ "Failed to fetch checkpoint: " ++ show err
-        Right (Left KP.UnknownTopicOrPartition) -> lookupByBits bits
+        Right (Left KP.UnknownTopicOrPartition) -> do
+          hPutStrLn stderr "UnknownTopicOrPartition, retrying..."
+          threadDelay 1000000
+          lookupByBits bits
         Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (Right ret) -> return ret
 
@@ -96,16 +102,14 @@ showOffset :: CPTuple -> IO ()
 showOffset = putStrLn . ("Offset is " ++) . show . fst
 
 -- todo:
-showCheckpointData :: CheckpointService -> CPTuple -> IO ()
-showCheckpointData EVM        = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . K._kMetadata . snd
-showCheckpointData ApiIndexer = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . K._kMetadata . snd
-showCheckpointData svc        = error $ "showCheckpointData called for service `" ++ show svc ++ "` which is unsupported"
+showCheckpointData :: CPTuple -> IO ()
+showCheckpointData = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . K._kMetadata . snd
 
 getAndDisplayExistingData :: CheckpointService -> IO CPTuple
 getAndDisplayExistingData service = do
     kafkaData <- lookupByBits (kafkaBitsForService service)
     showOffset kafkaData
-    when (hasCheckpointData service) $ showCheckpointData service kafkaData
+    showCheckpointData kafkaData
     return kafkaData
 
 doCheckpointGet :: CheckpointService -> IO ()
@@ -121,20 +125,16 @@ writeCheckpoint (clientId, consumerId, topicName) (ofs, md) = void $
 doCheckpointPut :: CheckpointService -> Maybe KP.Offset -> Maybe String -> IO ()
 doCheckpointPut service maybeNewOfs maybeNewData = do
     unless (isJust maybeNewOfs || isJust maybeNewData) $ error errPutFlagRequirement
-    when (isJust maybeNewData && not (hasCheckpointData service)) $
-        error $ "Service `" ++ show service ++ "` does not take checkpoint metadata"
 
     putStrLn $ "Existing data for service: " ++ show service
     (oldOfs, oldData) <- getAndDisplayExistingData service
-
     let newCp   = (newOfs, newData)
         newOfs  = fromMaybe oldOfs maybeNewOfs
-        newData = makeCheckpointData service oldData (fromMaybe "" maybeNewData)
-    putStrLn ""
+        newData = maybe oldData (KP.Metadata . KP.KString . S8.pack) maybeNewData
 
     putStrLn $ "Will commit the following checkpoint for service: " ++ show service
     showOffset newCp
-    when (hasCheckpointData service) $ showCheckpointData service newCp
+    showCheckpointData newCp
     putStrLn ""
 
     writeCheckpoint (kafkaBitsForService service) newCp
@@ -142,7 +142,7 @@ doCheckpointPut service maybeNewOfs maybeNewData = do
     putStrLn $ "Verify commit for service: " ++ show service
     verifyCP <- getAndDisplayExistingData service
     showOffset verifyCP
-    when (hasCheckpointData service) $ showCheckpointData service verifyCP
+    showCheckpointData verifyCP
 
 
 errPutFlagRequirement :: String
@@ -156,7 +156,7 @@ checkpointUsage =
     , "   * " ++ errPutFlagRequirement
     , ""
     , "Flags:"
-    , "  -s --service=SERVICE  The service whose metadata to operate against. One of: sequencer evm apiidx p2pidx"
+    , "  -s --service=SERVICE  The service whose metadata to operate against. One of: sequencer evm apiindexer p2pindexer slipstream"
     , "  -o --op=OP            The operation to perform. One of: get put"
     , "  -i --offset=INT       If -o PUT is specified, set the service's checkpointed Kafka offset"
     , "  -m --metadata=DATA    If -o PUT is specified, set the service-specific metadata in the checkpoint to DATA"

@@ -10,6 +10,7 @@ import qualified Test.Hspec.Expectations.Lifted as L
 import           Test.Hspec.Runner
 import           HFlags
 import           Control.Monad
+import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Base16  as B16
@@ -23,7 +24,6 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.Block as BDB
 import           Blockchain.Database.MerklePatricia as MP
-import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
@@ -82,7 +82,7 @@ spec = do
                     (SHA 0)
                     Nothing
                     Nothing
-        addressState <- getAddressState newAddress
+        addressState <- A.lookupWithDefault A.Proxy newAddress
         addressState `L.shouldBe` AddressState
            { addressStateNonce = 0
            , addressStateBalance = 0

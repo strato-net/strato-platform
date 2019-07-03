@@ -9,59 +9,59 @@ build-type:          Simple
 
 
 dependencies:
-  - base >=4.8 && <4.12
+  - aeson
   - alarmclock
+  - async
+  - base >=4.8 && <4.12
+  - base16-bytestring
+  - base64-bytestring
   - bimap
-  - blockapps-privacy
-  - classy-prelude
+  - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-haskoin
+  - blockapps-init
+  - blockapps-milena
+  - blockapps-privacy
   - blockapps-util
-  - format
+  - blockstanbul
+  - bytestring
+  - classy-prelude
   - clock
   - conduit
+  - conduit-combinators
   - containers
+  - cross-monitoring
+  - data-default
+  - deepseq
   - directory
+  - ethereum-rlp
   - exceptions
   - extra
-  - mtl
-  - resourcet
-  - text
-  - strato-genesis
+  - format
+  - lens
   - leveldb-haskell
-  - blockapps-milena
-  - binary
-  - base64-bytestring
-  - base16-bytestring
-  - bytestring
-  - ethereum-rlp
   - lifted-async
+  - monad-alter
   - monad-control
-  - time
+  - mtl
+  - prometheus-client
+  - resourcet
+  - seqevents
+  - servant-client
   - stm
   - stm-chans
   - stm-conduit
-  - conduit
-  - conduit-combinators
-  - blockstanbul
-  - stm-chans
-  - lens
-  - blockapps-haskoin
-  - aeson
-  - async
-  - prometheus-client
-  - transformers
-  - warp
-  - servant-client
   - strato-conf
+  - strato-genesis
   - strato-model
+  - text
+  - time
+  - transformers
+  - unliftio
   - wai-extra
   - wai-middleware-prometheus
-  - deepseq
-  - exceptions
-  - unliftio
-  - seqevents
-  - cross-monitoring
+  - warp
 
 ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 

@@ -6,6 +6,7 @@
 
 module Foundation where
 
+import           Control.Monad.Change.Modify (Accessible(..))
 import           Database.Persist.Sql     (ConnectionPool, runSqlPool)
 import           Import.NoFoundation
 import qualified Data.ByteString.Char8    as BC
@@ -110,8 +111,8 @@ instance Yesod App where
 
     makeLogger = return . appLogger
 
-instance HasSQLDB (HandlerFor App) where
-  getSQLDB = appConnPool <$> getYesod
+instance Accessible SQLDB (HandlerFor App) where
+  access _ = appConnPool <$> getYesod
 
 instance YesodPersist App where
     type YesodPersistBackend App = SqlBackend

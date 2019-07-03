@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric    #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.EthConf (
       EthConf(..),
@@ -161,12 +162,13 @@ runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientErr
 runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
 
 mkConfiguredKafkaState :: KafkaClientId -> KafkaState
-mkConfiguredKafkaState cid = mkKafkaState cid (kh, kp)
+mkConfiguredKafkaState cid = (mkKafkaState cid (kh, kp)) { _stateRequiredAcks = -1, _stateWaitSize = 1, _stateWaitTime = 100000}
     where k = kafkaConfig ethConf
           kh = fromString $ kafkaHost k
           kp = fromIntegral $ kafkaPort k
 
 lookupConsumerGroup :: KafkaClientId -> KP.ConsumerGroup
+lookupConsumerGroup "slipstream" = KP.ConsumerGroup "slipstream"
 lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ kStr `B8.append` nodeId
     where kStr   = KP._kString kcid
           nodeId = B8.pack $ "_" ++ peerId (ethUniqueId ethConf)

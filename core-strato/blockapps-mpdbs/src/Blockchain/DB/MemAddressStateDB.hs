@@ -1,10 +1,13 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-} -- todo fixme
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric    #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 module Blockchain.DB.MemAddressStateDB (
   HasMemAddressStateDB(..),
   AddressStateModification(..),
   formatAddressStateDBMap,
   getAddressState,
+  getAddressStateMaybe,
   putAddressState,
   flushMemAddressStateTxToBlockDB,
   flushMemAddressStateDB,
@@ -14,7 +17,9 @@ module Blockchain.DB.MemAddressStateDB (
 ) where
 
 import           Control.Monad
+import qualified Control.Monad.Change.Alter     as A
 import           Control.DeepSeq
+import           Data.Maybe
 import qualified Data.Map                       as M
 import GHC.Generics
 
@@ -25,7 +30,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.Strato.Model.Address
 import           Text.Format
 
-data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show, Generic)
+data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show, Eq, Generic)
 
 instance NFData AddressStateModification
 
@@ -44,19 +49,22 @@ class HasMemAddressStateDB m where
   getAddressStateBlockDBMap :: m (M.Map Address AddressStateModification)
   putAddressStateBlockDBMap :: M.Map Address AddressStateModification -> m ()
 
-getAddressState :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
-                 Address -> m AddressState
-getAddressState address = do
+getAddressState :: (Address `A.Alters` AddressState) m => Address -> m AddressState
+getAddressState address = fromMaybe blankAddressState <$> A.lookup A.Proxy address
+
+getAddressStateMaybe :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m)
+                     => Address -> m (Maybe AddressState)
+getAddressStateMaybe address = do
   theMap <- getAddressStateTxDBMap
   case M.lookup address theMap of
-    Just (ASModification addressState) -> return addressState
-    Just ASDeleted                     -> return blankAddressState
+    Just (ASModification addressState) -> return $ Just addressState
+    Just ASDeleted                     -> return $ Just blankAddressState
     Nothing                            -> do
       theBMap <- getAddressStateBlockDBMap
       case M.lookup address theBMap of
-        Just (ASModification addressState) -> return addressState
-        Just ASDeleted                     -> return blankAddressState
-        Nothing                            -> DB.getAddressState address
+        Just (ASModification addressState) -> return $ Just addressState
+        Just ASDeleted                     -> return $ Just blankAddressState
+        Nothing                            -> DB.getAddressStateMaybe address
 
 getAllAddressStates::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
                      m [(Address, AddressState)]

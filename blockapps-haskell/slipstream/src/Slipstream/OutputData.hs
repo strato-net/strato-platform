@@ -183,8 +183,7 @@ createInsertHistoryTable g cs = do
     insertHistoryTable g cs
 
 createInsertFunctionHistoryTable
-  :: OutputM m
-  => IORef Globals
+  :: IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
 createInsertFunctionHistoryTable _ cs = do
@@ -222,6 +221,7 @@ createHistoryTable globalsIORef contract = do
   when history $ do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract
+    yield $ addHistoryUnique contract
 
 insertIndexTable :: OutputM m
                  => IORef Globals
@@ -279,11 +279,20 @@ createHistoryTableQuery contract =
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", wrapDoubleQuotes historyName, " ("
-        , csv $ ["address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-                 "block_number text", "transaction_hash text", "transaction_sender text",
-                 "transaction_function_name text"] ++ tableColumns list
+        , csv $ ["address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
+                 "block_number text", "transaction_hash text NOT NULL", "transaction_sender text",
+                 "transaction_function_name text"]
+                 ++ tableColumns list
         , ");"
         ]
+
+addHistoryUnique :: ProcessedContract -> Text
+addHistoryUnique contract =
+  let historyName = ("history@" <>) . escapeQuotes $ contractName contract
+      indexName = "index_" <> historyName
+  in  "CREATE UNIQUE INDEX IF NOT EXISTS " <> wrapDoubleQuotes indexName <>
+      "\n  ON " <> wrapDoubleQuotes historyName <> " (address, \"chainId\", block_hash, transaction_hash);\n" <>
+      "ALTER TABLE " <> wrapDoubleQuotes historyName <> " ADD PRIMARY KEY USING INDEX " <> wrapDoubleQuotes indexName <> ";"
 
 insertIndexTableQuery :: [ProcessedContract] -> Text
 insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
@@ -356,5 +365,5 @@ insertHistoryTableQuery contracts@(x:_) =
         , keySt
         , "\n  VALUES "
         , inserts
-        , ";"
+        , "\n  ON CONFLICT DO NOTHING;"
         ]

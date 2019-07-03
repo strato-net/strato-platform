@@ -3,6 +3,7 @@
 module RawMP (doit) where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader
 import qualified Database.LevelDB                            as DB
 import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>), (</>))
 
@@ -18,7 +19,7 @@ formatKV (key, val) =
 
 showVals :: MonadIO m => DB.DB -> MP.StateRoot -> m ()
 showVals sdb sr = do
-  kvs <- MP.unsafeGetKeyVals MP.MPDB{MP.ldb=sdb, MP.stateRoot=sr} ""
+  kvs <- runReaderT (MP.unsafeGetKeyVals sr "") sdb
   liftIO . print $ length kvs
   --liftIO . putStrLn $ displayS (renderPretty 1.0 200 $ vsep $ formatKV <$> kvs) ""
   liftIO . putStrLn $ displayS (renderPretty 1.0 200 $ vsep $ formatKV <$> kvs) ""

@@ -26,10 +26,9 @@ import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
 import           Network.Socket
 import qualified Network.Socket.ByteString               as NB
-import           System.Timeout
-
 import           System.Entropy
 import           System.Random
+import           System.Timeout
 
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB
@@ -222,6 +221,9 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
                          , pPeerBondState = 0
                          , pPeerActiveState = 0
                          , pPeerVersion = T.pack "61" -- fix
+                         , pPeerNextDisableWindowSeconds=5
+                         , pPeerDisableExpiration=posixSecondsToUTCTime 0
+                         , pPeerEnode = peerToEnode peer
                          }
         void $ addPeer peer
   where addPeer' = do
@@ -243,8 +245,12 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
                           ,  pPeerBondState = 0
                           ,  pPeerActiveState = 0
                           ,  pPeerVersion = T.pack "61" -- fix
+                          , pPeerNextDisableWindowSeconds=5
+                          , pPeerDisableExpiration=posixSecondsToUTCTime 0
+                          , pPeerEnode = peerToEnode peer
                           }
           void $ addPeer peer
+
 
 -- TODO(tim): Reenable port selection
 -- getAddrPort :: SockAddr -> Either DiscoverException PortNumber

@@ -38,7 +38,7 @@ bodyContains' needle = withResponse $ \ res ->
   let haystack = simpleBody res
   in liftIO $ HUnit.assertBool ("Expected body " ++ show haystack ++ " to contain " ++ needle) $ haystack `contains` needle
 
-testJSON  ::  (Show a, Eq a) => (a -> [Block] -> (Bool, a)) -> a -> YesodExample App ()
+testJSON  ::  (Show a) => (a -> [Block] -> (Bool, a)) -> a -> YesodExample App ()
 testJSON f want = withResponse $ \res ->
   let extract (Right bs) = map bPrimeToB bs
       extract (Left err) = error err
@@ -79,7 +79,7 @@ setNum :: Integer -> Block -> Block
 setNum n b = let bd = blockBlockData b
              in b { blockBlockData = bd { blockDataNumber = n} }
 
-insertRandomBlocks :: (HasSQLDB m) => Integer -> Int -> m [Key BlockDataRef]
+insertRandomBlocks :: HasSQLDB m => Integer -> Int -> m [Key BlockDataRef]
 insertRandomBlocks start size = do
         blocks <- liftIO . generate . vectorOf size $ (arbitrary :: Gen Block)
         let numberedBlocks = zipWith setNum [start..] blocks

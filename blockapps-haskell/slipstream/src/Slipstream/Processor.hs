@@ -405,3 +405,4 @@ processTheMessages env conn g messages = do
     outputData conn . createInsertIndexTable g $ map indexInsert ins
     outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
     outputData conn . createInsertFunctionHistoryTable g $ concatMap functionInserts ins
+  flushPendingWrites g

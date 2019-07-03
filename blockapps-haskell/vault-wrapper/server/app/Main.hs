@@ -9,6 +9,7 @@ module Main where
 
 import           Control.Monad
 import           Database.PostgreSQL.Simple
+import           Data.IORef
 import           Data.Pool
 import           HFlags
 import           Network.HTTP.Client                    hiding (Proxy)
@@ -22,6 +23,7 @@ import           System.IO                              (BufferMode (..),
                                                         hSetBuffering, stderr,
                                                         stdout)
 
+import           BlockApps.Init
 import           BlockApps.Logging                      (LogLevel(..), flags_minLogLevel)
 import qualified Strato.Strato23.API                    as Strato23
 import qualified Strato.Strato23.Database.Migrations    as Strato23
@@ -32,6 +34,7 @@ import           Options
 
 main :: IO ()
 main = do
+  blockappsInit "blockapps-vault-wrapper-server"
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
   putStrLn . unlines $
     [ "@@@  @@@  @@@@@@  @@@  @@@ @@@    @@@@@@@     @@@  @@@  @@@ @@@@@@@   @@@@@@  @@@@@@@  @@@@@@@  @@@@@@@@ @@@@@@@ "
@@ -59,7 +62,8 @@ main = do
 
   pool <- createPool (connect dbConnectInfo) close 5 3 5
   mgr <- newManager defaultManagerSettings
-  let env = Strato23.VaultWrapperEnv mgr pool
+  password <- newIORef Nothing
+  let env = Strato23.VaultWrapperEnv mgr pool password
   run flags_port (appVaultWrapper env)
 
 appVaultWrapper :: Strato23.VaultWrapperEnv -> Application

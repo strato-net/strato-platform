@@ -24,6 +24,7 @@ dependencies:
   - ethereum-rlp
   - format
   - leveldb-haskell
+  - monad-alter
   - monad-control
   - nibblestring
   - resourcet

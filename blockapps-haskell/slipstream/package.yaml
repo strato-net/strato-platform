@@ -27,9 +27,12 @@ dependencies:
   - blockapps-bloc22-api
   - blockapps-bloc22-server
   - blockapps-ethereum
+  - blockapps-init
+  - blockapps-milena
   - blockapps-solidity
   - blockapps-strato-client
   - blockapps-strato-api
+  - blockapps-util
   - bloomfilter
   - bytestring
   - classy-prelude
@@ -46,7 +49,6 @@ dependencies:
   - http-client
   - lens
   - lrucache
-  - milena
   - MissingH
   - monad-control
   - mtl
@@ -85,7 +87,6 @@ executables:
     dependencies:
       - base
       - hflags
-      - milena
       - monad-control
       - mtl
       - persistent-postgresql

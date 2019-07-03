@@ -16,6 +16,8 @@ function newnode {
   then initialize=true
        cleanupDB
        doInit
+  else
+       sleep 10
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
@@ -49,6 +51,9 @@ function newnode {
   if [ -n "${averageTxsPerBlock}" ]; then
     atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
   fi
+  if [ -n "${privateChainAuthorizationMode}" ]; then
+    pcamFlag="--privateChainAuthorizationMode=${privateChainAuthorizationMode}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -60,6 +65,7 @@ function newnode {
      --networkID=$networkID \
      ${txgFlag} \
      ${atbFlag} \
+     ${pcamFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
@@ -127,13 +133,16 @@ function newnode {
   if [-n "${seqEventsCostHeuristic}" ]; then
       sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
   fi
+  if [-n "${cacheTransactionResults}"] ; then
+      ctrFlag="--cacheTransactionResults=${cacheTransactionResults}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
-                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
+                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" \
+                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
@@ -156,11 +165,21 @@ function newnode {
           # Kill all the rest of monitored processes
           for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
             if ps -p ${pid_to_kill} > /dev/null; then
-              echo "killing process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
-              kill -9 ${pid_to_kill} || true
+              echo "Sending SIGTERM to process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
+              kill -TERM ${pid_to_kill} || true
               echo "done"
             fi
           done
+          # Allow 10s for cleanup of processes
+          sleep 10
+          for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
+            if ps -p ${pid_to_kill} > /dev/null; then
+              echo "Sending SIGKILL to process ${MONITORED_PID[${pid_to_kill}]} (pid: ${pid_to_kill})"
+              kill -KILL ${pid_to_kill} || true
+              echo "done"
+            fi
+          done
+
           FILE_NAME="/var/lib/strato/logs/$(echo ${DEAD_PROCESS} | cut -d ' ' -f 1)"
           echo "Tail of logs for crashed process:"
           echo "+tail -n 20 ${FILE_NAME}"
@@ -211,7 +230,7 @@ function doInit {
 
   echo "strato-setup command: $cmd"
   # logging to stdout and log file:
-  $cmd 2>&1 | tee logs/strato-setup
+  NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
   if [ ${PIPESTATUS[0]} -ne 0 ]; then
     echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
     tail -f /dev/null
@@ -292,7 +311,8 @@ setEnv minQuorumSize 1
 setEnv maxConn 20
 setEnv difficultyBomb false
 
-setEnv sqlDiff true
+setEnv sqlDiff ${sqlDiff:-true}
+setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
 
 setEnv backupLocation /var/lib/strato/backup_strato_block
@@ -303,6 +323,7 @@ setEnv evmTraceMode false
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 
+mkdir -p /var/lib/strato
 cd /var/lib/strato
 
 if [[ -n $genesisBlock ]]

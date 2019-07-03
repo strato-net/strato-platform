@@ -1,13 +1,22 @@
+{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE TypeApplications     #-}
+{-# LANGUAGE TypeOperators        #-}
 
 module Blockchain.DB.BlockSummaryDB (
-  BlockSummaryDB,
-  HasBlockSummaryDB(..),
+  BlockSummaryDB(..),
+  HasBlockSummaryDB,
+  genericLookupBlockSummaryDB,
+  genericInsertBlockSummaryDB,
+  genericDeleteBlockSummaryDB,
   putBSum,
   getBSum,
   hasBSum
   ) where
 
 
+import           Control.DeepSeq
+import qualified Control.Monad.Change.Alter   as A
 import           Control.Monad.IO.Class
 import           Data.Binary
 import qualified Data.ByteString.Lazy         as BL
@@ -20,23 +29,35 @@ import           Blockchain.SHA
 
 import           Text.Format
 
-type BlockSummaryDB = LDB.DB
+newtype BlockSummaryDB = BlockSummaryDB { unBlockSummaryDB :: LDB.DB }
 
-class MonadIO m => HasBlockSummaryDB m where
-  getBlockSummaryDB :: m BlockSummaryDB
+instance NFData BlockSummaryDB where
+  rnf (BlockSummaryDB db) = db `seq` ()
 
+type HasBlockSummaryDB m = (SHA `A.Alters` BlockSummary) m
 
-getBSum:: HasBlockSummaryDB m=>SHA->m BlockSummary
-getBSum blockHash = do
-  db <- getBlockSummaryDB
-  fmap (rlpDecode . rlpDeserialize . fromMaybe (error $ "missing value in block summary DB: " ++ format blockHash)) $ LDB.get db LDB.defaultReadOptions $ BL.toStrict $ encode blockHash
+genericLookupBlockSummaryDB :: MonadIO m => m BlockSummaryDB -> SHA -> m (Maybe BlockSummary)
+genericLookupBlockSummaryDB f blockHash = do
+  db <- unBlockSummaryDB <$> f
+  fmap (rlpDecode . rlpDeserialize) <$> LDB.get db LDB.defaultReadOptions (BL.toStrict $ encode blockHash)
 
-putBSum::HasBlockSummaryDB m=>SHA->BlockSummary->m ()
-putBSum blockHash bSum = do
-  db <- getBlockSummaryDB
+genericInsertBlockSummaryDB :: MonadIO m => m BlockSummaryDB -> SHA -> BlockSummary -> m ()
+genericInsertBlockSummaryDB f blockHash bSum = do
+  db <- unBlockSummaryDB <$> f
   LDB.put db LDB.defaultWriteOptions (BL.toStrict $ encode blockHash) (rlpSerialize $ rlpEncode bSum)
 
-hasBSum::HasBlockSummaryDB m=>SHA->m Bool
-hasBSum blockHash = do
-    db <- getBlockSummaryDB
-    isJust <$> LDB.get db LDB.defaultReadOptions (BL.toStrict $ encode blockHash)
+genericDeleteBlockSummaryDB :: MonadIO m => m BlockSummaryDB -> SHA -> m ()
+genericDeleteBlockSummaryDB f blockHash = do
+  db <- unBlockSummaryDB <$> f
+  LDB.delete db LDB.defaultWriteOptions (BL.toStrict $ encode blockHash)
+
+getBSum :: HasBlockSummaryDB m => SHA -> m BlockSummary
+getBSum blockHash =
+  fromMaybe (error $ "missing value in block summary DB: " ++ format blockHash) <$>
+    A.lookup (A.Proxy @BlockSummary) blockHash
+
+putBSum :: HasBlockSummaryDB m => SHA -> BlockSummary -> m ()
+putBSum = A.insert (A.Proxy @BlockSummary)
+
+hasBSum :: HasBlockSummaryDB m => SHA -> m Bool
+hasBSum blockHash = isJust <$> A.lookup (A.Proxy @BlockSummary) blockHash

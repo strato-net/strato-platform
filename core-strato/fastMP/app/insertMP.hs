@@ -1,5 +1,9 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 
 --import Control.Monad.IO.Class
+import Control.Monad.Change.Alter
+import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.NibbleString as N
@@ -10,30 +14,32 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Text.Format
 
+import FastMP()
 import KV
 
-insertKV :: LDB.MonadResource m => MP.MPDB -> KV -> m MP.MPDB
-insertKV mpdb (KV key (Right val)) = do
+insertKV :: (MP.StateRoot `Alters` MP.NodeData) m
+         => MP.StateRoot -> KV -> m MP.StateRoot
+insertKV sr (KV key (Right val)) = do
   --liftIO $ putStrLn $ "key=" ++ show (N.pack $ map c2n key) ++ ", val=" ++ show val
-  MP.unsafePutKeyVal mpdb (N.pack key) val
+  MP.unsafePutKeyVal sr (N.pack key) val
 insertKV _ (KV _ val) = error $ "insertKV called with val = " ++ show val
 
-insertKVs :: LDB.MonadResource m => MP.MPDB -> [KV] -> m MP.MPDB
-insertKVs mpdb [] = return mpdb
-insertKVs mpdb (x:rest) = do
-  mpdb' <- insertKV mpdb x
-  insertKVs mpdb' rest
-
+insertKVs :: (MP.StateRoot `Alters` MP.NodeData) m
+          => MP.StateRoot -> [KV] -> m MP.StateRoot
+insertKVs sr [] = return sr
+insertKVs sr (x:rest) = do
+  sr' <- insertKV sr x
+  insertKVs sr' rest
 
 main :: IO ()
 main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
   let input = map (\[x, y] -> KV (map c2n $ BC.unpack x) $ Right (RLPString . fst . B16.decode $ y)) c
 
-  mpdb'  <- LDB.runResourceT $ do
+  sr'  <- LDB.runResourceT $ do
     ldb <- LDB.open "abcd" LDB.defaultOptions{LDB.createIfMissing=True}
-    let mpdb = MP.MPDB{MP.ldb=ldb, MP.stateRoot=MP.blankStateRoot}
-    MP.initializeBlank mpdb
-    insertKVs mpdb input
-    
-  putStrLn $ "new StateRoot: " ++ format (MP.stateRoot mpdb')
+    flip runReaderT ldb $ do
+      MP.initializeBlank
+      insertKVs MP.blankStateRoot input
+
+  putStrLn $ "new StateRoot: " ++ format sr'

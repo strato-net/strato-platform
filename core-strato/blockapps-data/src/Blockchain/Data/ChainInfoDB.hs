@@ -1,15 +1,19 @@
 {-# OPTIONS -fno-warn-missing-methods #-}
 {-# OPTIONS -fno-warn-orphans         #-}
 {-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE TypeApplications         #-}
+{-# LANGUAGE TypeOperators            #-}
 
 module Blockchain.Data.ChainInfoDB where
 
 import           Control.Arrow                      ((&&&))
 import           Control.Monad                      (when)
+import           Control.Monad.Change.Modify        (Accessible(..), Proxy(..))
 import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import           Data.Foldable                      (traverse_)
@@ -29,9 +33,9 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Strato.Model.Address
 
-getChainInfo :: (HasSQLDB m) => Word256 -> m (Maybe (NamedTuple "id" Word256 "info" ChainInfo))
+getChainInfo :: HasSQLDB m => Word256 -> m (Maybe (NamedTuple "id" Word256 "info" ChainInfo))
 getChainInfo chainId = do
-  db <- getSQLDB
+  db <- access (Proxy @SQLDB)
   runResourceT . flip SQL.runSqlPool db $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
       E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
@@ -109,11 +113,11 @@ getChainInfo chainId = do
                                 (fromInteger chainSignatureRefS)
                                 chainSignatureRefV
 
-getChainInfos :: (HasSQLDB m) => [Word256] -> m (NamedMap "id" Word256 "info" ChainInfo)
+getChainInfos :: HasSQLDB m => [Word256] -> m (NamedMap "id" Word256 "info" ChainInfo)
 getChainInfos chainIds = do
   cids <- case chainIds of
               [] -> do
-                  db <- getSQLDB
+                  db <- access (Proxy @SQLDB)
                   runResourceT . flip SQL.runSqlPool db $ do
                       chains <- E.select . E.from $ \cRef -> do
                           return cRef
@@ -127,9 +131,9 @@ getChainInfos chainIds = do
       Nothing -> return []
       Just cis -> return cis
 
-putChainInfo :: (HasSQLDB m) => Word256 -> ChainInfo -> m (Key ChainInfoRef)
+putChainInfo :: HasSQLDB m => Word256 -> ChainInfo -> m (Key ChainInfoRef)
 putChainInfo chainId (ChainInfo UnsignedChainInfo{..} csig) = do
-  db <- getSQLDB
+  db <- access (Proxy @SQLDB)
   runResourceT . flip SQL.runSqlPool db $ do
     let chainInfoRef = ChainInfoRef chainId
                                     (T.unpack chainLabel)
@@ -162,9 +166,9 @@ putChainInfo chainId (ChainInfo UnsignedChainInfo{..} csig) = do
             (toInteger chainS)
             chainV
 
-addMember :: (HasSQLDB m) => Word256 -> Address -> String -> m ()
+addMember :: HasSQLDB m => Word256 -> Address -> String -> m ()
 addMember chainId address enode = do
-  db <- getSQLDB
+  db <- access (Proxy @SQLDB)
   runResourceT . flip SQL.runSqlPool db $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
       E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
@@ -180,9 +184,9 @@ addMember chainId address enode = do
           when (null $ filter ((== address) . chainMemberRefAddress . E.entityVal) members) $ do
             insertMany_ [ChainMemberRef chainInfoRefId enode address]
 
-removeMember :: (HasSQLDB m) => Word256 -> Address -> m ()
+removeMember :: HasSQLDB m => Word256 -> Address -> m ()
 removeMember chainId address = do
-  db <- getSQLDB
+  db <- access (Proxy @SQLDB)
   runResourceT . flip SQL.runSqlPool db $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
       E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
@@ -200,4 +204,6 @@ removeMember chainId address = do
             delete . entityKey $ head member
 
 terminateChain :: (MonadLogger m, HasSQLDB m) => Word256 -> m ()
-terminateChain _ = $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"
+terminateChain _ = do
+  db <- access (Proxy @SQLDB)
+  db `seq` $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"

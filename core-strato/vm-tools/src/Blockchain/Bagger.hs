@@ -1,12 +1,17 @@
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 {-# OPTIONS -fprof-auto -fprof-cafs #-}
 module Blockchain.Bagger where
 
 import           Control.Arrow                      ((&&&))
+import qualified Control.Monad.Change.Alter         as A
+import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Blockchain.Output
@@ -15,8 +20,10 @@ import           Control.Monad.Trans.Except
 import qualified Data.Map                           as M
 import           Data.Map.Ordered                   (OMap)
 import qualified Data.Map.Ordered                   as OMap
+import           Data.Proxy
 import qualified Data.Text                          as T
 import           Data.Time.Clock
+import           Data.Time.Clock.POSIX              (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
 import qualified Data.Set                           as S
 import           Data.Word
 import           Numeric                            (readHex)
@@ -24,8 +31,6 @@ import           Numeric                            (readHex)
 import           Blockapps.Crossmon
 
 import           Blockchain.CoreFlags               (flags_difficultyBomb, flags_testnet)
-import           Blockchain.DB.HashDB
-import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 
 import qualified Blockchain.Bagger.BaggerState      as B
@@ -37,7 +42,7 @@ import qualified Blockchain.Data.DataDefs           as DD
 import           Blockchain.Data.BlockHeader        (txsLen2ExtraData)
 import qualified Blockchain.Data.TransactionDef     as TD
 import qualified Blockchain.Data.TXOrigin           as TO
-import           Blockchain.Database.MerklePatricia (StateRoot (..))
+import           Blockchain.Database.MerklePatricia (StateRoot (..), NodeData)
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
@@ -49,7 +54,13 @@ import           Executable.EVMFlags                (flags_maxTxsPerBlock)
 
 import           Text.Format
 
-class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
+class ( Monad m
+      , MonadIO m
+      , MonadLogger m
+      , Mod.Modifiable StateRoot m
+      , (StateRoot `A.Alters` NodeData) m
+      , (Address `A.Alters` DD.AddressState) m
+      ) => MonadBagger m where
     isBlockstanbul     :: m Bool
     getBaggerState     :: m B.BaggerState
     peekPendingVote    :: m (Address, Word64)
@@ -58,7 +69,12 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
-    {-# MINIMAL isBlockstanbul, getBaggerState, peekPendingVote, clearPendingVote, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
+
+    -- Would it make more sense to expand the MiningCache than to introduce a separate cache?
+    cacheRunResults :: DD.BlockData -> (StateRoot, Integer, [TxRunResult]) -> m ()
+    getCachedRunResults :: DD.BlockData -> m (Maybe (StateRoot, Integer, [TxRunResult]))
+    {-# MINIMAL isBlockstanbul, getBaggerState, peekPendingVote, clearPendingVote, putBaggerState,
+        runFromStateRoot, rewardCoinbases, txsDroppedCallback, cacheRunResults, getCachedRunResults #-}
 
     getCheckpointableState :: m (SHA, DD.BlockData)
     getCheckpointableState = do
@@ -76,7 +92,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
         let publicTxs  = filter ((/= PrivateHash) . txType) ts
             privateTxs = filter ((== PrivateHash) . txType) ts
         $logDebugS "Bagger.addTransactionsToMempool" $ T.pack $ "Adding " ++ show (length ts) ++ " txs"
-        existingStateDbStateRoot <- getStateRoot
+        existingStateDbStateRoot <- Mod.get (Proxy @StateRoot)
         stateRoot <- (B.lastExecutedStateRoot . B.miningCache) <$> getBaggerState
         setStateDBStateRoot stateRoot
         sequence_ (addToQueued Insertion <$> publicTxs)
@@ -94,10 +110,12 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     processNewBestBlock :: SHA -> DD.BlockData -> [SHA] -> m ()
     processNewBestBlock bh bd txShas = do
         $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
-        existingStateDbStateRoot <- getStateRoot
+        existingStateDbStateRoot <- Mod.get (Proxy @StateRoot)
         let thisStateRoot = DD.blockDataStateRoot bd
         state <- getBaggerState
-        time  <- liftIO getCurrentTime
+        -- This will be rounded in RLPEncode, but just for consistency.
+        -- Really, it should just be Int and then we wouldn't need to worry about leap seconds.
+        time  <- posixSecondsToUTCTime . fromInteger . round . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
         let pHashes = B.privateHashes $ B.miningCache state
             hashMap = OMap.fromList $ map (\a -> (a,a)) txShas -- why is this not a standard function?
         let newMiningCache = B.MiningCache { B.bestBlockSHA          = bh
@@ -133,7 +151,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     return build
                 else do
                     $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
-                    existingStateDbStateRoot <- getStateRoot
+                    existingStateDbStateRoot <- Mod.get (Proxy @StateRoot)
                     isPBFT <- isBlockstanbul
                     (coinbaseAddr, nonce) <- peekPendingVote
                     let lastSR          = B.lastExecutedStateRoot cache
@@ -368,7 +386,8 @@ removeFromSeen :: MonadBagger m => OutputTx -> m ()
 removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
-getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$> getAddressState addr
+getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$>
+  A.lookupWithDefault (A.Proxy @DD.AddressState) addr
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
 addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)
@@ -403,6 +422,8 @@ buildFromMiningCache = do
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
     recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
+    when isPBFT $
+      cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff
                        , obBlockUncles = uncles
@@ -448,10 +469,10 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
 
 buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData
 buildRewardedBlockHeader bd uncles = do
-  previousStateRoot <- getStateRoot
+  previousStateRoot <- Mod.get (Proxy @StateRoot)
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
-  rewardedStateRoot <- rewardCoinbases  (DD.blockDataStateRoot bd) (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
+  rewardedStateRoot <- rewardCoinbases (DD.blockDataStateRoot bd) (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
   setStateDBStateRoot previousStateRoot
   return bd{DD.blockDataStateRoot = rewardedStateRoot}

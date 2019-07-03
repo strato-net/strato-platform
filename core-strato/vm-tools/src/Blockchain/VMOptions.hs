@@ -9,6 +9,7 @@ module Blockchain.VMOptions (
   flags_svmDev,
   flags_altGenBlock,
   flags_brokenRefundReenable,
+  flags_cacheTransactionResults,
   flags_createTransactionResults,
   flags_sqlDiff,
   flags_diffPublish,
@@ -42,5 +43,6 @@ defineFlag "miningVerification" True "Flag to turn mining verification or/off"
 defineFlag "transactionRootVerification" False "Flag to turn transaction root verification or/off"
 defineFlag "startingBlock" (-1::Integer) "block in kafka to start running the VM on"
 defineFlag "svmDev" (False::Bool) "Whether to crash on SolidVM exceptions"
-defineFlag "svmTrace" (True::Bool) "Whether to have verbose logging in SolidVM"
+defineFlag "svmTrace" (False::Bool) "Whether to have verbose logging in SolidVM"
+defineFlag "cacheTransactionResults" True "Keep transaction results in an LRU cache to avoid reruns"
 defineEQFlag "miner" [| Instant :: MinerType |] "MINER" "What mining algorithm"
