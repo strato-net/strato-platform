@@ -1,12 +1,3 @@
-Skip to content
- blockapps / strato-platform
-Code  Issues 0  Pull requests 8  Projects 0  Wiki  Security  Pulse
-strato-platform/stack.yaml
-@VictorHWong VictorHWong commit
-879df23 4 hours ago
-@th0114nd @jamshidh @dustinnorwood @yunfjiang @VictorHWong
-116 lines (109 sloc)  3.11 KB
-  
 flags: {}
 packages:
 - blockapps-haskell/bloc/bloc22/api
@@ -60,6 +51,7 @@ packages:
 - core-strato/privacy/
 - core-strato/fastMP/
 - monad-alter/
+- shared-util/blockapps-init/
 - shared-util/common-log/
 - shared-util/cross-monitoring/
 - shared-util/format
@@ -122,15 +114,3 @@ docker:
   image: "strato-buildbase:lts-12.4"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
-© 2019 GitHub, Inc.
-Terms
-Privacy
-Security
-Status
-Help
-Contact GitHub
-Pricing
-API
-Training
-Blog
-About
