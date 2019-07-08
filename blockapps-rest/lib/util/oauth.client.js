@@ -131,6 +131,149 @@ const run = async function() {
   if (!commander.env) throw new Error("--env tokenName required");
 
   const signinUri = oauth.getSigninURL();
+  async function dir(req, res){
+    if (req.url.indexOf("/login") === 0) {
+      open(signinUri);
+      res.end();
+      return;
+    }
+    if (req.url.indexOf("/callback?") !== 0) {
+      res.writeHead(404, {});
+      res.end();
+      return;
+    }
+    const urlParts = req.url.split("?");
+    if (urlParts.length < 2) {
+      console.error("Missing query string in callback url.");
+      process.exit(6);
+    }
+    const query = qs.parse(urlParts[1]);
+    if (query.code === undefined) {
+      console.error(
+        'Missing required query parameter "code" in callback'
+      );
+      process.exit(7);
+    }
+    const acToken = await oauth.getAccessTokenByAuthCode(query.code);
+    envConfig[commander.env] = acToken.token.access_token;
+    const envContent = envfile.stringifySync(envConfig);
+    fs.writeFileSync(envPath, envContent);
+    console.log(".env file was saved!");
+
+    console.log("Token obtained by authorization code flow is:");
+    console.log(JSON.stringify(acToken, null, 2));
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.write(`
+      <html>
+        <head>
+          <title>
+            BlockApps Token Exchange Utility
+          </title>
+          <meta name="google" content="notranslate">
+          <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+          <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+          <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+          <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
+          <style>
+            pre {
+              white-space: pre-wrap;       /* Since CSS 2.1 */
+              white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+              white-space: -pre-wrap;      /* Opera 4-6 */
+              white-space: -o-pre-wrap;    /* Opera 7 */
+              word-wrap: break-word;       /* Internet Explorer 5.5+ */
+              background-color: #e7e7e7;
+              padding-left: 24px;
+              padding-right: 24px;
+              border-radius: 4px;
+            }
+            body {
+              padding: 24px;
+            }
+            .padButton {
+              padding-bottom: 12px;
+            }
+            textarea {
+              border: none;
+              color: #fff;
+            }
+          </style>
+          <script>
+            function copyToClipboard(text) {
+              var textArea = document.createElement("textarea");
+              textArea.value = text;
+              document.body.appendChild(textArea);
+              textArea.focus();
+              textArea.select();
+              document.execCommand('copy')
+              document.body.removeChild(textArea);
+            }
+            function logout(){
+              window.location.href='${
+                oauth.logOutUrl
+              }?redirect_uri=http://localhost:${portNumber}/login'
+            }
+          </script>
+        </head>
+        <body>
+          <div class="container">
+            <div class="row">
+              <div class="offset-sm-10 col-sm-1 text-right padButton">
+                  <button onclick="logout()" class="btn btn-outline-dark btn-sm"> Logout </button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="offset-sm-1 col-sm-9">
+                <h4>
+                  <small class="text-muted">Access Token</small>
+                </h4>
+              </div>
+              <div class="col-sm-1 text-right">
+                <button onclick="copyToClipboard('${
+                  acToken.token.access_token
+                }');" title="Copy to clipboard" class="btn btn-outline-dark btn-sm">
+                  <i class="fas fa-clipboard"></i>
+                </button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="offset-sm-1 col-sm-10">
+                <pre>
+                  <code>
+                    ${acToken.token.access_token}
+                  </code>
+                </pre>
+              </div>
+            </div>
+            <div class="row">
+              <div class="offset-sm-1 col-sm-9">
+                <h4>
+                  <small class="text-muted">ID Token</small>
+                </h4>
+              </div>
+              <div class="col-sm-1 text-right">
+                <button onclick="copyToClipboard('${
+                  acToken.token.id_token
+                }');" title="Copy to clipboard" class="btn btn-outline-dark btn-sm">
+                  <i class="fas fa-clipboard"></i>
+                </button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="offset-sm-1 col-sm-10">
+                <pre>
+                  <code>
+                    ${acToken.token.id_token}
+                  </code>
+                </pre>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    res.end();
+  }
   switch (commander.flow) {
     case "client-credential":
       if (
@@ -159,295 +302,11 @@ const run = async function() {
           cert: DUMMY_SSL_CERT
         }
         const server = https
-          .createServer(options, async(req, res) => {
-            if (req.url.indexOf("/login") === 0) {
-              open(signinUri);
-              res.end();
-              return;
-            }
-            if (req.url.indexOf("/callback?") !== 0) {
-              res.writeHead(404, {});
-              res.end();
-              return;
-            }
-            const urlParts = req.url.split("?");
-            if (urlParts.length < 2) {
-              console.error("Missing query string in callback url.");
-              process.exit(6);
-            }
-            const query = qs.parse(urlParts[1]);
-            if (query.code === undefined) {
-              console.error(
-                'Missing required query parameter "code" in callback'
-              );
-              process.exit(7);
-            }
-            const acToken = await oauth.getAccessTokenByAuthCode(query.code);
-            envConfig[commander.env] = acToken.token.access_token;
-            const envContent = envfile.stringifySync(envConfig);
-            fs.writeFileSync(envPath, envContent);
-            console.log(".env file was saved!");
-
-            console.log("Token obtained by authorization code flow is:");
-            console.log(JSON.stringify(acToken, null, 2));
-            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-            res.write(`
-              <html>
-                <head>
-                  <title>
-                    BlockApps Token Exchange Utility
-                  </title>
-                  <meta name="google" content="notranslate">
-                  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-                  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-                  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
-                  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-                  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
-                  <style>
-                    pre {
-                      white-space: pre-wrap;       /* Since CSS 2.1 */
-                      white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
-                      white-space: -pre-wrap;      /* Opera 4-6 */
-                      white-space: -o-pre-wrap;    /* Opera 7 */
-                      word-wrap: break-word;       /* Internet Explorer 5.5+ */
-                      background-color: #e7e7e7;
-                      padding-left: 24px;
-                      padding-right: 24px;
-                      border-radius: 4px;
-                    }
-                    body {
-                      padding: 24px;
-                    }
-                    .padButton {
-                      padding-bottom: 12px;
-                    }
-                    textarea {
-                      border: none;
-                      color: #fff;
-                    }
-                  </style>
-                  <script>
-                    function copyToClipboard(text) {
-                      var textArea = document.createElement("textarea");
-                      textArea.value = text;
-                      document.body.appendChild(textArea);
-                      textArea.focus();
-                      textArea.select();
-                      document.execCommand('copy')
-                      document.body.removeChild(textArea);
-                    }
-                    function logout(){
-                      window.location.href='${
-                        oauth.logOutUrl
-                      }?redirect_uri=http://localhost:${portNumber}/login'
-                    }
-                  </script>
-                </head>
-                <body>
-                  <div class="container">
-                    <div class="row">
-                      <div class="offset-sm-10 col-sm-1 text-right padButton">
-                          <button onclick="logout()" class="btn btn-outline-dark btn-sm"> Logout </button>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="offset-sm-1 col-sm-9">
-                        <h4>
-                          <small class="text-muted">Access Token</small>
-                        </h4>
-                      </div>
-                      <div class="col-sm-1 text-right">
-                        <button onclick="copyToClipboard('${
-                          acToken.token.access_token
-                        }');" title="Copy to clipboard" class="btn btn-outline-dark btn-sm">
-                          <i class="fas fa-clipboard"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="offset-sm-1 col-sm-10">
-                        <pre>
-                          <code>
-                            ${acToken.token.access_token}
-                          </code>
-                        </pre>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="offset-sm-1 col-sm-9">
-                        <h4>
-                          <small class="text-muted">ID Token</small>
-                        </h4>
-                      </div>
-                      <div class="col-sm-1 text-right">
-                        <button onclick="copyToClipboard('${
-                          acToken.token.id_token
-                        }');" title="Copy to clipboard" class="btn btn-outline-dark btn-sm">
-                          <i class="fas fa-clipboard"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="offset-sm-1 col-sm-10">
-                        <pre>
-                          <code>
-                            ${acToken.token.id_token}
-                          </code>
-                        </pre>
-                      </div>
-                    </div>
-                  </div>
-                </body>
-              </html>
-            `);
-            res.end();
-          })
+          .createServer(options, dir)
           .listen(portNumber);
       } else {
         const server = http
-          .createServer(async (req, res) => {
-            if (req.url.indexOf("/login") === 0) {
-              open(signinUri);
-              res.end();
-              return;
-            }
-            if (req.url.indexOf("/callback?") !== 0) {
-              res.writeHead(404, {});
-              res.end();
-              return;
-            }
-            const urlParts = req.url.split("?");
-            if (urlParts.length < 2) {
-              console.error("Missing query string in callback url.");
-              process.exit(6);
-            }
-            const query = qs.parse(urlParts[1]);
-            if (query.code === undefined) {
-              console.error(
-                'Missing required query parameter "code" in callback'
-              );
-              process.exit(7);
-            }
-            const acToken = await oauth.getAccessTokenByAuthCode(query.code);
-            envConfig[commander.env] = acToken.token.access_token;
-            const envContent = envfile.stringifySync(envConfig);
-            fs.writeFileSync(envPath, envContent);
-            console.log(".env file was saved!");
-
-            console.log("Token obtained by authorization code flow is:");
-            console.log(JSON.stringify(acToken, null, 2));
-            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-            res.write(`
-              <html>
-                <head>
-                  <title>
-                    BlockApps Token Exchange Utility
-                  </title>
-                  <meta name="google" content="notranslate">
-                  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-                  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-                  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
-                  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-                  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
-                  <style>
-                    pre {
-                      white-space: pre-wrap;       /* Since CSS 2.1 */
-                      white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
-                      white-space: -pre-wrap;      /* Opera 4-6 */
-                      white-space: -o-pre-wrap;    /* Opera 7 */
-                      word-wrap: break-word;       /* Internet Explorer 5.5+ */
-                      background-color: #e7e7e7;
-                      padding-left: 24px;
-                      padding-right: 24px;
-                      border-radius: 4px;
-                    }
-                    body {
-                      padding: 24px;
-                    }
-                    .padButton {
-                      padding-bottom: 12px;
-                    }
-                    textarea {
-                      border: none;
-                      color: #fff;
-                    }
-                  </style>
-                  <script>
-                    function copyToClipboard(text) {
-                      var textArea = document.createElement("textarea");
-                      textArea.value = text;
-                      document.body.appendChild(textArea);
-                      textArea.focus();
-                      textArea.select();
-                      document.execCommand('copy')
-                      document.body.removeChild(textArea);
-                    }
-                    function logout(){
-                      window.location.href='${
-                        oauth.logOutUrl
-                      }?redirect_uri=http://localhost:${portNumber}/login'
-                    }
-                  </script>
-                </head>
-                <body>
-                  <div class="container">
-                    <div class="row">
-                      <div class="offset-sm-10 col-sm-1 text-right padButton">
-                          <button onclick="logout()" class="btn btn-outline-dark btn-sm"> Logout </button>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="offset-sm-1 col-sm-9">
-                        <h4>
-                          <small class="text-muted">Access Token</small>
-                        </h4>
-                      </div>
-                      <div class="col-sm-1 text-right">
-                        <button onclick="copyToClipboard('${
-                          acToken.token.access_token
-                        }');" title="Copy to clipboard" class="btn btn-outline-dark btn-sm">
-                          <i class="fas fa-clipboard"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="offset-sm-1 col-sm-10">
-                        <pre>
-                          <code>
-                            ${acToken.token.access_token}
-                          </code>
-                        </pre>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="offset-sm-1 col-sm-9">
-                        <h4>
-                          <small class="text-muted">ID Token</small>
-                        </h4>
-                      </div>
-                      <div class="col-sm-1 text-right">
-                        <button onclick="copyToClipboard('${
-                          acToken.token.id_token
-                        }');" title="Copy to clipboard" class="btn btn-outline-dark btn-sm">
-                          <i class="fas fa-clipboard"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="offset-sm-1 col-sm-10">
-                        <pre>
-                          <code>
-                            ${acToken.token.id_token}
-                          </code>
-                        </pre>
-                      </div>
-                    </div>
-                  </div>
-                </body>
-              </html>
-            `);
-            res.end();
-          })
+          .createServer(dir)
           .listen(portNumber);
         }
       console.log(
