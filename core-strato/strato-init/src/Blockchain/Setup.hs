@@ -464,30 +464,13 @@ oneTimeSetup genesisBlockName = do
      {- connStr implicitly defined by ethconf.yaml above, & unsafePerformIO -}
 
       runLoggingT $ withPostgresqlConn connStr $ runReaderT $ do
-         liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
+         liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB; creating indexes"
          liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show connStr
 
          runMigration DataDefs.migrateAll
 
          EthDiscovery.setup bootnodes
 
-         liftIO $ putStrLn $ CL.yellow ">>>> Creating SQL Indexes"
-         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (number);" []
-         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);" []
-         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);" []
-         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase);" []
-         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (total_difficulty);" []
-
-         rawExecute "CREATE INDEX CONCURRENTLY ON address_state_ref (address);" []
-
-         rawExecute "CREATE INDEX CONCURRENTLY ON raw_transaction (from_address);" []
-         rawExecute "CREATE INDEX CONCURRENTLY ON raw_transaction (to_address);" []
-         rawExecute "CREATE INDEX CONCURRENTLY ON raw_transaction (block_number);" []
-         rawExecute "CREATE INDEX CONCURRENTLY ON raw_transaction (tx_hash);" []
-
-         rawExecute "CREATE INDEX CONCURRENTLY ON storage (key);" []
-
-         rawExecute "CREATE INDEX CONCURRENTLY ON transaction_result (transaction_hash);" []
 
      {- create directory and dbs -}
 
