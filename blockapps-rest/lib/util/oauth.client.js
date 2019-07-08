@@ -129,7 +129,7 @@ const run = async function() {
   const oauth = oauthUtil.init(config.nodes[0].oauth);
 
   const signinUri = oauth.getSigninURL();
-  async function requestListener(req, res){
+  async function requestListener(req, res) {
     if (req.url.indexOf("/login") === 0) {
       open(signinUri);
       res.end();
@@ -147,14 +147,12 @@ const run = async function() {
     }
     const query = qs.parse(urlParts[1]);
     if (query.code === undefined) {
-      console.error(
-        'Missing required query parameter "code" in callback'
-      );
+      console.error('Missing required query parameter "code" in callback');
       process.exit(7);
     }
     const acToken = await oauth.getAccessTokenByAuthCode(query.code);
 
-    if(commander.env){
+    if (commander.env) {
       envConfig[commander.env] = acToken.token.access_token;
       const envContent = envfile.stringifySync(envConfig);
       fs.writeFileSync(envPath, envContent);
@@ -286,29 +284,28 @@ const run = async function() {
         process.exit(5);
       }
       const ccToken = await oauth.getAccessTokenByClientSecret();
-      envConfig[commander.env] = ccToken.token.access_token;
-      const envContent = envfile.stringifySync(envConfig);
-      fs.writeFileSync(envPath, envContent);
-      console.log(".env file was saved!");
-
+      if (commander.env) {
+        envConfig[commander.env] = ccToken.token.access_token;
+        const envContent = envfile.stringifySync(envConfig);
+        fs.writeFileSync(envPath, envContent);
+        console.log(".env file was saved!");
+      }
       console.log("Token obtained by client credential flow is:");
       console.log(JSON.stringify(ccToken, null, 2));
       break;
     case "authorization-code":
       // start server
-      if(portNumber == 443){
+      if (portNumber == 443) {
         const options = {
-          key : DUMMY_SSL_KEY,
+          key: DUMMY_SSL_KEY,
           cert: DUMMY_SSL_CERT
-        }
+        };
         const server = https
           .createServer(options, requestListener)
           .listen(portNumber);
       } else {
-        const server = http
-          .createServer(requestListener)
-          .listen(portNumber);
-        }
+        const server = http.createServer(requestListener).listen(portNumber);
+      }
       console.log(
         `Open sign-in URL in your browser to sign-in with OAuth and fetch token: ${signinUri}`
       );
