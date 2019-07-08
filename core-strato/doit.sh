@@ -246,7 +246,6 @@ function doInit {
 }
 
 function doSplitInit {
-  mk-init-topic
   blockTime=${blockTime:-13}
   minBlockDifficulty=${minBlockDifficulty:-131072}
   if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
