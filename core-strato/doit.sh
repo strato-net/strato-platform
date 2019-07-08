@@ -239,9 +239,6 @@ function doInit {
     actualMinPeers=$numMinPeers
   fi
   sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$actualMinPeers"'/' .ethereumH/ethconf.yaml
-
-  echo "Creating a random coinbase"
-  mkCoinbase
 }
 
 # Find all logs greater than 10M, then copy and truncate
