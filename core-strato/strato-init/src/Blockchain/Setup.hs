@@ -93,6 +93,7 @@ defineFlag "redisDBNumber" (0  ::  Integer) "Redis database number"
 defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets to initialize"
 
 defineFlag "singlePrivateKey" (True :: Bool) "Whether to share P2P and PBFT keys"
+defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for more peers"
 
 data SetupDBs =
   SetupDBs {
@@ -232,7 +233,7 @@ defaultDiscoveryConfig  ::  DiscoveryConf
 defaultDiscoveryConfig =
     DiscoveryConf {
       discoveryPort=30303,
-      minAvailablePeers=100
+      minAvailablePeers=flags_minPeers
     }
 
 defaultRedisBlockDBConfig  ::  RedisBlockDBConf
