@@ -9,12 +9,15 @@
 
 module Blockchain.Data.Json where
 
+import           Control.Monad
 import           Data.Aeson
 import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
+import qualified Data.HashMap.Strict                  as HM
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe
+import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
@@ -201,11 +204,20 @@ tPrimeToT (Transaction' tx) = tx
 
 data Block' = Block' Block String deriving (Eq, Show)
 
+instance ToJSON Block where
+  toJSON (Block bd rt bu) =
+    object [ "blockData" .= bdToBdPrime bd
+           , "receiptTransactions" .= map tToTPrime rt
+           , "blockUncles" .= map bdToBdPrime bu
+           ]
+
 instance ToJSON Block' where
-      toJSON (Block' (Block bd rt bu) next) =
-        object ["next" .= next, "kind" .= ("Block" :: String), "blockData" .= bdToBdPrime bd,
-         "receiptTransactions" .= map tToTPrime rt,
-         "blockUncles" .= map bdToBdPrime bu]
+      toJSON (Block' blk next) =
+        case toJSON blk of
+          Object hm -> Object . HM.insert "next" (Data.Aeson.String $ T.pack next)
+                              . HM.insert "kind" "Block"
+                              $ hm
+          _ -> error "block must serialize to object"
 
 blockDataRefToBlock::BlockDataRef->[Transaction]->Block
 blockDataRefToBlock bdr txs = Block{
@@ -269,14 +281,16 @@ instance FromJSON BlockData' where
       <*> v .: "mixHash"
       )
 
+instance FromJSON Block where
+  parseJSON = withObject "Block" $
+    \v -> liftM3 Block (bdPrimeToBd <$> (v .: "blockData"))
+                       (map tPrimeToT <$> (v .: "receiptTransactions"))
+                       (map bdPrimeToBd <$> (v .: "blockUncles"))
+
 instance FromJSON Block' where
-    parseJSON = withObject "Block'" $ \v -> (Block'
-      <$> (Block
-        <$> (bdPrimeToBd <$> (v .: "blockData"))
-        <*> (map tPrimeToT <$> (v .: "receiptTransactions"))
-        <*> (map bdPrimeToBd <$> (v .: "blockUncles")))
-      <*> (v .: "next")
-      )
+    parseJSON x = withObject "Block'" (
+        \v -> liftM2 Block' (parseJSON x) (v .: "next")
+      ) x
 
 bdToBdPrime :: BlockData -> BlockData'
 bdToBdPrime = BlockData'

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric    #-}
+{-# LANGUAGE DeriveAnyClass   #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -46,19 +47,13 @@ data EthConf =
         quarryConfig       :: QuarryConf,
         blockConfig        :: BlockConf,
         discoveryConfig    :: DiscoveryConf
-    } deriving (Generic)
-
-instance FromJSON EthConf
-instance ToJSON EthConf
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data DiscoveryConf =
     DiscoveryConf {
         discoveryPort     :: Int,
         minAvailablePeers :: Int
-    } deriving (Generic)
-
-instance FromJSON DiscoveryConf
-instance ToJSON DiscoveryConf
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data SqlConf =
     SqlConf {
@@ -68,19 +63,13 @@ data SqlConf =
         port     :: Int,
         database :: String,
         poolsize :: Int
-    } deriving (Generic)
-
-instance FromJSON SqlConf
-instance ToJSON SqlConf
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data KafkaConf =
     KafkaConf {
         kafkaHost :: String,
         kafkaPort :: Int
-    } deriving (Generic)
-
-instance FromJSON KafkaConf
-instance ToJSON KafkaConf
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data RedisBlockDBConf =
     RedisBlockDBConf {
@@ -90,57 +79,32 @@ data RedisBlockDBConf =
         redisDBNumber       :: Integer,
         redisMaxConnections :: Int,
         redisMaxIdleTime    :: Integer
-    } deriving (Eq, Read, Show, Generic)
-
-instance FromJSON RedisBlockDBConf
-instance ToJSON   RedisBlockDBConf
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data EthUniqueId =
     EthUniqueId {
         peerId      :: String,
         genesisHash :: String,
         networkId   :: Int
-    } deriving (Generic)
-
-instance FromJSON EthUniqueId
-instance ToJSON EthUniqueId
-
-postgreSQLConnectionString :: SqlConf -> B.ByteString
-postgreSQLConnectionString sqlc =
-  PS.postgreSQLConnectionString ConnectInfo {
-    connectHost     = host sqlc,
-    connectPort     = fromIntegral $ port sqlc,
-    connectUser     = user sqlc,
-    connectPassword = password sqlc,
-    connectDatabase = database sqlc
-  }
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data LevelDBConf =
     LevelDBConf {
         table :: String,
         path  :: String
-    } deriving (Generic)
-
-instance FromJSON LevelDBConf
-instance ToJSON LevelDBConf
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data QuarryConf =
     QuarryConf {
         coinbaseAddress :: String,
         lazyBlocks      :: Bool
-    } deriving (Generic)
-
-instance FromJSON QuarryConf
-instance ToJSON QuarryConf
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data BlockConf =
     BlockConf {
         blockTime          :: Integer,
         minBlockDifficulty :: Integer
-    } deriving (Generic)
-
-instance FromJSON BlockConf
-instance ToJSON BlockConf
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 {- CONFIG: first change, make this local -}
 
@@ -154,6 +118,16 @@ ethConf = unsafePerformIO $ do
 
 
 {- CONFIG: clobber connection string -}
+
+postgreSQLConnectionString :: SqlConf -> B.ByteString
+postgreSQLConnectionString sqlc =
+  PS.postgreSQLConnectionString ConnectInfo {
+    connectHost     = host sqlc,
+    connectPort     = fromIntegral $ port sqlc,
+    connectUser     = user sqlc,
+    connectPassword = password sqlc,
+    connectDatabase = database sqlc
+  }
 
 connStr :: B.ByteString
 connStr = postgreSQLConnectionString . sqlConfig $ ethConf

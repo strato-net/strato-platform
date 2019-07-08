@@ -30,6 +30,7 @@ dependencies:
   - cryptonite
   - crypto-api
   - csv
+  - deepseq
   - directory
   - entropy
   - ethereum-discovery
