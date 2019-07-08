@@ -1,6 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-module Blockchain.Init.Protocol (EventInit(..)) where
+{-# LANGUAGE OverloadedStrings #-}
+module Blockchain.Init.Protocol
+  ( EventInit(..)
+  , initTopic
+  ) where
 
 import Data.Aeson
 import qualified Data.ByteString as B
@@ -9,6 +13,7 @@ import GHC.Generics
 import Blockchain.EthConf
 import Blockchain.Data.Json (Block')
 import Blockchain.Data.ChainInfo (AccountInfo)
+import Network.Kafka.Protocol as K
 
 data EventInit = EthConf EthConf
                | TopicList [(String, String)]
@@ -18,3 +23,6 @@ data EventInit = EthConf EthConf
                | ApiConfig [(FilePath, B.ByteString)]
                | InitComplete
                deriving (Show, Eq, Generic, ToJSON, FromJSON)
+
+initTopic :: K.TopicName
+initTopic = "strato-init-events"

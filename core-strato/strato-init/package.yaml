@@ -82,13 +82,6 @@ executables:
       - strato-init
     other-modules: []
 
-  mk-init-topic:
-    source-dirs: exec_src/
-    main: MkInitTopic.hs
-    dependencies:
-      - strato-init
-    other-modules: []
-
   tabula-rasa:
     source-dirs: exec_src/
     main: TabulaRasa.hs
