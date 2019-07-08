@@ -128,10 +128,8 @@ const run = async function() {
 
   const oauth = oauthUtil.init(config.nodes[0].oauth);
 
-  if (!commander.env) throw new Error("--env tokenName required");
-
   const signinUri = oauth.getSigninURL();
-  async function dir(req, res){
+  async function requestListener(req, res){
     if (req.url.indexOf("/login") === 0) {
       open(signinUri);
       res.end();
@@ -155,11 +153,13 @@ const run = async function() {
       process.exit(7);
     }
     const acToken = await oauth.getAccessTokenByAuthCode(query.code);
-    envConfig[commander.env] = acToken.token.access_token;
-    const envContent = envfile.stringifySync(envConfig);
-    fs.writeFileSync(envPath, envContent);
-    console.log(".env file was saved!");
 
+    if(commander.env){
+      envConfig[commander.env] = acToken.token.access_token;
+      const envContent = envfile.stringifySync(envConfig);
+      fs.writeFileSync(envPath, envContent);
+      console.log(".env file was saved!");
+    }
     console.log("Token obtained by authorization code flow is:");
     console.log(JSON.stringify(acToken, null, 2));
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -302,11 +302,11 @@ const run = async function() {
           cert: DUMMY_SSL_CERT
         }
         const server = https
-          .createServer(options, dir)
+          .createServer(options, requestListener)
           .listen(portNumber);
       } else {
         const server = http
-          .createServer(dir)
+          .createServer(requestListener)
           .listen(portNumber);
         }
       console.log(
