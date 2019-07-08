@@ -221,12 +221,6 @@ function doInit {
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
                     --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty $xfFlag"
-# For backup_restore; the environment var is set during strato-admin.sh invocation.
-# Required: Backup file to be accessible to strato container at /tmp/backup
-  if [[ $backupblocks ]] ; then
-     cmd="${cmd} --backupblocks=true < /var/lib/strato/backup_strato_block"
-     echo "# of lines in block-backup-file: " `cat $backupLocation | wc -l`
-  fi
 
   echo "strato-setup command: $cmd"
   # logging to stdout and log file:
@@ -314,8 +308,6 @@ setEnv difficultyBomb false
 setEnv sqlDiff ${sqlDiff:-true}
 setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
-
-setEnv backupLocation /var/lib/strato/backup_strato_block
 
 setEnv evmDebugMode false
 setEnv evmTraceMode false

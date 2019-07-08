@@ -8,7 +8,6 @@
 
 module Blockchain.GenesisBlock (
   initializeGenesisBlock,
-  BackupType(..)
 ) where
 
 
@@ -28,7 +27,6 @@ import           Data.Text                                    (Text)
 import qualified Data.Text                                    as T
 import           System.Directory
 
-import           Blockchain.BackupBlocks
 import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -120,8 +118,6 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
     genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
 
-data BackupType = NoBackup | BlockBackup | MPBackup
-
 initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
                           , Mem.HasMemAddressStateDB m
@@ -133,31 +129,15 @@ initializeGenesisBlock :: ( HasCodeDB m
                           , MonadLogger m
                           , (Ad.Address `Alters` AddressState) m
                           )
-                       => BackupType
-                       -> String
+                       => String
                        -> [Ad.Address]
                        -> m ()
-initializeGenesisBlock backupType genesisBlockName extraFaucets = do
+initializeGenesisBlock genesisBlockName extraFaucets = do
     $logInfoS "initgen" "Begin of initgen"
-    (srcInfo, genesisBlock, obGB) <-
-        case backupType of
-            NoBackup -> do
-                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
-                _ <- produceVMEvents [ChainBlock gb]
-                obGB <- liftIO $ bootstrapSequencer gb
-                putGenesisHash $ blockHash gb
-                return (si, gb, obGB)
-            BlockBackup -> do
-                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
-                _ <- produceVMEvents [ChainBlock gb]
-                obGB <- liftIO $ bootstrapSequencer gb
-                backupBlocks
-                putGenesisHash $ blockHash gb
-                return (si, gb, obGB)
-            MPBackup -> error "MPBackup called"
-            --    gb <- backupMP
-            --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
-            --    return (gb, undefined)
+    (srcInfo, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
+    _ <- produceVMEvents [ChainBlock genesisBlock]
+    obGB <- liftIO $ bootstrapSequencer genesisBlock
+    putGenesisHash $ blockHash genesisBlock
     $logInfoS "initgen" "Initial merkle patricia tries succussfully created"
     [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     $logInfoS "initgen" "Genesis Block put"

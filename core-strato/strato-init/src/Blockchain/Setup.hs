@@ -78,8 +78,6 @@ defineFlag "p:password" (""  ::  String) "Postgres password"
 defineFlag "K:kafkahost" (""  ::  String) "Kafka hostname"
 defineFlag "z:zkhost" ("localhost"  ::  String) "Zookeeper hostname"
 defineFlag "z:lazyblocks" (False  ::  Bool) "Don't mine empty blocks"
-defineFlag "backupmp" False "backup the MP database from STDIN"
-defineFlag "backupblocks" False "backup the block DB from STDIN"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag "stratoBootnode" [| []  ::  [String] |] "STRING_LIST"
      [| \s -> if any (==',') s then splitWhen (==',') s else [s] |]
@@ -511,8 +509,4 @@ oneTimeSetup genesisBlockName = do
          void . runLoggingT $ flip runReaderT (SetupDBs sdb srRef hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
            void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
-           case (flags_backupmp, flags_backupblocks) of
-             (False, False) -> initializeGenesisBlock NoBackup genesisBlockName decodedFaucets
-             (True, True)   -> error "You can't choose --backupmp and --backupblocks at the same time"
-             (False, True)  -> initializeGenesisBlock BlockBackup genesisBlockName decodedFaucets
-             (True, False)  -> initializeGenesisBlock MPBackup genesisBlockName decodedFaucets
+           initializeGenesisBlock genesisBlockName decodedFaucets
