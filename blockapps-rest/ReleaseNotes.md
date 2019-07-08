@@ -1,6 +1,6 @@
 ## RELEASE NOTES
 
-### Version 7.4.1
+### Version 7.4.2
 
 -   Update token getter to support https
 
