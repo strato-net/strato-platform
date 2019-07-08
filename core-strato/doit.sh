@@ -10,13 +10,17 @@ MONITORING_TIMER=5;
 function newnode {
   initialize=false
 
-  if [[ ! -d .ethereumH ]]
-  then initialize=true
-       mkdir logs
-       cleanupDB
-       doInit
+  if [[ ${splitinit:-false} ]]; then
+    doSplitInit
   else
-       sleep 10
+    if [[ ! -d .ethereumH ]]
+    then initialize=true
+	 mkdir logs
+         cleanupDB
+         doInit
+    else
+         sleep 10
+    fi
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
@@ -239,6 +243,41 @@ function doInit {
     echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
     tail -f /dev/null
   fi
+}
+
+function doSplitInit {
+  mk-init-topic
+  blockTime=${blockTime:-13}
+  minBlockDifficulty=${minBlockDifficulty:-131072}
+  if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
+    xfFlag="--extraFaucets=${extraFaucets:-$validators}"
+  fi
+  if [[ -n "${validators}" ]]; then
+    # Keep active discovery until all other validators are peers
+    echo "Overriding minAvailablePeers with number of consensus peers"
+    actualMinPeers=$( echo "${validators}" | tr -cd , | wc -c )
+  else
+    actualMinPeers=$numMinPeers
+  fi
+  args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
+        --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
+        --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
+        --addBootnodes=$addBootnodes $stratoBootnode \
+        --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty $xfFlag"
+  if [[ ! -d .ethereumH ]]; then
+    cmd="tabula-rasa $args"
+  else
+    cmd="from-volume $args"
+  fi
+
+  echo "init event source: $cmd"
+  # logging to stdout and log file:
+  NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+    tail -f /dev/null
+  fi
+  init-worker $args
 }
 
 # Find all logs greater than 10M, then copy and truncate
