@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 
 module BlockApps.Solidity.Storage where
 
