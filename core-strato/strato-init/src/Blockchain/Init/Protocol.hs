@@ -11,6 +11,7 @@ import Blockchain.Data.Json (Block')
 import Blockchain.Data.ChainInfo (AccountInfo)
 
 data EventInit = EthConf EthConf
+               | TopicList [(String, String)]
                | PeerList [String]
                | GenesisBlock Block'
                | GenesisAccounts [AccountInfo]

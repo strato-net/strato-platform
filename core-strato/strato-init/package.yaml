@@ -82,6 +82,41 @@ executables:
       - strato-init
     other-modules: []
 
+  mk-init-topic:
+    source-dirs: exec_src/
+    main: MkInitTopic.hs
+    dependencies:
+      - strato-init
+    other-modules: []
+
+  tabula-rasa:
+    source-dirs: exec_src/
+    main: TabulaRasa.hs
+    dependencies:
+      - strato-init
+    other-modules: []
+
+  from-volume:
+    source-dirs: exec_src/
+    main: FromVolume.hs
+    dependencies:
+      - strato-init
+    other-modules: []
+
+  from-restore:
+    source-dirs: exec_src/
+    main: FromRestore.hs
+    dependencies:
+      - strato-init
+    other-modules: []
+
+  init-worker:
+    source-dirs: exec_src/
+    main: InitWorker.hs
+    dependencies:
+      - strato-init
+    other-modules: []
+
 tests:
   strato-init-test:
     source-dirs: test/

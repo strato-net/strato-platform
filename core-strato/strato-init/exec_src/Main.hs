@@ -3,6 +3,7 @@
 import           HFlags
 
 import           Blockchain.Setup
+import           Blockchain.InitOptions()
 import           Blockchain.Output() -- Import the --minLogLevel flag
 
 defineFlag "genesisBlockName" "livenet" "use the alternate stablenet genesis block"
