@@ -23,6 +23,7 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Base64             as B64
 import qualified Data.ByteString.Char8              as C
+import           Data.Coerce
 import           Data.Either.Extra
 import           Data.FileEmbed
 import           Data.IORef
@@ -416,6 +417,9 @@ oneTimeSetup genesisBlockName = do
                    kafkaConfig = kafkaCfg,
                    ethUniqueId = defaultEthUniqueId {
                      peerId = uniqueString
+                   },
+                   quarryConfig = (quarryConfig cfg) {
+                    coinbaseAddress = formatAddress . fromInteger $ coerce myPrivKey
                    }
                  }
 

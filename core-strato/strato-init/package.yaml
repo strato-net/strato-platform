@@ -81,13 +81,6 @@ executables:
       - strato-init
     other-modules: []
 
-  mkCoinbase:
-    source-dirs: exec_src/
-    main: MkCoinbase.hs
-    dependencies:
-      - base64-bytestring
-    other-modules: []
-
 tests:
   strato-init-test:
     source-dirs: test/
