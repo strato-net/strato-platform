@@ -3,6 +3,7 @@
 ### Version 7.4.2
 
 -   Update token getter to support https
+-   Make --env flag optional
 
 ### Version 7.4.1
 
