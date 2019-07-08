@@ -37,7 +37,7 @@ newtype VaultM x = VaultM
         ( LoggingT
           ( ExceptT VaultWrapperError IO )
         ) x
-  } deriving
+  } deriving newtype
   ( Functor
   , Applicative
   , Monad

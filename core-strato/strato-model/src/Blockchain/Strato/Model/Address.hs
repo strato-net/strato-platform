@@ -57,7 +57,8 @@ instance RLPSerializable Address where
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
   rlpDecode x             = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
-newtype Address = Address Word160 deriving (Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral, Hashable, Data)
+newtype Address = Address Word160 deriving (Eq, Read, Enum, Bounded, Ord, Generic, Data)
+                                  deriving newtype (Real, Num, Integral, Hashable)
 
 instance Show Address where
   show (Address a) = printf "%040x" a

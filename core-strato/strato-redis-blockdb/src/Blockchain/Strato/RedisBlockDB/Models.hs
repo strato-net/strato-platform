@@ -96,13 +96,13 @@ instance (RLPSerializable a) => RedisDBValuable [a] where
     toValue         = rlpSerialize . RLPArray . fmap rlpEncode
     fromValue bytes = let (RLPArray elems) = rlpDeserialize bytes in rlpDecode <$> elems
 
-newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
-newtype RedisTx        = RedisTx       TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
-newtype RedisTxs       = RedisTxs      [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)
-newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
-newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving (Eq, Show, RLPSerializable)
-newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving (Eq, Show, RLPSerializable)
-newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [SHA]) deriving (Eq, Show, RLPSerializable)
+newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving newtype (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
+newtype RedisTx        = RedisTx       TXD.Transaction deriving newtype (Eq, Read, Show, RLPSerializable, TransactionLike)
+newtype RedisTxs       = RedisTxs      [RedisTx]       deriving newtype (Eq, Read, Show, RedisDBValuable)
+newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving newtype (Eq, Read, Show, RedisDBValuable)
+newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving newtype (Eq, Show, RLPSerializable)
+newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving newtype (Eq, Show, RLPSerializable)
+newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [SHA]) deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
 
 instance RLPSerializable RedisIPChains where

@@ -532,7 +532,9 @@ instance ToSample PostUsersContractMethodRequest where
 
 newtype PostUsersContractMethodResponse = PostUsersContractMethodResponse
   { postusercontractmethodresponseReturns :: [SolidityValue]
-  } deriving (Eq,Show,Generic,Arbitrary)
+  } deriving (Eq,Show,Generic)
+    deriving newtype (Arbitrary)
+
 instance ToJSON PostUsersContractMethodResponse where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostUsersContractMethodResponse where

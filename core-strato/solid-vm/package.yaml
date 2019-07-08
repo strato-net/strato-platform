@@ -9,12 +9,6 @@ license: Apache-2.0
 description:
     The client described in the Ethereum Yellowpaper
 
-default-extensions:
-  - DeriveGeneric
-  - DeriveAnyClass
-  - LambdaCase
-
-
 dependencies:
   - base >= 4 && < 5
   - aeson

@@ -43,7 +43,7 @@ newtype Bloc x = Bloc
         ( LoggingT
           ( ExceptT BlocError IO ) -- throw and catch errors
         ) x
-  } deriving
+  } deriving newtype
   ( Functor
   , Applicative
   , Monad
