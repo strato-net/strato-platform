@@ -1,7 +1,6 @@
 {-# LANGUAGE
       OverloadedStrings
     , DataKinds
-    , DeriveGeneric
     , FlexibleInstances
     , KindSignatures , TypeFamilies
 #-}

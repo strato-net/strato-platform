@@ -46,7 +46,6 @@ library:
     - FlexibleInstances
     - GeneralizedNewtypeDeriving
     - GADTs
-    - LambdaCase
     - RecordWildCards
     - FunctionalDependencies
 

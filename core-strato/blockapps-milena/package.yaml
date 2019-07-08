@@ -26,7 +26,6 @@ ghc-options:
 
 default-extensions:
   - ConstraintKinds
-  - DeriveGeneric
   - FlexibleContexts
   - GADTs
   - GeneralizedNewtypeDeriving
