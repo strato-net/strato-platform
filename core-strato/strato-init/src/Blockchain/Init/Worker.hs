@@ -14,12 +14,12 @@ import Data.Either.Combinators (whenLeft)
 import qualified Data.Map as M
 import Data.String (fromString)
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Data.Yaml (encodeFile)
 import Database.Persist.Postgresql
 import System.Directory
 import System.Exit
 import System.FilePath ((</>))
-import System.IO
 import System.IO.Temp
 import Text.Printf
 
@@ -53,7 +53,7 @@ runWorker = do
 
 process :: FilePath -> EventInit -> LoggingT (ResourceT IO) ()
 process pathRoot = \case
-  -- Note: EthConf must come first, and all the rest after.
+  -- Note: EthConf must come first, but otherwise the order doesn't (shouldn't ?) matter.
   EthConf ec -> do
     let dir = ".ethereumH"
     liftIO $ createDirectoryIfMissing True dir
@@ -79,7 +79,6 @@ process pathRoot = \case
       $logInfoS "ethconf/migrate" . T.pack $ CL.yellow ">>>> Indexing eth"
       runMigration DataDefs.indexAll
 
-
   PeerList bootnodes -> do
     $logInfoS "ethconf/bootnodes" . T.pack $ CL.yellow ">>>> Inserting bootnodes"
     $logInfoLS "ethconf/bootnodes" bootnodes
@@ -103,6 +102,6 @@ process pathRoot = \case
 
   GenesisAccounts acs -> do
     let accountFile = pathRoot ++ "AccountInfo"
-    liftIO $ withFile accountFile AppendMode (error $ "TODO(tim): serialize account info" ++ show acs)
+    liftIO $ TIO.appendFile accountFile acs
 
   InitComplete -> liftIO $ die "InitComplete shouldn't be here"

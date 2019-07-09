@@ -10,18 +10,25 @@ module Blockchain.Init.Protocol
 
 import Data.Aeson
 import qualified Data.ByteString as B
+import qualified Data.Text as T
 import GHC.Generics
 
 import Blockchain.EthConf.Model
-import Blockchain.Data.Json (Block')
-import Blockchain.Data.ChainInfo (AccountInfo)
+import Blockchain.Data.GenesisInfo
 import Network.Kafka.Protocol as K
 
 data EventInit = EthConf EthConf
                | TopicList [(String, String)]
                | PeerList (Maybe [String])
-               | GenesisBlock Block'
-               | GenesisAccounts [AccountInfo]
+               | GenesisBlock GenesisInfo
+               -- As the generator doesn't need to modify the account info,
+               -- its a little simpler to just ship text and the worker will
+               -- pipe that to the output file. While it may seem pointless to
+               -- backup the potentially huge AccountInfo file, it will preserve
+               -- the contents regardless of being input as an image file, an
+               -- embedded file, a file on a volume, or a file otherwise generated
+               -- at the launch of the container.
+               | GenesisAccounts T.Text
                | ApiConfig [(FilePath, B.ByteString)]
                | InitComplete
                deriving (Show, Eq, Generic, ToJSON, FromJSON)
