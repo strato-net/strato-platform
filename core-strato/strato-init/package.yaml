@@ -25,6 +25,8 @@ dependencies:
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
+  - common-log
+  - conduit
   - containers
   - cryptohash
   - cryptonite
@@ -32,6 +34,7 @@ dependencies:
   - csv
   - deepseq
   - directory
+  - either
   - entropy
   - ethereum-discovery
   - ethereum-rlp
@@ -62,6 +65,7 @@ dependencies:
   - strato-statediff
   - stm
   - stm-chans
+  - temporary
   - text
   - time
   - transformers

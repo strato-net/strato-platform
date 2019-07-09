@@ -12,7 +12,7 @@ import System.Entropy
 import System.Environment
 
 import Blockchain.EthConf
-import Blockchain.InitOptions
+import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 

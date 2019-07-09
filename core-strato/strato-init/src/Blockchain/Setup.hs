@@ -1,12 +1,8 @@
 {-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.Setup (
   oneTimeSetup
@@ -14,8 +10,6 @@ module Blockchain.Setup (
 
 import           Control.Concurrent
 import           Control.Monad
-import qualified Control.Monad.Change.Alter         as A
-import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
@@ -23,16 +17,12 @@ import qualified Data.Aeson                         as Ae
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C
 import           Data.FileEmbed
-import           Data.IORef
 import qualified Data.Map                           as Map
 import           Data.Maybe
-import qualified Data.NibbleString                  as N
 import           Data.String
 import qualified Data.Text                          as T
 import           Data.Yaml
-import qualified Database.LevelDB                   as DB
 import           Database.Persist.Postgresql        hiding (get)
-import qualified Database.Redis                     as Redis hiding (get)
 import           Network.Kafka
 import           Network.Kafka.Protocol
 import           System.Directory
@@ -41,115 +31,21 @@ import           System.FilePath
 
 import           Blockchain.APIFiles
 import           Blockchain.Constants
-import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
 import           Blockchain.GenesisBlock
-import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
-import           Blockchain.DB.HashDB
-import           Blockchain.DB.MemAddressStateDB
-import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.SQLDB
-import           Blockchain.DB.StateDB
 import           Blockchain.EthConf.Model
 import           Blockchain.Init.EthConf
-import           Blockchain.InitOptions
+import           Blockchain.Init.Monad
+import           Blockchain.Init.Options
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
-import           Blockchain.SHA
-import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery
 
 import qualified Text.Colors                        as CL
-
-data SetupDBs =
-  SetupDBs {
-    stateDB :: StateDB,
-    stateRoot :: IORef MP.StateRoot,
-    hashDB  :: HashDB,
-    codeDB  :: CodeDB,
-    sqlDB   :: SQLDB,
-    redisDB :: RBDB.RedisConnection,
-    localStorageTx :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
-    localStorageBlock :: IORef (Map.Map (Address, B.ByteString) B.ByteString),
-    localAddressStateTx :: IORef (Map.Map Address AddressStateModification),
-    localAddressStateBlock :: IORef (Map.Map Address AddressStateModification)
-    }
-
-type SetupDBM = ReaderT SetupDBs (LoggingT (ResourceT IO))
-
-instance Mod.Modifiable MP.StateRoot SetupDBM where
-  get _    = liftIO . readIORef =<< asks stateRoot
-  put _ sr = do
-    srRef <- asks stateRoot
-    liftIO $ atomicWriteIORef srRef sr
-
-instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
-  lookup _ = MP.genericLookupDB $ asks stateDB
-  insert _ = MP.genericInsertDB $ asks stateDB
-  delete _ = MP.genericDeleteDB $ asks stateDB
-
-instance HasMemRawStorageDB SetupDBM where
-  getMemRawStorageTxDB = do
-    cxt <- ask
-    lst <- liftIO . readIORef .localStorageTx $ cxt
-    return (stateDB cxt, lst)
-  putMemRawStorageTxMap theMap = do
-    lstref <- asks localStorageTx
-    liftIO $ atomicWriteIORef lstref theMap
-  getMemRawStorageBlockDB = do
-    cxt <- ask
-    lsb <- liftIO . readIORef . localStorageBlock $ cxt
-    return (stateDB cxt, lsb)
-  putMemRawStorageBlockMap theMap = do
-    lsbref <- asks localStorageBlock
-    liftIO $ atomicWriteIORef lsbref theMap
-
-instance (RawStorageKey `A.Alters` RawStorageValue) SetupDBM where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
-
-instance HasMemAddressStateDB SetupDBM where
-  getAddressStateTxDBMap = liftIO . readIORef =<< asks localAddressStateTx
-  putAddressStateTxDBMap theMap = do
-    lastref <- asks localAddressStateTx
-    liftIO $ atomicWriteIORef lastref theMap
-  getAddressStateBlockDBMap = liftIO . readIORef =<< asks localAddressStateBlock
-  putAddressStateBlockDBMap theMap = do
-    lasbref <- asks localAddressStateBlock
-    liftIO $ atomicWriteIORef lasbref theMap
-
-instance (Address `A.Alters` AddressState) SetupDBM where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
-
-instance (SHA `A.Alters` DBCode) SetupDBM where
-  lookup _ = genericLookupCodeDB $ asks codeDB
-  insert _ = genericInsertCodeDB $ asks codeDB
-  delete _ = genericDeleteCodeDB $ asks codeDB
-
-instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
-  lookup _ = genericLookupHashDB $ asks hashDB
-  insert _ = genericInsertHashDB $ asks hashDB
-  delete _ = genericDeleteHashDB $ asks hashDB
-
-instance Mod.Accessible SQLDB SetupDBM where
-  access _ = asks sqlDB
-
-instance Mod.Accessible RBDB.RedisConnection SetupDBM where
-  access _ = asks redisDB
-
-defaultPeers :: [(String,Int)]
-defaultPeers =
-  [
-    --("127.0.0.1", 30303),
-    --("52.87.251.111", 30303)   -- stratodev.blockapps.net
-  ]
 
 createKafkaTopic  ::  TopicName -> IO ()
 createKafkaTopic topic = do
@@ -240,7 +136,6 @@ oneTimeSetup genesisBlockName = do
 
       putStrLn $ CL.red "WARNING: the private key for this strato node is being written to the file .ethereumH/ethconf.yaml.  Please keep it secure; anyone who reads it will become you."
       encodeFile (".ethereumH" </> "ethconf.yaml") ethconf
-      encodeFile (".ethereumH" </> "peers.yaml") defaultPeers
 
       {- CONFIG: register this blockchain with the global database -}
 
@@ -291,26 +186,8 @@ oneTimeSetup genesisBlockName = do
 
      {- create directory and dbs -}
 
-      void . runResourceT $ do
+      void . runResourceT . runLoggingT . runSetupDBM $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
-
-     {- CONFIG: localized -}
-
-         sdb <- DB.open (dbDir "h" ++ stateDBPath)
-                DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-         hdb <- HashDB <$> DB.open (dbDir "h" ++ hashDBPath)
-                DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-         cdb <- CodeDB <$> DB.open (dbDir "h" ++ codeDBPath)
-                DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-         [m1, m2] <- liftIO . replicateM 2 . newIORef $ Map.empty
-         [m3, m4] <- liftIO . replicateM 2 . newIORef $ Map.empty
-         srRef <- liftIO . newIORef $ error "stateRoot not defined in oneTimeSetup"
-
-         pool <- runNoLoggingT $ createPostgresqlPool localConn 20
-
-         redisBDBPool <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect $ redisConnection $ redisBlockDBConfig ethconf)
-
-         void . runLoggingT $ flip runReaderT (SetupDBs sdb srRef hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
-           void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
-           liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
-           initializeGenesisBlock genesisBlockName decodedFaucets
+         void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
+         liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
+         initializeGenesisBlock genesisBlockName decodedFaucets

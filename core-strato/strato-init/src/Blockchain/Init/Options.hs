@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Blockchain.InitOptions where
+module Blockchain.Init.Options where
 
 import Data.List.Split
 import HFlags
