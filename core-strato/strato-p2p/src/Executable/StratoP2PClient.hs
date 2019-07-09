@@ -10,7 +10,6 @@
 
 module Executable.StratoP2PClient (stratoP2PClient) where
 
-import           Blockchain.PrivateKeyConf
 import           Blockchain.RLPx
 import           Control.Concurrent                    hiding (yield)
 import           Control.Concurrent.SSem               (SSem)

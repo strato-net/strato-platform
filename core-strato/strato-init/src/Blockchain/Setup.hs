@@ -21,11 +21,7 @@ import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.Aeson                         as Ae
 import qualified Data.ByteString                    as B
-import qualified Data.ByteString.Base16             as B16
-import qualified Data.ByteString.Base64             as B64
 import qualified Data.ByteString.Char8              as C
-import           Data.Coerce
-import           Data.Either.Extra
 import           Data.FileEmbed
 import           Data.IORef
 import qualified Data.Map                           as Map
@@ -40,8 +36,7 @@ import qualified Database.Redis                     as Redis hiding (get)
 import           Network.Kafka
 import           Network.Kafka.Protocol
 import           System.Directory
-import           System.Entropy
-import           System.Environment
+import           System.Exit
 import           System.FilePath
 
 import           Blockchain.APIFiles
@@ -57,15 +52,14 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
-import           Blockchain.EthConf
+import           Blockchain.EthConf.Model
+import           Blockchain.Init.EthConf
 import           Blockchain.InitOptions
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
-import           Blockchain.PrivateKeyConf
 import           Blockchain.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ExtendedWord
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery
 
@@ -150,95 +144,6 @@ instance Mod.Accessible SQLDB SetupDBM where
 instance Mod.Accessible RBDB.RedisConnection SetupDBM where
   access _ = asks redisDB
 
-{-
-connStr :: ConnectionString
-connStr = "host=localhost dbname=eth user=postgres password=api port=5432"
--}
-
-defaultSqlConfig  ::  SqlConf
-defaultSqlConfig =
-    SqlConf {
-      user = "postgres",
-      password = "api",
-      host = "localhost",
-      port = 5432,
-      database = "eth",
-      poolsize = 10
-    }
-
-defaultKafkaConfig  ::  KafkaConf
-defaultKafkaConfig = KafkaConf {
-  kafkaHost = "localhost",
-  kafkaPort = 9092
-  }
-
-defaultLevelDBConfig  ::  LevelDBConf
-defaultLevelDBConfig =
-    LevelDBConf {
-      table = "",
-      path = ""
-    }
-
-defaultBlockConfig  ::  BlockConf
-defaultBlockConfig =
-    BlockConf {
-      blockTime = 13,
-      minBlockDifficulty = 131072
-    }
-
-defaultPrivKey  ::  PrivKey
-defaultPrivKey = PrivKey 0
-
-defaultEthUniqueId  ::  EthUniqueId
-defaultEthUniqueId =
-    EthUniqueId {
-      peerId = "",
-      genesisHash = "",
-      networkId = 0
-    }
-
-defaultQuarryConfig  ::  QuarryConf
-defaultQuarryConfig =
-    QuarryConf {
-      coinbaseAddress = "ab",
-      lazyBlocks = False
-    }
-
-
-defaultDiscoveryConfig  ::  DiscoveryConf
-defaultDiscoveryConfig =
-    DiscoveryConf {
-      discoveryPort=30303,
-      minAvailablePeers=flags_minPeers
-    }
-
-defaultRedisBlockDBConfig  ::  RedisBlockDBConf
-defaultRedisBlockDBConfig = RedisBlockDBConf {
-    redisHost           = flags_redisHost,
-    redisPort           = flags_redisPort,
-    redisAuth           = Nothing,
-    redisDBNumber       = flags_redisDBNumber,
-    redisMaxConnections = 10,
-    redisMaxIdleTime    = 30
-    }
-
-defaultConfig  ::  EthConf
-defaultConfig =
-    EthConf {
-      ethUniqueId        = defaultEthUniqueId,
-      privKey            = defaultPrivKey,
-      sqlConfig          = defaultSqlConfig,
-      redisBlockDBConfig = defaultRedisBlockDBConfig,
-      levelDBConfig      = defaultLevelDBConfig,
-      kafkaConfig        = defaultKafkaConfig,
-      blockConfig        = defaultBlockConfig,
-      quarryConfig       = defaultQuarryConfig,
-      discoveryConfig    = defaultDiscoveryConfig
-    }
-
-decodedFaucets :: [Address]
-decodedFaucets = fromMaybe [] . Ae.decodeStrict . C.pack $ flags_extraFaucets
-
 defaultPeers :: [(String,Int)]
 defaultPeers =
   [
@@ -300,14 +205,15 @@ addStandardGenesisBlockIfNeeded genesisBlockName = do
   Preconditions: installed LevelDB, Postgres, Kafka, Redis.
 -}
 
+decodedFaucets :: [Address]
+decodedFaucets = fromMaybe [] . Ae.decodeStrict . C.pack $ flags_extraFaucets
+
 oneTimeSetup  ::  String -> IO ()
 oneTimeSetup genesisBlockName = do
   dirExists <- doesDirectoryExist ".ethereumH"
 
   if dirExists
-    then do
-        putStrLn ".ethereumH exists, unsafe to run setup"
-        return ()
+    then die ".ethereumH exists, unsafe to run setup"
     else do
       let bootnodes = case (flags_addBootnodes, flags_stratoBootnode) of
                      (False, _)      -> Nothing
@@ -322,106 +228,38 @@ oneTimeSetup genesisBlockName = do
 
       putStrLn "writing config"
 
-      maybePGuser <- case flags_pguser of
-             "" -> do putStrLn "using default postgres user: postgres"
-                      return (Just "postgres")
-             user' -> return (Just user')
-
-      maybePGhost <- case flags_pghost of
-             "" -> do putStrLn "using default postgres host: localhost"
-                      return (Just "localhost")
-             host' -> return (Just host')
-
-      maybePGpass <- case flags_password of
-             ""   -> error "specify password for postgres user: "
-             pass -> return (Just pass)
-
-      kafkaHostFlag <- case flags_kafkahost of
-             "" -> do putStrLn "using default kafka host: localhost"
-                      return "localhost"
-             host' -> return host'
-
-      bytes <- getEntropy 20
 
       createDirectoryIfMissing True $ dbDir "h"
 
 
-
-      let user'' =  case maybePGuser of
-                        Nothing  -> "postgres"
-                        Just ""  -> "postgres"
-                        Just usr -> usr
-
-          cfg = defaultConfig {
-                    sqlConfig = defaultSqlConfig {
-                        user     = user'',
-                        host     = fromMaybe "localhost" maybePGhost,
-                        password = fromMaybe "" maybePGpass
-                    },
-                    blockConfig = defaultBlockConfig {
-                        blockTime          = flags_blockTime,
-                        minBlockDifficulty = flags_minBlockDifficulty
-                    },
-                    quarryConfig = defaultQuarryConfig {
-                        lazyBlocks = flags_lazyblocks
-                    }
-                }
-
      {- CONFIG: create database and write default config files, including strato-api -}
 
-      myPrivKey <-
-        if flags_singlePrivateKey
-          then do
-            !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-            let !bs = fromRight (error $ "Invalid base64 NODEKEY: " ++ show skey) . B64.decode . C.pack $ skey
-            when (C.length bs /= 32) $ error $ "The private key decoded from NODEKEY is the wrong length: NODEKEY: " ++ show skey ++ ", decoded: '" ++ C.unpack (B16.encode bs) ++ "'"
-            return . PrivKey . fromIntegral $ bytesToWord256 bs
-          else generatePrivKey
-
-      let uniqueString = C.unpack . B16.encode $ bytes
-          pgCfg = sqlConfig cfg
-          pgCfg' = pgCfg { database = "" }
-          db = database pgCfg
-          db' = db ++ "_" ++ uniqueString
-          pgCfg'' = pgCfg { database = db' }
-          pgConn' = postgreSQLConnectionString pgCfg'
-          pgConnGlobal = postgreSQLConnectionString pgCfg { database = "blockchain" }
-          kafkaCfg = defaultKafkaConfig { kafkaHost = kafkaHostFlag }
-
-          cfg' = cfg {
-                   privKey = myPrivKey,
-                   sqlConfig = pgCfg'',
-                   kafkaConfig = kafkaCfg,
-                   ethUniqueId = defaultEthUniqueId {
-                     peerId = uniqueString
-                   },
-                   quarryConfig = (quarryConfig cfg) {
-                    coinbaseAddress = formatAddress . fromInteger $ coerce myPrivKey
-                   }
-                 }
-
+      ethconf <- genEthConf
       inflateDir stratoAPICerts
       inflateDir stratoAPIConfigDir
 
       putStrLn $ CL.red "WARNING: the private key for this strato node is being written to the file .ethereumH/ethconf.yaml.  Please keep it secure; anyone who reads it will become you."
-      encodeFile (".ethereumH" </> "ethconf.yaml") cfg'
+      encodeFile (".ethereumH" </> "ethconf.yaml") ethconf
       encodeFile (".ethereumH" </> "peers.yaml") defaultPeers
 
       {- CONFIG: register this blockchain with the global database -}
 
       currPath <- getCurrentDirectory
 
-      Blockchain.migrateDB pgConnGlobal
-      _ <- insertBlockchain pgConnGlobal currPath uniqueString
+      let pgconf = sqlConfig ethconf
+          rawConn = postgreSQLConnectionString pgconf{database = ""}
+          globalConn = postgreSQLConnectionString pgconf{database = "blockchain"}
+          localConn = postgreSQLConnectionString pgconf
+          db = database pgconf
+      Blockchain.migrateDB globalConn
+      _ <- insertBlockchain globalConn currPath . peerId . ethUniqueId $ ethconf
 
       {- CONFIG: Create the local database -}
+      liftIO $ putStrLn $ CL.yellow ">>>> Creating Database " ++ db
+      liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show rawConn
+      let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
 
-      liftIO $ putStrLn $ CL.yellow ">>>> Creating Database " ++ db'
-      liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show pgConn'
-
-      let query = T.pack $ "CREATE DATABASE " ++ show db' ++ ";"
-
-      runNoLoggingT $ withPostgresqlConn pgConn' (runReaderT (rawExecute query []) :: SqlWriteBackend -> LoggingT IO ())
+      runNoLoggingT $ withPostgresqlConn rawConn (runReaderT (rawExecute query []) :: SqlWriteBackend -> LoggingT IO ())
 
       {- CONFIG: create kafka topics -}
 
@@ -439,9 +277,9 @@ oneTimeSetup genesisBlockName = do
      {- CONFIG: define tables and indices -}
      {- connStr implicitly defined by ethconf.yaml above, & unsafePerformIO -}
 
-      runLoggingT $ withPostgresqlConn connStr $ runReaderT $ do
+      runLoggingT $ withPostgresqlConn localConn $ runReaderT $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB; creating indexes"
-         liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show connStr
+         liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show localConn
 
          runMigration DataDefs.migrateAll
 
@@ -465,9 +303,9 @@ oneTimeSetup genesisBlockName = do
          [m3, m4] <- liftIO . replicateM 2 . newIORef $ Map.empty
          srRef <- liftIO . newIORef $ error "stateRoot not defined in oneTimeSetup"
 
-         pool <- runNoLoggingT $ createPostgresqlPool connStr 20
+         pool <- runNoLoggingT $ createPostgresqlPool localConn 20
 
-         redisBDBPool <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+         redisBDBPool <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect $ redisConnection $ redisBlockDBConfig ethconf)
 
          void . runLoggingT $ flip runReaderT (SetupDBs sdb srRef hdb cdb pool redisBDBPool m1 m2 m3 m4) $ do
            void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
