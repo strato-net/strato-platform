@@ -69,6 +69,10 @@ migrateAll = do
   exec "ALTER TABLE IF EXISTS storage ALTER COLUMN value TYPE varchar;"
   exec "ALTER TABLE IF EXISTS transaction_result ALTER COLUMN response TYPE bytea USING response::bytea;"
   migrateAuto
+
+indexAll :: Migration
+indexAll = do
+  let exec = lift . lift . flip rawExecute []
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (number);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);"
