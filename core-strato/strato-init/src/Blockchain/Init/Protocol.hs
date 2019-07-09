@@ -10,7 +10,7 @@ import Data.Aeson
 import qualified Data.ByteString as B
 import GHC.Generics
 
-import Blockchain.EthConf
+import Blockchain.EthConf.Model
 import Blockchain.Data.Json (Block')
 import Blockchain.Data.ChainInfo (AccountInfo)
 import Network.Kafka.Protocol as K
