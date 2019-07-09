@@ -4,6 +4,8 @@
 module Blockchain.Init.Protocol
   ( EventInit(..)
   , initTopic
+  , addEvent
+  , receiveEvent
   ) where
 
 import Data.Aeson
@@ -17,7 +19,7 @@ import Network.Kafka.Protocol as K
 
 data EventInit = EthConf EthConf
                | TopicList [(String, String)]
-               | PeerList [String]
+               | PeerList (Maybe [String])
                | GenesisBlock Block'
                | GenesisAccounts [AccountInfo]
                | ApiConfig [(FilePath, B.ByteString)]
@@ -26,3 +28,9 @@ data EventInit = EthConf EthConf
 
 initTopic :: K.TopicName
 initTopic = "strato-init-events"
+
+addEvent :: EventInit -> IO ()
+addEvent = error "TODO(tim): addEvent"
+
+receiveEvent :: IO EventInit
+receiveEvent = error "TODO(tim): receiveEvent"

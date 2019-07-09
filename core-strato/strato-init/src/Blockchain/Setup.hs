@@ -139,7 +139,10 @@ oneTimeSetup genesisBlockName = do
 
       putStrLn $ CL.red "WARNING: the private key for this strato node is being written to the file .ethereumH/ethconf.yaml.  Please keep it secure; anyone who reads it will become you."
       encodeFile (".ethereumH" </> "ethconf.yaml") ethconf
+<<<<<<< HEAD
       makeReadOnly $ ".ethereumH" </> "ethconf.yaml"
+=======
+>>>>>>> f34e0f523... Monadify setup
 
       {- CONFIG: register this blockchain with the global database -}
 
