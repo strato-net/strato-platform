@@ -10,7 +10,7 @@ MONITORING_TIMER=5;
 function newnode {
   initialize=false
 
-  if [[ ${splitinit:-false} ]]; then
+  if ${splitinit:-false} ; then
     doSplitInit
   else
     if [[ ! -d .ethereumH ]]
