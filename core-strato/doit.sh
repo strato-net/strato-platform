@@ -12,7 +12,7 @@ function newnode {
 
   mkdir -p logs/rotation
 
-  if [[ ${splitinit:-false} ]]; then
+  if ${splitinit:-false} ; then
     doSplitInit
   else
     if [[ ! -d .ethereumH ]]
