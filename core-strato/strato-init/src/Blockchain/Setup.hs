@@ -303,11 +303,14 @@ oneTimeSetup genesisBlockName = do
      {- connStr implicitly defined by ethconf.yaml above, & unsafePerformIO -}
 
       runLoggingT $ withPostgresqlConn localConn $ runReaderT $ do
-         liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB; creating indexes"
+         liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
          liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show localConn
 
          runMigration DataDefs.migrateAll
+         liftIO $ putStrLn $ CL.yellow ">>>> Indexing SQL DB"
+         runMigration DataDefs.indexAll
 
+         liftIO $ putStrLn $ CL.yellow ">>>> Inserting bootnodes"
          EthDiscovery.setup bootnodes
 
 
