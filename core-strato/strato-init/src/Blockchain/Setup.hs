@@ -33,9 +33,9 @@ import           Blockchain.APIFiles
 import           Blockchain.Constants
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
-import           Blockchain.GenesisBlock
 import           Blockchain.DB.CodeDB
-import           Blockchain.EthConf.Model
+import           Blockchain.EthConf
+import           Blockchain.GenesisBlock
 import           Blockchain.Init.EthConf
 import           Blockchain.Init.Monad
 import           Blockchain.Init.Options
