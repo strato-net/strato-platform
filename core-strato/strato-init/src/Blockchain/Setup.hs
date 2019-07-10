@@ -28,6 +28,7 @@ import           Network.Kafka.Protocol
 import           System.Directory
 import           System.Exit
 import           System.FilePath
+import           Turtle (chmod, roo, fromText)
 
 import           Blockchain.APIFiles
 import           Blockchain.Constants
@@ -68,6 +69,9 @@ topics = [ "unminedblock"
 genesisFiles :: [(FilePath, B.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
 
+makeReadOnly :: FilePath -> IO ()
+makeReadOnly = void . chmod roo . fromText . T.pack
+
 addStandardGenesisBlockIfNeeded :: String->IO ()
 addStandardGenesisBlockIfNeeded genesisBlockName = do
   let genesisFileName = genesisBlockName ++ "Genesis.json"
@@ -79,13 +83,13 @@ addStandardGenesisBlockIfNeeded genesisBlockName = do
 
   case (jsonExists, maybeJSON) of
    (True, _) -> return ()
-   (_, Just contents) -> B.writeFile genesisFileName contents
+   (_, Just contents) -> B.writeFile genesisFileName contents >> makeReadOnly genesisFileName
    _ -> error $ "Search for genesis file has failed.  You need to supply a file named '" ++ genesisFileName ++ "'"
 
   infoExists <- doesFileExist accountInfoFileName
   case (infoExists, maybeInfo) of
     (True, _) -> return ()
-    (_, Just contents) -> B.writeFile accountInfoFileName contents
+    (_, Just contents) -> B.writeFile accountInfoFileName contents >> makeReadOnly accountInfoFileName
     _ -> putStrLn "No account info file found. Will proceed without it\
                   \ and assume Genesis.json is self contained."
 
@@ -136,6 +140,7 @@ oneTimeSetup genesisBlockName = do
 
       putStrLn $ CL.red "WARNING: the private key for this strato node is being written to the file .ethereumH/ethconf.yaml.  Please keep it secure; anyone who reads it will become you."
       encodeFile (".ethereumH" </> "ethconf.yaml") ethconf
+      makeReadOnly $ ".ethereumH" </> "ethconf.yaml"
 
       {- CONFIG: register this blockchain with the global database -}
 
