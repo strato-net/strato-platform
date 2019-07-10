@@ -20,6 +20,7 @@ import qualified Data.ByteString                   as BS
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
+import           Text.Printf
 
 newtype Password = Password ByteString
   deriving (Eq,Show)
@@ -63,8 +64,7 @@ decryptSecKey
   -> SecretBox.Nonce
   -> ByteString -- encrypted secret key
   -> Maybe SecKey
-decryptSecKey pw salt nonce = secKey <=< d
-  where d = decrypt pw salt nonce
+decryptSecKey pw salt nonce = secKey <=< decrypt pw salt nonce
 
 encrypt
   :: Password
@@ -83,6 +83,17 @@ encrypt (Password pw) salt nonce plaintext =
       encKey = fromMaybe err . Saltine.decode $
         Scrypt.generate scryptParams pw salt
    in SecretBox.secretbox encKey nonce plaintext
+
+reencryptKey :: Password -> Password -> ByteString -> SecretBox.Nonce -> ByteString -> Address -> Either String ByteString
+reencryptKey oldPass newPass salt nonce oldKey givenAddress=
+  case decryptSecKey oldPass salt nonce oldKey of
+    Nothing -> Left "could not decrypt account"
+    Just plainKey -> let foundAddress = deriveAddress plainKey
+                     in if foundAddress /= givenAddress
+                          then Left $ printf "address mismatch (wrong password?): got %s, want %s"
+                                             (show foundAddress)
+                                             (show givenAddress)
+                          else Right $ encrypt newPass salt nonce (getSecKey plainKey)
 
 deriveAddress :: SecKey -> Address
 deriveAddress = keccak256Address . BS.drop 1 . exportPubKey False . derivePubKey

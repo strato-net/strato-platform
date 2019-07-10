@@ -11,6 +11,8 @@ import           Data.Maybe                       (listToMaybe)
 import           Data.IORef
 import           Data.Text                        (Text)
 import           Data.Text.Encoding               (encodeUtf8)
+import           Database.PostgreSQL.Simple       (Connection)
+
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Queries
 import           Strato.Strato23.Monad
@@ -18,6 +20,15 @@ import           Strato.Strato23.Monad
 superSecretVaultWrapperMessage :: ByteString
 superSecretVaultWrapperMessage =
   "A monad is just a monoid in the category of endofunctors, what's the problem?"
+
+setPassword :: Password -> Connection -> IO Bool
+setPassword pw conn = do
+  (salt, nonce) <- newSaltAndNonce
+  let ciphertext = encrypt pw
+                           salt
+                           nonce
+                           superSecretVaultWrapperMessage
+  postMessageQuery salt nonce ciphertext conn
 
 postPassword :: Text -> VaultM ()
 postPassword password = do
@@ -30,12 +41,7 @@ postPassword password = do
       mMsg <- listToMaybe <$> vaultQuery getMessageQuery
       case mMsg of
         Nothing -> do
-          (salt, nonce) <- newSaltAndNonce
-          let ciphertext = encrypt (Password pw)
-                                   salt
-                                   nonce
-                                   superSecretVaultWrapperMessage
-          success <- vaultModify $ postMessageQuery salt nonce ciphertext
+          success <- vaultModify . setPassword $ Password pw
           if success
             then liftIO . atomicWriteIORef existingPassword $ Just password
             else vaultWrapperError $ AnError "Failed to insert encrypted message into database"
