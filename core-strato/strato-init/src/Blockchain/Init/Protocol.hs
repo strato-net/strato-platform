@@ -8,14 +8,19 @@ module Blockchain.Init.Protocol
   , receiveEvent
   ) where
 
-import Data.Aeson
+import qualified Data.Aeson as Ae
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import GHC.Generics
+import System.Exit
 
 import Blockchain.EthConf.Model
 import Blockchain.Data.GenesisInfo
-import Network.Kafka.Protocol as K
+import Blockchain.Stream.Raw
+import Blockchain.Strato.StateDiff.Kafka (filterResponse)
+import qualified Network.Kafka as K
+import qualified Network.Kafka.Protocol as K
 
 data EventInit = EthConf EthConf
                | TopicList [(String, String)]
@@ -31,13 +36,31 @@ data EventInit = EthConf EthConf
                | GenesisAccounts T.Text
                | ApiConfig [(FilePath, B.ByteString)]
                | InitComplete
-               deriving (Show, Eq, Generic, ToJSON, FromJSON)
+               deriving (Show, Eq, Generic, Ae.ToJSON, Ae.FromJSON)
 
 initTopic :: K.TopicName
 initTopic = "strato-init-events"
 
-addEvent :: EventInit -> IO ()
-addEvent = error "TODO(tim): addEvent"
+bootstrapState :: K.KafkaState
+bootstrapState = K.mkKafkaState "strato-init" ("kafka", 9092)
 
-receiveEvent :: IO EventInit
-receiveEvent = error "TODO(tim): receiveEvent"
+addEvent :: EventInit -> IO ()
+addEvent ev = do
+  eErr <- K.runKafka bootstrapState $ produceBytes initTopic [BL.toStrict . Ae.encode $ ev]
+  case eErr of
+    Left err -> die $ show err
+    Right rsp -> case filterResponse rsp of
+                      [] -> return ()
+                      errs -> die $ show errs
+
+receiveEvent :: K.Offset -> IO EventInit
+receiveEvent off = do
+  resps <- K.runKafka bootstrapState $ do
+    _ <- setDefaultKafkaState
+    fetchBytes initTopic off
+  case resps of
+    Left err -> die (show err)
+    Right [] -> die "no event received within 100s"
+    Right (x:_) -> case Ae.eitherDecodeStrict x of
+                Left err -> die $ "corrupt EventInit: " ++ show err
+                Right ev -> return ev
