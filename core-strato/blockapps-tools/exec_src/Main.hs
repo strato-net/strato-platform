@@ -13,9 +13,10 @@ import           Block
 import           BlockGO
 import           Checkpoints
 import           Code
-import           DumpKafkaBlocks
 import           CanonRedis
 import           ChainHash
+import           DeriveEnode
+import           DumpKafkaBlocks
 import           DumpKafkaRaw
 import           DumpKafkaSequencer
 import           DumpKafkaStateDiff
@@ -81,6 +82,7 @@ data Options = State{root::String, db::String}
              | VerifyKafkaFile { filename :: String }
              | SetParticipationMode { mode :: ParticipationMode }
              | ChainHash
+             | DeriveEnode { privatekey :: String, ip :: String }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -315,6 +317,12 @@ setParticipationModeOptions = record SetParticipationMode {mode = error "unused 
 chainHashOptions :: Annotate Ann
 chainHashOptions = record ChainHash []
 
+deriveEnodeOptions :: Annotate Ann
+deriveEnodeOptions = record DeriveEnode { privatekey = error "unused privatekey", ip = error "unused ip"}
+                   [ privatekey := error "--private-key required" += typ "BASE64 Private Key" += explicit += name "private-key"
+                   , ip := error "--ip required" += typ "IP address" += explicit += name "ip"
+                   ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -354,6 +362,7 @@ options = modes_ [blockGoOptions
                 , verifyKafkaFileOptions
                 , setParticipationModeOptions
                 , chainHashOptions
+                , deriveEnodeOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -410,3 +419,4 @@ run LoadKafka{..}              = loadKafka topic filename
 run VerifyKafkaFile{..}        = verifyKafkaFile filename
 run SetParticipationMode{..}   = remoteSetParticipationMode mode
 run ChainHash                  = chainHash
+run DeriveEnode{..}            = deriveEnode privatekey ip

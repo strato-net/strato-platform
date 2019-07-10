@@ -15,6 +15,7 @@ dependencies:
   - aeson
   - ansi-wl-pprint
   - base16-bytestring
+  - base64-bytestring
   - binary
   - blockapps-data
   - blockapps-datadefs
@@ -28,6 +29,7 @@ dependencies:
   - conduit
   - data-default
   - ethereum-discovery
+  - ethereum-encryption
   - ethereum-rlp
   - filepath
   - format
