@@ -18,7 +18,6 @@ import qualified Data.NibbleString                  as N
 import qualified Database.Redis                     as Redis
 import qualified Database.LevelDB                   as DB
 import           Database.Persist.Postgresql        (createPostgresqlPool)
-import           System.FilePath                    ((</>))
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
@@ -54,7 +53,7 @@ type SetupDBM = ReaderT SetupDBs (LoggingT (ResourceT IO))
 
 runSetupDBM :: SetupDBM a -> LoggingT (ResourceT IO) a
 runSetupDBM mv = do
-  let open path = DB.open (".ethereumH" </> path) DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+  let open path = DB.open (".ethereumH" ++ path) DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
   sdb <- open stateDBPath
   srRef <- liftIO . newIORef $ error "stateRoot used before defined"
   hdb <- HashDB <$> open hashDBPath
