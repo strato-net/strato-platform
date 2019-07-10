@@ -68,6 +68,7 @@ dependencies:
   - text
   - time
   - transformers
+  - turtle
   - unliftio-core
   - unordered-containers
   - utf8-string
