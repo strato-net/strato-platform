@@ -27,5 +27,6 @@ defineFlag "extraFaucets" ("[]" :: String) "JSON encoded list of other faucets t
 
 defineFlag "singlePrivateKey" (True :: Bool) "Whether to share P2P and PBFT keys"
 defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for more peers"
+defineFlag "genesisBlockName" "livenet" "use the alternate stablenet genesis block"
 
 $(return [])
