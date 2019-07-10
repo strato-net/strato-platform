@@ -72,6 +72,8 @@ mkAll genesisBlockName = do
   sendGenesisJson genesisFileName decodedFaucets
   sendAccountInfo accountInfoFileName
 
+  send InitComplete
+
 sendGenesisJson :: FilePath -> [Address] -> GenM ()
 sendGenesisJson genesisFilename extraFaucets = do
   fsFile <- doesFileExist genesisFilename
