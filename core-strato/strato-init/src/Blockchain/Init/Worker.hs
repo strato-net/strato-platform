@@ -37,11 +37,11 @@ import qualified Executable.EthDiscoverySetup as EthDiscovery
 import Network.Kafka as K
 import qualified Text.Colors as CL
 
-runWorker :: LoggingT (ResourceT IO) ()
-runWorker = do
+runWorker :: K.KafkaAddress -> LoggingT (ResourceT IO) ()
+runWorker kaddr = do
   withSystemTempFile "genesis_block" $ \tf _ -> do
     runConduit $ yieldMany [0..]
-              .| mapMC (liftIO . receiveEvent)
+              .| mapMC (liftIO . receiveEvent kaddr)
               .| takeWhileC (/= InitComplete)
               .| iterMC ($logInfoLS "runWorker/inbound")
               .| mapM_C (process tf)
