@@ -273,7 +273,7 @@ function doSplitInit {
     echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
     tail -f /dev/null
   fi
-  init-worker $args
+  init-worker --kafkahost=$kafkaHost
 }
 
 # Find all logs greater than 10M, then copy and truncate
