@@ -96,7 +96,7 @@ spec = do
                        (EVMCode $ SHA 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
               ],
             genesisInfoCodeInfo = [],
-            genesisInfoTransactionsRoot = StateRoot . fst . B16.decode $
+            genesisInfoTransactionRoot = StateRoot . fst . B16.decode $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
             genesisInfoReceiptsRoot =  StateRoot . fst . B16.decode $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
@@ -148,7 +148,7 @@ spec = do
                        (EVMCode $ SHA 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
               ],
             genesisInfoCodeInfo = [],
-            genesisInfoTransactionsRoot = StateRoot . fst . B16.decode $
+            genesisInfoTransactionRoot = StateRoot . fst . B16.decode $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
             genesisInfoReceiptsRoot =  StateRoot . fst . B16.decode $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
