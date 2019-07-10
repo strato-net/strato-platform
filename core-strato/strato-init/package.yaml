@@ -73,6 +73,7 @@ dependencies:
   - unordered-containers
   - utf8-string
   - vector
+  - unliftio
   - yaml
 
 library:

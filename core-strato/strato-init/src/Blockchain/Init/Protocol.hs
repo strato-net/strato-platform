@@ -41,21 +41,21 @@ data EventInit = EthConf EthConf
 initTopic :: K.TopicName
 initTopic = "strato-init-events"
 
-bootstrapState :: K.KafkaState
-bootstrapState = K.mkKafkaState "strato-init" ("kafka", 9092)
+bootstrapState :: K.KafkaAddress -> K.KafkaState
+bootstrapState = K.mkKafkaState "strato-init"
 
-addEvent :: EventInit -> IO ()
-addEvent ev = do
-  eErr <- K.runKafka bootstrapState $ produceBytes initTopic [BL.toStrict . Ae.encode $ ev]
+addEvent :: K.KafkaAddress -> EventInit -> IO ()
+addEvent kaddr ev = do
+  eErr <- K.runKafka (bootstrapState kaddr) $ produceBytes initTopic [BL.toStrict . Ae.encode $ ev]
   case eErr of
     Left err -> die $ show err
     Right rsp -> case filterResponse rsp of
                       [] -> return ()
                       errs -> die $ show errs
 
-receiveEvent :: K.Offset -> IO EventInit
-receiveEvent off = do
-  resps <- K.runKafka bootstrapState $ do
+receiveEvent :: K.KafkaAddress -> K.Offset -> IO EventInit
+receiveEvent kaddr off = do
+  resps <- K.runKafka (bootstrapState kaddr) $ do
     _ <- setDefaultKafkaState
     fetchBytes initTopic off
   case resps of
