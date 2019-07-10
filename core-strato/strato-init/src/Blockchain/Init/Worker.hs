@@ -40,9 +40,11 @@ import qualified Text.Colors as CL
 runWorker :: LoggingT (ResourceT IO) ()
 runWorker = do
   withSystemTempFile "genesis_block" $ \tf _ -> do
-    runConduit $ repeatWhileMC (liftIO receiveEvent) (/= InitComplete)
-                          .| iterMC ($logInfoLS "runWorker/inbound")
-                          .| mapM_C (process tf)
+    runConduit $ yieldMany [0..]
+              .| mapMC (liftIO . receiveEvent)
+              .| takeWhileC (/= InitComplete)
+              .| iterMC ($logInfoLS "runWorker/inbound")
+              .| mapM_C (process tf)
     $logInfoS "runWorker" "All events received"
     runSetupDBM $ do
       $logInfoS "runWorker" "Adding empty code"
