@@ -9,9 +9,9 @@ import HFlags
 
 main :: IO ()
 main = do
+  _ <- $initHFlags "tabula-rasa"
   let kaddr = case flags_kafkahost of
                   "" -> ("kafka", 9092)
                   _ -> (fromString flags_kafkahost, 9092)
 
-  _ <- $initHFlags "tabula-rasa"
   runGenM kaddr $ mkAll flags_genesisBlockName
