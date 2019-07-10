@@ -22,6 +22,7 @@ import System.Exit
 import System.FilePath ((</>))
 import System.IO.Temp
 import Text.Printf
+import Turtle (chmod, roo, fromText)
 
 import BlockApps.Logging
 import Blockchain.APIFiles (inflateDir)
@@ -53,6 +54,9 @@ runWorker kaddr = do
       initializeGenesisBlock tf []
     $logInfoS "runWorker" "done."
 
+makeReadOnly :: FilePath -> IO ()
+makeReadOnly = void . chmod roo . fromText . T.pack
+
 process :: FilePath -> EventInit -> LoggingT (ResourceT IO) ()
 process pathRoot = \case
   -- Note: EthConf must come first, but otherwise the order doesn't (shouldn't ?) matter.
@@ -60,6 +64,7 @@ process pathRoot = \case
     let dir = ".ethereumH"
     liftIO $ createDirectoryIfMissing True dir
     liftIO $ encodeFile (dir </> "ethconf.yaml") ec
+    liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
     let pgconf = EC.sqlConfig ec
         rawConn = EC.postgreSQLConnectionString pgconf{EC.database = ""}
         globalConn = EC.postgreSQLConnectionString pgconf{EC.database = "blockchain"}
@@ -90,6 +95,7 @@ process pathRoot = \case
     let uniqueTopicMap = M.fromList topics
     let topicList = map (fromString . snd) topics
     encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
+    makeReadOnly $ ".ethereumH" </> "topics.yaml"
 
     res <- UEC.runKafkaConfigured "init-worker" $ K.updateMetadatas topicList
     whenLeft res $ \err ->
@@ -98,12 +104,13 @@ process pathRoot = \case
     threadDelay 1000000
   ApiConfig filePairs -> liftIO $ inflateDir filePairs
 
-  GenesisBlock gb -> do
+  GenesisBlock gb -> liftIO $ do
     let blockFile = pathRoot ++ "Genesis.json"
-    liftIO $ Ae.encodeFile blockFile gb
+    Ae.encodeFile blockFile gb
+    makeReadOnly blockFile
 
-  GenesisAccounts acs -> do
+  GenesisAccounts acs -> liftIO $ do
     let accountFile = pathRoot ++ "AccountInfo"
-    liftIO $ TIO.appendFile accountFile acs
+    TIO.appendFile accountFile acs
 
   InitComplete -> liftIO $ die "InitComplete shouldn't be here"
