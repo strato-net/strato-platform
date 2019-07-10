@@ -1,6 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Blockchain.Init.Generator where
 
+import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Reader
@@ -22,7 +24,7 @@ import Blockchain.Init.Protocol
 import Blockchain.Init.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
-import Network.Kafka (KafkaAddress)
+import Network.Kafka (KafkaAddress, mkKafkaState, runKafka, updateMetadata)
 
 type GenM = ReaderT KafkaAddress IO
 
@@ -34,11 +36,22 @@ send ev = do
   kaddr <- ask
   liftIO $ addEvent kaddr ev
 
+initializeTopic :: GenM ()
+initializeTopic = do
+  kaddr <- ask
+  liftIO $ do
+    res <- runKafka (mkKafkaState "generator" kaddr) $ updateMetadata initTopic
+    either (die . show) return res
+    putStrLn "Superstitions persist"
+    threadDelay 1000000
+
 genesisFiles :: [(FilePath, C8.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
 
 mkAll :: String -> GenM ()
 mkAll genesisBlockName = do
+  initializeTopic
+
   ethconf <- liftIO genEthConf
   send $ EthConf ethconf
 
