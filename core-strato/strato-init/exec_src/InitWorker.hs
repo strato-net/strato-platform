@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-import Control.Monad.Trans.Resource
 import Data.String
 import HFlags
 
@@ -17,4 +16,4 @@ main = do
   let kaddr = case flags_kafkahost of
                   "" -> ("kafka", 9092)
                   _ -> (fromString flags_kafkahost, 9092)
-  runResourceT . runLoggingT $ runWorker kaddr
+  runLoggingT $ runWorker kaddr

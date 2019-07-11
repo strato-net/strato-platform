@@ -5,7 +5,8 @@ module Blockchain.Init.Generator where
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Unlift
-import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.State
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString.Char8 as C8
 import Data.FileEmbed
@@ -24,24 +25,19 @@ import Blockchain.Init.Protocol
 import Blockchain.Init.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
-import Network.Kafka (KafkaAddress, mkKafkaState, runKafka, updateMetadata)
+import Network.Kafka (KafkaAddress, mkKafkaState, runKafka, updateMetadata, KafkaState, KafkaClientError)
 
-type GenM = ReaderT KafkaAddress IO
+type GenM = StateT KafkaState (ExceptT KafkaClientError IO)
 
 runGenM :: KafkaAddress -> GenM a -> IO a
-runGenM = flip runReaderT
-
-send :: EventInit -> GenM()
-send ev = do
-  kaddr <- ask
-  liftIO $ addEvent kaddr ev
+runGenM kaddr mv = do
+  eRes <- runKafka (mkKafkaState "generator" kaddr) mv
+  either (die . ("runGenM: " ++) . show) return eRes
 
 initializeTopic :: GenM ()
 initializeTopic = do
-  kaddr <- ask
+  updateMetadata initTopic
   liftIO $ do
-    res <- runKafka (mkKafkaState "generator" kaddr) $ updateMetadata initTopic
-    either (die . show) return res
     putStrLn "Superstitions persist"
     threadDelay 1000000
 
@@ -53,16 +49,16 @@ mkAll genesisBlockName = do
   initializeTopic
 
   ethconf <- liftIO genEthConf
-  send $ EthConf ethconf
+  addEvent $ EthConf ethconf
 
-  send $ TopicList [(t, t) | t <- ["unminedblock", "statediff", "seq_vm_events", "seq_p2p_events"
+  addEvent $ TopicList [(t, t) | t <- ["unminedblock", "statediff", "seq_vm_events", "seq_p2p_events"
                                       , "unseqevents", "jsonrpcresponse", "indexevents", "block"]]
   let bootnodes = if flags_addBootnodes
                     then Just $ filter (not . null) flags_stratoBootnode
                     else Nothing
-  send $ PeerList bootnodes
+  addEvent $ PeerList bootnodes
 
-  send $ ApiConfig $ stratoAPICerts ++ stratoAPIConfigDir
+  addEvent $ ApiConfig $ stratoAPICerts ++ stratoAPIConfigDir
 
 
   let decodedFaucets = fromMaybe [] . Ae.decodeStrict . C8.pack $ flags_extraFaucets
@@ -72,7 +68,7 @@ mkAll genesisBlockName = do
   sendGenesisJson genesisFileName decodedFaucets
   sendAccountInfo accountInfoFileName
 
-  send InitComplete
+  addEvent InitComplete
 
 sendGenesisJson :: FilePath -> [Address] -> GenM ()
 sendGenesisJson genesisFilename extraFaucets = do
@@ -87,7 +83,7 @@ sendGenesisJson genesisFilename extraFaucets = do
     Right genInfo -> do
       let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
           faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-      send $ GenesisBlock genInfo {
+      addEvent $ GenesisBlock genInfo {
                genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo genInfo)
              }
 
@@ -100,11 +96,13 @@ sendAccountInfo accountInfoFileName = do
           sendChunks h = do
             chk <- liftIO $ TIO.hGetChunk h
             unless (T.null chk) $ do
-              send $ GenesisAccounts chk
+              addEvent $ GenesisAccounts chk
               sendChunks h
-      withFile accountInfoFileName ReadMode $ \h -> do
+      s <- get
+      liftIO . withFile accountInfoFileName ReadMode $ \h -> do
         hSetBuffering h (BlockBuffering (Just (1024 * 1024)))
-        sendChunks h
+        mErr <- runKafka s $ sendChunks h
+        either (die . ("sendAccountInfo: " ++) . show) return mErr
     else case lookup accountInfoFileName genesisFiles of
             Nothing -> liftIO $ putStrLn "No account info found, assuming it isn't needed"
-            Just bs -> send $ GenesisAccounts $ decodeUtf8 bs
+            Just bs -> addEvent $ GenesisAccounts $ decodeUtf8 bs

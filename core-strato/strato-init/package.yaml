@@ -47,6 +47,7 @@ dependencies:
   - leveldb-haskell
   - memory
   - merkle-patricia-db
+  - monad-control
   - monad-alter
   - mtl
   - nibblestring
@@ -68,6 +69,7 @@ dependencies:
   - text
   - time
   - transformers
+  - transformers-base
   - turtle
   - unliftio-core
   - unordered-containers

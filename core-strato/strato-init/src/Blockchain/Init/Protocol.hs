@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Init.Protocol
   ( EventInit(..)
@@ -8,8 +9,10 @@ module Blockchain.Init.Protocol
   , receiveEvent
   ) where
 
+import Control.Monad.IO.Class
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import GHC.Generics
@@ -41,26 +44,19 @@ data EventInit = EthConf EthConf
 initTopic :: K.TopicName
 initTopic = "strato-init-events"
 
-bootstrapState :: K.KafkaAddress -> K.KafkaState
-bootstrapState = K.mkKafkaState "strato-init"
+addEvent :: K.Kafka k => EventInit -> k ()
+addEvent ev = do
+  rsp <- produceBytes initTopic [BL.toStrict . Ae.encode $ ev]
+  case filterResponse rsp of
+    [] -> return ()
+    errs -> liftIO . die $ show errs
 
-addEvent :: K.KafkaAddress -> EventInit -> IO ()
-addEvent kaddr ev = do
-  eErr <- K.runKafka (bootstrapState kaddr) $ produceBytes initTopic [BL.toStrict . Ae.encode $ ev]
-  case eErr of
-    Left err -> die $ show err
-    Right rsp -> case filterResponse rsp of
-                      [] -> return ()
-                      errs -> die $ show errs
-
-receiveEvent :: K.KafkaAddress -> K.Offset -> IO EventInit
-receiveEvent kaddr off = do
-  resps <- K.runKafka (bootstrapState kaddr) $ do
-    _ <- setDefaultKafkaState
-    fetchBytes initTopic off
-  case resps of
-    Left err -> die (show err)
-    Right [] -> die "no event received within 100s"
-    Right (x:_) -> case Ae.eitherDecodeStrict x of
-                Left err -> die $ "corrupt EventInit: " ++ show err
-                Right ev -> return ev
+receiveEvent :: K.Kafka k => K.Offset -> k EventInit
+receiveEvent off = do
+  _ <- setDefaultKafkaState
+  bss <- fetchBytes initTopic off
+  case bss of
+    [] -> liftIO . die $ "receiveEvent: no event received within 100s"
+    (bs:_) -> case Ae.eitherDecodeStrict bs of
+                  Left err -> liftIO . die $ "corrupt EventInit: " ++ show (err, C8.unpack bs)
+                  Right ev -> return ev

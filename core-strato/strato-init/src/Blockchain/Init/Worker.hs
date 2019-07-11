@@ -1,13 +1,23 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 module Blockchain.Init.Worker (runWorker) where
 
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Except
 import Control.Monad.Trans.Resource
+import Control.Monad.Trans.State
 import Conduit
 import qualified Data.Aeson as Ae
 import Data.Either.Combinators (whenLeft)
@@ -34,20 +44,41 @@ import qualified Blockchain.EthConf.Model as EC
 import Blockchain.GenesisBlock
 import Blockchain.Init.Monad
 import Blockchain.Init.Protocol
+import Blockchain.MilenaTools
 import qualified Executable.EthDiscoverySetup as EthDiscovery
 import Network.Kafka as K
+import Network.Kafka.Protocol as K
 import qualified Text.Colors as CL
 
-runWorker :: K.KafkaAddress -> LoggingT (ResourceT IO) ()
+
+-- This definition has been removed upstream, but MBC is a requirement
+-- for Kafka 🙃
+-- instance MonadBase b m => MonadBase b (ResourceT m) where
+--   liftBase = liftBaseDefault
+
+-- instance MonadTransControl ResourceT where
+--   type StT ResourceT a = a
+--   liftWith f = ResourceT $ \rMap -> f $ \t -> unResourceT t rMap
+--   restoreT = ResourceT . const
+
+-- instance MonadBaseControl b m => MonadBaseControl b (ResourceT m) where
+--   type StM (ResourceT m) a = ComposeSt ResourceT m a
+--   liftBaseWith = defaultLiftBaseWith
+--   restoreM = defaultRestoreM
+
+runWorker :: K.KafkaAddress -> LoggingT IO ()
 runWorker kaddr = do
   withSystemTempFile "genesis_block" $ \tf _ -> do
-    runConduit $ yieldMany [0..]
-              .| mapMC (liftIO . receiveEvent kaddr)
-              .| takeWhileC (/= InitComplete)
-              .| iterMC ($logInfoLS "runWorker/inbound")
-              .| mapM_C (process tf)
+    workerKafka kaddr $ do
+      firstOffset <- start
+      runConduit $ yieldMany [firstOffset..]
+                .| mapMC (\o -> (o,) <$> receiveEvent o)
+                .| takeWhileC ((/= InitComplete) . snd)
+                .| iterMC ($logInfoLS "runWorker/inbound")
+                .| mapMC (\(o, ev) -> lift . lift $ process tf o ev)
+                .| mapM_C commit
     $logInfoS "runWorker" "All events received"
-    runSetupDBM $ do
+    runResourceT . runSetupDBM $ do
       $logInfoS "runWorker" "Adding empty code"
       void $ addCode EVM mempty -- blank code is the default for Accounts, but gets added nowhere else.
       $logInfoS "runWorker" "Processing genesis block"
@@ -57,8 +88,27 @@ runWorker kaddr = do
 makeReadOnly :: FilePath -> IO ()
 makeReadOnly = void . chmod roo . fromText . T.pack
 
-process :: FilePath -> EventInit -> LoggingT (ResourceT IO) ()
-process pathRoot = \case
+consumerGroup :: K.ConsumerGroup
+consumerGroup = "init-worker"
+
+workerKafka :: MonadIO m => K.KafkaAddress -> StateT KafkaState (ExceptT KafkaClientError m) a -> m a
+workerKafka kaddr mv = do
+  eRes <- runExceptT $ evalStateT mv (K.mkKafkaState "init-worker" kaddr)
+  either (liftIO . die . ("worker: "++) . show) return eRes
+
+commit :: Kafka k => K.Offset -> k ()
+commit koffset = either (liftIO . die . ("commit: "++) . show) return =<< commitSingleOffset consumerGroup initTopic 0 koffset ""
+
+start :: K.Kafka k => k K.Offset
+start = do
+  eOff <- fetchSingleOffset consumerGroup initTopic 0
+  case eOff of
+    Left K.UnknownTopicOrPartition -> commit 0 >> start
+    Left e -> liftIO . die $ "start: " ++ show e
+    Right off -> return $ fst off
+
+process :: FilePath -> K.Offset -> EventInit -> LoggingT IO K.Offset
+process pathRoot off = (>> return off) . \case
   -- Note: EthConf must come first, but otherwise the order doesn't (shouldn't ?) matter.
   EthConf ec -> do
     let dir = ".ethereumH"
@@ -77,9 +127,9 @@ process pathRoot = \case
     $logInfoLS "ethconf/Create Database" rawConn
     let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
 
-    withPostgresqlConn rawConn (runReaderT (rawExecute query []) :: SqlWriteBackend -> LoggingT (ResourceT IO) ())
+    withPostgresqlConn rawConn (runReaderT (rawExecute query []) :: SqlWriteBackend -> LoggingT IO ())
 
-    runLoggingT $ withPostgresqlConn localConn $ runReaderT $ do
+    withPostgresqlConn localConn $ runReaderT $ do
       $logInfoS "ethconf/migrate" . T.pack $ CL.yellow ">>>> Migrating eth"
       $logInfoLS "ethconf/migrateconn" localConn
       runMigration DataDefs.migrateAll

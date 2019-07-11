@@ -189,7 +189,7 @@ oneTimeSetup genesisBlockName = do
 
      {- create directory and dbs -}
 
-      void . runResourceT . runLoggingT . runSetupDBM $ do
+      void . runLoggingT . runResourceT . runSetupDBM $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
          void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
          liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"

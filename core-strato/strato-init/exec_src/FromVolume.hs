@@ -14,5 +14,6 @@ main = do
   let kaddr = case flags_kafkahost of
                   "" -> ("kafka", 9092)
                   _ -> (fromString flags_kafkahost, 9092)
-  runGenM kaddr initializeTopic
-  addEvent kaddr InitComplete
+  runGenM kaddr $ do
+    initializeTopic
+    addEvent InitComplete
