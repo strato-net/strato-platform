@@ -4,6 +4,7 @@
 import Data.String
 import Blockchain.Init.Options
 import Blockchain.Init.Protocol
+import Blockchain.Init.Generator (runGenM, initializeTopic)
 
 import HFlags
 
@@ -13,4 +14,5 @@ main = do
   let kaddr = case flags_kafkahost of
                   "" -> ("kafka", 9092)
                   _ -> (fromString flags_kafkahost, 9092)
+  runGenM kaddr initializeTopic
   addEvent kaddr InitComplete
