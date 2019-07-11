@@ -50,22 +50,6 @@ import Network.Kafka as K
 import Network.Kafka.Protocol as K
 import qualified Text.Colors as CL
 
-
--- This definition has been removed upstream, but MBC is a requirement
--- for Kafka 🙃
--- instance MonadBase b m => MonadBase b (ResourceT m) where
---   liftBase = liftBaseDefault
-
--- instance MonadTransControl ResourceT where
---   type StT ResourceT a = a
---   liftWith f = ResourceT $ \rMap -> f $ \t -> unResourceT t rMap
---   restoreT = ResourceT . const
-
--- instance MonadBaseControl b m => MonadBaseControl b (ResourceT m) where
---   type StM (ResourceT m) a = ComposeSt ResourceT m a
---   liftBaseWith = defaultLiftBaseWith
---   restoreM = defaultRestoreM
-
 runWorker :: K.KafkaAddress -> LoggingT IO ()
 runWorker kaddr = do
   withSystemTempFile "genesis_block" $ \tf _ -> do
