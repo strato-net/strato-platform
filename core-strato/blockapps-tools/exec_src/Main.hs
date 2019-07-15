@@ -26,6 +26,7 @@ import           Hash
 import           InsertP2P
 import           InsertSeq
 import           InsertTX
+import           Kafka
 import           Psql
 import           Raw
 import           RawMP
@@ -70,6 +71,9 @@ data Options = State{root::String, db::String}
              | RedisMatch { pattern :: String }
              | Migrate { tables :: String }
              | AddTx { txJson :: String}
+             | SaveKafka { topic :: String, filename :: String }
+             | LoadKafka { topic :: String, filename :: String }
+             | VerifyKafkaFile { filename :: String }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -261,6 +265,23 @@ addTxOptions = record AddTx { txJson = error "unused txJson"}
              [ txJson := error "addtx --tx=<json>" += typ "JSON" += explicit += name "tx"
              ]
 
+saveKafkaOptions :: Annotate Ann
+saveKafkaOptions = record SaveKafka { filename = error "unused filename", topic = error "unused topic"}
+                 [ filename := error "savekafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename"
+                 , topic := error "savekafka --filename=<file> --topic=<topic>" += typ "TOPIC" += explicit += name "topic"
+                 ]
+
+loadKafkaOptions :: Annotate Ann
+loadKafkaOptions = record LoadKafka { filename = error "unused filename", topic = error "unused topic"}
+                 [ filename := error "loadkafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename"
+                 , topic := error "loadkafka --filename=<file> --topic=<topic>" += typ "TOPIC" += explicit += name "topic"
+                 ]
+
+verifyKafkaFileOptions :: Annotate Ann
+verifyKafkaFileOptions = record VerifyKafkaFile { filename = error "unused filename"}
+                       [ filename := error "verifykafkafile --filename=<file>" += typ "PATH" += explicit += name "filename"
+                       ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -292,6 +313,9 @@ options = modes_ [blockGoOptions
                 , redisMatchOptions
                 , migrateOptions
                 , addTxOptions
+                , saveKafkaOptions
+                , loadKafkaOptions
+                , verifyKafkaFileOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -340,3 +364,6 @@ run Redis{..}                  = redis $ BC.pack key
 run RedisMatch{..}             = redisMatch $ BC.pack pattern
 run Migrate{..}                = migrate tables
 run AddTx{..}                  = addTx txJson
+run SaveKafka{..}              = saveKafka topic filename
+run LoadKafka{..}              = loadKafka topic filename
+run VerifyKafkaFile{..}        = verifyKafkaFile filename

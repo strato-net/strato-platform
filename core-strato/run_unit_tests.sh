@@ -8,6 +8,7 @@ TESTS=(
   blockapps-data
   blockapps-ecrecover
   blockapps-mpdbs
+  blockapps-tools
   blockstanbul
   ethereum-discovery
   ethereum-rlp
