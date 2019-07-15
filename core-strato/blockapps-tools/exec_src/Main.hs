@@ -24,6 +24,7 @@ import           DumpRedis
 import           FRawMP
 import           Hash
 import           InsertP2P
+import           InsertSeq
 import           InsertTX
 import           Psql
 import           Raw
@@ -68,6 +69,7 @@ data Options = State{root::String, db::String}
              | Redis { key :: String }
              | RedisMatch { pattern :: String }
              | Migrate { tables :: String }
+             | AddTx { txJson :: String}
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -254,6 +256,11 @@ migrateOptions = record Migrate { tables = error "unused tables"}
                [ tables := error "migrate (data|global|peer|all)" += typ "TABLES" += argPos 0
                ]
 
+addTxOptions :: Annotate Ann
+addTxOptions = record AddTx { txJson = error "unused txJson"}
+             [ txJson := error "addtx --tx=<json>" += typ "JSON" += explicit += name "tx"
+             ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -284,6 +291,7 @@ options = modes_ [blockGoOptions
                 , redisOptions
                 , redisMatchOptions
                 , migrateOptions
+                , addTxOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -331,3 +339,4 @@ run RSVP{..}                   = rsvp chainId memberId address
 run Redis{..}                  = redis $ BC.pack key
 run RedisMatch{..}             = redisMatch $ BC.pack pattern
 run Migrate{..}                = migrate tables
+run AddTx{..}                  = addTx txJson
