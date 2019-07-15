@@ -31,7 +31,9 @@ dependencies:
   - filepath
   - format
   - hflags
+  - lens
   - leveldb-haskell
+  - memory
   - merkle-patricia-db
   - monad-alter
   - blockapps-milena
@@ -81,3 +83,14 @@ executables:
       - hflags
       - time
     other-modules: []
+
+tests:
+  blockapps-tools-test:
+    source-dirs: test/
+    main: KafkaSpec.hs
+    dependencies:
+      - QuickCheck
+      - blockapps-tools
+      - bytestring-arbitrary
+      - hspec
+      - temporary
