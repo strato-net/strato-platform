@@ -3,6 +3,10 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# OPTIONS_GHC -Wall #-}
 
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as BC
+import           Data.Int
 import           System.Console.CmdArgs
 
 import           Block
@@ -20,6 +24,7 @@ import           DumpRedis
 import           FRawMP
 import           Hash
 import           InsertP2P
+import           InsertSeq
 import           InsertTX
 import           Psql
 import           Raw
@@ -33,9 +38,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import qualified Data.ByteString.Base16             as B16
-import qualified Data.ByteString.Char8              as BC
-import           Data.Int
+import           Blockchain.Strato.Model.SHA hiding (hash)
 
 data Options = State{root::String, db::String}
              | Block{hash::String, db::String}
@@ -61,10 +64,12 @@ data Options = State{root::String, db::String}
              | InsertTX{}
              | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
              | PushBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
+             | AskForTxs
              | RSVP {chainId :: Word256, memberId :: String, address::Address}
              | Redis { key :: String }
              | RedisMatch { pattern :: String }
              | Migrate { tables :: String }
+             | AddTx { txJson :: String}
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -225,6 +230,9 @@ pushOptions =
          , peer := 0x0 += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
          ]
 
+txOptions :: Annotate Ann
+txOptions = record AskForTxs []
+
 
 rsvpOptions :: Annotate Ann
 rsvpOptions = record RSVP { chainId = error "unused chain id", memberId = error "unused member", address = error "unused address"}
@@ -247,6 +255,11 @@ migrateOptions :: Annotate Ann
 migrateOptions = record Migrate { tables = error "unused tables"}
                [ tables := error "migrate (data|global|peer|all)" += typ "TABLES" += argPos 0
                ]
+
+addTxOptions :: Annotate Ann
+addTxOptions = record AddTx { txJson = error "unused txJson"}
+             [ txJson := error "addtx --tx=<json>" += typ "JSON" += explicit += name "tx"
+             ]
 
 options::Annotate Ann
 options = modes_ [blockGoOptions
@@ -273,10 +286,12 @@ options = modes_ [blockGoOptions
                 , stateOptions
                 , askOptions
                 , pushOptions
+                , txOptions
                 , rsvpOptions
                 , redisOptions
                 , redisMatchOptions
                 , migrateOptions
+                , addTxOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -316,7 +331,12 @@ run Checkpoints{..}            = case operation of
       NullOperation -> doCheckpointUsage
 run AskForBlocks{..}           = insertP2P (OEAskForBlocks startBlock endBlock peer)
 run PushBlocks{..}             = insertP2P (OEPushBlocks startBlock endBlock peer)
+run AskForTxs                  = insertP2P . OEGetTx
+                                           . map (SHA . bytesToWord256 . fst . B16.decode)
+                                           . filter (not . B.null)
+                                           . BC.split '\n' =<< B.getContents
 run RSVP{..}                   = rsvp chainId memberId address
 run Redis{..}                  = redis $ BC.pack key
 run RedisMatch{..}             = redisMatch $ BC.pack pattern
 run Migrate{..}                = migrate tables
+run AddTx{..}                  = addTx txJson

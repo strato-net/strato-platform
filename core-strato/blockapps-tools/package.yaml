@@ -12,6 +12,7 @@ description:
 
 dependencies:
   - base >= 4 && < 5
+  - aeson
   - ansi-wl-pprint
   - base16-bytestring
   - binary
