@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
@@ -73,13 +74,18 @@ instance Binary Transaction where
   put = put . rlpSerialize . rlpEncode
   get = (rlpDecode . rlpDeserialize) <$> get
 
+formatChainId :: Maybe Word256 -> String
+formatChainId = \case
+  Nothing -> "<main chain>"
+  Just cid -> format $ SHA cid
+
 instance Format Transaction where
   format PrivateHashTX{transactionTxHash=h, transactionChainHash=ch} =
     CL.blue "Private Transaction Hash" ++
     tab (
       "\n" ++
-      "Transaction Hash:       " ++ show h ++ "\n" ++
-      "Transaction Chain Hash: " ++ show ch ++ "\n")
+      "Transaction Hash:       " ++ format (SHA h) ++ "\n" ++
+      "Transaction Chain Hash: " ++ format (SHA ch) ++ "\n")
   format t@MessageTX
              { transactionNonce=n
              , transactionGasPrice=gp
@@ -99,7 +105,7 @@ instance Format Transaction where
       "to: " ++ format to' ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
       "tData: " ++ ("\n" ++ format d) ++ "\n" ++
-      "chainId: " ++ show cid ++ "\n" ++
+      "chainId: " ++ formatChainId cid ++ "\n" ++
       "metadata: " ++ show md ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
   format t@ContractCreationTX
@@ -119,7 +125,7 @@ instance Format Transaction where
       "tGasLimit: " ++ show gl ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
       "tInit: " ++ codeToString theCode ++ "\n" ++
-      "chainId: " ++ show cid ++ "\n" ++
+      "chainId: " ++ formatChainId cid ++ "\n" ++
       "metadata: " ++ show md ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
     where
