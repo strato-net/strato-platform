@@ -270,17 +270,17 @@ addTxOptions = record AddTx { txJson = error "unused txJson"}
 
 addBlocksFromFileOptions :: Annotate Ann
 addBlocksFromFileOptions = record AddBlocksFromFile { fileName = error "unused fileName"}
-             [ fileName := error "addblocksfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "--file-name"
+             [ fileName := error "addblocksfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "file-name"
              ]
 
 addGenesisFromFileOptions :: Annotate Ann
 addGenesisFromFileOptions = record AddGenesisFromFile { fileName = error "unused fileName"}
-             [ fileName := error "addgenesisfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "--file-name"
+             [ fileName := error "addgenesisfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "file-name"
              ]
 
 addTxsFromFileOptions :: Annotate Ann
 addTxsFromFileOptions = record AddTxsFromFile { fileName = error "unused fileName"}
-             [ fileName := error "addtxsfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "--file-name"
+             [ fileName := error "addtxsfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "file-name"
              ]
 
 saveKafkaOptions :: Annotate Ann
