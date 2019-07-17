@@ -70,7 +70,10 @@ instance ToJSON RawTransaction' where
                  ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
-parseHexStr = fmap (fst . head . readHex)
+parseHexStr = fmap readHexStr
+
+readHexStr :: Integral a => String -> a
+readHexStr = fst . head . readHex
 
 instance FromJSON RawTransaction' where
     parseJSON (Object t) = do
@@ -172,7 +175,7 @@ instance FromJSON Transaction' where
       th <- (t .:? "transactionHash")
       tch <- (t .:? "chainHash")
       case (th, tch) of
-        (Just h, Just ch) -> return (Transaction' (PrivateHashTX h ch))
+        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (readHexStr h) (readHexStr ch)))
         _ -> do
           tto <- (t .:? "to")
           tnon <- (t .:? "nonce" .!= 0)
