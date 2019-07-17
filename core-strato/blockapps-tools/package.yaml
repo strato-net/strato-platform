@@ -25,6 +25,7 @@ dependencies:
   - bytestring
   - cmdargs
   - common-log
+  - conduit
   - data-default
   - ethereum-discovery
   - ethereum-rlp
