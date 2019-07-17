@@ -1,11 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 module Kafka (saveKafka, loadKafka, verifyKafkaFile, readMsg, writeMsg) where
 
-import Control.Lens.Operators ((.=))
+import Control.Lens.Combinators (_1, _2, use, uses)
+import Control.Lens.Operators ((.=), (+=), (%=))
 import Control.Monad
+import Control.Monad.Trans.State
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
+import Conduit
+import qualified Data.Conduit.List as CL
 import Data.Memory.Endian (fromBE, toBE)
 import Data.String
 import Data.Word
@@ -17,6 +23,7 @@ import Text.Printf
 
 import Blockchain.EthConf
 import Blockchain.Stream.Raw
+import Blockchain.Strato.StateDiff.Kafka
 import Network.Kafka
 import Network.Kafka.Protocol
 
@@ -61,28 +68,59 @@ saveKafka topic' file = do
     hSetBuffering h . BlockBuffering . Just $ 1024 * 1024
     res <- runKafkaConfigured "querystrato" $ do
       stateBufferSize .= 100 * 1024 * 1024
+      stateWaitTime .= 500
       let loop :: Kafka k => Offset -> k ()
           loop off = do
             msgs <- fetchBytes topic off
-            mapM_ (liftIO . writeMsg h) msgs
-            loop (off + fromIntegral (length msgs))
+            unless (null msgs) $ do
+              mapM_ (liftIO . writeMsg h) msgs
+              loop (off + fromIntegral (length msgs))
       loop 0
     either (die . show) return res
 
+
+unfoldM' :: Monad m => m (Maybe a) -> ConduitT void a m ()
+unfoldM' mv = CL.unfoldM (\() -> fmap (, ()) <$> mv) ()
+
+streamFile :: MonadIO m => Handle -> ConduitT void B.ByteString m ()
+streamFile h = unfoldM' (liftIO $ readMsg h)
+
+maxBundleSize :: Int
+maxBundleSize = 1024 * 1024
+
+bundleMessages :: MonadIO m => ConduitT B.ByteString [B.ByteString] m ()
+bundleMessages = void . flip runStateT (0, []) $ do
+  let releasePending = do
+        lift . yield =<< uses _2 reverse
+        _1 .= 0
+        _2 .= []
+
+      addMessage msg = do
+        _1 += B.length msg
+        _2 %= (msg:)
+
+      loop = do
+        mMsg <- lift await
+        case mMsg of
+          Nothing -> releasePending
+          Just msg -> do
+            pendingSize <- use _1
+            when (pendingSize + B.length msg > maxBundleSize) releasePending
+            addMessage msg
+            loop
+  loop
 
 loadKafka :: String -> FilePath -> IO ()
 loadKafka topic file = do
   withBinaryFile file ReadMode $ \h -> do
     hSetBuffering h . BlockBuffering . Just $ 1024 * 1024
-    res <- runKafkaConfigured "queryStrato" $ do
-      let loop :: Kafka k => k ()
-          loop = do
-            -- TODO: batch writes
-            mMsg <- liftIO $ readMsg h
-            case mMsg of
-              Nothing -> return ()
-              Just msg -> produceBytes topic [msg] >> loop
-      loop
+    res <- runKafkaConfigured "queryStrato" . runConduit $
+         streamFile h
+      .| bundleMessages
+      .| mapMC (produceBytes' topic)
+      .| mapC filterResponse
+      .| mapM_C (\errs -> unless (null errs) . liftIO . die . printf "errors from kafka: %s" $ show errs)
+
     either (die . show) return res
 
 
@@ -90,13 +128,9 @@ verifyKafkaFile :: FilePath -> IO ()
 verifyKafkaFile file = do
   withBinaryFile file ReadMode $ \h -> do
     hSetBuffering h . BlockBuffering . Just $ 1024 * 1024
-    let loop :: Int -> Int -> IO (Int, Int)
-        loop msgs bytes = do
-          mMsg <- readMsg h
-          case mMsg of
-            Nothing -> return (msgs, bytes)
-            Just msg -> do
-              printf "Read message %d: %d\n" msgs $ B.length msg
-              loop (msgs + 1) (bytes + B.length msg)
-    (msgsRead, bytesRead) <- loop 0 0
+    (msgsRead, bytesRead) :: (Int, Int) <- flip execStateT (0, 0) . runConduit $
+         streamFile h
+      .| iterMC (\_ -> _1 += 1)
+      .| iterMC (\msg -> _2 += B.length msg)
+      .| mapM_C (\msg -> use _1 >>= \idx -> liftIO (printf "Read message #%d: %d bytes\n" idx (B.length msg)))
     printf "%d messages read, %d bytes read\n" msgsRead bytesRead
