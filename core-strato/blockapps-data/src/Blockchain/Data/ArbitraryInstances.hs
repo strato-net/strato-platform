@@ -97,26 +97,33 @@ instance Arbitrary Block where
 
 instance Arbitrary Transaction where
     arbitrary = do
-        nonce     <- unboxPI <$> arbitrary
-        gasPrice  <- unboxPI <$> arbitrary
-        gasLimit  <- arbitrary `suchThat` (> gasPrice)
-        value     <- unboxPI <$> arbitrary
-        prvKey    <- unboxPK <$> arbitrary
-        isMessage <- arbitrary :: Gen Bool
-        chainId   <- arbitrary
-        md        <- arbitrary
-        case isMessage of
-            True  -> do
-                to     <- arbitrary
-                txData <- arbitrary
-                return . unsafePerformIO .
-                    H.withSource H.devURandom $
-                        createChainMessageTX nonce gasPrice gasLimit to value txData chainId md prvKey
-            False -> do
-                contractCode <- arbitrary
-                return . unsafePerformIO .
-                    H.withSource H.devURandom $
-                        createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId md prvKey
+      isPrivHash <- arbitrary :: Gen Bool
+      if isPrivHash
+        then do
+          tHash <- arbitrary `suchThat` (/= 0)
+          cHash <- arbitrary `suchThat` (/= 0)
+          return $ PrivateHashTX tHash cHash
+        else do
+          nonce     <- unboxPI <$> arbitrary
+          gasPrice  <- unboxPI <$> arbitrary
+          gasLimit  <- arbitrary `suchThat` (> gasPrice)
+          value     <- unboxPI <$> arbitrary
+          prvKey    <- unboxPK <$> arbitrary
+          isMessage <- arbitrary :: Gen Bool
+          chainId   <- arbitrary
+          md        <- arbitrary
+          case isMessage of
+              True  -> do
+                  to     <- arbitrary
+                  txData <- arbitrary
+                  return . unsafePerformIO .
+                      H.withSource H.devURandom $
+                          createChainMessageTX nonce gasPrice gasLimit to value txData chainId md prvKey
+              False -> do
+                  contractCode <- arbitrary
+                  return . unsafePerformIO .
+                      H.withSource H.devURandom $
+                          createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId md prvKey
 
 instance Arbitrary Code where
     -- PrecompiledCode can't be serialized!

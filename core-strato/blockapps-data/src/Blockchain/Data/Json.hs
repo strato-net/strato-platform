@@ -28,7 +28,9 @@ import           Blockchain.Data.Block
 import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
+import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util                      (toMaybe)
 import           Text.Format
 
@@ -68,31 +70,34 @@ instance ToJSON RawTransaction' where
                  ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
-parseHexStr = fmap (fst . head . readHex)
+parseHexStr = fmap readHexStr
+
+readHexStr :: Integral a => String -> a
+readHexStr = fst . head . readHex
 
 instance FromJSON RawTransaction' where
     parseJSON (Object t) = do
-      fa <- parseHexStr (t .: "from")
-      tnon  <- t .: "nonce"
-      tgp <- t .: "gasPrice"
-      tgl <- t .: "gasLimit"
+      fa <- parseHexStr (t .:? "from" .!= "0")
+      tnon  <- t .:? "nonce" .!= 0
+      tgp <- t .:? "gasPrice" .!= 0
+      tgl <- t .:? "gasLimit" .!= 0
       tto <- fmap (fmap $ Address . fst . head . readHex) (t .:? "to")
-      tval <- fmap read (t .: "value")
-      tcd <- fmap (fst .  B16.decode . T.encodeUtf8 ) (t .: "codeOrData")
+      tval <- read <$> t .:? "value" .!= "0"
+      tcd <- fmap (fst .  B16.decode . T.encodeUtf8 ) (t .:? "codeOrData" .!= "")
       cid <- fmap (fmap $ fst . head . readHex) (t .:? "chainId")
       (tr :: Integer) <- parseHexStr (t .: "r")
       (ts :: Integer) <- parseHexStr (t .: "s")
-      (tv :: Word8) <- parseHexStr (t .: "v")
+      (tv :: Word8) <- parseHexStr (t .:? "v" .!= "0")
       md <- t .:? "metadata"
       bn <- t .:? "blockNumber" .!= (-1)
-      h <- (t .: "hash")
+      h <- (t .:? "hash" .!= (SHA $ fromIntegral tr)) -- when transaction is PrivateHashTX
       -- Unfortunately, time is rendered with `show` in ToJSON for RawTransaction'
       -- instead of using the ToJSON instance for UTCTime, and so it fails
       -- to parse in FromJSON for UTCTime.
       let defaultTime = UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
       (rawTime :: String) <- t .:? "timestamp" .!= ""
       let (time :: UTCTime) = fromMaybe defaultTime . readMaybe $ rawTime
-      o <- fmap read $ t .:? "origin" .!= "API"
+      o <- (read <$> t .:? "origin" .!= "API") :: Parser TXOrigin
       next <- t .:? "next" .!= ""
 
       return (RawTransaction'
@@ -160,8 +165,8 @@ instance ToJSON Transaction' where
                  ++ (("chainId" .=) <$> (maybeToList tcid))
                  ++ (("metadata" .=) <$> maybeToList md)
     toJSON (Transaction' tx@(PrivateHashTX th tch)) =
-        object ["r" .= showHex th "",
-                "s" .= showHex tch "",
+        object ["transactionHash" .= showHex th "",
+                "chainHash" .= showHex tch "",
                 "transactionType" .= (show $ transactionSemantics $ tx)]
 
 
@@ -170,23 +175,25 @@ instance FromJSON Transaction' where
       th <- (t .:? "transactionHash")
       tch <- (t .:? "chainHash")
       case (th, tch) of
-        (Just h, Just ch) -> return (Transaction' (PrivateHashTX h ch))
+        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (readHexStr h) (readHexStr ch)))
         _ -> do
           tto <- (t .:? "to")
-          tnon <- (t .: "nonce")
-          tgp <- (t .: "gasPrice")
-          tgl <- (t .: "gasLimit")
-          tval <- (t .: "value")
+          tnon <- (t .:? "nonce" .!= 0)
+          tgp <- (t .:? "gasPrice" .!= 0)
+          tgl <- (t .:? "gasLimit" .!= 0)
+          tval <- (t .:? "value" .!= 0)
           tcid <- (t .:? "chainId")
           tr <- parseHexStr (t .: "r")
           ts <- parseHexStr (t .: "s")
-          tv <- parseHexStr (t .: "v")
+          tv <- parseHexStr (t .:? "v" .!= "0")
           md <- t .:? "metadata"
 
           case tto of
             Nothing -> do
-              (ti :: Code) <- (t .: "init")
-              return . Transaction' $ ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv md
+              (mti :: Maybe Code) <- (t .:? "init")
+              case mti of
+                Nothing -> return . Transaction' $ PrivateHashTX (fromInteger tr) (fromInteger ts)
+                Just ti -> return . Transaction' $ ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv md
             (Just to') -> do
               td <- (t .: "data")
               return . Transaction' $ MessageTX tnon tgp tgl to' tval td tcid tr ts tv md
@@ -258,7 +265,7 @@ instance FromJSON BlockData' where
       <*> v .: "stateRoot"
       <*> v .: "transactionsRoot"
       <*> v .: "receiptsRoot"
-      <*> v .:? "logBloom" .!= ""
+      <*> v .:? "logBloom" .!= (B.replicate 64 0x30) -- this is what log blooms currently get set to
       <*> v .: "difficulty"
       <*> v .: "number"
       <*> v .: "gasLimit"
