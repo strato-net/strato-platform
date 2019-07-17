@@ -207,10 +207,12 @@ async function checkSystemInfo() {
     sysInfoCollected.mem_free = memdata.free;
     sysInfoCollected.mem_available = memdata.available;
 
-    if (memdata.available / memdata.total * 100 < config.healthCheck.diskUsageBound) {
+    if (memdata.available / memdata.total * 100 < config.healthCheck.memoryUsageBound) {
       isHealthy = false;
       additional_info.push("Low Memory")
     }
+    // FIXME: the callback function is async and the response may come late and be unprocessed!
+    // Why checking the disk space with both - `diskspace` and `si` ?? Can we fully remove this faulty `diskspace` code block?
     disk.check('/', function(err, info) {
       if (err) {
         winston.warn("Error when checking for disk usage", err);
@@ -219,7 +221,7 @@ async function checkSystemInfo() {
       } else {
         const diskUsageRatio = info.free / info.total *100;
         sysInfoCollected.disk_usage = diskUsageRatio;
-        if (diskUsageRatio < config.healthCheck.memoryUsageBound) {
+        if (diskUsageRatio < config.healthCheck.diskUsageBound) {
           isHealthy = false;
           additional_info.push("Low Disk Space")
         }
@@ -238,7 +240,7 @@ async function checkSystemInfo() {
       fsDetails.fsSize_used = fs.used;
       fsDetails.fsSize_size = fs.size;
       fss.push(fsDetails)
-      if (fsDetails.fsSize_use < config.healthCheck.diskUsageBound) {
+      if ((100 - fsDetails.fsSize_use) <= config.healthCheck.diskUsageBound) {
         isHealthy = false;
         additional_info.push(`Low Disk Space on ${fsDetails.name}`)
       }
