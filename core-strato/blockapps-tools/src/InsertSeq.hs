@@ -43,7 +43,7 @@ addBlocksFromFile :: FilePath -> IO ()
 addBlocksFromFile fileName = do
   file <- BLC.readFile fileName
   case eitherDecode @[Block'] file of
-    Left err -> printf "Malformed block file: %s" err
+    Left err -> die $ printf "Malformed block file: %s" err
     Right b -> do
       let bs = map bPrimeToB b
       printf "Inserting %d blocks into unseq_events...\n" (length bs)
@@ -58,7 +58,7 @@ addGenesisFromFile :: FilePath -> IO ()
 addGenesisFromFile fileName = do
   file <- BLC.readFile fileName
   case eitherDecode @(NamedMap "id" Word256 "info" ChainInfo) file of
-    Left err -> printf "Malformed ChainInfo file: %s" err
+    Left err -> die $ printf "Malformed ChainInfo file: %s" err
     Right bs -> do
       printf "Inserting %d chain infos into unseq_events...\n" (length bs)
       resps <- runKafkaConfigured "queryStrato" $ do
@@ -71,7 +71,7 @@ addTxsFromFile :: FilePath -> IO ()
 addTxsFromFile fileName = do
   file <- BLC.readFile fileName
   case eitherDecode @[Transaction'] file of
-    Left err -> printf "Malformed transaction file: %s" err
+    Left err -> die $ printf "Malformed transaction file: %s" err
     Right b -> do
       let bs = map (\(Transaction' t) -> t) b
       printf "Inserting %d transactions into unseq_events...\n" (length bs)
