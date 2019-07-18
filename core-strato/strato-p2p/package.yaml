@@ -25,6 +25,7 @@ dependencies:
   - blockapps-util
   - bytestring
   - classy-prelude
+  - common-log
   - conduit
   - conduit-combinators
   - conduit-extra

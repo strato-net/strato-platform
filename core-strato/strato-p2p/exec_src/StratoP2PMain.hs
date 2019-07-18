@@ -10,6 +10,7 @@ import           Blockchain.Output
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
+import           Executable.StratoP2PLoopback
 import           BlockApps.Init
 
 main :: IO ()
@@ -20,5 +21,6 @@ main = do
   race_
     (run 10248 metricsApp)
     (runLoggingT $
-      race_ stratoP2PClient
-            stratoP2PServer)
+      race_ stratoP2PLoopback
+        (race_ stratoP2PClient
+               stratoP2PServer))
