@@ -2,26 +2,30 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-module Kafka (saveKafka, loadKafka, verifyKafkaFile, readMsg, writeMsg) where
+module Kafka (saveKafka, loadKafka, verifyKafkaFile, compressRoundChanges, readMsg, writeMsg) where
 
 import Control.Lens.Combinators (_1, _2, use, uses)
 import Control.Lens.Operators ((.=), (+=), (%=))
 import Control.Monad
 import Control.Monad.Trans.State
 import Control.Monad.IO.Class
+import Data.Binary
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Conduit
 import qualified Data.Conduit.List as CL
 import Data.Memory.Endian (fromBE, toBE)
 import Data.String
-import Data.Word
 import Foreign.Marshal.Alloc
 import Foreign.Storable
 import System.Exit
 import System.IO
 import Text.Printf
+import UnliftIO.IORef
 
+import Blockchain.Blockstanbul.Messages
 import Blockchain.EthConf
+import Blockchain.Sequencer.Event
 import Blockchain.Stream.Raw
 import Blockchain.Strato.StateDiff.Kafka
 import Network.Kafka
@@ -134,3 +138,40 @@ verifyKafkaFile file = do
       .| iterMC (\msg -> _2 += B.length msg)
       .| mapM_C (\msg -> use _1 >>= \idx -> liftIO (printf "Read message #%d: %d bytes\n" idx (B.length msg)))
     printf "%d messages read, %d bytes read\n" msgsRead bytesRead
+
+
+compressRoundChanges :: FilePath -> FilePath -> IO ()
+compressRoundChanges src' dst' =
+  withBinaryFile dst' WriteMode $ \dst ->
+  withBinaryFile src' ReadMode $ \src -> do
+    hSetBuffering dst . BlockBuffering . Just $ 1024 * 1024
+    hSetBuffering src . BlockBuffering . Just $ 1024 * 1024
+    runConduit $
+         streamFile src
+      .| mapC BL.fromStrict
+      .| mapC decode
+      .| dedupRoundChanges
+      .| mapC encode
+      .| mapC BL.toStrict
+      .| mapM_C (writeMsg dst)
+
+-- On a long running network, there can be millions of round changes but only
+-- thousands of actual events. These round changes take hours to process, but
+-- can mostly be dropped from the file as a long run of round changes has the
+-- same effect as the highest round number from each peer.  Here we assume that
+-- the order is mostly increasing, and just need to keep 64 to
+-- have a very good chance of not losing an important round change.
+dedupRoundChanges :: MonadIO m => ConduitT IngestEvent IngestEvent m ()
+dedupRoundChanges = do
+  queue <- newIORef []
+  let flush = do
+        yieldMany . reverse . take 16 =<< readIORef queue
+        writeIORef queue []
+      add iev = modifyIORef queue (iev:)
+  let loop = do
+        mIev <- await
+        case mIev of
+          Nothing -> flush
+          Just iev@(IEBlockstanbul (WireMessage{_message=RoundChange{}})) -> add iev >> loop
+          Just iev -> flush >> yield iev >> loop
+  loop
