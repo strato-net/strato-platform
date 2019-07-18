@@ -182,7 +182,7 @@ spec = parallel $ do
         validators .= S.fromList [sender auth]
         blockWithVs <- uses validators $ flip addValidators blk
         pk <- use prvkey
-        pseal <- proposerSeal blockWithVs pk
+        let pseal = proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
         curView <- use view
         let hsh = blockHash sealedBlk
@@ -519,10 +519,10 @@ spec = parallel $ do
               blk' = addValidators vals . truncateExtra . setBlockNo 19 $ blk
           validators .= vals
           proposer .= me
-          pSeal <- proposerSeal blk' pk
+          let pSeal = proposerSeal blk' pk
           let lockBlk = addProposerSeal pSeal blk'
           myKey <- use prvkey
-          OMsg auth wm <- signMessage myKey $ Preprepare v lockBlk
+          let OMsg auth wm = signMessage myKey $ Preprepare v lockBlk
 
           lockSender .= Just them
           blockLock .= Just lockBlk
@@ -573,9 +573,9 @@ spec = parallel $ do
           let blk2 = addValidators vals
                    . truncateExtra
                    $ blk1
-          pSeal <- proposerSeal blk2 proper
+              pSeal = proposerSeal blk2 proper
           let blk3 = addProposerSeal pSeal blk2
-          cSeals <- mapM (commitmentSeal (blockHash blk3)) committers
+              cSeals = map (commitmentSeal (blockHash blk3)) committers
           return $ addCommitmentSeals cSeals blk3
 
         votingBlock :: Block

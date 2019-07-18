@@ -2,6 +2,7 @@
 module Blockchain.ExtendedECDSA (
   module Blockchain.ExtendedECDSA.Model.ExtendedSignature,
   extSignMsg,
+  detExtSignMsg,
   getPubKeyFromSignature
   ) where
 
@@ -9,6 +10,8 @@ import           Control.Monad
 import qualified Control.Monad.State       as S
 import           Control.Monad.Trans       (lift)
 import           Data.Bits
+import qualified Data.ByteString           as BS
+import           Data.Maybe                (mapMaybe)
 
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.ExtendedECDSA.Model.ExtendedSignature
@@ -46,6 +49,30 @@ genKeyPair = do
     return (d,q)
 
 -----------------------
+
+-- Generates a list of deterministic (k, p) values. In accordance with
+-- RFC 6979, the first pair that succeeds unsafeExtSignMsg should be used.
+detGenKeyPair :: Word256 -> PrvKey -> [(FieldN, Point)]
+detGenKeyPair h d
+  | fromPrvKey d == 0 = error "detGenKeyPair: Invalid private key 0"
+  | otherwise = go $ hmacDRBGNew (encodePrvKey d) (encode' h) BS.empty
+ where
+  go ws = case hmacDRBGGen ws 32 BS.empty of
+            (_, Nothing) -> error "detGenKeyPair: No suitable K value found"
+            (ws', Just k) ->
+              let kI = bsToInteger k
+                  p = mulPoint (fromInteger kI) curveG
+                  in if isIntegerValidKey kI
+                        then (fromInteger kI, p):go ws'
+                        else go ws'
+
+detExtSignMsg :: Word256 -> PrvKey -> ExtendedSignature
+detExtSignMsg h d = case mapMaybe (unsafeExtSignMsg h (prvKeyFieldN d)) (detGenKeyPair h d)  of
+                        [] -> error "no signature found"
+                        xs:_ -> xs
+
+-----------------------
+
 
 unsafeExtSignMsg :: Word256 -> FieldN -> (FieldN, Point) -> Maybe ExtendedSignature
 unsafeExtSignMsg _ 0 _ = Nothing

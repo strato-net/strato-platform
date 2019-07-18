@@ -217,7 +217,7 @@ roundChange = do
   nextView <- uses view (over round (+1))
   pk <- use prvkey
   pendingRound .= Just (_round nextView)
-  yield =<< signMessage pk (RoundChange nextView)
+  yield $ signMessage pk (RoundChange nextView)
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent OutEvent m ()
 nextRound nt = do
@@ -256,7 +256,7 @@ nextRound nt = do
       Just lb -> do
         pk <- use prvkey
         v <- use view
-        yield =<< signMessage pk (Preprepare v lb)
+        yield $ signMessage pk (Preprepare v lb)
   prepared .= M.empty
   committed .= M.empty
   roundChanged .= M.empty
@@ -318,8 +318,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         pk <- use prvkey
         vs <- use validators
         let blockWithVs = addValidators vs blk
-        pseal <- proposerSeal blockWithVs pk
-        let sealedBlk = addProposerSeal pseal blockWithVs
+            pseal = proposerSeal blockWithVs pk
+            sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
         let realSealed = fromMaybe sealedBlk mLocked
         wantParent <- use lastParent
@@ -336,7 +336,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Right () -> do
             hasPreprepared .= True
             proposal .= Just realSealed
-            yield =<< signMessage pk (Preprepare v realSealed)
+            yield $ signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
       mBlockLock <- use blockLock
@@ -370,7 +370,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   proposal .= Just pp
                   pk <- use prvkey
                   editVoted pp pr
-                  yield =<< signMessage pk (Prepare v (blockHash pp))
+                  yield $ signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- poolSize
@@ -381,8 +381,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         hasPrepared .= True
         setLock
         pk <- use prvkey
-        seal <- commitmentSeal di pk
-        yield =<< signMessage pk (Commit v di seal)
+        let seal = commitmentSeal di pk
+        yield $ signMessage pk (Commit v di seal)
     IMsg auth (Commit v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
       total <- poolSize
@@ -410,7 +410,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         pendingRound .= Just rn
         pk <- use prvkey
         $logInfoS "blockstanbul/roundchange" "agreed change"
-        yield =<< signMessage pk (RoundChange vn)
+        yield $ signMessage pk (RoundChange vn)
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
         case next of
