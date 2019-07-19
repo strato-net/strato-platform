@@ -1,20 +1,28 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 module Blockchain.Participation
   ( allowOutbound
   , ParticipationMode(..)
   , setParticipationMode
   , getParticipationMode
+  , remoteSetParticipationMode
   , p2pApp
   ) where
 
 import Control.Monad.IO.Class
 import Data.Aeson
+import Data.Data
 import GHC.Generics
+import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Servant
+import Servant.Client
+import System.Exit
 import System.IO.Unsafe
+import Text.Printf
 import UnliftIO.IORef
 
 import Blockchain.Data.Wire
@@ -22,7 +30,7 @@ import Blockchain.Data.Wire
 data ParticipationMode = Full
                        | None
                        | NoConsensus
-                       deriving (Show, Read, Eq, Enum, Generic, FromJSON, ToJSON)
+                       deriving (Show, Read, Eq, Enum, Generic, FromJSON, ToJSON, Data)
 
 {-# NOINLINE globalParticipationMode #-}
 globalParticipationMode :: IORef ParticipationMode
@@ -54,3 +62,13 @@ p2pServer = getParticipationMode
 
 p2pApp :: Application
 p2pApp = serve (Proxy :: Proxy P2PAPI) p2pServer
+
+postParticipationMode :: ParticipationMode -> ClientM ParticipationMode
+_ :<|> postParticipationMode = client (Proxy @ P2PAPI)
+
+remoteSetParticipationMode :: ParticipationMode -> IO ()
+remoteSetParticipationMode mode = do
+  mgr <- newManager defaultManagerSettings
+  let url = BaseUrl Http "localhost" 10248 ""
+  eRes <- runClientM (postParticipationMode mode) $ ClientEnv mgr url Nothing
+  either (die . show) (printf "Participation mode set to: %s\n" . show) eRes
