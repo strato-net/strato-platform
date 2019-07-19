@@ -1,9 +1,9 @@
--- for openid reference see https://github.com/zmartzone/lua-resty-openidc 
+-- for openid reference see https://github.com/zmartzone/lua-resty-openidc
 
 -- This Lua script supports two request types:
 -- 1. access_token provided directly in Authorization header (OAuth2 authorization flow happens on the third-party application side) -
 --    the token is being verified and either authorizes the request or exits with 403
--- 2. Nginx session-based OAuth2 (for SMD and API calls from browser; uses STRATO client id and secret): 
+-- 2. Nginx session-based OAuth2 (for SMD and API calls from browser; uses STRATO client id and secret):
 --    if no session provided in request OR session is expired OR access token in session is expired on invalid:
 --      - if UI call (SMD, i.e. "/dashboard/..") - redirect to OAuth2 provider sign-in page, then redirect back to the requested page (without hash part of url);
 --      - if API call - return 401 Unauthorized
@@ -67,6 +67,10 @@ if ngx.req.get_headers()["Authorization"] then
 
 else
   -- Else - use the openidc authenticate flow
+  if "<OAUTH_TEMPORARY_MIXED_AUTH>" == "true" then
+    -- This is a request coming from a legacy unit tests, leave it alone.
+    return
+  end
 
   -- If it's the logout request - unset custom cookies. All the rest is handled by .authenticate()
   if ngx.var.request_uri == authenticate_opts.logout_path then
@@ -76,7 +80,7 @@ else
   local authenticate_res, authenticate_err
   -- if requested_uri is the UI page (like SMD) or the API call
   if ngx.var.is_ui == "true" then
-    -- authenticate with full flow - authenticate() handles authorization, all OAuth2 redirects, sessions, logout flow; 
+    -- authenticate with full flow - authenticate() handles authorization, all OAuth2 redirects, sessions, logout flow;
     -- processes the OAuth2 sign-in and token exchange redirects until the request is completely authorized, or there is an error
     authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts)
   else
