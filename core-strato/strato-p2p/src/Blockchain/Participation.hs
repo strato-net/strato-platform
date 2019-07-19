@@ -2,10 +2,11 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 module Blockchain.Participation
-  ( allowOutbound
+  ( checkOutbound
   , ParticipationMode(..)
   , setParticipationMode
   , getParticipationMode
@@ -16,8 +17,10 @@ module Blockchain.Participation
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Data
+import qualified Data.Text as T
 import GHC.Generics
 import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Prometheus
 import Servant
 import Servant.Client
 import System.Exit
@@ -36,6 +39,17 @@ data ParticipationMode = Full
 globalParticipationMode :: IORef ParticipationMode
 globalParticipationMode = unsafePerformIO $ newIORef Full
 
+participationStats :: Vector T.Text Counter
+participationStats = unsafeRegister
+                   . vector "decision"
+                   . counter
+                   $ Info "p2p_participation_stats" "Statistics about participation filters"
+
+allow :: MonadIO m => m Bool
+allow = liftIO $ withLabel participationStats "allow" incCounter >> return True
+
+deny :: MonadIO m => m Bool
+deny = liftIO $ withLabel participationStats "deny" incCounter >> return False
 
 setParticipationMode :: MonadIO m => ParticipationMode -> m ()
 setParticipationMode mode = writeIORef globalParticipationMode mode
@@ -43,15 +57,15 @@ setParticipationMode mode = writeIORef globalParticipationMode mode
 getParticipationMode :: MonadIO m => m ParticipationMode
 getParticipationMode = readIORef globalParticipationMode
 
-allowOutbound :: MonadIO m => Message -> m Bool
-allowOutbound msg = do
+checkOutbound :: MonadIO m => Message -> m Bool
+checkOutbound msg = do
   m <- getParticipationMode
   case m of
-    None -> return False
-    Full -> return True
+    None -> deny
+    Full -> allow
     NoConsensus -> case msg of
-                    Blockstanbul{} -> return False
-                    _ -> return True
+                    Blockstanbul{} -> deny
+                    _ -> allow
 
 type P2PAPI = "participation_mode" :> Get '[JSON] ParticipationMode
          :<|> "participation_mode" :> ReqBody '[JSON] ParticipationMode :> Post '[JSON] ParticipationMode
