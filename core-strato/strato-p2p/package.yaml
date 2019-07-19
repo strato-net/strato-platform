@@ -60,6 +60,7 @@ dependencies:
   - random
   - resourcet
   - SafeSemaphore
+  - servant-server
   - split
   - stm
   - stm-conduit

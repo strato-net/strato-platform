@@ -2,6 +2,7 @@
 
 module Blockchain.Options where
 
+import           Blockchain.Participation (ParticipationMode(..))
 import           HFlags
 
 data P2PClientMode = SingleThreaded | MultiThreaded
@@ -31,6 +32,8 @@ defineEQFlag "privateChainAuthorizationMode" [| FlexibleAuth :: AuthorizationMod
     \ enforce both an ip and/or key match. It relies on the ability to send a roundtrip to authenticate\
     \ the ip address, and the p2p handshake to authenticate the public key."
 
+defineEQFlag "participationMode" [| Full :: ParticipationMode |] "PARTICIPATIONMODE"
+  "Whether to send all mesages to peers (Full), no messages to peers (None), or everything except PBFT (NoConsensus)"
 
 computeNetworkID :: Int
 computeNetworkID = if flags_networkID == -1

@@ -53,6 +53,7 @@ import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.Output
+import           Blockchain.Participation
 import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
@@ -182,7 +183,7 @@ handleMsgClientConduit myId peer = do
                 handleGetChainDetails peer []
                 stampActionTimestamp
         other -> assertHandshake other
-    handleEvents peer
+    handleEvents peer .| filterMC (either (const $ return True) allowOutbound)
 
 handleMsgServerConduit :: (MonadIO (StateT Context m)
                          , MonadResource m
@@ -224,7 +225,7 @@ handleMsgServerConduit myPubkey peer = do
                         genesisHash=genHash
                     }
         other -> assertHandshake other
-    handleEvents peer
+    handleEvents peer .| filterMC (either (const $ return True) allowOutbound)
 
 awaitMsg :: (MonadIO m) => ConduitM Event (Either P2PCNC Message) m (Maybe Message)
 awaitMsg = await >>= \case
