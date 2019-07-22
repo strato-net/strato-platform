@@ -36,6 +36,7 @@ import           RSVP
 import           State
 
 import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
@@ -77,6 +78,7 @@ data Options = State{root::String, db::String}
              | SaveKafka { topic :: String, filename :: String }
              | LoadKafka { topic :: String, filename :: String }
              | VerifyKafkaFile { filename :: String }
+             | SetParticipationMode { mode :: ParticipationMode }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -300,6 +302,14 @@ verifyKafkaFileOptions = record VerifyKafkaFile { filename = error "unused filen
                        [ filename := error "verifykafkafile --filename=<file>" += typ "PATH" += explicit += name "filename"
                        ]
 
+setParticipationModeOptions :: Annotate Ann
+setParticipationModeOptions = record SetParticipationMode {mode = error "unused participationMode"}
+                            [ mode := error "setparticipationmode --mode=(Full|None|NoConsensus)"
+                                   += typ "PARTICIPTIONMODE"
+                                   += explicit
+                                   += name "mode"
+                            ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -337,6 +347,7 @@ options = modes_ [blockGoOptions
                 , saveKafkaOptions
                 , loadKafkaOptions
                 , verifyKafkaFileOptions
+                , setParticipationModeOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -391,3 +402,4 @@ run AddTxsFromFile{..}         = addTxsFromFile fileName
 run SaveKafka{..}              = saveKafka topic filename
 run LoadKafka{..}              = loadKafka topic filename
 run VerifyKafkaFile{..}        = verifyKafkaFile filename
+run SetParticipationMode{..}   = remoteSetParticipationMode mode

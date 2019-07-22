@@ -54,6 +54,9 @@ function newnode {
   if [ -n "${privateChainAuthorizationMode}" ]; then
     pcamFlag="--privateChainAuthorizationMode=${privateChainAuthorizationMode}"
   fi
+  if [ -n "${participationMode}" ]; then
+    pmFlag="--participationMode=${participationMode}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -66,6 +69,7 @@ function newnode {
      ${txgFlag} \
      ${atbFlag} \
      ${pcamFlag} \
+     ${pmFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo

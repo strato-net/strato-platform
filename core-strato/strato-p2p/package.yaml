@@ -44,6 +44,7 @@ dependencies:
   - ghc
   - blockapps-haskoin
   - hflags
+  - http-client
   - iproute
   - json-rpc-server
   - json-rpc-client
@@ -60,6 +61,8 @@ dependencies:
   - random
   - resourcet
   - SafeSemaphore
+  - servant-client
+  - servant-server
   - split
   - stm
   - stm-conduit
