@@ -20,6 +20,7 @@ import           Blockchain.ExtWord             (Word256)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.CodePtr
 
 import           Handler.Filters
 import           Import                         hiding (hash)
@@ -48,8 +49,10 @@ postChainR = do
       when (M.size mb == 0) $ invalidArgs ["member list is empty"]
       let accountCodeHashes = S.fromList . flip mapMaybe acin $ \case
             NonContract _ _ -> Nothing
-            ContractNoStorage _ _ c -> Just c
-            ContractWithStorage _ _ c _ -> Just c
+            ContractNoStorage _ _ (EVMCode c) -> Just c
+            ContractNoStorage _ _ (SolidVMCode _ c) -> Just c
+            ContractWithStorage _ _ (EVMCode c) _ -> Just c
+            ContractWithStorage _ _ (SolidVMCode _ c) _ -> Just c
           codeCodeHashes = S.fromList . flip map cdin $ \CodeInfo{..} -> hash codeInfoCode
       case accountCodeHashes S.\\ codeCodeHashes of
         s | s /= S.empty -> invalidArgs ["Each contract code hash in accountInfo must match a corresponding code hash in codeInfo."]

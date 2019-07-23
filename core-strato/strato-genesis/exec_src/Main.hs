@@ -17,6 +17,7 @@ import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Generation (insertContractsCount, insertContractsJSON, insertContractsJSONHashMaps)
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.SHA
 
 
@@ -90,10 +91,12 @@ showAccountInfo (NonContract (Address address) balance) =
   "a " ++ showHex address "" ++ " " ++ show balance
 showAccountInfo (ContractNoStorage (Address address) balance code) =
   "a " ++ showHex address "" ++ " " ++ show balance ++ show code
-showAccountInfo (ContractWithStorage (Address address) balance (SHA code) storage) =
-  "a " ++ addressString ++ " " ++ show balance ++ " " ++ showHex code "" ++ "\n"
+showAccountInfo (ContractWithStorage (Address address) balance code storage) =
+  "a " ++ addressString ++ " " ++ show balance ++ " " ++ showCodeHash code "" ++ "\n"
   ++ unlines (map (\(k, v) -> "s " ++ addressString ++ " " ++ showHex k "" ++ " " ++ showHex v "") storage)
   where addressString = showHex address ""
+        showCodeHash (EVMCode (SHA c)) = showHex c
+        showCodeHash (SolidVMCode _ (SHA c)) = showHex c
 
 
 

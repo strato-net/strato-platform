@@ -180,7 +180,7 @@ AccountInfoRef
     chainInfoId ChainInfoRefId
     address Address
     balance Integer
-    codeHash SHA Maybe
+    codeHash CodePtr Maybe
     map [MapPair] Maybe
     deriving Eq Generic Show
 

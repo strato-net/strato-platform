@@ -32,6 +32,7 @@ import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber)
 import           Blockchain.Data.BlockHeader           (extraData2TxsLen)
 import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
@@ -174,7 +175,8 @@ insertNewChains events = do
   newChains <- forM newChainInfos $ \(cId, cInfo) -> do
     $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
     $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
-    sr <- chainInfoToGenesisState cInfo
+    let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
+    sr <- chainInfoToGenesisState theVM cInfo
     mGSR <- getGenesisStateRoot cId
     case mGSR of
       Just gsr -> do

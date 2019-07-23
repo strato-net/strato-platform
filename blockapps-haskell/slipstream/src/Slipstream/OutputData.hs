@@ -31,6 +31,7 @@ import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.SHA
 
 import Slipstream.Events

@@ -22,6 +22,7 @@ import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import           Crypto.Util                          (i2bs_unsized)
+import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.Map                             as Map
 import           Data.Maybe                           (catMaybes)
@@ -90,11 +91,11 @@ putAccount acc = case acc of
     A.insert A.Proxy address blankAddressState{addressStateBalance=balance'}
   ContractNoStorage address balance' codeHash' -> do
     A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
-                                              , addressStateCodeHash=EVMCode codeHash'
+                                              , addressStateCodeHash=codeHash'
                                               }
   ContractWithStorage address balance' codeHash' slots -> do
     A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
-                                              , addressStateCodeHash=EVMCode codeHash'
+                                              , addressStateCodeHash=codeHash'
                                               }
     putStorageTrie address slots
 
@@ -174,8 +175,12 @@ parseHex theString =
    [(value, "")] -> value
    _ -> error $ "parseHex: error parsing string: " ++ theString
 
-initializeCodeDB :: HasCodeDB m => [CodeInfo] -> m ()
-initializeCodeDB = mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin))
+initializeCodeDB :: HasCodeDB m => String -> [CodeInfo] -> m ()
+initializeCodeDB "EVM" x = do
+  mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin)) x
+initializeCodeDB "SolidVM" x = do
+  mapM_ (addCode SolidVM . (\(CodeInfo _ src _) -> BC.pack $ T.unpack src)) x
+initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
 chainInfoToGenesisState :: ( MonadLogger m
                            , HasCodeDB m
@@ -185,11 +190,11 @@ chainInfoToGenesisState :: ( MonadLogger m
                            , HasStorageDB m
                            , HasMemStorageDB m
                            , (Ad.Address `A.Alters` AddressState) m
-                           )
-                          => ChainInfo
-                          -> m StateRoot
-chainInfoToGenesisState ci = do
-    initializeCodeDB (codeInfo $ chainInfo ci)
+                           ) =>
+                           String -> ChainInfo -> m StateRoot
+chainInfoToGenesisState vmType ci = do
+    initializeCodeDB vmType (codeInfo $ chainInfo ci)
+    
     initializeStateDB (accountInfo $ chainInfo ci)
     get (Proxy @StateRoot)
 
@@ -199,8 +204,10 @@ zipSourceInfo accounts codes =
       codeMap = Map.fromList . map hashPair $ codes
       findCodeFor :: AccountInfo -> Maybe (AccountInfo, CodeInfo)
       findCodeFor (NonContract _ _) = Nothing
-      findCodeFor acc@(ContractNoStorage _ _ hsh) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(ContractWithStorage _ _ hsh _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractNoStorage _ _ (EVMCode hsh)) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractWithStorage _ _ (EVMCode hsh) _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
   in catMaybes . map findCodeFor $ accounts
 
 genesisInfoToGenesisBlock :: ( MonadLogger m
@@ -220,7 +227,7 @@ genesisInfoToGenesisBlock :: ( MonadLogger m
 genesisInfoToGenesisBlock gi gn as = do
     let codes = genesisInfoCodeInfo gi
     let accounts = genesisInfoAccountInfo gi
-    initializeCodeDB codes
+    initializeCodeDB "EVM" codes
     initializeStateDBAndAccountInfos accounts gn
     sr <- get (Proxy @StateRoot)
     let sourceInfo = zipSourceInfo (accounts ++ as) codes
