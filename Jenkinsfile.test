@@ -157,6 +157,12 @@ pipeline {
             '''
           },
 
+          'Shared tests': {
+            dir('strato-worktree/') {
+              sh 'stack test ./shared-util/'
+            }
+          },
+
           'SMD tests': {
             sh '''#!/bin/bash -le
               set -x
