@@ -19,10 +19,12 @@ import           Strato.Strato23.Server.Key
 import           Strato.Strato23.Server.Password
 import           Strato.Strato23.Server.Ping
 import           Strato.Strato23.Server.Signature
+import           Strato.Strato23.Server.User
 
 vaultWrapper :: ServerT VaultWrapperAPI VaultM
 vaultWrapper = getPing
           :<|> getKey
+          :<|> getUsers
           :<|> postKey
           :<|> postSignature
           :<|> postPassword

@@ -11,17 +11,19 @@
 module Strato.Strato23.Monad where
 
 import           Control.Exception.Lifted        hiding (Handler, handle)
-import           Data.Pool                       (Pool, withResource)
 import           Control.Monad.Base
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
+import qualified Data.ByteString.Lazy            as LB
 import           Data.Foldable
 import           Data.IORef
+import           Data.Pool                       (Pool, withResource)
 import           Data.Profunctor.Product.Default
 import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
+import           Data.Text.Encoding
 import           Database.PostgreSQL.Simple      (Connection, withTransaction)
 import           GHC.Stack
 import           Network.HTTP.Client
@@ -110,6 +112,7 @@ data VaultWrapperError
   | Unimplemented Text
   | AlreadyExists Text
   | RuntimeError SomeException
+  | UserDoesNotExist Text
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -139,6 +142,7 @@ enterVaultWrapper env x
                      "Please contact your network administrator to have this problem fixed."
                    ]}
           UserError err -> err400{errBody = fromString $ show err}
+          UserDoesNotExist t -> err401{errBody = LB.fromStrict $ encodeUtf8 t}
           NoPasswordError ->
             err503{errBody = fromString $ unlines
                    [
