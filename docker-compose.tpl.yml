@@ -259,6 +259,7 @@ services:
     - OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false} # for backwards-compatibility with 4.2
     - OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL} # for backwards-compatibility with 4.2
     - OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK} # for backwards-compatibility with 4.2
+    - OAUTH_TEMPORARY_MIXED_AUTH=${OAUTH_TEMPORARY_MIXED_AUTH} # To allow gradual migration of tests to oauth
     - SMD_MODE=${SMD_MODE}
     - SERVE_LOGS=${SERVE_LOGS}
     - ssl=${ssl}
