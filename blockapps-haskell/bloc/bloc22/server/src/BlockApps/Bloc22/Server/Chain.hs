@@ -95,7 +95,7 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
             case theVM of
               "EVM" -> return (EVMCode $ keccak256SHA contractdetailsCodeHash, contractdetailsBinRuntime, src)
               "SolidVM" -> do
-                return (SolidVMCode (Text.unpack contractdetailsName) $ hash (BC.pack $ Text.unpack src), Text.pack $ BC.unpack $ B16.encode $ BC.pack $ Text.unpack src, "")
+                return (SolidVMCode (Text.unpack contractdetailsName) $ hash (BC.pack $ Text.unpack src), Text.pack $ BC.unpack $ B16.encode $ BC.pack $ Text.unpack src, src)
               _ -> throwError . UserError . Text.pack $ "Unknown VM: " ++ show theVM
               
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
