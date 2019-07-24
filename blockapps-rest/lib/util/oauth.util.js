@@ -33,6 +33,7 @@ class OAuthUtil {
 	getOpenIdConfig() {
 		try {
 			const response = request('GET', this.openIdDiscoveryUrl).getBody('utf8');
+			console.log(response)
 			this.openIdConfig = parse(response);
 			this.jwtAlgorithm = this.openIdConfig.id_token_signing_alg_values_supported;
 			this.issuer = this.openIdConfig.issuer;
