@@ -294,7 +294,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
                              EVM
                              (case storage d of
                                 EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
-                                SolidVMDiff _ -> error "TODO(tim): solid vm genesisblock support")
+                                SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map (error "TODO(tim): solid vm genesisblock support") m)
                              [A.emptyCallData]
         , A._actionMetadata = getMetadata ch
         }
