@@ -83,6 +83,7 @@ pipeline {
           docker-compose -p strato --log-level ERROR stop
           docker-compose -p strato --log-level ERROR start
           check_bloc
+          docker exec strato_bloc_1 curl http://vault-wrapper:8000/strato/v2.3/password -H "Content-Type: application/json" -d '"testPassword"'
         '''
       }
     }
