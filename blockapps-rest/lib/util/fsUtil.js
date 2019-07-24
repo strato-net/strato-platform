@@ -1,5 +1,6 @@
 import fs from 'fs'
 import yaml from 'js-yaml';
+import {parse} from 'flatted/esm';
 
 function get(filename) {
   const content = fs.readFileSync(filename, 'utf8')
@@ -13,7 +14,7 @@ function getYaml(filename) {
 
 function getJson(filename, options) {
   const content = fs.readFileSync(filename, options)
-  return JSON.parse(content)
+  return parse(content)
 }
 
 export default {

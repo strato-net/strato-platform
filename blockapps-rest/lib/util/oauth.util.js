@@ -3,7 +3,7 @@ import simpleOauth from 'simple-oauth2'
 import unixTime from 'unix-time'
 import request from 'sync-request'
 import getPem from 'rsa-pem-from-mod-exp'
-
+import {parse} from 'flatted/esm';
 
 class OAuthUtil {
 	constructor(oauthConfig) {
@@ -33,14 +33,14 @@ class OAuthUtil {
 	getOpenIdConfig() {
 		try {
 			const response = request('GET', this.openIdDiscoveryUrl).getBody('utf8');
-			this.openIdConfig = JSON.parse(response);
+			this.openIdConfig = parse(response);
 			this.jwtAlgorithm = this.openIdConfig.id_token_signing_alg_values_supported;
 			this.issuer = this.openIdConfig.issuer;
 			this.logOutUrl = this.openIdConfig.end_session_endpoint;
 
 			if(this.openIdConfig.jwks_uri) {
 				const keyResponse = request('GET', this.openIdConfig.jwks_uri).getBody('utf8');
-				this.keys = JSON.parse(keyResponse).keys;
+				this.keys = parse(keyResponse).keys;
 			}
 
 		}
