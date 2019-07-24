@@ -33,13 +33,14 @@ class OAuthUtil {
 	getOpenIdConfig() {
 		try {
 			const response = request('GET', this.openIdDiscoveryUrl).getBody('utf8');
-			this.openIdConfig = JSON.parse(response);
+			this.openIdConfig = parse(response);
 			this.jwtAlgorithm = this.openIdConfig.id_token_signing_alg_values_supported;
 			this.issuer = this.openIdConfig.issuer;
 			this.logOutUrl = this.openIdConfig.end_session_endpoint;
 
 			if(this.openIdConfig.jwks_uri) {
 				const keyResponse = request('GET', this.openIdConfig.jwks_uri).getBody('utf8');
+				console.log(keyResponse)
 				this.keys = parse(keyResponse).keys;
 			}
 
