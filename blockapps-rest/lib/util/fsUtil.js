@@ -1,6 +1,6 @@
 import fs from 'fs'
 import yaml from 'js-yaml';
-import {parse} from 'flatted/cjs';
+const {parse} = require('flatted/cjs');
 
 function get(filename) {
   const content = fs.readFileSync(filename, 'utf8')

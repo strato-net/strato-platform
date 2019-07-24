@@ -7,7 +7,7 @@ import http from "http";
 import https from "https";
 import open from "open";
 import qs from "query-string";
-import {stringify} from 'flatted/cjs';
+const {stringify} = require('flatted/cjs');
 const envPath = ".env";
 const envfile = require("envfile");
 let envConfig = {};

@@ -1,6 +1,6 @@
 import axios from 'axios'
 import queryString from 'query-string'
-import {parse, stringify} from 'flatted/cjs';
+const {parse, stringify} = require('flatted/cjs');
 
 axios.defaults.headers.post['Content-Type'] = 'application/json'
 

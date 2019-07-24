@@ -1,4 +1,4 @@
-import {parse, stringify} from 'flatted/cjs';
+const {stringify} = require('flatted/cjs');
 
 class RestError extends Error {
   constructor(status, statusText, data) {
