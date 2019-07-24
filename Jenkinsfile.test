@@ -115,19 +115,6 @@ pipeline {
             '''
           },
 
-          'E2E-Test': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running BlockApps BA deploy script and tests'
-              rm -rf blockapps-ba
-              git clone https://github.com/blockapps/blockapps-ba.git -b master
-              cd blockapps-ba
-              npm i
-              SERVER=localhost npm run deploy --timeout=6000000
-              sleep 5
-              SERVER=localhost npm run test --timeout=6000000
-            '''
-          },
           'Track And Trace': {
             sh 'rm -rf track-and-trace && git clone https://github.com/blockapps/track-and-trace.git'
             dir('track-and-trace') {
