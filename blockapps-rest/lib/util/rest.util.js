@@ -1,4 +1,4 @@
-import {parse, stringify} from 'flatted/esm';
+import {parse, stringify} from 'flatted/cjs';
 
 class RestError extends Error {
   constructor(status, statusText, data) {

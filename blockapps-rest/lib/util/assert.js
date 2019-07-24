@@ -1,5 +1,5 @@
 import { assert } from 'chai'
-import { stringify} from 'flatted/esm';
+import { stringify} from 'flatted/cjs';
 
 assert.restStatus = async (func, expectedRestStatus, regex, expectedStatusText) => {
   let result
