@@ -8,9 +8,11 @@
 module Handler.ChainInfo where
 
 import           Data.Aeson
+import qualified Data.ByteString.Char8          as BC
 import qualified Data.Map                       as M
 import qualified Data.Set                       as S
 import qualified Data.Text                      as T
+
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
@@ -43,17 +45,25 @@ postChainR = do
 
   ci <- parseJsonBody :: HandlerFor App (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ _) _) -> do
+    Success gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ mmd) _) -> do
     -- add more checks?
       when (length acin == 0) $ invalidArgs ["account info is empty"]
       when (M.size mb == 0) $ invalidArgs ["member list is empty"]
+
+      let theVM = fromMaybe "EVM" $ M.lookup "VM" mmd
+      
       let accountCodeHashes = S.fromList . flip mapMaybe acin $ \case
             NonContract _ _ -> Nothing
             ContractNoStorage _ _ (EVMCode c) -> Just c
             ContractNoStorage _ _ (SolidVMCode _ c) -> Just c
             ContractWithStorage _ _ (EVMCode c) _ -> Just c
             ContractWithStorage _ _ (SolidVMCode _ c) _ -> Just c
-          codeCodeHashes = S.fromList . flip map cdin $ \CodeInfo{..} -> hash codeInfoCode
+          getCode CodeInfo{..} =
+            case theVM of --For SolidVM, the source is the code
+              "SolidVM" -> BC.pack $ T.unpack codeInfoSource
+              _ -> codeInfoCode
+          codeCodeHashes = S.fromList . flip map cdin $ hash . getCode
+                                           
       case accountCodeHashes S.\\ codeCodeHashes of
         s | s /= S.empty -> invalidArgs ["Each contract code hash in accountInfo must match a corresponding code hash in codeInfo."]
           | otherwise -> do
