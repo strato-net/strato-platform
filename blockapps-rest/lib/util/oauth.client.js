@@ -130,6 +130,7 @@ const run = async function() {
   const oauth = oauthUtil.init(config.nodes[0].oauth);
 
   const signinUri = oauth.getSigninURL();
+  console.log("SIGN IN:", signinUri)
   async function requestListener(req, res) {
     if (req.url.indexOf("/login") === 0) {
       open(signinUri);
