@@ -130,7 +130,6 @@ const run = async function() {
   const oauth = oauthUtil.init(config.nodes[0].oauth);
 
   const signinUri = oauth.getSigninURL();
-  console.log("SIGN IN:", signinUri)
   async function requestListener(req, res) {
     if (req.url.indexOf("/login") === 0) {
       open(signinUri);
@@ -211,7 +210,7 @@ const run = async function() {
             function logout(){
               window.location.href='${
                 oauth.logOutUrl
-              }?redirect_uri=http://localhost:${portNumber}/login'
+              }?redirect_uri=http://ec2-3-93-198-52.compute-1.amazonaws.com:${portNumber}/login'
             }
           </script>
         </head>
