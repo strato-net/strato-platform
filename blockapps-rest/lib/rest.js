@@ -74,6 +74,7 @@ async function getUser(args, options) {
 }
 
 async function createUser(args, options) {
+  console.log("LOGGING CREATE USER")
   const address = await createOrGetKey(args, options);
   console.log("ADDRESSS:", address)
   const user = Object.assign({}, args, { address });
