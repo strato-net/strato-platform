@@ -52,7 +52,7 @@ decodeCacheValues hxs prevState = either (error . printf "SVM.decodeCacheValues:
       isBasic (StoragePath [Field _]) = True
       isBasic _ = False
   pathValues <- mapM parseM $ M.toList hxs
-  let pathValues' = filter ((/= BDefault) . snd) $ filter (isBasic . fst) pathValues
+  let pathValues' = filter (isBasic . fst) pathValues
   finalState <- bimap show HM.toList $ case prevState of
     [] -> synthesize pathValues'
     tvs -> replayDeltas pathValues' . HM.fromList . map (first encodeUtf8) $ tvs
