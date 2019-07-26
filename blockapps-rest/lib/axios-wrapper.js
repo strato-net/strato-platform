@@ -1,6 +1,5 @@
 import axios from 'axios'
 import queryString from 'query-string'
-const {parse, stringify} = require('flatted/cjs');
 
 axios.defaults.headers.post['Content-Type'] = 'application/json'
 
@@ -9,7 +8,7 @@ const nullLogger = { info: () => {}, debug: () => {}, error: () => {} }
 
 function toJson(string) {
   try {
-    return parse(string)
+    return JSON.parse(string)
   } catch (err) {
     return string
   }
@@ -63,7 +62,7 @@ function errorFormatter(err) {
   // rest error
   if (err.response && err.response.data) return err.response.data
   // other
-  return stringify(err)
+  return JSON.stringify(err)
 }
 
 async function postue(host, endpoint, data, _options) {
