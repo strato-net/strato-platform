@@ -255,8 +255,8 @@ spec = do
                 pvk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                 addr = prvKey2Address pvk
                 (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
-            esign <- signBenfInfo pvk (testAddr, True, 1)
-            let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
+                esign = signBenfInfo pvk (testAddr, True, 1)
+                esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
                 vote = API.CandidateReceived{API.sender=addr
                                            , API.signature=esignStr
                                            , API.recipient=testAddr
@@ -273,8 +273,8 @@ spec = do
             checkForVotes voteList
             vmevs <- drainVM
             vmevs `shouldContain` [OEVoteToMake { voteRecipient = testAddr, voteVotingDir = True, voteSender = addr}]
-            esign' <- signBenfInfo pvk (testAddr, False, 1)
-            let esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
+            let esign' = signBenfInfo pvk (testAddr, False, 1)
+                esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
                 vote' = API.CandidateReceived{API.sender=addr
                                             , API.signature=esignStr'
                                             , API.recipient=testAddr
@@ -346,13 +346,13 @@ spec = do
       it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
         let blk0 = makeBlock 2 1
-            blk1= Block (blockBlockData blk0){blockDataParentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
+            blk1 = Block (blockBlockData blk0){blockDataParentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
             blk2 = addValidators (_validators ctx) blk1{
                       blockBlockData = (blockBlockData blk1){blockDataNumber = 1}}
-        pseal <- proposerSeal blk2 (_prvkey ctx)
-        let blk3 = addProposerSeal pseal blk2
-        cseal <- commitmentSeal (blockHash blk3) (_prvkey ctx)
-        let blk4 = addCommitmentSeals [cseal] blk3
+            pseal = proposerSeal blk2 (_prvkey ctx)
+            blk3 = addProposerSeal pseal blk2
+            cseal = commitmentSeal (blockHash blk3) (_prvkey ctx)
+            blk4 = addCommitmentSeals [cseal] blk3
             iev = IEBlock . blockToIngestBlock TO.Morphism $ blk4
         putBlockstanbulContext ctx
         checkForUnseq [iev]
