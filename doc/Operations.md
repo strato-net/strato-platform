@@ -631,3 +631,122 @@ pbft_current_view{view_field="sequence_number"} 2.0
 pbft_current_view{view_field="round_number"} 9.0
 pbft_current_view{view_field="sequence_number"} 2.
 ```
+
+### How do I view metrics?
+To view the raw prometheus input data, each instrumented process will serve HTTP requests to
+a /metrics endpoint. For every sample exported, there is a line with the metric name, a
+comma separated list of label pairs inside curly braces, and a floating point number corresponding
+to the value of the metric.
+
+To execute more complex queries (perhaps with history), normal queries can be URL encoded and excuted
+against the API:
+```
+curl --silent 'http://3.95.216.65:8080/prometheus/api/v1/query?query=vm_loop_timer%7Bloop_section%3D%22one%20full%20loop%22%7D&_=1563215892117' | jq .
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "__name__": "vm_loop_timer",
+          "instance": "3.95.216.65:8080",
+          "job": "vm-runner",
+          "loop_section": "one full loop",
+          "quantile": "0.5"
+        },
+        "value": [
+          1563292607.978,
+          "100.004883927"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "vm_loop_timer",
+          "instance": "3.95.216.65:8080",
+          "job": "vm-runner",
+          "loop_section": "one full loop",
+          "quantile": "0.9"
+        },
+        "value": [
+          1563292607.978,
+          "100.007825452"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "vm_loop_timer",
+          "instance": "3.95.216.65:8080",
+          "job": "vm-runner",
+          "loop_section": "one full loop",
+          "quantile": "0.99"
+        },
+        "value": [
+          1563292607.978,
+          "100.010408168"
+        ]
+      }
+    ]
+  }
+}
+```
+
+If this is for a human rather than a tool, browse to `<hostname>/prometheus`. Here you can
+create an ad-hoc dashboard by choosing the metrics to graph or display latest value. Queries
+can filter the metric on the labels specified, or determine the rate for each 1 minute interval,
+or anything else supported by the query language: https://prometheus.io/docs/prometheus/latest/querying/basics/
+
+### How do make an in-database copy of postgres tables?
+It doesn't seem possible to use the metadata query to get the table names to then create new commands in
+just SQL, but it can be done using one of the other programming languages that postgres supports.
+Here is an example in PL/pgSQL that creates a copy of all the history tables with a timestamp
+in their name of the time the snapshot was created. The file can be loaded with the `-f` flag
+to psql, and a backup created with `select backup_history();`.
+
+```
+DROP FUNCTION IF EXISTS backup_history();
+
+CREATE FUNCTION backup_history() RETURNS VOID AS $$
+DECLARE
+  table_name text;
+  backup_table text;
+BEGIN
+  FOR table_name in SELECT tablename
+                    FROM pg_catalog.pg_tables
+                    WHERE schemaname = 'public'
+                        AND tablename LIKE 'history@%'
+                        AND tablename NOT LIKE '%backup%'
+  LOOP
+    backup_table := table_name || '_backup_' || now();
+    EXECUTE 'CREATE TABLE ' || quote_ident(backup_table) || ' AS TABLE ' || quote_ident(table_name);
+  END LOOP;
+  RETURN;
+END $$ LANGUAGE plpgsql;
+```
+
+
+### How do I resynchronize a PBFT network?
+The first step is see that all nodes are healthy. If a node has died, in some
+circumstances (e.g. a memory leak) you should be able to `docker restart strato_strato_1`
+on that node and just catch up on the missing blocks.
+
+If the node is live and the sequence number is behind, this is likely a p2p issue. Check
+that messages are being sent/received on either the p2p logs or metrics. If it is not,
+check that ethereum-discover is making requests to the boot node, that the boot node is
+the right one for this network, and that the boot node is accepting requests, and
+check that peers are accepting handshake requests, that the enable time in postgres
+is not far in the future, and that the peer isn't accidentally marked as active.
+If p2p is healthy and sync is not automatically working, you can try to fetch
+the missing blocks with `qs askforblocks --start-block=<have+1> --end-block=<need> --peer=<address_with_blocks>`.
+
+If the round number on this node is not correct but there is otherwise quorum on a round number,
+p2p is likely not connected enough to see the round changes from all peers.
+Checking `p_peer` might show that e.g. we only know of one peer, the peers are mistakenly
+marked as active but have no threads working on them, or that we have blacklisted the peer
+for being unresponsive and we're waiting 4 hours to try to connect to them again.
+
+When there is not quorum on a round number, historically this meant that the network was stuck until
+a quorum of nodes were restarted to be synchronized on round number 0. Instead nowadays when this
+happens, you can increase the round number on some nodes in order to try to realign things:
+`docker exec strato_strato_1 forced-config-change --round_number=812` (this should probably be moved
+into queryStrato). Note however that `forced-config-change` cannot move the round number backwards.
