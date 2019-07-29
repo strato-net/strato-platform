@@ -227,7 +227,7 @@ Python 2.7.15+ (default, Nov 27 2018, 23:36:35)
 [GCC 7.3.0] on linux2
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import kafka
->>> con = kafka.KafkaConsumer('indexevents', group_id='strato-api-indexer-test', bootstrap_servers='kafka :9092')
+>>> con = kafka.KafkaConsumer('indexevents', group_id='strato-api-indexer-test', bootstrap_servers='kafka:9092')
 >>> con.commit({kafka.TopicPartition('indexevents', 0): kafka.OffsetAndMetadata(20, '4557')})
 ```
 
@@ -243,7 +243,7 @@ git push origin ${BRANCH}
 TOKEN="rdaABqoRvQLjQga"
 URL="https://jenkins.blockapps.net/buildByToken/buildWithParameters?job=STRATO_test&token=${TOKEN}&PLATFORM_BRANCH_NAME=${BRANCH}"
 echo curl -X POST -L --insecure $URL
-curl -X POST -L --insecure $UR
+curl -X POST -L --insecure $URL
 ```
 
 ### How do I grab a docker-compose.yml from a test run?
