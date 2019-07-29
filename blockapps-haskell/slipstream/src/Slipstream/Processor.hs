@@ -3,7 +3,6 @@
     , DeriveGeneric
     , FlexibleContexts
     , GeneralizedNewtypeDeriving
-    , LambdaCase
     , OverloadedStrings
     , QuasiQuotes
     , RecordWildCards

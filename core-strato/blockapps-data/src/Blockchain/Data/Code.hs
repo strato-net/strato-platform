@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 
 module Blockchain.Data.Code (Code(..)) where
 

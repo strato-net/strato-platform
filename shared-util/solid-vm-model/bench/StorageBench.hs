@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-unused-local-binds #-}
 import Control.Monad
 import Criterion.Main

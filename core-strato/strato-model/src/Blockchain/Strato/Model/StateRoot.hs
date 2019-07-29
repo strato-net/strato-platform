@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
@@ -36,7 +35,8 @@ import           GHC.Generics
 -- (ie- the pointer to the full set of key/value pairs at a particular time in history), and
 -- will be of interest if you need to refer to older or parallel version of the data.
 
-newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Ord, Read, Generic, IsString, Data)
+newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Ord, Read, Generic, Data)
+                                           deriving newtype (IsString)
 
 instance Format StateRoot where
   format x             | x == emptyTriePtr = CL.yellow "<empty>"

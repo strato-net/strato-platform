@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImplicitParams             #-}
-{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -39,7 +38,7 @@ newtype VaultM x = VaultM
         ( LoggingT
           ( ExceptT VaultWrapperError IO )
         ) x
-  } deriving
+  } deriving newtype
   ( Functor
   , Applicative
   , Monad

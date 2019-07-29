@@ -2,7 +2,6 @@
 {-# OPTIONS -fno-warn-orphans         #-}
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE DeriveDataTypeable       #-}
-{-# LANGUAGE DeriveGeneric            #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE RecordWildCards          #-}

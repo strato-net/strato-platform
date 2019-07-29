@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.ExtendedECDSA (
   module Blockchain.ExtendedECDSA.Model.ExtendedSignature,
   extSignMsg,

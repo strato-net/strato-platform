@@ -13,11 +13,6 @@ build-type: Simple
 
 ghc-options: -Wall -Werror
 
-default-extensions:
-  - DeriveGeneric
-  - DeriveAnyClass
-  - LambdaCase
-
 dependencies:
   - base
   - blockapps-ethereum

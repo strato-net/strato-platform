@@ -13,11 +13,6 @@ library:
 
 ghc-options: -Wall -Werror -rtsopts
 
-default-extensions:
-  - DeriveGeneric
-  - DeriveAnyClass
-  - LambdaCase
-
 dependencies:
   - base
   - aeson

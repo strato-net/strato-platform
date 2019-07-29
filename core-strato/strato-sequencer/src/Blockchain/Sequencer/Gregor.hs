@@ -4,7 +4,6 @@
 -- the sequencer becomes more testable as it does not require a kafka setup to run,
 -- and the sequencer does not have to worry about long blocking reads from kafka
 -- preventing other events from being processed.
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}

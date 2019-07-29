@@ -1,5 +1,4 @@
 --{-# LANGUAGE TypeHoles #-}
-{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module Versioning where

@@ -10,7 +10,6 @@
 - communications when different components would represent the entire node
 - to a peer at different times.
 -}
-{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Blockchain.PrivateKeyConf where
 
