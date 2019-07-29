@@ -296,7 +296,8 @@ export BLOC_IMAGE=bloc:bisect
 export VAULTWRAPPER_IMAGE=vault-wrapper:bisect
 reload_ht3
 run_ht3
-```. In this case `reload_ht3` will `cd strato-getting-started && ./strato --wipe && ./strato```
+```
+In this case `reload_ht3` will `cd strato-getting-started && ./strato --wipe && ./strato```
 and `run_ht3` will `cd ht3 && npm run test`. The VERSION and REPO environment variables will
 set the tags on the created strato/bloc/vault-wrapper images, and then `{STRATO,BLOC,VAULTWRAPPER}_IMAGE`
 will use those images to start the new containers. If image construction fails, then we try
