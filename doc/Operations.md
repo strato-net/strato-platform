@@ -73,7 +73,7 @@ docker build -t ${IMAGE_TAG} ${BUILD_DIR}
 echo "Image ${IMAGE_TAG} created"
 ```
 
-Compilition of the binary will likely still be a bottleneck,
+Compilation of the binary will likely still be a bottleneck,
 but if it only has to compile the package or two that you are working
 in the savings can be worth it over a full rebuild. With a full cache,
 this takes 4s to create a new image:
@@ -126,38 +126,43 @@ curl -u admin:admin -F address=cad7234 localhost/strato-api/eth/v1.2/faucet
 ```
 
 ### How do I restart a process?
-From 4.5.0 on, every process created with a haskell binary* has a signal handler installed that will catch
-a SIGHUP and exec itself. What this affords is is the ability to reset memory on a process or swap out
-the executable, while retaining the supervision from doit.sh. The trick here is that historically,
-process creation has consisted of two parts: `fork` uses the same process image but creates a new copy,
-and `exec` changes the process image in place. We don't fork here, so the process is just replaced.
-The same `argv` is used and so flags are not changed, and the environment is inherited from the original
-process.
+From 4.5.0 on, every process created with a haskell binary has a signal
+handler installed that will catch a SIGHUP and exec itself. What this affords
+is is the ability to reset memory on a process or swap out the executable,
+while retaining the supervision from doit.sh. The trick here is that
+historically, process creation has consisted of two parts: `fork` uses the same
+process image but creates a new copy, and `exec` changes the process image in
+place. We don't fork here, so the process is just replaced.  The same `argv` is
+used and so flags are not changed, and the environment is inherited from the
+original process.
 
-There are some caveats to this trick. If used on a process that doesn't support this, the default
-handler for SIGHUP is termination. Then doit.sh will terminate all processes. In 4.5.0, all
-executables should install the handler (through calling `blockappsInit`), but its probably worth
-checking before trying this in production and `blockappsInit` should be called at the start
-of `main` for all new long lived processes.
+There are some caveats to this trick. If used on a process that doesn't support
+this, the default handler for SIGHUP is termination. Then doit.sh will
+terminate all processes. In 4.5.0, all executables should install the handler
+(through calling `blockappsInit`), but its probably worth checking before
+trying this in production and `blockappsInit` should be called at the start of
+`main` for all new long lived processes.
 
-The other caveat is that files opened by the original process should have CLOEXEC (close-on-exec).
-Libraries like `leveldb` and `wai` should be doing this already (or something else to simulate
-the behavior), but there was a bug in implementing this where the file descriptor used to listen
-on port 30303 stayed open in `strato-p2p`, and it was not able to reaquire it for listening.
+The other caveat is that files opened by the original process should have
+CLOEXEC (close-on-exec).  Libraries like `leveldb` and `wai` should be doing
+this already (or something else to simulate the behavior), but there was a bug
+in implementing this where the file descriptor used to listen on port 30303
+stayed open in `strato-p2p`, and it was not able to reaquire it for listening.
 
-The process should also be designed to be able to restart itself normally, by either being stateless
-(like strato-p2p) or saving the necessary state somewhere persistent (like strato-sequencer with
-the kafka metadata).
+The process should also be designed to be able to restart itself normally, by
+either being stateless (like strato-p2p) or saving the necessary state
+somewhere persistent (like strato-sequencer with the kafka metadata).
 
 ### How do I pause a node?
-I've never tried `docker pause strato_strato_1`, but it should halt all processes and be able
-to resume them with `docker unpause strato_strato_1`. If you just want to stop a branch of
-inputs/outputs to prevent the node from doing damage or isolate it for debugging, a SIGSTOP
-will pause the process that can be resumed with SIGCONT:
-```docker exec strato_strato_1 pkill --exact --echo strato-p2p\|strato-api```
-(Note that /proc/<pid/>stat has an upper bound of 15 characters for the process name, so
-pkill has a bizarre upper bound of 15 characters in the process name, and needs either
---full or a truncated process name to target correctly:
+I've never tried `docker pause strato_strato_1`, but it should halt all
+processes and be able to resume them with `docker unpause strato_strato_1`. If
+you just want to stop a branch of inputs/outputs to prevent the node from doing
+damage or isolate it for debugging, a SIGSTOP will pause the process that can
+be resumed with SIGCONT: ```docker exec strato_strato_1 pkill --exact --echo
+strato-p2p\|strato-api``` (Note that /proc/<pid/>stat has an upper bound of 15
+characters for the process name, so pkill has a bizarre upper bound of 15
+characters in the process name, and needs either --full or a truncated process
+name to target correctly:
 ```
 tim@ip-172-31-11-233 ~/strato-platform ❯❯❯ docker exec strato_strato_1 pkill --echo strato-sequencer
 tim@ip-172-31-11-233 ~/strato-platform ❯❯❯ docker exec strato_strato_1 pkill --echo strato-sequenc    ✘ 1
@@ -305,12 +310,323 @@ git bisect good 4.2.0
 git bisect run ht3-bisect.sh
 ```
 and go about your business doing other things, as even though this should only test ~20 commits it will take
-a long time on each one. As simpler example of looking for the introduction of a certain variable,
+a long time on each one. For a simpler example looking for the removal of a variable (the cabal files were
+giving checkout issues):
 ```
-git bisect start
-git bisect bad develop
-git bisect good c39e09
-git bisect run grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+tim@ip-172-31-11-233 ~/s/ironhide ❯❯❯ find . -name "*cabal" -exec rm {} \;
+tim@ip-172-31-11-233 ~/s/ironhide ❯❯❯ git bisect start
+tim@ip-172-31-11-233 ~/s/ironhide ❯❯❯ git bisect bad develop
+tim@ip-172-31-11-233 ~/s/ironhide ❯❯❯ git bisect good c39e09
+Bisecting: 2647 revisions left to test after this (roughly 11 steps)
+[3216b8828806275ba2b6d177a5471208adc03601] Merge pull request #540 from blockapps/partial_unlift_3
+tim@ip-172-31-11-233 ~/s/ironhide ❯❯❯ git bisect run grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+Bisecting: 1290 revisions left to test after this (roughly 10 steps)
+[7b62d4dd62086e567895371ce6726c651d05ffd6] Fixed merge conflicts
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
+            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
+Bisecting: 643 revisions left to test after this (roughly 9 steps)
+[b1dc4e983a8b0aa5abed67741a57f93937ec2f44] Merge pull request #396 from blockapps/fmt
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
+            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
+Bisecting: 321 revisions left to test after this (roughly 8 steps)
+[e7b6d3f944fbc2576a7f94e4661cc1b027bb1b90] add back txsParameters
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+Bisecting: 146 revisions left to test after this (roughly 7 steps)
+[8542fbc34f64fa9998a7876c063e0620492f9104] Merge branch 'develop' into audit-trail
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+Bisecting: 87 revisions left to test after this (roughly 7 steps)
+[d4f9611bf88d4e267478e817a783a224b94bddea] Merge pull request #372 from blockapps/independence
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
+            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
+Bisecting: 41 revisions left to test after this (roughly 6 steps)
+[467be02de9c696617a28ab4e4b2bef50060d161d] Merge branch 'audit-sloppy' into Slipstream-history
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+Bisecting: 26 revisions left to test after this (roughly 5 steps)
+[1782b44b9d5bdbae852614d40574e7e539aa2aa9] Resolved Newest Develop
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
+            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
+Bisecting: 13 revisions left to test after this (roughly 4 steps)
+[48cd95fb79b087591596cde1b24c0cc0f189cdb6] Modified Test To Include View Creation and Name Resolution
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
+            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
+Bisecting: 6 revisions left to test after this (roughly 3 steps)
+[d343b9d1ba9d8bb54615e62276c36b34027a9f30] Updated PSQL Output
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
+            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
+Bisecting: 3 revisions left to test after this (roughly 2 steps)
+[3253b5a94782a4e75061c6eb7d577ac385acf13b] Added Action.hs
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+Bisecting: 0 revisions left to test after this (roughly 1 step)
+[49a9e02fcaa991cb6eb887f672c5dbfe21243907] Always run blocks
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[ad4745c6c8269b7900cea742ba5f4014dc311afc] Add tx level cache to in-memory dbs
+running grep currentBaggerSR core-strato/ethereum-vm/src/Blockchain/BlockChain.hs
+            let currentBaggerSR = Bagger.lastRewardedStateRoot cache
+            $logInfoS "addBlocks" . T.pack $ "Bagger state root: " ++ format currentBaggerSR
+            if (flags_miner /= Mining.Instant || blockSR == currentBaggerSR)
+49a9e02fcaa991cb6eb887f672c5dbfe21243907 is the first bad commit
+commit 49a9e02fcaa991cb6eb887f672c5dbfe21243907
+Author: dustinnorwood <dnorwood2010@aol.com>
+Date:   Tue Sep 18 12:00:15 2018 -0400
+
+    Always run blocks
+
+:040000 040000 981b84cfe5061e61c2e63b55784eea052cc291ba 4452357a981ce9de12c81e84889bf48d1d0a0135 M      core-strato
+bisect run success
+```
+In this case 49a9 is not actually a "bad" commit, just the first one that the test failed on.
+
+### How do I kill a single p2p thread?
+Maybe you have a bug in p2p, and a thread is hung or filtering certain messages. Or it is leaking memory,
+and you want to kill threads to reclaim that memory but can't do a full process restart. In this
+case what you can do is attach to the process and close the file descriptior for a socket to a peer, so
+that the next write causes the thread to throw an exception and be replaced by a new one.
+
+The first step is seeing which file descriptor is allocated for a particular peer:
+```
+host> docker exec -it strato_strato_1 bash
+strato> apt update && apt install lsof
+strato> lsof -p $(pgrep --exact strato-p2p)
+root@f30c58887d4b:/var/lib/strato# lsof -p $(pgrep --exact strato-p2p) | grep IPv4
+strato-p2  75 root   11u     IPv4 299133014      0t0       TCP f30c58887d4b:37122->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+strato-p2  75 root   12u     IPv4 190271661      0t0       TCP *:10248 (LISTEN)
+strato-p2  75 root   13u     IPv4 299132395      0t0       TCP f30c58887d4b:37120->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+strato-p2  75 root   14u     IPv4 190271668      0t0       TCP *:30303 (LISTEN)
+strato-p2  75 root   15u     IPv4 299249949      0t0       TCP f30c58887d4b:45888->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+strato-p2  75 root   16u     IPv4 299249953      0t0       TCP f30c58887d4b:45890->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+strato-p2  75 root   17u     IPv4 196846433      0t0       TCP f30c58887d4b:30303->ec2-3-216-60-69.compute-1.amazonaws.com:44036 (ESTABLISHED)
+strato-p2  75 root   18u     IPv4 196853986      0t0       TCP f30c58887d4b:30303->ec2-3-220-195-204.compute-1.amazonaws.com:46568 (ESTABLISHED)
+strato-p2  75 root   19u     IPv4 196858783      0t0       TCP f30c58887d4b:30303->ec2-3-221-37-62.compute-1.amazonaws.com:42290 (ESTABLISHED)
+strato-p2  75 root   20u     IPv4 196846440      0t0       TCP f30c58887d4b:38716->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+strato-p2  75 root   21u     IPv4 299249957      0t0       TCP f30c58887d4b:45892->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+strato-p2  75 root   23u     IPv4 190274197      0t0       TCP f30c58887d4b:10248->strato_prometheus_1.strato_static:60030 (ESTABLISHED)
+strato-p2  75 root   25u     IPv4 196858789      0t0       TCP f30c58887d4b:39694->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+strato-p2  75 root   26u     IPv4 196855045      0t0       TCP f30c58887d4b:39190->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+strato-p2  75 root   28u     IPv4 190279538      0t0       TCP f30c58887d4b:38188->172.20.0.1:30303 (ESTABLISHED)
+strato-p2  75 root   29u     IPv4 190279542      0t0       TCP f30c58887d4b:30303->172.20.0.1:41388 (ESTABLISHED)
+strato-p2  75 root   33u     IPv4 209609561      0t0       TCP f30c58887d4b:41822->strato_postgres_1.strato_static:postgresql (ESTABLISHED)
+strato-p2  75 root   36u     IPv4 190277435      0t0       TCP f30c58887d4b:38166->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+strato-p2  75 root   38u     IPv4 190277445      0t0       TCP f30c58887d4b:38172->strato_kafka_1.strato_static:9092 (ESTABLISHED)
+```
+The peer connections here are the ones connected to an `ec2` instance, and the
+files are 17, 18, and 19. We can see as well that this node is the server side
+for each of these connections, since we are on port 30303 and the peer is on a
+port chosen by the networking stack. We can see as well that we are listening
+on 30303 (for p2p) and on 10248 (for the /metrics route).
+
+If the strato container is run in privileged mode, `gdb` can attach to a
+process inside of the container. This is typically not the case, and you need
+to attach to `strato-p2p` as a process on the host (note that it will have a
+different PID in the host namespace)
+```
+host> sudo apt install gdb
+host> sudo gdb -p $(pgrep --exact strato-p2p)
+GNU gdb (Ubuntu 8.1-0ubuntu3) 8.1.0.20180409-git
+Copyright (C) 2018 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+<http://www.gnu.org/software/gdb/documentation/>.
+For help, type "help".
+Type "apropos word" to search for commands related to "word".
+Attaching to process 21071
+[New LWP 21088]
+[New LWP 21089]
+[New LWP 21112]
+[New LWP 21115]
+[New LWP 21125]
+[New LWP 21385]
+[New LWP 22818]
+[New LWP 22883]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+warning: Target and debugger are in different PID namespaces; thread lists and other data are likely unreliable.  Connect to gdbserver inside the container.
+0x00007f86caadc9f3 in futex_wait_cancelable (private=<optimized out>, expected=0, futex_word=0x530a148)
+    at ../sysdeps/unix/sysv/linux/futex-internal.h:88
+88      ../sysdeps/unix/sysv/linux/futex-internal.h: No such file or directory.
+(gdb) call close(17)
+$1 = 0
+(gdb) quit
+A debugging session is active.
+
+        Inferior 1 [process 21071] will be detached.
+
+Quit anyway? (y or n) y
+Detaching from program: target:/usr/local/bin/strato-p2p, process 21071
+```
+After detaching, the p2p process will resume and you can see the thread exiting:
+```
+[2019-07-29 18:52:52.500303579 UTC]  INFO | ThreadId 21878 | runEthServer/exit                   |  * Connection ended to 3.216.60.69
 ```
 
+### How do I run my own docker registry?
+This section should maybe instead be labeled `why should you`? The essential
+reason I've had is that when compiling with profiling enabled, the strato image
+is typically 5GB and the blockapps registry fails to accept images that large.
+An additional reason is that these are images that I'm testing with, but they
+are large and nobody else will need to run them. Rather than pollute S3 with
+them forever, they just get lost when I decide to down the registry.
 
+Point the DNS records for a hostname you have to the VM, and modify the following
+to taste:
+```
+#!/usr/bin/env zsh
+
+sudo docker run  \
+  -d \
+  --restart=always \
+  --name localreg \
+  --mount type=bind,source=/etc/letsencrypt/,target=/etc/letsencrypt,readonly=true \
+  --mount type=bind,source="${PWD}/auth",target=/auth,readonly=true \
+  -e REGISTRY_AUTH=htpasswd \
+  -e REGISTRY_AUTH_HTPASSWD_REALM="Registry Realm" \
+  -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \
+  -e REGISTRY_HTTP_ADDR=0.0.0.0:443 \
+  -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/letsencrypt/live/thnd.dev/fullchain.pem \
+  -e REGISTRY_HTTP_TLS_KEY=/etc/letsencrypt/live/thnd.dev/privkey.pem \
+  -p 443:443 \
+  registry:2
+```
+Since the .dev TLD is on the HSTS list, it was necessary to enable SSL. The certificates
+from Let's Encrypt were mounted on the container, the `registry:2` image also has
+an htpasswd executable:
+```
+docker run --entrypoint htpasswd registry:2 -Bbn thnd c5e7f38d665b95f7fb357e904a99852d > auth/htpasswd
+```
+Then for the nodes that need to pull from the registry, login:
+```
+docker login --username thnd --password c5e7f38d665b95f7fb357e904a99852d thnd.dev
+```
+
+To build, specify the REPO_URL directly and push at will:
+```
+REPO_URL=thnd.dev/ make && docker-compose -f docker-compose.push.yml push
+```
+
+### How do I deploy a multinode network?
+A tool I've found pretty useful is `parallel-ssh`. If I'm just executing a one off,
+it might make sense to do `for node in <network-name>{0,1,2,3}; do ssh $node <command>; done`,
+but a lot of times its nice to just have to type in a single command and for some common
+tasks (pulling images, restarting containers) they can take between 10s and minutes, so
+parallelization is definitely noticed. I also think that Ansible would be a good fit here,
+especially because it seems to have the capability of parallel-ssh but with the ability
+to have a cleaner separation between network definitions and command definition.
+
+Here is an example transcript of taking a trio of (essentially) fresh nodes and spin them up into a network:
+```
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ alias doall='parallel-ssh --timeout 0 --inline -H multinode303 -H multinode304 -H multinode305'
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ alias sendall='parallel-ssh --timeout 0 -H multinode303 -H multinode304 -H multinode305'
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ doall 'rm -rf /tmp/sgs && git clone https://github.com/blockapps/strato-getting-started /tmp/sgs'
+[1] 19:11:13 [SUCCESS] multinode305
+Stderr: Cloning into '/tmp/sgs'...
+warning: unable to access '/home/ubuntu/.config/git/attributes': Permission denied
+[2] 19:11:14 [SUCCESS] multinode304
+Stderr: Cloning into '/tmp/sgs'...
+warning: unable to access '/home/ubuntu/.config/git/attributes': Permission denied
+[3] 19:11:14 [SUCCESS] multinode303
+Stderr: Cloning into '/tmp/sgs'...
+warning: unable to access '/home/ubuntu/.config/git/attributes': Permission denied
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ doall 'sudo chown -R ubuntu /home/ubuntu/.config'
+[1] 19:12:31 [SUCCESS] multinode305
+[2] 19:12:31 [SUCCESS] multinode303
+[3] 19:12:31 [SUCCESS] multinode304
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ cat << EOF >| node-list.json
+heredoc else> [ {"host": "multinode303.ci.blockapps.net"},
+heredoc else>   {"host": "multinode304.ci.blockapps.net"},
+heredoc else>   {"host": "multinode305.ci.blockapps.net"}
+heredoc else> ]
+heredoc else> EOF
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ ./strato --scriptgen
+IP address of multinode303.ci.blockapps.net was resolved as 52.23.161.240
+IP address of multinode304.ci.blockapps.net was resolved as 18.213.3.139
+IP address of multinode305.ci.blockapps.net was resolved as 54.242.60.210
+Resulting node list: [{"ip": "52.23.161.240", "host": "multinode303.ci.blockapps.net"}, {"ip": "18.213.3.139", "host": "multinode304.ci.blockapps.net"}, {"ip": "54.242.60.210", "host": "multinode305.ci.blockapps.net"}]
+STRATO image used: strato:4.5.0-4e1cfb7b7
+{
+    "key_address_pairs": [
+        {
+            "address": "4a36a59bca3041cef4a2557d3d3800a4adbd0bab",
+            "private_key": "Uk3iQPbSfEnjWks84yQbNwrgCt30SMVx3tmVBwySY90="
+        },
+        {
+            "address": "8ec10d0fc7df376edd86079dd060cd294b62b8ea",
+            "private_key": "6fMus90cd/JumvT8Y+FH8Wyhw3TQwurF6G9KHwRG6ms="
+        },
+        {
+            "address": "c95fddfb53d349f00bcfcb1b2d7da12410e31d53",
+            "private_key": "VNI+VCpNLvfIm9RNq7XeSX2MDIi+hf8az3hnBGmM80U="
+        }
+    ],
+    "all_validators": [
+        "4a36a59bca3041cef4a2557d3d3800a4adbd0bab",
+        "8ec10d0fc7df376edd86079dd060cd294b62b8ea",
+        "c95fddfb53d349f00bcfcb1b2d7da12410e31d53"
+    ]
+}
+
+Successfully finished. Check my-node-scripts/ directory for scripts
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ for node in multinode30{3,4,5}; do
+for else> scp "my-node-scripts/${node}.ci.blockapps.net/run.sh" $node:/tmp/sgs
+for else> done
+run.sh                        100%  413   878.6KB/s   00:00
+run.sh                        100%  413   859.4KB/s   00:00
+run.sh                        100%  414     1.0MB/s   00:00
+
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ sendall docker-compose.yml /tmp/sgs
+[1] 19:17:59 [SUCCESS] multinode304
+[2] 19:17:59 [SUCCESS] multinode303
+[3] 19:17:59 [SUCCESS] multinode305
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ md5sum docker-compose.yml
+2c02add90be9d08c00644feecf3899da  docker-compose.yml
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ doall md5sum /tmp/sgs/docker-compose.yml
+[1] 19:22:21 [SUCCESS] multinode304
+2c02add90be9d08c00644feecf3899da  /tmp/sgs/docker-compose.yml
+[2] 19:22:21 [SUCCESS] multinode305
+2c02add90be9d08c00644feecf3899da  /tmp/sgs/docker-compose.yml
+[3] 19:22:22 [SUCCESS] multinode303
+2c02add90be9d08c00644feecf3899da  /tmp/sgs/docker-compose.yml
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ doall 'cd /tmp/sgs && ./strato --wipe && ./strato --pull && ./run.sh'
+<omitted>
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ doall 'curl --silent -F address=3 localhost/strato-api/eth/v1.2/faucet'
+[1] 19:20:47 [SUCCESS] multinode304
+["c6c07dcdec6fecc36b69159591c0ab74a17bcef35e33a5921359da39a7d27002","e3920aa981dc05b65fe201701db3e704ef8f2a6f6bc9c9aeaa88e7f82964fe46"][2] 19:20:47 [SUCCESS] multinode303
+["0b63b6d467c733fdb8cb924b9e7ae1438ffa39b67427df43dbf55ac9d462bea1","abd64f1e9b534767c3e0a0f86a42eeefd58bc8145f2fadc9741490079ee09fd1"][3] 19:20:47 [SUCCESS] multinode305
+["12c8a2710afa3f45499154a54b856a91b175c2d6ffe7692956d31b1f9a22fc36","fb1a7ed566156cb2c712d199e73b67882c60744717d51639fd4779d5dc264d75"]%
+tim@ip-172-31-11-233 ~/strato-getting-started ❯❯❯ doall 'docker exec strato_strato_1 curl --silent localhost:8050/metrics | grep view'
+[1] 19:20:29 [SUCCESS] multinode305
+# HELP pbft_current_view Current (Roundno, Seqno) of PBFT
+# TYPE pbft_current_view gauge
+pbft_current_view{view_field="round_number"} 9.0
+pbft_current_view{view_field="sequence_number"} 2.0
+[2] 19:20:29 [SUCCESS] multinode304
+# HELP pbft_current_view Current (Roundno, Seqno) of PBFT
+# TYPE pbft_current_view gauge
+pbft_current_view{view_field="round_number"} 9.0
+pbft_current_view{view_field="sequence_number"} 2.0
+[3] 19:20:30 [SUCCESS] multinode303
+# HELP pbft_current_view Current (Roundno, Seqno) of PBFT
+# TYPE pbft_current_view gauge
+pbft_current_view{view_field="round_number"} 9.0
+pbft_current_view{view_field="sequence_number"} 2.
+```
