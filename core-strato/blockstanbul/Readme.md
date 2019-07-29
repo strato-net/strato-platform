@@ -33,3 +33,27 @@ machine are then derived, by e.g. seeing if there is a blockhash that has
 quorum in the `_committed` field. There are similar maps in `_prepared`,
 `_roundChanged`, and `_voted` (`_voted` for administrative purposes, to
 resize the validator pool).
+
+Communication
+-------------
+The normal PBFT messages (PREPREPARE/PREPARE/COMMIT/ROUNDCHANGE) are exchanged
+on the topics between the sequencer and p2p, and are broadcast to all peers.
+The RLP instance for these should be the same as for the geth implementation of
+Istanbul, but its possible that they have an extra layer of RLP by the time it
+reaches ethcrypt. If integration becomes a concern, that may need to be fixed.
+There are also some supplementary p2p controls (GapFound/LeadFound) that can be
+used to bring a peer that's behind up to speed.
+
+The protocol between the sequencer and the VM has a MakeBlockCommand for
+PBFT to request a block when this node is the proposer, and the ToCommit
+message to finalize a block with the VM. When voting, a PendingVote
+will be authenticate by PBFT and forwarded to Bagger to be included in a block
+(this step could just be omitted by having the blockstanbul-vote tool write
+directly to kafka and simplify it by authenticating through ssh keys/docker
+access. It partly depends on how this is integrated into a UI).
+
+PBFT will set a timer with `ResetTimer RoundNumber` and then after the
+round period should receive `RoundTimeout RoundNumber`
+
+On state transitions, a `NewCheckpoint` will be emitted and for now
+this is saved as kafka metadata.
