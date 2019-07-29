@@ -15,6 +15,7 @@ import           Checkpoints
 import           Code
 import           DumpKafkaBlocks
 import           CanonRedis
+import           ChainHash
 import           DumpKafkaRaw
 import           DumpKafkaSequencer
 import           DumpKafkaStateDiff
@@ -79,6 +80,7 @@ data Options = State{root::String, db::String}
              | LoadKafka { topic :: String, filename :: String }
              | VerifyKafkaFile { filename :: String }
              | SetParticipationMode { mode :: ParticipationMode }
+             | ChainHash
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -310,6 +312,9 @@ setParticipationModeOptions = record SetParticipationMode {mode = error "unused 
                                    += name "mode"
                             ]
 
+chainHashOptions :: Annotate Ann
+chainHashOptions = record ChainHash []
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -348,6 +353,7 @@ options = modes_ [blockGoOptions
                 , loadKafkaOptions
                 , verifyKafkaFileOptions
                 , setParticipationModeOptions
+                , chainHashOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -403,3 +409,4 @@ run SaveKafka{..}              = saveKafka topic filename
 run LoadKafka{..}              = loadKafka topic filename
 run VerifyKafkaFile{..}        = verifyKafkaFile filename
 run SetParticipationMode{..}   = remoteSetParticipationMode mode
+run ChainHash                  = chainHash
