@@ -19,6 +19,7 @@
     "test:app-metadata:local": "mocha --config=config-local.yaml lib/appMetadata/test/appMetadata.test.js --api-debug"
   },
   "dependencies": {
+    "@promster/express": "^3.1.0",
     "adm-zip": "0.4.7",
     "aws-sdk": "2.254.1",
     "bcrypt": "1.0.3",
@@ -51,6 +52,7 @@
     "pg": "^6.4.1",
     "pg-hstore": "2.3.2",
     "pgtools": "0.3.0",
+    "prom-client": "11.5.3",
     "rand-token": "0.3.0",
     "request": "2.83.0",
     "request-promise": "4.2.2",
