@@ -61,7 +61,7 @@ pipeline {
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=localhost
-          NODE_HOST=${NODE_HOST} genesis=smokeTest ./strato.sh -m 1 --single
+          NODE_HOST=${NODE_HOST} PASSWORD=123 genesis=smokeTest ./strato.sh -m 1 --single
           docker ps
           counter=0
           # Few quick tests

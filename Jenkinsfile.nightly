@@ -39,7 +39,7 @@ pipeline {
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cd strato-getting-started
           NODE_HOST=localhost
-          NODE_HOST=${NODE_HOST} genesis=smokeTest ./strato.sh -m 1 --single
+          NODE_HOST=${NODE_HOST} PASSWORD=123 genesis=smokeTest ./strato.sh -m 1 --single
           docker ps
           # Few quick tests
           check_bloc() {
@@ -60,6 +60,7 @@ pipeline {
           echo "Restarting docker containers to simulate computer restart..."
           docker-compose -p strato --log-level ERROR stop
           docker-compose -p strato --log-level ERROR start
+          PASSWORD=${PASSWORD} ./strato --set-password
           check_bloc
         '''
       }
