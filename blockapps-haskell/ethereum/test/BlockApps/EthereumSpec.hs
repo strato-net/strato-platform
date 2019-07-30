@@ -3,7 +3,6 @@
 
 module BlockApps.EthereumSpec where
 
-import Debug.Trace
 import Control.Applicative (liftA2)
 import Crypto.HaskoinShim
 import Data.Aeson
@@ -89,13 +88,9 @@ spec = modifyMaxSuccess (const 10) $ do
           , unsignedTransactionChainId = Nothing
           }
         signed1' = signTransaction key1 unsigned1'
-      traceIO "start"
       unsigned1' `shouldBe` unsigned1
-      traceIO "post unsigned equelity"
-      traceShowId signed1' `shouldSatisfy` verifyTransaction (derivePubKey key1)
-      traceIO "signed transaction can be verified"
+      signed1' `shouldSatisfy` verifyTransaction (derivePubKey key1)
       recoverTransaction signed1' `shouldBe` Just (derivePubKey key1)
-      traceIO "recovered key is the source key"
       recoverTransaction signed1' `shouldBe` recoverTransaction signed1
     it "correctly signs transaction (2)" $ do
       let

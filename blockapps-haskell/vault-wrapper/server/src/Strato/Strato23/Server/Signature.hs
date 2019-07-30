@@ -32,6 +32,6 @@ postSignature userName (UserData (Hex msgHash)) = do
       Just msg' -> do
         let sig = exportCompactRecSig $ signRecMsg prvKey msg'
         return $ SignatureDetails
-                  (Hex . alsoRemoveThisOne $ getCompactRecSigR sig)
-                  (Hex . alsoRemoveThisOne $ getCompactRecSigS sig)
+                  (Hex $ getCompactRecSigR sig)
+                  (Hex $ getCompactRecSigS sig)
                   (Hex $ 0x1b + getCompactRecSigV sig)
