@@ -7,7 +7,7 @@ fi
 
 HOST=$1
 ssh $HOST mkdir -p bin
-for bin in qs spsql blog dlf stlog grablogs.sh grablogs2.sh stwait cleanzeros.sh view-tracker.sh; do
+for bin in qs spsql blog dlf stlog esql grab_dc.sh view-tracker.sh force_docker_purge_all; do
   scp ~/bin/${bin} $HOST:./bin
   ssh ${HOST} chmod +x bin/${bin}
 done

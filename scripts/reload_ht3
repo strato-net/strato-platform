@@ -1,12 +1,13 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env sh
 set -x
 set -e
 
-export HTTP_PORT=8080 \
-export NODE_HOST=localhost:8080 \
-export OAUTH_JWT_VALIDATION_ENABLED=true \
-export OAUTH_JWT_VALIDATION_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/HT3/.well-known/openid-configuration \
-export OAUTH_JWT_USERNAME_PROPERTY=email \
-export OAUTH_STRATO42_FALLBACK=true \
+export HTTP_PORT=8080
+export NODE_HOST=localhost:8080
+export OAUTH_JWT_USERNAME_PROPERTY=email
+export OAUTH_JWT_VALIDATION_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/HT3/.well-known/openid-configuration
+export OAUTH_JWT_VALIDATION_ENABLED=true
+export OAUTH_STRATO42_FALLBACK=true
+
 reload.sh
 docker exec -i strato_vault-wrapper_1 curl --silent -H "Content-Type: application/json" -d '"ht3"' localhost:8000/strato/v2.3/password || true
