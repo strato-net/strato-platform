@@ -1,7 +1,21 @@
 import axios from 'axios'
 import queryString from 'query-string'
 const { stringify} = require('flatted/cjs');
+import commander from "commander";
+import fs from "fs";
+import fsUtil from "./util/fsUtil";
 
+if (!fs.existsSync(commander.config)) {
+    console.error(
+        `Could not open config file at location "${
+            commander.config
+            }". You may need to specify --config option`
+    );
+    process.exit(1);
+}
+const config = fsUtil.getYaml(commander.config);
+
+console.log("AXIOS-WRAPPER config:", config)
 axios.defaults.headers.post['Content-Type'] = 'application/json'
 
 const urlencodedHeaders = { 'Content-Type': 'application/x-www-form-urlencoded' }
