@@ -17,9 +17,7 @@ function toJson(string) {
 }
 
 async function get(host, endpoint, options = {}) {
-  console.log("APIDEBUG axios-wrapper ", options)
-  //const logger = options.logger || (options.config.apiDebug? console : nullLogger)
-    const logger = (options.config.apiDebug? console : nullLogger)
+  const logger = options.logger || (options.config.apiDebug? console : nullLogger)
   const url = host + endpoint
   const request = {
     method: 'GET',
@@ -40,7 +38,7 @@ async function get(host, endpoint, options = {}) {
 }
 
 async function post(host, endpoint, body, options) {
-  const logger = options.logger || nullLogger
+  const logger = options.logger || (options.config.apiDebug? console : nullLogger)
   const url = host + endpoint
   const request = {
     url,
