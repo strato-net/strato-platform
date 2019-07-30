@@ -210,7 +210,7 @@ const run = async function() {
             function logout(){
               window.location.href='${
                 oauth.logOutUrl
-              }?redirect_uri=http://ec2-3-93-198-52.compute-1.amazonaws.com:${portNumber}/login'
+              }?redirect_uri=http://localhost:${portNumber}/login'
             }
           </script>
         </head>

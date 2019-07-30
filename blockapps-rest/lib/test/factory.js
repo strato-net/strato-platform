@@ -13,7 +13,7 @@ const enode = `enode://${publicKey}@${localIp}:${port}`;
 const balance = 100000000000000000000; // TODO express in ether
 
 function getTestConfig() {
-  const config = fsUtil.getYaml(`${util.cwd}/lib/test/fixtures/token-getter.config.yaml`); //TODO: Change back to normal config
+  const config = fsUtil.getYaml(`${util.cwd}/lib/test/fixtures/config.yaml`);
   assert.isDefined(config, "config should be defined");
   assert.isDefined(config.nodes, "config.nodes should be defined");
   assert.isArray(config.nodes, "config.nodes should be an array");
