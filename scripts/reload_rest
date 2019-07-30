@@ -1,0 +1,10 @@
+#!/usr/bin/env zsh
+set -x
+set -e
+
+export OAUTH_CLIENT_ID=localhost-80-infinite
+export OAUTH_CLIENT_SECRET=adac9a89-ee8b-4683-b043-084ae14ef776
+export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
+export OAUTH_ENABLED=true
+reload.sh
+docker exec -i strato_vault-wrapper_1 curl --silent -H "Content-Type: application/json" -d '"rest"' localhost:8000/strato/v2.3/password || true

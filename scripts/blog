@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+docker exec -it strato_bloc_1 tail -c+1 -f "/logs/${1}"

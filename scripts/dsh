@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+docker exec -it "strato_${1}_1" bash
