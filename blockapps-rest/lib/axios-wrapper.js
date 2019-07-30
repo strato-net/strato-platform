@@ -16,6 +16,7 @@ function toJson(string) {
 }
 
 async function get(host, endpoint, options = {}) {
+  console.log("APIDEBUG")
   const logger = options.logger || nullLogger
   const url = host + endpoint
   const request = {
