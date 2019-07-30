@@ -121,7 +121,7 @@ loadKafka topic file = do
     res <- runKafkaConfigured "queryStrato" . runConduit $
          streamFile h
       .| bundleMessages
-      .| mapMC (produceBytes' topic)
+      .| mapMC (produceBytes $ fromString topic)
       .| mapC filterResponse
       .| mapM_C (\errs -> unless (null errs) . liftIO . die . printf "errors from kafka: %s" $ show errs)
 
