@@ -72,7 +72,7 @@ simulates its effects and rejects all other inline assembly programs. Rather
 than implementing writable references to characters inside of a string, we
 simulate that solidity with `SHexDecodeAndTrim or `SAddressToAscii`.
 
-Prefer to use the exceptions is SolidException rather than `error`. By default,
+Prefer to use the exceptions in SolidException rather than `error`. By default,
 these exceptions will be caught at the end of a `runSM` block, with the
 exception of `internalError`. To catch none of the exceptions, run with
 `svmDev=true`.
