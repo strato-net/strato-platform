@@ -3,7 +3,6 @@ import simpleOauth from 'simple-oauth2'
 import unixTime from 'unix-time'
 import request from 'sync-request'
 import getPem from 'rsa-pem-from-mod-exp'
-const {parse} = require('flatted/cjs');
 
 class OAuthUtil {
 	constructor(oauthConfig) {

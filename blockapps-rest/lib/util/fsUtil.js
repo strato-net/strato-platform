@@ -1,6 +1,5 @@
 import fs from 'fs'
 import yaml from 'js-yaml';
-const {parse} = require('flatted/cjs');
 
 function get(filename) {
   const content = fs.readFileSync(filename, 'utf8')
@@ -14,7 +13,7 @@ function getYaml(filename) {
 
 function getJson(filename, options) {
   const content = fs.readFileSync(filename, options)
-  return parse(content)
+  return JSON.parse(content)
 }
 
 export default {
