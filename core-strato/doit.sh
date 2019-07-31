@@ -215,22 +215,23 @@ function cleanupDB {
 }
 
 function doInit {
-  export blockTime=${blockTime:-13}
-  export minBlockDifficulty=${minBlockDifficulty:-131072}
+  blockTime=${blockTime:-13}
+  minBlockDifficulty=${minBlockDifficulty:-131072}
   if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
     xfFlag="--extraFaucets=${extraFaucets:-$validators}"
+  fi
+  if [[ -n "${validators}" ]]; then
+    # Keep active discovery until all other validators are peers
+    echo "Overriding minAvailablePeers with number of consensus peers"
+    actualMinPeers=$( echo "${validators}" | tr -cd , | wc -c )
+  else
+    actualMinPeers=$numMinPeers
   fi
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty $xfFlag"
-# For backup_restore; the environment var is set during strato-admin.sh invocation.
-# Required: Backup file to be accessible to strato container at /tmp/backup
-  if [[ $backupblocks ]] ; then
-     cmd="${cmd} --backupblocks=true < /var/lib/strato/backup_strato_block"
-     echo "# of lines in block-backup-file: " `cat $backupLocation | wc -l`
-  fi
+                    --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty $xfFlag"
 
   echo "strato-setup command: $cmd"
   # logging to stdout and log file:
@@ -239,19 +240,6 @@ function doInit {
     echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
     tail -f /dev/null
   fi
-
-
-  if [[ -n "${validators}" ]]; then
-    # Keep active discovery until all other validators are peers
-    echo "Overriding minAvailablePeers with number of consensus peers"
-    actualMinPeers=$( echo "${validators}" | tr -cd , | wc -c )
-  else
-    actualMinPeers=$numMinPeers
-  fi
-  sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$actualMinPeers"'/' .ethereumH/ethconf.yaml
-
-  echo "Creating a random coinbase"
-  mkCoinbase
 }
 
 # Find all logs greater than 10M, then copy and truncate
@@ -318,8 +306,6 @@ setEnv difficultyBomb false
 setEnv sqlDiff ${sqlDiff:-true}
 setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
-
-setEnv backupLocation /var/lib/strato/backup_strato_block
 
 setEnv evmDebugMode false
 setEnv evmTraceMode false

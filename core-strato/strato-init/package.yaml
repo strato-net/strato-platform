@@ -25,12 +25,15 @@ dependencies:
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
+  - common-log
+  - conduit
   - containers
   - cryptohash
   - cryptonite
   - crypto-api
   - csv
   - directory
+  - either
   - entropy
   - ethereum-discovery
   - ethereum-rlp
@@ -61,9 +64,11 @@ dependencies:
   - strato-statediff
   - stm
   - stm-chans
+  - temporary
   - text
   - time
   - transformers
+  - turtle
   - unliftio-core
   - unordered-containers
   - utf8-string
@@ -79,33 +84,6 @@ executables:
     main: Main.hs
     dependencies:
       - strato-init
-    other-modules: []
-
-  strato-backup:
-    source-dirs: exec_src/
-    main: Backup.hs
-    dependencies:
-      - monad-control
-    other-modules: []
-
-  strato-block-backup:
-    source-dirs: exec_src/
-    main: BlockBackup.hs
-    other-modules: []
-
-  strato-ez-restore:
-    source-dirs: exec_src/
-    main: RestoreTool.hs
-    dependencies:
-      - strato-init
-      - monad-control
-    other-modules: []
-
-  mkCoinbase:
-    source-dirs: exec_src/
-    main: MkCoinbase.hs
-    dependencies:
-      - base64-bytestring
     other-modules: []
 
 tests:
