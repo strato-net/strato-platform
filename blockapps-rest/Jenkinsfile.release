@@ -41,6 +41,7 @@ pipeline {
             OAUTH_CLIENT_SECRET=adac9a89-ee8b-4683-b043-084ae14ef776 \
             OAUTH_JWT_USERNAME_PROPERTY=email \
             OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
+            PASSWORD=123 \
             ./strato --single
           docker ps
           counter=0
