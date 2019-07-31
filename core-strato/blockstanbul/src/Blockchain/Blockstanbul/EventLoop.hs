@@ -62,7 +62,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _hasCommitted :: Bool
   , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
-  , _roundChanged :: M.Map Address RoundNumber
+  , _roundChanged :: M.Map RoundNumber (S.Set Address)
   , _voted :: M.Map Address (M.Map Address Bool)
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
@@ -258,7 +258,7 @@ nextRound nt = do
         yield $ signMessage pk (Preprepare v lb)
   prepared .= M.empty
   committed .= M.empty
-  roundChanged .= M.empty
+  roundChanged %= M.dropWhileAntitone (<= thisR)
 
   hasPreprepared .= False
   hasCommitted .= False
@@ -401,10 +401,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             yield . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
-      rs <- roundChanged <%= M.insert (sender auth) rn
+      rs <- roundChanged <%= M.alter (Just . S.insert (sender auth) . fromMaybe S.empty) rn
       total <- poolSize
       sentRN <- use pendingRound
-      let sameRNCount = M.size . M.filter (== rn) $ rs
+      let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
         pendingRound .= Just rn
         pk <- use prvkey
