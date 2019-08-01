@@ -358,6 +358,22 @@ spec = do
         , BString (fst $ B16.decode "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868")
         ]
 
+    it "can hash multiple arguments" . runTest $ do
+      liftIO $ pendingWith "TODO(blockapps.atlassian.net/browse/STRATO-1520)"
+      runBS [r|
+contract qq {
+  bytes32 hsh;
+  constructor() public {
+    string username = "uname";
+    string nodeIp = "enode://8814738274@127.0.0.1:30303";
+    string chainId = "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868";
+    hsh = keccak256(username, nodeIp, chainId);
+  }
+}
+|]
+      getFields ["hsh"] `shouldReturn` [BString $ word256ToBytes 0x4ebc701886e9562cf7998b9ab563c6d3ca5ad243b547f11f31ae1ae156b2ff97]
+
+
     it "can create a struct" . runTest $ do
       runBS [r|
 contract qq {
