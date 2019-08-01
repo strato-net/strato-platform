@@ -289,11 +289,11 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
         , A._actionTransactionSender = Ad.Address 0
         , A._actionData = Map.singleton a $
                            A.ActionData
-                             (EVMCode ch)
-                             EVM
+                             (codeHash d)
+                             vmType
                              (case storage d of
                                 EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
-                                SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map (error "TODO(tim): solid vm genesisblock support") m)
+                                SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map fromDiff m)
                              [A.emptyCallData]
         , A._actionMetadata = getMetadata ch
         }
@@ -302,7 +302,9 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
                case codeHash d of
                  EVMCode ch' -> ch'
                  SolidVMCode _ ch' -> ch'
-
+             vmType = case codeHash d of
+                 EVMCode _ -> EVM
+                 SolidVMCode _ _ -> SolidVM
       fromDiff (Value v) = v
       squashMap f = map (uncurry f) . Map.toList
       actions = squashMap toAction accountDiffs
