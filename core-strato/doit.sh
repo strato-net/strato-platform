@@ -241,7 +241,7 @@ function doInit {
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
     fi
-    init-worker --kafkahost=$kafkaHost 2>&1 | tee logs/strato-setup
+    init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
