@@ -23,6 +23,7 @@ dependencies:
   - blockapps-mpdbs
   - blockapps-privacy
   - blockapps-util
+  - blockstanbul
   - bytestring
   - cmdargs
   - common-log
@@ -56,6 +57,7 @@ dependencies:
   - strato-statediff
   - transformers
   - hedis
+  - unliftio
 
 library:
   source-dirs: src/

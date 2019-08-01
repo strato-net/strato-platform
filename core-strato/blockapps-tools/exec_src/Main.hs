@@ -83,6 +83,7 @@ data Options = State{root::String, db::String}
              | SetParticipationMode { mode :: ParticipationMode }
              | ChainHash
              | DeriveEnode { privatekey :: String, ip :: String }
+             | CompressRoundChanges { infilename :: String, outfilename :: String }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -323,6 +324,12 @@ deriveEnodeOptions = record DeriveEnode { privatekey = error "unused privatekey"
                    , ip := error "--ip required" += typ "IP address" += explicit += name "ip"
                    ]
 
+compressRoundChangesOptions :: Annotate Ann
+compressRoundChangesOptions = record CompressRoundChanges { infilename = error "unused infilename", outfilename = error "unused outfilename"}
+                            [ infilename := error "compressroundchanges --infilename=<file>" += typ "PATH" += explicit += name "infilename"
+                            , outfilename := error "compressroundchanges --outfilename=<file>" += typ "PATH" += explicit += name "outfilename"
+                            ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -363,6 +370,7 @@ options = modes_ [blockGoOptions
                 , setParticipationModeOptions
                 , chainHashOptions
                 , deriveEnodeOptions
+                , compressRoundChangesOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -420,3 +428,4 @@ run VerifyKafkaFile{..}        = verifyKafkaFile filename
 run SetParticipationMode{..}   = remoteSetParticipationMode mode
 run ChainHash                  = chainHash
 run DeriveEnode{..}            = deriveEnode privatekey ip
+run CompressRoundChanges{..}   = compressRoundChanges infilename outfilename
