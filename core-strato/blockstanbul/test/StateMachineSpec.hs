@@ -182,7 +182,7 @@ spec = parallel $ do
         validators .= S.fromList [sender auth]
         blockWithVs <- uses validators $ flip addValidators blk
         pk <- use prvkey
-        pseal <- proposerSeal blockWithVs pk
+        let pseal = proposerSeal blockWithVs pk
         let sealedBlk = addProposerSeal pseal blockWithVs
         curView <- use view
         let hsh = blockHash sealedBlk
@@ -363,13 +363,13 @@ spec = parallel $ do
         sendMessages [IMsg a1 $ RoundChange next] `shouldReturn` []
         -- 1 vote is not enough
         use pendingRound `shouldReturn` Nothing
-        use roundChanged `shouldReturn` M.singleton (sender a1) roundNext
+        use roundChanged `shouldReturn` M.singleton roundNext (S.singleton (sender a1))
         use view `shouldReturn` curView
         -- 2 votes will be broadcast, but not taken up.
         omsgs <- sendMessages [IMsg a2 $ RoundChange next]
         map oMessage omsgs `shouldBe` [RoundChange next]
         use pendingRound `shouldReturn` Just roundNext
-        use roundChanged `shouldReturn` M.fromList [(sender a1, roundNext), (sender a2, roundNext)]
+        use roundChanged `shouldReturn` M.singleton roundNext (S.fromList [sender a1, sender a2])
         use view `shouldReturn` curView
         -- 3 votes will do it
         sendMessages [IMsg a3 $ RoundChange next] `shouldReturn`
@@ -386,6 +386,20 @@ spec = parallel $ do
         use view `shouldReturn` next
         sendMessages [IMsg a $ RoundChange next] `shouldReturn` []
         use view `shouldReturn` next
+
+    it "Remembers round changes from the future" $ property $ \blk s1 s2 s3 ->
+      let [a1, a2, a3] = zipWith MsgAuth [1..] [s1, s2, s3]
+      in runTest $ do
+        _ <- setupRound blk [sender a1, sender a2, sender a3]
+        now <- use view
+        next <- uses view (over round (+1))
+        nextnext <- uses view (over round (+2))
+        _ <- sendMessages [IMsg a2 $ RoundChange nextnext, IMsg a2 $ RoundChange next]
+        use view `shouldReturn` now
+        _ <- sendMessages [IMsg a1 $ RoundChange next, IMsg a3 $ RoundChange next]
+        use view `shouldReturn` next
+        _ <- sendMessages [IMsg a1 $ RoundChange nextnext, IMsg a3 $ RoundChange nextnext]
+        use view `shouldReturn` nextnext
 
   describe "An UnannouncedBlock message" $ do
     let selfElected = do
@@ -519,10 +533,10 @@ spec = parallel $ do
               blk' = addValidators vals . truncateExtra . setBlockNo 19 $ blk
           validators .= vals
           proposer .= me
-          pSeal <- proposerSeal blk' pk
+          let pSeal = proposerSeal blk' pk
           let lockBlk = addProposerSeal pSeal blk'
           myKey <- use prvkey
-          OMsg auth wm <- signMessage myKey $ Preprepare v lockBlk
+          let OMsg auth wm = signMessage myKey $ Preprepare v lockBlk
 
           lockSender .= Just them
           blockLock .= Just lockBlk
@@ -573,9 +587,9 @@ spec = parallel $ do
           let blk2 = addValidators vals
                    . truncateExtra
                    $ blk1
-          pSeal <- proposerSeal blk2 proper
+              pSeal = proposerSeal blk2 proper
           let blk3 = addProposerSeal pSeal blk2
-          cSeals <- mapM (commitmentSeal (blockHash blk3)) committers
+              cSeals = map (commitmentSeal (blockHash blk3)) committers
           return $ addCommitmentSeals cSeals blk3
 
         votingBlock :: Block

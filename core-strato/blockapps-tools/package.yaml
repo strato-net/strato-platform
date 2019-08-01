@@ -15,6 +15,7 @@ dependencies:
   - aeson
   - ansi-wl-pprint
   - base16-bytestring
+  - base64-bytestring
   - binary
   - blockapps-data
   - blockapps-datadefs
@@ -22,12 +23,14 @@ dependencies:
   - blockapps-mpdbs
   - blockapps-privacy
   - blockapps-util
+  - blockstanbul
   - bytestring
   - cmdargs
   - common-log
   - conduit
   - data-default
   - ethereum-discovery
+  - ethereum-encryption
   - ethereum-rlp
   - filepath
   - format
@@ -54,6 +57,7 @@ dependencies:
   - strato-statediff
   - transformers
   - hedis
+  - unliftio
 
 library:
   source-dirs: src/

@@ -52,6 +52,7 @@ library:
   exposed-modules:
     - Blockchain.Strato.Discovery.Data.Peer
     - Blockchain.Strato.Discovery.UDP
+    - Blockchain.Strato.Discovery.P2PUtil
     - Executable.EthereumDiscovery
     - Executable.EthDiscoverySetup
 

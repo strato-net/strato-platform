@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImplicitParams             #-}
-{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -43,7 +42,7 @@ newtype Bloc x = Bloc
         ( LoggingT
           ( ExceptT BlocError IO ) -- throw and catch errors
         ) x
-  } deriving
+  } deriving newtype
   ( Functor
   , Applicative
   , Monad

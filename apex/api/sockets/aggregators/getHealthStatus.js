@@ -1,13 +1,20 @@
-const {GET_HEALTH, GET_NODE_UPTIME, GET_SYSTEM_INFO} = require('../rooms');
-const {emitter, ON_SOCKET_PUBLISH_EVENTS} = require('../eventBroker');
+const { GET_HEALTH, GET_NODE_UPTIME, GET_SYSTEM_INFO } = require('../rooms');
+const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker');
 const rp = require('request-promise');
 const models = require('../../models');
 const config = require('../../config/app.config');
+const { Prometheus } = require("../../lib/promClient")
+
+const counter = new Prometheus.Counter({
+  name: 'health_status_counter',
+  help: 'health_status_counter'
+})
 
 let healthStatus, uptimeDur, systemInfoStatus, systemInfoMessages;
 
 
 async function getHealthStatus() {
+  counter.inc()
   const healthInfoPromise = models.CurrentHealth.findOne({
     where: {
       processName: "HealthStat"
@@ -64,7 +71,7 @@ async function getHealthStatus() {
   }
   emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
   emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, uptimeDur / 1000);
-  emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SYSTEM_INFO, {status: systemInfoStatus, warnings: systemInfoMessages})
+  emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SYSTEM_INFO, { status: systemInfoStatus, warnings: systemInfoMessages })
 }
 
 getHealthStatus()
@@ -79,7 +86,7 @@ function initialHydrateUptime(socket) {
 }
 
 function initialHydrateSystemInfo(socket) {
-  socket.emit(`PRELOAD_${GET_SYSTEM_INFO}`, {status: systemInfoStatus, warnings: systemInfoMessages});
+  socket.emit(`PRELOAD_${GET_SYSTEM_INFO}`, { status: systemInfoStatus, warnings: systemInfoMessages });
 }
 
 module.exports = {

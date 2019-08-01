@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Strato.Indexer.Model
     ( IndexEvent(..)

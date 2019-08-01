@@ -43,7 +43,6 @@ benchmarks:
       - DeriveDataTypeable
       - DeriveFoldable
       - DeriveFunctor
-      - DeriveGeneric
       - DeriveTraversable
       - EmptyDataDecls
       - FlexibleContexts
@@ -51,7 +50,6 @@ benchmarks:
       - FunctionalDependencies
       - GADTs
       - GeneralizedNewtypeDeriving
-      - LambdaCase
       - LiberalTypeSynonyms
       - MagicHash
       - MultiParamTypeClasses

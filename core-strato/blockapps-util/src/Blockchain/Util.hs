@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE NoDeriveAnyClass #-}
 
 module Blockchain.Util
   ( module Blockchain.Util

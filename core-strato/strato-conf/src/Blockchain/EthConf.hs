@@ -1,146 +1,24 @@
-{-# LANGUAGE DeriveGeneric    #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.EthConf (
-      EthConf(..),
-      DiscoveryConf(..),
-      SqlConf(..), postgreSQLConnectionString,
-      KafkaConf(..), runKafkaConfigured, lookupConsumerGroup, mkConfiguredKafkaState,
-      RedisBlockDBConf(..), lookupRedisBlockDBConfig,
-      LevelDBConf(..),
-      QuarryConf(..),
-      BlockConf(..),
-      EthUniqueId(..),
-      PrivKey(..),
-      ethConf,
-      connStr,
-    ) where
+module Blockchain.EthConf
+  ( module Blockchain.EthConf.Model
+  , module Blockchain.EthConf
+  ) where
 
 import           Control.Monad.Except       (ExceptT (..))
 import           Control.Monad.Trans.State
 import qualified Data.ByteString            as B
 import qualified Data.ByteString.Char8      as B8
-import           Data.Ratio                 ((%))
 import           Data.String
 import           Data.Yaml
-import           Database.PostgreSQL.Simple (ConnectInfo (..))
-import qualified Database.PostgreSQL.Simple as PS (postgreSQLConnectionString)
 import qualified Database.Redis             as Redis
 import           Network.Kafka
 import qualified Network.Kafka.Protocol     as KP
 import           System.IO.Unsafe
 
-import           GHC.Generics
+import           Blockchain.EthConf.Model
 
-import           Blockchain.PrivateKeyConf
-
-data EthConf =
-    EthConf {
-        ethUniqueId        :: EthUniqueId,
-        privKey            :: PrivKey,
-        sqlConfig          :: SqlConf,
-        redisBlockDBConfig :: RedisBlockDBConf,
-        kafkaConfig        :: KafkaConf,
-        levelDBConfig      :: LevelDBConf,
-        quarryConfig       :: QuarryConf,
-        blockConfig        :: BlockConf,
-        discoveryConfig    :: DiscoveryConf
-    } deriving (Generic)
-
-instance FromJSON EthConf
-instance ToJSON EthConf
-
-data DiscoveryConf =
-    DiscoveryConf {
-        discoveryPort     :: Int,
-        minAvailablePeers :: Int
-    } deriving (Generic)
-
-instance FromJSON DiscoveryConf
-instance ToJSON DiscoveryConf
-
-data SqlConf =
-    SqlConf {
-        user     :: String,
-        password :: String,
-        host     :: String,
-        port     :: Int,
-        database :: String,
-        poolsize :: Int
-    } deriving (Generic)
-
-instance FromJSON SqlConf
-instance ToJSON SqlConf
-
-data KafkaConf =
-    KafkaConf {
-        kafkaHost :: String,
-        kafkaPort :: Int
-    } deriving (Generic)
-
-instance FromJSON KafkaConf
-instance ToJSON KafkaConf
-
-data RedisBlockDBConf =
-    RedisBlockDBConf {
-        redisHost           :: String,
-        redisPort           :: Int,
-        redisAuth           :: Maybe String,
-        redisDBNumber       :: Integer,
-        redisMaxConnections :: Int,
-        redisMaxIdleTime    :: Integer
-    } deriving (Eq, Read, Show, Generic)
-
-instance FromJSON RedisBlockDBConf
-instance ToJSON   RedisBlockDBConf
-
-data EthUniqueId =
-    EthUniqueId {
-        peerId      :: String,
-        genesisHash :: String,
-        networkId   :: Int
-    } deriving (Generic)
-
-instance FromJSON EthUniqueId
-instance ToJSON EthUniqueId
-
-postgreSQLConnectionString :: SqlConf -> B.ByteString
-postgreSQLConnectionString sqlc =
-  PS.postgreSQLConnectionString ConnectInfo {
-    connectHost     = host sqlc,
-    connectPort     = fromIntegral $ port sqlc,
-    connectUser     = user sqlc,
-    connectPassword = password sqlc,
-    connectDatabase = database sqlc
-  }
-
-data LevelDBConf =
-    LevelDBConf {
-        table :: String,
-        path  :: String
-    } deriving (Generic)
-
-instance FromJSON LevelDBConf
-instance ToJSON LevelDBConf
-
-data QuarryConf =
-    QuarryConf {
-        coinbaseAddress :: String,
-        lazyBlocks      :: Bool
-    } deriving (Generic)
-
-instance FromJSON QuarryConf
-instance ToJSON QuarryConf
-
-data BlockConf =
-    BlockConf {
-        blockTime          :: Integer,
-        minBlockDifficulty :: Integer
-    } deriving (Generic)
-
-instance FromJSON BlockConf
-instance ToJSON BlockConf
 
 {- CONFIG: first change, make this local -}
 
@@ -174,12 +52,4 @@ lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ kStr `B8.append` node
           nodeId = B8.pack $ "_" ++ peerId (ethUniqueId ethConf)
 
 lookupRedisBlockDBConfig :: Redis.ConnectInfo
-lookupRedisBlockDBConfig = let r = redisBlockDBConfig ethConf in
-    Redis.defaultConnectInfo {
-        Redis.connectHost           = redisHost r,
-        Redis.connectPort           = Redis.PortNumber $ fromIntegral (redisPort r),
-        Redis.connectAuth           = B8.pack <$> redisAuth r,
-        Redis.connectDatabase       = redisDBNumber r,
-        Redis.connectMaxConnections = redisMaxConnections r,
-        Redis.connectMaxIdleTime    = fromRational (redisMaxIdleTime r % 1)
-    }
+lookupRedisBlockDBConfig = redisConnection $ redisBlockDBConfig ethConf

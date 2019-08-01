@@ -21,8 +21,6 @@ dependencies:
 
 default-extensions:
   - BangPatterns
-  - DeriveAnyClass
-  - DeriveGeneric
   - OverloadedStrings
 
 library:

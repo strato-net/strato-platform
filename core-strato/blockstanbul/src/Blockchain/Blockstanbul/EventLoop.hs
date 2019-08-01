@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
@@ -63,7 +62,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _hasCommitted :: Bool
   , _pendingRound :: Maybe RoundNumber
   -- Which peers have we received a notice for a round-change
-  , _roundChanged :: M.Map Address RoundNumber
+  , _roundChanged :: M.Map RoundNumber (S.Set Address)
   , _voted :: M.Map Address (M.Map Address Bool)
   -- The nodekey for this validator
   , _prvkey :: HK.PrvKey
@@ -217,7 +216,7 @@ roundChange = do
   nextView <- uses view (over round (+1))
   pk <- use prvkey
   pendingRound .= Just (_round nextView)
-  yield =<< signMessage pk (RoundChange nextView)
+  yield $ signMessage pk (RoundChange nextView)
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent OutEvent m ()
 nextRound nt = do
@@ -256,10 +255,10 @@ nextRound nt = do
       Just lb -> do
         pk <- use prvkey
         v <- use view
-        yield =<< signMessage pk (Preprepare v lb)
+        yield $ signMessage pk (Preprepare v lb)
   prepared .= M.empty
   committed .= M.empty
-  roundChanged .= M.empty
+  roundChanged %= M.dropWhileAntitone (<= thisR)
 
   hasPreprepared .= False
   hasCommitted .= False
@@ -318,8 +317,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         pk <- use prvkey
         vs <- use validators
         let blockWithVs = addValidators vs blk
-        pseal <- proposerSeal blockWithVs pk
-        let sealedBlk = addProposerSeal pseal blockWithVs
+            pseal = proposerSeal blockWithVs pk
+            sealedBlk = addProposerSeal pseal blockWithVs
         mLocked <- use blockLock
         let realSealed = fromMaybe sealedBlk mLocked
         wantParent <- use lastParent
@@ -336,7 +335,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Right () -> do
             hasPreprepared .= True
             proposal .= Just realSealed
-            yield =<< signMessage pk (Preprepare v realSealed)
+            yield $ signMessage pk (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
       mBlockLock <- use blockLock
@@ -370,7 +369,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   proposal .= Just pp
                   pk <- use prvkey
                   editVoted pp pr
-                  yield =<< signMessage pk (Prepare v (blockHash pp))
+                  yield $ signMessage pk (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
       total <- poolSize
@@ -381,8 +380,8 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         hasPrepared .= True
         setLock
         pk <- use prvkey
-        seal <- commitmentSeal di pk
-        yield =<< signMessage pk (Commit v di seal)
+        let seal = commitmentSeal di pk
+        yield $ signMessage pk (Commit v di seal)
     IMsg auth (Commit v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
       total <- poolSize
@@ -402,15 +401,15 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             yield . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
-      rs <- roundChanged <%= M.insert (sender auth) rn
+      rs <- roundChanged <%= M.alter (Just . S.insert (sender auth) . fromMaybe S.empty) rn
       total <- poolSize
       sentRN <- use pendingRound
-      let sameRNCount = M.size . M.filter (== rn) $ rs
+      let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
       when (3 * sameRNCount > total && Just rn > sentRN) $ do
         pendingRound .= Just rn
         pk <- use prvkey
         $logInfoS "blockstanbul/roundchange" "agreed change"
-        yield =<< signMessage pk (RoundChange vn)
+        yield $ signMessage pk (RoundChange vn)
       when (3 * sameRNCount > 2 * total) $ do
         next <- use pendingRound
         case next of

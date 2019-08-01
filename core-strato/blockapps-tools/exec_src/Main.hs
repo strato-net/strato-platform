@@ -13,8 +13,10 @@ import           Block
 import           BlockGO
 import           Checkpoints
 import           Code
-import           DumpKafkaBlocks
 import           CanonRedis
+import           ChainHash
+import           DeriveEnode
+import           DumpKafkaBlocks
 import           DumpKafkaRaw
 import           DumpKafkaSequencer
 import           DumpKafkaStateDiff
@@ -79,6 +81,9 @@ data Options = State{root::String, db::String}
              | LoadKafka { topic :: String, filename :: String }
              | VerifyKafkaFile { filename :: String }
              | SetParticipationMode { mode :: ParticipationMode }
+             | ChainHash
+             | DeriveEnode { privatekey :: String, ip :: String }
+             | CompressRoundChanges { infilename :: String, outfilename :: String }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -310,6 +315,21 @@ setParticipationModeOptions = record SetParticipationMode {mode = error "unused 
                                    += name "mode"
                             ]
 
+chainHashOptions :: Annotate Ann
+chainHashOptions = record ChainHash []
+
+deriveEnodeOptions :: Annotate Ann
+deriveEnodeOptions = record DeriveEnode { privatekey = error "unused privatekey", ip = error "unused ip"}
+                   [ privatekey := error "--private-key required" += typ "BASE64 Private Key" += explicit += name "private-key"
+                   , ip := error "--ip required" += typ "IP address" += explicit += name "ip"
+                   ]
+
+compressRoundChangesOptions :: Annotate Ann
+compressRoundChangesOptions = record CompressRoundChanges { infilename = error "unused infilename", outfilename = error "unused outfilename"}
+                            [ infilename := error "compressroundchanges --infilename=<file>" += typ "PATH" += explicit += name "infilename"
+                            , outfilename := error "compressroundchanges --outfilename=<file>" += typ "PATH" += explicit += name "outfilename"
+                            ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -348,6 +368,9 @@ options = modes_ [blockGoOptions
                 , loadKafkaOptions
                 , verifyKafkaFileOptions
                 , setParticipationModeOptions
+                , chainHashOptions
+                , deriveEnodeOptions
+                , compressRoundChangesOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -403,3 +426,6 @@ run SaveKafka{..}              = saveKafka topic filename
 run LoadKafka{..}              = loadKafka topic filename
 run VerifyKafkaFile{..}        = verifyKafkaFile filename
 run SetParticipationMode{..}   = remoteSetParticipationMode mode
+run ChainHash                  = chainHash
+run DeriveEnode{..}            = deriveEnode privatekey ip
+run CompressRoundChanges{..}   = compressRoundChanges infilename outfilename
