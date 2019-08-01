@@ -60,7 +60,15 @@ scrape_configs:
     metric_relabel_configs:
       - target_label: instance
         replacement: '__NODE_HOST_MARKER__'
-  
+
+  - job_name: 'vault-wrapper'
+    metrics_path: '/strato/v2.3/metrics'
+    static_configs:
+      - targets: ['vault-wrapper:8000']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
   - job_name: 'apex'
     metrics_path: '/metrics'
     static_configs:
@@ -68,7 +76,7 @@ scrape_configs:
     metric_relabel_configs:
       - target_label: instance
         replacement: '__NODE_HOST_MARKER__'
-  
+
   - job_name: 'nginx'
     metrics_path: '/metrics'
     static_configs:
