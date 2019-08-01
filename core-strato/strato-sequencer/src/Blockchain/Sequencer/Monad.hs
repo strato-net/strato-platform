@@ -431,7 +431,7 @@ fuseChannels = do
   loop <- use loopTimeout
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift) <$> mergeSources
-               [ sourceTQueue unseq .| mapC UnseqEvent
+               [ sourceTBQueue unseq .| mapC UnseqEvent
                , sourceTQueue votes .| mapC VoteMade
                , sourceTMChan timers .| mapC TimerFire
                , sourceTMChan loop .| mapC (const WaitTerminated)]

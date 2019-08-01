@@ -18,6 +18,7 @@ import           Conduit
 import           Control.Concurrent
 import           Control.Concurrent.STM.TMChan
 import           Control.Concurrent.STM.TQueue
+import           Control.Concurrent.STM.TBQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
 import           Control.Concurrent.Async             as Async
@@ -295,7 +296,7 @@ spec = do
         tch <- asks blockstanbulTimeouts
         atomically . writeTMChan tch $ rn
         uch <- asks $ unseqEvents . cablePackage
-        atomically . writeTQueue uch $ iev
+        atomically . writeTBQueue uch $ iev
         vch <- asks blockstanbulBeneficiary
         atomically . writeTQueue vch $ vote
         src0 <- sealConduitT <$> fuseChannels
@@ -307,7 +308,7 @@ spec = do
     describe "sequencer" $ do
       it "should be able to run in a test" $ withMaxSuccess 5 $ property $ \iev -> runTestM $ do
         uch <- asks $ unseqEvents . cablePackage
-        atomically . writeTQueue uch $ iev
+        atomically . writeTBQueue uch $ iev
         src <- sealConduitT <$> fuseChannels
         void $ oneSequencerIter src
 

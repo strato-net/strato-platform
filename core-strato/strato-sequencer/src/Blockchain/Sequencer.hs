@@ -11,6 +11,7 @@ import           ClassyPrelude                             (atomically)
 import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
+import           Control.Concurrent.STM.TBQueue
 import           Blockchain.Output
 import           Control.Lens
 import qualified Control.Monad.Change.Alter                as A
@@ -104,7 +105,7 @@ readEventsInBufferedWindow src = do
   logF "Reading from fused channels..."
   dt <- asks maxUsPerIter
   uch <- asks $ unseqEvents . cablePackage
-  top <- atomically . tryPeekTQueue $ uch
+  top <- atomically . tryPeekTBQueue $ uch
   $logDebugS "sequencer/events" . T.pack $ "top event is: " ++ show top
   -- There may be WaitTerminateds left over from the last iteration
   -- This will block indefinitely if there are no real messages to process,

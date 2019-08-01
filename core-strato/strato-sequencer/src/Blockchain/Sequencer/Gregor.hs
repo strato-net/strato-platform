@@ -33,6 +33,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Default
 import           Data.List (partition)
+import           Data.List.Extra (chunksOf)
 import qualified Data.Text as T
 import qualified Prometheus as P
 import           System.IO.Unsafe
@@ -62,7 +63,7 @@ data GregorConfig = GregorConfig
 data GregorContext = GregorContext
                      { _gregorKafkaState :: K.KafkaState
                      , _gregorConsumerGroup :: KP.ConsumerGroup
-                     , _gregorUnseq :: TQueue IngestEvent
+                     , _gregorUnseq :: TBQueue IngestEvent
                      , _gregorSeqP2P :: TQueue OutputEvent
                      , _gregorSeqVM :: TQueue OutputEvent
                      }
@@ -180,10 +181,11 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
   P.withLabel gregorLoop "unseq_events" P.incCounter
   $logInfoS "gregor" . T.pack $ "Fetched " ++ show (length inEvents) ++ " unseq events"
   ch <- use gregorUnseq
-  atomically . forM_ inEvents $ writeTQueue ch
-  hd <- atomically $ tryPeekTQueue ch
+  forM_ (chunksOf (queueDepth `div` 4) inEvents) $ \chnk -> do
+    atomically . forM_ chnk $ writeTBQueue ch
+    P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length chnk))
+  hd <- atomically $ tryPeekTBQueue ch
   $logDebugS "gregor/unseqchHead" $ maybe "empty" (T.pack . format) hd
-  P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length inEvents))
   -- TODO: This should only really be set by the writer, i.e. once
   -- the results are committed to seq_.*_events. The reader should use
   -- an internal offset to detirmine the read start. However, with
