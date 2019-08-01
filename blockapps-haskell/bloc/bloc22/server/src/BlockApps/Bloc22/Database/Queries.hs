@@ -14,9 +14,9 @@ import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Except
 import           Crypto.Hash
+import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
-import           Crypto.Secp256k1
 import           Data.Aeson                      (Result(..), fromJSON, decode, encode)
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
