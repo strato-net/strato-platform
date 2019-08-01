@@ -12,6 +12,7 @@
 module Blockchain.Init.Worker (runWorker) where
 
 import Control.Concurrent
+import Control.Lens.Combinators (uses)
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
@@ -21,6 +22,7 @@ import Control.Monad.Trans.State
 import Conduit
 import qualified Data.Aeson as Ae
 import Data.Either.Combinators (whenLeft)
+import Data.List (nub)
 import qualified Data.Map as M
 import Data.String (fromString)
 import qualified Data.Text as T
@@ -131,11 +133,17 @@ process pathRoot off = (>> return off) . \case
     encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
     makeReadOnly $ ".ethereumH" </> "topics.yaml"
 
-    res <- UEC.runKafkaConfigured "init-worker" $ K.updateMetadatas topicList
+    res <- UEC.runKafkaConfigured "init-worker" $ do
+      let waitForMetas = do
+            K.updateMetadatas topicList
+            let findError (TopicMetadata (e, _, _)) = e
+            errors <- uses stateTopicMetadata (nub . map findError . M.elems)
+            case errors of
+              [NoError] -> return ()
+              _ -> liftIO (threadDelay 100000) >> waitForMetas
+      waitForMetas
     whenLeft res $ \err ->
       die $ printf "error connecting to kafka (%s): %s" (show $ EC.kafkaConfig UEC.ethConf) (show err)
-    -- Superstitions persist
-    threadDelay 1000000
   ApiConfig filePairs -> liftIO $ inflateDir filePairs
 
   GenesisBlock gb -> liftIO $ do

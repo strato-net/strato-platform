@@ -3,6 +3,7 @@
 module Blockchain.Init.Generator where
 
 import Control.Concurrent
+import Control.Lens.Combinators (use)
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Except
@@ -13,6 +14,7 @@ import Data.FileEmbed
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
+import qualified Data.Map as M
 import qualified Data.Text.IO as TIO
 import System.Exit
 import UnliftIO.Directory
@@ -25,7 +27,8 @@ import Blockchain.Init.Protocol
 import Blockchain.Init.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
-import Network.Kafka (KafkaAddress, mkKafkaState, runKafka, updateMetadata, KafkaState, KafkaClientError)
+import Network.Kafka (KafkaAddress, mkKafkaState, runKafka, updateMetadata, KafkaState, KafkaClientError, stateTopicMetadata)
+import Network.Kafka.Protocol (KafkaError(..), TopicMetadata(..))
 
 type GenM = StateT KafkaState (ExceptT KafkaClientError IO)
 
@@ -37,9 +40,11 @@ runGenM kaddr mv = do
 initializeTopic :: GenM ()
 initializeTopic = do
   updateMetadata initTopic
-  liftIO $ do
-    putStrLn "Superstitions persist"
-    threadDelay 1000000
+  meta <- use stateTopicMetadata
+  -- Wait until the broker believes in the metadata
+  case M.lookup initTopic meta of
+    Just (TopicMetadata (NoError, _, _)) -> return ()
+    _ -> liftIO (threadDelay 100000) >> initializeTopic
 
 genesisFiles :: [(FilePath, C8.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
@@ -47,7 +52,6 @@ genesisFiles = $(embedDir "genesisBlocks")
 mkAll :: String -> GenM ()
 mkAll genesisBlockName = do
   initializeTopic
-
   ethconf <- liftIO genEthConf
   addEvent $ EthConf ethconf
 

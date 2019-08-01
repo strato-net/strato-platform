@@ -44,6 +44,7 @@ dependencies:
   - hedis
   - hflags
   - json-stream
+  - lens
   - leveldb-haskell
   - memory
   - merkle-patricia-db
