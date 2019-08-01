@@ -103,7 +103,6 @@ convertRecSig (RecSig (ExtendedSignature sig _)) = coerce sig
 derivePubKey :: SecKey -> PubKey
 derivePubKey = coerce . HK.derivePubKey . coerce
 
--- TODO: Use detExtSignMsg when https://github.com/blockapps/strato-platform/pull/881 lands
 signRecMsg :: SecKey -> Msg -> RecSig
 signRecMsg sec word = coerce $ detExtSignMsg (coerce word) (coerce sec)
 
