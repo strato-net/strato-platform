@@ -7,7 +7,9 @@ fi
 
 HOST=$1
 ssh $HOST mkdir -p bin
-for bin in qs spsql blog dlf stlog esql grab_dc.sh view-tracker.sh force_docker_purge_all; do
-  scp ~/bin/${bin} $HOST:./bin
-  ssh ${HOST} chmod +x bin/${bin}
-done
+cd ~
+# Assumes that on the host, they are located in ~/bin/ and on the destination
+# they should go there as well.
+BINS="bin/qs bin/spsql bin/blog bin/dlf bin/stlog bin/stwait bin/view-tracker.sh"
+scp $BINS $HOST:./bin
+ssh $HOST chmod +x $BINS
