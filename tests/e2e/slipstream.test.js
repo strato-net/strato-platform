@@ -62,4 +62,29 @@ contract Y {
     console.log(`indexX returned ${JSON.stringify(indexX, null, 2)}`);
     assert.equal(indexX[0].z, "7624", "z");
   }).timeout(config.timeout);
+
+
+  const Counter = `
+contract Z {
+  uint public count = 0;
+  function incr() public {
+    count++;
+  }
+}
+`;
+  it("Will index updates to a contract", async () => {
+    const [user, contract] = await upload("Z", Counter);
+    let indexZ = await co.wrap(rest.waitQuery)("Z", 1);
+    assert.equal(indexZ.length, 1, JSON.stringify(indexZ, null, 2));
+    console.log(`Initial index: ${JSON.stringify(indexZ, null, 2)}`);
+    let res = await co.wrap(rest.callMethod)(user, contract, "incr");
+    console.log(`Incr result 1: ${JSON.stringify(res, null, 2)}`);
+    indexZ = await co.wrap(rest.waitQuery)("Z?count=eq.1", 1);
+    console.log(`Second index: ${JSON.stringify(indexZ, null, 2)}`);
+    res = await co.wrap(rest.callMethod)(user, contract, "incr");
+    console.log(`Incr result 2: ${JSON.stringify(res, null, 2)}`);
+    indexZ = await co.wrap(rest.waitQuery)("Z?count=eq.2", 1);
+    console.log(`Last index: ${JSON.stringify(indexZ, null, 2)}`);
+  }).timeout(config.timeout);
+
 });
