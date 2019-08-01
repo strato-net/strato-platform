@@ -122,8 +122,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Move generated files to nginx dirs
   ########
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
-  cp /tmp/prometheus.tpl.lua /tmp/prometheus.lua
-  mv /tmp/prometheus.lua /usr/local/openresty/nginx/lua/prometheus.lua
 
   if [ "$OAUTH_ENABLED" = true ]; then
     mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
