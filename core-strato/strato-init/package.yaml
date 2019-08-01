@@ -97,13 +97,6 @@ executables:
       - strato-init
     other-modules: []
 
-  from-volume:
-    source-dirs: exec_src/
-    main: FromVolume.hs
-    dependencies:
-      - strato-init
-    other-modules: []
-
   from-restore:
     source-dirs: exec_src/
     main: FromRestore.hs

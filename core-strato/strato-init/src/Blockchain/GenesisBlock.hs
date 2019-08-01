@@ -137,7 +137,7 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
     _ <- produceVMEvents [ChainBlock genesisBlock]
     obGB <- liftIO $ bootstrapSequencer genesisBlock
     putGenesisHash $ blockHash genesisBlock
-    $logInfoS "initgen" "Initial merkle patricia tries succussfully created"
+    $logInfoS "initgen" "Initial merkle patricia tries successfully created"
     [genBId] <- putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
     $logInfoS "initgen" "Genesis Block put"
     $logInfoS "initgen" "State diff has been generated"

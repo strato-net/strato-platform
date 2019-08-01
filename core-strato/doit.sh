@@ -8,19 +8,13 @@ declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
 function newnode {
-  initialize=false
 
-  if ${splitinit:-false} ; then
-    doSplitInit
+  if [[ ! -d .ethereumH ]] ; then
+    mkdir logs
+    cleanupDB
+    doInit
   else
-    if [[ ! -d .ethereumH ]]
-    then initialize=true
-	 mkdir logs
-         cleanupDB
-         doInit
-    else
-         sleep 10
-    fi
+    sleep 10
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
@@ -230,53 +224,39 @@ function doInit {
   else
     actualMinPeers=$numMinPeers
   fi
-  cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
-                    --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-                    --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
-                    --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty $xfFlag"
-
-  echo "strato-setup command: $cmd"
-  # logging to stdout and log file:
-  NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
-  if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-    tail -f /dev/null
-  fi
-}
-
-function doSplitInit {
-  blockTime=${blockTime:-13}
-  minBlockDifficulty=${minBlockDifficulty:-131072}
-  if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
-    xfFlag="--extraFaucets=${extraFaucets:-$validators}"
-  fi
-  if [[ -n "${validators}" ]]; then
-    # Keep active discovery until all other validators are peers
-    echo "Overriding minAvailablePeers with number of consensus peers"
-    actualMinPeers=$( echo "${validators}" | tr -cd , | wc -c )
-  else
-    actualMinPeers=$numMinPeers
-  fi
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode \
         --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty $xfFlag"
-  if [[ ! -d .ethereumH ]]; then
-    cmd="tabula-rasa $args"
-  else
-    cmd="from-volume $args"
-  fi
 
-  echo "init event source: $cmd"
-  # logging to stdout and log file:
-  NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
-  if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-    tail -f /dev/null
+  if ${splitinit:-false} ; then
+    #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
+    cmd="tabula-rasa $args"
+
+    echo "init event source: $cmd"
+    # logging to stdout and log file:
+    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+      tail -f /dev/null
+    fi
+    init-worker --kafkahost=$kafkaHost 2>&1 | tee logs/strato-setup
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+      tail -f /dev/null
+    fi
+  else
+    cmd="strato-setup $args"
+
+    echo "strato-setup command: $cmd"
+    # logging to stdout and log file:
+    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+      tail -f /dev/null
+    fi
   fi
-  init-worker --kafkahost=$kafkaHost
 }
 
 # Find all logs greater than 10M, then copy and truncate
