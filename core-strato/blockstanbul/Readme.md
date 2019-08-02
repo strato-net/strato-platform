@@ -57,3 +57,13 @@ round period should receive `RoundTimeout RoundNumber`
 
 On state transitions, a `NewCheckpoint` will be emitted and for now
 this is saved as kafka metadata.
+
+Historic Blocks
+---------------
+When PBFT receives a block, the ones without signatures attached will be considered
+for the next proposal if this node is the leader. When the block does have signatures
+attached, it will be verified for continuity (the correct parent hash, block number)
+and for authenticity (the validators on the block are the same as the ones in memory,
+the proposer was a validator, and >2/3s of the validators had a commitment seal). 
+If those checks all pass, the sequence number will be incremented and the block will
+be sent to the VM to be included into the total state.
