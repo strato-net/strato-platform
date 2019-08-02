@@ -77,11 +77,6 @@ these exceptions will be caught at the end of a `runSM` block, with the
 exception of `internalError`. To catch none of the exceptions, run with
 `svmDev=true`.
 
-routines, there are also predefined routines for code that currently can't be
-written in SolidVM. One example of this is many blockapps-sol contracts use
-inline assembly to
-
-the use of inline assembly to convert bytes32 to string (MloadAdd32), and
 
 Execution is currently gasless, but at some point gas should be implemented to
 defend the node from a bad transaction.
