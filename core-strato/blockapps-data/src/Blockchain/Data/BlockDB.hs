@@ -31,9 +31,7 @@ import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 
 import           Data.List
-import qualified Data.Map                           as M
 import           Data.Maybe
-import qualified Data.Set                           as S
 
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
@@ -69,15 +67,13 @@ import           Text.Format
 instance Pretty B.ByteString where
   pretty = blue . text . BC.unpack . B16.encode
 
-blk2BlkDataRef :: HasSQLDB m
-               => M.Map SHA Integer
-               -> (Block, SHA)
+blk2BlkDataRef :: Block
+               -> SHA
+               -> Integer
                -> Bool
-               -> m BlockDataRef
-blk2BlkDataRef dm (b, hash') makeHashOne = do
-  let difficulty' = fromMaybe (error $ "missing value in difficulty map: " ++ format hash') $
-                   M.lookup hash' dm --  <- calcTotalDifficulty b blkId
-  return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
+               -> BlockDataRef
+blk2BlkDataRef b hash' difficulty' makeHashOne =
+  BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
       hash'' = if makeHashOne then SHA 1 else hash'
       bd = blockBlockData b
@@ -143,69 +139,23 @@ homesteadNextDifficulty useDiffBomb _useTestnet parentNumber oldDifficulty oldTi
         then 2^(periodCount - 2)
         else 0
 
-getDifficulties :: HasSQLDB m
-                => [SHA]
-                -> m [(SHA, Integer)]
-getDifficulties hashes = do
-  db <- access (Proxy @SQLDB)
-  blocks <-
-    runResourceT $
-    flip SQL.runSqlPool db $
-    E.select $
-    E.from $ \bd -> do
-      E.where_ ((bd E.^. BlockDataRefHash) `E.in_` E.valList hashes)
-      return (bd E.^. BlockDataRefHash, bd E.^. BlockDataRefTotalDifficulty)
-
-  return $ map f blocks
-
-  where
-    f::(E.Value SHA, E.Value Integer)->(SHA, Integer)
-    f (h, a) = (E.unValue h, E.unValue a)
-
-addDifficulties::M.Map SHA Integer->[(SHA, Integer, SHA)]->M.Map SHA Integer
-addDifficulties dm [] = dm
-addDifficulties dm ((hash', blockDifficulty, parentHash'):rest) =
-  let parentDifficulty = fromMaybe (error $ "missing hash in difficulty map in addDifficulties: " ++ format parentHash' ++ ", hash=" ++ format hash') $ M.lookup parentHash' dm
-      dm' = M.insert hash' (parentDifficulty + blockDifficulty) dm
-  in addDifficulties dm' rest
-
-getDifficultyMap :: HasSQLDB m
-                 => [(SHA, Integer)]
-                 -> [(Block, SHA)]
-                 -> m (M.Map SHA Integer)
-getDifficultyMap difficultyBase blocksAndHashes = do
-  let hashes = S.fromList $ map snd blocksAndHashes
-      parents = S.fromList $ map (blockDataParentHash . blockBlockData . fst) blocksAndHashes
-
-  dm' <- M.fromList . (difficultyBase ++) <$> getDifficulties (S.toList $ parents S.\\ hashes)
-
-  return $ addDifficulties dm'
-    (map (\(x, y) ->
-           (y,
-            blockDataDifficulty $ blockBlockData x,
-            blockDataParentHash $ blockBlockData x)
-         ) blocksAndHashes)
-
-
 putBlocks :: HasSQLDB m
-          => [(SHA, Integer)]
-          -> [Block]
+          => [(Block, Integer)]
           -> Bool
           -> m [Key BlockDataRef]
-putBlocks difficultyBase blocks makeHashOne = do
-  let blocksAndHashes = map (\b -> (b, blockHash b)) blocks
-  dm <- getDifficultyMap difficultyBase blocksAndHashes
+putBlocks blocksAndDifficulties makeHashOne = do
+  let blocksHashesAndDifficulties = (\(b,d) -> (b, blockHash b, d)) <$> blocksAndDifficulties
   db <- access (Proxy @SQLDB)
   runResourceT $
     flip SQL.runSqlPool db $
-    forM blocksAndHashes $ \(b, hash') -> do
+    forM blocksHashesAndDifficulties $ \(b, hash', diff) -> do
       insertTXIfNew' (BlockHash $ blockHash b) (Just $ blockDataNumber $ blockBlockData b) (blockReceiptTransactions b)
 
       existingBlockData <- SQL.selectList [BlockDataRefHash SQL.==.  blockHash b] []
 
       case existingBlockData of
            [] -> do
-             toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') makeHashOne
+             let toInsert = blk2BlkDataRef b hash' diff makeHashOne
              blkDataRefId <- SQL.insert toInsert
              forM_ (blockReceiptTransactions b) $ \tx -> do
                txID <- updateBlockNumber b (transactionHash tx) (txChainId tx)
