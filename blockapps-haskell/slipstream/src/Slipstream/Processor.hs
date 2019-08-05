@@ -32,7 +32,7 @@ import Data.Either (lefts, rights)
 import Data.Int (Int32)
 import Data.IORef
 import Data.Function
-import Data.List (sortOn)
+import Data.List (foldl', sortOn)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
@@ -110,7 +110,7 @@ matters AggregateAction{..} = (actionType == Create || (not $ diffNull actionSto
 -- assumes all Actions in the list are for the same (Address, Maybe ChainId) pair
 combineActions :: [AggregateAction] -> AggregateAction
 combineActions [] = error "cannot combine 0 actions"
-combineActions (x:xs) = foldr merge x xs
+combineActions (x:xs) = foldl' merge x xs
   where
     merge a b = b { actionStorage  = (mergeDiffs `on` actionStorage) b a
                   , actionMetadata = (Map.union `on` actionMetadata) b a
