@@ -5,6 +5,7 @@
 module Blockchain.Sequencer.Event where
 
 import           Control.DeepSeq
+import           Data.Aeson                                hiding (encode)
 import           Data.Binary
 import           Data.Data
 import           Data.List                                 (intercalate)
@@ -18,6 +19,7 @@ import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
+import           Blockchain.Data.Json
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO
@@ -149,12 +151,42 @@ data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otBaseTx :: TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic, NFData, Data)
 
+data OutputTx' = OutputTx' { ot'Origin :: TO.TXOrigin
+                           , ot'Hash   :: SHA
+                           , ot'Signer :: A.Address
+                           , ot'BaseTx :: Transaction'
+                           } deriving (Eq, Show, GHCG.Generic)
+
+otxToOtxPrime :: OutputTx -> OutputTx'
+otxToOtxPrime (OutputTx o h s b) = (OutputTx' o h s (Transaction' b))
+
+otxPrimeToOtx :: OutputTx' -> OutputTx
+otxPrimeToOtx (OutputTx' o h s (Transaction' b)) = OutputTx o h s b
+
 data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                , obTotalDifficulty     :: Integer
                                , obBlockData           :: DD.BlockData
                                , obReceiptTransactions :: [OutputTx]
                                , obBlockUncles         :: [DD.BlockData]
                                } deriving (Eq, Read, Show, GHCG.Generic, Data)
+
+data OutputBlock' = OutputBlock' { ob'Origin              :: TO.TXOrigin
+                                 , ob'TotalDifficulty     :: Integer
+                                 , ob'BlockData           :: BlockData'
+                                 , ob'ReceiptTransactions :: [OutputTx']
+                                 , ob'BlockUncles         :: [BlockData']
+                                 } deriving (Eq, Show, GHCG.Generic)
+
+obToObPrime :: OutputBlock -> OutputBlock'
+obToObPrime (OutputBlock o td bd rt bu) =
+  OutputBlock' o td (BlockData' bd)
+                    ((\(OutputTx r h s t) -> OutputTx' r h s (Transaction' t)) <$> rt)
+                    (BlockData' <$> bu)
+
+obPrimeToOb :: OutputBlock' -> OutputBlock
+obPrimeToOb (OutputBlock' o td (BlockData' bd) rt bu) =
+  OutputBlock o td bd ((\(OutputTx' r h s (Transaction' t)) -> OutputTx r h s t) <$> rt)
+                      ((\(BlockData' b) -> b) <$> bu)
 
 data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
                                    , ogGenesisInfo     :: (Word256, ChainInfo)
@@ -458,6 +490,11 @@ derive makeArbitrary ''OutputEvent
 derive makeArbitrary ''OutputTx
 derive makeArbitrary ''OutputBlock
 derive makeArbitrary ''OutputGenesis
+
+instance ToJSON OutputBlock' where
+instance FromJSON OutputBlock' where
+instance ToJSON OutputTx' where
+instance FromJSON OutputTx' where
 
 -- just end me fam
 instance Arbitrary JsonRpcCommand where
