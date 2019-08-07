@@ -236,7 +236,7 @@ addBlocks unfiltered = do
       $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
                                              (show . blockDataNumber . obBlockData $ firstBlock))
       didReplaceBest   <- liftIO (newIORef False)
-      ranPrivateTxs    <- liftIO (newIORef S.empty)
+      ranPrivateTxs    <- liftIO (newIORef M.empty)
       replacedBest     <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
       (actions, srLog') <- flip State.runStateT [] $ forM filtered $ \block ->
           let blockNo = blockDataNumber $! obBlockData block
@@ -246,31 +246,27 @@ addBlocks unfiltered = do
         (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift $ replaceBestIfBetter block
         when didReplaceThisTime $ do
           writeIORef didReplaceBest True
-          writeIORef replacedBest (block, replacedBits)
+          writeIORef replacedBest replacedBits
           -- Gather a chain of better block stateroots. The last one found should be the best block,
           -- and the intermediate ones increase the granularity at which we can compute a sequence
           -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
           -- the diff between them, which is estimated by the number of transactions.
           id %= ((blockDataStateRoot $ obBlockData block, hsh, num, txCount):)
-        unless (S.null ranPriv) . liftIO $ do
-          modifyIORef' ranPrivateTxs (S.union ranPriv)
-          drb <- liftIO (readIORef didReplaceBest)
-          unless drb $ do
-            writeIORef replacedBest (block, replacedBits)
+        unless (M.null ranPriv) . liftIO $
+          modifyIORef' ranPrivateTxs $ flip M.unionWith ranPriv $
+            \(n1,s1) (n2,s2) -> if n1 > n2 then (n1,s1) else (n2,s2)
         return actions
       let srLog = reverse srLog'
       $logDebugLS "addBlocks/srLog" srLog
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
-      when (didReplaceBest' || not (S.null ranPrivateTxs')) $ do
+      when didReplaceBest' $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-        (theBlock, nbb) <- liftIO (readIORef replacedBest)
+        nbb <- liftIO (readIORef replacedBest)
         timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
         when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
-          calculateAndEmitStateDiffs srLog
-                                     (if didReplaceBest' then Just oldHeader else Nothing)
-                                     ranPrivateTxs'
-                                     theBlock
+          calculateAndEmitStateDiffs srLog oldHeader
+      when (not $ M.null ranPrivateTxs') $ calculateAndEmitChainDiffs ranPrivateTxs'
       return $ concat actions
 
 setParentStateRoot :: OutputBlock -> ContextM BlockSummary
@@ -702,7 +698,7 @@ indexMaybe (_:rest) i = indexMaybe rest (i-1)
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> ContextM (Bool, S.Set Word256, (SHA, Integer, Integer))
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, M.Map Word256 (Integer, SHA), (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     bbi <- getContextBestBlockInfo
 
@@ -723,7 +719,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
                             || (newNumber > oldNumber)
                             || ((newNumber == oldNumber) && (td > oldBestDifficulty))
                             || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
-            ranPriv = S.fromList . catMaybes $ map txChainId txs
+            ranPriv = M.fromSet (const (newNumber, bH)) . S.fromList . catMaybes $ map txChainId txs
 
         $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
@@ -750,28 +746,23 @@ splitCreateDiffs =
      in S.toList . S.fromList . srch
 
 calculateAndEmitStateDiffs :: [(MP.StateRoot, SHA, Integer, Int)]
-                           -> Maybe BlockData
-                           -> S.Set Word256
-                           -> OutputBlock
+                           -> BlockData
                            -> ContextM ()
-calculateAndEmitStateDiffs srLog mOldPubHeader chainIds newBlock = do
-    case mOldPubHeader of
-      Nothing -> return ()
-      Just oldHeader -> do
-        let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
-            diffLog = compactDiffs base srLog
-        runConduit $ yieldMany diffLog
-                  .| mapMC completeDiff
-                  .| mapM_C (lift . commitSqlDiffs)
-    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show (S.map (format . SHA) chainIds)
-    let newHeader    = blockHeader newBlock
-        newHash      = blockHash newBlock
-        newNumber    = blockHeaderOrdering newHeader
-    chainDiffs <- chainDiff newNumber newHash $ S.toList chainIds
+calculateAndEmitStateDiffs srLog oldHeader = do
+  let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
+      diffLog = compactDiffs base srLog
+  runConduit $ yieldMany diffLog
+            .| mapMC completeDiff
+            .| mapM_C (lift . commitSqlDiffs)
 
-    $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
-
-    forM_ chainDiffs $ lift . commitSqlDiffs
+calculateAndEmitChainDiffs :: M.Map Word256 (Integer, SHA) -> ContextM ()
+calculateAndEmitChainDiffs chainMap = do
+  let chainList = M.toList chainMap
+      chainIds = format . SHA . fst <$> chainList
+  $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
+  chainDiffs <- fmap catMaybes . forM chainList $
+    \(cId, (newNumber, newHash)) -> chainDiff cId newNumber newHash
+  forM_ chainDiffs $ lift . commitSqlDiffs
 
 diffMaxCost :: Int
 diffMaxCost = 500
