@@ -393,7 +393,7 @@ addTransactions canCache blockData blockGas0 txs = timeit ("addTransactions, " +
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction False blockData blockGas t
       afterMap <- getAddressStateTxDBMap
 
-      printTransactionMessage t result deltaT
+      printTransactionMessage t result deltaT (blockdataChainId blockData)
       P.setGauge vmTxMined (realToFrac deltaT)
 
       trr <- setNewAddresses $ TxRunResult t result deltaT beforeMap afterMap []
@@ -412,7 +412,7 @@ data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCa
                                      } deriving (Show)
 
 mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> ContextM TxMiningResult
-mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
+mineTransactions' bd remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     flushMemAddressStateTxToBlockDB
     flushMemStorageTxDBToBlockDB
@@ -420,7 +420,7 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     (!time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
-    printTransactionMessage tx result time'
+    printTransactionMessage tx result time'(blockdataChainId blockData)
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
         Right execResult -> do
@@ -668,18 +668,19 @@ multilineLog source theLines = do
     $logInfoS source $ T.pack theLine
 
 printTransactionMessage::MonadLogger m=>
-                         OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->m ()
-printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash} (Left errMsg) deltaT = do
+                         OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->Maybe ChainId ->  m ()
+printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash} (Left errMsg) deltaT cid = do
   let tNonce = transactionNonce baseTx
   multilineLog "printTx/err" $ boringBox
     [ "Adding transaction signed by: " ++ format tAddr
     , "Tx hash:  " ++ format theHash
     , "Tx nonce: " ++ show tNonce
+    , "Chain Id: " ++ maybe "Main Chain." show cid
     , CL.red "Transaction failure: " ++ CL.red (format errMsg)
     , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
     ]
 
-printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Right results) deltaT = do
+printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Right results) deltaT cid = do
     let tNonce = transactionNonce t
         extra =
           if isMessageTX t
@@ -690,6 +691,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Ri
       [ "Adding transaction signed by: " ++ format tAddr
       , "Tx hash:  " ++ format theHash
       , "Tx nonce: " ++ show tNonce
+      , "Chain Id: " ++ maybe "Main Chain." show cid
       , shortDescription t ++ " " ++ extra
       , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
       ]
