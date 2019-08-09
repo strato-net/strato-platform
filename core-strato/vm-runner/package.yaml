@@ -13,6 +13,7 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-ethereum
   - blockapps-init
   - blockapps-milena
   - blockapps-mpdbs

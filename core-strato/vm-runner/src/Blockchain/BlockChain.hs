@@ -60,6 +60,7 @@ import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.Transaction
+import           Blockchain.Data.TransactionDef          (formatChainId)
 import           Blockchain.Data.TransactionResult
 import           Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia      as MP
@@ -344,12 +345,12 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
   let chains' = partitionWith (txChainId . otBaseTx) . filter ((/= PrivateHash) . txType . otBaseTx) $ transactions
       chains  = if runPublicTxs then chains' else filter (isJust . fst) chains'
   fmap concat . forM chains $ \(chainId, txs) -> do
-    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ show chainId ++ " with " ++ show txs
+    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ formatChainId chainId ++ " with " ++ show txs
     withBlockchain (blockHeaderHash bd) chainId $ do
       when flags_debug $ do
         sr <- Mod.get (Proxy @MP.StateRoot)
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "Old chain state root: " ++ format sr
-      $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
+      $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ formatChainId chainId
       let canUseCache = chainId == Nothing
       -- TODO: Run the checks Bagger does reject invalid transactions for private chains
       (actions, asm) <- addTransactions canUseCache bd (blockDataGasLimit $ obBlockData b) txs
@@ -393,7 +394,7 @@ addTransactions canCache blockData blockGas0 txs = timeit ("addTransactions, " +
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction False blockData blockGas t
       afterMap <- getAddressStateTxDBMap
 
-      printTransactionMessage t result deltaT (blockdataChainId blockData)
+      printTransactionMessage t result deltaT (txChainId bt)
       P.setGauge vmTxMined (realToFrac deltaT)
 
       trr <- setNewAddresses $ TxRunResult t result deltaT beforeMap afterMap []
@@ -412,7 +413,7 @@ data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCa
                                      } deriving (Show)
 
 mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> ContextM TxMiningResult
-mineTransactions' bd remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
+mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     flushMemAddressStateTxToBlockDB
     flushMemStorageTxDBToBlockDB
@@ -420,7 +421,7 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     (!time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
-    printTransactionMessage tx result time'(blockdataChainId blockData)
+    printTransactionMessage tx result time' (txChainId bt)
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
         Right execResult -> do
@@ -668,14 +669,14 @@ multilineLog source theLines = do
     $logInfoS source $ T.pack theLine
 
 printTransactionMessage::MonadLogger m=>
-                         OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->Maybe ChainId ->  m ()
+                         OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->Maybe Word256 ->  m ()
 printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash} (Left errMsg) deltaT cid = do
   let tNonce = transactionNonce baseTx
   multilineLog "printTx/err" $ boringBox
     [ "Adding transaction signed by: " ++ format tAddr
     , "Tx hash:  " ++ format theHash
     , "Tx nonce: " ++ show tNonce
-    , "Chain Id: " ++ maybe "Main Chain." show cid
+    , "Chain Id: " ++ formatChainId cid
     , CL.red "Transaction failure: " ++ CL.red (format errMsg)
     , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
     ]
