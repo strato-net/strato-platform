@@ -6,7 +6,8 @@ module Blockchain.Data.TransactionDef (
   Transaction(..),
   isMessageTX,
   partialRLPEncode,
-  partialRLPDecode
+  partialRLPDecode,
+  formatChainId
   ) where
 
 import           Control.Arrow                ((***))
