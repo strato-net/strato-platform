@@ -692,7 +692,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Ri
       [ "Adding transaction signed by: " ++ format tAddr
       , "Tx hash:  " ++ format theHash
       , "Tx nonce: " ++ show tNonce
-      , "Chain Id: " ++ maybe "Main Chain." show cid
+      , "Chain Id: " ++ formatChainId cid
       , shortDescription t ++ " " ++ extra
       , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
       ]
