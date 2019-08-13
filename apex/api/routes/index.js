@@ -36,6 +36,9 @@ const multerMiddleware = (req, res, next) => {
 };
 
 const checkUID = async (req,res,next) => {
+  if (!isOAuth()) {
+    return next();
+  }
   const uID = req.headers['x-user-unique-name'];
   if (!uID) {
     // every request should have the username forwarded by nginx

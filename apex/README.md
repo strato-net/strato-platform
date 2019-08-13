@@ -10,7 +10,8 @@
     4. vault-wrapper port mapped to (8484:8000)
     5. postgrest (note the xtra t) port mapped to (3434:3001)
 2. cd `apex/api`
-3. `stratoRoot=http://localhost:3333/eth/v1.2 \
+3. `OAUTH_ENABLED=true \ # if STRATO is OAUTH_ENABLED=true \
+    stratoRoot=http://localhost:3333/eth/v1.2 \
     blocRoot=http://localhost:8888/bloc/v2.2 \
     postgresPort=5433 \
     vaultWrapperHttpHost=http://localhost:8484 \
@@ -31,7 +32,7 @@
     5. postgrest (note the xtra t) port mapped to (3434:3001)
 2. cd `apex/api`
 3. `NODE_ENV=development \
-    OAUTH_ENABLED=true \
+    OAUTH_ENABLED=true \ # if STRATO is OAUTH_ENABLED=true
     STRATO_HOST=localhost:3333 \
     BLOC_HOST=localhost:8888 \
     VAULT_HOST=localhost:8484 \
