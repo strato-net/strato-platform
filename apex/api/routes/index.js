@@ -1,20 +1,23 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 
 const authHandler = require('../middlewares/authHandler.js');
-
 const authController = require('../controllers/auth');
-const oAuthController = require('../lib/oAuth/oAuth');
+// const oAuthController = require('../lib/oAuth/oAuth');
 const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
-const trackHandler = require('../controllers/track');
 const healthHandler = require('../controllers/health');
+const trackHandler = require('../controllers/track');
 const checkMode = require('../lib/checkMode').checkMode;
 const appConfig = require(`${process.cwd()}/config/app.config`);
-const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
+const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
+const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 
 const fileController = isOAuth() ? require(`${process.cwd()}/controllers/file.oAuth`) : require('../controllers/file');
+
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const multerMiddleware = (req, res, next) => {
   upload.single('content')(req, res, (error) => {
@@ -30,7 +33,28 @@ const multerMiddleware = (req, res, next) => {
     }
     next();
   })
-}
+};
+
+const checkUID = async (req,res,next) => {
+  const uID = req.headers['x-user-unique-name'];
+  if (!uID) {
+    // every request should have the username forwarded by nginx
+    let err = new Error('server misconfigured: no x-user-unique-name header provided in request');
+    console.error(err);
+    err.status = RestStatus.INTERNAL_SERVER_ERROR;
+    return next(err);
+  }
+  //validates or creates user account, will throw on failure
+  try {
+    await oAuth.getOrCreateKey(uID);
+    return next()
+  } catch(error) {
+    let err = new Error('server misconfigured: could not post transaction');
+    console.error(err);
+    err.status = RestStatus.SERVICE_UNAVAILABLE;
+    return next(err);
+  }
+};
 
 router.post('/dapps', dappController.upload);
 
@@ -42,8 +66,8 @@ router.post('/logout', checkMode, authHandler.validateRequest(), authController.
 router.post('/verify-email', checkMode, authController.verifyEmail);
 router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
 
-router.post('/bloc/file/upload', multerMiddleware, fileController.upload);
-router.post('/bloc/file/attest', fileController.attest);
+router.post('/bloc/file/upload', checkUID, multerMiddleware, fileController.upload);
+router.post('/bloc/file/attest', checkUID, fileController.attest);
 router.get('/bloc/file/verify', fileController.verify);
 router.get('/bloc/file/download', fileController.download);
 router.get('/bloc/file/list', fileController.list)
