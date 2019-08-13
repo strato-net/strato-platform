@@ -190,9 +190,10 @@ blockstanbulSend' msg = do
   rch <- asks blockstanbulVoteResps
   atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
-  let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul
+  let getSequencedBlock = ingestBlockToSequencedBlock lookupChainIdFromChainHash
+                        . blockToIngestBlock TO.Blockstanbul
       rewriteBlock b = do
-        let msb = getSequencedBlock b
+        msb <- getSequencedBlock b
         for msb $ \sb -> do
           return . OEBlock $ sequencedBlockToOutputBlock sb 1
       creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
@@ -219,8 +220,8 @@ blockstanbulSend' msg = do
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
-  mAnchor <- join . fmap _onChainId <$> A.lookup (A.Proxy @ChainHashEntry) (SHA ch')
-  for_ (wrapTransaction mAnchor t) $ \otx -> do
+  motx <- wrapTransaction lookupChainIdFromChainHash t
+  for_ motx $ \otx -> do
     let witnessHash = witnessableHash otx
     witnessed <- wasTransactionHashWitnessed witnessHash
     unless witnessed $ do
@@ -239,7 +240,7 @@ transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- forM pairs $ \(ts,itx) ->
-    case wrapTransaction Nothing itx of
+    wrapTransaction lookupChainIdFromChainHash itx >>= \case
       Nothing -> return Nothing
       Just otx -> do
         let witnessHash = witnessableHash otx
@@ -378,15 +379,13 @@ hydrateAndEmit chainId = awaitForever $ \case
   oe -> yield oe
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
-transformBlocks = mapM_ $ \ib -> do
-  let mSb = ingestBlockToSequencedBlock ib
-  case mSb of
-    Nothing -> do
-      $logWarnS "transformEvents/emitBlocks" . T.pack
-        $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-      P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-    Just sb -> do
-      runBlockWithConsensus sb
+transformBlocks = mapM_ $ \ib -> ingestBlockToSequencedBlock lookupChainIdFromChainHash ib >>= \case
+  Nothing -> do
+    $logWarnS "transformEvents/emitBlocks" . T.pack
+      $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
+    P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+  Just sb -> do
+    runBlockWithConsensus sb
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do

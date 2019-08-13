@@ -10,6 +10,7 @@ module Blockchain.Privacy.Event
   , insertTransaction
   , findChainHashUses
   , insertPrivateHash
+  , lookupChainIdFromChainHash
   , insertChainHash
   , useChainHash
   , getChainBuffer
@@ -91,6 +92,9 @@ insertPrivateHash tx = case txChainId tx of
     mapM_ (flip insertChainHash chainId) cHashes
     mapM_ (insertChainBufferEntry chainId) cHashes
     findChainHashUses chainId cHashes
+
+lookupChainIdFromChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m (Maybe Word256)
+lookupChainIdFromChainHash ch = join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) ch
 
 insertChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> Word256 -> m ()
 insertChainHash cHash chainId =

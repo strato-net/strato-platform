@@ -150,8 +150,8 @@ addressStates = do
   states' <- zipWithM getDataAndRevertAddressState addrs states
   return $ zip addrs states'
 
-txToOutputTx :: Maybe Word256 -> Transaction -> OutputTx
-txToOutputTx mAnchor = fromJust . wrapTransaction mAnchor . IngestTx TO.Direct
+txToOutputTx :: Transaction -> OutputTx
+txToOutputTx = fromJust . wrapTransactionUnanchored . IngestTx TO.Direct
 
 runTest::Test-> ContextM ()
 runTest test = do
@@ -265,7 +265,7 @@ runTest test = do
                     Nothing
                     (tSecretKey' transaction)
         signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
-        let signedTransaction = txToOutputTx Nothing signedTransaction'
+        let signedTransaction = txToOutputTx signedTransaction'
         result <-
           runExceptT $ addTransaction True (blockBlockData block) (currentGasLimit $ env test) signedTransaction
         when flags_debugEnabled $

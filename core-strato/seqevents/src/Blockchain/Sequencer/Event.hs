@@ -7,6 +7,7 @@ module Blockchain.Sequencer.Event where
 import           Control.DeepSeq
 import           Data.Binary
 import           Data.Data
+import           Data.Functor.Identity
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust)
 import           Data.DeriveTH
@@ -178,17 +179,19 @@ ingestBlockToBlock :: IngestBlock -> BDB.Block
 ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBlockUncles = us} =
     BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us}
 
-ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
-ingestBlockToSequencedBlock ib =
-    let theHash = (BDB.blockHeaderHash . ibBlockData $ ib)
-     in case sequence $ wrapIngestBlockTransaction theHash Nothing <$> ibReceiptTransactions ib of
-         Nothing -> Nothing
-         Just outputTxs -> Just SequencedBlock { sbOrigin              = ibOrigin ib
-                                               , sbHash                = theHash
-                                               , sbBlockData           = ibBlockData ib
-                                               , sbReceiptTransactions = outputTxs
-                                               , sbBlockUncles         = ibBlockUncles ib
-                                               }
+ingestBlockToSequencedBlock :: Monad m => (SHA -> m (Maybe Word256)) -> IngestBlock -> m (Maybe SequencedBlock)
+ingestBlockToSequencedBlock f ib = do
+  let theHash = (BDB.blockHeaderHash . ibBlockData $ ib)
+  otxs <- traverse (wrapIngestBlockTransaction f theHash) $ ibReceiptTransactions ib
+  return $ case sequence otxs of
+    Nothing -> Nothing
+    Just outputTxs -> Just SequencedBlock
+      { sbOrigin              = ibOrigin ib
+      , sbHash                = theHash
+      , sbBlockData           = ibBlockData ib
+      , sbReceiptTransactions = outputTxs
+      , sbBlockUncles         = ibBlockUncles ib
+      }
 
 sequencedBlockToOutputBlock :: SequencedBlock -> Integer -> OutputBlock
 sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin              = sbOrigin sb
@@ -209,27 +212,39 @@ sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
     "Block #" ++ CL.yellow(show . DD.blockDataNumber $ d) ++ "/" ++ CL.blue(format theHash)
 
-getAnchorChain :: TransactionLike t => t -> Maybe Word256 -> AnchorChain
-getAnchorChain tx = \case
-  Just anchor -> AnchoredPrivate anchor
-  Nothing -> if txType tx == PrivateHash
-    then UnknownPrivate
-    else maybe Public KnownPrivate $ txChainId tx
+getAnchorChain :: (Monad m, TransactionLike t) => (SHA -> m (Maybe Word256)) -> t -> m AnchorChain
+getAnchorChain f tx =
+  if txType tx == PrivateHash
+    then f (txChainHash tx) >>= \case
+      Just anchor -> return $ AnchoredPrivate anchor
+      Nothing -> return UnknownPrivate
+    else return . maybe Public KnownPrivate $ txChainId tx
 
---getAnchorChain :: (SHA `A.Alters` ChainHashEntry) m => TX.Transaction -> m AnchorChain
---getAnchorChain tx = case tx of
---  PrivateHashTX _ ch -> do
---    maybe UnknownPrivate AnchoredPrivate . join . fmap _onChainId <$>
---      A.lookup (A.Proxy @ChainHashEntry) (SHA ch)
---  _ -> return . maybe Public KnownPrivate $ txChainId tx
+getAnchorChainUnanchored :: TransactionLike t => t -> AnchorChain
+getAnchorChainUnanchored = runIdentity . getAnchorChain (const (Identity Nothing))
 
-wrapTransaction :: Maybe Word256 -> IngestTx -> Maybe OutputTx
-wrapTransaction mAnchor tx@IngestTx{} =
+wrapTransaction :: Monad m => (SHA -> m (Maybe Word256)) -> IngestTx -> m (Maybe OutputTx)
+wrapTransaction f tx@IngestTx{} = do
+  let baseTx = itTransaction tx
+  case TX.whoSignedThisTransaction baseTx of
+    Nothing -> return Nothing
+    Just signer -> do
+      anchor <- getAnchorChain f baseTx
+      return $ Just OutputTx
+        { otOrigin = itOrigin tx
+        , otHash   = TX.transactionHash baseTx
+        , otSigner = signer
+        , otAnchorChain = anchor
+        , otBaseTx = baseTx
+        }
+
+wrapTransactionUnanchored :: IngestTx -> Maybe OutputTx
+wrapTransactionUnanchored tx@IngestTx{} =
   let baseTx = itTransaction tx
    in case TX.whoSignedThisTransaction baseTx of
         Nothing -> Nothing
         Just signer ->
-          let anchor = getAnchorChain baseTx mAnchor
+          let anchor = getAnchorChainUnanchored baseTx
            in Just OutputTx
                 { otOrigin = itOrigin tx
                 , otHash   = TX.transactionHash baseTx
@@ -238,12 +253,26 @@ wrapTransaction mAnchor tx@IngestTx{} =
                 , otBaseTx = baseTx
                 }
 
-wrapIngestBlockTransaction :: SHA -> Maybe Word256 -> TX.Transaction -> Maybe OutputTx
-wrapIngestBlockTransaction hash mAnchor tx =
+wrapIngestBlockTransaction :: Monad m => (SHA -> m (Maybe Word256)) -> SHA -> TX.Transaction -> m (Maybe OutputTx)
+wrapIngestBlockTransaction f hash tx =
+  case TX.whoSignedThisTransaction tx of
+    Nothing -> return Nothing
+    Just signer -> do
+      anchor <- getAnchorChain f tx
+      return $ Just OutputTx
+        { otOrigin = TO.BlockHash hash
+        , otSigner = signer
+        , otBaseTx = tx
+        , otAnchorChain = anchor
+        , otHash   = TX.transactionHash tx
+        }
+
+wrapIngestBlockTransactionUnanchored :: SHA -> TX.Transaction -> Maybe OutputTx
+wrapIngestBlockTransactionUnanchored hash tx =
   case TX.whoSignedThisTransaction tx of
     Nothing -> Nothing
     Just signer ->
-      let anchor = getAnchorChain tx mAnchor
+      let anchor = getAnchorChainUnanchored tx
        in Just OutputTx
             { otOrigin = TO.BlockHash hash
             , otSigner = signer
@@ -277,22 +306,26 @@ outputBlockToBlock :: OutputBlock -> Block
 outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}=
     BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions=otBaseTx <$> txs, BDB.blockBlockUncles=us}
 
-quarryBlockToOutputBlock :: BDB.Block -> OutputBlock
-quarryBlockToOutputBlock BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
-    OutputBlock { obOrigin              = TO.Quarry
-                , obBlockData           = bd
-                , obBlockUncles         = us
-                , obReceiptTransactions = wrapQuarryReceipt <$> txs
-                , obTotalDifficulty     = 0
-                }
+quarryBlockToOutputBlock :: Monad m => (SHA -> m (Maybe Word256)) -> BDB.Block -> m OutputBlock
+quarryBlockToOutputBlock f BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} = do
+  rtxs <- mapM wrapQuarryReceipt txs
+  return OutputBlock
+    { obOrigin              = TO.Quarry
+    , obBlockData           = bd
+    , obBlockUncles         = us
+    , obReceiptTransactions = rtxs
+    , obTotalDifficulty     = 0
+    }
 
-    where wrapQuarryReceipt t =
-            OutputTx { otOrigin = TO.Quarry
-                     , otBaseTx = t
-                     , otSigner = fromJust . TX.whoSignedThisTransaction $ t
-                     , otAnchorChain = getAnchorChain t Nothing
-                     , otHash   = TX.transactionHash t
-                     }
+    where wrapQuarryReceipt t = do
+            anchor <- getAnchorChain f t
+            return OutputTx
+              { otOrigin = TO.Quarry
+              , otBaseTx = t
+              , otSigner = fromJust . TX.whoSignedThisTransaction $ t
+              , otAnchorChain = anchor
+              , otHash   = TX.transactionHash t
+              }
 
 instance Witnessable IngestTx where
     witnessableHash = TX.partialTransactionHash . itTransaction
@@ -468,7 +501,7 @@ instance TransactionLike OutputTx where
     morphTx t = OutputTx { otOrigin = TO.Direct -- todo: introduce a "morph" conversion?
                          , otHash   = txHash t
                          , otSigner = fromJust (txSigner t) -- todo: D A N G E R
-                         , otAnchorChain = getAnchorChain t Nothing
+                         , otAnchorChain = runIdentity $ getAnchorChain (const (Identity Nothing)) t
                          , otBaseTx = morphTx t
                          }
 
