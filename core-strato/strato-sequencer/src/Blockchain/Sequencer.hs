@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeApplications  #-}
 module Blockchain.Sequencer where
 
 import           ClassyPrelude                             (atomically)
@@ -218,7 +219,8 @@ blockstanbulSend' msg = do
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
-  for_ (wrapTransaction t) $ \otx -> do
+  mAnchor <- join . fmap _onChainId <$> A.lookup (A.Proxy @ChainHashEntry) (SHA ch')
+  for_ (wrapTransaction mAnchor t) $ \otx -> do
     let witnessHash = witnessableHash otx
     witnessed <- wasTransactionHashWitnessed witnessHash
     unless witnessed $ do
@@ -237,7 +239,7 @@ transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- forM pairs $ \(ts,itx) ->
-    case wrapTransaction itx of
+    case wrapTransaction Nothing itx of
       Nothing -> return Nothing
       Just otx -> do
         let witnessHash = witnessableHash otx

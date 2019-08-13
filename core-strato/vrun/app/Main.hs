@@ -99,7 +99,7 @@ main = do
 
 
 txToOutputTx :: Transaction -> OutputTx
-txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct
+txToOutputTx = fromJust . wrapTransaction Nothing . IngestTx TO.Direct
 
 
 

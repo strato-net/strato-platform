@@ -41,6 +41,12 @@ import           Blockchain.Sequencer.BinaryInstances      ()
 import qualified Text.Colors                               as CL
 import           Text.Format
 
+data AnchorChain = Public
+                 | UnknownPrivate
+                 | KnownPrivate Word256
+                 | AnchoredPrivate Word256
+                 deriving (Eq, Show, Read, GHCG.Generic, NFData, Data)
+
 data SeqLoopEvent = TimerFire PBFT.RoundNumber
                   | VoteMade PBFT.CandidateReceived
                   | UnseqEvent IngestEvent
@@ -143,10 +149,11 @@ instance Format OutputEvent where
   format (OEBlockstanbul o)       = format o
   format x                        = show x
 
-data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
-                         , otHash   :: SHA
-                         , otSigner :: A.Address
-                         , otBaseTx :: TX.Transaction
+data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
+                         , otHash        :: SHA
+                         , otSigner      :: A.Address
+                         , otAnchorChain :: AnchorChain
+                         , otBaseTx      :: TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic, NFData, Data)
 
 data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
@@ -174,14 +181,14 @@ ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBl
 ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
 ingestBlockToSequencedBlock ib =
     let theHash = (BDB.blockHeaderHash . ibBlockData $ ib)
-            in case sequence $ wrapIngestBlockTransaction theHash <$> ibReceiptTransactions ib of
-                Nothing -> Nothing
-                Just outputTxs -> Just SequencedBlock { sbOrigin              = ibOrigin ib
-                                                      , sbHash                = theHash
-                                                      , sbBlockData           = ibBlockData ib
-                                                      , sbReceiptTransactions = outputTxs
-                                                      , sbBlockUncles         = ibBlockUncles ib
-                                                      }
+     in case sequence $ wrapIngestBlockTransaction theHash Nothing <$> ibReceiptTransactions ib of
+         Nothing -> Nothing
+         Just outputTxs -> Just SequencedBlock { sbOrigin              = ibOrigin ib
+                                               , sbHash                = theHash
+                                               , sbBlockData           = ibBlockData ib
+                                               , sbReceiptTransactions = outputTxs
+                                               , sbBlockUncles         = ibBlockUncles ib
+                                               }
 
 sequencedBlockToOutputBlock :: SequencedBlock -> Integer -> OutputBlock
 sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin              = sbOrigin sb
@@ -202,25 +209,48 @@ sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
     "Block #" ++ CL.yellow(show . DD.blockDataNumber $ d) ++ "/" ++ CL.blue(format theHash)
 
-wrapTransaction :: IngestTx -> Maybe OutputTx
-wrapTransaction tx@IngestTx{} =
-    let baseTx = itTransaction tx in case TX.whoSignedThisTransaction baseTx of
-            Nothing -> Nothing
-            Just signer -> Just OutputTx { otOrigin = itOrigin tx
-                                         , otHash   = TX.transactionHash baseTx
-                                         , otSigner = signer
-                                         , otBaseTx = baseTx
-                                         }
+getAnchorChain :: TransactionLike t => t -> Maybe Word256 -> AnchorChain
+getAnchorChain tx = \case
+  Just anchor -> AnchoredPrivate anchor
+  Nothing -> if txType tx == PrivateHash
+    then UnknownPrivate
+    else maybe Public KnownPrivate $ txChainId tx
 
-wrapIngestBlockTransaction :: SHA -> TX.Transaction -> Maybe OutputTx
-wrapIngestBlockTransaction hash tx =
-    case TX.whoSignedThisTransaction tx of
+--getAnchorChain :: (SHA `A.Alters` ChainHashEntry) m => TX.Transaction -> m AnchorChain
+--getAnchorChain tx = case tx of
+--  PrivateHashTX _ ch -> do
+--    maybe UnknownPrivate AnchoredPrivate . join . fmap _onChainId <$>
+--      A.lookup (A.Proxy @ChainHashEntry) (SHA ch)
+--  _ -> return . maybe Public KnownPrivate $ txChainId tx
+
+wrapTransaction :: Maybe Word256 -> IngestTx -> Maybe OutputTx
+wrapTransaction mAnchor tx@IngestTx{} =
+  let baseTx = itTransaction tx
+   in case TX.whoSignedThisTransaction baseTx of
         Nothing -> Nothing
-        Just signer -> Just OutputTx { otOrigin = TO.BlockHash hash
-                                     , otSigner = signer
-                                     , otBaseTx = tx
-                                     , otHash   = TX.transactionHash tx
-                                     }
+        Just signer ->
+          let anchor = getAnchorChain baseTx mAnchor
+           in Just OutputTx
+                { otOrigin = itOrigin tx
+                , otHash   = TX.transactionHash baseTx
+                , otSigner = signer
+                , otAnchorChain = anchor
+                , otBaseTx = baseTx
+                }
+
+wrapIngestBlockTransaction :: SHA -> Maybe Word256 -> TX.Transaction -> Maybe OutputTx
+wrapIngestBlockTransaction hash mAnchor tx =
+  case TX.whoSignedThisTransaction tx of
+    Nothing -> Nothing
+    Just signer ->
+      let anchor = getAnchorChain tx mAnchor
+       in Just OutputTx
+            { otOrigin = TO.BlockHash hash
+            , otSigner = signer
+            , otBaseTx = tx
+            , otAnchorChain = anchor
+            , otHash   = TX.transactionHash tx
+            }
 
 parentHashBS :: SequencedBlock -> BS.ByteString
 parentHashBS = B.toStrict . encode . DD.blockDataParentHash . sbBlockData
@@ -256,11 +286,13 @@ quarryBlockToOutputBlock BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransac
                 , obTotalDifficulty     = 0
                 }
 
-    where wrapQuarryReceipt t = OutputTx { otOrigin = TO.Quarry
-                                         , otBaseTx = t
-                                         , otSigner = fromJust . TX.whoSignedThisTransaction $ t
-                                         , otHash   = TX.transactionHash t
-                                         }
+    where wrapQuarryReceipt t =
+            OutputTx { otOrigin = TO.Quarry
+                     , otBaseTx = t
+                     , otSigner = fromJust . TX.whoSignedThisTransaction $ t
+                     , otAnchorChain = getAnchorChain t Nothing
+                     , otHash   = TX.transactionHash t
+                     }
 
 instance Witnessable IngestTx where
     witnessableHash = TX.partialTransactionHash . itTransaction
@@ -277,6 +309,7 @@ instance Eq SequencedBlock where
 instance Ord OutputTx where
     compare OutputTx{otHash = hA} OutputTx{otHash = hB} = compare hA hB
 
+instance Binary AnchorChain where
 instance Binary IngestTx where
 instance Binary IngestBlock where
 instance Binary IngestGenesis where
@@ -397,9 +430,10 @@ instance Format OutputBlock where
 instance Format OutputTx where
     format OutputTx{ otOrigin = origin
                    , otSigner = signer
+                   , otAnchorChain = anchor
                    , otBaseTx = base
                    } =
-           CL.red("OutputTx from address " ++ format signer)
+           CL.red("OutputTx from address " ++ format signer ++ " on chain " ++ show anchor)
                 ++ tab (" via " ++ format origin ++ "\n" ++ format (txHash base))
 
 instance Format IngestTx where
@@ -434,6 +468,7 @@ instance TransactionLike OutputTx where
     morphTx t = OutputTx { otOrigin = TO.Direct -- todo: introduce a "morph" conversion?
                          , otHash   = txHash t
                          , otSigner = fromJust (txSigner t) -- todo: D A N G E R
+                         , otAnchorChain = getAnchorChain t Nothing
                          , otBaseTx = morphTx t
                          }
 
@@ -449,6 +484,7 @@ instance BlockLike DD.BlockData OutputTx OutputBlock where
     blockOrdering = DD.blockDataNumber . obBlockData
     buildBlock = OutputBlock TO.Morphism 0
 
+derive makeArbitrary ''AnchorChain
 derive makeArbitrary ''IngestEvent
 derive makeArbitrary ''IngestTx
 derive makeArbitrary ''IngestBlock
