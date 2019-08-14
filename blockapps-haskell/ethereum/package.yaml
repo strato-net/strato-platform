@@ -26,6 +26,7 @@ dependencies:
   - extra
   - generic-random
   - hashable
+  - haskoin-shim
   - http-api-data
   - lens
   - largeword
@@ -34,7 +35,6 @@ dependencies:
   - QuickCheck
   - quickcheck-instances
   - relapse
-  - secp256k1
   - servant
   - servant-docs
   - strato-model
@@ -47,9 +47,10 @@ library:
 
 tests:
   blockapps-ethereum-test:
-    main: Spec.hs
+    main: Main.hs
     source-dirs: test/
     dependencies:
       - blockapps-ethereum
       - clock
       - hspec
+

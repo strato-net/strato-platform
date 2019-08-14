@@ -14,7 +14,7 @@ import           Crypto.Random.Entropy
 import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
-import           Crypto.Secp256k1
+import           Crypto.HaskoinShim
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as BS
 import           Data.Maybe

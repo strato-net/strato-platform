@@ -27,11 +27,12 @@ import Data.Bifunctor (second)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Short as SB
 import Data.Either (lefts, rights)
 import Data.Int (Int32)
 import Data.IORef
 import Data.Function
-import Data.List (sortOn)
+import Data.List (foldl', sortOn)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
@@ -85,7 +86,7 @@ data BatchedInserts = BatchedInserts
   , functionInserts :: [ProcessedContract]
   } deriving (Show)
 
-toAction :: BL.ByteString -> Action'
+toAction :: BL.ByteString -> Action
 toAction x =
  case JSON.eitherDecode x of
   Left e -> error $ show e
@@ -99,25 +100,24 @@ enterBloc2 env x = do
    Left e -> error $ show e
    Right v -> return v
 
+{-# NOINLINE emptyHash #-}
 emptyHash :: SHA
 emptyHash = hash B.empty
 
-hasContract::Action->Bool
-hasContract = (/= EVMCode emptyHash) . actionCodeHash
-
-matters :: Action -> Bool
-matters Action{..} = (actionType == Create) || (not $ diffNull actionStorage)
+matters :: AggregateAction -> Bool
+matters AggregateAction{..} = (actionType == Create || (not $ diffNull actionStorage))
+                           && (codePtrToSHA actionCodeHash /= emptyHash)
 
 -- assumes all Actions in the list are for the same (Address, Maybe ChainId) pair
-combineActions :: [Action] -> Action
+combineActions :: [AggregateAction] -> AggregateAction
 combineActions [] = error "cannot combine 0 actions"
-combineActions (x:xs) = foldr merge x xs
+combineActions (x:xs) = foldl' merge x xs
   where
     merge a b = b { actionStorage  = (mergeDiffs `on` actionStorage) b a
                   , actionMetadata = (Map.union `on` actionMetadata) b a
                   }
 
-splitActions :: [Action] -> [((Address, Maybe ChainId), [Action])]
+splitActions :: [AggregateAction] -> [((Address, Maybe ChainId), [AggregateAction])]
 splitActions = partitionWith (actionAddress &&& actionTxChainId)
 
 functionDetailsFromContract :: Contract -> ByteString -> (Text, ([(Text, Type)],[(Maybe Text, Type)]))
@@ -173,9 +173,9 @@ data ABIID = ABIID { aiAbi :: Text
 
 processedContract :: ABIID
                   -> Map.Map Text Value
-                  -> Action
+                  -> AggregateAction
                   -> ProcessedContract
-processedContract ABIID{..} state Action{..} =
+processedContract ABIID{..} state AggregateAction{..} =
   ProcessedContract
     { address = actionAddress
     , codehash = actionCodeHash
@@ -194,12 +194,12 @@ processedContract ABIID{..} state Action{..} =
 makeFunctionInserts :: Xabi
                     -> ABIID
                     -> Map.Map Text Value
-                    -> Action
+                    -> AggregateAction
                     -> Bloc [ProcessedContract]
-makeFunctionInserts xabi ABIID{..} state Action{..} =
+makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
   forM actionCallData $ \CallData{..} -> do
-    let ibytes = _input
-        obytes = fromMaybe B.empty _output
+    let ibytes = SB.fromShort $ _callDataInput
+        obytes = SB.fromShort $ fromMaybe SB.empty _callDataOutput
         (f',i,o) = getFunctionCallValues xabi ibytes obytes
         f = if T.null f'
               then if actionType == Create
@@ -231,9 +231,9 @@ lookupT k = MaybeT . return . Map.lookup k
 
 -- Note: This could be reshaped to remove the bloch dependency, as
 -- we only care about the ABI from `sourceToContractDetails` and
--- not the metadata id. Additinally, at some point this must
+-- not the metadata id. Additionally, at some point this must
 -- offload to disk.
-getCachedSolidVMDetails :: IORef Globals -> Action -> Bloc (Maybe (Text, Text))
+getCachedSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Text))
 getCachedSolidVMDetails g row = liftM2 (<|>)
   (getSolidVMABIs g codePtr)
   (runMaybeT $ do
@@ -245,7 +245,7 @@ getCachedSolidVMDetails g row = liftM2 (<|>)
   )
  where codePtr = actionCodeHash row
 
-detailsForRow :: Action -> Bloc (Maybe (Int32, ContractDetails))
+detailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
   (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)
   (runMaybeT $ do
@@ -255,7 +255,7 @@ detailsForRow row = liftM2 (<|>)
     detailsMap <- lift $ sourceToContractDetails True src
     lookupT name detailsMap)
 
-adjustGlobals :: IORef Globals -> Action -> ContractDetails -> Bloc ()
+adjustGlobals :: IORef Globals -> AggregateAction -> ContractDetails -> Bloc ()
 adjustGlobals gref row details = do
   let go m (k,f) = runMaybeT $ do
         v <- lookupT k $ actionMetadata row
@@ -275,7 +275,7 @@ adjustGlobals gref row details = do
                           ,("nofunctionhistory", removeFromFunctionHistoryList)
                           ]
 
-ensureContractInstance :: Int32 -> Action -> Bloc ()
+ensureContractInstance :: Int32 -> AggregateAction -> Bloc ()
 ensureContractInstance cmId row = do
   let addr = actionAddress row
       chainId = actionTxChainId row
@@ -293,7 +293,8 @@ readPreviousSolidVMState :: IORef Globals -> Address -> Maybe ChainId -> Bloc [(
 readPreviousSolidVMState gref addr chainId = fromMaybe [] <$> getContractState gref addr chainId
 
 
-rowToInsert :: IORef Globals -> ABIID -> Action -> Contract -> [(Text, Value)] -> Bloc ProcessedContract
+rowToInsert :: IORef Globals -> ABIID -> AggregateAction -> Contract -> [(Text, Value)]
+            -> Bloc ProcessedContract
 rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
                     BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
@@ -301,7 +302,9 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAddress row) (actionTxChainId row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-rowToHistories :: IORef Globals -> ABIID -> Action -> [Action] -> Contract -> ContractDetails -> [(Text, Value)] -> Bloc ([ProcessedContract], [ProcessedContract])
+rowToHistories :: IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> Contract
+               -> ContractDetails -> [(Text, Value)]
+               -> Bloc ([ProcessedContract], [ProcessedContract])
 rowToHistories gref abiid row actions cont details oldState = do
   hist <- isHistoric gref $ actionCodeHash row
   second join . unzip <$> if not hist
@@ -324,14 +327,13 @@ rowToHistories gref abiid row actions cont details oldState = do
 
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
-withSourceFirst :: (a, [Action]) -> Down Bool
+withSourceFirst :: (a, [AggregateAction]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
-parseActions :: [B.ByteString] -> [((Address, Maybe ChainId), [Action])]
+parseActions :: [B.ByteString] -> [((Address, Maybe ChainId), [AggregateAction])]
 parseActions = sortOn withSourceFirst
              . splitActions
              . filter matters
-             . filter hasContract
              . concatMap (flatten . toAction . BL.fromStrict)
 
 processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> LoggingT IO ()

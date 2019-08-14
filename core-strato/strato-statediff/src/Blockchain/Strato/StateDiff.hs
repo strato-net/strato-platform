@@ -34,7 +34,6 @@ import qualified Data.ByteString                             as B
 import           Data.Function
 import           Data.Maybe
 import           Data.String
-import           Data.Traversable                            (forM)
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as Map
 import qualified Data.NibbleString                           as N
@@ -164,8 +163,8 @@ chainDiff :: ( HasStateDB m
              , Modifiable GenesisRoot m
              , Modifiable BestBlockRoot m
              )
-          => Integer -> SHA -> [Word256] -> m [StateDiff]
-chainDiff newBlockNum newBlockHash chains = fmap catMaybes . forM chains $ \chainId -> do
+          => Word256 -> Integer -> SHA -> m (Maybe StateDiff)
+chainDiff chainId newBlockNum newBlockHash = do
   newSR <- fromMaybe emptyTriePtr <$> getChainStateRoot chainId newBlockHash
   ~(bHash, bNum) <- fromMaybe (SHA 0, 0) <$> getChainBestBlock chainId
   if newBlockNum < bNum

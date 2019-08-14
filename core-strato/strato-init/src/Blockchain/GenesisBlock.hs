@@ -138,7 +138,7 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
     obGB <- liftIO $ bootstrapSequencer genesisBlock
     putGenesisHash $ blockHash genesisBlock
     $logInfoS "initgen" "Initial merkle patricia tries succussfully created"
-    [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+    [genBId] <- putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
     $logInfoS "initgen" "Genesis Block put"
     $logInfoS "initgen" "State diff has been generated"
 
