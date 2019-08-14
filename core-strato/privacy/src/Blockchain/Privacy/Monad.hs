@@ -47,37 +47,6 @@ instance Format a => Format (CircularBuffer a) where
     , tab $ "Queue:    " ++ format (toList _queue)
     ]
 
-data ChainHashEntry = ChainHashEntry
-  { _used         :: Bool
-  , _onChainId    :: Maybe Word256
-  , _inBlocks     :: Q.Seq SHA
-  } deriving (Show, Generic, Binary)
-makeLenses ''ChainHashEntry
-
-blankChainHashEntry :: ChainHashEntry
-blankChainHashEntry = ChainHashEntry False Nothing Q.empty
-
-instance Default ChainHashEntry where
-  def = blankChainHashEntry
-
-instance Format ChainHashEntry where
-  format ChainHashEntry{..} = unlines
-    [ "ChainHashEntry"
-    , "--------------"
-    , tab $ "Used:      " ++ show _used
-    , tab $ "On chain:  " ++ format (SHA <$> _onChainId)
-    , tab $ "In blocks: " ++ format (toList _inBlocks)
-    ]
-
-chainHashEntryUsed :: ChainHashEntry
-chainHashEntryUsed = ChainHashEntry True Nothing Q.empty
-
-chainHashEntryWithChainId :: Word256 -> ChainHashEntry
-chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) Q.empty
-
-chainHashEntryInBlock :: SHA -> ChainHashEntry
-chainHashEntryInBlock bHash = ChainHashEntry True Nothing (Q.singleton bHash)
-
 data BlockInfo = BlockInfo
   { _bhash     :: SHA
   , _bordering :: Integer
@@ -94,6 +63,37 @@ instance Format BlockInfo where
 
 instance Ord BlockInfo where
   compare = compare `on` _bordering
+
+data ChainHashEntry = ChainHashEntry
+  { _used         :: Bool
+  , _onChainId    :: Maybe Word256
+  , _inBlocks     :: Set BlockInfo
+  } deriving (Show, Generic, Binary)
+makeLenses ''ChainHashEntry
+
+blankChainHashEntry :: ChainHashEntry
+blankChainHashEntry = ChainHashEntry False Nothing S.empty
+
+instance Default ChainHashEntry where
+  def = blankChainHashEntry
+
+instance Format ChainHashEntry where
+  format ChainHashEntry{..} = unlines
+    [ "ChainHashEntry"
+    , "--------------"
+    , tab $ "Used:      " ++ show _used
+    , tab $ "On chain:  " ++ format (SHA <$> _onChainId)
+    , tab $ "In blocks: " ++ format (toList _inBlocks)
+    ]
+
+chainHashEntryUsed :: ChainHashEntry
+chainHashEntryUsed = ChainHashEntry True Nothing S.empty
+
+chainHashEntryWithChainId :: Word256 -> ChainHashEntry
+chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) S.empty
+
+chainHashEntryInBlock :: BlockInfo -> ChainHashEntry
+chainHashEntryInBlock bInfo = ChainHashEntry True Nothing (S.singleton bInfo)
 
 data ChainIdEntry = ChainIdEntry
   { _chainIdInfo :: ChainInfo
