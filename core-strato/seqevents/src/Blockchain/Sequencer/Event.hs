@@ -9,7 +9,7 @@ import           Data.Binary
 import           Data.Data
 import           Data.Functor.Identity
 import           Data.List                                 (intercalate)
-import           Data.Maybe                                (fromJust)
+import           Data.Maybe                                (fromJust, isNothing)
 import           Data.DeriveTH
 import           Test.QuickCheck
 
@@ -47,6 +47,47 @@ data AnchorChain = Public
                  | KnownPrivate Word256 --       but I'm leaving them in for now.
                  | AnchoredPrivate Word256
                  deriving (Eq, Ord, Show, Read, GHCG.Generic, NFData, Data)
+
+getAnchorChain :: (Monad m, TransactionLike t) => (SHA -> m (Maybe Word256)) -> t -> m AnchorChain
+getAnchorChain f tx =
+  if txType tx == PrivateHash
+    then f (txChainHash tx) >>= \case
+      Just anchor -> return $ AnchoredPrivate anchor
+      Nothing -> return UnknownPrivate
+    else return . maybe Public KnownPrivate $ txChainId tx
+
+getAnchorChainUnanchored :: TransactionLike t => t -> AnchorChain
+getAnchorChainUnanchored = runIdentity . getAnchorChain (const (Identity Nothing))
+
+isAnchored :: AnchorChain -> Bool
+isAnchored Public              = True
+isAnchored (AnchoredPrivate _) = True
+isAnchored _                   = False
+
+isAnchoredPrivate :: AnchorChain -> Bool
+isAnchoredPrivate (AnchoredPrivate _) = True
+isAnchoredPrivate _                   = False
+
+-- Transactions that are anchored (Public or AnchoredPrivate), and the anchors are correct
+isAnchoredCorrectly :: TransactionLike t => AnchorChain -> t -> Bool
+isAnchoredCorrectly Public                tx = isNothing (txChainId tx) && (txType tx /= PrivateHash)
+isAnchoredCorrectly (AnchoredPrivate cId) tx = txChainId tx == Just cId
+isAnchoredCorrectly _                     _  = False
+
+-- Transactions that may or may not be anchored, but that status matches the transaction payload
+hasCorrectAnchor :: TransactionLike t => AnchorChain -> t -> Bool
+hasCorrectAnchor Public                tx = isNothing (txChainId tx) && (txType tx /= PrivateHash)
+hasCorrectAnchor (AnchoredPrivate cId) tx = txChainId tx == Just cId
+hasCorrectAnchor UnknownPrivate        tx = txType tx == PrivateHash
+hasCorrectAnchor _                     _  = False
+
+fromAnchorChain :: AnchorChain -> Maybe Word256
+fromAnchorChain (AnchoredPrivate cId) = Just cId
+fromAnchorChain _                     = Nothing
+
+filterAnchoredTxs :: OutputBlock -> OutputBlock
+filterAnchoredTxs ob = ob{obReceiptTransactions = filter f (obReceiptTransactions ob)}
+  where f otx = hasCorrectAnchor (otAnchorChain otx) otx
 
 data SeqLoopEvent = TimerFire PBFT.RoundNumber
                   | VoteMade PBFT.CandidateReceived
@@ -211,17 +252,6 @@ sequencedBlockToBlock sb = BDB.Block
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
     "Block #" ++ CL.yellow(show . DD.blockDataNumber $ d) ++ "/" ++ CL.blue(format theHash)
-
-getAnchorChain :: (Monad m, TransactionLike t) => (SHA -> m (Maybe Word256)) -> t -> m AnchorChain
-getAnchorChain f tx =
-  if txType tx == PrivateHash
-    then f (txChainHash tx) >>= \case
-      Just anchor -> return $ AnchoredPrivate anchor
-      Nothing -> return UnknownPrivate
-    else return . maybe Public KnownPrivate $ txChainId tx
-
-getAnchorChainUnanchored :: TransactionLike t => t -> AnchorChain
-getAnchorChainUnanchored = runIdentity . getAnchorChain (const (Identity Nothing))
 
 wrapTransaction :: Monad m => (SHA -> m (Maybe Word256)) -> IngestTx -> m (Maybe OutputTx)
 wrapTransaction f tx@IngestTx{} = do

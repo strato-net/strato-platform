@@ -335,31 +335,13 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format (outputBlockHash b) ++ ")."
     return actions
 
-isAnchored :: AnchorChain -> Bool
-isAnchored Public              = True
-isAnchored (AnchoredPrivate _) = True
-isAnchored _                   = False
-
-isAnchoredPrivate :: AnchorChain -> Bool
-isAnchoredPrivate (AnchoredPrivate _) = True
-isAnchoredPrivate _                   = False
-
-hasCorrectAnchor :: TransactionLike t => AnchorChain -> t -> Bool
-hasCorrectAnchor Public                tx = isNothing (txChainId tx) && (txType tx == PrivateHash)
-hasCorrectAnchor (AnchoredPrivate cId) tx = txChainId tx == Just cId
-hasCorrectAnchor _                     _  = False
-
-fromAnchorChain :: AnchorChain -> Maybe Word256
-fromAnchorChain (AnchoredPrivate cId) = Just cId
-fromAnchorChain _                     = Nothing
-
 addBlockTransactions :: Bool -> OutputBlock -> ContextM [Action]
 addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   let f = if runPublicTxs then isAnchored else isAnchoredPrivate
       chains = partitionWith otAnchorChain $ filter (f . otAnchorChain) transactions
   fmap concat . forM chains $ \(anchor, txs) -> do
-    let (goodTxs, badTxs) = partition (hasCorrectAnchor anchor) txs
+    let (goodTxs, badTxs) = partition (isAnchoredCorrectly anchor) txs
         chainId = fromAnchorChain anchor
     unless (null badTxs) $
       $logErrorS "addBlockTransactions" . T.pack $ "There are incorrectly-anchored transactions in this block! " ++ show badTxs
