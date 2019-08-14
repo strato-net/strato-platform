@@ -9,12 +9,10 @@ module Blockchain.Privacy.Event
   ( lookupSeenChain
   , insertTransaction
   , findChainHashUses
-  , insertPrivateHash
   , lookupChainIdFromChainHash
   , insertChainHash
   , useChainHash
-  , getChainBuffer
-  , lookupChainBuffer
+  , getChainBuffer , lookupChainBuffer
   , insertChainBufferEntry
   , getNewChainHash
   , checkIfIsMissingTX
@@ -76,7 +74,6 @@ findChainHashUses chainId cHashes = do
 
 insertPrivateHash :: ( MonadLogger m
                      , MonadMonitor m
-                     , HasPrivateHashDB m
                      , (SHA `Alters` OutputBlock) m
                      , (SHA `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
@@ -88,7 +85,7 @@ insertPrivateHash tx = case txChainId tx of
     return ()
   Just chainId -> do
     withLabel txMetrics "private_hash" incCounter
-    cHashes <- generateChainHashes tx
+    let cHashes = generateChainHashes tx
     mapM_ (flip insertChainHash chainId) cHashes
     mapM_ (insertChainBufferEntry chainId) cHashes
     findChainHashUses chainId cHashes
@@ -133,7 +130,7 @@ getNewChainHash chainId = do
   case Q.viewl q of
     Q.EmptyL -> do
       logFF "getNewChainHash" $ "Empty chain buffer for chainId " ++ format (SHA chainId)
-      traverse (generateInitialChainHash . _chainIdInfo) =<< lookup (Proxy @ChainIdEntry) chainId
+      fmap (generateInitialChainHash . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
     (h Q.:< q') -> do
       adjustStatefully_ (Proxy @ChainIdEntry) chainId $
         chainHashes .= CircularBuffer cap (sz - 1) q'
@@ -325,7 +322,7 @@ insertNewChainInfo :: ( MonadLogger m
                    -> ChainInfo
                    -> m [OutputBlock]
 insertNewChainInfo chainId cInfo = do
-  cHash <- generateInitialChainHash cInfo
+  let cHash = generateInitialChainHash cInfo
   repsert_ Proxy chainId $ return . maybe (chainIdEntry cInfo) (chainIdInfo .~ cInfo)
   withLabel chainMetrics "seen_chains" incCounter
   insertChainHash cHash chainId

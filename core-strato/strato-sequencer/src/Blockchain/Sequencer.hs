@@ -278,39 +278,41 @@ transformFullTransactions pairs = do
               , ". Inserting the chain Id into the GetChains list"
               ]
             insertGetChainsDB chainId
-          Just _ -> do
+          Just cInfo -> do
             forM_ ptxs $ \(ts, ptx) -> do
               logF . concat $
                 [ "We know the details for chain "
                 , format (SHA chainId)
-                , ". Inserting "
-                , prettyOTx ptx
-                , "into PrivateHashDB"
+                , ". Sending to P2P."
                 ]
-              let tHash = txHash ptx
               markForP2P $ pairToOETx (ts, ptx)
               --liftIO $ withLabel txMetrics "private_hash" incCounter
-              insertPrivateHash ptx
-              when (otOrigin ptx == TO.API) $ getNewChainHash chainId >>= \case
-                Nothing -> error $ concat
-                  [ "transformFullTransactions: "
-                  , "Could not acquire new chain hash for chain ID "
-                  , format (SHA chainId)
-                  , ". This should never happen, "
-                  , " so something is seriously wrong."
+              when (otOrigin ptx == TO.API) $ do
+                cHash <- getNewChainHash chainId >>= \case
+                  Nothing -> do
+                    let iHash = generateInitialChainHash cInfo
+                    logF . concat $
+                      [ "transformFullTransactions: "
+                      , "Encountered empty chain hash buffer for chain ID "
+                      , "Could not acquire new chain hash for chain ID "
+                      , TD.formatChainId $ Just chainId
+                      , ". Using initial chain hash instead: "
+                      , format iHash
+                      ]
+                    return iHash
+                  Just ch -> return ch
+                let tHash = txHash ptx
+                    SHA th' = txHash ptx
+                    SHA ch' = cHash
+                    phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
+                logF . concat $
+                  [ "Created chain hash "
+                  , format cHash
+                  , " for transaction "
+                  , format tHash
                   ]
-                Just cHash -> do
-                  logF . concat $
-                    [ "Created chain hash "
-                    , format cHash
-                    , " for transaction "
-                    , format tHash
-                    ]
-                  let SHA th' = tHash
-                      SHA ch' = cHash
-                      phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
-                  markForVM $ pairToOETx (ts, phtx)
-                  markForP2P $ pairToOETx (ts, phtx)
+                markForVM $ pairToOETx (ts, phtx)
+                markForP2P $ pairToOETx (ts, phtx)
             mapM_ (markForVM . OEBlock) =<< runBlocks chainId
 
 transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()

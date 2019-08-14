@@ -5,9 +5,11 @@
 module Blockchain.Privacy.Monad where
 
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.RLP
 import           Blockchain.ExtWord            (Word256)
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Util
 import           Control.Lens
 import           Data.Binary
@@ -114,8 +116,20 @@ instance Format ChainIdEntry where
     ]
 
 class HasPrivateHashDB m where
-  getChainId               :: ChainInfo -> m SHA
-  generateInitialChainHash :: ChainInfo -> m SHA
-  generateChainHashes      :: OutputTx -> m [SHA]
   requestChain             :: Word256 -> m ()
   requestTransaction       :: SHA -> m ()
+
+getChainId :: ChainInfo -> SHA
+getChainId = hash . rlpSerialize . rlpEncode
+
+generateInitialChainHash :: ChainInfo -> SHA
+generateInitialChainHash = hash . rlpSerialize . rlpEncode
+
+-- Point-free with permutations is less readable, but more fun
+generateChainHashes :: OutputTx -> [SHA]
+generateChainHashes tx =
+  let r = txSigR tx
+      s = txSigS tx
+      rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
+      sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
+   in [rs,sr]
