@@ -43,8 +43,8 @@ import qualified Text.Colors                               as CL
 import           Text.Format
 
 data AnchorChain = Public
-                 | UnknownPrivate
-                 | KnownPrivate Word256
+                 | UnknownPrivate       -- TODO: It's possible these two aren't needed,
+                 | KnownPrivate Word256 --       but I'm leaving them in for now.
                  | AnchoredPrivate Word256
                  deriving (Eq, Ord, Show, Read, GHCG.Generic, NFData, Data)
 
