@@ -125,7 +125,7 @@ class MenuBar extends Component {
           {this.renderDeveloperButton()}
           {this.renderChainDropDown()}
           <span className="pt-navbar-divider" />
-          <small className="pt-text-muted">SMD v{process.env.REACT_APP_VERSION} - {isModePublic() ? "Public" : "Enterprise"} </small>
+          <small className="pt-text-muted">STRATO v{process.env.REACT_STRATO_VERSION || ' N/A'}</small>
           {this.afterLoggedIn()}
         </div>
         {isModePublic() && <div><Login />

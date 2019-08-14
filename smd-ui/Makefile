@@ -5,4 +5,4 @@ endif
 all: build
 
 build:
-	docker build -t $(BASIL_DOCKER_TAG) .
+	docker build --build-arg STRATO_VERSION=$(STRATO_VERSION) -t $(BASIL_DOCKER_TAG) .
