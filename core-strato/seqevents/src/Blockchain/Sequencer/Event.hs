@@ -46,7 +46,7 @@ data AnchorChain = Public
                  | UnknownPrivate
                  | KnownPrivate Word256
                  | AnchoredPrivate Word256
-                 deriving (Eq, Show, Read, GHCG.Generic, NFData, Data)
+                 deriving (Eq, Ord, Show, Read, GHCG.Generic, NFData, Data)
 
 data SeqLoopEvent = TimerFire PBFT.RoundNumber
                   | VoteMade PBFT.CandidateReceived

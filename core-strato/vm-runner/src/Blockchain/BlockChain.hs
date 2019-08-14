@@ -335,13 +335,35 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format (outputBlockHash b) ++ ")."
     return actions
 
+isAnchored :: AnchorChain -> Bool
+isAnchored Public              = True
+isAnchored (AnchoredPrivate _) = True
+isAnchored _                   = False
+
+isAnchoredPrivate :: AnchorChain -> Bool
+isAnchoredPrivate (AnchoredPrivate _) = True
+isAnchoredPrivate _                   = False
+
+hasCorrectAnchor :: TransactionLike t => AnchorChain -> t -> Bool
+hasCorrectAnchor Public                tx = isNothing (txChainId tx) && (txType tx == PrivateHash)
+hasCorrectAnchor (AnchoredPrivate cId) tx = txChainId tx == Just cId
+hasCorrectAnchor _                     _  = False
+
+fromAnchorChain :: AnchorChain -> Maybe Word256
+fromAnchorChain (AnchoredPrivate cId) = Just cId
+fromAnchorChain _                     = Nothing
+
 addBlockTransactions :: Bool -> OutputBlock -> ContextM [Action]
 addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
-  let chains' = partitionWith (txChainId . otBaseTx) . filter ((/= PrivateHash) . txType . otBaseTx) $ transactions
-      chains  = if runPublicTxs then chains' else filter (isJust . fst) chains'
-  fmap concat . forM chains $ \(chainId, txs) -> do
-    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ formatChainId chainId ++ " with " ++ show txs
+  let f = if runPublicTxs then isAnchored else isAnchoredPrivate
+      chains = partitionWith otAnchorChain $ filter (f . otAnchorChain) transactions
+  fmap concat . forM chains $ \(anchor, txs) -> do
+    let (goodTxs, badTxs) = partition (hasCorrectAnchor anchor) txs
+        chainId = fromAnchorChain anchor
+    unless (null badTxs) $
+      $logErrorS "addBlockTransactions" . T.pack $ "There are incorrectly-anchored transactions in this block! " ++ show badTxs
+    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ formatChainId chainId ++ " with " ++ show goodTxs
     withBlockchain (blockHeaderHash bd) chainId $ do
       when flags_debug $ do
         sr <- Mod.get (Proxy @MP.StateRoot)
@@ -349,7 +371,7 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
       $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ formatChainId chainId
       let canUseCache = chainId == Nothing
       -- TODO: Run the checks Bagger does reject invalid transactions for private chains
-      (actions, asm) <- addTransactions canUseCache bd (blockDataGasLimit $ obBlockData b) txs
+      (actions, asm) <- addTransactions canUseCache bd (blockDataGasLimit $ obBlockData b) goodTxs
       when (not flags_sqlDiff) $ timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $ do
         lift $ updateSQLBalanceAndNonce $ [((theAddress, chainId), (addressStateBalance asMod, addressStateNonce asMod))
                                         | (theAddress, ASModification asMod) <- M.toList asm]
