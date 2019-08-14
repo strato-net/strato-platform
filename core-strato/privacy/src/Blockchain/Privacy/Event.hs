@@ -277,9 +277,22 @@ hydratePrivateHashes chainF b = do
                             blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                         return (Nothing, (tHash:dts, S.insert chainId cs))
                       Just ptx -> do
-                        logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
-                        insertPrivateHash ptx
-                        return (Just ptx, st)
+                        if Just chainId == txChainId ptx
+                          then do
+                            logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
+                            insertPrivateHash ptx
+                            let ptx' = ptx{otAnchorChain = AnchoredPrivate chainId}
+                            return (Just ptx', st)
+                          else do
+                            logF $ concat
+                              [ "Transaction hash "
+                              , format tHash
+                              , " is not missing,"
+                              , " but it's chain ID does not match"
+                              , " that of its chain hash entry."
+                              , " Discarding!"
+                              ]
+                            return (Nothing, st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation
