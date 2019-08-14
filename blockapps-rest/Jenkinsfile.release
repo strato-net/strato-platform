@@ -29,35 +29,40 @@ pipeline {
 
     stage('Deploy STRATO') {
       steps {
-        sh '''#!/bin/bash -le
-          set -x
-          rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started
-          cd strato-getting-started
-          ./strato --compose
-          ./strato --pull
-          OAUTH_ENABLED=true \
-            OAUTH_CLIENT_ID=localhost-80-infinite \
-            OAUTH_CLIENT_SECRET=adac9a89-ee8b-4683-b043-084ae14ef776 \
-            OAUTH_JWT_USERNAME_PROPERTY=email \
-            OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
-            PASSWORD=123 \
-            ./strato --single
-          docker ps
-          counter=0
-          # Few quick tests
-          until curl --silent --output /dev/null --fail --location http://localhost/health
-          do
-            if [[ "$counter" -gt 120 ]]; then
-              echo "STRATO took longer than 2 minutes to initialize! aborting."
-              exit 73
-            fi
-            echo "waiting for STRATO to be available through nginx"
-            counter=$((counter+1))
-            sleep 1
-          done
-          echo "STRATO is available through nginx - node is running"
-        '''
+        withCredentials([
+          usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+          usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+        ]) {
+            sh '''#!/bin/bash -le
+              set -x
+              rm -rf strato-getting-started
+              git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-getting-started
+              cd strato-getting-started
+              ./strato --compose
+              ./strato --pull
+              OAUTH_ENABLED=true \
+                OAUTH_CLIENT_ID=localhost-80-infinite \
+                OAUTH_CLIENT_SECRET=adac9a89-ee8b-4683-b043-084ae14ef776 \
+                OAUTH_JWT_USERNAME_PROPERTY=email \
+                OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
+                PASSWORD=123 \
+                ./strato --single
+              docker ps
+              counter=0
+              # Few quick tests
+              until curl --silent --output /dev/null --fail --location http://localhost/health
+              do
+                if [[ "$counter" -gt 120 ]]; then
+                  echo "STRATO took longer than 2 minutes to initialize! aborting."
+                  exit 73
+                fi
+                echo "waiting for STRATO to be available through nginx"
+                counter=$((counter+1))
+                sleep 1
+              done
+              echo "STRATO is available through nginx - node is running"
+            '''
+        }
       }
     }
 
@@ -84,7 +89,7 @@ pipeline {
               set -x
               
               rm -rf blockapps-rest
-              git clone https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/blockapps-rest
+              git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/blockapps-rest
               cd blockapps-rest
               rm -rf $(ls -A . | grep -v .git)
               
