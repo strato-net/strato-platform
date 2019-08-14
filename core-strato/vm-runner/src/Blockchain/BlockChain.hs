@@ -267,7 +267,7 @@ addBlocks unfiltered = do
         timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
         when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
           calculateAndEmitStateDiffs srLog oldHeader
-      when (not $ M.null ranPrivateTxs') $ calculateAndEmitChainDiffs ranPrivateTxs'
+      when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
       return $ concat actions
 
 setParentStateRoot :: OutputBlock -> ContextM BlockSummary
