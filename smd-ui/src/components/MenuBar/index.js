@@ -125,7 +125,7 @@ class MenuBar extends Component {
           {this.renderDeveloperButton()}
           {this.renderChainDropDown()}
           <span className="pt-navbar-divider" />
-          <small className="pt-text-muted">STRATO v{process.env.REACT_STRATO_VERSION || ' N/A'}</small>
+          <small className="pt-text-muted">STRATO {env.STRATO_VERSION}</small>
           {this.afterLoggedIn()}
         </div>
         {isModePublic() && <div><Login />

@@ -2,6 +2,10 @@ ifeq ($(BASIL_DOCKER_TAG),)
   $(error BASIL_DOCKER_TAG is not set)
 endif
 
+ifeq ($(STRATO_VERSION),)
+  $(error STRATO_VERSION is not set)
+endif
+
 all: build
 
 build:
