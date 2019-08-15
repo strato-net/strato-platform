@@ -110,7 +110,8 @@ import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.SHA (CodePtr(..), shaToHex, SHA(..))
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.SHA (shaToHex, SHA(..))
 
 
 lastWord64 :: Word256 -> Word64
@@ -740,8 +741,8 @@ instance ToSchema CodeInfo where
         & description ?~ "Code Info" )
 
 data AccountInfo = NonContract Address Integer
-                 | ContractNoStorage Address Integer Keccak256
-                 | ContractWithStorage Address Integer Keccak256 (Map Word256 Word256)
+                 | ContractNoStorage Address Integer CodePtr
+                 | ContractWithStorage Address Integer CodePtr (Map Word256 Word256)
    deriving (Show, Eq, Generic)
 
 instance ToJSON AccountInfo where
