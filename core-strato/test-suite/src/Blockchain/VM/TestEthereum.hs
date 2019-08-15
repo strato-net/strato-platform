@@ -267,7 +267,7 @@ runTest test = do
         signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
         let signedTransaction = txToOutputTx signedTransaction'
         result <-
-          runExceptT $ addTransaction True (blockBlockData block) (currentGasLimit $ env test) signedTransaction
+          runExceptT $ addTransaction Nothing True (blockBlockData block) (currentGasLimit $ env test) signedTransaction
         when flags_debugEnabled $
           liftIO . putStrLn . ("addTransaction: " ++) . show $ result
 

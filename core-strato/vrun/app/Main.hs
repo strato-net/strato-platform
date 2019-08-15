@@ -90,7 +90,7 @@ main = do
         addressStateChainId=Nothing
       }
 
-    runExceptT $ addTransaction True blockData 10000000000000000000000000000 signedTransaction
+    runExceptT $ addTransaction Nothing True blockData 10000000000000000000000000000 signedTransaction
 
   case result of
     Left e -> putStrLn $ show e

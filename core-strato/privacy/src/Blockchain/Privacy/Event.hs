@@ -10,7 +10,6 @@ module Blockchain.Privacy.Event
   , insertTransaction
   , findChainHashUses
   , lookupChainIdFromChainHash
-  , insertChainHash
   , useChainHash
   , getChainBuffer , lookupChainBuffer
   , insertChainBufferEntry

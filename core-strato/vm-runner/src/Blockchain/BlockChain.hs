@@ -133,6 +133,7 @@ instance Bagger.MonadBagger ContextM where
             Just TFBlockGasLimitExceeded{}  -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
             Just f@TFInsufficientFunds{} -> recoverable f
             Just f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
+            Just f@TFChainIdMismatch{} -> recoverable f
             Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
 
     rewardCoinbases sr us uncles ourNumber = do
@@ -208,6 +209,8 @@ instance Bagger.MonadBagger ContextM where
 
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, SHA) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
+    WrongChainId   s q OutputTx{otHash=hsh, otBaseTx=bt} ->
+        (p' s q ++ "chainId (expected: main, actual: " ++ formatChainId (txChainId bt) ++ ")", hsh)
     NonceTooLow    s q expected OutputTx{otHash=hsh, otBaseTx=bt} ->
         (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hsh)
     BalanceTooLow  s q needed actual OutputTx{otHash=hsh} ->
@@ -344,11 +347,8 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
              . filter ((/= PrivateHash) . txType)
              $ filter (f . otAnchorChain) transactions
   fmap concat . forM chains $ \(anchor, txs) -> do
-    let (goodTxs, badTxs) = partition (isAnchoredCorrectly anchor) txs
-        chainId = fromAnchorChain anchor
-    unless (null badTxs) $
-      $logErrorS "addBlockTransactions" . T.pack $ "There are incorrectly-anchored transactions in this block! " ++ show badTxs
-    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ formatChainId chainId ++ " with good txs: " ++ show goodTxs
+    let chainId = fromAnchorChain anchor
+    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ formatChainId chainId ++ " with txs: " ++ show txs
     withBlockchain (blockHeaderHash bd) chainId $ do
       when flags_debug $ do
         sr <- Mod.get (Proxy @MP.StateRoot)
@@ -356,7 +356,7 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
       $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ formatChainId chainId
       let canUseCache = chainId == Nothing
       -- TODO: Run the checks Bagger does reject invalid transactions for private chains
-      (actions, asm) <- addTransactions canUseCache bd (blockDataGasLimit $ obBlockData b) goodTxs
+      (actions, asm) <- addTransactions chainId canUseCache bd (blockDataGasLimit $ obBlockData b) txs
       when (not flags_sqlDiff) $ timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $ do
         lift $ updateSQLBalanceAndNonce $ [((theAddress, chainId), (addressStateBalance asMod, addressStateNonce asMod))
                                         | (theAddress, ASModification asMod) <- M.toList asm]
@@ -368,8 +368,14 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "New chain state root: " ++ format sr'
       return actions
 
-addTransactions :: Bool -> BlockData -> Integer -> [OutputTx] -> ContextM ([Action], M.Map Address AddressStateModification)
-addTransactions canCache blockData blockGas0 txs = timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
+addTransactions :: Maybe Word256
+                -> Bool
+                -> BlockData
+                -> Integer
+                -> [OutputTx]
+                -> ContextM ([Action], M.Map Address AddressStateModification)
+addTransactions chainId canCache blockData blockGas0 txs =
+ timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
   mtrrs <- if canCache
             then Bagger.getCachedRunResults blockData
             else return Nothing
@@ -394,7 +400,7 @@ addTransactions canCache blockData blockGas0 txs = timeit ("addTransactions, " +
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
-      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction False blockData blockGas t
+      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
       afterMap <- getAddressStateTxDBMap
 
       printTransactionMessage t result deltaT (txChainId bt)
@@ -421,7 +427,7 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     flushMemAddressStateTxToBlockDB
     flushMemStorageTxDBToBlockDB
     beforeMap <- getAddressStateTxDBMap
-    (!time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
+    (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
     printTransactionMessage tx result time' (txChainId bt)
@@ -436,8 +442,13 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
 
-addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> ExceptT TransactionFailureCause ContextM ExecResults
-addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
+addTransaction :: Maybe Word256
+               -> Bool
+               -> BlockData
+               -> Integer
+               -> OutputTx
+               -> ExceptT TransactionFailureCause ContextM ExecResults
+addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
 
     nonceValid <- lift $ isNonceValid t
 
@@ -456,6 +467,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         realIG = fromIntegral intrinsicGas'
         maxGas = fromIntegral (maxBound :: Int)
+    when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
     when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
     when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
     when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
