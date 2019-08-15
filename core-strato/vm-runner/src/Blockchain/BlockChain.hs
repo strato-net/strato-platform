@@ -338,14 +338,17 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 addBlockTransactions :: Bool -> OutputBlock -> ContextM [Action]
 addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
+  $logDebugS "addBlockTransactions" . T.pack $ "AnchorChains: " ++ show (map (otAnchorChain &&& txType) transactions)
   let f = if runPublicTxs then isAnchored else isAnchoredPrivate
-      chains = partitionWith otAnchorChain $ filter (f . otAnchorChain) transactions
+      chains = partitionWith otAnchorChain
+             . filter ((/= PrivateHash) . txType)
+             $ filter (f . otAnchorChain) transactions
   fmap concat . forM chains $ \(anchor, txs) -> do
     let (goodTxs, badTxs) = partition (isAnchoredCorrectly anchor) txs
         chainId = fromAnchorChain anchor
     unless (null badTxs) $
       $logErrorS "addBlockTransactions" . T.pack $ "There are incorrectly-anchored transactions in this block! " ++ show badTxs
-    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ formatChainId chainId ++ " with " ++ show goodTxs
+    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ formatChainId chainId ++ " with good txs: " ++ show goodTxs
     withBlockchain (blockHeaderHash bd) chainId $ do
       when flags_debug $ do
         sr <- Mod.get (Proxy @MP.StateRoot)

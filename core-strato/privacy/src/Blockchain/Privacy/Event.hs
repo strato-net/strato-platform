@@ -86,7 +86,16 @@ insertPrivateHash bInfo tx = case txChainId tx of
       didInsert <- insertChainHash bInfo cHash chainId
       if didInsert
         then return $ Just cHash
-        else return Nothing
+        else do
+          $logErrorS "insertPrivateHash" . T.pack $ concat
+            [ "insertChainHash failed for BlockInfo "
+            , format bInfo
+            , ", chain hash "
+            , format cHash
+            , ", chain ID "
+            , formatChainId $ Just chainId
+            ]
+          return Nothing
     mapM_ (insertChainBufferEntry chainId) cHashes'
     findChainHashUses chainId cHashes'
 
@@ -277,12 +286,10 @@ hydratePrivateHashes chainF b = do
                             blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                         return (Nothing, (tHash:dts, S.insert chainId cs))
                       Just ptx -> do
+                        logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
                         if Just chainId == txChainId ptx
                           then do
-                            logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
                             insertPrivateHash bInfo ptx
-                            let ptx' = ptx{otAnchorChain = AnchoredPrivate chainId}
-                            return (Just ptx', st)
                           else do
                             logF $ concat
                               [ "Transaction hash "
@@ -290,14 +297,18 @@ hydratePrivateHashes chainF b = do
                               , " is not missing,"
                               , " but it's chain ID does not match"
                               , " that of its chain hash entry."
-                              , " Discarding!"
+                              , " Not inserting chain hashes,"
+                              , " but still sending transaction to the VM,"
+                              , " where it will fail."
                               ]
-                            return (Nothing, st)
+                        let ptx' = ptx{otAnchorChain = AnchoredPrivate chainId}
+                        return (Just ptx', st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation
-  let txs'' = filter (\otx -> not (discluded (fromJust $ txChainId otx)
-                     || S.member (fromJust $ txChainId otx) newDiscludes)
+  let anchorToChain = fromJust . fromAnchorChain . otAnchorChain
+      txs'' = filter (\otx -> not (discluded $ anchorToChain otx)
+                     || S.member (anchorToChain otx) newDiscludes
                      ) $ catMaybes txs'
 
   unless (null depTXs) $ do
@@ -311,7 +322,7 @@ hydratePrivateHashes chainF b = do
     mapM_ requestTransaction depTXs
   if null txs''
     then return Nothing
-    else return . Just $ buildBlock' (blockHeader b) txs'' (blockUncleHeaders b)
+    else return . Just $ b{obReceiptTransactions = txs''}
 
 insertNewChainInfo :: ( MonadLogger m
                       , MonadMonitor m
