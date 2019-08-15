@@ -13,7 +13,7 @@ module Blockchain.Event (
   checkPeerIsMember' -- For testing
   ) where
 
-import           Control.Arrow                         ((&&&))
+import           Control.Arrow                         ((&&&), first)
 import           Control.Monad
 import           Control.Monad.Change.Modify           hiding (get, put)
 import           Control.Monad.IO.Class
@@ -46,6 +46,7 @@ import           Blockchain.Data.Control               (P2PCNC(..))
 import           Blockchain.Data.Enode
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
+import           Blockchain.Data.TransactionDef        (formatChainId)
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.EventModel
@@ -318,7 +319,7 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (GetTransactions trHashes) -> do
       stampActionTimestamp
       $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: "
-        ++ (intercalate "\n" (show <$> trHashes))
+        ++ (intercalate "\n" (format <$> trHashes))
       ptrs <- fmap catMaybes . lift . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions trHashes
       mems <- lift . RBDB.withRedisBlockDB $ mapM (RBDB.getChainMembers . fromJust . txChainId) ptrs
       let trMems = zip ptrs mems
@@ -348,21 +349,21 @@ handleEvents peer = awaitForever $ \case
 
           if not match
             then $logInfoS "handleEvents/OETx" $ T.pack $
-                    printf "peer %s is not authorized for chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (show cId)
+                    printf "peer %s is not authorized for chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId cId)
             else do
-              $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ show cId
+              $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId cId
               $logDebugS "handleEvents/OETx" . T.pack $ "the transaction was: " ++ format tx
               yieldR $ Transactions [otBaseTx tx]
       OEGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
         when (shouldSend peer og) $ do
-          $logInfoS "handleEvents/OEGenesis" . T.pack $ "received new chain: " ++ show cId ++ " with " ++ show uci
+          $logInfoS "handleEvents/OEGenesis" . T.pack $ "received new chain: " ++ formatChainId (Just cId) ++ " with " ++ show uci
           if checkPeerIsMember peer $ members uci
             then do
-              $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (show cId)
+              $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (formatChainId $ Just cId)
               yieldR $ ChainDetails [(cId, cInfo)]
             else do
               $logInfoS "handleEvents/OEGenesis" $ T.pack $
-                printf "peer %s is not authorized for received chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (show cId)
+                printf "peer %s is not authorized for received chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId $ Just cId)
               $logDebugLS "handleEvents/OEGenesis/members" $ members uci
       OEGetChain chainIds -> yieldR $ GetChainDetails chainIds
       OEGetTx shas -> yieldR $ GetTransactions shas
@@ -436,7 +437,7 @@ handleGetChainDetails peer cids' = do
             [] -> RBDB.withRedisBlockDB $ RBDB.getIPChains (peerIPAddress peer)
             xs -> return $ S.fromList xs
   stampActionTimestamp
-  $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ show <$> cids)
+  $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ formatChainId . Just <$> cids)
   mems <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainMembers cids
   let pairs = zip cids mems
       filteredPairs = map fst $ filter ((checkPeerIsMember peer) . snd) pairs
@@ -447,7 +448,7 @@ handleGetChainDetails peer cids' = do
     yieldR $ ChainDetails finalPairs
     stampActionTimestamp
     $logInfoS "handleGetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
-      (intercalate "\n" $ show <$> finalPairs)
+      (intercalate "\n" $ (show . first (formatChainId . Just)) <$> finalPairs)
 
 numFromRedis :: Maybe RedisBestBlock -> Integer
 numFromRedis = \case

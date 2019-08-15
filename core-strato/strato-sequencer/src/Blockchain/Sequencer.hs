@@ -48,7 +48,6 @@ import           Blockchain.Sequencer.Metrics
 import           Blockchain.Sequencer.Monad
 
 import qualified Blockchain.Data.BlockDB                   as BDB
-import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified Blockchain.Data.RLP                       as RL
@@ -447,18 +446,18 @@ prettyBlock SequencedBlock{sbOrigin=o,sbBlockData=bd,sbReceiptTransactions=txs} 
 
 prettyTx :: IngestTx -> String
 prettyTx IngestTx{itOrigin=o, itTransaction=t} = prefix t ++ " via " ++ shortOrigin o
-      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format $ txHash t) ++ "]"
+            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format $ txHash t) ++ "]"
+            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format $ txHash t) ++ "]"
 
             shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
             shortOrigin x                    = format x
 
 prettyOTx :: OutputTx -> String
 prettyOTx OutputTx{otOrigin=o, otBaseTx=t} = prefix t ++ " via " ++ shortOrigin o
-      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format $ txHash t) ++ "]"
+            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format $ txHash t) ++ "]"
+            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format $ txHash t) ++ "]"
 
             shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
             shortOrigin x                    = format x
