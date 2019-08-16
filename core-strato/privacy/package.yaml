@@ -9,6 +9,7 @@ dependencies:
   - blockapps-util
   - containers
   - data-default
+  - ethereum-rlp
   - format
   - lens
   - monad-alter

@@ -60,7 +60,8 @@ import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import qualified Blockchain.Strato.Model.Action as BS
-import Blockchain.Strato.Model.SHA (codePtrToSHA, hash)
+import Blockchain.Strato.Model.CodePtr (codePtrToSHA)
+import Blockchain.Strato.Model.SHA (hash)
 
 
 import Slipstream.Data.Action

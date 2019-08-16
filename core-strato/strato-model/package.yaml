@@ -30,6 +30,7 @@ dependencies:
   - memory
   - nibblestring
   - path-pieces
+  - persistent-template
   - primitive
   - swagger2
   - text

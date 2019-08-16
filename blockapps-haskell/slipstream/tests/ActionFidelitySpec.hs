@@ -14,6 +14,7 @@ import Test.Hspec
 
 import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.SHA
 import Blockchain.SolidVM.Model
 import qualified Slipstream.Data.Action as SS

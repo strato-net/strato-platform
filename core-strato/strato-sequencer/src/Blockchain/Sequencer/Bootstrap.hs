@@ -41,11 +41,12 @@ bootstrapSequencer Block{blockBlockData = bd,
                }
   hash       = blockHeaderHash bd
   difficulty = blockDataDifficulty bd
-  kludge t   = fromMaybe fallback (wrapIngestBlockTransaction hash t)
+  kludge t   = fromMaybe fallback (wrapIngestBlockTransactionUnanchored hash t)
     where fallback = OutputTx { otOrigin = TO.BlockHash hash
                    , otSigner = Address 0
                    , otBaseTx = t
                    , otHash   = TX.transactionHash t
+                   , otAnchorChain = Public
                    }
   initLevelDB :: CablePackage -> IO ()
   initLevelDB pkg = do

@@ -22,6 +22,7 @@ import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.ExtWord
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Util
 import qualified Text.Colors                      as CL
 import           Text.Format
@@ -79,9 +80,3 @@ instance RLPSerializable AddressState where
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
 
-instance RLPSerializable CodePtr where
-  rlpEncode (EVMCode codeHash) = rlpEncode codeHash
-  rlpEncode (SolidVMCode n ch) = RLPArray [RLPString "SolidVM", rlpEncode n, rlpEncode ch]
-
-  rlpDecode (RLPArray [RLPString "SolidVM", n, ch]) = SolidVMCode (rlpDecode n) (rlpDecode ch)
-  rlpDecode ch = EVMCode $ rlpDecode ch

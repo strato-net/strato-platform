@@ -30,6 +30,7 @@ import Data.Text.Encoding
 import GHC.Generics
 
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.SHA hiding (hash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Data.GenesisInfo
@@ -165,7 +166,7 @@ insertContracts slotss name src code start gi =
       codeHash = if extra /= "" && extra /= "\n"
                    then error ("bytecode not encoded in base16:" ++ show code)
                    else superProprietaryStratoSHAHash decoded
-      mkContract (addr, slots) = ContractWithStorage addr 0 codeHash slots
+      mkContract (addr, slots) = ContractWithStorage addr 0 (EVMCode codeHash) slots
       addrs = map (start+) [0..]
       addrsAndSlots = zip addrs slotss
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,

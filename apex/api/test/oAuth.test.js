@@ -84,10 +84,7 @@ describe('OAuth tests', function () {
   it('creates new user', async function () {
     const username = util.uid(userData.userName); //fixme - small chance of collision if not run w/ fresh system, should clear db in before block
 
-    const user = await co.wrap(oAuth.createKey)({
-      'X-USER-UNIQUE-NAME': username,
-      'X-USER-ID': userData.hash
-    })
+    const user = await co.wrap(oAuth.createKey)(username);
 
     assert.equal(user.status,RestStatus.OK,'user created')
   });
@@ -96,20 +93,14 @@ describe('OAuth tests', function () {
   it('finds existing user', async function () {
     const username = util.uid(userData.userName); //fixme - small chance of collision if not run w/ fresh system, should clear db in before block
 
-    const result = await co.wrap(oAuth.createKey)({
-      'X-USER-UNIQUE-NAME': username,
-      'X-USER-ID': userData.hash
-    })
+    const result = await co.wrap(oAuth.createKey)(username);
 
     if(result.status == RestStatus.OK){ //user created, faucet em
       userAccountAddress = result.user.address;
       await waitFaucet(userAccountAddress);
     }
 
-    const user = await co.wrap(oAuth.getKey)({
-      'X-USER-UNIQUE-NAME': username,
-      'X-USER-ID': userData.hash
-    })
+    const user = await co.wrap(oAuth.getKey)(username)
 
     assert.equal(user.status,RestStatus.OK,'user found')
   });

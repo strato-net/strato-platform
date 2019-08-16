@@ -5,9 +5,11 @@
 module Blockchain.Privacy.Monad where
 
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.RLP
 import           Blockchain.ExtWord            (Word256)
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Util
 import           Control.Lens
 import           Data.Aeson
@@ -49,40 +51,6 @@ instance Format a => Format (CircularBuffer a) where
     , tab $ "Queue:    " ++ format (toList _queue)
     ]
 
-data ChainHashEntry = ChainHashEntry
-  { _used         :: Bool
-  , _onChainId    :: Maybe Word256
-  , _inBlocks     :: Q.Seq SHA
-  } deriving (Show, Generic, Binary)
-makeLenses ''ChainHashEntry
-
-instance ToJSON ChainHashEntry where
-instance FromJSON ChainHashEntry where
-
-blankChainHashEntry :: ChainHashEntry
-blankChainHashEntry = ChainHashEntry False Nothing Q.empty
-
-instance Default ChainHashEntry where
-  def = blankChainHashEntry
-
-instance Format ChainHashEntry where
-  format ChainHashEntry{..} = unlines
-    [ "ChainHashEntry"
-    , "--------------"
-    , tab $ "Used:      " ++ show _used
-    , tab $ "On chain:  " ++ format (SHA <$> _onChainId)
-    , tab $ "In blocks: " ++ format (toList _inBlocks)
-    ]
-
-chainHashEntryUsed :: ChainHashEntry
-chainHashEntryUsed = ChainHashEntry True Nothing Q.empty
-
-chainHashEntryWithChainId :: Word256 -> ChainHashEntry
-chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) Q.empty
-
-chainHashEntryInBlock :: SHA -> ChainHashEntry
-chainHashEntryInBlock bHash = ChainHashEntry True Nothing (Q.singleton bHash)
-
 data BlockInfo = BlockInfo
   { _bhash     :: SHA
   , _bordering :: Integer
@@ -102,6 +70,40 @@ instance Format BlockInfo where
 
 instance Ord BlockInfo where
   compare = compare `on` _bordering
+
+data ChainHashEntry = ChainHashEntry
+  { _used         :: Bool
+  , _onChainId    :: Maybe Word256
+  , _inBlocks     :: Set BlockInfo
+  } deriving (Show, Generic, Binary)
+makeLenses ''ChainHashEntry
+
+instance ToJSON ChainHashEntry where
+instance FromJSON ChainHashEntry where
+
+blankChainHashEntry :: ChainHashEntry
+blankChainHashEntry = ChainHashEntry False Nothing S.empty
+
+instance Default ChainHashEntry where
+  def = blankChainHashEntry
+
+instance Format ChainHashEntry where
+  format ChainHashEntry{..} = unlines
+    [ "ChainHashEntry"
+    , "--------------"
+    , tab $ "Used:      " ++ show _used
+    , tab $ "On chain:  " ++ format (SHA <$> _onChainId)
+    , tab $ "In blocks: " ++ format (toList _inBlocks)
+    ]
+
+chainHashEntryUsed :: ChainHashEntry
+chainHashEntryUsed = ChainHashEntry True Nothing S.empty
+
+chainHashEntryWithChainId :: Word256 -> ChainHashEntry
+chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) S.empty
+
+chainHashEntryInBlock :: BlockInfo -> ChainHashEntry
+chainHashEntryInBlock bInfo = ChainHashEntry True Nothing (S.singleton bInfo)
 
 data ChainIdEntry = ChainIdEntry
   { _chainIdInfo :: ChainInfo
@@ -127,8 +129,20 @@ instance Format ChainIdEntry where
     ]
 
 class HasPrivateHashDB m where
-  getChainId               :: ChainInfo -> m SHA
-  generateInitialChainHash :: ChainInfo -> m SHA
-  generateChainHashes      :: OutputTx -> m [SHA]
   requestChain             :: Word256 -> m ()
   requestTransaction       :: SHA -> m ()
+
+getChainId :: ChainInfo -> SHA
+getChainId = hash . rlpSerialize . rlpEncode
+
+generateInitialChainHash :: ChainInfo -> SHA
+generateInitialChainHash = hash . rlpSerialize . rlpEncode
+
+-- Point-free with permutations is less readable, but more fun
+generateChainHashes :: OutputTx -> [SHA]
+generateChainHashes tx =
+  let r = txSigR tx
+      s = txSigS tx
+      rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
+      sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
+   in [rs,sr]

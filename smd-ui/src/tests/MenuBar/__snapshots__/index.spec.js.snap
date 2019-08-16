@@ -81,10 +81,8 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
     </span>
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
-      SMD v
-       - 
-      Enterprise
-       
+      STRATO 
+      N/A
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
@@ -160,10 +158,8 @@ exports[`MenuBar: index renders enterprise mode component without values 1`] = `
     </span>
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
-      SMD v
-       - 
-      Enterprise
-       
+      STRATO 
+      N/A
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />
@@ -254,10 +250,8 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
     </span>
     <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
-      SMD v
-       - 
-      Public
-       
+      STRATO 
+      N/A
     </small>
     <div>
       <span className=\\"pt-navbar-divider\\" />

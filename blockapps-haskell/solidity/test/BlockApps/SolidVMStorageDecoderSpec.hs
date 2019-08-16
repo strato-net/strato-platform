@@ -273,44 +273,48 @@ spec = do
 
     it "can decode everything (with empty cache)" $ do
       let input = toInputMap
-                [ (singleton "addr", BAddress 0xdeadbeef)
+                [ -- We are currently filtering out arrays, maps from decodeCacheValues, since cirrus
+                  -- should not handle these types...  the tests for arrays and maps also need to
+                  -- be filtered out
+                  (singleton "addr", BAddress 0xdeadbeef)
                 , (singleton "boolean", BBool True)
                 , (singleton "contract", BContract "X" 0x999)
                 , (singleton "number", BInteger 77714314)
                 , (singleton "str", BString "Hello, World!")
                 , (singleton "enum_val", BEnumVal "E" "C" 22)
-                , (fromList [Field "array_of_nums", ArrayIndex 1], BInteger 20)
-                , (fromList [Field "array_of_nums", ArrayIndex 2], BInteger 40)
-                , (fromList [Field "array_of_nums", ArrayIndex 3], BInteger 77)
-                , (fromList [Field "array_of_nums", Field "length"], BInteger 4)
-                , (fromList [Field "strukt", Field "first_field"], BInteger 887)
-                , (fromList [Field "strukt", Field "second_field"], BString "CLOROX DISINFECTING WIPES")
-                , (fromList [Field "set"], BMappingSentinel)
-                , (fromList [Field "set", MapIndex (INum 22)], BBool True)
-                , (fromList [Field "set", MapIndex (INum 23)], BBool True)
-                , (fromList [Field "set", MapIndex (INum 46)], BBool True)
+--                , (fromList [Field "array_of_nums", ArrayIndex 1], BInteger 20)
+--                , (fromList [Field "array_of_nums", ArrayIndex 2], BInteger 40)
+--                , (fromList [Field "array_of_nums", ArrayIndex 3], BInteger 77)
+--                , (fromList [Field "array_of_nums", Field "length"], BInteger 4)
+--                , (fromList [Field "strukt", Field "first_field"], BInteger 887)
+--                , (fromList [Field "strukt", Field "second_field"], BString "CLOROX DISINFECTING WIPES")
+--                , (fromList [Field "set"], BMappingSentinel)
+--                , (fromList [Field "set", MapIndex (INum 22)], BBool True)
+--                , (fromList [Field "set", MapIndex (INum 23)], BBool True)
+--                , (fromList [Field "set", MapIndex (INum 46)], BBool True)
                 ]
           got = decodeCacheValues input []
       sort got `shouldBe` sort
-          [ ("addr", address 0xdeadbeef)
-          , ("array_of_nums", ValueArrayDynamic . I.fromList $
-               zip [1..] [ int 20, int 40, int 77, ValueArraySentinel 4])
+          [
+            ("addr", address 0xdeadbeef)
+--          , ("array_of_nums", ValueArrayDynamic . I.fromList $
+--               zip [1..] [ int 20, int 40, int 77, ValueArraySentinel 4])
           , ("boolean", bool True)
           , ("contract", ValueContract 0x999)
           , ("enum_val", ValueEnum "E" "C" 22)
           , ("number", int 77714314)
-          , ("strukt", ValueStruct $ M.fromList
-              [ ("first_field", int 887)
-              , ("second_field", SimpleValue $ ValueBytes Nothing "CLOROX DISINFECTING WIPES")
-              ])
-          , ("set", ValueMapping $ M.fromList
-              [ (ValueInt True Nothing 22, bool True)
-              , (ValueInt True Nothing 23, bool True)
-              , (ValueInt True Nothing 46, bool True)
-              ])
+--          , ("strukt", ValueStruct $ M.fromList
+--              [ ("first_field", int 887)
+--              , ("second_field", SimpleValue $ ValueBytes Nothing "CLOROX DISINFECTING WIPES")
+--              ])
+--          , ("set", ValueMapping $ M.fromList
+--              [ (ValueInt True Nothing 22, bool True)
+--              , (ValueInt True Nothing 23, bool True)
+--              , (ValueInt True Nothing 46, bool True)
+--              ])
           , ("str", SimpleValue $ ValueBytes Nothing "Hello, World!")
           ]
-
+{-
     it "can deal with array lengths (with empty cache)" $ do
       let Success input' = rawInput
           input = M.fromList $ map (\Storage{storageKV=SolidVMEntry (HexStorage k) (HexStorage v)} -> (k, v)) input'
@@ -331,7 +335,7 @@ spec = do
               , bytes "5553443200000000000000000000000000000000000000000000000000000000"
               , bytes "4f4c440000000000000000000000000000000000000000000000000000000000"
               , ValueArraySentinel 14])]
-
+-}
     describe "Simple field updates" $ do
       it "can update ints" $ do
         let input = toInputMap [(singleton "number", BInteger 100)]

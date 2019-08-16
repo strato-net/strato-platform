@@ -26,6 +26,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON()
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.TypeLits
 import           Blockchain.Util
 
@@ -91,8 +92,8 @@ instance RLPSerializable CodeInfo where
   rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject")
 
 data AccountInfo = NonContract Address Integer
-                 | ContractNoStorage Address Integer SHA
-                 | ContractWithStorage Address Integer SHA [(Word256, Word256)]
+                 | ContractNoStorage Address Integer CodePtr
+                 | ContractWithStorage Address Integer CodePtr [(Word256, Word256)]
    deriving (Show, Eq, Read, GHCG.Generic, Data)
 
 instance Format AccountInfo where
