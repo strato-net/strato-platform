@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeApplications  #-}
 module Blockchain.Sequencer where
 
 import           ClassyPrelude                             (atomically)
@@ -47,7 +48,6 @@ import           Blockchain.Sequencer.Metrics
 import           Blockchain.Sequencer.Monad
 
 import qualified Blockchain.Data.BlockDB                   as BDB
-import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified Blockchain.Data.RLP                       as RL
@@ -189,9 +189,10 @@ blockstanbulSend' msg = do
   rch <- asks blockstanbulVoteResps
   atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
-  let getSequencedBlock = ingestBlockToSequencedBlock . blockToIngestBlock TO.Blockstanbul
+  let getSequencedBlock = ingestBlockToSequencedBlock lookupChainIdFromChainHash
+                        . blockToIngestBlock TO.Blockstanbul
       rewriteBlock b = do
-        let msb = getSequencedBlock b
+        msb <- getSequencedBlock b
         for msb $ \sb -> do
           return . OEBlock $ sequencedBlockToOutputBlock sb 1
       creates = [OECreateBlockCommand | MakeBlockCommand <- resp]
@@ -218,7 +219,8 @@ blockstanbulSend' msg = do
 
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
-  for_ (wrapTransaction t) $ \otx -> do
+  motx <- wrapTransaction lookupChainIdFromChainHash t
+  for_ motx $ \otx -> do
     let witnessHash = witnessableHash otx
     witnessed <- wasTransactionHashWitnessed witnessHash
     unless witnessed $ do
@@ -237,7 +239,7 @@ transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- forM pairs $ \(ts,itx) ->
-    case wrapTransaction itx of
+    wrapTransaction lookupChainIdFromChainHash itx >>= \case
       Nothing -> return Nothing
       Just otx -> do
         let witnessHash = witnessableHash otx
@@ -275,39 +277,41 @@ transformFullTransactions pairs = do
               , ". Inserting the chain Id into the GetChains list"
               ]
             insertGetChainsDB chainId
-          Just _ -> do
+          Just cInfo -> do
             forM_ ptxs $ \(ts, ptx) -> do
               logF . concat $
                 [ "We know the details for chain "
                 , format (SHA chainId)
-                , ". Inserting "
-                , prettyOTx ptx
-                , "into PrivateHashDB"
+                , ". Sending to P2P."
                 ]
-              let tHash = txHash ptx
               markForP2P $ pairToOETx (ts, ptx)
               --liftIO $ withLabel txMetrics "private_hash" incCounter
-              insertPrivateHash ptx
-              when (otOrigin ptx == TO.API) $ getNewChainHash chainId >>= \case
-                Nothing -> error $ concat
-                  [ "transformFullTransactions: "
-                  , "Could not acquire new chain hash for chain ID "
-                  , format (SHA chainId)
-                  , ". This should never happen, "
-                  , " so something is seriously wrong."
+              when (otOrigin ptx == TO.API) $ do
+                cHash <- getNewChainHash chainId >>= \case
+                  Nothing -> do
+                    let iHash = generateInitialChainHash cInfo
+                    logF . concat $
+                      [ "transformFullTransactions: "
+                      , "Encountered empty chain hash buffer for chain ID "
+                      , "Could not acquire new chain hash for chain ID "
+                      , TD.formatChainId $ Just chainId
+                      , ". Using initial chain hash instead: "
+                      , format iHash
+                      ]
+                    return iHash
+                  Just ch -> return ch
+                let tHash = txHash ptx
+                    SHA th' = txHash ptx
+                    SHA ch' = cHash
+                    phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
+                logF . concat $
+                  [ "Created chain hash "
+                  , format cHash
+                  , " for transaction "
+                  , format tHash
                   ]
-                Just cHash -> do
-                  logF . concat $
-                    [ "Created chain hash "
-                    , format cHash
-                    , " for transaction "
-                    , format tHash
-                    ]
-                  let SHA th' = tHash
-                      SHA ch' = cHash
-                      phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
-                  markForVM $ pairToOETx (ts, phtx)
-                  markForP2P $ pairToOETx (ts, phtx)
+                markForVM $ pairToOETx (ts, phtx)
+                markForP2P $ pairToOETx (ts, phtx)
             mapM_ (markForVM . OEBlock) =<< runBlocks chainId
 
 transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
@@ -376,15 +380,13 @@ hydrateAndEmit chainId = awaitForever $ \case
   oe -> yield oe
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
-transformBlocks = mapM_ $ \ib -> do
-  let mSb = ingestBlockToSequencedBlock ib
-  case mSb of
-    Nothing -> do
-      $logWarnS "transformEvents/emitBlocks" . T.pack
-        $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
-      P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
-    Just sb -> do
-      runBlockWithConsensus sb
+transformBlocks = mapM_ $ \ib -> ingestBlockToSequencedBlock lookupChainIdFromChainHash ib >>= \case
+  Nothing -> do
+    $logWarnS "transformEvents/emitBlocks" . T.pack
+      $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
+    P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
+  Just sb -> do
+    runBlockWithConsensus sb
 
 transformGenesis :: [IngestGenesis] -> SequencerM ()
 transformGenesis chains = forM_ chains $ \ig -> do
@@ -444,18 +446,18 @@ prettyBlock SequencedBlock{sbOrigin=o,sbBlockData=bd,sbReceiptTransactions=txs} 
 
 prettyTx :: IngestTx -> String
 prettyTx IngestTx{itOrigin=o, itTransaction=t} = prefix t ++ " via " ++ shortOrigin o
-      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format $ txHash t) ++ "]"
+            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format $ txHash t) ++ "]"
+            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format $ txHash t) ++ "]"
 
             shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
             shortOrigin x                    = format x
 
 prettyOTx :: OutputTx -> String
 prettyOTx OutputTx{otOrigin=o, otBaseTx=t} = prefix t ++ " via " ++ shortOrigin o
-      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
-            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+      where prefix TD.MessageTX{}          = "MessageTx [" ++ (format $ txHash t) ++ "]"
+            prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format $ txHash t) ++ "]"
+            prefix TD.PrivateHashTX{}    = "PrivateHashTx[" ++ (format $ txHash t) ++ "]"
 
             shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
             shortOrigin x                    = format x

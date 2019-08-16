@@ -9,11 +9,9 @@ module Blockchain.Privacy.Event
   ( lookupSeenChain
   , insertTransaction
   , findChainHashUses
-  , insertPrivateHash
-  , insertChainHash
+  , lookupChainIdFromChainHash
   , useChainHash
-  , getChainBuffer
-  , lookupChainBuffer
+  , getChainBuffer , lookupChainBuffer
   , insertChainBufferEntry
   , getNewChainHash
   , checkIfIsMissingTX
@@ -26,6 +24,7 @@ module Blockchain.Privacy.Event
   ) where
 
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.TransactionDef (formatChainId)
 import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Privacy.Monad
@@ -37,7 +36,6 @@ import           Control.Arrow                 ((&&&))
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Change.Alter
-import           Data.Foldable                 (for_, toList)
 import           Data.Maybe
 import qualified Data.Set                      as S
 import qualified Data.Sequence                 as Q
@@ -64,40 +62,56 @@ findChainHashUses :: ( (SHA `Alters` OutputBlock) m
                      )
                   => Word256 -> [SHA] -> m ()
 findChainHashUses chainId cHashes = do
-  blocks <- toList
-          . S.fromList
-          . concat
-          . map (toList . maybe Q.empty _inBlocks)
+  infos <- S.unions
+          . map (maybe S.empty _inBlocks)
         <$> mapM (lookup (Proxy @ChainHashEntry)) cHashes
-  bOrders <- map (fmap blockOrdering) <$> mapM (lookup (Proxy @OutputBlock)) blocks
-  let infos = S.fromList . catMaybes $ zipWith (fmap . BlockInfo) blocks bOrders
   adjustStatefully_ (Proxy @ChainIdEntry) chainId $ blocksToRun %= S.union infos
 
 insertPrivateHash :: ( MonadLogger m
                      , MonadMonitor m
-                     , HasPrivateHashDB m
                      , (SHA `Alters` OutputBlock) m
                      , (SHA `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
                      )
-                  => OutputTx -> m ()
-insertPrivateHash tx = case txChainId tx of
+                  => BlockInfo -> OutputTx -> m ()
+insertPrivateHash bInfo tx = case txChainId tx of
   Nothing -> do
     logFF "insertPrivateHash" $ "Trying to insert the public transaction " ++ show (txHash tx)
     return ()
   Just chainId -> do
     withLabel txMetrics "private_hash" incCounter
-    cHashes <- generateChainHashes tx
-    mapM_ (flip insertChainHash chainId) cHashes
-    mapM_ (insertChainBufferEntry chainId) cHashes
-    findChainHashUses chainId cHashes
+    let cHashes = generateChainHashes tx
+    cHashes' <- fmap catMaybes . forM cHashes $ \cHash -> do
+      didInsert <- insertChainHash bInfo cHash chainId
+      if didInsert
+        then return $ Just cHash
+        else do
+          $logErrorS "insertPrivateHash" . T.pack $ concat
+            [ "insertChainHash failed for BlockInfo "
+            , format bInfo
+            , ", chain hash "
+            , format cHash
+            , ", chain ID "
+            , formatChainId $ Just chainId
+            ]
+          return Nothing
+    mapM_ (insertChainBufferEntry chainId) cHashes'
+    findChainHashUses chainId cHashes'
 
-insertChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> Word256 -> m ()
-insertChainHash cHash chainId =
-  adjustWithDefaultStatefully_ Proxy cHash $ onChainId .= Just chainId
+lookupChainIdFromChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m (Maybe Word256)
+lookupChainIdFromChainHash ch = join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) ch
+
+insertChainHash :: (SHA `Alters` ChainHashEntry) m => BlockInfo -> SHA -> Word256 -> m Bool
+insertChainHash obi cHash chainId = lookup Proxy cHash >>= \case
+  Nothing -> True <$ insert Proxy cHash (chainHashEntryWithChainId chainId)
+  Just ChainHashEntry{..} -> case _onChainId of
+    Just cId -> return $ cId == chainId
+    Nothing -> case S.lookupMin _inBlocks of
+      Just bi | bi <= obi -> return False
+      _ -> True <$ adjustStatefully_ Proxy cHash (onChainId .= Just chainId)
 
 useChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m ()
-useChainHash cHash = adjustStatefully_ Proxy cHash $ used .= True
+useChainHash cHash = adjustWithDefaultStatefully_ Proxy cHash $ used .= True
 
 getChainBuffer :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m (CircularBuffer SHA)
 getChainBuffer chainId = maybe emptyCircularBuffer _chainHashes <$> lookup Proxy chainId
@@ -129,7 +143,7 @@ getNewChainHash chainId = do
   case Q.viewl q of
     Q.EmptyL -> do
       logFF "getNewChainHash" $ "Empty chain buffer for chainId " ++ format (SHA chainId)
-      traverse (generateInitialChainHash . _chainIdInfo) =<< lookup (Proxy @ChainIdEntry) chainId
+      fmap (generateInitialChainHash . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
     (h Q.:< q') -> do
       adjustStatefully_ (Proxy @ChainIdEntry) chainId $
         chainHashes .= CircularBuffer cap (sz - 1) q'
@@ -144,7 +158,7 @@ checkIfIsMissingTX :: ( MonadLogger m
                       )
                    => SHA -> SHA -> m ()
 checkIfIsMissingTX th ch = do
-  let logF = logFF "runPrivateHashTX"
+  let logF = logFF "checkIfIsMissingTX"
   mChainId <- join . fmap _onChainId <$> lookup Proxy ch
   case mChainId of
     Nothing -> do
@@ -155,12 +169,10 @@ checkIfIsMissingTX th ch = do
         , format (SHA chainId)
         , ". Requesting transaction from peers"
         ]
-      useChainHash ch
       requestTransaction th
 
 runPrivateHashTX :: ( MonadLogger m
                     , HasPrivateHashDB m
-                    , (SHA `Alters` OutputTx) m
                     , (SHA `Alters` ChainHashEntry) m
                     )
                  => SHA -> SHA -> m ()
@@ -172,9 +184,7 @@ runPrivateHashTX tHash cHash = do
     , " with chain hash "
     , format cHash
     ]
-  mthe <- lookup (Proxy @OutputTx) tHash
-  for_ mthe . const $
-    adjustWithDefaultStatefully_ (Proxy @ChainHashEntry) cHash $ used .= True
+  useChainHash cHash
   checkIfIsMissingTX tHash cHash
 
 runBlocks :: ( MonadLogger m
@@ -223,6 +233,8 @@ hydratePrivateHashes :: ( MonadLogger m
 hydratePrivateHashes chainF b = do
   let logF = logFF "hydratePrivateHashes"
       bHash = blockHeaderHash $ blockHeader b
+      bOrdering = blockOrdering b
+      bInfo = BlockInfo bHash bOrdering
   when (any isPrivateHashTX $ blockTransactions b) $
     insert (Proxy @OutputBlock) bHash b
   let discluded cId = maybe False (/= cId) chainF
@@ -242,7 +254,7 @@ hydratePrivateHashes chainF b = do
         let cHash = txChainHash tx
         runPrivateHashTX tHash cHash
         adjustWithDefaultStatefully_ (Proxy @ChainHashEntry) cHash $
-          inBlocks %= (Q.|> bHash)
+          inBlocks %= (S.insert $ BlockInfo bHash bOrdering)
         mChainId <- join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) cHash
         case mChainId of
           Nothing -> do
@@ -274,13 +286,28 @@ hydratePrivateHashes chainF b = do
                         return (Nothing, (tHash:dts, S.insert chainId cs))
                       Just ptx -> do
                         logF $ "Transaction hash " ++ format tHash ++ " is not missing. Hydrating!"
-                        insertPrivateHash ptx
-                        return (Just ptx, st)
+                        if Just chainId == txChainId ptx
+                          then do
+                            insertPrivateHash bInfo ptx
+                          else do
+                            logF $ concat
+                              [ "Transaction hash "
+                              , format tHash
+                              , " is not missing,"
+                              , " but it's chain ID does not match"
+                              , " that of its chain hash entry."
+                              , " Not inserting chain hashes,"
+                              , " but still sending transaction to the VM,"
+                              , " where it will fail."
+                              ]
+                        let ptx' = ptx{otAnchorChain = AnchoredPrivate chainId}
+                        return (Just ptx', st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation
-  let txs'' = filter (\otx -> not (discluded (fromJust $ txChainId otx)
-                     || S.member (fromJust $ txChainId otx) newDiscludes)
+  let anchorToChain = fromJust . fromAnchorChain . otAnchorChain
+      txs'' = filter (\otx -> not (discluded $ anchorToChain otx)
+                     || S.member (anchorToChain otx) newDiscludes
                      ) $ catMaybes txs'
 
   unless (null depTXs) $ do
@@ -294,7 +321,7 @@ hydratePrivateHashes chainF b = do
     mapM_ requestTransaction depTXs
   if null txs''
     then return Nothing
-    else return . Just $ buildBlock' (blockHeader b) txs'' (blockUncleHeaders b)
+    else return . Just $ b{obReceiptTransactions = txs''}
 
 insertNewChainInfo :: ( MonadLogger m
                       , MonadMonitor m
@@ -308,13 +335,26 @@ insertNewChainInfo :: ( MonadLogger m
                    -> ChainInfo
                    -> m [OutputBlock]
 insertNewChainInfo chainId cInfo = do
-  cHash <- generateInitialChainHash cInfo
+  let cHash = generateInitialChainHash cInfo
   repsert_ Proxy chainId $ return . maybe (chainIdEntry cInfo) (chainIdInfo .~ cInfo)
   withLabel chainMetrics "seen_chains" incCounter
-  insertChainHash cHash chainId
-  insertChainBufferEntry chainId cHash
-  findChainHashUses chainId [cHash]
-  runBlocks chainId
+  let bHash = creationBlock $ chainInfo cInfo
+  bInfo <- BlockInfo bHash . maybe 0 blockOrdering <$> lookup (Proxy @OutputBlock) bHash
+  insertChainHash bInfo cHash chainId >>= \case
+    False -> do
+      $logErrorS "insertNewChainInfo" . T.pack $ concat
+        [ "Initial chain hash of chain ID "
+        , formatChainId $ Just chainId
+        , " found before chain's creation block "
+        , format bInfo
+        , ". This is most likely a bug in the STRATO platform."
+        , " Please file this as an issue at https://github.com/blockapps/strato-getting-started/"
+        ]
+      return []
+    True -> do
+      insertChainBufferEntry chainId cHash
+      findChainHashUses chainId [cHash]
+      runBlocks chainId
 
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType
