@@ -48,7 +48,7 @@ data AnchorChain = Public
                  | UnknownPrivate       -- TODO: It's possible these two aren't needed,
                  | KnownPrivate Word256 --       but I'm leaving them in for now.
                  | AnchoredPrivate Word256
-                 deriving (Eq, Ord, Show, Read, GHCG.Generic, NFData, Data)
+                 deriving (Eq, Ord, Show, Read, GHCG.Generic, NFData, Data, ToJSON, FromJSON)
 
 getAnchorChain :: (Monad m, TransactionLike t) => (SHA -> m (Maybe Word256)) -> t -> m AnchorChain
 getAnchorChain f tx =
@@ -200,17 +200,18 @@ data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
                          , otBaseTx      :: TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic, NFData, Data)
 
-data OutputTx' = OutputTx' { ot'Origin :: TO.TXOrigin
-                           , ot'Hash   :: SHA
-                           , ot'Signer :: A.Address
-                           , ot'BaseTx :: Transaction'
+data OutputTx' = OutputTx' { ot'Origin      :: TO.TXOrigin
+                           , ot'Hash        :: SHA
+                           , ot'Signer      :: A.Address
+                           , ot'AnchorChain :: AnchorChain
+                           , ot'BaseTx      :: Transaction'
                            } deriving (Eq, Show, GHCG.Generic)
 
 otxToOtxPrime :: OutputTx -> OutputTx'
-otxToOtxPrime (OutputTx o h s b) = (OutputTx' o h s (Transaction' b))
+otxToOtxPrime (OutputTx o h s a b) = (OutputTx' o h s a (Transaction' b))
 
 otxPrimeToOtx :: OutputTx' -> OutputTx
-otxPrimeToOtx (OutputTx' o h s (Transaction' b)) = OutputTx o h s b
+otxPrimeToOtx (OutputTx' o h s a (Transaction' b)) = OutputTx o h s a b
 
 data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                , obTotalDifficulty     :: Integer
@@ -229,12 +230,12 @@ data OutputBlock' = OutputBlock' { ob'Origin              :: TO.TXOrigin
 obToObPrime :: OutputBlock -> OutputBlock'
 obToObPrime (OutputBlock o td bd rt bu) =
   OutputBlock' o td (BlockData' bd)
-                    ((\(OutputTx r h s t) -> OutputTx' r h s (Transaction' t)) <$> rt)
+                    (otxToOtxPrime <$> rt)
                     (BlockData' <$> bu)
 
 obPrimeToOb :: OutputBlock' -> OutputBlock
 obPrimeToOb (OutputBlock' o td (BlockData' bd) rt bu) =
-  OutputBlock o td bd ((\(OutputTx' r h s (Transaction' t)) -> OutputTx r h s t) <$> rt)
+  OutputBlock o td bd (otxPrimeToOtx <$> rt)
                       ((\(BlockData' b) -> b) <$> bu)
 
 data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
