@@ -2,6 +2,7 @@ name: blockapps-privacy
 ghc-options: -Wall -Werror
 
 dependencies:
+  - aeson
   - base
   - binary
   - blockapps-data

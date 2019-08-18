@@ -12,6 +12,7 @@ import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Util
 import           Control.Lens
+import           Data.Aeson
 import           Data.Binary
 import           Data.Default
 import           Data.Foldable                 (toList)
@@ -28,6 +29,9 @@ data CircularBuffer a = CircularBuffer
   , _queue    :: Q.Seq a
   } deriving (Show, Generic, Binary)
 makeLenses ''CircularBuffer
+
+instance ToJSON a => ToJSON (CircularBuffer a) where
+instance FromJSON a => FromJSON (CircularBuffer a) where
 
 maxBufferCapacity :: Int
 maxBufferCapacity = 4096
@@ -53,6 +57,9 @@ data BlockInfo = BlockInfo
   } deriving (Eq, Show, Generic, Binary)
 makeLenses ''BlockInfo
 
+instance ToJSON BlockInfo where
+instance FromJSON BlockInfo where
+
 instance Format BlockInfo where
   format BlockInfo{..} = unlines
     [ "BlockInfo"
@@ -70,6 +77,9 @@ data ChainHashEntry = ChainHashEntry
   , _inBlocks     :: Set BlockInfo
   } deriving (Show, Generic, Binary)
 makeLenses ''ChainHashEntry
+
+instance ToJSON ChainHashEntry where
+instance FromJSON ChainHashEntry where
 
 blankChainHashEntry :: ChainHashEntry
 blankChainHashEntry = ChainHashEntry False Nothing S.empty
@@ -101,6 +111,9 @@ data ChainIdEntry = ChainIdEntry
   , _blocksToRun :: Set BlockInfo
   } deriving (Show, Generic, Binary)
 makeLenses ''ChainIdEntry
+
+instance ToJSON ChainIdEntry where
+instance FromJSON ChainIdEntry where
 
 chainIdEntry :: ChainInfo -> ChainIdEntry
 chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
