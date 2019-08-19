@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Executable.EthereumVM (
   ethereumVM
@@ -9,26 +10,27 @@ module Executable.EthereumVM (
 
 import           Control.Lens                          ((.=), (||=), use)
 import           Control.Monad
+import qualified Control.Monad.Change.Modify             as Mod
 import           Control.Monad.IO.Class
+import qualified Blockchain.Database.MerklePatricia      as MP
 import           Blockchain.Output
 import           Control.Monad.Trans.State.Lazy        (gets)
+import qualified Data.ByteString                       as BS
 import           Data.List
 import           Data.Proxy
 import qualified Data.Text                             as T
 import qualified Data.Map.Ordered                      as O
 import qualified Data.Map                              as M
 import           Data.Maybe                            (isNothing, fromMaybe)
-import qualified Data.ByteString                       as BS
-import qualified Blockchain.MilenaTools                as K
+import qualified Data.Set                              as S
+import           Data.Time.Clock.POSIX
 import qualified Network.Kafka.Protocol                as KP
 import           Text.Printf
 import           Util                                  hiding (intercalate)
 
-import           Control.Monad.Change.Modify
-
 import           Blockapps.Crossmon
 import           Blockchain.BlockChain
-import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber)
+import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber, BlockData(..))
 import           Blockchain.Data.BlockHeader           (extraData2TxsLen)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.ChainInfo
@@ -39,8 +41,10 @@ import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
 import           Blockchain.EthConf
 import           Blockchain.JsonRpcCommand
+import qualified Blockchain.MilenaTools                as K
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
@@ -51,9 +55,13 @@ import           Executable.EVMFlags
 
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
+import qualified Blockchain.DB.MemAddressStateDB      as Mem
+import           Blockchain.DB.StorageDB
+import qualified Blockchain.SolidVM                      as SolidVM
 import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
@@ -74,7 +82,7 @@ ethereumVM = void . execContextM $ do
     $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpMSR)
 
     putContextBestBlockInfo cpBBI
-    mapM_ (put Proxy . BlockHashRoot) cpMSR
+    mapM_ (Mod.put Proxy . BlockHashRoot) cpMSR
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
@@ -164,7 +172,7 @@ ethereumVM = void . execContextM $ do
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
-        withChainroot <- checkpointData . Just . unBlockHashRoot <$> get Proxy
+        withChainroot <- checkpointData . Just . unBlockHashRoot <$> Mod.get Proxy
         setCheckpoint newOffset withChainroot
 
 insertNewChains :: [OutputEvent] -> ContextM ()
@@ -175,7 +183,8 @@ insertNewChains events = do
     $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
     $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
     let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
-    sr <- chainInfoToGenesisState theVM cInfo
+    _ <- chainInfoToGenesisState theVM cInfo
+    sr <- runChainConstructor cId
     mGSR <- getGenesisStateRoot cId
     case mGSR of
       Just gsr -> do
@@ -187,6 +196,56 @@ insertNewChains events = do
         putChainGenesisInfo cId (SHA 0) sr >> return [(cId, cInfo)]
 
   void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains
+
+
+
+runChainConstructor :: Word256 -> ContextM MP.StateRoot
+runChainConstructor cId = do
+  -- We are inventing the rules of how the constructor should run when a chain is created.
+  -- Since all VM runs need some environment variables passed in, we need to define what all of
+  -- those variables should be.  The truth is, most of these variables are rarely used, but we
+  -- still need to pre-decide what they should be else the VM would crash whenever they are used.
+  -- I've set most of these variables to default dummy values below...  We might decide to refine
+  -- some of these variables in the future.
+  _ <- SolidVM.call
+         False --isRunningTests
+         True --isHomestead
+         False --noValueTransfer
+         S.empty --pre-existing suicide list
+         (BlockData
+            (SHA 0)
+            (SHA 0)
+            (Address 0)
+            MP.emptyTriePtr
+            MP.emptyTriePtr
+            MP.emptyTriePtr
+            ""
+            0
+            (-1)
+            100000000000
+            0
+            (posixSecondsToUTCTime 0)
+            ""
+            0
+            (SHA 0))
+         0 --callDepth
+         (Address 0) --receiveAddress
+         (Address 0x100) --codeAddress
+         (Address 0) --sender
+         0 --value
+         1 --gasPrice
+         ""
+         1000000000000 --availableGas
+         (Address 0)
+         (SHA 0)
+         (Just cId)
+         (Just $ M.fromList [("args", "()"), ("funcName", "<constructor>")])
+  
+  flushMemStorageDB
+  Mem.flushMemAddressStateDB
+
+  Mod.get (Proxy @MP.StateRoot)
+
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
