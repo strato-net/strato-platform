@@ -1,59 +1,44 @@
 /* jshint esnext: true */
-const bcrypt = require('bcrypt');
-const blockappsRest = require('blockapps-rest').rest;
-const co = require('co');
-const moment = require('moment');
-const rp = require('request-promise');
 const querystring = require('querystring');
-
 const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
 
-const appConfig = require('../../config/app.config');
-const authHandler = require('../../middlewares/authHandler.js');
-const models = require('../../models/index');
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 
 
-function* createKey(userHeaders, userParams = null) {
+async function createKey(username, userParams = null) {
 
-    const username = userHeaders['X-USER-UNIQUE-NAME'];
-    const hash = userHeaders['X-USER-ID'];
-
-    if (!username || !hash) {
-      let err = new Error("invalid header params, expected: {x-user-unique-name:username, x-user-id:hash}");
+    if (!username) {
+      let err = new Error("invalid param, expected username to be a non-empty string");
       err.status = RestStatus.BAD_REQUEST;
       throw err;
     }
-
-
-    // Create blockchain user in bloc
+    
+    // Create blockchain user
     try {
 
       userParams = userParams == null ? {} : userParams;
-      const userAccount = yield ax.post(process.env.vaultWrapperHttpHost, userParams, '/strato/v2.3/key', userHeaders);
+      const userAccount = await ax.post(process.env.vaultWrapperHttpHost, userParams, '/strato/v2.3/key', {
+        "x-user-unique-name": username,
+      });
 
       //faucet user so they can do stuff
-      yield waitFaucet(userAccount.address)
+      await waitFaucet(userAccount.address);
 
       return {
         status: RestStatus.OK,
         user: userAccount
       };
     } catch (blocError) {
-      console.log(blocError)
-      let err = new Error('could not create bloc account: ', blocError); //fixme - see universalError in ht3
+      let err = new Error('could not create bloc account: ' + blocError); //fixme - see universalError in ht3
+      console.error(err);
       throw err;
     }
-
 }
 
+async function getKey(username, userQuery = null) {
 
-function* getKey(userHeaders, userQuery = null) {
-  const username = userHeaders['X-USER-UNIQUE-NAME'];
-  const hash = userHeaders['X-USER-ID'];
-
-  if (!username || !hash) {
-    let err = new Error("invalid header params, expected: {x-user-unique-name:username, x-user-id:hash}");
+  if (!username) {
+    let err = new Error("invalid param, expected username to be a non-empty string");
     err.status = RestStatus.BAD_REQUEST;
     throw err;
   }
@@ -61,9 +46,8 @@ function* getKey(userHeaders, userQuery = null) {
   try {
     const query = userQuery ? `?${querystring.stringify(userQuery)}` : '';
 
-    const userAccount = yield ax.get(process.env.vaultWrapperHttpHost, `/strato/v2.3/key${query}`, {
+    const userAccount = await ax.get(process.env.vaultWrapperHttpHost, `/strato/v2.3/key${query}`, {
       "x-user-unique-name": username,
-      "x-user-id": hash
     });
 
     return {
@@ -71,17 +55,17 @@ function* getKey(userHeaders, userQuery = null) {
       user: userAccount
     };
   } catch (blocError) {
-    let err = new Error('could not find bloc account: ', blocError); //fixme - see universalError in ht3
+    let err = new Error('could not find bloc account: ' + blocError); //fixme - see universalError in ht3
     throw err
   }
 
 }
 
-function* getOrCreateKey(userHeaders, userQuery = null){
+async function getOrCreateKey(userUniqueName, userQuery = null){
   try {
-    return yield getKey(userHeaders, userQuery)
+    return await getKey(userUniqueName, userQuery)
   } catch (err) {
-    return yield createKey(userHeaders, userQuery)
+    return await createKey(userUniqueName, userQuery)
   }
 }
 
@@ -91,15 +75,14 @@ function* getOrCreateKey(userHeaders, userQuery = null){
 // Helper functions
 //===================
 
-function* waitFaucet(address) { //fixme - function duplicated in multiple tests, move to util file
+async function waitFaucet(address) { //fixme - function duplicated in multiple tests, move to util file
   const params = {
     address: address
   }
 
   //faucet
-  yield ax.postue(process.env.stratoRoot, params, '/faucet')
-
-
+  await ax.postue(process.env.stratoRoot, params, '/faucet')
+  
   //wait for update
   const sleep = function (ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -107,10 +90,10 @@ function* waitFaucet(address) { //fixme - function duplicated in multiple tests,
 
   let res = [];
   do {
-    yield sleep(400);
+    await sleep(400);
     const query = `?${querystring.stringify(params)}`;
 
-    res = yield ax.get(process.env.stratoRoot, `/account${query}`)
+    res = await ax.get(process.env.stratoRoot, `/account${query}`)
 
   } while (res.length < 1);
 

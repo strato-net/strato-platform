@@ -75,7 +75,6 @@ import           Data.Time.Clock
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
-import           Blockchain.Data.RLP
 import           Blockchain.ExtWord                        (Word256)
 import           Blockchain.Output
 import           Blockchain.Privacy
@@ -87,7 +86,6 @@ import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
 import           Blockchain.SHA
-import           Blockchain.Strato.Model.Class
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
 import           Text.Format
@@ -146,15 +144,6 @@ instance Mod.Modifiable GetTransactionsDB SequencerM where
   put _ = assign getTransactionsDB
 
 instance HasPrivateHashDB SequencerM where
-  getChainId = return . hash . rlpSerialize . rlpEncode
-  generateInitialChainHash = return . hash . rlpSerialize . rlpEncode
-  generateChainHashes tx =
-    let r = txSigR tx
-        s = txSigS tx
-        rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
-        sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
-     in return [rs,sr]
-
   requestChain = insertGetChainsDB
   requestTransaction = insertGetTransactionsDB
 

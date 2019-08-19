@@ -34,6 +34,7 @@ data BlockDBNamespace = Headers
                       | PrivateTransactions
                       | PrivateTxsInBlocks
                       | PrivateIPChains
+                      | PrivateOrgIdChains
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -81,6 +82,10 @@ instance RedisDBValuable RedisIPChains where
     toValue   = rlpSerialize . rlpEncode
     fromValue = rlpDecode . rlpDeserialize
 
+instance RedisDBValuable RedisOrgIdChains where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
 instance RedisDBKeyable Integer where
     toKey = S8.pack . show
 
@@ -104,10 +109,15 @@ newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving newtype (Eq, Sho
 newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [SHA]) deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
+newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
 
 instance RLPSerializable RedisIPChains where
   rlpEncode (RedisIPChains s) = rlpEncode $ S.toList s
   rlpDecode = RedisIPChains . S.fromList . rlpDecode
+
+instance RLPSerializable RedisOrgIdChains where
+  rlpEncode (RedisOrgIdChains s) = rlpEncode $ S.toList s
+  rlpDecode = RedisOrgIdChains . S.fromList . rlpDecode
 
 data RedisBestBlock = RedisBestBlock { bestBlockHash            :: SHA
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
@@ -135,5 +145,6 @@ displayForNamespace ns input = case ns of
     PrivateTransactions -> let RedisTx tx = fromValue input in format tx
     PrivateTxsInBlocks -> let RedisChainTxsInBlocks ctibs = fromValue input in show ctibs
     PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
+    PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
   where
     readSHA = let SHA x = fromValue input in format x

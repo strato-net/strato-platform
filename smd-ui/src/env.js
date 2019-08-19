@@ -30,6 +30,7 @@ export const env = {
   STRATO_GS_MODE: window.STRATO_GS_MODE && window.STRATO_GS_MODE !== '__STRATO_GS_MODE__' ? window.STRATO_GS_MODE : '0',
   SINGLE_NODE: window.SINGLE_NODE && window.SINGLE_NODE !== '__SINGLE_NODE__' ? window.SINGLE_NODE : 'false',
   SMD_MODE: smd_mode,
-  EXT_STORAGE_ENABLED: window.EXT_STORAGE_S3_BUCKET && window.EXT_STORAGE_S3_BUCKET !== '__EXT_STORAGE_S3_BUCKET__' ? 'true' : (process.env.REACT_APP_EXT_STORAGE_ENABLED ? process.env.REACT_APP_EXT_STORAGE_ENABLED : 'false')
+  EXT_STORAGE_ENABLED: window.EXT_STORAGE_S3_BUCKET && window.EXT_STORAGE_S3_BUCKET !== '__EXT_STORAGE_S3_BUCKET__' ? 'true' : (process.env.REACT_APP_EXT_STORAGE_ENABLED ? process.env.REACT_APP_EXT_STORAGE_ENABLED : 'false'),
+  STRATO_VERSION: window.STRATO_VERSION && window.STRATO_VERSION !== '__STRATO_VERSION__' ? window.STRATO_VERSION : 'N/A',
 };
 

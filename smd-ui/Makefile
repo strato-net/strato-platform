@@ -2,7 +2,11 @@ ifeq ($(BASIL_DOCKER_TAG),)
   $(error BASIL_DOCKER_TAG is not set)
 endif
 
+ifeq ($(STRATO_VERSION),)
+  $(error STRATO_VERSION is not set)
+endif
+
 all: build
 
 build:
-	docker build -t $(BASIL_DOCKER_TAG) .
+	docker build --build-arg STRATO_VERSION=$(STRATO_VERSION) -t $(BASIL_DOCKER_TAG) .
