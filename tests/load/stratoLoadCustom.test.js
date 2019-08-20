@@ -64,9 +64,6 @@ describe('Strato Load Test', function() {
       console.log(`Received ${results.length} receipts`);
       txResults = txResults.concat(results);
       if(batchDelay > 100) {
-         let result = yield api.strato.account(admin.address);
-         let nonce = result[0].nonce
-         console.log('nonce', nonce);
          console.log('delay', batchDelay, 'ms');
         yield promiseTimeout(batchDelay);
       }
