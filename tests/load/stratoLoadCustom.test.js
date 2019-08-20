@@ -60,7 +60,8 @@ describe('Strato Load Test', function() {
       blocTime += blocEndTime.diff(blocStartTime, 'seconds');
       console.log(`Received ${results.length} receipts`);
       txResults = txResults.concat(results);
-      if(batchDelay > 100) {
+     if(batchDelay > 100) {
+         console.log('delay', batchDelay, 'ms');
         yield promiseTimeout(batchDelay);
       }
     }
