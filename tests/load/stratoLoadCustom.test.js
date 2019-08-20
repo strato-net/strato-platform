@@ -31,7 +31,7 @@ describe('Strato Load Test', function() {
   const batchDelay = util.getArgInt('--batchDelay', 0);
   console.log(`batchSize`, batchSize);
   console.log(`batchCount`, batchCount);
-  console.log('delay', batchDelay, 'ms');
+  console.log('batchDelay', batchDelay, 'ms');
 
 
   before(function * () {
