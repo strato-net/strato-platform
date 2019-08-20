@@ -83,6 +83,8 @@ describe('Strato Load Test', function() {
             return console.log(err);
         }
 
+        console.log('batchSize', batchSize,);
+        console.log('batchCount', batchCount,);
         console.log("graph_PERFORMANCE_multinode_strato_load_custom.csv data has been sent!");
         });
     fs.appendFile("graph_PERFORMANCE_multinode_strato_load_custom.csv", "\n", function(err) {
