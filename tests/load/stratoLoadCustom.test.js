@@ -29,7 +29,8 @@ describe('Strato Load Test', function() {
   const batchSize = util.getArgInt('--batchSize', 1);
   const batchCount = util.getArgInt('--batchCount', 1);
   const batchDelay = util.getArgInt('--batchDelay', 0);
-
+  console.log(`batchSize`, batchSize);
+  console.log(`batchCount`, batchCount);
 
   before(function * () {
     console.log(`Creating admin user and contract`);
@@ -83,8 +84,6 @@ describe('Strato Load Test', function() {
             return console.log(err);
         }
 
-        console.log('batchSize', ${PARAM_BATCH_SIZE},);
-        console.log('batchCount', ${PARAM_COUNT_SIZE},);
         console.log("graph_PERFORMANCE_multinode_strato_load_custom.csv data has been sent!");
         });
     fs.appendFile("graph_PERFORMANCE_multinode_strato_load_custom.csv", "\n", function(err) {
