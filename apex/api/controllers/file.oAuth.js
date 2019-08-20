@@ -50,6 +50,7 @@ async function upload(req, res, next) {
   
   try {
     const args = {
+      _fileKey: uploadedFile.Key,
       _uri: uploadedFile.Location,
       _host: provider,
       _hash: hash,
@@ -63,13 +64,14 @@ async function upload(req, res, next) {
 
     const contractUpload = await externalStorage.uploadContract(userCredentials, args);
 
+    // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
     await models.Upload.create({
       contractAddress: contractUpload.address,
       uri: uploadedFile.Location,
       hash: hash
     });
 
-    res.status(RestStatus.OK).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
+    res.status(RestStatus.OK).json({ contractAddress: contractUpload.address, fileKey: uploadedFile.Key, uri: uploadedFile.Location, metadata: metadata });
   } catch (error) {
     let err = new Error(error);
     console.error(error);
@@ -79,6 +81,7 @@ async function upload(req, res, next) {
 }
 
 async function list(req, res, next) {
+  // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
   const uploads = await models.Upload.all({
     attributes: ['contractAddress', 'uri', 'hash', 'createdAt']
   });
@@ -94,6 +97,7 @@ async function verify(req, res, next) {
     return next(err);
   }
 
+  // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
   const record = await models.Upload.findOne({
     where: { contractAddress: contractAddress },
   });
@@ -124,7 +128,8 @@ async function attest(req, res, next) {
     err.status = RestStatus.BAD_REQUEST;
     return next(err);
   }
-  
+
+  // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
   const record = await models.Upload.findOne({
     where: { contractAddress: contractAddress },
   });
@@ -169,6 +174,7 @@ async function download(req, res, next) {
     return next(err);
   }
 
+  // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
   const record = await models.Upload.findOne({
     where: { contractAddress: contractAddress },
   });
@@ -184,7 +190,7 @@ async function download(req, res, next) {
 
     const options = {
       Bucket: appConfig.s3.bucket.Bucket,
-      Key: /[^/]*$/.exec(data.uri)[0],
+      Key: data.fileKey,
       Expires: 3600
     };
 
