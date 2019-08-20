@@ -22,7 +22,7 @@ let txs = [];
 let txResults = [];
 
 describe('Strato Load Test', function() {
-  this.timeout(9999 * 1000);
+  this.timeout(99999 * 1000);
 
   let admin;
 
