@@ -5,7 +5,6 @@ const crypto = require('crypto');
 const appConfig = require('../config/app.config');
 const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
 const externalStorage = require('../lib/externalStorage/externalStorage.oAuth');
-const models = require('../models');
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 const s3 = require('../lib/s3');
 const uploader = require('../lib/uploader');
@@ -64,13 +63,6 @@ async function upload(req, res, next) {
 
     const contractUpload = await externalStorage.uploadContract(userCredentials, args);
 
-    // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
-    await models.Upload.create({
-      contractAddress: contractUpload.address,
-      uri: uploadedFile.Location,
-      hash: hash
-    });
-
     res.status(RestStatus.OK).json({ contractAddress: contractUpload.address, fileKey: uploadedFile.Key, uri: uploadedFile.Location, metadata: metadata });
   } catch (error) {
     let err = new Error(error);
@@ -81,11 +73,20 @@ async function upload(req, res, next) {
 }
 
 async function list(req, res, next) {
-  // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
-  const uploads = await models.Upload.all({
-    attributes: ['contractAddress', 'uri', 'hash', 'createdAt']
+  const limit = req.query.limit || 100;
+  const offset = req.query.offset || 0;
+  const list = await externalStorage.getExternalStorageList(limit, offset);
+  const listFormatted = list.map(f => {
+    return {
+      'contractAddress': f.address,
+      'hash': f.fileHash,
+      'fileKey': f.fileKey,
+      'uri': f.uri,
+      'createdAt': new Date(f.timeStamp*1000).toISOString()
+    }
   });
-  res.status(RestStatus.OK).json({ list: uploads });
+  
+  res.status(RestStatus.OK).json({ list: listFormatted });
 }
 
 async function verify(req, res, next) {
@@ -97,17 +98,12 @@ async function verify(req, res, next) {
     return next(err);
   }
 
-  // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
-  const record = await models.Upload.findOne({
-    where: { contractAddress: contractAddress },
-  });
-
-  if (!record) {
-    let err = new Error('Contract address not found');
-    err.status = RestStatus.BAD_REQUEST;
-    return next(err);
-  }
   try {
+    if (! await externalStorage.checkExternalStorageExists(contractAddress)) {
+      let err = new Error('Contract address not found');
+        err.status = RestStatus.BAD_REQUEST;
+        return next(err);
+    }
     const data = await externalStorage.getExternalStorage(contractAddress);
     res.status(RestStatus.OK).json({ uri: data.uri, timeStamp: data.timeStamp, signers: data.signers });
   } catch (error) {
@@ -129,23 +125,17 @@ async function attest(req, res, next) {
     return next(err);
   }
 
-  // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
-  const record = await models.Upload.findOne({
-    where: { contractAddress: contractAddress },
-  });
-
-  if (!record) {
-    let err = new Error('Contract address not found');
-    err.status = RestStatus.BAD_REQUEST;
-    return next(err);
-  }
-
   const args = {};
   const userCredentials = {
     'x-user-unique-name': uID,
   };
 
   try {
+    if (! await externalStorage.checkExternalStorageExists(contractAddress)) {
+      let err = new Error('Contract address not found');
+      err.status = RestStatus.BAD_REQUEST;
+      return next(err);
+    }
     const result = await externalStorage.getExternalStorage(contractAddress);
     const account = await ax.get(process.env.vaultWrapperHttpHost, `/strato/v2.3/key`, userCredentials);
     if (result.signers.indexOf(account.address) > -1) {
@@ -174,18 +164,12 @@ async function download(req, res, next) {
     return next(err);
   }
 
-  // TODO: get rid of Upload records in apex db - read ExternalStorage contract data from cirrus
-  const record = await models.Upload.findOne({
-    where: { contractAddress: contractAddress },
-  });
-
-  if (!record) {
-    let err = new Error('Contract address not found');
-    err.status = RestStatus.BAD_REQUEST;
-    return next(err);
-  }
-
   try {
+    if (! await externalStorage.checkExternalStorageExists(contractAddress)) {
+      let err = new Error('Contract address not found');
+      err.status = RestStatus.BAD_REQUEST;
+      return next(err);
+    }
     const data = await externalStorage.getExternalStorage(contractAddress);
 
     const options = {
