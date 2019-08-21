@@ -259,7 +259,7 @@ handleEvents peer = awaitForever $ \case
       let shas = take mrh shas'
       getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
-          ptxs <- fmap catMaybes . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
+          ptxs <- fmap (map snd . catMaybes) . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
           unless (null ptxs) . yieldR $ Transactions ptxs)
         where getUntilMissing :: (Accessible RBDB.RedisConnection m, MonadIO m)
                               => [SHA] -> [Block] -> [SHA] -> m ([Block],[SHA])
@@ -321,9 +321,9 @@ handleEvents peer = awaitForever $ \case
       $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: "
         ++ (intercalate "\n" (format <$> trHashes))
       ptrs <- fmap catMaybes . lift . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions trHashes
-      mems <- lift . RBDB.withRedisBlockDB $ mapM (RBDB.getChainMembers . fromJust . txChainId) ptrs
+      mems <- lift . RBDB.withRedisBlockDB $ mapM (RBDB.getChainMembers . fst) ptrs
       let trMems = zip ptrs mems
-      yieldR . Transactions . map fst $ filter ((checkPeerIsMember peer) . snd) trMems
+      yieldR . Transactions . map (snd . fst) $ filter ((checkPeerIsMember peer) . snd) trMems
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
