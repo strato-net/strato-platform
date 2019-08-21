@@ -54,7 +54,17 @@ async function getExternalStorage(address) {
 }
 
 async function getExternalStorageList(limit, offset) {
-  return (await co(restLite.query(`${contractName}?limit=${limit}&offset=${offset}`,)));
+  let list;
+  try {
+    list = await co(restLite.query(`${contractName}?limit=${limit}&offset=${offset}`,))
+  } catch(error) {
+    if (error.status === 404) {
+      list = []
+    } else {
+      throw error
+    }
+  }
+  return list
 }
 
 module.exports = {
