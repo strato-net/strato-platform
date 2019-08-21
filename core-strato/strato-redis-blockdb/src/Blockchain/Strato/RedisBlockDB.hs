@@ -43,7 +43,7 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Blockchain.Util                       (partitionWith)
 
-import           Control.Arrow                         ((&&&), second)
+import           Control.Arrow                         ((&&&), (***), second)
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
@@ -354,6 +354,18 @@ getPrivateTransactions sha = getInNamespace PrivateTransactions sha >>= \case
     Right (Just rtx) -> let (anchor, RedisTx tx) = fromValue rtx in
         return . Just $ (anchor, morphTx tx)
 
+addPrivateTransactions :: TransactionLike t
+                       => [(SHA, (Word256, t))]
+                       -> Redis (Either Reply Status)
+addPrivateTransactions ptxs = do
+  res <- multiExec
+       . msetnx
+       $ map (inNamespace PrivateTransactions *** toValue) ptxs
+  case res of
+      TxSuccess _ -> pure $ Right Ok
+      TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Aborted")
+      TxError e   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Error" ++ e)
+
 getUncles :: BlockHeaderLike h
           => SHA
           -> Redis (Maybe [h])
@@ -530,8 +542,8 @@ putBlock b = do
         uncles  = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
         inNS'   = flip inNamespace sha
     unless (null ptxs) $ do
-      void . multiExec . msetnx $
-        map ((inNamespace PrivateTransactions . txHash) &&& (toValue . ((fromJust . txAnchorChain) &&& id))) ptxs
+      void . addPrivateTransactions $
+        map (txHash &&& ((fromJust . txAnchorChain) &&& id)) ptxs
       forM_ (partitionWith txAnchorChain ptxs) $ \(cId, ptxs') ->
                          -- ^-- already filtered on (isJust . txChainId)
         addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
