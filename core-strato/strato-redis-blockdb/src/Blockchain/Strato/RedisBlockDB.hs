@@ -525,16 +525,13 @@ putBlock b = do
         header' = morphBlockHeader header :: RedisHeader
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
         ptxs    = filter
-                    (\a -> and [ isJust (txChainId a)
-                               , isJust (txAnchorChain a)
-                               ]
-                    )
+                    (isJust . txAnchorChain)
                     (morphTx <$> blockTransactions b :: [Models.RedisTx])
         uncles  = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
         inNS'   = flip inNamespace sha
     unless (null ptxs) $ do
       void . multiExec . msetnx $
-        map ((inNamespace PrivateTransactions . txHash) &&& (toValue . (txAnchorChain &&& id))) ptxs
+        map ((inNamespace PrivateTransactions . txHash) &&& (toValue . ((fromJust . txAnchorChain) &&& id))) ptxs
       forM_ (partitionWith txAnchorChain ptxs) $ \(cId, ptxs') ->
                          -- ^-- already filtered on (isJust . txChainId)
         addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
