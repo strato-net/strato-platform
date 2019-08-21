@@ -94,7 +94,7 @@ class UploadForm extends Component {
 
     const isPublicMode = isModePublic();
 
-    return <React.Fragment>
+    return <div>
       <div className="row">
         <div className="col-sm-3 text-right">
           <label className="pt-label smd-pad-4">
@@ -136,7 +136,7 @@ class UploadForm extends Component {
           <span className="error-text">{this.errorMessageFor('password')}</span>
         </div>
       </div>
-    </React.Fragment>
+    </div>
   }
 
   renderAddress = (isPublicMode) => {
@@ -176,7 +176,7 @@ class UploadForm extends Component {
             <div className="row">
               <div className="col-sm-3 text-right">
                 <label className="pt-label smd-pad-4">
-                  Drop Video
+                  File
             </label>
               </div>
               <div className="col-sm-9 smd-pad-4">

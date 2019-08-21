@@ -75,18 +75,24 @@ async function upload(req, res, next) {
 async function list(req, res, next) {
   const limit = req.query.limit || 100;
   const offset = req.query.offset || 0;
-  const list = await externalStorage.getExternalStorageList(limit, offset);
-  const listFormatted = list.map(f => {
-    return {
-      'contractAddress': f.address,
-      'hash': f.fileHash,
-      'fileKey': f.fileKey,
-      'uri': f.uri,
-      'createdAt': new Date(f.timeStamp*1000).toISOString()
-    }
-  });
-  
-  res.status(RestStatus.OK).json({ list: listFormatted });
+  try {
+    const list = await externalStorage.getExternalStorageList(limit, offset);
+    const listFormatted = list.map(f => {
+      return {
+        'contractAddress': f.address,
+        'hash': f.fileHash,
+        'fileKey': f.fileKey,
+        'uri': f.uri,
+        'createdAt': new Date(f.timeStamp*1000).toISOString()
+      }
+    });
+    res.status(RestStatus.OK).json({ list: listFormatted });
+  } catch(error) {
+    let err = new Error(error);
+    console.error(error);
+    err.status = RestStatus.INTERNAL_SERVER_ERROR;
+    return next(err);
+  }
 }
 
 async function verify(req, res, next) {
