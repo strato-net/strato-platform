@@ -9,7 +9,7 @@
     "test:load": "mocha load/stratoLoad.test.js --batchCount 20 --batchSize 20 && mocha load/stratoLoadFactory.test.js --batchCount 20 --batchSize 20",
     "test:load10k": "mocha load/stratoLoad.test.js --batchCount 100 --batchSize 100",
     "test:loadcustom": "mocha load/stratoLoadCustom.test.js --batchDelay ${PARAM_BATCH_DELAY} --batchCount ${PARAM_COUNT_SIZE} --batchSize ${PARAM_BATCH_SIZE}",
-    "test:loadcustomindefinite": "mocha load/stratoLoadCustomIndefinite.test.js --batchDelay ${PARAM_BATCH_DELAY} --batchCount ${PARAM_COUNT_SIZE} --batchSize ${PARAM_BATCH_SIZE}",
+    "test:loadcustomindefinite": "mocha load/stratoLoadCustom.test.js --batchDelay ${PARAM_BATCH_DELAY} --batchCount ${PARAM_COUNT_SIZE} --batchSize ${PARAM_BATCH_SIZE}",
     "test:loadecho": "mocha load/stratoLoadEcho.test.js --batchCount 20 --batchSize 20 --config config/localhost.config.yaml",
     "test:solidvm": "mocha e2e/solidvm.test.js",
     "test:upload": "mocha load/uploadString.test.js --batchCount 10 --batchSize 10 && mocha load/uploadUniqueAddresses.test.js --batchCount 10 --batchSize 10",
