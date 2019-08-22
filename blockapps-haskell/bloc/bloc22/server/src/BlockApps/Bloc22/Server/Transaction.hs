@@ -86,7 +86,14 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (map (\(ContractPayload _ c a v m) -> UploadListContract (fromJust c) (fromMaybe Map.empty a) txParams v m) p)
                         chainId
                         resolve
-            postUsersUploadList' bclp (callSignature userName)
+                md = contractpayloadMetadata $ head p      --Determine VM option by the metadata of the first tx in list
+                poster = case Map.lookup "VM" =<< md of
+                  Nothing -> postUsersUploadListEVM'
+                  Just "EVM" -> postUsersUploadListEVM'
+                  Just "SolidVM" -> postUsersUploadListSolidVM'
+                  Just vm -> \_ _ -> throwError $ UserError $ Text.pack
+                                   $ "Invalid value for VM choice: " ++ show vm
+            poster bclp (callSignature userName)
         FUNCTION -> case txs of
           [] -> return []
           [x] -> do
