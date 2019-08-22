@@ -181,22 +181,24 @@ handleEvents peer = awaitForever $ \case
             , ", but we don't have these in our canonical chain...."
             , " I don't know what to do, so I am returning a blank response."
             , " This may indicate something unhealthy in the network."]
-      yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
+      yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
       stampActionTimestamp
-      maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
+      maybeHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
       case maybeHeader of
         Nothing    -> yieldR (BlockBodies [])
         Just head' -> do
           let num = blockHeaderBlockNumber head'
-          start' <- case dir of
-            Reverse -> return $ if num > fromIntegral max' then num - (fromIntegral max') else 1
-            Forward -> return num
+              start' = case dir of
+                Forward -> num
+                Reverse -> if num > fromIntegral max'
+                             then num - fromIntegral max'
+                             else 1
           mrh <- gets maxReturnedHeaders
           let count = (1 + skip') * min mrh (fromIntegral num)
           chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' count
-          yieldR . BlockHeaders . skipEntries skip' $ snd <$> chain
+          yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
         stampActionTimestamp
@@ -207,7 +209,7 @@ handleEvents peer = awaitForever $ \case
             --     allNeeded = headerHashes `S.union` parentHashes
 
             -- check if blockheaders we recieved have parents.
-            parentsInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ parentHash <$> headers
+            parentsInDB <- RBDB.withRedisBlockDB . RBDB.getHeaders $ parentHash <$> headers
             let existingParents = [(sha, x) | (sha, Just x) <- parentsInDB]
             let missingParents  = [sha | (sha, Nothing) <- parentsInDB, sha /= SHA 0]
             unless (null missingParents) $ do
@@ -221,7 +223,7 @@ handleEvents peer = awaitForever $ \case
                  syncFetch Reverse lastParent
 
             -- todo: try with (&&&)
-            headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
+            headersInDB <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
             let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
             let (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
@@ -257,12 +259,12 @@ handleEvents peer = awaitForever $ \case
       stampActionTimestamp
       mrh <- gets maxReturnedHeaders
       let shas = take mrh shas'
-      getUntilMissing shas [] [] >>= (\(bodies, pshas) -> do
+      getUntilMissing shas [] [] >>= \(bodies, pshas) -> do
           yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
           ptxs <- fmap (map snd . catMaybes) . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
-          unless (null ptxs) . yieldR $ Transactions ptxs)
+          unless (null ptxs) . yieldR . Transactions $ morphTx <$> ptxs
         where getUntilMissing :: (Accessible RBDB.RedisConnection m, MonadIO m)
-                              => [SHA] -> [Block] -> [SHA] -> m ([Block],[SHA])
+                              => [SHA] -> [OutputBlock] -> [SHA] -> m ([OutputBlock],[SHA])
               getUntilMissing []     bodies pshas = return (bodies, pshas)
               getUntilMissing (h:hs) bodies pshas = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
                   Nothing   -> return (bodies, pshas)
@@ -275,8 +277,8 @@ handleEvents peer = awaitForever $ \case
                                   filter ((checkPeerIsMember peer) . snd) trMems
                     getUntilMissing hs (body:bodies) (pshas ++ pshas')
 
-              toBody :: Block -> ([Transaction], [BlockHeader])
-              toBody = (blockTransactions &&& fmap morphBlockHeader . blockUncleHeaders)
+              toBody :: OutputBlock -> ([Transaction], [BlockHeader])
+              toBody = ((map otBaseTx . obReceiptTransactions) &&& fmap morphBlockHeader . obBlockUncles)
 
     -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
     -- todo:
@@ -323,7 +325,7 @@ handleEvents peer = awaitForever $ \case
       ptrs <- fmap catMaybes . lift . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions trHashes
       mems <- lift . RBDB.withRedisBlockDB $ mapM (RBDB.getChainMembers . fst) ptrs
       let trMems = zip ptrs mems
-      yieldR . Transactions . map (snd . fst) $ filter ((checkPeerIsMember peer) . snd) trMems
+      yieldR . Transactions . map (morphTx . snd . fst) $ filter ((checkPeerIsMember peer) . snd) trMems
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
@@ -393,7 +395,7 @@ handleEvents peer = awaitForever $ \case
           when (null chain) $
             $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
               "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
-          let outbound = BlockHeaders . map snd $ chain
+          let outbound = BlockHeaders $ morphBlockHeader . snd <$> chain
           $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
           yieldR outbound
       OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
