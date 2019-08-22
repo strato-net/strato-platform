@@ -96,7 +96,7 @@ create :: Bool
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ _ _ _ _ _ _ _ _ pc@(PrecompiledCode _) _ _ _ = internalError "call precompiled code" pc
-create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId' metadata = do
+create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash' chainId' metadata = do
   recordCreate
   let env' = Env.Environment {
         Env.blockHeader = blockData,
@@ -116,12 +116,10 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
         !args = either (parseError "create arguments") Xabi.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource initCode
-    create' sender' hsh cc contractName' args
+    create' sender' newAddress hsh cc contractName' args
 
-create' :: Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> SM ExecResults
-create' creator ch cc contractName' argExps = do
-  newAddress <- getNewAddress creator
-
+create' :: Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> SM ExecResults
+create' creator newAddress ch cc contractName' argExps = do
   initializeAction newAddress contractName' ch
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
@@ -923,8 +921,8 @@ expToVar' x@(Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array{})) Xabi.NamedArg
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
   creator <- getCurrentAddress
   (hsh, cc) <- getCurrentCodeCollection
-  incrementNonce creator
-  execResults <- create' creator hsh cc contractName' args
+  newAddress <- getNewAddress creator
+  execResults <- create' creator newAddress hsh cc contractName' args
   return $ Constant $ SContract contractName' $ fromIntegral
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAddress execResults

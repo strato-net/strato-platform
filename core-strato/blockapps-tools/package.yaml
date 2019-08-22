@@ -55,6 +55,7 @@ dependencies:
   - strato-p2p
   - strato-sequencer
   - strato-statediff
+  - text
   - transformers
   - hedis
   - unliftio
