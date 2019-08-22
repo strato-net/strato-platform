@@ -78,6 +78,7 @@ describe('Strato Load Test', function() {
     const seconds = endTime.diff(startTime, 'seconds');
     console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);
 
+   /*
     var TPS = batchSize * batchCount/seconds;
     var data  = [TPS,]; //Alternatively [seconds,blocTime,TPS];
     const fs = require('fs');
@@ -92,7 +93,7 @@ describe('Strato Load Test', function() {
         if(err) {
             return console.log(err);
         }
-
+    */
         //console.log("The file was saved!");
         });
 
