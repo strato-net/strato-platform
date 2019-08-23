@@ -522,7 +522,7 @@ putBlock b = do
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
         ptxs    = filter
                     (isJust . txAnchorChain)
-                    (blockTransactions b)
+                    (obReceiptTransactions b)
         uncles  = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
         inNS'   = flip inNamespace sha
     unless (null ptxs) $ do
