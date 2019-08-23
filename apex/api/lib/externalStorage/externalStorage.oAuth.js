@@ -43,14 +43,35 @@ async function attest(user, contractAddress, args) {
 }
 
 // ================== wrapper methods ====================
+
+async function checkExternalStorageExists(address) {
+  const contractState = await co(restLite.getState({name: contractName, address: address}));
+  return !!contractState.fileHash
+}
+
 async function getExternalStorage(address) {
   return (await co(restLite.waitQuery(`${contractName}?address=eq.${address}`, 1, 3 * 60 * 1000)))[0];
 }
 
+async function getExternalStorageList(limit, offset) {
+  let list;
+  try {
+    list = await co(restLite.query(`${contractName}?limit=${limit}&offset=${offset}`,))
+  } catch(error) {
+    if (error.status === 404) {
+      list = []
+    } else {
+      throw error
+    }
+  }
+  return list
+}
 
 module.exports = {
   compileSearch,
   uploadContract,
   attest,
   getExternalStorage,
+  getExternalStorageList,
+  checkExternalStorageExists,
 };

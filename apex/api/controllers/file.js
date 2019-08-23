@@ -69,6 +69,7 @@ module.exports = {
       
       try {
         const args = {
+          _fileKey: uploadedFile.Key,
           _uri: uploadedFile.Location,
           _host: provider,
           _hash: hash,
@@ -89,7 +90,7 @@ module.exports = {
           hash: hash
         });
 
-        res.status(RestStatus.OK).json({ contractAddress: contractUpload.address, uri: uploadedFile.Location, metadata: metadata });
+        res.status(RestStatus.OK).json({ contractAddress: contractUpload.address, fileKey: uploadedFile.Key, uri: uploadedFile.Location, metadata: metadata });
       } catch (error) {
         let err = new Error(error);
         err.status = RestStatus.INTERNAL_SERVER_ERROR;
@@ -213,7 +214,7 @@ module.exports = {
 
         var options = {
           Bucket: appConfig.s3.bucket.Bucket,
-          Key: /[^/]*$/.exec(data.uri)[0],
+          Key: data.fileKey,
           Expires: 3600
         };
 
