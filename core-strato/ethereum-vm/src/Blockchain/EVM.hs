@@ -984,23 +984,29 @@ parseTraceFlag = \case
 runCodeFromStart :: VMM ()
 runCodeFromStart = do
   code <- getEnvVar envCode
-  theData <- getEnvVar envInputData
 
   when flags_debug $
      lift $ $logInfoS "runCodeFromStart" . T.pack $ "running code: " ++ tab (CL.magenta ("\n" ++ showCode 0 code))
 
-  case code of
-   PrecompiledCode x -> do
-     ret <- callPrecompiledContract (fromIntegral x) theData
-     vmState <- lift get
-     lift $ put vmState{returnVal=Just ret}
-     return ()
-   _ -> case parseTraceFlag flags_trace of
-     Fast -> runCodeFast
-     Trace -> $logInfoS "runCodeFromStart" "running traced code" >> runCodeTrace
-     SQLTrace -> $logInfoS "runCodeFromStart" "running sql traced code" >> runCodeSQLTrace 0
-     EVMProfile -> $logInfoS "runCodeFromStart" "running evm profiled code" >> runCodeEVMProfile
-     EVMMetrics -> $logInfoS "runCodeFromStart" "running evm metrics profiled code" >> runCodeEVMMetrics
+  case parseTraceFlag flags_trace of
+    Fast -> runCodeFast
+    Trace -> $logInfoS "runCodeFromStart" "running traced code" >> runCodeTrace
+    SQLTrace -> $logInfoS "runCodeFromStart" "running sql traced code" >> runCodeSQLTrace 0
+    EVMProfile -> $logInfoS "runCodeFromStart" "running evm profiled code" >> runCodeEVMProfile
+    EVMMetrics -> $logInfoS "runCodeFromStart" "running evm metrics profiled code" >> runCodeEVMMetrics
+
+runPrecompiled :: PrecompiledCode -> VMM ()
+runPrecompiled precompiled = do
+  when flags_debug $
+     lift $ $logInfoS "runPrecompiled" . T.pack $ "running precompiled code: "
+       ++ tab (CL.magenta ("\n" ++ show precompiled))
+
+  theData <- getEnvVar envInputData
+  let (gas, ret) = callPrecompiledContract precompiled theData
+  useGas gas
+  vmState <- lift get
+  lift $ put vmState{returnVal=Just ret}
+  return ()
 
 runVMM :: Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM ExecResults
 runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = force <$> do
@@ -1187,14 +1193,7 @@ call :: Bool
      -> ContextM ExecResults
 call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
      (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata = do
-
-  code <-
-    if 0 < codeAddress && codeAddress < 5
-    then return $ PrecompiledCode $ fromIntegral codeAddress
-    else fmap Code . getEVMCode' =<< addressStateCodeHash <$>
-      A.lookupWithDefault (A.Proxy @AddressState) (Address codeAddress)
-
-  let env =
+  let env code =
         Environment{
           envGasPrice=fromIntegral gasPrice,
           envBlockHeader=b,
@@ -1210,7 +1209,16 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
           envMetadata = metadata
           }
 
-  runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas $ call' noValueTransfer
+  case getPrecompiledCode (fromIntegral codeAddress) of
+    Just pc ->
+      runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env $ Code "") availableGas $
+        callPrecompiled' noValueTransfer pc
+    Nothing -> do
+      codeHash <- addressStateCodeHash <$>
+        A.lookupWithDefault (A.Proxy @AddressState) (Address codeAddress)
+      code <- Code <$> getEVMCode' codeHash
+      runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env code) availableGas $
+        call' noValueTransfer
 
 call' :: Bool -> VMM B.ByteString
 call' noValueTransfer = do
@@ -1237,6 +1245,36 @@ call' noValueTransfer = do
   --    --putStrLn $ "Result: " ++ format result
   --    putStrLn $ "Gas remaining: " ++ show (vmGasRemaining vmState) ++ ", needed: " ++ show (5*toInteger (B.length result))
   --    --putStrLn $ show (pretty address) ++ ": " ++ format result
+  let Environment{..} = environment vmState
+  action . actionData . at envOwner. mapped . actionDataCallData %=
+    (:) CallData
+          { _callDataType        = Update
+          , _callDataSender      = envSender
+          , _callDataOwner       = envOwner
+          , _callDataGasPrice    = envGasPrice
+          , _callDataValue       = envValue
+          , _callDataInput       = BSS.toShort envInputData
+          , _callDataOutput      = BSS.toShort <$> returnVal vmState
+          }
+
+  return (fromMaybe B.empty $ returnVal vmState)
+
+callPrecompiled' :: Bool -> PrecompiledCode -> VMM B.ByteString
+callPrecompiled' noValueTransfer precompiled = do
+  value <- getEnvVar envValue
+  receiveAddress <- getEnvVar envOwner
+  sender <- getEnvVar envSender
+  action . actionData %= M.insert receiveAddress (ActionData (EVMCode (SHA 0)) EVM (ActionEVMDiff M.empty) [])
+
+  --TODO- Deal with this return value
+  unless noValueTransfer $ do
+    _ <- pay "call value transfer" sender receiveAddress (fromIntegral value)
+    return ()
+
+  runPrecompiled precompiled
+
+  vmState <- lift get
+
   let Environment{..} = environment vmState
   action . actionData . at envOwner. mapped . actionDataCallData %=
     (:) CallData
