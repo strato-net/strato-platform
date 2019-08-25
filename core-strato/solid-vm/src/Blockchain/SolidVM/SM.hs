@@ -552,7 +552,7 @@ getCallInfoForAddress addr = do
     (callInfo:_) -> return callInfo
 
 getXabiType :: Mod.Modifiable [CallInfo] m => Address -> B.ByteString -> m (Maybe Xabi.Type)
-getXabiType addr field = getXabiType' field =<< getCallInfoForAddress addr
+getXabiType addr field = getXabiType' field <$> getCallInfoForAddress addr
 
 getXabiValueType :: MonadSM m => AddressedPath -> m Xabi.Type
 getXabiValueType (AddressedPath loc path) = do

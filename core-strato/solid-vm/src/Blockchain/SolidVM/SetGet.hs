@@ -97,11 +97,11 @@ toBasic = \case
   SMappingSentinel -> MS.BMappingSentinel
   x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
 
-setVar :: MonadSM m => Variable -> Value -> m Variable
-setVar (Constant dst) src = Constant <$> setVal dst src
-setVar (Variable _) val = return $ Variable val
+setVar :: MonadSM m => Variable -> Value -> m ()
+setVar (Constant dst) src = setVal dst src
+setVar (Variable var) val = liftIO $ writeIORef var val
 
-setVal :: MonadSM m => Value -> Value -> m Value
+setVal :: MonadSM m => Value -> Value -> m ()
 -- If val is a simple value, assign it. If it
 -- is deeper, read the subfields and assign to their adjustment
 
@@ -178,7 +178,7 @@ getContract :: String -> Variable -> SM Value
 getContract contractName = getVar' (Just $ TContract contractName)
 -}
 
-weakGetVar :: MonadSM m => Variable -> m Value
+weakGetVar :: MonadIO m => Variable -> m Value
 weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
 
@@ -201,7 +201,7 @@ getVar (Constant (SReference addressedPath@(AddressedPath addr key))) = do
         _ -> return $ findDefault typeHint
     _ -> return $ fromBasic theValue
 getVar (Constant v) = return v
-getVar (Variable v) = return v
+getVar (Variable v) = liftIO $ readIORef v
 
 
 getInt :: MonadSM m => Variable -> m Integer
