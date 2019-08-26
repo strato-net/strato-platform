@@ -13,7 +13,6 @@ import           Network.Kafka.Protocol
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.EthConf                 (lookupConsumerGroup)
-import           Blockchain.Sequencer.Event         (filterAnchoredTxs)
 
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
@@ -33,7 +32,7 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
         case e of
             RanBlock b -> do
                 $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
-                void $ RBDB.withRedisBlockDB (RBDB.putBlock $ filterAnchoredTxs b)
+                void $ RBDB.withRedisBlockDB (RBDB.putBlock b)
             NewBestBlock (sha, num, tdiff) -> do
                 $logInfoS "p2pIndexer" . T.pack $
                     "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ", " ++ show tdiff ++ ")"
