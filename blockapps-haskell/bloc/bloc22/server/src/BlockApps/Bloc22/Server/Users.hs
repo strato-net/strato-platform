@@ -325,10 +325,67 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
                contracts
                chainId
                (resolve || _resolve)
-  postUsersUploadList' bclp (return . signTransaction sk)
+  case join $ fmap (Map.lookup "VM") $ uploadlistcontractMetadata (head contracts) of  --Determine VM option by the metadata of the first tx in list
+    Just "EVM" -> postUsersUploadListEVM' bclp (return . signTransaction sk)
+    Just "SolidVM" -> postUsersUploadListSolidVM' bclp (return . signTransaction sk)
+    Nothing -> postUsersUploadListEVM' bclp (return . signTransaction sk) -- The EVM is the default VM
+    Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
-postUsersUploadList' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
-postUsersUploadList' ContractListParameters{..} sign = do
+postUsersUploadListSolidVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersUploadListSolidVM' ContractListParameters{..} sign = do
+  txsWithParams <- genNonces (getAccountNonce fromAddr chainId) uploadlistcontractTxParams contracts
+  namesCmIdsTxs <- fmap fst . forStateT Map.empty txsWithParams $
+    \(UploadListContract name args params value md) -> do
+      mtuple <- use $ at name
+      (_, src, cmId, xabi) <- case mtuple of
+        Just (b, src, cmId', x) -> return (b, src, cmId', x)
+        Nothing -> do
+          mContract <- lift . blocQueryMaybe $ proc () -> do
+            (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
+            returnA -< (bin16,src,cmId',x'')
+          case mContract of
+            Nothing -> throwError . UserError $ Text.concat
+              [ "Upload List: When deploying multiple contract creation transactions, "
+              , "the contracts' source code must be uploaded via the /compile route "
+              , "ahead of time. Please try uploading the contracts' source code via "
+              , "the /compile route, and try again. If you continue to receive this "
+              , "error message, please contact your administrator."
+              ]
+            Just (b16,src,(cmId' :: Int32),x') -> do
+              let (b, leftOver) = Base16.decode b16
+              unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+              x <- lift $ deserializeXabi x'
+              at name <?= (b, src, cmId', x)
+      let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
+      (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just (fmap argValueToText args)) xabiArgs
+
+      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
+      tx <- lift . signAndPrepare sign fromAddr metadata' $
+          TransactionHeader
+            Nothing
+            fromAddr
+            (fromMaybe emptyTxParams params)
+            (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+            (BC.pack $ Text.unpack src)
+            chainId
+      return ((name,cmId),tx)
+  let
+    txs = map snd namesCmIdsTxs
+  hashes <- blocStrato (postTxList txs)
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable
+    [( Nothing
+    , constant hash
+    , constant cmId
+    , constant (1 :: Int32)
+    , constant name
+    )
+    | (hash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
+    ]
+  getBatchBlocTransactionResult' chainId hashes resolve
+
+              
+postUsersUploadListEVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersUploadListEVM' ContractListParameters{..} sign = do
   txsWithParams <- genNonces (getAccountNonce fromAddr chainId) uploadlistcontractTxParams contracts
   namesCmIdsTxs <- fmap fst . forStateT Map.empty txsWithParams $
     \(UploadListContract name args params value md) -> do
