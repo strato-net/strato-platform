@@ -76,7 +76,8 @@ describe('Strato Load Test', function() {
 
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
-    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${(batchCopies * batchSize * batchCount)/seconds}`);
+    const timestamp = new Date().getTime();  //current timestamp in milliseconds
+    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS: ${(batchCopies * batchSize * batchCount)/seconds} Timestamp: ${timestamp}`);
 
   });
 
@@ -118,7 +119,7 @@ function factory_createCallList(contractAddress, batchSize, batchIndex, batchCop
         contractName: 'FiscalFactory',
         methodName: 'createFiscal',
         args: {
-            src_countryCode: `src_countryCode_${batchIndex}_${i}` 
+            src_countryCode: `src_countryCode_${batchIndex}_${i}`
           , src_currencyCode: `src_currencyCode_${batchIndex}_${i}`
           , src_phoneNumber: `src_phoneNumber_${batchIndex}_${i}`
           , src_taxCode: `src_taxCode_${batchIndex}_${i}`
@@ -152,7 +153,7 @@ function factory_createCallList(contractAddress, batchSize, batchIndex, batchCop
         contractName: 'FiscalFactory',
         methodName: 'generateFiscal',
         args: {
-            src_countryCode: `src_countryCode_${batchIndex}_${i}` 
+            src_countryCode: `src_countryCode_${batchIndex}_${i}`
           , src_currencyCode: `src_currencyCode_${batchIndex}_${i}`
           , src_phoneNumber: `src_phoneNumber_${batchIndex}_${i}`
           , src_taxCode: `src_taxCode_${batchIndex}_${i}`
