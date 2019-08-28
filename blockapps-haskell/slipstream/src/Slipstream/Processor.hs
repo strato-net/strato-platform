@@ -239,7 +239,7 @@ getCachedSolidVMDetails g row = liftM2 (<|>)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
-    detailsMap <- lift $ sourceToContractDetails True src
+    detailsMap <- lift $ sourceToContractDetails False src
     setSolidVMABIs g codePtr detailsMap
     MaybeT $ getSolidVMABIs g codePtr
   )
