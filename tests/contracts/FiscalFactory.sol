@@ -96,7 +96,7 @@ contract FiscalFactory {
                        , string datasetSpecificFields_details
                        , bool   fakeTransaction
                        ) {
-/*    Fiscal t = new Fiscal( src_countryCode
+    Fiscal t = new Fiscal( src_countryCode
                          , src_currencyCode
                          , src_phoneNumber
                          , src_taxCode
@@ -115,7 +115,7 @@ contract FiscalFactory {
                          , datasetSpecificFields_interest
                          , datasetSpecificFields_details
                          , fakeTransaction
-                         );    */
+                         );    
   } 
 
   function generateFiscal( string src_countryCode
