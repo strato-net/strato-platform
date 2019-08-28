@@ -1,6 +1,7 @@
 name: seqevents
 
 dependencies:
+  - aeson
   - base
   - binary
   - blockapps-data
