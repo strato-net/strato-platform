@@ -273,6 +273,7 @@ hydratePrivateHashes chainF b = do
                   then do
                     notHydrating "this is not the chain's next block to run"
                     logF $ "If blocksToRun is null: " ++ show (S.null _blocksToRun) ++ " Next block to run is: "++ format (_bhash $ S.elemAt 0 _blocksToRun)
+                    logF $ "All the blocksToRun: " ++ show _blocksToRun
                     adjustStatefully_ (Proxy @ChainIdEntry) chainId $
                       when (isNothing chainF) $
                         blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
