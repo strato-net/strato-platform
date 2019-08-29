@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -e
+
+userAddress=`curl -s -d '"qqqq"' -H "Content-Type: application/json" http://localhost/bloc/v2.2/users/fred | perl -pe "s/\"//g"`
+
+
+echo "user addres is $userAddress"
+
+echo "Filling up the gas tank...."
+
+curl -s -d '' http://localhost/bloc/v2.2/users/fred/$userAddress/fill?resolve > /dev/null
+
+echo "Gas tank filled"
+
+echo "Creating a new private chain"
+
+
+chainID=`curl -s -H "Content-Type: application/json" -d '{"metadata": {"VM": "SolidVM"}, "src": "pragma solidity ^0.4.25; contract qq { int gval; function qq() {gval=99;} function aFunction() returns (int) { int x = 1; return gval; } }", "label": "someChain", "balances": [{"address": "'$userAddress'", "balance": 100000000000}], "args": {"gval": 1}, "members": [{"address": "93fdd1d21502c4f87295771253f5b71d897d911c", "enode": "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"}]}' http://localhost/bloc/v2.2/chain | perl -pe "s/\"//g"`
+
+echo "chain ID is $chainID"
+
+echo "calling governance contract function"
+
+curl -s -d '{"password": "qqqq", "method": "aFunction", "args": {}}' -H "Content-Type: application/json" http://localhost/bloc/v2.2/users/fred/$userAddress/contract/qq/100/call?chainid=$chainID\&resolve | jq .
+
+
+curl -s http://localhost/strato-api/eth/v1.2/chain | jq .
+
+
