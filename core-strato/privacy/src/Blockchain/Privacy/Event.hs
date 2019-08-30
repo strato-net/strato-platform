@@ -56,7 +56,7 @@ lookupSeenChain chainId = isJust <$> lookup (Proxy @ChainIdEntry) chainId
 insertTransaction :: (SHA `Alters` OutputTx) m => OutputTx -> m ()
 insertTransaction = uncurry (insert Proxy) . (txHash &&& id)
 
-findChainHashUses :: ( (SHA `Alters` OutputBlock) m
+findChainHashUses :: ( MonadLogger m
                      , (SHA `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
                      )
@@ -65,11 +65,11 @@ findChainHashUses chainId cHashes = do
   infos <- S.unions
           . map (maybe S.empty _inBlocks)
         <$> mapM (lookup (Proxy @ChainHashEntry)) cHashes
+  logFF "Privacy/findChainHashUses" $ "blocksToRun unioning infos " ++ show infos
   adjustStatefully_ (Proxy @ChainIdEntry) chainId $ blocksToRun %= S.union infos
 
 insertPrivateHash :: ( MonadLogger m
                      , MonadMonitor m
-                     , (SHA `Alters` OutputBlock) m
                      , (SHA `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
                      )
@@ -96,6 +96,7 @@ insertPrivateHash bInfo tx = case txChainId tx of
             ]
           return Nothing
     mapM_ (insertChainBufferEntry chainId) cHashes'
+    logFF "insertPrivateHash" $ "findChainHashUses for chainId: " ++ format chainId ++ ", and cHashes': " ++ format cHashes'
     findChainHashUses chainId cHashes'
 
 lookupChainIdFromChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m (Maybe Word256)
@@ -208,6 +209,7 @@ runBlocks chainId = go
           fmap (fromMaybe [] . join) . for mBlock $ \block -> do
             mHydrated <- hydratePrivateHashes (Just chainId) block
             for mHydrated $ \b -> do
+              logFF "Privacy/runBlocks" $ "blocksToRun deleting " ++ format b0
               adjustStatefully_ (Proxy @ChainIdEntry) chainId $
                 blocksToRun %= S.delete b0
               (b:) <$> go
@@ -277,6 +279,7 @@ hydratePrivateHashes chainF b = do
                     logF $ "bHash of this tx: " ++ show bHash
                     adjustStatefully_ (Proxy @ChainIdEntry) chainId $
                       when (isNothing chainF) $
+                        --logF $ "blocksToRun inserting " ++ format bHash 
                         blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                     return (Nothing, (dts,S.insert chainId cs))
                   else do
@@ -285,6 +288,7 @@ hydratePrivateHashes chainF b = do
                         notHydrating "we don't have this transaction's body"
                         adjustStatefully_ (Proxy @ChainIdEntry) chainId $ do
                           when (isNothing chainF) $
+                            -- logF $ "blocksToRun inserting " ++ format bHash 
                             blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                         return (Nothing, (tHash:dts, S.insert chainId cs))
                       Just ptx -> do
@@ -356,6 +360,7 @@ insertNewChainInfo chainId cInfo = do
       return []
     True -> do
       insertChainBufferEntry chainId cHash
+      logFF "insertNewChainInfo" $ "findChainHashUses for chainId: " ++ format chainId ++ ", and cHash: " ++ format cHash
       findChainHashUses chainId [cHash]
       runBlocks chainId
 
