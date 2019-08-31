@@ -55,6 +55,7 @@ import           Executable.EVMFlags
 
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
+import           Blockchain.Data.ExecResults
 import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.StorageDB
 import qualified Blockchain.SolidVM                      as SolidVM
@@ -184,7 +185,11 @@ insertNewChains events = do
     $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
     let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
     _ <- chainInfoToGenesisState theVM cInfo
-    sr <- runChainConstructor cId
+    let maybeSource =
+          case codeInfo $ chainInfo cInfo of
+            [] -> Nothing
+            (s:_) -> Just $ codeInfoSource s
+    sr <- runChainConstructor cId maybeSource
     mGSR <- getGenesisStateRoot cId
     case mGSR of
       Just gsr -> do
@@ -199,15 +204,16 @@ insertNewChains events = do
 
 
 
-runChainConstructor :: Word256 -> ContextM MP.StateRoot
-runChainConstructor cId = do
+runChainConstructor :: Word256 -> Maybe T.Text -> ContextM MP.StateRoot
+runChainConstructor cId maybeSource = do  
   -- We are inventing the rules of how the constructor should run when a chain is created.
   -- Since all VM runs need some environment variables passed in, we need to define what all of
   -- those variables should be.  The truth is, most of these variables are rarely used, but we
   -- still need to pre-decide what they should be else the VM would crash whenever they are used.
   -- I've set most of these variables to default dummy values below...  We might decide to refine
   -- some of these variables in the future.
-  _ <- SolidVM.call
+
+  ExecResults {erAction=maybeAction} <- SolidVM.call
          False --isRunningTests
          True --isHomestead
          False --noValueTransfer
@@ -221,7 +227,7 @@ runChainConstructor cId = do
             MP.emptyTriePtr
             ""
             0
-            (-1)
+            0 --block number
             100000000000
             0
             (posixSecondsToUTCTime 0)
@@ -239,11 +245,18 @@ runChainConstructor cId = do
          (Address 0)
          (SHA 0)
          (Just cId)
-         (Just $ M.fromList [("args", "()"), ("funcName", "<constructor>")])
-  
+         (Just $ M.fromList $
+           [("args", "()"), ("funcName", "<constructor>")]
+           ++ case maybeSource of Nothing -> []; Just s -> [("src", s)])
+
   flushMemStorageDB
   Mem.flushMemAddressStateDB
 
+  case maybeAction of
+    Nothing -> return ()
+    Just action -> 
+      void . K.withKafkaViolently $ writeActionJSONToKafka [action]
+  
   Mod.get (Proxy @MP.StateRoot)
 
 
