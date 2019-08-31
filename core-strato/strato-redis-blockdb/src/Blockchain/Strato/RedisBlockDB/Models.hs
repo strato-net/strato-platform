@@ -16,6 +16,7 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction   as TXD
+import           Blockchain.Data.TransactionDef (formatChainId)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
@@ -101,6 +102,10 @@ instance (RLPSerializable a) => RedisDBValuable [a] where
     toValue         = rlpSerialize . RLPArray . fmap rlpEncode
     fromValue bytes = let (RLPArray elems) = rlpDeserialize bytes in rlpDecode <$> elems
 
+instance (RLPSerializable a, RLPSerializable b) => RedisDBValuable (a,b) where
+    toValue (a,b)   = rlpSerialize $ RLPArray [rlpEncode a, rlpEncode b]
+    fromValue bytes = let (RLPArray [a,b]) = rlpDeserialize bytes in (rlpDecode a, rlpDecode b)
+
 newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving newtype (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
 newtype RedisTx        = RedisTx       TXD.Transaction deriving newtype (Eq, Read, Show, RLPSerializable, TransactionLike)
 newtype RedisTxs       = RedisTxs      [RedisTx]       deriving newtype (Eq, Read, Show, RedisDBValuable)
@@ -142,7 +147,7 @@ displayForNamespace ns input = case ns of
     Uncles -> let RedisUncles us = fromValue input in show us
     PrivateChainInfo -> let RedisChainInfo info = fromValue input in show info
     PrivateChainMembers -> let RedisChainMembers mems = fromValue input in show mems
-    PrivateTransactions -> let RedisTx tx = fromValue input in format tx
+    PrivateTransactions -> let (anchor, RedisTx tx) = fromValue input in formatChainId (Just anchor) ++ format tx
     PrivateTxsInBlocks -> let RedisChainTxsInBlocks ctibs = fromValue input in show ctibs
     PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
     PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)

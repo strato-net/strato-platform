@@ -28,7 +28,6 @@ import           Blockchain.Data.Transaction         (insertTX)
 import           Blockchain.DBM
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
-import           Blockchain.Sequencer.Event         (filterAnchoredTxs)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
@@ -62,7 +61,7 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         then do
             insertStartTime <- liftIO $ getTime Realtime
             $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
-            bids <- lift $ putBlocks ((outputBlockToBlock &&& obTotalDifficulty) . filterAnchoredTxs <$> blocks) False
+            bids <- lift $ putBlocks ((outputBlockToBlock &&& obTotalDifficulty) <$> blocks) False
             resultsTime <- liftIO $ getTime Realtime
             IndexerBestBlockInfo bestBid <- getIndexerBestBlockInfo
             bestBidTime <- liftIO $ getTime Realtime
