@@ -227,7 +227,7 @@ genericInsertSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
                        -> SequencerM ()
 genericInsertSequencer registry p k a = do
   registry . at k ?= Modification a
-  addLdbBatchOps . (:[]) $ batchInsertInLDB p k a
+  insertInLDB p k a
 
 genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
                        => Lens' SequencerContext (Map (NSKey a) (Modification a))
