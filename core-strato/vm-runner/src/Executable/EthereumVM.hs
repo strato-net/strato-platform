@@ -184,12 +184,15 @@ insertNewChains events = do
     $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
     $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
     let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
-    _ <- chainInfoToGenesisState theVM cInfo
+    sr' <- chainInfoToGenesisState theVM cInfo
     let maybeSource =
           case codeInfo $ chainInfo cInfo of
             [] -> Nothing
             (s:_) -> Just $ codeInfoSource s
-    sr <- runChainConstructor cId maybeSource
+    sr <-
+      case theVM of
+        "SolidVM" -> runChainConstructor cId maybeSource
+        _ -> return sr'
     mGSR <- getGenesisStateRoot cId
     case mGSR of
       Just gsr -> do
