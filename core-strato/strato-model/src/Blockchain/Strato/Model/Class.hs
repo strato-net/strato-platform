@@ -94,10 +94,11 @@ class (RLPSerializable t) => TransactionLike t where
     txData        :: t -> Maybe B.ByteString -- todo make a `Code` newtype
     txChainId     :: t -> Maybe Word256
     txMetadata    :: t -> Maybe (Map Text Text)
+    txAnchorChain :: t -> Maybe Word256
 
     morphTx :: (TransactionLike t2) => t2 -> t
     {-# MINIMAL txHash, txPartialHash, txChainHash, txSigner, txNonce, txType, txSignature, txValue,
-        txDestination, txGasPrice, txGasLimit, txCode, txData, txChainId, txMetadata, morphTx #-}
+        txDestination, txGasPrice, txGasLimit, txCode, txData, txChainId, txMetadata, txAnchorChain, morphTx #-}
 
     txSigR :: t -> Integer
     txSigR t = let (r, _, _) = txSignature t in r

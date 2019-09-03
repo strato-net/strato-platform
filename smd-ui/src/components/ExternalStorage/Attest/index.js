@@ -79,7 +79,7 @@ class Attest extends Component {
 
     const isPublicMode = isModePublic();
 
-    return <React.Fragment>
+    return <div>
       <div className="row">
         <div className="col-sm-3 text-right">
           <label className="pt-label smd-pad-4">
@@ -121,7 +121,7 @@ class Attest extends Component {
           <span className="error-text">{this.errorMessageFor('password')}</span>
         </div>
       </div>
-    </React.Fragment>
+    </div>
   }
 
   renderAddress = (isPublicMode) => {

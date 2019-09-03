@@ -146,8 +146,8 @@ feedBackOutputsToInput = map rebox
     where rebox (OETx ts t) = IETx ts $ unboxTx t
           rebox (OEBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles
           rebox x = error $ "why are we testing against " ++ show x
-          unboxTx (OutputTx origin _ _ base) = IngestTx origin base
-          unboxBlockTx (OutputTx _ _ _ base) = base
+          unboxTx (OutputTx origin _ _ _ base) = IngestTx origin base
+          unboxBlockTx (OutputTx _ _ _ _ base) = base
 
 spec :: Spec
 spec = do

@@ -29,6 +29,7 @@ import           InsertP2P
 import           InsertSeq
 import           InsertTX
 import           Kafka
+import           Privacy
 import           Psql
 import           Raw
 import           RawMP
@@ -84,6 +85,8 @@ data Options = State{root::String, db::String}
              | ChainHash
              | DeriveEnode { privatekey :: String, ip :: String }
              | CompressRoundChanges { infilename :: String, outfilename :: String }
+             | GetPrivacy { registry :: String, key :: String }
+             | PutPrivacy { registry :: String, key :: String , value :: String }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -330,6 +333,19 @@ compressRoundChangesOptions = record CompressRoundChanges { infilename = error "
                             , outfilename := error "compressroundchanges --outfilename=<file>" += typ "PATH" += explicit += name "outfilename"
                             ]
 
+getPrivacyOptions :: Annotate Ann
+getPrivacyOptions = record GetPrivacy { registry = error "unused registry", key = error "unused key"}
+                            [ registry := error "getprivacy --registry=<registry>" += typ "STRING" += explicit += name "registry"
+                            , key := error "getprivacy --key=<key>" += typ "STRING" += explicit += name "key"
+                            ]
+
+putPrivacyOptions :: Annotate Ann
+putPrivacyOptions = record PutPrivacy { registry = error "unused registry", key = error "unused key", value = error "unused value"}
+                            [ registry := error "putprivacy --registry=<registry>" += typ "STRING" += explicit += name "registry"
+                            , key := error "putprivacy --key=<key>" += typ "STRING" += explicit += name "key"
+                            , value := error "putprivacy --value=<value>" += typ "STRING" += explicit += name "value"
+                            ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -371,6 +387,8 @@ options = modes_ [blockGoOptions
                 , chainHashOptions
                 , deriveEnodeOptions
                 , compressRoundChangesOptions
+                , getPrivacyOptions
+                , putPrivacyOptions
                 ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
@@ -429,3 +447,5 @@ run SetParticipationMode{..}   = remoteSetParticipationMode mode
 run ChainHash                  = chainHash
 run DeriveEnode{..}            = deriveEnode privatekey ip
 run CompressRoundChanges{..}   = compressRoundChanges infilename outfilename
+run GetPrivacy{..}             = putStrLn =<< getPrivacy registry key True
+run PutPrivacy{..}             = putStrLn =<< putPrivacy registry key value True
