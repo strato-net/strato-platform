@@ -82,7 +82,6 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   checkForVotes [cr | VoteMade cr <- events]
   checkForTimeouts [rn | TimerFire rn <- events]
   checkForUnseq [iev | UnseqEvent iev <- events]
-  prunePrivacyDBs
   vmEvs <- drainVM
   unless (null vmEvs) $ do
     writeSeqVmEvents vmEvs

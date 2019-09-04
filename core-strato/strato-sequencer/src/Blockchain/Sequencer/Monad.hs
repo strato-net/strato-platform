@@ -27,7 +27,6 @@ module Blockchain.Sequencer.Monad (
   , genericDeleteSequencer
   , getChainsDB
   , getTransactionsDB
-  , prunePrivacyDBs
   , runSequencerM
   , pairToOETx
   , markForVM
@@ -92,16 +91,14 @@ import           Text.Format
 
 import qualified Database.LevelDB                          as LDB
 
-data Modification a = Modification a | Deletion
-
 data SequencerContext = SequencerContext
   { _dependentBlockDB    :: DependentBlockDB
   , _seenTransactionDB   :: SeenTransactionDB
   , _dbeRegistry         :: Map SHA DependentBlockEntry
-  , _blockHashRegistry   :: Map SHA (Modification OutputBlock)
-  , _txHashRegistry      :: Map SHA (Modification OutputTx)
-  , _chainHashRegistry   :: Map SHA (Modification ChainHashEntry)
-  , _chainIdRegistry     :: Map Word256 (Modification ChainIdEntry)
+  , _blockHashRegistry   :: Map SHA OutputBlock
+  , _txHashRegistry      :: Map SHA OutputTx
+  , _chainHashRegistry   :: Map SHA ChainHashEntry
+  , _chainIdRegistry     :: Map Word256 ChainIdEntry
   , _getChainsDB         :: GetChainsDB
   , _getTransactionsDB   :: GetTransactionsDB
   , _ldbBatchOps         :: Q.Seq LDB.BatchOp
@@ -205,80 +202,69 @@ batchDeleteInLDB :: HasNamespace a
                  => Mod.Proxy a -> NSKey a -> LDB.BatchOp
 batchDeleteInLDB p k = LDB.Del (namespaced p k)
 
-genericLookupSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
-                       => Lens' SequencerContext (Map (NSKey a) (Modification a))
-                       -> Mod.Proxy a
+genericLookupSequencer :: (Binary a, HasNamespace a)
+                       => Mod.Proxy a
                        -> NSKey a
                        -> SequencerM (Maybe a)
-genericLookupSequencer registry p k = use (registry . at k) >>= \case
-  Just Deletion -> return Nothing
-  Just (Modification a) -> return $ Just a
-  Nothing -> lookupInLDB p k >>= \case
+genericLookupSequencer p k =lookupInLDB p k >>= \case
     Nothing -> return Nothing
     Just a -> do
-      registry . at k ?= Modification a
       return $ Just a
 
-genericInsertSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
-                       => Lens' SequencerContext (Map (NSKey a) (Modification a))
-                       -> Mod.Proxy a
+genericInsertSequencer :: (Binary a, HasNamespace a)
+                       => Mod.Proxy a
                        -> NSKey a
                        -> a
                        -> SequencerM ()
-genericInsertSequencer registry p k a = do
-  registry . at k ?= Modification a
-  insertInLDB p k a
+genericInsertSequencer p k a = insertInLDB p k a
 
-genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
-                       => Lens' SequencerContext (Map (NSKey a) (Modification a))
-                       -> Mod.Proxy a
+genericDeleteSequencer :: (HasNamespace a)
+                       => Mod.Proxy a
                        -> NSKey a
                        -> SequencerM ()
-genericDeleteSequencer registry p k = do
-  registry . at k ?= Deletion
-  addLdbBatchOps . (:[]) $ batchDeleteInLDB p k
+genericDeleteSequencer p k = deleteInLDB p k
 
 instance (SHA `A.Alters` OutputBlock) SequencerM where
-  lookup = genericLookupSequencer blockHashRegistry
+  lookup = genericLookupSequencer
   insert p k v = do
-    genericInsertSequencer blockHashRegistry p k v
+    genericInsertSequencer p k v
     sz <- M.size <$> use blockHashRegistry
     liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
   delete p k = do
-    genericDeleteSequencer blockHashRegistry p k
+    genericDeleteSequencer p k
     sz <- M.size <$> use blockHashRegistry
     liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
 
 instance (SHA `A.Alters` OutputTx) SequencerM where
-  lookup = genericLookupSequencer txHashRegistry
+  lookup = genericLookupSequencer
   insert p k v = do
-    genericInsertSequencer txHashRegistry p k v
+    genericInsertSequencer p k v
     sz <- M.size <$> use txHashRegistry
     liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
   delete p k = do
-    genericDeleteSequencer txHashRegistry p k
+    genericDeleteSequencer p k
     sz <- M.size <$> use txHashRegistry
     liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
 
 instance (SHA `A.Alters` ChainHashEntry) SequencerM where
-  lookup = genericLookupSequencer chainHashRegistry
+  lookup = genericLookupSequencer
   insert p k v = do
-    genericInsertSequencer chainHashRegistry p k v
+    genericInsertSequencer p k v
     sz <- M.size <$> use chainHashRegistry
     liftIO $ withLabel chainHashRegistrySize "chain_hash_registry" (flip setGauge (fromIntegral sz))
   delete p k = do
-    genericDeleteSequencer chainHashRegistry p k
+    genericDeleteSequencer p k
     sz <- M.size <$> use chainHashRegistry
     liftIO $ withLabel chainHashRegistrySize "chain_hash_registry" (flip setGauge (fromIntegral sz))
 
 instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
-  lookup = genericLookupSequencer chainIdRegistry
+  lookup = genericLookupSequencer
   insert p k v = do
-    genericInsertSequencer chainIdRegistry p k v
+    genericInsertSequencer p k v
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
   delete p k = do
-    genericDeleteSequencer chainIdRegistry p k
+    genericDeleteSequencer p k
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
 
@@ -307,16 +293,6 @@ instance (SHA `A.Alters` ()) SequencerM where
 instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = assign (blockstanbulContext . _Just)
-
-prunePrivacyDBs :: SequencerM ()
-prunePrivacyDBs = do
-  prune blockHashRegistry
-  prune txHashRegistry
-  prune chainHashRegistry
-  prune chainIdRegistry
-  where prune = flip (%=) . M.mapMaybe $ \case
-          Modification a -> Just $ Modification a
-          Deletion       -> Nothing
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
