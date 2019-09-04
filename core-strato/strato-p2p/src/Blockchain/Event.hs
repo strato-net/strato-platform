@@ -15,7 +15,7 @@ module Blockchain.Event (
 
 import           Control.Arrow                         ((&&&), first)
 import           Control.Monad
-import           Control.Monad.Change.Modify           hiding (get, put)
+import           Control.Monad.Change.Modify           hiding (get, put, yield, awaitForever)
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.State
