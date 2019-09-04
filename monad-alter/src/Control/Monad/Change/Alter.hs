@@ -84,11 +84,20 @@ class (Ord k, Monad f) => Alters k a f where
      to insert the new value in the Map. From `alter`, we can derive every other function in the
      `Alters` typeclass. However, for many cases, defining `alter` by itself is not the most
      efficient implementation for the underlying monad. The default instance is implemented as
-     the singleton version of `alterMany`, but could also be implemented as a combination of
-     `lookup`, `insert`, and `delete`.
+     a combination of `lookup`, `insert`, and `delete`, but could also be implemented as
+     the singleton case of `alterMany`.
+     NB: Since most monads implement `Alters` only using `lookup`, `insert`, and `delete`,
+         and all of the compound functions are defined in terms of `alter`, it only makes
+         sense to define `alter` in terms of `lookup`, `insert`, and `delete`.
   -}
   alter :: Proxy a -> k -> (Maybe a -> f (Maybe a)) -> f (Maybe a)
-  alter p k f = M.lookup k <$> alterMany p [k] (M.alterF f k)
+  alter p k f = do
+    ma <- lookup p k
+    ma' <- f ma
+    case ma' of
+      Just a -> insert p k a
+      Nothing -> when (isJust ma) $ delete p k
+    return ma'
 
   {- lookupMany
      Take a list of keys, and return a `Map k a` of the keys and their values existing in the
@@ -96,13 +105,13 @@ class (Ord k, Monad f) => Alters k a f where
      but could also be implemented as `alterMany` on the identity function.
   -}
   lookupMany :: Proxy a -> [k] -> f (Map k a)
-  lookupMany p ks = M.fromList . catMaybes <$> forM ks (\k -> fmap (k,) <$> lookup p k)
+  lookupMany p ks = M.fromList . catMaybes <$> forM ks (\k -> fmap (k,) <$> alter p k pure)
 
   {- lookup
      Lookup the corresponding value for a given key `k` in the underlying monad `f`
   -}
   lookup :: Proxy a -> k -> f (Maybe a)
-  lookup p k = alter p k pure
+  lookup p k = M.lookup k <$> alterMany p [k] pure
 
   {- insertMany
      Take a `Map k a`, and insert/overwrite its entries in the underlying monad `f`.
@@ -110,13 +119,13 @@ class (Ord k, Monad f) => Alters k a f where
      but could also be implemented as `alterMany` on the `const . Just` function.
   -}
   insertMany :: Proxy a -> Map k a -> f ()
-  insertMany p m = forM_ (M.assocs m) . uncurry $ insert p
+  insertMany p m = forM_ (M.assocs m) $ \(k,a) -> alter_ p k (pure . const (Just a))
 
   {- insert
      Insert the corresponding key/value pair in the underlying monad `f`
   -}
   insert :: Proxy a -> k -> a -> f ()
-  insert p k a = alter_ p k (pure . const (Just a))
+  insert p k a = alterMany_ p [k] (pure . const (M.singleton k a))
 
   {- deleteMany
      Take a list of keys, and delete the corresponding entries in the underlying monad `f`.
@@ -124,13 +133,13 @@ class (Ord k, Monad f) => Alters k a f where
      but could also be implemented as `alterMany` on the `const Nothing` function.
   -}
   deleteMany :: Proxy a -> [k] -> f ()
-  deleteMany p ks = forM_ ks $ delete p
+  deleteMany p ks = forM_ ks $ \k -> alter_ p k (pure . const Nothing)
 
   {- delete
      Delete the corresponding entry for the key `k` in the underlying monad `f`
   -}
   delete :: Proxy a -> k -> f ()
-  delete p k = alter_ p k (pure . const Nothing)
+  delete p k = alterMany_ p [k] (pure . const M.empty)
 
   {-# MINIMAL alterMany
             | alter
