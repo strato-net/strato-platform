@@ -326,9 +326,13 @@ callWrapper from to mContract functionName argExps = do
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
   initializeAction to (_contractName contract) hsh
 
+  let functionsIncludingConstructor =
+        case contract^.constructor of
+          Nothing -> contract^.functions
+          Just c -> M.insert "<constructor>" c $ contract^.functions
 
   (f, args) <-
-        case M.lookup functionName $ contract^.functions of
+        case M.lookup functionName functionsIncludingConstructor of
           Just theFunction -> do
             args' <- argsToVals contract' theFunction argExps
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args'
