@@ -11,7 +11,7 @@ module Blockchain.SeqEventNotify (
   ) where
 
 import           Conduit
-import           Control.Monad.Change.Modify
+import           Control.Monad.Change.Modify (Modifiable(..))
 import           Control.Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import           Blockchain.Output
