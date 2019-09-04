@@ -2,7 +2,7 @@
 
 ### Version 7.4.4
 
--   Make solidity-parser library synchronous
+-   Make calls to solidity-parser library synchronous
 
 ### Version 7.4.3
 
