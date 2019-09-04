@@ -64,19 +64,6 @@ import           Prelude                     hiding (lookup)
 -}
 class (Ord k, Monad f) => Alters k a f where
 
-  {- alterMany
-     Apply an effectful function to a `Map k a`, and return the new Map.
-     The default instance is a combination of `{lookup, insert, delete}Many`.
-     Could also be implemented as the list version of `alter`
-  -}
-  alterMany :: Proxy a -> [k] -> (Map k a -> f (Map k a)) -> f (Map k a)
-  alterMany p ks f = do
-    m <- lookupMany p ks
-    m' <- f m
-    deleteMany p . M.keys $ m M.\\ m'
-    insertMany p m'
-    return m'
-
   {- alter
      The most general function that can be applied to a Map-like structure.
      Apply an effectful function to a `Maybe a`, which represents a value that may or may not
@@ -99,53 +86,60 @@ class (Ord k, Monad f) => Alters k a f where
       Nothing -> when (isJust ma) $ delete p k
     return ma'
 
-  {- lookupMany
-     Take a list of keys, and return a `Map k a` of the keys and their values existing in the
-     underlying monad `f`. The default instance is implemented as the list version of `lookup`,
-     but could also be implemented as `alterMany` on the identity function.
-  -}
-  lookupMany :: Proxy a -> [k] -> f (Map k a)
-  lookupMany p ks = M.fromList . catMaybes <$> forM ks (\k -> fmap (k,) <$> alter p k pure)
-
   {- lookup
      Lookup the corresponding value for a given key `k` in the underlying monad `f`
   -}
   lookup :: Proxy a -> k -> f (Maybe a)
-  lookup p k = M.lookup k <$> alterMany p [k] pure
-
-  {- insertMany
-     Take a `Map k a`, and insert/overwrite its entries in the underlying monad `f`.
-     The default instance is implemented as the list version of `insert`,
-     but could also be implemented as `alterMany` on the `const . Just` function.
-  -}
-  insertMany :: Proxy a -> Map k a -> f ()
-  insertMany p m = forM_ (M.assocs m) $ \(k,a) -> alter_ p k (pure . const (Just a))
+  lookup p k = alter p k pure
 
   {- insert
      Insert the corresponding key/value pair in the underlying monad `f`
   -}
   insert :: Proxy a -> k -> a -> f ()
-  insert p k a = alterMany_ p [k] (pure . const (M.singleton k a))
-
-  {- deleteMany
-     Take a list of keys, and delete the corresponding entries in the underlying monad `f`.
-     The default instance is implemented as the list version of `delete`,
-     but could also be implemented as `alterMany` on the `const Nothing` function.
-  -}
-  deleteMany :: Proxy a -> [k] -> f ()
-  deleteMany p ks = forM_ ks $ \k -> alter_ p k (pure . const Nothing)
+  insert p k a = alter_ p k $ pure . const (Just a)
 
   {- delete
      Delete the corresponding entry for the key `k` in the underlying monad `f`
   -}
   delete :: Proxy a -> k -> f ()
-  delete p k = alterMany_ p [k] (pure . const M.empty)
+  delete p k = alter_ p k $ pure . const Nothing
 
-  {-# MINIMAL alterMany
-            | alter
-            | lookupMany, insertMany, deleteMany
+  {-# MINIMAL alter
             | lookup, insert, delete
     #-}
+
+  {- alterMany
+     Apply an effectful function to a `Map k a`, and return the new Map.
+     The default instance is a combination of `{lookup, insert, delete}Many`.
+  -}
+  alterMany :: Proxy a -> [k] -> (Map k a -> f (Map k a)) -> f (Map k a)
+  alterMany p ks f = do
+    m <- lookupMany p ks
+    m' <- f m
+    deleteMany p . M.keys $ m M.\\ m'
+    insertMany p m'
+    return m'
+
+  {- lookupMany
+     Take a list of keys, and return a `Map k a` of the keys and their values existing in the
+     underlying monad `f`. The default instance is implemented as the list version of `lookup`.
+  -}
+  lookupMany :: Proxy a -> [k] -> f (Map k a)
+  lookupMany p ks = M.fromList . catMaybes <$> forM ks (\k -> fmap (k,) <$> lookup p k)
+
+  {- insertMany
+     Take a `Map k a`, and insert/overwrite its entries in the underlying monad `f`.
+     The default instance is implemented as the list version of `insert`.
+  -}
+  insertMany :: Proxy a -> Map k a -> f ()
+  insertMany p m = forM_ (M.assocs m) . uncurry $ insert p
+
+  {- deleteMany
+     Take a list of keys, and delete the corresponding entries in the underlying monad `f`.
+     The default instance is implemented as the list version of `delete`.
+  -}
+  deleteMany :: Proxy a -> [k] -> f ()
+  deleteMany p ks = forM_ ks $ delete p
 
   {- alterMany_
      Same as `alterMany` except it discards the return value.
