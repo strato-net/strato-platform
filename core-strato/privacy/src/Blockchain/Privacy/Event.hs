@@ -83,16 +83,45 @@ insertPrivateHash bInfo tx = case txChainId tx of
     let cHashes = generateChainHashes tx
     cHashes' <- fmap catMaybes . forM cHashes $ \cHash -> do
       didInsert <- insertChainHash bInfo cHash chainId
-      if didInsert
-        then return $ Just cHash
-        else do
-          $logErrorS "insertPrivateHash" . T.pack $ concat
-            [ "insertChainHash failed for BlockInfo "
-            , format bInfo
-            , ", chain hash "
+      case didInsert of
+        Inserted -> do
+          logFF "insertPrivateHash" $ concat
+            [ " Successfully inserted chain hash "
             , format cHash
-            , ", chain ID "
+            , " for chain ID "
             , formatChainId $ Just chainId
+            ]
+          return $ Just cHash
+        AlreadyExistsOnSameChain -> do
+          logFF "insertPrivateHash" $ concat
+            [ "Chain hash "
+            , format cHash
+            , " for chain ID "
+            , formatChainId $ Just chainId
+            , " has been previously inserted for the same chain ID."
+            , " Not reinserting."
+            ]
+          return Nothing
+        SeenPreviouslyOnUnknownChain bi -> do
+          $logErrorS "insertPrivateHash" . T.pack $ concat
+            [ "Chain hash "
+            , format cHash
+            , " has been seen previous to block "
+            , format bInfo
+            , " in block "
+            , format bi
+            , ". This is most likely a bug in the STRATO platform."
+            , " Please file this as an issue at https://github.com/blockapps/strato-getting-started/"
+            ]
+          return Nothing
+        WrongChainId cid -> do
+          $logErrorS "insertPrivateHash" . T.pack $ concat
+            [ "Initial chain hash of chain ID "
+            , formatChainId $ Just chainId
+            , " was previously associated with a different chain, "
+            , formatChainId $ Just cid
+            , ". This is most likely a bug in the STRATO platform."
+            , " Please file this as an issue at https://github.com/blockapps/strato-getting-started/"
             ]
           return Nothing
     mapM_ (insertChainBufferEntry chainId) cHashes'
@@ -102,14 +131,25 @@ insertPrivateHash bInfo tx = case txChainId tx of
 lookupChainIdFromChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m (Maybe Word256)
 lookupChainIdFromChainHash ch = join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) ch
 
-insertChainHash :: (SHA `Alters` ChainHashEntry) m => BlockInfo -> SHA -> Word256 -> m Bool
+data InsertChainHashResult = Inserted
+                           | AlreadyExistsOnSameChain
+                           | SeenPreviouslyOnUnknownChain BlockInfo
+                           | WrongChainId Word256
+
+insertChainHash :: (SHA `Alters` ChainHashEntry) m
+                => BlockInfo
+                -> SHA
+                -> Word256
+                -> m InsertChainHashResult
 insertChainHash obi cHash chainId = lookup Proxy cHash >>= \case
-  Nothing -> True <$ insert Proxy cHash (chainHashEntryWithChainId chainId)
+  Nothing -> Inserted <$ insert Proxy cHash (chainHashEntryWithChainId chainId)
   Just ChainHashEntry{..} -> case _onChainId of
-    Just cId -> return $ cId == chainId
+    Just cid -> if cid == chainId
+                  then return AlreadyExistsOnSameChain
+                  else return $ WrongChainId cid
     Nothing -> case S.lookupMin _inBlocks of
-      Just bi | bi <= obi -> return False
-      _ -> True <$ adjustStatefully_ Proxy cHash (onChainId .= Just chainId)
+      Just bi | bi <= obi -> return $ SeenPreviouslyOnUnknownChain bi
+      _ -> Inserted <$ adjustStatefully_ Proxy cHash (onChainId .= Just chainId)
 
 useChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m ()
 useChainHash cHash = adjustWithDefaultStatefully_ Proxy cHash $ used .= True
@@ -348,21 +388,43 @@ insertNewChainInfo chainId cInfo = do
   let bHash = creationBlock $ chainInfo cInfo
   bInfo <- BlockInfo bHash . maybe 0 blockOrdering <$> lookup (Proxy @OutputBlock) bHash
   insertChainHash bInfo cHash chainId >>= \case
-    False -> do
+    Inserted -> do
+      insertChainBufferEntry chainId cHash
+      logFF "insertNewChainInfo" $ "findChainHashUses for chainId: " ++ format chainId ++ ", and cHash: " ++ format cHash
+      findChainHashUses chainId [cHash]
+      runBlocks chainId
+    AlreadyExistsOnSameChain -> do
+      logFF "insertNewChainInfo" $ concat
+        [ "Initial chain hash "
+        , format cHash
+        , " of chain ID "
+        , formatChainId $ Just chainId
+        , " has been previously inserted for the same chain ID."
+        , " Not reinserting."
+        ]
+      return []
+    SeenPreviouslyOnUnknownChain bi -> do
       $logErrorS "insertNewChainInfo" . T.pack $ concat
         [ "Initial chain hash of chain ID "
         , formatChainId $ Just chainId
         , " found before chain's creation block "
         , format bInfo
+        , " in block "
+        , format bi
         , ". This is most likely a bug in the STRATO platform."
         , " Please file this as an issue at https://github.com/blockapps/strato-getting-started/"
         ]
       return []
-    True -> do
-      insertChainBufferEntry chainId cHash
-      logFF "insertNewChainInfo" $ "findChainHashUses for chainId: " ++ format chainId ++ ", and cHash: " ++ format cHash
-      findChainHashUses chainId [cHash]
-      runBlocks chainId
+    WrongChainId cid -> do
+      $logErrorS "insertNewChainInfo" . T.pack $ concat
+        [ "Initial chain hash of chain ID "
+        , formatChainId $ Just chainId
+        , " was previously associated with a different chain, "
+        , formatChainId $ Just cid
+        , ". This is most likely a bug in the STRATO platform."
+        , " Please file this as an issue at https://github.com/blockapps/strato-getting-started/"
+        ]
+      return []
 
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType
