@@ -32,7 +32,6 @@ import           Blockchain.Privacy.Metrics
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
-import           Control.Arrow                 ((&&&))
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Change.Alter
