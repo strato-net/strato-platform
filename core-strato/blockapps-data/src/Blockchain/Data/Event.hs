@@ -8,8 +8,8 @@ import           GHC.Generics
 
 data Event =
   Event {
-    name   :: String,
-    args   :: [(String, String)] -- TODO: probably think of better types, fields for this
+    evName   :: String,
+    evArgs   :: [String] -- TODO: probably think of better types, fields for this
     } deriving (Eq, Read, Show, Generic)
 
 instance NFData Event

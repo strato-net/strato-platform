@@ -157,7 +157,7 @@ LogDB
 
 EventDB
     name String
-    args [TextPair]
+    args [String]
     deriving Eq Read Show Generic
 
 ChainInfoRef
