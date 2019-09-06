@@ -155,6 +155,11 @@ LogDB
     bloom Word512
     deriving Eq Read Show Generic
 
+EventDB
+    name String
+    args [TextPair]
+    deriving Eq Read Show Generic
+
 ChainInfoRef
     chainId Word256
     chainLabel String
