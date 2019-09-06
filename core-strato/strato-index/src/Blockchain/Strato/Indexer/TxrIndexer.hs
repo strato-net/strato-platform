@@ -22,9 +22,10 @@ import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.ChainInfoDB        (addMember, removeMember, terminateChain)
-import           Blockchain.Data.DataDefs           (LogDB (..), TransactionResult (..))
+import           Blockchain.Data.DataDefs           (LogDB (..), EventDB (..), TransactionResult (..))
 import           Blockchain.Data.Enode
 import qualified Blockchain.Data.LogDB              as LogDB
+import qualified Blockchain.Data.EventDB            as EventDB
 import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 
@@ -89,6 +90,9 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                       lift $ terminateChain chainId
                     _ -> return ()
                 void . lift $ LogDB.putLogDB l
+            EventDBEntry ev -> do
+              $logInfoS "txrIndexer" . T.pack $ "Inserting EventDB entry for Event: " ++ eventDBName ev ++ " with args: " ++ show (eventDBArgs ev)
+              void . lift $ EventDB.putEventDB ev
             TxResult r -> do
                 $logInfoS "txrIndexer" . T.pack $
                     "Inserting TXResult for tx " ++ format (transactionResultTransactionHash r) ++ " at block " ++ format (transactionResultBlockHash r)

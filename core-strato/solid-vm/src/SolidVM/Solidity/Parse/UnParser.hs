@@ -165,7 +165,13 @@ unparseStatement (Return (Just e)) = "return " ++ unparseExpression e ++ ";"
 unparseStatement Break = "break;"
 unparseStatement Continue = "continue;"
 unparseStatement (AssemblyStatement (MloadAdd32 dst src)) = printf "assembly { %s := mload(add(%s, 32)) }" dst src
---unparseStatement x = show x
+
+unparseStatement (EmitStatement eventName extups) = 
+  let 
+    expVals = map (unparseExpression . snd) extups
+  in
+    "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
+
 unparseStatement x = error $ "missing case in call to unparseStatement: " ++ show x
 
 unparseVarDefEntry :: VarDefEntry -> String

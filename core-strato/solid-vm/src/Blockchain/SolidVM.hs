@@ -41,6 +41,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
+import           Blockchain.Data.Event
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
@@ -538,6 +539,14 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
 
   -- TODO(tim): should this hex encode src and pad?
   setVar dstVar =<< getString srcVar
+  return Nothing
+
+runStatement (Xabi.EmitStatement eventName exptups) = do
+  exps <- mapM (expToVar . snd) exptups
+  expVals <- mapM (getVar) exps
+
+  liftIO $ putStrLn $ "emit " ++ eventName ++ "(" ++ (intercalate ", " (map show expVals)) ++ ");"
+  addEvent $ Event eventName (map show expVals)
   return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x

@@ -73,8 +73,9 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
-import           Blockchain.Data.DataDefs           (LogDB, TransactionResult)
+import           Blockchain.Data.DataDefs           (LogDB, EventDB, TransactionResult)
 import           Blockchain.Data.LogDB
+import           Blockchain.Data.EventDB
 import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -125,6 +126,7 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextRedisPool              :: RBDB.RedisConnection
                        , contextTxResultQueue          :: Q.Seq TransactionResult
                        , contextLogDBQueue             :: [LogDB]
+                       , contextEventDBQueue           :: [EventDB]
                        , contextHasBlockstanbul        :: Bool
                        , _contextBlockRequested        :: Bool
                        , contextCoinbaseQueue          :: Q.Seq ((Address,Word64), Address)
@@ -165,6 +167,17 @@ instance HasMemLogDB ContextM where
     _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.LogDBEntry <$> toWrite)
     put $ ctx { contextLogDBQueue = [] }
 
+instance HasMemEventDB ContextM where
+  enqueueEventEntries es = do
+    ctx <- get
+    let q = contextEventDBQueue ctx
+    put $ ctx { contextEventDBQueue = (q ++ es) }
+
+  flushEventEntries = do
+    ctx <- get
+    let toWrite = contextEventDBQueue ctx
+    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.EventDBEntry <$> toWrite)
+    put $ ctx { contextEventDBQueue = [] }
 
 instance Mod.Modifiable MP.StateRoot ContextM where
   get _    = gets (MP.stateRoot . contextStateDB)
@@ -283,7 +296,9 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      initialKafkaState
                      Unspecified
                      (RBDB.RedisConnection redisPool)
-                     Q.empty []
+                     Q.empty 
+                     []
+                     []
                      False
                      False
                      Q.empty
@@ -328,6 +343,7 @@ runContextM f = do
                        Unspecified
                        (RBDB.RedisConnection redisPool)
                        Q.empty
+                       []
                        []
                        flags_blockstanbul
                        False
