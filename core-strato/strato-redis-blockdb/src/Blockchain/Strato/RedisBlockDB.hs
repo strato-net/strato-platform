@@ -19,7 +19,7 @@ module Blockchain.Strato.RedisBlockDB
     , getOrgIdChains, addOrgIdChain, removeOrgIdChain
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
-    , getTransactions, getPrivateTransactions, getUncles
+    , getTransactions, getPrivateTransactions, addPrivateTransactions, getUncles
     , getParent, getParents
     , getParentChain, getHeaderChain, getBlockChain
     , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
@@ -151,7 +151,7 @@ putChainMembers :: Word256
 putChainMembers cId mems = do
     let rmems    = RedisChainMembers mems
 
-    res <- multiExec $ setnx (inNamespace PrivateChainMembers cId) (toValue rmems)
+    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
     case res of
         TxSuccess _ -> fmap (foldl' (>>) (Right Ok)) . forM (M.elems mems) $ \e -> getCompose $
           Compose (addIPChain (ipAddress e) cId) *>
@@ -205,7 +205,7 @@ putChainTxsInBlock :: SHA
 putChainTxsInBlock bHash chainIdTxHashMap = do
     let rmems    = RedisChainTxsInBlocks chainIdTxHashMap
 
-    res <- multiExec $ setnx (inNamespace PrivateTxsInBlocks bHash) (toValue rmems)
+    res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue rmems)
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Aborted")
@@ -354,7 +354,7 @@ addPrivateTransactions :: [(SHA, (Word256, OutputTx))]
                        -> Redis (Either Reply Status)
 addPrivateTransactions ptxs = do
   res <- multiExec
-       . msetnx
+       . mset
        $ map (inNamespace PrivateTransactions *** toValue) ptxs
   case res of
       TxSuccess _ -> pure $ Right Ok

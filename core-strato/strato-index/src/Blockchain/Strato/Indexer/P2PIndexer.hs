@@ -3,8 +3,10 @@
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Strato.Indexer.P2PIndexer where
 
+import           Control.Arrow                      ((&&&))
 import           Control.Monad
 import           Blockchain.Output
+import           Data.Maybe                         (fromJust)
 import qualified Data.Text                          as T
 import           Network.Kafka
 import           Blockchain.MilenaTools
@@ -17,6 +19,7 @@ import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Model.Class
 
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 
@@ -28,6 +31,9 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
     (offset, idxEvents) <- getUnprocessedIndexEvents
     $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
     let zipIdxEvents = zip [offset+1..] idxEvents
+        ptxs = [t | (_,IndexPrivateTx t) <- zipIdxEvents]
+    void . RBDB.withRedisBlockDB . RBDB.addPrivateTransactions $
+      map (txHash &&& (fromJust . txChainId &&& id)) ptxs
     forM_ zipIdxEvents $ \(nextIdx, e) -> do
         case e of
             RanBlock b -> do

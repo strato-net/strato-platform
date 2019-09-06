@@ -181,6 +181,7 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
                  | OEVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
                  | OENewCheckpoint PBFT.Checkpoint -- A pseudo out event that shouldn't leave the sequencer
+                 | OEPrivateTx OutputTx
                  deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format OutputEvent where
@@ -191,6 +192,7 @@ instance Format OutputEvent where
   format (OEGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
   format (OENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
   format (OEBlockstanbul o)       = format o
+  format (OEPrivateTx o)          = format o
   format x                        = show x
 
 data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
@@ -470,6 +472,7 @@ instance Binary OutputEvent where
     put (OENewChainMember c a e) = putWord8 13 >> put c >> put a >> put e
     put (OEVoteToMake r d s) = putWord8 14 >> put r >> put d >> put s
     put (OENewCheckpoint{}) = error "pbft checkpoints should not be sent to p2p/vm"
+    put (OEPrivateTx t)     = putWord8 15 >> put t
     get = do
         tag <- getWord8
         case tag of
@@ -488,6 +491,7 @@ instance Binary OutputEvent where
             12 -> OEPushBlocks <$> get <*> get <*> get
             13 -> OENewChainMember <$> get <*> get <*> get
             14 -> OEVoteToMake <$> get <*> get <*> get
+            15 -> OEPrivateTx <$> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where

@@ -402,6 +402,7 @@ handleEvents peer = awaitForever $ \case
       OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
       OEVoteToMake{} -> $logErrorS "handleEvents/OEVoteToMake" "absurd"
       OENewCheckpoint{} -> $logErrorS "handleEvents/OENewCheckpoint" "Maybe they should be disjoint types?"
+      OEPrivateTx{} -> $logErrorS "handleEvents/OEPrivateTx" "This type is reserved for the VM"
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
