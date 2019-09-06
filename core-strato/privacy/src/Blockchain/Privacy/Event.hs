@@ -56,7 +56,7 @@ lookupSeenChain chainId = isJust <$> lookup (Proxy @ChainIdEntry) chainId
 insertTransaction :: (SHA `Alters` OutputTx) m => OutputTx -> m ()
 insertTransaction = uncurry (insert Proxy) . (txHash &&& id)
 
-findChainHashUses :: ( (SHA `Alters` OutputBlock) m
+findChainHashUses :: ( MonadLogger m
                      , (SHA `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
                      )
@@ -65,11 +65,11 @@ findChainHashUses chainId cHashes = do
   infos <- S.unions
           . map (maybe S.empty _inBlocks)
         <$> mapM (lookup (Proxy @ChainHashEntry)) cHashes
+  logFF "Privacy/findChainHashUses" $ "blocksToRun unioning infos " ++ show infos
   adjustStatefully_ (Proxy @ChainIdEntry) chainId $ blocksToRun %= S.union infos
 
 insertPrivateHash :: ( MonadLogger m
                      , MonadMonitor m
-                     , (SHA `Alters` OutputBlock) m
                      , (SHA `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
                      )
@@ -83,32 +83,73 @@ insertPrivateHash bInfo tx = case txChainId tx of
     let cHashes = generateChainHashes tx
     cHashes' <- fmap catMaybes . forM cHashes $ \cHash -> do
       didInsert <- insertChainHash bInfo cHash chainId
-      if didInsert
-        then return $ Just cHash
-        else do
-          $logErrorS "insertPrivateHash" . T.pack $ concat
-            [ "insertChainHash failed for BlockInfo "
-            , format bInfo
-            , ", chain hash "
+      case didInsert of
+        Inserted -> do
+          logFF "insertPrivateHash" $ concat
+            [ " Successfully inserted chain hash "
             , format cHash
-            , ", chain ID "
+            , " for chain ID "
             , formatChainId $ Just chainId
+            ]
+          return $ Just cHash
+        AlreadyExistsOnSameChain -> do
+          logFF "insertPrivateHash" $ concat
+            [ "Chain hash "
+            , format cHash
+            , " for chain ID "
+            , formatChainId $ Just chainId
+            , " has been previously inserted for the same chain ID."
+            , " Not reinserting."
+            ]
+          return Nothing
+        SeenPreviouslyOnUnknownChain bi -> do
+          $logErrorS "insertPrivateHash" . T.pack $ concat
+            [ "Chain hash "
+            , format cHash
+            , " has been seen previous to block "
+            , format bInfo
+            , " in block "
+            , format bi
+            , ". This is most likely a bug in the STRATO platform."
+            , " Please file this as an issue at https://github.com/blockapps/strato-getting-started/"
+            ]
+          return Nothing
+        WrongChainId cid -> do
+          $logErrorS "insertPrivateHash" . T.pack $ concat
+            [ "Initial chain hash of chain ID "
+            , formatChainId $ Just chainId
+            , " was previously associated with a different chain, "
+            , formatChainId $ Just cid
+            , ". This is most likely a bug in the STRATO platform."
+            , " Please file this as an issue at https://github.com/blockapps/strato-getting-started/"
             ]
           return Nothing
     mapM_ (insertChainBufferEntry chainId) cHashes'
+    logFF "insertPrivateHash" $ "findChainHashUses for chainId: " ++ format chainId ++ ", and cHashes': " ++ format cHashes'
     findChainHashUses chainId cHashes'
 
 lookupChainIdFromChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m (Maybe Word256)
 lookupChainIdFromChainHash ch = join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) ch
 
-insertChainHash :: (SHA `Alters` ChainHashEntry) m => BlockInfo -> SHA -> Word256 -> m Bool
+data InsertChainHashResult = Inserted
+                           | AlreadyExistsOnSameChain
+                           | SeenPreviouslyOnUnknownChain BlockInfo
+                           | WrongChainId Word256
+
+insertChainHash :: (SHA `Alters` ChainHashEntry) m
+                => BlockInfo
+                -> SHA
+                -> Word256
+                -> m InsertChainHashResult
 insertChainHash obi cHash chainId = lookup Proxy cHash >>= \case
-  Nothing -> True <$ insert Proxy cHash (chainHashEntryWithChainId chainId)
+  Nothing -> Inserted <$ insert Proxy cHash (chainHashEntryWithChainId chainId)
   Just ChainHashEntry{..} -> case _onChainId of
-    Just cId -> return $ cId == chainId
+    Just cid -> if cid == chainId
+                  then return AlreadyExistsOnSameChain
+                  else return $ WrongChainId cid
     Nothing -> case S.lookupMin _inBlocks of
-      Just bi | bi <= obi -> return False
-      _ -> True <$ adjustStatefully_ Proxy cHash (onChainId .= Just chainId)
+      Just bi | bi <= obi -> return $ SeenPreviouslyOnUnknownChain bi
+      _ -> Inserted <$ adjustStatefully_ Proxy cHash (onChainId .= Just chainId)
 
 useChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m ()
 useChainHash cHash = adjustWithDefaultStatefully_ Proxy cHash $ used .= True
@@ -208,6 +249,7 @@ runBlocks chainId = go
           fmap (fromMaybe [] . join) . for mBlock $ \block -> do
             mHydrated <- hydratePrivateHashes (Just chainId) block
             for mHydrated $ \b -> do
+              logFF "Privacy/runBlocks" $ "blocksToRun deleting " ++ format b0
               adjustStatefully_ (Proxy @ChainIdEntry) chainId $
                 blocksToRun %= S.delete b0
               (b:) <$> go
@@ -272,8 +314,12 @@ hydratePrivateHashes chainF b = do
                 if not (S.null _blocksToRun || (_bhash $ S.elemAt 0 _blocksToRun) == bHash)
                   then do
                     notHydrating "this is not the chain's next block to run"
+                    logF $ "If blocksToRun is null: " ++ show (S.null _blocksToRun) ++ " Next block to run is: "++ format (_bhash $ S.elemAt 0 _blocksToRun)
+                    logF $ "All the blocksToRun: " ++ show _blocksToRun
+                    logF $ "bHash of this tx: " ++ show bHash
                     adjustStatefully_ (Proxy @ChainIdEntry) chainId $
                       when (isNothing chainF) $
+                        --logF $ "blocksToRun inserting " ++ format bHash 
                         blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                     return (Nothing, (dts,S.insert chainId cs))
                   else do
@@ -282,6 +328,7 @@ hydratePrivateHashes chainF b = do
                         notHydrating "we don't have this transaction's body"
                         adjustStatefully_ (Proxy @ChainIdEntry) chainId $ do
                           when (isNothing chainF) $
+                            -- logF $ "blocksToRun inserting " ++ format bHash 
                             blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                         return (Nothing, (tHash:dts, S.insert chainId cs))
                       Just ptx -> do
@@ -341,20 +388,43 @@ insertNewChainInfo chainId cInfo = do
   let bHash = creationBlock $ chainInfo cInfo
   bInfo <- BlockInfo bHash . maybe 0 blockOrdering <$> lookup (Proxy @OutputBlock) bHash
   insertChainHash bInfo cHash chainId >>= \case
-    False -> do
+    Inserted -> do
+      insertChainBufferEntry chainId cHash
+      logFF "insertNewChainInfo" $ "findChainHashUses for chainId: " ++ format chainId ++ ", and cHash: " ++ format cHash
+      findChainHashUses chainId [cHash]
+      runBlocks chainId
+    AlreadyExistsOnSameChain -> do
+      logFF "insertNewChainInfo" $ concat
+        [ "Initial chain hash "
+        , format cHash
+        , " of chain ID "
+        , formatChainId $ Just chainId
+        , " has been previously inserted for the same chain ID."
+        , " Not reinserting."
+        ]
+      return []
+    SeenPreviouslyOnUnknownChain bi -> do
       $logErrorS "insertNewChainInfo" . T.pack $ concat
         [ "Initial chain hash of chain ID "
         , formatChainId $ Just chainId
         , " found before chain's creation block "
         , format bInfo
+        , " in block "
+        , format bi
         , ". This is most likely a bug in the STRATO platform."
         , " Please file this as an issue at https://github.com/blockapps/strato-getting-started/"
         ]
       return []
-    True -> do
-      insertChainBufferEntry chainId cHash
-      findChainHashUses chainId [cHash]
-      runBlocks chainId
+    WrongChainId cid -> do
+      $logErrorS "insertNewChainInfo" . T.pack $ concat
+        [ "Initial chain hash of chain ID "
+        , formatChainId $ Just chainId
+        , " was previously associated with a different chain, "
+        , formatChainId $ Just cid
+        , ". This is most likely a bug in the STRATO platform."
+        , " Please file this as an issue at https://github.com/blockapps/strato-getting-started/"
+        ]
+      return []
 
 isPrivateHashTX :: TransactionLike t => t -> Bool
 isPrivateHashTX = (== PrivateHash) . txType

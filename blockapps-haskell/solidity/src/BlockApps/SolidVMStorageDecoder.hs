@@ -45,7 +45,7 @@ bimapValue f (name', value') = do
 
 
 decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
-decodeCacheValues hxs prevState = either (error . printf "SVM.decodeCacheValues: %s" . show) id $ do
+decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValues: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
       isBasic (StoragePath [Field _]) = True
       isBasic _ = False
