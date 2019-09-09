@@ -1024,6 +1024,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
           when flags_debug $ $logDebugS "runVMM/Left" "VM has finished running"
           return execResults{
                    erLogs=[],
+                   erEvents=[],
                    erException = Just (Right e),
                    erRefund=0, -- even if e == RevertException, since the full state reverts, all refunds go to 0.
                    erRemainingTxGas =
@@ -1401,6 +1402,7 @@ vmStateToExecResults vmState = do
       , erReturnVal          = BSS.toShort <$> returnVal vmState
       , erTrace              = theTrace vmState
       , erLogs               = logs vmState
+      , erEvents             = []
       -- I think erNewContractAddress should be Nothing if there is an error
       , erNewContractAddress = Nothing
       , erSuicideList        = suicideList vmState

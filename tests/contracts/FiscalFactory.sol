@@ -76,6 +76,8 @@ contract Fiscal {
 
 contract FiscalFactory {
 
+  event FiscalEvent(Fiscal x);
+
   function createFiscal( string src_countryCode
                        , string src_currencyCode
                        , string src_phoneNumber
@@ -115,7 +117,9 @@ contract FiscalFactory {
                          , datasetSpecificFields_interest
                          , datasetSpecificFields_details
                          , fakeTransaction
-                         );    
+                         );   
+
+     emit FiscalEvent(t);
   } 
 
   function generateFiscal( string src_countryCode

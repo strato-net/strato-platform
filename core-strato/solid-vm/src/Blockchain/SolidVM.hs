@@ -153,6 +153,7 @@ create' creator ch cc contractName' argExps = do
     erReturnVal = Just BSS.empty,
     erTrace = [],
     erLogs = [],
+    erEvents = events sstate,
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
     erAction = Just $ sstate ^. action,
@@ -217,12 +218,14 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
     finalAct <- use action
+    sstate <- get
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
       erRefund = 0,
       erReturnVal = BSS.toShort <$> returnVal,
       erTrace = [],
       erLogs = [],
+      erEvents = events sstate,
       erNewContractAddress = Nothing,
       erSuicideList = S.empty,
       erAction = Just $ finalAct,
