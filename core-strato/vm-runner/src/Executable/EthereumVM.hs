@@ -114,6 +114,12 @@ ethereumVM = void . execContextM $ do
                                   . K.withKafkaViolently
                                   . writeIndexEvents
                                   $ map (uncurry IndexTransaction) txPairs
+
+        let ptxs = [IndexPrivateTx t | OEPrivateTx t <- seqEvents]
+        when (not $ null ptxs) . void
+                               . K.withKafkaViolently
+                               $ writeIndexEvents ptxs
+
         let (bLen, tLen) = (length blocks, length allTxs)
         recordSeqEventCount bLen tLen
 
@@ -414,6 +420,7 @@ logEventSummaries events = do
     getNames (OENewChainMember _ _ _) = "OENewChainMember"
     getNames (OEVoteToMake _ _ _) = "OEVoteToMake"
     getNames OENewCheckpoint{} = "OENewCheckpoint"
+    getNames (OEPrivateTx _) = "OEPrivateTx"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x

@@ -32,7 +32,6 @@ import           Blockchain.Privacy.Metrics
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
-import           Control.Arrow                 ((&&&))
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Change.Alter
@@ -53,8 +52,11 @@ logFF str = $logInfoS str . T.pack
 lookupSeenChain :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m Bool
 lookupSeenChain chainId = isJust <$> lookup (Proxy @ChainIdEntry) chainId
 
-insertTransaction :: (SHA `Alters` OutputTx) m => OutputTx -> m ()
-insertTransaction = uncurry (insert Proxy) . (txHash &&& id)
+insertTransaction :: (MonadLogger m, (SHA `Alters` OutputTx) m) => OutputTx -> m ()
+insertTransaction otx = do
+  let tHash = txHash $ otBaseTx otx
+  logFF "insertTransaction" $ "Inserting transaction " ++ format tHash
+  insert (Proxy @OutputTx) tHash otx
 
 findChainHashUses :: ( MonadLogger m
                      , (SHA `Alters` ChainHashEntry) m
@@ -353,9 +355,8 @@ hydratePrivateHashes chainF b = do
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation
   let anchorToChain = fromJust . fromAnchorChain . otAnchorChain
-      txs'' = filter (\otx -> not (discluded $ anchorToChain otx)
-                     || S.member (anchorToChain otx) newDiscludes
-                     ) $ catMaybes txs'
+      cond cid = not (discluded cid || S.member cid newDiscludes)
+      txs'' = filter (cond . anchorToChain) $ catMaybes txs'
 
   unless (null depTXs) $ do
     logF . concat $
@@ -367,7 +368,11 @@ hydratePrivateHashes chainF b = do
       ]
     mapM_ requestTransaction depTXs
   if null txs''
-    then return Nothing
+    then case chainF of
+           Nothing -> return Nothing
+           Just cid -> if cond cid
+                         then return . Just $ b{obReceiptTransactions = txs''}
+                         else return Nothing
     else return . Just $ b{obReceiptTransactions = txs''}
 
 insertNewChainInfo :: ( MonadLogger m

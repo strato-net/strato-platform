@@ -268,6 +268,9 @@ transformFullTransactions pairs = do
           , format (SHA chainId)
           ]
         mapM_ (insertTransaction . snd) ptxs
+        mapM_ (markForVM . OEPrivateTx . snd) ptxs -- we want to get these transactions into the
+                                                   -- P2P indexer ASAP so we can return them to
+                                                   -- peers requesting them
         mcInfo <- fmap _chainIdInfo <$> A.lookup (Proxy :: Proxy ChainIdEntry) chainId
         case mcInfo of
           Nothing -> do
