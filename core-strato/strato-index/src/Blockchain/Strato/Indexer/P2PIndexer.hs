@@ -32,8 +32,11 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
     $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
     let zipIdxEvents = zip [offset+1..] idxEvents
         ptxs = [t | (_,IndexPrivateTx t) <- zipIdxEvents]
-    void . RBDB.withRedisBlockDB . RBDB.addPrivateTransactions $
-      map (txHash &&& (fromJust . txChainId &&& id)) ptxs
+    unless (null ptxs)
+      . void
+      . RBDB.withRedisBlockDB
+      . RBDB.addPrivateTransactions
+      $ map (txHash &&& (fromJust . txChainId &&& id)) ptxs
     forM_ zipIdxEvents $ \(nextIdx, e) -> do
         case e of
             RanBlock b -> do
