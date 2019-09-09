@@ -70,17 +70,15 @@ sender = 0xdeadbeef
 
 origin :: Address
 origin = 0x8341
--- TODO: It's not clear what the difference between newAddress and uploadAddress,
--- aside from the fact that one is an argument to create and the other is generated
--- by SolidVM's create'
-newAddress :: Address
-newAddress = 0x0ddba11
 
 uploadAddress :: Address
 uploadAddress = getNewAddress_unsafe sender 0
 
 secondAddress :: Address
 secondAddress = getNewAddress_unsafe sender 1
+
+recursiveAddr :: Address
+recursiveAddr = getNewAddress_unsafe uploadAddress 0
 
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
@@ -139,6 +137,7 @@ runArgs args bs = do
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
+  newAddress <- getNewAddress sender
   er <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
           value gasPrice availableGas newAddress code txHash chainId metadata
   rethrowEx er
@@ -177,11 +176,12 @@ runCall funcName callArgs bs = do
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
+  newAddress <- getNewAddress sender
   er1 <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
     value gasPrice availableGas newAddress code txHash chainId createMetadata
   rethrowEx er1
   er2 <- SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
-    uploadAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+    newAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
   rethrowEx er2
   return $ erReturnVal er2
 
@@ -1623,7 +1623,6 @@ contract qq {
   }
 }|]
     let diffs = fmap _actionDataStorageDiffs . _actionData <$> erAction xr
-        recursiveAddr = getNewAddress_unsafe uploadAddress 1
     diffs `shouldBe` Just (M.fromList
       [ (uploadAddress, ActionSolidVMDiff $ M.singleton ".s"
             (rlpSerialize $ rlpEncode $ BContract "Sub" recursiveAddr))
@@ -1788,7 +1787,6 @@ contract qq {
     x = new X();
   }
 }|]
-    let recursiveAddr = getNewAddress_unsafe uploadAddress 1
     -- qq should become the `owner` in X
     getFields ["x"] `shouldReturn` [BContract "X" recursiveAddr]
     getSolidStorageKeyVal' recursiveAddr (MS.singleton "owner") `shouldReturn`
@@ -2051,7 +2049,6 @@ contract qq {
     x = new X({_z: "ok", _y: 0x777777});
   }
 }|]
-    let recursiveAddr = getNewAddress_unsafe uploadAddress 1
     getFields ["x"] `shouldReturn` [BContract "X" recursiveAddr]
     mapM (getSolidStorageKeyVal' recursiveAddr) [MS.singleton "y", MS.singleton "z"]
       `shouldReturn` [BInteger 0x777777, BString "ok"]
