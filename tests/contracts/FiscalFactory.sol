@@ -120,6 +120,7 @@ contract FiscalFactory {
                          );   
 
      emit FiscalEvent(t);
+     emit MemberAdded("1234567", "123457");
   } 
 
   function generateFiscal( string src_countryCode

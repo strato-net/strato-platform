@@ -156,6 +156,7 @@ LogDB
     deriving Eq Read Show Generic
 
 EventDB
+    chainId Word256 Maybe
     name String
     args [String]
     deriving Eq Read Show Generic

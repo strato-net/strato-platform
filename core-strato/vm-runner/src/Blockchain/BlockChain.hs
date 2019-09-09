@@ -650,7 +650,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
           ranBlockHash = hashFunction b
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-          mkEventEntry Event{..} = EventDB evName evArgs
+          mkEventEntry Event{..} = EventDB chainId evName evArgs
           (!response, theTrace', theLogs, theEvents) =
             case result of
               Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
