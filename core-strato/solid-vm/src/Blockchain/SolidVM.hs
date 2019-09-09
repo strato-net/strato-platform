@@ -548,6 +548,7 @@ runStatement (Xabi.EmitStatement eventName exptups) = do
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM (getVar) exps
 
+  -- TODO: maybe we don't need this log statement...
   liftIO $ putStrLn $ "emit " ++ eventName ++ "(" ++ (intercalate ", " (map show expVals)) ++ ");"
   addEvent $ Event eventName (map show expVals)
   return Nothing
