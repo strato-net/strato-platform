@@ -546,8 +546,9 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
 
 runStatement (Xabi.EmitStatement eventName exptups) = do
   exps <- mapM (expToVar . snd) exptups
-  expVals <- mapM (getVar) exps
-  addEvent $ Event eventName (map show expVals)
+  expVals <- mapM getVar exps
+  expStrs <- mapM showSM expVals
+  addEvent $ Event eventName expStrs
   return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
