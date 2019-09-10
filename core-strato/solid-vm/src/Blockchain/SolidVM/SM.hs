@@ -31,7 +31,8 @@ module Blockchain.SolidVM.SM (
   getValueType,
   pushSender,
   initializeAction,
-  markDiffForAction
+  markDiffForAction,
+  addEvent
   ) where
 
 import           Control.Applicative ((<|>))
@@ -50,12 +51,14 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.NibbleString as N
+import qualified Data.Sequence as S
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
+import           Blockchain.Data.Event
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
@@ -122,6 +125,7 @@ data SState =
     codeDB                 :: CodeDB,
     hashDB                 :: HashDB,
     stateDB                :: MP.MPDB,
+    events                 :: S.Seq Event,
     addressStateTxDBMap    :: M.Map Address AddressStateModification,
     addressStateBlockDBMap :: M.Map Address AddressStateModification,
     storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
@@ -200,6 +204,7 @@ runSM maybeCode env f = do
         codeDB = contextCodeDB vmcontext,
         hashDB = contextHashDB vmcontext,
         stateDB = contextStateDB vmcontext,
+        events = S.empty,
         addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
         addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
         storageTxMap = contextStorageTxMap vmcontext,
@@ -550,3 +555,10 @@ markDiffForAction owner key' val' = do
               ActionSolidVMDiff m -> ActionSolidVMDiff $ M.insert key val m
               _ -> error "SolidVM Diff executing in EVM"
   (action . actionData . at owner . mapped . actionDataStorageDiffs) %= ins
+
+
+addEvent :: Event -> SM ()
+addEvent newEvent = do
+  sstate <- get 
+  put sstate { events = events sstate |> newEvent }
+

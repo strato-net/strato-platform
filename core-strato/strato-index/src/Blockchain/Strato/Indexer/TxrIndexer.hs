@@ -22,9 +22,10 @@ import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.ChainInfoDB        (addMember, removeMember, terminateChain)
-import           Blockchain.Data.DataDefs           (LogDB (..), TransactionResult (..))
+import           Blockchain.Data.DataDefs           (LogDB (..), EventDB (..), TransactionResult (..))
 import           Blockchain.Data.Enode
 import qualified Blockchain.Data.LogDB              as LogDB
+import qualified Blockchain.Data.EventDB            as EventDB
 import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 
@@ -35,6 +36,7 @@ import           Blockchain.SHA                     (hash)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Util                    (byteString2Integer)
@@ -89,6 +91,41 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                       lift $ terminateChain chainId
                     _ -> return ()
                 void . lift $ LogDB.putLogDB l
+            EventDBEntry ev -> do
+                let mChainId = eventDBChainId ev
+                    evName = eventDBName ev
+                    evArgs = eventDBArgs ev
+                $logInfoS "txrIndexer" . T.pack $ "Inserting EventDB entry for Event: " ++ evName ++ " with args: " ++ show evArgs ++ " for chainID: " ++ show mChainId
+                when (isJust mChainId) $ do
+                  let Just chainId = mChainId
+                  case evName of 
+                    "MemberAdded" -> do
+                        if (length evArgs) == 2
+                        then do 
+                          let Just address = stringAddress $ head evArgs
+                              enodeStr = last evArgs 
+                          eNode :: Either SomeException Enode <- liftIO . try . evaluate . force $ readEnode enodeStr
+                          case eNode of
+                            Left err -> $logErrorS "txrIndexer" . T.pack $ "failed to parse enode" ++ show err
+                            Right enode -> do
+                              $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
+                              lift $ addMember chainId address enodeStr
+                              void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
+                              void . withKafkaRetry1s $ writeUnseqEvents [IENewChainMember chainId address enode]
+                        else
+                          $logInfoS "txrIndexer" . T.pack $ "MemberAdded called with invalid args - logging and moving on"
+                          -- TODO: should this throw error instead of adding to postgres?
+                    "MemberRemoved" -> do
+                        if (length evArgs == 1)
+                        then do
+                          let Just address = stringAddress $ head evArgs
+                          $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
+                          lift $ removeMember chainId address
+                          void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
+                        else
+                          $logInfoS "txrIndexer" . T.pack $ "MemberRemoved called with invalid args - logging and moving on"
+                    _ -> return () 
+                void . lift $ EventDB.putEventDB ev
             TxResult r -> do
                 $logInfoS "txrIndexer" . T.pack $
                     "Inserting TXResult for tx " ++ format (transactionResultTransactionHash r) ++ " at block " ++ format (transactionResultBlockHash r)

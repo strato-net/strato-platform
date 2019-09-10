@@ -59,6 +59,8 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import           Blockchain.Data.LogDB
+import           Blockchain.Data.Event
+import           Blockchain.Data.EventDB
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionDef          (formatChainId)
 import           Blockchain.Data.TransactionResult
@@ -648,13 +650,15 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
           ranBlockHash = hashFunction b
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-          (!response, theTrace', theLogs) =
+          mkEventEntry Event{..} = EventDB chainId evName evArgs
+          (!response, theTrace', theLogs, theEvents) =
             case result of
-              Left _ -> (BSS.empty, [], []) --TODO keep the trace when the run fails
+              Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
               Right r ->
-                (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r)
+                (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
       enqueueLogEntries $ mkLogEntry <$> theLogs
+      enqueueEventEntries $ mkEventEntry <$> theEvents
       enqueueTransactionResult $
              TransactionResult { transactionResultBlockHash        = ranBlockHash
                                , transactionResultTransactionHash  = theHash

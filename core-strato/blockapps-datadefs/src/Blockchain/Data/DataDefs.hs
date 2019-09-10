@@ -110,3 +110,4 @@ instance NFData TXOrigin
 instance NFData RawTransaction
 instance NFData TransactionResult
 instance NFData LogDB
+instance NFData EventDB

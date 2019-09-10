@@ -17,6 +17,7 @@ import           Blockchain.VM.VMException
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
+import           Blockchain.Data.Event
 import           Blockchain.Data.Transaction
 import           Blockchain.SolidVM.Model
 import           Blockchain.VMOptions
@@ -28,6 +29,7 @@ data ExecResults =
     erReturnVal          :: Maybe BSS.ShortByteString,
     erTrace              :: [String],
     erLogs               :: [Log],
+    erEvents             :: [Event],
     erNewContractAddress :: Maybe Address,
     erSuicideList        :: S.Set Address,
     erAction             :: Maybe Action,
@@ -61,6 +63,7 @@ errorResults ck remainingGas e =
     , erReturnVal=Nothing
     , erTrace=[]
     , erLogs=[]
+    , erEvents=[]
     , erNewContractAddress=Nothing
     , erSuicideList = S.empty
     , erAction = Nothing

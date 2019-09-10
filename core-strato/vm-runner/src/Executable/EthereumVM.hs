@@ -36,6 +36,7 @@ import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.LogDB
+import           Blockchain.Data.EventDB
 import           Blockchain.Data.TransactionResult
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
@@ -172,6 +173,7 @@ ethereumVM = void . execContextM $ do
 
         -- todo: is this the best place to put this?
         loopTimeit "flushLogEntries" $ flushLogEntries
+        loopTimeit "flushEventEntries" $ flushEventEntries
         loopTimeit "flushTransactionResults" $ flushTransactionResults
         loopTimeit "writeActionJSONToKafka" $ void . K.withKafkaViolently $ writeActionJSONToKafka actions
         loopTimeit "compactContextM" $ compactContextM

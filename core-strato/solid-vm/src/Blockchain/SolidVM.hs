@@ -41,6 +41,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
+import           Blockchain.Data.Event
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
@@ -152,6 +153,7 @@ create' creator ch cc contractName' argExps = do
     erReturnVal = Just BSS.empty,
     erTrace = [],
     erLogs = [],
+    erEvents = toList $ events sstate,
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
     erAction = Just $ sstate ^. action,
@@ -216,12 +218,14 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
     finalAct <- use action
+    sstate <- get
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
       erRefund = 0,
       erReturnVal = BSS.toShort <$> returnVal,
       erTrace = [],
       erLogs = [],
+      erEvents = toList $ events sstate,
       erNewContractAddress = Nothing,
       erSuicideList = S.empty,
       erAction = Just $ finalAct,
@@ -538,6 +542,12 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
 
   -- TODO(tim): should this hex encode src and pad?
   setVar dstVar =<< getString srcVar
+  return Nothing
+
+runStatement (Xabi.EmitStatement eventName exptups) = do
+  exps <- mapM (expToVar . snd) exptups
+  expVals <- mapM (getVar) exps
+  addEvent $ Event eventName (map show expVals)
   return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
