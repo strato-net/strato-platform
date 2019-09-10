@@ -51,6 +51,7 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.NibbleString as N
+import qualified Data.Sequence as S
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
@@ -124,7 +125,7 @@ data SState =
     codeDB                 :: CodeDB,
     hashDB                 :: HashDB,
     stateDB                :: MP.MPDB,
-    events                 :: [Event],
+    events                 :: S.Seq Event,
     addressStateTxDBMap    :: M.Map Address AddressStateModification,
     addressStateBlockDBMap :: M.Map Address AddressStateModification,
     storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
@@ -203,7 +204,7 @@ runSM maybeCode env f = do
         codeDB = contextCodeDB vmcontext,
         hashDB = contextHashDB vmcontext,
         stateDB = contextStateDB vmcontext,
-        events = [],
+        events = S.empty,
         addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
         addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
         storageTxMap = contextStorageTxMap vmcontext,
@@ -559,5 +560,5 @@ markDiffForAction owner key' val' = do
 addEvent :: Event -> SM ()
 addEvent newEvent = do
   sstate <- get 
-  put sstate { events = newEvent:events sstate }
+  put sstate { events = events sstate |> newEvent }
 
