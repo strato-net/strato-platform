@@ -154,11 +154,11 @@ spec = do
 
         shouldAccept :: AuthorizationMode -> (String, String) -> IO ()
         shouldAccept mode (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldSatisfy` (\p -> checkPeerIsMember' mode p chainMembers)
+          DataPeer.buildPeer (Just key, ip, 30303) `shouldSatisfy` (\p -> checkPeerIsMember' mode p $ ChainMembers chainMembers)
 
         shouldReject :: AuthorizationMode -> (String, String) -> IO ()
         shouldReject mode (key, ip) =
-          DataPeer.buildPeer (Just key, ip, 30303) `shouldNotSatisfy` (\p -> checkPeerIsMember' mode p chainMembers)
+          DataPeer.buildPeer (Just key, ip, 30303) `shouldNotSatisfy` (\p -> checkPeerIsMember' mode p $ ChainMembers chainMembers)
 
     describe "IPOnly" $ do
       it "should reject the wrong ip" $ IPOnly `shouldReject` (key1, ip4)

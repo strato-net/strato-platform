@@ -204,7 +204,7 @@ lengthenPeerDisable peer' = try . withGlobalSQLPool $ \sqldb -> do
 
 -- TODO: Allow an empty public key in the Enode type
 peerToEnode :: PPeer -> Maybe Enode
-peerToEnode peer = (\pk -> Enode (pointToBytes pk)
+peerToEnode peer = (\pk -> Enode (OrgId $ pointToBytes pk)
                                  (readIP . T.unpack $ pPeerIp peer)
                                  (pPeerTcpPort peer)
                                  (Just $ pPeerUdpPort peer)) <$> pPeerPubkey peer

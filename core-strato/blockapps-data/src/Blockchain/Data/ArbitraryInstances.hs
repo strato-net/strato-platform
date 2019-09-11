@@ -136,7 +136,7 @@ instance Arbitrary IPAddress where
 
 instance Arbitrary Enode where
   arbitrary = Enode
-          <$> (B.pack <$> vectorOf 64 arbitrary)
+          <$> (OrgId . B.pack <$> vectorOf 64 arbitrary)
           <*> arbitrary
           <*> arbitrary `suchThat` (>=0)
           <*> (arbitrary `suchThat` maybe True (>=0))

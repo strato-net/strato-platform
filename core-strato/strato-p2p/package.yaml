@@ -35,6 +35,7 @@ dependencies:
   - crypto-pubkey
   - crypto-pubkey-types
   - dlist
+  - data-default
   - dns
   - either
   - esqueleto
@@ -72,6 +73,7 @@ dependencies:
   - strato-conf
   - text
   - time
+  - these
   - transformers
   - transformers-base
   - wai-middleware-prometheus

@@ -1,9 +1,10 @@
-
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module Blockchain.Event (
   module Blockchain.EventModel,
@@ -13,34 +14,41 @@ module Blockchain.Event (
   checkPeerIsMember' -- For testing
   ) where
 
-import           Control.Arrow                         ((&&&), first)
+import           Control.Arrow                         ((&&&), second)
 import           Control.Lens                          (use)
 import           Control.Monad
+import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify           hiding (get, put, yield, awaitForever)
+import qualified Control.Monad.Change.Modify           as Mod (get, put)
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Conduit
+import           Data.Default                          (def)
 import           Data.Foldable                         (for_)
 import qualified Data.DList                            as DL
-import           Data.List
-import           Data.Map.Strict                       (Map)
+import           Data.List                             hiding (lookup)
+import           Data.Map.Internal                     (WhenMissing(..), WhenMatched(..))
+import           Data.Map.Merge.Strict
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
+import           Data.These
 import           Data.Time.Clock
 import           MonadUtils
 import qualified Network.Kafka                         as K
+import           Prelude                               hiding (lookup)
 import           System.Random
 import           Text.Printf
 import           UnliftIO.Exception
 
 import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Context
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
@@ -63,10 +71,7 @@ import           Blockchain.Verification
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
-import qualified Blockchain.Strato.RedisBlockDB        as RBDB
-import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
 import           Blockapps.Crossmon                    (recordMaxBlockNumber)
 import           Blockchain.Metrics
@@ -116,11 +121,21 @@ yieldL = yield . Left
 
 handleEvents :: ( MonadIO m
                 , MonadResource m
-                , Accessible RBDB.RedisConnection m
                 , Accessible (SK.UnseqSink m) m
                 , MonadState Context m
                 , MonadLogger m
                 , Modifiable K.KafkaState m
+                , Modifiable BestBlock m
+                , Modifiable WorldBestBlock m
+                , (Integer `Selectable` Canonical BlockData) m
+                , (SHA `Alters` BlockData) m
+                , (IPAddress `Selectable` IPChains) m
+                , (OrgId `Selectable` OrgIdChains) m
+                , (SHA `Selectable` ChainTxsInBlock) m
+                , (Word256 `Selectable` ChainMembers) m
+                , (Word256 `Selectable` ChainInfo) m
+                , (SHA `Selectable` Private (Word256, OutputTx)) m
+                , (SHA `Alters` OutputBlock) m
                 ) => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
@@ -139,28 +154,25 @@ handleEvents peer = awaitForever $ \case
         let header      = blockHeader block'
         let num         = blockHeaderBlockNumber header
         let parentHash' = blockHeaderParentHash header
-        eResult <- RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo sha num tdiff)
-        case eResult of
-          Left  _     -> $logInfoS "handleEvents/NewBlock" $ T.pack "Failed to update WorldBestBlockInfo"
-          Right False -> $logInfoS "handleEvents/NewBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
-          Right True  -> do
-            (redisParentHeader :: Maybe BlockData) <- RBDB.withRedisBlockDB (RBDB.getHeader parentHash')
-            case redisParentHeader of
-                Nothing -> do
-                    bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-                    let bestBlockNum = numFromRedis bestBlock
-                    let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
-                    $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
-                    $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
-                    syncFetch Forward fetchNumber
-                Just _  -> do
-                    lift . void $ setTitleAndProduceBlocks [block']
-                    void . lift $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
+        lift . Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $
+          BestBlock sha num tdiff
+        parentHeader <- lift $ lookup (Proxy @BlockData) parentHash'
+        case parentHeader of
+          Nothing -> do
+            bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+            let bestBlockNum = numberFromBestBlock bestBlock
+                fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
+            $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
+            $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
+            syncFetch Forward fetchNumber
+          Just _ -> do
+            lift . void $ setTitleAndProduceBlocks [block']
+            void . lift $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
         stampActionTimestamp
-        bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-        let bestBlockNum = numFromRedis bestBlock
+        bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+        let bestBlockNum = numberFromBestBlock bestBlock
         let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
         $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
         syncFetch Forward fetchNumber
@@ -175,7 +187,7 @@ handleEvents peer = awaitForever $ \case
       -- 3/4s of the blocks will be dropped when creating the blockheaders
       -- so we overcompensate here.
       let count = (1 + skip') * max mrh max'
-      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' count
+      chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start'..]
       when (null chain) $
         $logInfoS "handleEvents/GetBlockHeaders" $ T.concat $
             ["Warning: A peer requested blocks starting at #"
@@ -183,11 +195,11 @@ handleEvents peer = awaitForever $ \case
             , ", but we don't have these in our canonical chain...."
             , " I don't know what to do, so I am returning a blank response."
             , " This may indicate something unhealthy in the network."]
-      yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . snd <$> chain
+      yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
       stampActionTimestamp
-      maybeHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
+      maybeHeader <- lift $ lookup (Proxy @BlockData) start
       case maybeHeader of
         Nothing    -> yieldR (BlockBodies [])
         Just head' -> do
@@ -199,10 +211,11 @@ handleEvents peer = awaitForever $ \case
                              else 1
           mrh <- gets maxReturnedHeaders
           let count = (1 + skip') * min mrh (fromIntegral num)
-          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' count
-          yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . snd <$> chain
+          chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start'..]
+          yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
 
-    MsgEvt (BlockHeaders headers) -> do
+    MsgEvt (BlockHeaders bHeaders) -> do
+        let headers = morphBlockHeader <$> bHeaders
         stampActionTimestamp
         alreadyRequestedHeaders <- lift getBlockHeaders -- get already requested headers
         when (null alreadyRequestedHeaders) $ do        -- proceed if we are not already requesting headers
@@ -211,23 +224,23 @@ handleEvents peer = awaitForever $ \case
             --     allNeeded = headerHashes `S.union` parentHashes
 
             -- check if blockheaders we recieved have parents.
-            parentsInDB <- RBDB.withRedisBlockDB . RBDB.getHeaders $ parentHash <$> headers
-            let existingParents = [(sha, x) | (sha, Just x) <- parentsInDB]
-            let missingParents  = [sha | (sha, Nothing) <- parentsInDB, sha /= SHA 0]
-            unless (null missingParents) $ do
-                 bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-                 let fetchNumber = numFromRedis bestBlock + 1
+            let parents = map blockDataParentHash headers
+            existingParents <- lift $ lookupMany (Proxy @BlockData) parents
+            let missingParents  = S.fromList parents S.\\ M.keysSet existingParents
+            unless (S.null missingParents) $ do
+                 bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+                 let fetchNumber = numberFromBestBlock bestBlock + 1
                  $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-                 let lastParent = case length existingParents of
-                                      0 -> fetchNumber
-                                      _ -> head . sort $ blockHeaderBlockNumber . snd <$> existingParents
-                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents)
+                 let lastParent = if M.null existingParents
+                                    then fetchNumber
+                                    else head . sort $ blockHeaderBlockNumber <$> M.elems existingParents
+                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
                  syncFetch Reverse lastParent
 
-            -- todo: try with (&&&)
-            headersInDB <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
-            let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
-            let (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
+            let headerHashes = M.fromList $ map (blockHeaderHash &&& id) headers
+            headersInDB <- lift . lookupMany (Proxy @BlockData) $ M.keys headerHashes
+            let neededHeaders = M.elems $ headerHashes M.\\ headersInDB
+                (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
             --     neededHashes = map headerHash neededHeaders
@@ -241,7 +254,7 @@ handleEvents peer = awaitForever $ \case
             lift $ putBlockHeaders neededHeaders'
             lift $ putRemainingBHeaders remainingHeaders
             $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
-            yieldR . GetBlockBodies $ headerHash <$> neededHeaders'
+            yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
             stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
@@ -261,26 +274,34 @@ handleEvents peer = awaitForever $ \case
       stampActionTimestamp
       mrh <- gets maxReturnedHeaders
       let shas = take mrh shas'
-      getUntilMissing shas DL.empty DL.empty >>= \(bodies, pshas) -> do
-          yieldR . BlockBodies $ map toBody bodies
-          ptxs <- fmap (map snd . catMaybes) . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
-          unless (null ptxs) . yieldR . Transactions $ morphTx <$> ptxs
-        where getUntilMissing :: (Accessible RBDB.RedisConnection m, MonadIO m)
+      lift (getUntilMissing shas DL.empty DL.empty) >>= \(bodies, pshas) -> do
+          yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
+          ptxs <- fmap M.elems . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) pshas
+          unless (null ptxs) . yieldR . Transactions $ morphTx  . snd . unPrivate <$> ptxs
+        where getUntilMissing :: ( (SHA `Selectable` ChainTxsInBlock) m
+                                 , (Word256 `Selectable` ChainMembers) m
+                                 , (SHA `Alters` OutputBlock) m
+                                 )
                               => [SHA] -> DL.DList OutputBlock -> DL.DList SHA -> m ([OutputBlock],[SHA])
               getUntilMissing []     bodies pshas = return (DL.toList bodies, DL.toList pshas)
-              getUntilMissing (h:hs) bodies pshas = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
+              getUntilMissing (h:hs) bodies pshas = lookup (Proxy @OutputBlock) h >>= \case
                   Nothing   -> return (DL.toList bodies, DL.toList pshas)
                   Just body -> do
-                    cIdTxsMap <- RBDB.withRedisBlockDB $ RBDB.getChainTxsInBlock h
-                    let kvs = M.assocs cIdTxsMap
-                    mems <- RBDB.withRedisBlockDB . mapM (RBDB.getChainMembers . fst) $ kvs
-                    let trMems = zip kvs mems
-                        pshas' = concat . map (snd . fst) $
-                                  filter ((checkPeerIsMember peer) . snd) trMems
-                    getUntilMissing hs (bodies `DL.snoc` body) (pshas `DL.append` DL.fromList pshas')
+                    ChainTxsInBlock cIdTxsMap <- selectWithDefault (Proxy @ChainTxsInBlock) h
+                    mems <- selectMany (Proxy @ChainMembers) $ M.keys cIdTxsMap
+                    let whenMissing f = WhenMissing (pure . M.map f) (\_ x -> (pure . Just $ f x))
+                        trMems = merge (whenMissing This)
+                                       (whenMissing That)
+                                       (WhenMatched $ \_ x y -> pure . Just $ These x y)
+                                       cIdTxsMap
+                                       mems
+                        filtered = flip M.filter trMems $
+                          mergeTheseWith (const False) (checkPeerIsMember peer) (||)
+                        pshas' = M.foldr (DL.append . DL.fromList . these id (const []) const) DL.empty filtered
+                    getUntilMissing hs (bodies `DL.snoc` body) (pshas `DL.append` pshas')
 
-              toBody :: OutputBlock -> ([Transaction], [BlockHeader])
-              toBody = ((map otBaseTx . obReceiptTransactions) &&& fmap morphBlockHeader . obBlockUncles)
+              toBody :: OutputBlock -> ([Transaction], [BlockData])
+              toBody = ((map otBaseTx . obReceiptTransactions) &&& obBlockUncles)
 
     -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
     -- todo:
@@ -288,11 +309,11 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (BlockBodies bodies) -> do
         stampActionTimestamp
         headers <- lift getBlockHeaders
-        let verified = and $ zipWith (\h b -> transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
+        let verified = and $ zipWith (\h b -> blockDataTransactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
         unless verified $ error "headers don't match bodies"
         $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
-        recordMaxBlockNumber "p2p_block_bodies" . maximum $ map number headers
-        let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
+        recordMaxBlockNumber "p2p_block_bodies" . maximum $ map blockDataNumber headers
+        let blocks' = zipWith createBlockFromHeaderAndBody (morphBlockHeader <$> headers) bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
         lift . forM_ blocks' $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
         rHeaders <- lift getRemainingBHeaders
@@ -302,10 +323,10 @@ handleEvents peer = awaitForever $ \case
         if null neededHeaders
             then when (newCount > 0) $ do
                 mrh <- gets maxReturnedHeaders
-                yieldR $ GetBlockHeaders (BlockHash $ headerHash $ last headers) mrh 0 Forward
+                yieldR $ GetBlockHeaders (BlockHash $ blockHeaderHash $ last headers) mrh 0 Forward
                 stampActionTimestamp
             else do
-                yieldR $ GetBlockBodies (map headerHash neededHeaders)
+                yieldR $ GetBlockBodies (map blockHeaderHash neededHeaders)
                 stampActionTimestamp
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
@@ -315,7 +336,7 @@ handleEvents peer = awaitForever $ \case
       lift $ SK.emitBlockstanbulMsg wm
 
     -- private chains
-    MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer cids'
+    MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'
 
     MsgEvt (ChainDetails chpairs) -> do
       stampActionTimestamp
@@ -326,10 +347,11 @@ handleEvents peer = awaitForever $ \case
       stampActionTimestamp
       $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: "
         ++ (intercalate "\n" (format <$> trHashes))
-      ptrs <- fmap catMaybes . lift . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions trHashes
-      mems <- lift . RBDB.withRedisBlockDB $ mapM (RBDB.getChainMembers . fst) ptrs
-      let trMems = zip ptrs mems
-      yieldR . Transactions . map (morphTx . snd . fst) $ filter ((checkPeerIsMember peer) . snd) trMems
+      ptrs <- fmap (map unPrivate . M.elems) . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) trHashes
+      mems <- lift . selectMany (Proxy @ChainMembers) $ map fst ptrs
+      let isMember cId = maybe False (checkPeerIsMember peer)
+                       $ M.lookup cId mems
+      yieldR . Transactions . map (morphTx . snd) $ filter (isMember . fst) ptrs
 
     MsgEvt (Disconnect _) -> do
             $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
@@ -338,20 +360,18 @@ handleEvents peer = awaitForever $ \case
     NewSeqEvent oe -> case oe of
       P2pBlock b  -> do
         when (shouldSend peer $ obOrigin b) $ do
-          worldBestBlock <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
-          case worldBestBlock of
-            Nothing -> return ()
-            Just (RedisBestBlock _ _ worldTDiff) -> do
-              $logInfoS "handleEvents/P2pBlock" . T.pack $ "World TDiff: " ++ show worldTDiff
-              when (obTotalDifficulty b >= worldTDiff) $ do
-                $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
-                yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
+          WorldBestBlock (BestBlock _ _ worldTDiff) <- lift $ Mod.get (Proxy @WorldBestBlock)
+          $logInfoS "handleEvents/P2pBlock" . T.pack $ "World TDiff: " ++ show worldTDiff
+          when (obTotalDifficulty b >= worldTDiff) $ do
+            $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
+            yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
       P2pTx tx -> do
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
           let cId = txChainId tx
           match <- case cId of
             Nothing -> return True
-            Just cid' -> checkPeerIsMember peer <$> RBDB.withRedisBlockDB (RBDB.getChainMembers cid')
+            Just cid' -> fmap (maybe False (checkPeerIsMember peer)) . lift $
+              select (Proxy @ChainMembers) cid'
 
           if not match
             then $logInfoS "handleEvents/P2pTx" $ T.pack $
@@ -363,7 +383,7 @@ handleEvents peer = awaitForever $ \case
       P2pGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
         when (shouldSend peer og) $ do
           $logInfoS "handleEvents/P2pGenesis" . T.pack $ "received new chain: " ++ formatChainId (Just cId) ++ " with " ++ show uci
-          if checkPeerIsMember peer $ members uci
+          if checkPeerIsMember peer . ChainMembers $ members uci
             then do
               $logInfoS "handleEvents/P2pGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (formatChainId $ Just cId)
               yieldR $ ChainDetails [(cId, cInfo)]
@@ -376,11 +396,11 @@ handleEvents peer = awaitForever $ \case
       P2pNewChainMember cId _ _ -> do
         let formatted = format $ SHA cId
         $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "New member added to chain " ++ formatted
-        mems <- lift . RBDB.withRedisBlockDB $ RBDB.getChainMembers cId
+        mems <- lift $ selectWithDefault (Proxy @ChainMembers) cId
         when (checkPeerIsMember peer mems) $ do
           $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
-          mcInfo <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
-          for_ ((cId,) <$> mcInfo) $ yieldR . ChainDetails . (:[])
+          mcInfo <- fmap (fmap ((,) cId)) . lift $ select (Proxy @ChainInfo) cId
+          for_ mcInfo $ yieldR . ChainDetails . (:[])
       P2pBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
@@ -395,11 +415,11 @@ handleEvents peer = awaitForever $ \case
         when ss $ do
           mrh <- gets maxReturnedHeaders
           let count = min mrh . fromIntegral $ end - start + 1
-          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start count
+          chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start..]
           when (null chain) $
             $logErrorS "handleEvents/P2pPushBlocks" . T.pack $ printf
               "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
-          let outbound = BlockHeaders $ morphBlockHeader . snd <$> chain
+          let outbound = BlockHeaders $ morphBlockHeader . unCanonical . snd <$> chain
           $logDebugS "handleEvents/P2pPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
           yieldR outbound
 
@@ -427,40 +447,39 @@ handleEvents peer = awaitForever $ \case
 
 handleGetChainDetails :: ( MonadIO m
                          , MonadResource m
-                         , Accessible RBDB.RedisConnection m
                          , MonadState Context m
                          , MonadLogger m
+                         , (IPAddress `Selectable` IPChains) m
+                         , (OrgId `Selectable` OrgIdChains) m
+                         , (Word256 `Selectable` ChainMembers) m
+                         , (Word256 `Selectable` ChainInfo) m
                          )
                       => PPeer
-                      -> [Word256]
+                      -> S.Set Word256
                       -> ConduitM Event (Either P2PCNC Message) m ()
 handleGetChainDetails peer cids' = do
-  cids <- S.toList <$> case cids' of
-            [] -> RBDB.withRedisBlockDB $ do
-                    ipChains <- RBDB.getIPChains (peerIPAddress peer)
-                    orgIdChains <- fmap (fromMaybe S.empty)
-                                 . traverse (RBDB.getOrgIdChains . pointToBytes)
-                                 $ pPeerPubkey peer
-                    return $ S.union ipChains orgIdChains
-            xs -> return $ S.fromList xs
+  cids <- S.toList <$> if S.null cids'
+            then lift $ do
+              ipChains <- selectWithDefault (Proxy @IPChains) (peerIPAddress peer)
+              orgIdChains <- fmap (fromMaybe def)
+                           . traverse (selectWithDefault (Proxy @OrgIdChains) . OrgId . pointToBytes)
+                           $ pPeerPubkey peer
+              return $ S.union (unIPChains ipChains) (unOrgIdChains orgIdChains)
+            else return cids'
   stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ formatChainId . Just <$> cids)
-  mems <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainMembers cids
-  let pairs = zip cids mems
-      filteredPairs = map fst $ filter ((checkPeerIsMember peer) . snd) pairs
+  mems <- lift $ selectMany (Proxy @ChainMembers) cids
+  let filteredPairs = M.keys $ M.filter (checkPeerIsMember peer) mems
 
   unless (null filteredPairs) $ do
-    cInfos <- lift . RBDB.withRedisBlockDB $ mapM RBDB.getChainInfo cids
-    let finalPairs = map (fmap fromJust) . filter (isJust . snd) $ zip cids cInfos
-    yieldR $ ChainDetails finalPairs
+    cInfos <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) cids
+    yieldR $ ChainDetails cInfos
     stampActionTimestamp
-    $logInfoS "handleGetChainDetails" $ T.pack $ "the following (ChainId, ChainInfo) pairs were returned " ++
-      (intercalate "\n" $ (show . first (formatChainId . Just)) <$> finalPairs)
+    $logInfoS "handleGetChainDetails" $ T.pack $ "the following ChainIds were returned " ++
+      (intercalate "\n" $ formatChainId . Just . fst <$> cInfos)
 
-numFromRedis :: Maybe RedisBestBlock -> Integer
-numFromRedis = \case
-    Nothing                     -> 0
-    Just (RedisBestBlock _ n _) -> n
+numberFromBestBlock :: BestBlock -> Integer
+numberFromBestBlock (BestBlock _ n _) = n
 
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
@@ -496,17 +515,17 @@ shouldSendGossip peer txo = recordGossipFinal
     _ -> return True
 
 
-checkPeerIsMember :: PPeer -> Map Address Enode -> Bool
+checkPeerIsMember :: PPeer -> ChainMembers -> Bool
 checkPeerIsMember = checkPeerIsMember' flags_privateChainAuthorizationMode
 
-checkPeerIsMember' :: AuthorizationMode -> PPeer -> Map Address Enode -> Bool
+checkPeerIsMember' :: AuthorizationMode -> PPeer -> ChainMembers -> Bool
 checkPeerIsMember' mode peer mems =
-  let elems = M.elems mems
+  let elems = M.elems $ unChainMembers mems
       ips = map ipAddress elems
       keys = map (Just . pubKey) elems
       ipkeys = map (ipAddress &&& (Just . pubKey)) elems
       thisIP = peerIPAddress peer
-      thisKey = pointToBytes <$> pPeerPubkey peer
+      thisKey = OrgId . pointToBytes <$> pPeerPubkey peer
   in case mode of
         IPOnly -> thisIP `elem` ips
         PubkeyOnly -> thisKey `elem` keys
@@ -529,9 +548,9 @@ splitNeededHeaders x =
       indexToSplit _ li [] [] = li
   in splitAt -}
 
-splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
+splitNeededHeaders :: [BlockData] -> ([BlockData], [BlockData])
 splitNeededHeaders neededHeaders =
-  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+  let txsLens = extraData2TxsLen <$> blockDataExtraData <$> neededHeaders
       txsLensInSums =  scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
       txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
   in splitAt (length txsLensInLimit) neededHeaders

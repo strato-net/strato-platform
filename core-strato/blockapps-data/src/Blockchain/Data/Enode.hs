@@ -4,45 +4,72 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
-module Blockchain.Data.Enode (
-  Enode(..),
-  IPAddress(..),
-  showEnode,
-  readEnode,
-  showIP,
-  readIP
+module Blockchain.Data.Enode
+  ( Enode(..)
+  , IPAddress(..)
+  , OrgId(..)
+  , ChainMembers(..)
+  , ChainTxsInBlock(..)
+  , IPChains(..)
+  , OrgIdChains(..)
+  , showEnode
+  , readEnode
+  , showIP
+  , readIP
   ) where
 
 
-import                  Control.DeepSeq
-import                  Data.Bits
-import                  Data.Binary
-import qualified        Data.ByteString             as B
-import qualified        Data.ByteString.Char8       as C8
-import qualified        Data.ByteString.Base16      as B16
-import                  Data.Data
-import                  Data.List
-import                  Database.Persist.Sql
-import qualified        Data.Text                   as T
-import                  Data.Aeson
-import qualified        GHC.Generics                as GHCG
-import                  Network.Socket.Internal
+import           Control.DeepSeq
+import           Data.Aeson
+import           Data.Bits
+import           Data.Binary
+import qualified Data.ByteString             as B
+import qualified Data.ByteString.Char8       as C8
+import qualified Data.ByteString.Base16      as B16
+import           Data.Data
+import           Data.Default
+import           Data.List
+import           Database.Persist.Sql
+import qualified Data.Map.Strict             as M
+import qualified Data.Set                    as S
+import qualified Data.Text                   as T
+import qualified GHC.Generics                as GHCG
+import           Network.Socket.Internal
 
-import                  Blockchain.Data.RLP
+import           Blockchain.Data.Address
+import           Blockchain.Data.RLP
+import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.SHA
 
 
-data IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
+newtype IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
 instance RLPSerializable IPAddress where
   rlpEncode (IPv4 addy) = rlpEncode $ toInteger addy
   rlpDecode x = IPv4 (fromInteger $ rlpDecode x)
 
+newtype OrgId = OrgId { unOrgId :: B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
+
+instance RLPSerializable OrgId where
+  rlpEncode (OrgId bs) = rlpEncode bs
+  rlpDecode = OrgId . rlpDecode
+
 data Enode = Enode
-  { pubKey     :: B.ByteString
+  { pubKey     :: OrgId
   , ipAddress  :: IPAddress
   , tcpPort    :: Int
   , udpPort    :: Maybe Int
   } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
+
+newtype ChainMembers = ChainMembers { unChainMembers :: M.Map Address Enode } deriving (Eq)
+newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [SHA] } deriving (Eq)
+newtype IPChains = IPChains { unIPChains :: S.Set Word256 } deriving (Eq)
+newtype OrgIdChains = OrgIdChains { unOrgIdChains :: S.Set Word256 } deriving (Eq)
+
+instance Default ChainMembers    where def = ChainMembers M.empty
+instance Default ChainTxsInBlock where def = ChainTxsInBlock M.empty
+instance Default IPChains        where def = IPChains S.empty
+instance Default OrgIdChains     where def = OrgIdChains S.empty
 
 instance RLPSerializable Enode where
   rlpEncode (Enode pk ip tp up) =
@@ -84,7 +111,7 @@ readIP input =
   in (IPv4 addy)
 
 showEnode :: Enode -> String
-showEnode (Enode pk ip tp up) =
+showEnode (Enode (OrgId pk) ip tp up) =
     "enode://" ++
     (C8.unpack $ B16.encode pk) ++
     "@" ++
@@ -111,7 +138,7 @@ readEnode input =
           case udp of
             [] -> Nothing
             _ -> Just (read udp)
-     in (Enode (fst $ B16.decode (C8.pack pk)) (readIP ip) (read tcp) up)
+     in (Enode (OrgId . fst $ B16.decode (C8.pack pk)) (readIP ip) (read tcp) up)
 
 
 instance PersistFieldSql Enode where
