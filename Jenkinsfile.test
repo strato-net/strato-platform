@@ -195,10 +195,10 @@ pipeline {
     }
 
     stage('Redeploy with OAuth') {
-        steps {
+      steps {
         sh '''#!/bin/bash -le
           set -x
-          ./strato.sh --wipe
+         ./strato.sh --wipe
           export NODE_HOST=$(</host)
           export genesis=smokeTest
           export BLOC_DEBUG=true
@@ -234,10 +234,10 @@ pipeline {
           check_bloc
           docker exec strato_bloc_1 curl http://vault-wrapper:8000/strato/v2.3/password -H "Content-Type: application/json" -d '"testPassword"'
         '''
-        }
       }
+    }
 
-      stage('Test on OAuth Node') {
+    stage('Test with OAuth Node') {
       steps {
         parallel (
 
@@ -265,7 +265,7 @@ pipeline {
           },
 
           'Track And Trace': {
-            sh 'rm -rf track-and-trace && git clone https://github.com/blockapps/track-and-trace.git'
+            sh 'rm -rf track-and-trace && git clone https://github.com/blockapps/track-and-trace.git && git checkout oauth42style'
             dir('track-and-trace') {
               sh 'git submodule update --init --recursive'
               sh 'sed -i "s/localhost:8080/localhost/g" server/config/localhost.config.yaml'
@@ -339,9 +339,9 @@ pipeline {
           }
         )
       }
+    }
+
   }
-
-
 
   post {
     always {
@@ -377,5 +377,4 @@ pipeline {
       }
     }
   }
-}
 }
