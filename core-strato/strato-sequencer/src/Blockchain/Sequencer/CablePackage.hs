@@ -6,8 +6,9 @@ import Blockchain.Sequencer.Event
 
 data CablePackage = CablePackage
                   { unseqEvents :: TBQueue IngestEvent
-                  , seqP2PEvents :: TQueue OutputEvent
-                  , seqVMEvents :: TQueue OutputEvent
+                  , unseqCheckpoints :: TQueue OutputEvent --todo: Replace with Checkpoint type
+                  , seqP2PEvents :: TQueue OutputSeqP2pEvent
+                  , seqVMEvents :: TQueue OutputSeqVmEvent
                   }
 
 queueDepth :: Int
@@ -18,4 +19,5 @@ newCablePackage = do
   a <- newTBQueue queueDepth
   b <- newTQueue
   c <- newTQueue
-  return $ CablePackage a b c
+  d <- newTQueue
+  return $ CablePackage a b c d

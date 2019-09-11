@@ -177,9 +177,9 @@ data OutputEvent = OETx Timestamp OutputTx
                  | OEBlockstanbul PBFT.WireMessage
                  | OECreateBlockCommand
                  -- Ask and push for inclusive ranges of blocks
-                 | OEAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
-                 | OEPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
-                 | OEVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
+                 | OEAskForBlocks {oeAskStart :: Integer, oeAskEnd :: Integer, oeAskPeer :: A.Address}
+                 | OEPushBlocks {oePushStart :: Integer, oePushEnd :: Integer, oePushPeer :: A.Address}
+                 | OEVoteToMake { oeVoteRecipient :: A.Address, oeVoteVotingDir :: Bool, oeVoteSender :: A.Address }
                  | OENewCheckpoint PBFT.Checkpoint -- A pseudo out event that shouldn't leave the sequencer
                  | OEPrivateTx OutputTx
                  deriving (Eq, Show, GHCG.Generic, Data)
@@ -194,6 +194,45 @@ instance Format OutputEvent where
   format (OEBlockstanbul o)       = format o
   format (OEPrivateTx o)          = format o
   format x                        = show x
+
+data OutputSeqP2pEvent =
+    OSPETx OutputTx
+  | OSPEBlock OutputBlock
+  | OSPEGenesis OutputGenesis
+  | OSPEGetChain [Word256]
+  | OSPEGetTx [SHA]
+  | OSPENewChainMember Word256 A.Address Enode
+  | OSPEBlockstanbul PBFT.WireMessage
+  -- Ask and push for inclusive ranges of blocks
+  | OSPEAskForBlocks {ospeAskStart :: Integer, ospeAskEnd :: Integer, ospeAskPeer :: A.Address}
+  | OSPEPushBlocks {ospePushStart :: Integer, ospePushEnd :: Integer, ospePushPeer :: A.Address}
+  deriving (Eq, Show, GHCG.Generic, Data)
+
+instance Format OutputSeqP2pEvent where
+  format (OSPETx o)                 = format o
+  format (OSPEBlock o)              = format o
+  format (OSPEGenesis o)            = show o
+  format (OSPEGetChain cids)        = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (OSPEGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
+  format (OSPENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
+  format (OSPEBlockstanbul o)       = format o
+  format x                          = show x
+
+data OutputSeqVmEvent =
+    OSVETx Timestamp OutputTx
+  | OSVEBlock OutputBlock
+  | OSVEGenesis OutputGenesis
+  | OSVEJsonRpcCommand JsonRpcCommand
+  | OSVECreateBlockCommand
+  | OSVEVoteToMake { osveVoteRecipient :: A.Address, osveVoteVotingDir :: Bool, osveVoteSender :: A.Address }
+  | OSVEPrivateTx OutputTx
+  deriving (Eq, Show, GHCG.Generic, Data)
+
+instance Format OutputSeqVmEvent where
+  format (OSVETx ts o)              = show ts ++ " " ++ format o
+  format (OSVEBlock o)              = format o
+  format (OSVEGenesis o)            = show o
+  format x                          = show x
 
 data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
                          , otHash        :: SHA
@@ -415,84 +454,10 @@ instance Binary SequencedBlock where
 instance Binary OutputTx where
 instance Binary OutputBlock where
 instance Binary OutputGenesis where
-
 instance Binary IngestEvent where
-    -- put (IETx t)    = putWord8 0 >> put t -- legacy IETx
-    put (IETx ts t) = putWord8 2 >> put ts >> put t
-    put (IEBlock b) = putWord8 1 >> put b
-    put (IEGenesis g) = putWord8 3 >> put g
-    put (IEBlockstanbul m) = putWord8 4 >> put m
-    put (IENewChainMember c a e) = putWord8 5 >> put c >> put a >> put e
-    put (IEForcedConfigChange cc) = putWord8 6 >> put cc
-    get = do
-        tag <- getWord8
-        case tag of
-            0 -> IETx 0 <$> get -- legacy IETx
-            1 -> IEBlock  <$> get
-            2 -> IETx <$> get <*> get
-            3 -> IEGenesis <$> get
-            4 -> IEBlockstanbul <$> get
-            5 -> IENewChainMember <$> get <*> get <*> get
-            6 -> IEForcedConfigChange <$> get
-            x -> error $ "unknown InputEvent tag " ++ show x
-
 instance Binary JsonRpcCommand where
-  put JRCGetBalance{jrcAddress=a, jrcId=i, jrcBlockString=b} =
-    putWord8 0 >> put a >> put i >> put b
-  put JRCGetCode{jrcAddress=a, jrcId=i, jrcBlockString=b} =
-    putWord8 1 >> put a >> put i >> put b
-  put JRCGetTransactionCount {jrcAddress=a, jrcId=i, jrcBlockString=b} =
-    putWord8 2 >> put a >> put i >> put b
-  put JRCGetStorageAt {jrcAddress=a, jrcKey=k, jrcId=i, jrcBlockString=b} =
-    putWord8 3 >> put a >> put k >> put i >> put b
-  put JRCCall{jrcCode=c,jrcId=i,jrcBlockString=b} =
-    putWord8 4 >> put c >> put i >> put b
-  get = do
-        tag <- getWord8
-        case tag of
-            0 -> JRCGetBalance <$> get <*> get <*> get
-            1 -> JRCGetCode <$> get <*> get <*> get
-            2 -> JRCGetTransactionCount <$> get <*> get <*> get
-            3 -> JRCGetStorageAt <$> get <*> get <*> get <*> get
-            4 -> JRCCall <$> get <*> get <*> get
-            x -> error $ "unknown JsonRpcCommand tag " ++ show x
-
-instance Binary OutputEvent where
-    -- Reserved tags: 0, 9, 10
-    put (OETx ts t)          = putWord8 3 >> put ts >> put t
-    put (OEBlock b)          = putWord8 1 >> put b
-    put (OEJsonRpcCommand c) = putWord8 2 >> put c
-    put (OEGenesis g)        = putWord8 4 >> put g
-    put (OEGetChain cid)     = putWord8 5 >> put cid
-    put (OEGetTx tx)         = putWord8 6 >> put tx
-    put (OEBlockstanbul m)   = putWord8 7 >> put m
-    put (OECreateBlockCommand) = putWord8 8
-    put (OEAskForBlocks s e p) = putWord8 11 >> put s >> put e >> put p
-    put (OEPushBlocks s e p) = putWord8 12 >> put s >> put e >> put p
-    put (OENewChainMember c a e) = putWord8 13 >> put c >> put a >> put e
-    put (OEVoteToMake r d s) = putWord8 14 >> put r >> put d >> put s
-    put (OENewCheckpoint{}) = error "pbft checkpoints should not be sent to p2p/vm"
-    put (OEPrivateTx t)     = putWord8 15 >> put t
-    get = do
-        tag <- getWord8
-        case tag of
-            0 -> OETx 0 <$> get -- legacy OETx
-            1 -> OEBlock <$> get
-            2 -> OEJsonRpcCommand <$> get
-            3 -> OETx <$> get <*> get
-            4 -> OEGenesis <$> get
-            5 -> OEGetChain <$> get
-            6 -> OEGetTx <$> get
-            7 -> OEBlockstanbul <$> get
-            8 -> pure OECreateBlockCommand
-            9 -> OEAskForBlocks <$> get <*> get <*> pure 0x0 -- legacy OEAFB
-            10 -> OEPushBlocks <$> get <*> get <*> pure 0x0 -- legacy OEPB
-            11 -> OEAskForBlocks <$> get <*> get <*> get
-            12 -> OEPushBlocks <$> get <*> get <*> get
-            13 -> OENewChainMember <$> get <*> get <*> get
-            14 -> OEVoteToMake <$> get <*> get <*> get
-            15 -> OEPrivateTx <$> get
-            x -> error $ "unknown OutputEvent tag " ++ show x
+instance Binary OutputSeqP2pEvent where
+instance Binary OutputSeqVmEvent where
 
 instance Format IngestBlock where
     format b@IngestBlock { ibOrigin              = origin
@@ -592,6 +557,8 @@ derive makeArbitrary ''IngestBlock
 derive makeArbitrary ''IngestGenesis
 derive makeArbitrary ''SequencedBlock
 derive makeArbitrary ''OutputEvent
+derive makeArbitrary ''OutputSeqP2pEvent
+derive makeArbitrary ''OutputSeqVmEvent
 derive makeArbitrary ''OutputTx
 derive makeArbitrary ''OutputBlock
 derive makeArbitrary ''OutputGenesis

@@ -4,6 +4,7 @@
 -- the sequencer becomes more testable as it does not require a kafka setup to run,
 -- and the sequencer does not have to worry about long blocking reads from kafka
 -- preventing other events from being processed.
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -28,11 +29,11 @@ import           Control.Concurrent.Extra (Lock, withLock, newLock)
 import           Control.Concurrent.STM (orElse, flushTQueue)
 import           Control.Lens               hiding (op)
 import qualified Control.Monad.Change.Modify as Mod
-import           Control.Monad.Extra (whenJust)
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Default
-import           Data.List (partition)
+import           Data.Foldable (for_)
+import           Data.List (foldl')
 import           Data.List.Extra (chunksOf)
 import qualified Data.Text as T
 import qualified Prometheus as P
@@ -64,8 +65,9 @@ data GregorContext = GregorContext
                      { _gregorKafkaState :: K.KafkaState
                      , _gregorConsumerGroup :: KP.ConsumerGroup
                      , _gregorUnseq :: TBQueue IngestEvent
-                     , _gregorSeqP2P :: TQueue OutputEvent
-                     , _gregorSeqVM :: TQueue OutputEvent
+                     , _gregorUnseqCheckpoints :: TQueue OutputEvent --todo: Replace with only Checkpoint type
+                     , _gregorSeqP2P :: TQueue OutputSeqP2pEvent
+                     , _gregorSeqVM :: TQueue OutputSeqVmEvent
                      }
 makeLenses ''GregorContext
 
@@ -79,6 +81,7 @@ convert GregorConfig{..} =
   in GregorContext { _gregorKafkaState = kState
                    , _gregorConsumerGroup = kafkaConsumerGroup
                    , _gregorUnseq = unseqEvents cablePackage
+                   , _gregorUnseqCheckpoints = unseqCheckpoints cablePackage
                    , _gregorSeqP2P = seqP2PEvents cablePackage
                    , _gregorSeqVM = seqVMEvents cablePackage
                    }
@@ -107,12 +110,12 @@ readUnseqEvents' = do
     P.unsafeAddCounter gregorUnseqRead $ fromIntegral count
     return (offset + fromIntegral count, ret)
 
-writeSeqVmEvents :: [OutputEvent] -> GregorM ()
+writeSeqVmEvents :: [OutputSeqVmEvent] -> GregorM ()
 writeSeqVmEvents events = do
     void $ K.withKafkaRetry1s (SK.writeSeqVmEvents events)
     P.unsafeAddCounter gregorVMWrite (fromIntegral(length events))
 
-writeSeqP2pEvents :: [OutputEvent] -> GregorM ()
+writeSeqP2pEvents :: [OutputSeqP2pEvent] -> GregorM ()
 writeSeqP2pEvents events = do
     void $ K.withKafkaRetry1s (SK.writeSeqP2pEvents events)
     P.unsafeAddCounter gregorP2PWrite (fromIntegral(length events))
@@ -193,35 +196,40 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
   -- with the events that `seqWriters` processes.
   updateOffset_locked nextOff
 
+data ImOnlyUsedInSeqWriters a b c = VM a | P2P b | KafkaCheckpoint c
+  deriving (Foldable)
+
 seqWriters :: GregorM ()
 seqWriters = forever . timeAction gregorSeqTiming $ do
   vmq <- use gregorSeqVM
   p2pq <- use gregorSeqP2P
+  ckptq <- use gregorUnseqCheckpoints
   events <- atomically $
-    fmap Left (blockFlushTQueue vmq) `orElse` fmap Right (blockFlushTQueue p2pq)
+    fmap VM (blockFlushTQueue vmq)
+    `orElse` (fmap P2P (blockFlushTQueue p2pq)
+    `orElse` fmap KafkaCheckpoint (blockFlushTQueue ckptq))
   $logDebugS "gregor/seqWriter" . T.pack . show $ length events
   case events of
-    Left vmevs -> do
+    VM vmevs -> do
       P.withLabel gregorLoop "seq_vm_events" P.incCounter
       P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
+      writeSeqVmEvents vmevs
+
+    P2P p2pevs -> do
+      P.withLabel gregorLoop "seq_p2p_events" P.incCounter
+      P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
+      writeSeqP2pEvents p2pevs
+
+    KafkaCheckpoint ckpts -> do
       let isCheckpoint OENewCheckpoint{} = True
           isCheckpoint _ = False
-          safeLast [] = Nothing
-          safeLast [x] = Just x
-          safeLast (_:xs) = safeLast xs
-          (ckpts, vmevs') = partition isCheckpoint vmevs
-      writeSeqVmEvents vmevs'
-      whenJust (safeLast ckpts) $ \case
+          lastCheckpoint = foldl' (\b a -> if isCheckpoint a then Just a else b) Nothing ckpts
+      for_ lastCheckpoint $ \case
         OENewCheckpoint ckpt -> do
           $logDebugLS "gregor/seqWriter/checkpoint" ckpt
           P.incCounter gregorCheckpointsSent
           updateMetadata_locked $ encodeMeta ckpt
         oe -> error $ "non-checkpoint partitioned with checkpoints: " ++ show oe -- we untyped now
-
-    Right p2pevs -> do
-      P.withLabel gregorLoop "seq_p2p_events" P.incCounter
-      P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
-      writeSeqP2pEvents p2pevs
 
 -- Will only read if at least one element is in the queue.
 blockFlushTQueue :: TQueue a -> STM [a]
