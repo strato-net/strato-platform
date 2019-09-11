@@ -192,8 +192,9 @@ pipeline {
           }
         )
       }
+    }
 
-      stage('Redeploy with OAuth') {
+    stage('Redeploy with OAuth') {
         steps {
         sh '''#!/bin/bash -le
           set -x
@@ -338,8 +339,6 @@ pipeline {
           }
         )
       }
-
-    }
   }
 
 
