@@ -10,17 +10,14 @@ import           Blockchain.Data.Code
 import           Blockchain.EVM.Opcodes
 import           Blockchain.Util
 
-import qualified Text.Colors            as CL
 import           Text.Format
 
 
 getOperationAt::Code->CodePointer->(Operation, CodePointer)
 getOperationAt (Code bytes) p        = opCode2Op bytes p
-getOperationAt (PrecompiledCode _) _ = error "getOperationAt called for precompilded code"
 
 showCode::CodePointer->Code->String
 showCode _ (Code bytes) | B.null bytes = ""
-showCode _ (PrecompiledCode x) = CL.blue $ "<PrecompiledCode:" ++ show x ++">"
 showCode lineNumber c@(Code rom) = showHex lineNumber "" ++ " " ++ format (B.pack $ op2OpCode op) ++ " " ++ show (pretty op) ++ "\n" ++  showCode (lineNumber + nextP) (Code (safeIntDrop nextP rom))
         where
           (op, nextP) = getOperationAt c 0
@@ -29,7 +26,6 @@ formatCode::Code->String
 formatCode = showCode 0
 
 getValidJUMPDESTs :: Code -> I.IntSet
-getValidJUMPDESTs (PrecompiledCode _) = error "getValidJUMPDESTs called on precompiled code"
 getValidJUMPDESTs (Code bytes) = I.fromAscList $ go 0
  where
   len = B.length bytes
@@ -42,8 +38,7 @@ getValidJUMPDESTs (Code bytes) = I.fromAscList $ go 0
                        | otherwise -> go (x+1)
 
 codeLength::Code->CodePointer
-codeLength (Code bytes)        = B.length bytes
-codeLength (PrecompiledCode _) = error "codeLength called on precompiled code"
+codeLength (Code bytes) = B.length bytes
 
 compile::[Operation]->Code
 compile x = Code bytes

@@ -96,7 +96,6 @@ create :: Bool
        -> ContextM ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create _ _ _ _ _ _ _ _ _ _ _ pc@(PrecompiledCode _) _ _ _ = internalError "call precompiled code" pc
 create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId' metadata = do
   recordCreate
   let env' = Env.Environment {

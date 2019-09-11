@@ -140,7 +140,6 @@ showInfo (key,AddressState'{nonce'=n, balance'=b, storage'=s, contractCode'=Code
           else (", " ++) . show . M.toList . M.map showHexInt . M.mapKeys showHash $ s
          ) ++
          (if B.null c then "" else ", CODE:[" ++ C.blue (format c) ++ "]")
-showInfo _ = undefined
 
 addressStates::ContextM [(Address, AddressState')]
 addressStates = do

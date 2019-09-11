@@ -14,10 +14,10 @@ import qualified Data.ByteString.Lazy       as BL
 import           Network.Haskoin.Internals  (Signature (..))
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.Code
 import           Blockchain.ExtendedECDSA
 import           Blockchain.EVM.OpcodePrices
-import           Blockchain.EVM.VMM
-import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.Util
 
 
@@ -46,25 +46,23 @@ sha2 input =
 --    in
      SHA2.hash input
 
-callPrecompiledContract::Word160->B.ByteString->VMM B.ByteString
-callPrecompiledContract 0 _ = return B.empty
+callPrecompiledContract :: PrecompiledCode -> B.ByteString -> (Gas, B.ByteString)
+callPrecompiledContract NullContract _ = (0, B.empty)
 
-callPrecompiledContract 1 inputData = do
-  useGas gECRECOVER
-  return $ ecdsaRecover $ inputData `B.append` B.replicate 128 0 --need to right pad with zeros to get the full value if the input isn't large enough....  Since extra bytes will be cut off, it doesn't hurt to just add this everywhere
+callPrecompiledContract ECRecover inputData =
+  let ret = ecdsaRecover $ inputData `B.append` B.replicate 128 0 --need to right pad with zeros to get the full value if the input isn't large enough....  Since extra bytes will be cut off, it doesn't hurt to just add this everywhere
+   in (gECRECOVER, ret)
 
-callPrecompiledContract 2 inputData = do
-  useGas $ gSHA256BASE + gSHA256WORD*(ceiling $ fromIntegral (B.length inputData)/(32::Double))
-  return $ sha2 inputData
+callPrecompiledContract SHA256 inputData = do
+  let gas = gSHA256BASE + gSHA256WORD*(ceiling $ fromIntegral (B.length inputData)/(32::Double))
+   in (gas, sha2 inputData)
 
-callPrecompiledContract 3 inputData = do
-  useGas $ gRIPEMD160BASE +
-    gRIPEMD160WORD*(ceiling $ fromIntegral (B.length inputData)/(32::Double))
-  return $ ripemd inputData
+callPrecompiledContract RIPEMD160 inputData = do
+  let gas = gRIPEMD160BASE +
+        gRIPEMD160WORD*(ceiling $ fromIntegral (B.length inputData)/(32::Double))
+   in (gas, ripemd inputData)
 
-callPrecompiledContract 4 inputData = do
-  useGas $ gIDENTITYBASE +
-    gIDENTITYWORD*(ceiling $ fromIntegral (B.length inputData)/(32::Double))
-  return inputData
-
-callPrecompiledContract x _ = error $ "missing precompiled contract: " ++ show x
+callPrecompiledContract IdentityContract inputData = do
+  let gas = gIDENTITYBASE +
+        gIDENTITYWORD*(ceiling $ fromIntegral (B.length inputData)/(32::Double))
+   in (gas, inputData)
