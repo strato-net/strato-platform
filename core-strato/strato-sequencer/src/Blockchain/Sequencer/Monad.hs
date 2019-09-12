@@ -29,7 +29,7 @@ module Blockchain.Sequencer.Monad (
   , getTransactionsDB
   , prunePrivacyDBs
   , runSequencerM
-  , pairToOSVETx
+  , pairToVmTx
   , markForVM
   , markForP2P
   , clearLdbBatchOps
@@ -105,8 +105,8 @@ data SequencerContext = SequencerContext
   , _getChainsDB         :: GetChainsDB
   , _getTransactionsDB   :: GetTransactionsDB
   , _ldbBatchOps         :: Q.Seq LDB.BatchOp
-  , _vmEvents            :: Q.Seq OutputSeqVmEvent
-  , _p2pEvents           :: Q.Seq OutputSeqP2pEvent
+  , _vmEvents            :: Q.Seq VmEvent
+  , _p2pEvents           :: Q.Seq P2pEvent
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
@@ -347,19 +347,19 @@ runSequencerM c mbc m = do
             }
     return $ fst a
 
-pairToOSVETx :: (Timestamp, OutputTx) -> OutputSeqVmEvent
-pairToOSVETx = uncurry OSVETx
+pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
+pairToVmTx = uncurry VmTx
 
-markForVM :: OutputSeqVmEvent -> SequencerM ()
+markForVM :: VmEvent -> SequencerM ()
 markForVM oe = vmEvents %= (Q.|> oe)
 
-markForP2P :: OutputSeqP2pEvent -> SequencerM ()
+markForP2P :: P2pEvent -> SequencerM ()
 markForP2P oe = p2pEvents %= (Q.|> oe)
 
-drainP2P :: SequencerM [OutputSeqP2pEvent]
+drainP2P :: SequencerM [P2pEvent]
 drainP2P = fmap toList $ p2pEvents <<.= Q.empty
 
-drainVM :: SequencerM [OutputSeqVmEvent]
+drainVM :: SequencerM [VmEvent]
 drainVM = fmap toList $ vmEvents <<.= Q.empty
 
 clearDBERegistry :: SequencerM ()

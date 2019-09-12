@@ -195,43 +195,43 @@ instance Format OutputEvent where
   format (OEPrivateTx o)          = format o
   format x                        = show x
 
-data OutputSeqP2pEvent =
-    OSPETx OutputTx
-  | OSPEBlock OutputBlock
-  | OSPEGenesis OutputGenesis
-  | OSPEGetChain [Word256]
-  | OSPEGetTx [SHA]
-  | OSPENewChainMember Word256 A.Address Enode
-  | OSPEBlockstanbul PBFT.WireMessage
+data P2pEvent =
+    P2pTx OutputTx
+  | P2pBlock OutputBlock
+  | P2pGenesis OutputGenesis
+  | P2pGetChain [Word256]
+  | P2pGetTx [SHA]
+  | P2pNewChainMember Word256 A.Address Enode
+  | P2pBlockstanbul PBFT.WireMessage
   -- Ask and push for inclusive ranges of blocks
-  | OSPEAskForBlocks {ospeAskStart :: Integer, ospeAskEnd :: Integer, ospeAskPeer :: A.Address}
-  | OSPEPushBlocks {ospePushStart :: Integer, ospePushEnd :: Integer, ospePushPeer :: A.Address}
+  | P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
+  | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
   deriving (Eq, Show, GHCG.Generic, Data)
 
-instance Format OutputSeqP2pEvent where
-  format (OSPETx o)                 = format o
-  format (OSPEBlock o)              = format o
-  format (OSPEGenesis o)            = show o
-  format (OSPEGetChain cids)        = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
-  format (OSPEGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format (OSPENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
-  format (OSPEBlockstanbul o)       = format o
+instance Format P2pEvent where
+  format (P2pTx o)                 = format o
+  format (P2pBlock o)              = format o
+  format (P2pGenesis o)            = show o
+  format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
+  format (P2pNewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
+  format (P2pBlockstanbul o)       = format o
   format x                          = show x
 
-data OutputSeqVmEvent =
-    OSVETx Timestamp OutputTx
-  | OSVEBlock OutputBlock
-  | OSVEGenesis OutputGenesis
-  | OSVEJsonRpcCommand JsonRpcCommand
-  | OSVECreateBlockCommand
-  | OSVEVoteToMake { osveVoteRecipient :: A.Address, osveVoteVotingDir :: Bool, osveVoteSender :: A.Address }
-  | OSVEPrivateTx OutputTx
+data VmEvent =
+    VmTx Timestamp OutputTx
+  | VmBlock OutputBlock
+  | VmGenesis OutputGenesis
+  | VmJsonRpcCommand JsonRpcCommand
+  | VmCreateBlockCommand
+  | VmVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
+  | VmPrivateTx OutputTx
   deriving (Eq, Show, GHCG.Generic, Data)
 
-instance Format OutputSeqVmEvent where
-  format (OSVETx ts o)              = show ts ++ " " ++ format o
-  format (OSVEBlock o)              = format o
-  format (OSVEGenesis o)            = show o
+instance Format VmEvent where
+  format (VmTx ts o)              = show ts ++ " " ++ format o
+  format (VmBlock o)              = format o
+  format (VmGenesis o)            = show o
   format x                          = show x
 
 data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
@@ -456,8 +456,8 @@ instance Binary OutputBlock where
 instance Binary OutputGenesis where
 instance Binary IngestEvent where
 instance Binary JsonRpcCommand where
-instance Binary OutputSeqP2pEvent where
-instance Binary OutputSeqVmEvent where
+instance Binary P2pEvent where
+instance Binary VmEvent where
 
 instance Format IngestBlock where
     format b@IngestBlock { ibOrigin              = origin
@@ -557,8 +557,8 @@ derive makeArbitrary ''IngestBlock
 derive makeArbitrary ''IngestGenesis
 derive makeArbitrary ''SequencedBlock
 derive makeArbitrary ''OutputEvent
-derive makeArbitrary ''OutputSeqP2pEvent
-derive makeArbitrary ''OutputSeqVmEvent
+derive makeArbitrary ''P2pEvent
+derive makeArbitrary ''VmEvent
 derive makeArbitrary ''OutputTx
 derive makeArbitrary ''OutputBlock
 derive makeArbitrary ''OutputGenesis

@@ -80,5 +80,5 @@ bootstrapSequencer Block{blockBlockData = bd,
             }
       runGregorM dummyGregorCfg $ do
         assertTopicCreation
-        writeSeqVmEvents [OSVEBlock shortCircuit]  -- todo handle the error :)
-        writeSeqP2pEvents [OSPEBlock shortCircuit]  -- todo handle the error :)
+        writeSeqVmEvents [VmBlock shortCircuit]  -- todo handle the error :)
+        writeSeqP2pEvents [P2pBlock shortCircuit]  -- todo handle the error :)

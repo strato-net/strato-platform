@@ -66,8 +66,8 @@ data GregorContext = GregorContext
                      , _gregorConsumerGroup :: KP.ConsumerGroup
                      , _gregorUnseq :: TBQueue IngestEvent
                      , _gregorUnseqCheckpoints :: TQueue OutputEvent --todo: Replace with only Checkpoint type
-                     , _gregorSeqP2P :: TQueue OutputSeqP2pEvent
-                     , _gregorSeqVM :: TQueue OutputSeqVmEvent
+                     , _gregorSeqP2P :: TQueue P2pEvent
+                     , _gregorSeqVM :: TQueue VmEvent
                      }
 makeLenses ''GregorContext
 
@@ -110,12 +110,12 @@ readUnseqEvents' = do
     P.unsafeAddCounter gregorUnseqRead $ fromIntegral count
     return (offset + fromIntegral count, ret)
 
-writeSeqVmEvents :: [OutputSeqVmEvent] -> GregorM ()
+writeSeqVmEvents :: [VmEvent] -> GregorM ()
 writeSeqVmEvents events = do
     void $ K.withKafkaRetry1s (SK.writeSeqVmEvents events)
     P.unsafeAddCounter gregorVMWrite (fromIntegral(length events))
 
-writeSeqP2pEvents :: [OutputSeqP2pEvent] -> GregorM ()
+writeSeqP2pEvents :: [P2pEvent] -> GregorM ()
 writeSeqP2pEvents events = do
     void $ K.withKafkaRetry1s (SK.writeSeqP2pEvents events)
     P.unsafeAddCounter gregorP2PWrite (fromIntegral(length events))

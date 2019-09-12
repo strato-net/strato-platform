@@ -103,19 +103,19 @@ ethereumVM = void . execContextM $ do
 
         insertNewChains seqEvents
 
-        mapM_ (uncurry3 queuePendingVote) [(r, d, s) | OSVEVoteToMake r d s <- seqEvents]
-        let newCommands = [c | OSVEJsonRpcCommand c <- seqEvents]
+        mapM_ (uncurry3 queuePendingVote) [(r, d, s) | VmVoteToMake r d s <- seqEvents]
+        let newCommands = [c | VmJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
-        let txPairs = [(ts,t) | OSVETx ts t <- seqEvents]
-            allTxs = map (uncurry OSVETx) txPairs
-            blocks = [b | OSVEBlock b <- seqEvents]
+        let txPairs = [(ts,t) | VmTx ts t <- seqEvents]
+            allTxs = map (uncurry VmTx) txPairs
+            blocks = [b | VmBlock b <- seqEvents]
         when (not $ null txPairs) . void
                                   . K.withKafkaViolently
                                   . writeIndexEvents
                                   $ map (uncurry IndexTransaction) txPairs
 
-        let ptxs = [IndexPrivateTx t | OSVEPrivateTx t <- seqEvents]
+        let ptxs = [IndexPrivateTx t | VmPrivateTx t <- seqEvents]
         when (not $ null ptxs) . void
                                . K.withKafkaViolently
                                $ writeIndexEvents ptxs
@@ -124,7 +124,7 @@ ethereumVM = void . execContextM $ do
         recordSeqEventCount bLen tLen
 
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
-        let allNewTxs = [(ts, t) | OSVETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
+        let allNewTxs = [(ts, t) | VmTx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
         let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
@@ -141,7 +141,7 @@ ethereumVM = void . execContextM $ do
             writeBlockSummary b
         actions <- addBlocks blocks
 
-        contextBlockRequested ||= (OSVECreateBlockCommand `elem` seqEvents)
+        contextBlockRequested ||= (VmCreateBlockCommand `elem` seqEvents)
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
@@ -184,9 +184,9 @@ ethereumVM = void . execContextM $ do
         withChainroot <- checkpointData . Just . unBlockHashRoot <$> Mod.get Proxy
         setCheckpoint newOffset withChainroot
 
-insertNewChains :: [OutputSeqVmEvent] -> ContextM ()
+insertNewChains :: [VmEvent] -> ContextM ()
 insertNewChains events = do
-  let newChainInfos = [c | OSVEGenesis (OutputGenesis _ c) <- events]
+  let newChainInfos = [c | VmGenesis (OutputGenesis _ c) <- events]
 
   newChains <- forM newChainInfos $ \(cId, cInfo) -> do
     $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
@@ -276,7 +276,7 @@ consumerGroup = lookupConsumerGroup "ethereum-vm"
 
 getFirstBlockFromSequencer :: ContextM OutputBlock
 getFirstBlockFromSequencer = do
-    (OSVEBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
+    (VmBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
     return block
 
 -- this one starts at 1, 0 is reserved for genesis block and is used to
@@ -347,7 +347,7 @@ setCheckpointNoMetadata ofs = do
     ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
     either (error . show) return ret
 
-getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputSeqVmEvent]
+getUnprocessedKafkaEvents :: KP.Offset -> ContextM [VmEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
     ret <- K.withKafkaViolently (readSeqVmEvents offset)
@@ -362,9 +362,9 @@ getUnprocessedKafkaEvents offset = do
             . scanl (+) 0
             . map approxCost
             $ ret
-        approxCost :: OutputSeqVmEvent -> Int
+        approxCost :: VmEvent -> Int
         approxCost = \case
-          OSVEBlock OutputBlock{..} -> fromMaybe (length obReceiptTransactions)
+          VmBlock OutputBlock{..} -> fromMaybe (length obReceiptTransactions)
                                      . extraData2TxsLen
                                      $ blockDataExtraData obBlockData
           _ -> 1
@@ -396,7 +396,7 @@ shouldProcessNewTransactions =
 
 
 
-logEventSummaries :: [OutputSeqVmEvent] -> ContextM ()
+logEventSummaries :: [VmEvent] -> ContextM ()
 logEventSummaries events = do
   let names = map getNames events
       numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
@@ -405,15 +405,15 @@ logEventSummaries events = do
     "#### Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"
 
   where
-    getNames :: OutputSeqVmEvent -> String
-    getNames (OSVETx _ _) = "TX"
-    getNames (OSVEBlock _) = "Block"
-    getNames (OSVEGenesis _) = "GenesisBlock"
-    getNames (OSVEJsonRpcCommand _) = "JsonRpcCommand"
+    getNames :: VmEvent -> String
+    getNames (VmTx _ _) = "TX"
+    getNames (VmBlock _) = "Block"
+    getNames (VmGenesis _) = "GenesisBlock"
+    getNames (VmJsonRpcCommand _) = "JsonRpcCommand"
 
-    getNames OSVECreateBlockCommand = "CreateBlockCommand"
-    getNames (OSVEVoteToMake _ _ _) = "VoteToMake"
-    getNames (OSVEPrivateTx _) = "PrivateTx"
+    getNames VmCreateBlockCommand = "CreateBlockCommand"
+    getNames (VmVoteToMake _ _ _) = "VoteToMake"
+    getNames (VmPrivateTx _) = "PrivateTx"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x

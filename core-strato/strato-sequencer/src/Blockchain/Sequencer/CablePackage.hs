@@ -7,8 +7,8 @@ import Blockchain.Sequencer.Event
 data CablePackage = CablePackage
                   { unseqEvents :: TBQueue IngestEvent
                   , unseqCheckpoints :: TQueue OutputEvent --todo: Replace with Checkpoint type
-                  , seqP2PEvents :: TQueue OutputSeqP2pEvent
-                  , seqVMEvents :: TQueue OutputSeqVmEvent
+                  , seqP2PEvents :: TQueue P2pEvent
+                  , seqVMEvents :: TQueue VmEvent
                   }
 
 queueDepth :: Int

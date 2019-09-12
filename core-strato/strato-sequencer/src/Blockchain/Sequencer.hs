@@ -155,14 +155,14 @@ checkForUnseq inEvents = do
     logF "Applied pending LDB writes"
     chainIds <- unGetChainsDB <$> use getChainsDB
     unless (S.null chainIds) $
-      markForP2P . OSPEGetChain $ toList chainIds
+      markForP2P . P2pGetChain $ toList chainIds
     txHashes <- unGetTransactionsDB <$> use getTransactionsDB
     unless (S.null txHashes) $
-      markForP2P . OSPEGetTx $ toList txHashes
+      markForP2P . P2pGetTx $ toList txHashes
 
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
-  writeSeqVmEvents [OSVECreateBlockCommand]
+  writeSeqVmEvents [VmCreateBlockCommand]
   createFirstTimer
 
 blockstanbulSend :: [InEvent] -> SequencerM ()
@@ -174,7 +174,7 @@ blockstanbulSend = mapM_ $ \ie -> do
    .| sinkList
     )
 
-blockstanbulSend' :: InEvent -> SequencerM [OutputSeqVmEvent]
+blockstanbulSend' :: InEvent -> SequencerM [VmEvent]
 blockstanbulSend' msg = do
   resp' <- sendAllMessages [msg]
   let blocks = [b | ToCommit b <- resp']
@@ -194,16 +194,16 @@ blockstanbulSend' msg = do
       rewriteBlock b = do
         msb <- getSequencedBlock b
         for msb $ \sb -> do
-          return . OSVEBlock $ sequencedBlockToOutputBlock sb 1
-      creates = [OSVECreateBlockCommand | MakeBlockCommand <- resp]
+          return . VmBlock $ sequencedBlockToOutputBlock sb 1
+      creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
   rBlocks <- fmap catMaybes $ mapM rewriteBlock blocks
   let vmevs = creates
            ++ rBlocks
-           ++ [OSVEVoteToMake r d s| PendingVote r d s <- resp]
-           -- ++ [OSVENewCheckpoint ck | NewCheckpoint ck <- resp] -- todo: create separate queue for checkpoints
-      p2pevs = [OSPEBlockstanbul (WireMessage a m) | OMsg a m <- resp]
-            ++ [OSPEAskForBlocks (h+1) l p | GapFound h l p <- resp]
-            ++ [OSPEPushBlocks (l+1) h p | LeadFound h l p <- resp]
+           ++ [VmVoteToMake r d s| PendingVote r d s <- resp]
+           -- ++ [VmNewCheckpoint ck | NewCheckpoint ck <- resp] -- todo: create separate queue for checkpoints
+      p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
+            ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
+            ++ [P2pPushBlocks (l+1) h p | LeadFound h l p <- resp]
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
@@ -232,8 +232,8 @@ transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHas
       unless pwitnessed $ do
         witnessTransactionHash privateWitnessHash
         runPrivateHashTX (SHA th') (SHA ch')
-        markForP2P $ OSPETx otx
-        markForVM  $ OSVETx ts otx
+        markForP2P $ P2pTx otx
+        markForVM  $ VmTx ts otx
 
 transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformFullTransactions pairs = do
@@ -258,8 +258,8 @@ transformFullTransactions pairs = do
     if not isPrivateChain
       then do
         logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
-        mapM_ (markForVM . pairToOSVETx) txs
-        mapM_ (markForP2P . OSPETx . snd) txs
+        mapM_ (markForVM . pairToVmTx) txs
+        mapM_ (markForP2P . P2pTx . snd) txs
       else forM_ (partitionWith (TD.transactionChainId . otBaseTx . snd) txs) $ \(Just chainId, ptxs) -> do
         logF . concat $
           [ "Transforming "
@@ -268,7 +268,7 @@ transformFullTransactions pairs = do
           , format (SHA chainId)
           ]
         mapM_ (insertTransaction . snd) ptxs
-        mapM_ (markForVM . OSVEPrivateTx . snd) ptxs -- we want to get these transactions into the
+        mapM_ (markForVM . VmPrivateTx . snd) ptxs -- we want to get these transactions into the
                                                    -- P2P indexer ASAP so we can return them to
                                                    -- peers requesting them
         mcInfo <- fmap _chainIdInfo <$> A.lookup (Proxy :: Proxy ChainIdEntry) chainId
@@ -287,7 +287,7 @@ transformFullTransactions pairs = do
                 , format (SHA chainId)
                 , ". Sending to P2P."
                 ]
-              markForP2P $ OSPETx ptx
+              markForP2P $ P2pTx ptx
               --liftIO $ withLabel txMetrics "private_hash" incCounter
               when (otOrigin ptx == TO.API) $ do
                 cHash <- getNewChainHash chainId >>= \case
@@ -313,9 +313,9 @@ transformFullTransactions pairs = do
                   , " for transaction "
                   , format tHash
                   ]
-                markForVM $ pairToOSVETx (ts, phtx)
-                markForP2P $ OSPETx phtx
-            mapM_ (markForVM . OSVEBlock) =<< runBlocks chainId
+                markForVM $ pairToVmTx (ts, phtx)
+                markForP2P $ P2pTx phtx
+            mapM_ (markForVM . VmBlock) =<< runBlocks chainId
 
 transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransaction . snd) events) $ \(isPrivateHash, pairs) ->
@@ -352,15 +352,15 @@ expandBlock = awaitForever $ \sb -> do
           $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
           yield $ Left sb
 
-runConsensus :: ConduitM (Either SequencedBlock OutputBlock) OutputSeqVmEvent SequencerM ()
+runConsensus :: ConduitM (Either SequencedBlock OutputBlock) VmEvent SequencerM ()
 runConsensus = awaitForever $ \eob -> do
   hasPBFT <- lift $ blockstanbulRunning
   if not hasPBFT
     then case eob of
       Left _ -> return ()
       Right ob -> do
-        lift . markForP2P $ OSPEBlock ob
-        yield $ OSVEBlock ob
+        lift . markForP2P $ P2pBlock ob
+        yield $ VmBlock ob
     else do
       let convert :: BDB.Block -> InEvent
           convert blk = if isHistoricBlock blk
@@ -373,12 +373,12 @@ runConsensus = awaitForever $ \eob -> do
       oes <- lift . blockstanbulSend' . convert $ route eob
       yieldMany oes
 
-hydrateAndEmit :: Maybe Word256 -> ConduitM OutputSeqVmEvent OutputSeqVmEvent SequencerM ()
+hydrateAndEmit :: Maybe Word256 -> ConduitM VmEvent VmEvent SequencerM ()
 hydrateAndEmit chainId = awaitForever $ \case
-  OSVEBlock ob -> do
-    when (isNothing chainId) . yield $ OSVEBlock ob
+  VmBlock ob -> do
+    when (isNothing chainId) . yield $ VmBlock ob
     ob' <- lift $ hydratePrivateHashes chainId ob
-    for_ ob' $ yield . OSVEBlock
+    for_ ob' $ yield . VmBlock
   oe -> yield oe
 
 transformBlocks :: [IngestBlock] -> SequencerM ()
@@ -400,9 +400,9 @@ transformGenesis chains = forM_ chains $ \ig -> do
     True -> logF "We've seen this chain before. Not emitting to VM"
     False -> do
       logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM, P2P"
-      markForVM $ OSVEGenesis og
-      markForP2P (OSPEGenesis og)
-      mapM_ (markForVM . OSVEBlock) =<< insertNewChainInfo chainId cInfo
+      markForVM $ VmGenesis og
+      markForP2P (P2pGenesis og)
+      mapM_ (markForVM . VmBlock) =<< insertNewChainInfo chainId cInfo
 
 splitEvents :: [IngestEvent] -> SequencerM ()
 splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
@@ -423,7 +423,7 @@ splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
       transformGenesis $ map (\(IEGenesis og) -> og) events
     IETNewChainMember -> do
       record "inevent_type_new_chain_member" "IngestNewChainMembers"
-      mapM_ (\(IENewChainMember c a e) -> markForP2P $ OSPENewChainMember c a e) events
+      mapM_ (\(IENewChainMember c a e) -> markForP2P $ P2pNewChainMember c a e) events
     IETBlockstanbul -> do
       record "inevent_type_blockstanbul" "IngestBlockstanbuls"
       blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
@@ -464,12 +464,12 @@ prettyOTx OutputTx{otOrigin=o, otBaseTx=t} = prefix t ++ " via " ++ shortOrigin 
             shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
             shortOrigin x                    = format x
 
-writeSeqVmEvents :: [OutputSeqVmEvent] -> SequencerM ()
+writeSeqVmEvents :: [VmEvent] -> SequencerM ()
 writeSeqVmEvents events = do
     ch <- asks (seqVMEvents . cablePackage)
     atomically . mapM_ (writeTQueue ch) $ events
 
-writeSeqP2pEvents :: [OutputSeqP2pEvent] -> SequencerM ()
+writeSeqP2pEvents :: [P2pEvent] -> SequencerM ()
 writeSeqP2pEvents events = do
     ch <- asks (seqP2PEvents . cablePackage)
     atomically . mapM_ (writeTQueue ch) $ events

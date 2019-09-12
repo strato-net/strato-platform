@@ -332,7 +332,7 @@ handleEvents peer = awaitForever $ \case
             throwIO PeerDisconnected
 
     NewSeqEvent oe -> case oe of
-      OSPEBlock b  -> do
+      P2pBlock b  -> do
         when (shouldSend peer $ obOrigin b) $ do
           worldBestBlock <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
           case worldBestBlock of
@@ -342,7 +342,7 @@ handleEvents peer = awaitForever $ \case
               when (obTotalDifficulty b >= worldTDiff) $ do
                 $logInfoS "handleEvents/OEBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
-      OSPETx tx -> do
+      P2pTx tx -> do
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
           let cId = txChainId tx
           match <- case cId of
@@ -356,7 +356,7 @@ handleEvents peer = awaitForever $ \case
               $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId cId
               $logDebugS "handleEvents/OETx" . T.pack $ "the transaction was: " ++ format tx
               yieldR $ Transactions [otBaseTx tx]
-      OSPEGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
+      P2pGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
         when (shouldSend peer og) $ do
           $logInfoS "handleEvents/OEGenesis" . T.pack $ "received new chain: " ++ formatChainId (Just cId) ++ " with " ++ show uci
           if checkPeerIsMember peer $ members uci
@@ -367,9 +367,9 @@ handleEvents peer = awaitForever $ \case
               $logInfoS "handleEvents/OEGenesis" $ T.pack $
                 printf "peer %s is not authorized for received chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId $ Just cId)
               $logDebugLS "handleEvents/OEGenesis/members" $ members uci
-      OSPEGetChain chainIds -> yieldR $ GetChainDetails chainIds
-      OSPEGetTx shas -> yieldR $ GetTransactions shas
-      OSPENewChainMember cId _ _ -> do
+      P2pGetChain chainIds -> yieldR $ GetChainDetails chainIds
+      P2pGetTx shas -> yieldR $ GetTransactions shas
+      P2pNewChainMember cId _ _ -> do
         let formatted = format $ SHA cId
         $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "New member added to chain " ++ formatted
         mems <- lift . RBDB.withRedisBlockDB $ RBDB.getChainMembers cId
@@ -377,16 +377,16 @@ handleEvents peer = awaitForever $ \case
           $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
           mcInfo <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
           for_ ((cId,) <$> mcInfo) $ yieldR . ChainDetails . (:[])
-      OSPEBlockstanbul msg -> do
+      P2pBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yieldR outbound
-      OSPEAskForBlocks start _ p -> do
+      P2pAskForBlocks start _ p -> do
         ss <- shouldSendToPeer p
         when ss $ do
           $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "syncFetch: " ++ show start
           syncFetch Forward start
-      OSPEPushBlocks start end p -> do
+      P2pPushBlocks start end p -> do
         ss <- shouldSendToPeer p
         when ss $ do
           mrh <- gets maxReturnedHeaders

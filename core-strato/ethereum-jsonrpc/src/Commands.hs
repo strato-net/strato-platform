@@ -223,7 +223,7 @@ emitKafkaJsonRlpCommand::JsonRpcCommand->IO ()
 emitKafkaJsonRlpCommand c = do
     rets <-
       liftIO $ runKafkaConfigured "strato-api" $
-      writeSeqVmEvents [OSVEJsonRpcCommand c]
+      writeSeqVmEvents [VmJsonRpcCommand c]
     case rets of
         Left e      -> error $ "Could not write txs to Kafka: " ++ show e
         Right _ -> return ()

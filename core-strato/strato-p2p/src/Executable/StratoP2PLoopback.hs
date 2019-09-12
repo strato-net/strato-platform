@@ -33,7 +33,7 @@ stratoP2PLoopback = do
   void . runContextM ctx $ do
     ks <- gets contextKafkaState
     let toWireMessage = \case
-          OSPEBlockstanbul wm -> Just wm
+          P2pBlockstanbul wm -> Just wm
           _ -> Nothing
 
     runConduit $
