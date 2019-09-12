@@ -141,10 +141,10 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
-feedBackOutputsToInput :: [OutputEvent] -> [IngestEvent]
+feedBackOutputsToInput :: [VmEvent] -> [IngestEvent]
 feedBackOutputsToInput = map rebox
-    where rebox (OETx ts t) = IETx ts $ unboxTx t
-          rebox (OEBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles
+    where rebox (VmTx ts t) = IETx ts $ unboxTx t
+          rebox (VmBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles
           rebox x = error $ "why are we testing against " ++ show x
           unboxTx (OutputTx origin _ _ _ base) = IngestTx origin base
           unboxBlockTx (OutputTx _ _ _ _ base) = base
@@ -194,7 +194,7 @@ spec = do
             outTxs <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IETx ts <$> inTxs)
               oes <- drainVM
-              return [OETx s t | VmTx s t <- oes]
+              return [t | t@VmTx{} <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn = feedBackOutputsToInput outTxs
             dedupedOut <- withTemporaryDepBlockDB False gb $ do
@@ -210,7 +210,7 @@ spec = do
             outTxs <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IETx ts <$> inTxs)
               oes <- drainVM
-              return [OETx s t | VmTx s t <- oes]
+              return [t | t@VmTx{} <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn          = feedBackOutputsToInput outTxs
                 replicationsNeeded = (dedupWindow `quot` length dedupedIn) + 1

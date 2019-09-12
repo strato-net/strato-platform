@@ -167,34 +167,6 @@ data JsonRpcCommand
     | JRCCall { jrcCode :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
     deriving (Eq, Read, Show, GHCG.Generic, Data)
 
-data OutputEvent = OETx Timestamp OutputTx
-                 | OEBlock OutputBlock
-                 | OEGenesis OutputGenesis
-                 | OEJsonRpcCommand JsonRpcCommand
-                 | OEGetChain [Word256]
-                 | OEGetTx [SHA]
-                 | OENewChainMember Word256 A.Address Enode
-                 | OEBlockstanbul PBFT.WireMessage
-                 | OECreateBlockCommand
-                 -- Ask and push for inclusive ranges of blocks
-                 | OEAskForBlocks {oeAskStart :: Integer, oeAskEnd :: Integer, oeAskPeer :: A.Address}
-                 | OEPushBlocks {oePushStart :: Integer, oePushEnd :: Integer, oePushPeer :: A.Address}
-                 | OEVoteToMake { oeVoteRecipient :: A.Address, oeVoteVotingDir :: Bool, oeVoteSender :: A.Address }
-                 | OENewCheckpoint PBFT.Checkpoint -- A pseudo out event that shouldn't leave the sequencer
-                 | OEPrivateTx OutputTx
-                 deriving (Eq, Show, GHCG.Generic, Data)
-
-instance Format OutputEvent where
-  format (OETx ts o)              = show ts ++ " " ++ format o
-  format (OEBlock o)              = format o
-  format (OEGenesis o)            = show o
-  format (OEGetChain cids)        = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
-  format (OEGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format (OENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
-  format (OEBlockstanbul o)       = format o
-  format (OEPrivateTx o)          = format o
-  format x                        = show x
-
 data P2pEvent =
     P2pTx OutputTx
   | P2pBlock OutputBlock
@@ -556,7 +528,6 @@ derive makeArbitrary ''IngestTx
 derive makeArbitrary ''IngestBlock
 derive makeArbitrary ''IngestGenesis
 derive makeArbitrary ''SequencedBlock
-derive makeArbitrary ''OutputEvent
 derive makeArbitrary ''P2pEvent
 derive makeArbitrary ''VmEvent
 derive makeArbitrary ''OutputTx
