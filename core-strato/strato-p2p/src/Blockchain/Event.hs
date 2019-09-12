@@ -338,9 +338,9 @@ handleEvents peer = awaitForever $ \case
           case worldBestBlock of
             Nothing -> return ()
             Just (RedisBestBlock _ _ worldTDiff) -> do
-              $logInfoS "handleEvents/OEBlock" . T.pack $ "World TDiff: " ++ show worldTDiff
+              $logInfoS "handleEvents/P2pBlock" . T.pack $ "World TDiff: " ++ show worldTDiff
               when (obTotalDifficulty b >= worldTDiff) $ do
-                $logInfoS "handleEvents/OEBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
+                $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
       P2pTx tx -> do
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
@@ -350,41 +350,41 @@ handleEvents peer = awaitForever $ \case
             Just cid' -> checkPeerIsMember peer <$> RBDB.withRedisBlockDB (RBDB.getChainMembers cid')
 
           if not match
-            then $logInfoS "handleEvents/OETx" $ T.pack $
+            then $logInfoS "handleEvents/P2pTx" $ T.pack $
                     printf "peer %s is not authorized for chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId cId)
             else do
-              $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId cId
-              $logDebugS "handleEvents/OETx" . T.pack $ "the transaction was: " ++ format tx
+              $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId cId
+              $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
               yieldR $ Transactions [otBaseTx tx]
       P2pGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
         when (shouldSend peer og) $ do
-          $logInfoS "handleEvents/OEGenesis" . T.pack $ "received new chain: " ++ formatChainId (Just cId) ++ " with " ++ show uci
+          $logInfoS "handleEvents/P2pGenesis" . T.pack $ "received new chain: " ++ formatChainId (Just cId) ++ " with " ++ show uci
           if checkPeerIsMember peer $ members uci
             then do
-              $logInfoS "handleEvents/OEGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (formatChainId $ Just cId)
+              $logInfoS "handleEvents/P2pGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (formatChainId $ Just cId)
               yieldR $ ChainDetails [(cId, cInfo)]
             else do
-              $logInfoS "handleEvents/OEGenesis" $ T.pack $
+              $logInfoS "handleEvents/P2pGenesis" $ T.pack $
                 printf "peer %s is not authorized for received chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId $ Just cId)
-              $logDebugLS "handleEvents/OEGenesis/members" $ members uci
+              $logDebugLS "handleEvents/P2pGenesis/members" $ members uci
       P2pGetChain chainIds -> yieldR $ GetChainDetails chainIds
       P2pGetTx shas -> yieldR $ GetTransactions shas
       P2pNewChainMember cId _ _ -> do
         let formatted = format $ SHA cId
-        $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "New member added to chain " ++ formatted
+        $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "New member added to chain " ++ formatted
         mems <- lift . RBDB.withRedisBlockDB $ RBDB.getChainMembers cId
         when (checkPeerIsMember peer mems) $ do
-          $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
+          $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
           mcInfo <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
           for_ ((cId,) <$> mcInfo) $ yieldR . ChainDetails . (:[])
       P2pBlockstanbul msg -> do
         let outbound = Blockstanbul msg
-        $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
+        $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yieldR outbound
       P2pAskForBlocks start _ p -> do
         ss <- shouldSendToPeer p
         when ss $ do
-          $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "syncFetch: " ++ show start
+          $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
           syncFetch Forward start
       P2pPushBlocks start end p -> do
         ss <- shouldSendToPeer p
@@ -393,10 +393,10 @@ handleEvents peer = awaitForever $ \case
           let count = min mrh . fromIntegral $ end - start + 1
           chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start count
           when (null chain) $
-            $logErrorS "handleEvents/OEPushBlocks" . T.pack $ printf
+            $logErrorS "handleEvents/P2pPushBlocks" . T.pack $ printf
               "Blockstanbul believes we have blocks for [%d..%d], they are not found in redis" start end
           let outbound = BlockHeaders $ morphBlockHeader . snd <$> chain
-          $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
+          $logDebugS "handleEvents/P2pPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
           yieldR outbound
 
     TimerEvt -> do
