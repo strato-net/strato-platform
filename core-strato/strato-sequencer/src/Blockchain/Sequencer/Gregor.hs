@@ -33,7 +33,6 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Default
 import           Data.Foldable (for_)
-import           Data.List (foldl')
 import           Data.List.Extra (chunksOf)
 import qualified Data.Text as T
 import qualified Prometheus as P
@@ -65,7 +64,7 @@ data GregorContext = GregorContext
                      { _gregorKafkaState :: K.KafkaState
                      , _gregorConsumerGroup :: KP.ConsumerGroup
                      , _gregorUnseq :: TBQueue IngestEvent
-                     , _gregorUnseqCheckpoints :: TQueue OutputEvent --todo: Replace with only Checkpoint type
+                     , _gregorUnseqCheckpoints :: TQueue Checkpoint
                      , _gregorSeqP2P :: TQueue P2pEvent
                      , _gregorSeqVM :: TQueue VmEvent
                      }
@@ -221,15 +220,12 @@ seqWriters = forever . timeAction gregorSeqTiming $ do
       writeSeqP2pEvents p2pevs
 
     KafkaCheckpoint ckpts -> do
-      let isCheckpoint OENewCheckpoint{} = True
-          isCheckpoint _ = False
-          lastCheckpoint = foldl' (\b a -> if isCheckpoint a then Just a else b) Nothing ckpts
-      for_ lastCheckpoint $ \case
-        OENewCheckpoint ckpt -> do
-          $logDebugLS "gregor/seqWriter/checkpoint" ckpt
-          P.incCounter gregorCheckpointsSent
-          updateMetadata_locked $ encodeMeta ckpt
-        oe -> error $ "non-checkpoint partitioned with checkpoints: " ++ show oe -- we untyped now
+      let safeLast [] = Nothing
+          safeLast xs = Just $ last xs
+      for_ (safeLast ckpts) $ \ckpt -> do
+        $logDebugLS "gregor/seqWriter/checkpoint" ckpt
+        P.incCounter gregorCheckpointsSent
+        updateMetadata_locked $ encodeMeta ckpt
 
 -- Will only read if at least one element is in the queue.
 blockFlushTQueue :: TQueue a -> STM [a]

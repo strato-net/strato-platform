@@ -200,10 +200,10 @@ blockstanbulSend' msg = do
   let vmevs = creates
            ++ rBlocks
            ++ [VmVoteToMake r d s| PendingVote r d s <- resp]
-           -- ++ [VmNewCheckpoint ck | NewCheckpoint ck <- resp] -- todo: create separate queue for checkpoints
       p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
             ++ [P2pPushBlocks (l+1) h p | LeadFound h l p <- resp]
+      ckpts = [ck | NewCheckpoint ck <- resp]
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
@@ -212,6 +212,9 @@ blockstanbulSend' msg = do
     now <- liftIO getCurrentTime
     when (now < tNext) $
       liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+
+  $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
+  writeUnseqCheckpoints ckpts
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
   mapM_ markForP2P p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
@@ -463,6 +466,11 @@ prettyOTx OutputTx{otOrigin=o, otBaseTx=t} = prefix t ++ " via " ++ shortOrigin 
 
             shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
             shortOrigin x                    = format x
+
+writeUnseqCheckpoints :: [Checkpoint] -> SequencerM ()
+writeUnseqCheckpoints events = do
+    ch <- asks (unseqCheckpoints . cablePackage)
+    atomically . mapM_ (writeTQueue ch) $ events
 
 writeSeqVmEvents :: [VmEvent] -> SequencerM ()
 writeSeqVmEvents events = do
