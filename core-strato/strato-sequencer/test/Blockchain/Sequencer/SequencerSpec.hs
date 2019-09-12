@@ -171,7 +171,7 @@ spec = do
             outBlocks <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IEBlock <$> inChain)
               oes <- drainVM
-              return [block | OEBlock block <- oes ]
+              return [block | OSVEBlock block <- oes ]
             ret <- validateOrder gb outBlocks
             ret `shouldSatisfy` isValid
 
@@ -182,7 +182,7 @@ spec = do
             outBlocks <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IEBlock <$> shuffled)
               oes <- drainVM
-              return [block | OEBlock block <- oes ]
+              return [block | OSVEBlock block <- oes ]
             ret <- validateOrder gb outBlocks
             ret `shouldSatisfy` isValid
 
@@ -194,7 +194,7 @@ spec = do
             outTxs <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IETx ts <$> inTxs)
               oes <- drainVM
-              return [o | o@(OETx _ _) <- oes]
+              return [OETx s t | OSVETx s t <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn = feedBackOutputsToInput outTxs
             dedupedOut <- withTemporaryDepBlockDB False gb $ do
@@ -210,7 +210,7 @@ spec = do
             outTxs <- withTemporaryDepBlockDB False gb $ do
               splitEvents (IETx ts <$> inTxs)
               oes <- drainVM
-              return [o | o@(OETx _ _) <- oes]
+              return [OETx s t | OSVETx s t <- oes]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn          = feedBackOutputsToInput outTxs
                 replicationsNeeded = (dedupWindow `quot` length dedupedIn) + 1
@@ -218,7 +218,7 @@ spec = do
             dedupedOut <- withTemporaryDepBlockDB False gb $ do
               splitEvents replicatedIn
               oes <- drainVM
-              return [o | o@(OETx _ _) <- oes]
+              return [o | o@(OSVETx _ _) <- oes]
             length dedupedOut `shouldBe` length dedupedOut
 
     describe "SequencerM" $ do
@@ -273,7 +273,7 @@ spec = do
             voteList `shouldMatchList` [vote]
             checkForVotes voteList
             vmevs <- drainVM
-            vmevs `shouldContain` [OEVoteToMake { voteRecipient = testAddr, voteVotingDir = True, voteSender = addr}]
+            vmevs `shouldContain` [OSVEVoteToMake { osveVoteRecipient = testAddr, osveVoteVotingDir = True, osveVoteSender = addr}]
             let esign' = signBenfInfo pvk (testAddr, False, 1)
                 esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
                 vote' = API.CandidateReceived{API.sender=addr
@@ -286,7 +286,7 @@ spec = do
             voteList' `shouldMatchList` [vote']
             checkForVotes voteList'
             vmevs' <- drainVM
-            vmevs' `shouldNotContain` [OEVoteToMake { voteRecipient = testAddr, voteVotingDir = False, voteSender = addr}]
+            vmevs' `shouldNotContain` [OSVEVoteToMake { osveVoteRecipient = testAddr, osveVoteVotingDir = False, osveVoteSender = addr}]
             bctn <- getBlockstanbulContext
             let unwrapbct' = fromMaybe bct bctn
             _authSenders unwrapbct' `shouldBe` M.singleton addr 1
@@ -339,10 +339,10 @@ spec = do
             iev = IEBlock . blockToIngestBlock TO.Morphism $ b
         checkForUnseq [iev]
         p2pevs <- drainP2P
-        let pbftEvs = [m | OEBlockstanbul (WireMessage _ m) <- p2pevs]
+        let pbftEvs = [m | OSPEBlockstanbul (WireMessage _ m) <- p2pevs]
         map categorize pbftEvs `shouldMatchList` [PreprepareK, PrepareK, CommitK]
         vmevs <- drainVM
-        vmevs `shouldContain` [OECreateBlockCommand]
+        vmevs `shouldContain` [OSVECreateBlockCommand]
 
       it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
@@ -359,8 +359,8 @@ spec = do
         checkForUnseq [iev]
         drainP2P `shouldReturn` []
         vmevs <- drainVM
-        vmevs `shouldContain` [OECreateBlockCommand]
-        map outputBlockToBlock [oblk | OEBlock oblk <- vmevs] `shouldMatchList` [blk4]
+        vmevs `shouldContain` [OSVECreateBlockCommand]
+        map outputBlockToBlock [oblk | OSVEBlock oblk <- vmevs] `shouldMatchList` [blk4]
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
 
@@ -420,10 +420,10 @@ spec = do
         let hashTx = PrivateHashTX th ch
         checkForUnseq [IETx 0 (IngestTx TO.Morphism hashTx)]
         vmevs <- drainVM
-        let txs = [tx | OETx _ tx <- vmevs]
+        let txs = [tx | OSVETx _ tx <- vmevs]
         map txType txs `shouldBe` [PrivateHash]
         p2pevs <- drainP2P
-        let txs' = [tx | OETx _ tx <- p2pevs]
+        let txs' = [tx | OSPETx tx <- p2pevs]
         map txType txs' `shouldBe` [PrivateHash]
 
       it "should forward a private transaction hash only once" . runTestM $ do
@@ -433,20 +433,20 @@ spec = do
             ietx = IETx 0 (IngestTx TO.Morphism hashTx)
         checkForUnseq [ietx,ietx]
         vmevs <- drainVM
-        let txs = [tx | OETx _ tx <- vmevs]
+        let txs = [tx | OSVETx _ tx <- vmevs]
         map txType txs `shouldBe` [PrivateHash]
         p2pevs <- drainP2P
-        let txs' = [tx | OETx _ tx <- p2pevs]
+        let txs' = [tx | OSPETx tx <- p2pevs]
         map txType txs' `shouldBe` [PrivateHash]
 
       it "should create a PrivateHashTX for a private transaction" . runTestM $ do
         checkForUnseq [chainDetails1]
         checkForUnseq [IETx 0 (IngestTx TO.API tx1)]
         vmevs <- drainVM
-        let txs = [tx | OETx _ tx <- vmevs]
+        let txs = [tx | OSVETx _ tx <- vmevs]
         map txType txs `shouldBe` [PrivateHash]
         p2pevs <- drainP2P
-        let txs' = [tx | OETx _ tx <- p2pevs]
+        let txs' = [tx | OSPETx tx <- p2pevs]
         map txType txs' `shouldBe` [Message, PrivateHash]
 
       it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
@@ -455,10 +455,10 @@ spec = do
         checkForUnseq [IETx 0 (IngestTx TO.Morphism tx1)]
         checkForUnseq [iev]
         p2pevs <- drainP2P
-        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        let bs = [b | OSPEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         vmevs <- drainVM
-        let obs = [b | OEBlock b <- vmevs]
+        let obs = [b | OSVEBlock b <- vmevs]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash],[Message]]
 
       it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
@@ -466,14 +466,14 @@ spec = do
         checkForUnseq [chainDetails1]
         checkForUnseq [iev]
         vmevs <- drainVM
-        let obs = [b | OEBlock b <- vmevs]
+        let obs = [b | OSVEBlock b <- vmevs]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash]]
         p2pevs <- drainP2P
-        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        let bs = [b | OSPEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         checkForUnseq [IETx 0 (IngestTx TO.Morphism tx1)]
         vmevs' <- drainVM
-        let obs' = [b | OEBlock b <- vmevs']
+        let obs' = [b | OSVEBlock b <- vmevs']
         map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message]]
 
       it "should not split up block when all chains are known" . runPBFTTestMWithGenesis $ \h -> do
@@ -483,10 +483,10 @@ spec = do
         checkForUnseq [ietx tx1, ietx tx2]
         checkForUnseq [iev]
         p2pevs <- drainP2P
-        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        let bs = [b | OSPEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash, PrivateHash]]
         vmevs <- drainVM
-        let obs = [b | OEBlock b <- vmevs]
+        let obs = [b | OSVEBlock b <- vmevs]
         map (map txType . obReceiptTransactions) obs `shouldBe`
           [[PrivateHash,PrivateHash],[Message,Message]]
 
@@ -496,14 +496,14 @@ spec = do
         checkForUnseq [ietx tx1, ietx tx2]
         checkForUnseq [iev]
         p2pevs <- drainP2P
-        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        let bs = [b | OSPEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash,PrivateHash]]
         vmevs <- drainVM
-        let obs = [b | OEBlock b <- vmevs]
+        let obs = [b | OSVEBlock b <- vmevs]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash,PrivateHash]]
         checkForUnseq [chainDetails1, chainDetails2]
         vmevs' <- drainVM
-        let obs' = [b | OEBlock b <- vmevs']
+        let obs' = [b | OSVEBlock b <- vmevs']
         map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message],[Message]]
 
       it "should split up block when chain infos are staggered" . runPBFTTestMWithGenesis $ \h -> do
@@ -511,18 +511,18 @@ spec = do
             ietx = IETx 0 . IngestTx TO.Morphism
         checkForUnseq [ietx tx1, ietx tx2, iev]
         p2pevs <- drainP2P
-        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        let bs = [b | OSPEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash,PrivateHash]]
         vmevs <- drainVM
-        let obs = [b | OEBlock b <- vmevs]
+        let obs = [b | OSVEBlock b <- vmevs]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash,PrivateHash]]
         checkForUnseq [chainDetails1]
         vmevs' <- drainVM
-        let obs' = [b | OEBlock b <- vmevs']
+        let obs' = [b | OSVEBlock b <- vmevs']
         map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message]]
         checkForUnseq [chainDetails2]
         vmevs'' <- drainVM
-        let obs'' = [b | OEBlock b <- vmevs'']
+        let obs'' = [b | OSVEBlock b <- vmevs'']
         map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message]]
 
       it "should re-run blocks when chain info is delayed" . runPBFTTestMWithGenesis $ \h -> do
@@ -530,19 +530,19 @@ spec = do
             ietx = IETx 0 . IngestTx TO.Morphism
         checkForUnseq [iev]
         p2pevs <- drainP2P
-        let bs = [b | OEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        let bs = [b | OSPEBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         vmevs <- drainVM
-        let obs = [b | OEBlock b <- vmevs]
+        let obs = [b | OSVEBlock b <- vmevs]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash]]
         checkForUnseq [chainDetails1]
         vmevs' <- drainVM
-        let obs' = [b | OEBlock b <- vmevs']
+        let obs' = [b | OSVEBlock b <- vmevs']
         obs' `shouldBe` []
         p2pevs' <- drainP2P
-        let gtxs' = [th | OEGetTx th <- p2pevs']
+        let gtxs' = [th | OSPEGetTx th <- p2pevs']
         gtxs' `shouldBe` [[txHash tx1]]
         checkForUnseq [ietx tx1]
         vmevs'' <- drainVM
-        let obs'' = [b | OEBlock b <- vmevs'']
+        let obs'' = [b | OSVEBlock b <- vmevs'']
         map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message]]

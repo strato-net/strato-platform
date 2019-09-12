@@ -121,7 +121,7 @@ spec = do
 
     it "should broadcast blockstanbul messages" $ property $ withMaxSuccess 10 $ \wm ->
       runTestPeer . const $ do
-        runConduit $ yield (NewSeqEvent (OEBlockstanbul wm))
+        runConduit $ yield (NewSeqEvent (OSPEBlockstanbul wm))
                       .| handleEvents testPeer
                       .| sinkList
             `L.shouldReturn` [Right $ Blockstanbul wm]

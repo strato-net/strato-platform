@@ -31,7 +31,7 @@ seqEventNotificationSource :: ( MonadIO m
                               , MonadResource m
                               , MonadLogger m
                               )
-                           => K.KafkaState -> ConduitM () OutputEvent m ()
+                           => K.KafkaState -> ConduitM () OutputSeqP2pEvent m ()
 seqEventNotificationSource ks = evalStateC ks $ do
     ofs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
     loop ofs'

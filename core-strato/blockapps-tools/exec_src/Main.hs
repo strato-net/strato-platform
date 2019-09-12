@@ -426,9 +426,9 @@ run Checkpoints{..}            = case operation of
       Get           -> doCheckpointGet service
       Put           -> doCheckpointPut service (fromIntegral <$> offset) cp
       NullOperation -> doCheckpointUsage
-run AskForBlocks{..}           = insertP2P (OEAskForBlocks startBlock endBlock peer)
-run PushBlocks{..}             = insertP2P (OEPushBlocks startBlock endBlock peer)
-run AskForTxs                  = insertP2P . OEGetTx
+run AskForBlocks{..}           = insertP2P (OSPEAskForBlocks startBlock endBlock peer)
+run PushBlocks{..}             = insertP2P (OSPEPushBlocks startBlock endBlock peer)
+run AskForTxs                  = insertP2P . OSPEGetTx
                                            . map (SHA . bytesToWord256 . fst . B16.decode)
                                            . filter (not . B.null)
                                            . BC.split '\n' =<< B.getContents

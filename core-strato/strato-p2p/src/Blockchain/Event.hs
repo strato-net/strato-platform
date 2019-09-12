@@ -332,7 +332,7 @@ handleEvents peer = awaitForever $ \case
             throwIO PeerDisconnected
 
     NewSeqEvent oe -> case oe of
-      OEBlock b  -> do
+      OSPEBlock b  -> do
         when (shouldSend peer $ obOrigin b) $ do
           worldBestBlock <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
           case worldBestBlock of
@@ -342,7 +342,7 @@ handleEvents peer = awaitForever $ \case
               when (obTotalDifficulty b >= worldTDiff) $ do
                 $logInfoS "handleEvents/OEBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
-      OETx _ tx -> do
+      OSPETx tx -> do
         whenM (shouldSendGossip peer $ otOrigin tx) $ do
           let cId = txChainId tx
           match <- case cId of
@@ -356,7 +356,7 @@ handleEvents peer = awaitForever $ \case
               $logInfoS "handleEvents/OETx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId cId
               $logDebugS "handleEvents/OETx" . T.pack $ "the transaction was: " ++ format tx
               yieldR $ Transactions [otBaseTx tx]
-      OEGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
+      OSPEGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
         when (shouldSend peer og) $ do
           $logInfoS "handleEvents/OEGenesis" . T.pack $ "received new chain: " ++ formatChainId (Just cId) ++ " with " ++ show uci
           if checkPeerIsMember peer $ members uci
@@ -367,9 +367,9 @@ handleEvents peer = awaitForever $ \case
               $logInfoS "handleEvents/OEGenesis" $ T.pack $
                 printf "peer %s is not authorized for received chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId $ Just cId)
               $logDebugLS "handleEvents/OEGenesis/members" $ members uci
-      OEGetChain chainIds -> yieldR $ GetChainDetails chainIds
-      OEGetTx shas -> yieldR $ GetTransactions shas
-      OENewChainMember cId _ _ -> do
+      OSPEGetChain chainIds -> yieldR $ GetChainDetails chainIds
+      OSPEGetTx shas -> yieldR $ GetTransactions shas
+      OSPENewChainMember cId _ _ -> do
         let formatted = format $ SHA cId
         $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "New member added to chain " ++ formatted
         mems <- lift . RBDB.withRedisBlockDB $ RBDB.getChainMembers cId
@@ -377,16 +377,16 @@ handleEvents peer = awaitForever $ \case
           $logInfoS "handleEvents/OENewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
           mcInfo <- lift . RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
           for_ ((cId,) <$> mcInfo) $ yieldR . ChainDetails . (:[])
-      OEBlockstanbul msg -> do
+      OSPEBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/OEBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yieldR outbound
-      OEAskForBlocks start _ p -> do
+      OSPEAskForBlocks start _ p -> do
         ss <- shouldSendToPeer p
         when ss $ do
           $logDebugS "handleEvents/OEAskForBlocks" . T.pack $ "syncFetch: " ++ show start
           syncFetch Forward start
-      OEPushBlocks start end p -> do
+      OSPEPushBlocks start end p -> do
         ss <- shouldSendToPeer p
         when ss $ do
           mrh <- gets maxReturnedHeaders
@@ -398,11 +398,6 @@ handleEvents peer = awaitForever $ \case
           let outbound = BlockHeaders $ morphBlockHeader . snd <$> chain
           $logDebugS "handleEvents/OEPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
           yieldR outbound
-      OEJsonRpcCommand _ -> $logErrorS "handleEvents/OEJsonRpcCommand" "The impossible happened"
-      OECreateBlockCommand -> $logErrorS "handleEvents/OECreateBlockCommand" "何"
-      OEVoteToMake{} -> $logErrorS "handleEvents/OEVoteToMake" "absurd"
-      OENewCheckpoint{} -> $logErrorS "handleEvents/OENewCheckpoint" "Maybe they should be disjoint types?"
-      OEPrivateTx{} -> $logErrorS "handleEvents/OEPrivateTx" "This type is reserved for the VM"
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
