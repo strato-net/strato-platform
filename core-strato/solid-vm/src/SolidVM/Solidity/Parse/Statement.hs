@@ -2,7 +2,7 @@
 module SolidVM.Solidity.Parse.Statement where
 
 import           Control.Monad
-import           Data.Foldable (asum)
+import           Data.Foldable (asum, foldl')
 import           Data.Functor.Identity
 import qualified Data.Text as T
 import           Text.Parsec
@@ -146,7 +146,7 @@ memberAccess = do
 arrayIndex :: SolidityParser (Expression -> Expression)
 arrayIndex = do
   idxs <- many1 . brackets $ optionMaybe expression
-  return $ \x -> foldl IndexAccess x idxs
+  return $ \x -> foldl' IndexAccess x idxs
 
 binary :: String -> Operator String u Identity Expression
 binary x = Infix (do { reservedOp x; return (Binary x)}) AssocLeft
