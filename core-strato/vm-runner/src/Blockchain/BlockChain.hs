@@ -33,6 +33,7 @@ import           Control.Monad.Trans.Except
 import           Data.Bifunctor                          (bimap)
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Short                   as BSS
+import qualified Data.DList                              as DL
 import           Data.Either.Extra
 import           Data.List
 import qualified Data.Map                                as M
@@ -244,7 +245,7 @@ addBlocks unfiltered = do
       didReplaceBest   <- liftIO (newIORef False)
       ranPrivateTxs    <- liftIO (newIORef M.empty)
       replacedBest     <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
-      (actions, srLog') <- flip State.runStateT [] $ forM filtered $ \block ->
+      (actions, srLog') <- flip State.runStateT DL.empty $ forM filtered $ \block ->
           let blockNo = blockDataNumber $! obBlockData block
               txCount = length $! obReceiptTransactions block
           in timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
@@ -257,12 +258,12 @@ addBlocks unfiltered = do
           -- and the intermediate ones increase the granularity at which we can compute a sequence
           -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
           -- the diff between them, which is estimated by the number of transactions.
-          id %= ((blockDataStateRoot $ obBlockData block, hsh, num, txCount):)
+          id %= (`DL.snoc` (blockDataStateRoot $ obBlockData block, hsh, num, txCount))
         unless (M.null ranPriv) . liftIO $
           modifyIORef' ranPrivateTxs $ flip M.unionWith ranPriv $
             \(n1,s1) (n2,s2) -> if n1 > n2 then (n1,s1) else (n2,s2)
         return actions
-      let srLog = reverse srLog'
+      let srLog = DL.toList srLog'
       $logDebugLS "addBlocks/srLog" srLog
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
