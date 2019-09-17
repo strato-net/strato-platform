@@ -125,7 +125,7 @@ instance Bagger.MonadBagger ContextM where
         setStateDBStateRoot sr
         (TxMiningResult res ranTxs unranTxs newGas) <-
           timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
-          $ mineTransactions' theBlockHeader remainingGas [] txs
+          $ mineTransactions' theBlockHeader remainingGas DL.empty txs
         timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
         timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
         newStateRoot <- Mod.get (Proxy @MP.StateRoot)
@@ -389,7 +389,7 @@ addTransactions chainId canCache blockData blockGas0 txs =
             then Bagger.getCachedRunResults blockData
             else return Nothing
   trrs <- case mtrrs of
-    Nothing -> go blockGas0 txs []
+    Nothing -> go blockGas0 txs DL.empty
     Just (cachedSR, _, cachedTRRs) -> do
       let cachedTXs = map trrTransaction cachedTRRs
       when (flags_debug && txs /= cachedTXs) $ do
@@ -404,7 +404,7 @@ addTransactions chainId canCache blockData blockGas0 txs =
   return (catMaybes otrs, asms)
 
   where
-    go _ [] trrs = return $ reverse trrs
+    go _ [] trrs = return $ DL.toList trrs
     go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs = do
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
@@ -422,7 +422,7 @@ addTransactions chainId canCache blockData blockGas0 txs =
             Left _           -> blockGas
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
-      go remainingBlockGas rest (trr : trrs)
+      go remainingBlockGas rest (trrs `DL.snoc` trr)
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
                                      , tmrRanTxs   :: [TxRunResult]
@@ -430,8 +430,8 @@ data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCa
                                      , tmrRemGas   :: Integer
                                      } deriving (Show)
 
-mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> ContextM TxMiningResult
-mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
+mineTransactions' :: BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> ContextM TxMiningResult
+mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     flushMemAddressStateTxToBlockDB
     flushMemStorageTxDBToBlockDB
@@ -444,8 +444,8 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     case result of
         Right execResult -> do
           let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
-          mineTransactions' header nextRemGas (trr:ran) txs
-        Left  failure    -> return $ TxMiningResult (Just failure) (reverse ran) unran remGas
+          mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+        Left  failure    -> return $ TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
 
 blockIsHomestead :: Integer -> Bool
