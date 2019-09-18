@@ -231,9 +231,9 @@ addBlocks :: [OutputBlock] -> ContextM [Action]
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . blockDataNumber . obBlockData) unfiltered
       timerToUse = Just vmBlockInsertionMined
-  -- unless (null unfiltered) $
+  unless (null unfiltered) $
     -- emit all blocks to the indexers
-    -- timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> unfiltered)
+    timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> unfiltered)
   bbi <- getContextBestBlockInfo
   case (filtered, bbi) of
     ([], _) -> return []
