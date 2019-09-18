@@ -18,6 +18,9 @@ export const BALANCE_FAILURE = 'BALANCE_FAILURE';
 export const FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST = 'FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST';
 export const FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS = 'FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS';
 export const FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE = 'FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE';
+export const FETCH_OAUTH_ACCOUNTS_REQUEST = 'FETCH_OAUTH_ACCOUNTS_REQUEST';
+export const FETCH_OAUTH_ACCOUNTS_SUCCESS = 'FETCH_OAUTH_ACCOUNTS_SUCCESS';
+export const FETCH_OAUTH_ACCOUNTS_FAILURE = 'FETCH_OAUTH_ACCOUNTS_FAILURE';
 
 export const fetchAccounts = function (loadAddresses, loadBalances, chainId) {
   return {
@@ -172,5 +175,24 @@ export const fetchCurrentAccountDetailFailure = function (address, error) {
     type: FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE,
     address: address,
     error: error
+  }
+};
+
+export const fetchOauthAccounts = function () {
+  return {
+    type: FETCH_OAUTH_ACCOUNTS_REQUEST
+  }
+};
+
+export const fetchOauthAccountsSuccess = function (data) {
+  return {
+    type: FETCH_OAUTH_ACCOUNTS_SUCCESS,
+    data
+  }
+};
+
+export const fetchOauthAccountsFailure = function () {
+  return {
+    type: FETCH_OAUTH_ACCOUNTS_FAILURE
   }
 };

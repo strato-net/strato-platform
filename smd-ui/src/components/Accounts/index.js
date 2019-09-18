@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { fetchAccounts, changeAccountFilter, fetchUserAddresses, fetchAccountDetail, resetUserAddress } from './accounts.actions';
+import { fetchAccounts, changeAccountFilter, fetchUserAddresses, fetchAccountDetail, resetUserAddress, fetchOauthAccounts } from './accounts.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -38,7 +38,11 @@ class Accounts extends Component {
   }
 
   componentDidMount() {
-    this.props.fetchAccounts(true, true, this.props.selectedChain);
+    if (env.OAUTH_ENABLED) {
+      this.props.fetchOauthAccounts();
+    } else {
+      this.props.fetchAccounts(true, true, this.props.selectedChain);
+    }
     mixpanelWrapper.track('accounts_page_load')
   }
 
@@ -170,6 +174,7 @@ export default withRouter(
       fetchUserAddresses,
       fetchAccounts,
       changeAccountFilter,
-      resetUserAddress
+      resetUserAddress,
+      fetchOauthAccounts
     }
   )(Accounts));

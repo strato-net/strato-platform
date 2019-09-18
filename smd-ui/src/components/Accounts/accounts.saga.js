@@ -25,13 +25,17 @@ import {
   fetchBalanceFailure,
   fetchCurrentAccountDetailSuccess,
   fetchCurrentAccountDetailFailure,
-  FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST
+  FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST,
+  FETCH_OAUTH_ACCOUNTS_REQUEST,
+  fetchOauthAccountsSuccess,
+  fetchOauthAccountsFailure
 } from './accounts.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
 import { delay } from 'redux-saga';
 import { handleErrors } from '../../lib/handleErrors';
 
+const oauthAccountDataUrl = env.STRATO_URL_V23 + "/users";
 const accountDataUrl = env.STRATO_URL + "/account?address=:address&:chainid";
 const addressUrl = env.BLOC_URL + '/users/:user';
 const usernameUrl = env.BLOC_URL + "/users";
@@ -100,7 +104,7 @@ export function getAccountDetailApi(address, chainId) {
 export function postFaucet(username, address) {
   return fetch(
     faucetUrl.replace(":user", username)
-             .replace(":address", address),
+      .replace(":address", address),
     {
       method: 'POST',
       credentials: "include",
@@ -116,6 +120,28 @@ export function postFaucet(username, address) {
     .catch(function (error) {
       throw error;
     })
+}
+
+export function getOauthAccountsApi() {
+  // strato URL add limit and offset if needed
+  const localOauthAccountDataUrl = `${oauthAccountDataUrl}`
+  return fetch(
+    localOauthAccountDataUrl,
+    {
+      method: 'GET',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json'
+      },
+    }
+  )
+    .then(handleErrors)
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
 export function* getAccounts(action) {
@@ -198,6 +224,17 @@ export function* getBalance(action) {
   }
 }
 
+export function* getOauthAccounts() {
+  try {
+    const response = yield call(getOauthAccountsApi);
+    console.log("----------------------------------", response)
+    yield put(fetchOauthAccountsSuccess(response));
+  }
+  catch (err) {
+    yield put(fetchOauthAccountsFailure('failed to fetch oauth accounts'));
+  }
+}
+
 export default function* watcAccountActions() {
   yield [
     takeLatest(FETCH_ACCOUNTS, getAccounts),
@@ -205,6 +242,7 @@ export default function* watcAccountActions() {
     takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
     takeEvery(FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST, getCurrentAccountDetail),
     takeLatest(FAUCET_REQUEST, faucetAccount),
-    takeEvery(GET_BALANCE, getBalance)
+    takeEvery(GET_BALANCE, getBalance),
+    takeEvery(FETCH_OAUTH_ACCOUNTS_REQUEST, getOauthAccounts)
   ];
 }
