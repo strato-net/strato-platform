@@ -15,6 +15,7 @@ import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Lazy               as BL
 import           Data.Maybe                         (isJust)
+import qualified Data.List                          as List
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8)
 import           Network.Kafka
@@ -95,7 +96,7 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                 let mChainId = eventDBChainId ev
                     evName = eventDBName ev
                     evArgs = eventDBArgs ev
-                $logInfoS "txrIndexer" . T.pack $ "Inserting EventDB entry for Event: " ++ evName ++ " with args: " ++ show evArgs ++ " for chainID: " ++ show mChainId
+                $logInfoS "txrIndexer" . T.pack $ "Inserting EventDB entry for Event: " ++ evName ++ " with args: " ++ (List.intercalate "," evArgs) ++ " for chainID: " ++ show mChainId
                 when (isJust mChainId) $ do
                   let Just chainId = mChainId
                   case evName of 

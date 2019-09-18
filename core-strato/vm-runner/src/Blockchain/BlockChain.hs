@@ -558,13 +558,13 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
 
   let owner = transactionTo ut
 
-
   codeHash <- addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
 
   let call =
         case codeHash of
           EVMCode _ -> EVM.call
-          SolidVMCode _ _ -> SolidVM.call
+          SolidVMCode _ _ ->  SolidVM.call
+
 
   call isRunningTests'
        isHomestead
