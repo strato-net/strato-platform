@@ -7,6 +7,7 @@ import SendTokens from './components/SendTokens';
 import Tour from '../Tour';
 import Account from '../Account';
 import CreateBlocUser from '../CreateBlocUser';
+import { env } from '../../env';
 import './accounts.css';
 
 const tourSteps = [/* {
@@ -109,7 +110,7 @@ class Accounts extends Component {
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">
               <SendTokens />
-              <CreateBlocUser />
+              {!env.OAUTH_ENABLED && <CreateBlocUser />}
             </div>
           </div>
         </div>
