@@ -29,6 +29,7 @@ import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
+import qualified Data.List                            as List
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
@@ -209,6 +210,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         Env.chainId=chainId',
         Env.metadata=metadata
         }
+
   fmap (either solidvmErrorResults id) . runSM Nothing env' $ do
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
@@ -216,7 +218,11 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
+    
+    liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SolidVM.call with sender " ++ (format sender') ++ " and origin " ++ (format origin') ++ " and function " ++ funcName ++ " with args " ++ argString
+    
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
+  
     finalAct <- use action
     sstate <- get
     return $ ExecResults {
@@ -251,7 +257,7 @@ getCodeAndCollection address' = do
     return (c', hsh, cc')
     else do
     codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
-
+    liftIO $ putStrLn $ "TRANSFERDEBUG, codehash is " ++ (show codeHash) ++ "and callee address is " ++ (show address') ++ " and caller address is " ++ (fromMaybe "Nothng" (fmap format maybeAddress))
     (contractName', ch, cc) <-
       case codeHash of
         SolidVMCode cn ch' -> do
@@ -549,6 +555,8 @@ runStatement (Xabi.EmitStatement eventName exptups) = do
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
   addEvent $ Event eventName expStrs
+
+  liftIO $ putStrLn $ "Event Emission Parsed: " ++ eventName ++ " (" ++ List.intercalate "," expStrs 
   return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
@@ -956,12 +964,16 @@ expToVar' (Xabi.FunctionCall e args) = do
       case (val', last pieces) of
         (SContract _ toAddress, MS.Field funcName) -> do
           fromAddress <- getCurrentAddress
+          
+          liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SContract calling callWrapper, fromAddress " ++ (format fromAddress) ++ " for function " ++ (show funcName)
           res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
           case res of
             Just v -> return $ Constant $ v
             Nothing -> return $ Constant SNULL
         (SAddress toAddress, MS.Field funcName) -> do
           fromAddress <- getCurrentAddress
+
+          liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SAddress calling callWrapper, toAddress " ++ (format toAddress) ++ " for function " ++ (show funcName)
           res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
           case res of
             Just v -> return $ Constant $ v
@@ -1003,11 +1015,15 @@ expToVar' (Xabi.FunctionCall e args) = do
     Constant (SContractItem address itemName) -> do
 
       from <- getCurrentAddress
+
+      liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SContractItem calling callWrapper, fromAddress " ++ (format from) ++ " toAddress " ++ (format address) ++ " for function " ++ (show itemName) ++ " with args " ++ (show (argVals))
       result <- callWrapper from address Nothing itemName args
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SContractFunction name address functionName) -> do
       from <- getCurrentAddress
+
+      liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SContractFunction calling callWrapper, fromAddress " ++ (format from) ++ " toAddress " ++ (format address) ++ " for function " ++ (show functionName) ++ " in contract " ++ (show name)
       result <- callWrapper from address name functionName args
       return . Constant . fromMaybe SNULL $ result
 
