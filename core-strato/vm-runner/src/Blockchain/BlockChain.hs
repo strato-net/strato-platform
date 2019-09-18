@@ -534,19 +534,6 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
                          return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
   --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
-  if (join $ fmap (M.lookup "VM") $ transactionMetadata ut) == Nothing
-  then
-    $logInfoS "TRANSFERDEBUG" $ T.pack $ "No metadata field for create, using default EVM"
-  else if (join $ fmap (M.lookup "VM") $ transactionMetadata ut) == Just "EVM"
-  then 
-    $logInfoS "TRANSFERDEBUG" $ T.pack $ "EVM GIVEN to create!!"
-  else if (join $ fmap (M.lookup "VM") $ transactionMetadata ut) == Just "SolidVM"
-  then
-    $logInfoS "TRANSFERDEBUG" $ T.pack $ "SolidVM given to create"
-  else
-    $logInfoS "TRANSFERDEBUG" $ T.pack $ "other"
-    
-
   nonce <- addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
   let newAddress = getNewAddress_unsafe tAddr (nonce-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
 
@@ -571,10 +558,8 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
 
   let owner = transactionTo ut
 
-
   codeHash <- addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
 
-  $logInfoS "TRANSFERDEBUG" $ T.pack $ "CALL, to address " ++ (show tAddr) ++ ", from address: " ++ (show owner) ++ " with codeHash " ++ (show codeHash) 
   let call =
         case codeHash of
           EVMCode _ -> EVM.call

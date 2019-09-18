@@ -217,8 +217,6 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
     
-    liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SolidVM.call with sender " ++ (format sender') ++ " and origin " ++ (format origin') ++ " and function " ++ funcName ++ " with args " ++ argString
-    
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
   
     finalAct <- use action
@@ -255,7 +253,7 @@ getCodeAndCollection address' = do
     return (c', hsh, cc')
     else do
     codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
-    liftIO $ putStrLn $ "TRANSFERDEBUG, codehash is " ++ (show codeHash) ++ "and callee address is " ++ (show address') ++ " and caller address is " ++ (fromMaybe "Nothng" (fmap format maybeAddress))
+    
     (contractName', ch, cc) <-
       case codeHash of
         SolidVMCode cn ch' -> do
@@ -554,7 +552,8 @@ runStatement (Xabi.EmitStatement eventName exptups) = do
   expStrs <- mapM showSM expVals
   addEvent $ Event eventName expStrs
 
-  liftIO $ putStrLn $ "Event Emission Parsed: " ++ eventName ++ " (" ++ List.intercalate "," expStrs 
+  onTraced $ liftIO $ putStrLn $ "Event Emission Parsed: " ++ eventName ++ " (" ++ List.intercalate "," expStrs ++ ")"
+
   return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
@@ -960,18 +959,17 @@ expToVar' (Xabi.FunctionCall e args) = do
     Constant (SReference (AddressedPath address (MS.StoragePath pieces))) -> do
       val' <- getVar $ Constant $ SReference $ AddressedPath address $MS.StoragePath $ init pieces
       case (val', last pieces) of
+        
         (SContract _ toAddress, MS.Field funcName) -> do
           fromAddress <- getCurrentAddress
-          
-          liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SContract calling callWrapper, fromAddress " ++ (format fromAddress) ++ " for function " ++ (show funcName)
           res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
           case res of
             Just v -> return $ Constant $ v
             Nothing -> return $ Constant SNULL
+        
         (SAddress toAddress, MS.Field funcName) -> do
           fromAddress <- getCurrentAddress
 
-          liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SAddress calling callWrapper, toAddress " ++ (format toAddress) ++ " for function " ++ (show funcName)
           res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
           case res of
             Just v -> return $ Constant $ v
@@ -1013,7 +1011,7 @@ expToVar' (Xabi.FunctionCall e args) = do
     Constant (SContractItem address "transfer") -> do
       from <- getCurrentAddress
       success <- case argVals of
-        OrderedVals [SInteger amount] ->
+        OrderedVals [SInteger amount] -> do
           pay "built-in transfer function" from address amount
         _ -> return False
       return . Constant $ SBool success
@@ -1021,15 +1019,12 @@ expToVar' (Xabi.FunctionCall e args) = do
     Constant (SContractItem address itemName) -> do
 
       from <- getCurrentAddress
-
-      liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SContractItem calling callWrapper, fromAddress " ++ (format from) ++ " toAddress " ++ (format address) ++ " for function " ++ (show itemName) ++ " with args " ++ (show (argVals))
       result <- callWrapper from address Nothing itemName args
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SContractFunction name address functionName) -> do
+      
       from <- getCurrentAddress
-
-      liftIO $ putStrLn $ "TRANSFERDEBUG - - - - SContractFunction calling callWrapper, fromAddress " ++ (format from) ++ " toAddress " ++ (format address) ++ " for function " ++ (show functionName) ++ " in contract " ++ (show name)
       result <- callWrapper from address name functionName args
       return . Constant . fromMaybe SNULL $ result
 
