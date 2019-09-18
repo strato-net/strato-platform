@@ -18,7 +18,7 @@ import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
 import qualified Data.ByteString.Lazy.Char8                   as BLC
-import           Data.Either                                  (isLeft)
+--import           Data.Either                                  (isLeft)
 import           Data.Map.Strict                              (Map)
 import           Data.Maybe
 import qualified Data.JsonStream.Parser                       as JS
@@ -66,8 +66,8 @@ import qualified Data.Map                             as Map
 import           Blockchain.EthConf                   (runKafkaConfigured)
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
-import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
-import qualified Blockchain.Strato.Indexer.Model      as IdxModel
+--import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
+--import qualified Blockchain.Strato.Indexer.Model      as IdxModel
 import qualified Blockchain.Strato.Model.Address      as Ad
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
@@ -233,7 +233,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
        Left err -> error . show $ err
 
 bootstrapIndexer :: SQL.Key BlockDataRef -> OutputBlock -> IO ()
-bootstrapIndexer key obGB =
+bootstrapIndexer key _  =
     let clientId = fst ApiIndexer.kafkaClientIds
         consumer = snd ApiIndexer.kafkaClientIds
         topic    = IContext.targetTopicName
@@ -246,11 +246,11 @@ bootstrapIndexer key obGB =
         runner = commit >>= \case
             Right (Right _) -> do
                 putStrLn "bootstrapIndex API checkpoint successful!"
-                res <- runKafkaConfigured clientId $
-                      IdxKafka.writeIndexEvents [IdxModel.RanBlock obGB]
-                when (isLeft res) . error $ "bootstrapping index events failed: " ++ show res
-                print res
-                putStrLn "bootstrapIndex genesis seed successful!"
+                --res <- runKafkaConfigured clientId $
+                --      IdxKafka.writeIndexEvents [IdxModel.RanBlock obGB]
+                --when (isLeft res) . error $ "bootstrapping index events failed: " ++ show res
+                --print res
+                --putStrLn "bootstrapIndex genesis seed successful!"
             Right (Left l) -> do
                 putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show (l :: KP.KafkaError)
                 runner

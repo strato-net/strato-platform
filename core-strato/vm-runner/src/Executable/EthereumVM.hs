@@ -110,10 +110,10 @@ ethereumVM = void . execContextM $ do
         let txPairs = [(ts,t) | OETx ts t <- seqEvents]
             allTxs = map (uncurry OETx) txPairs
             blocks = [b | OEBlock b <- seqEvents]
-        when (not $ null txPairs) . void
-                                  . K.withKafkaViolently
-                                  . writeIndexEvents
-                                  $ map (uncurry IndexTransaction) txPairs
+        --when (not $ null txPairs) . void
+        --                          . K.withKafkaViolently
+        --                          . writeIndexEvents
+        --                          $ map (uncurry IndexTransaction) txPairs
 
         let ptxs = [IndexPrivateTx t | OEPrivateTx t <- seqEvents]
         when (not $ null ptxs) . void
