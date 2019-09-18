@@ -192,6 +192,7 @@ insertNewChains events = do
     $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
     $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
     let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
+    $logInfoS "TRANSFERDEBUG" $ T.pack $ "VM type: " ++ theVM
     sr' <- chainInfoToGenesisState theVM cInfo
     let maybeSource =
           case codeInfo $ chainInfo cInfo of
@@ -224,6 +225,7 @@ runChainConstructor cId maybeSource = do
   -- I've set most of these variables to default dummy values below...  We might decide to refine
   -- some of these variables in the future.
 
+  $logInfoS "TRANSFERDEBUG" $ T.pack $ " calling SolidVM with cid " ++ (show cId) ++ " and source: " ++ (show $ fromMaybe "NULL" maybeSource)
   ExecResults {erAction=maybeAction} <- SolidVM.call
          False --isRunningTests
          True --isHomestead
