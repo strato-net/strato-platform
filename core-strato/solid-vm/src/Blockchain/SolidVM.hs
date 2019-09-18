@@ -43,6 +43,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Event
 import qualified Blockchain.Database.MerklePatricia   as MP
+import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
@@ -995,6 +996,14 @@ expToVar' (Xabi.FunctionCall e args) = do
         OrderedVals [SContract _ addr] ->
           return $ Constant $ SContract contractName' $ addr
         _ -> typeError "contract variable creation" argVals
+
+    Constant (SContractItem address "transfer") -> do
+      from <- getCurrentAddress
+      success <- case argVals of
+        OrderedVals [SInteger amount] ->
+          pay "built-in transfer function" from address amount
+        _ -> return False
+      return . Constant $ SBool success
 
     Constant (SContractItem address itemName) -> do
 
