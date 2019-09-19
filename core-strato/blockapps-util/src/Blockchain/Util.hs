@@ -7,13 +7,14 @@ module Blockchain.Util
   , module Blockchain.Strato.Model.Util
   ) where
 
-import           Control.Monad.State.Lazy (State, execState, get, put)
+import           Control.Monad.State.Lazy (State, execState)
 import           Data.Bits
 import qualified Data.ByteString          as B
 import           Data.ByteString.Internal
 import           Data.Char
 import           Data.Data
 import qualified Data.Map.Strict          as M
+import           Data.Maybe               (fromMaybe)
 import           Data.Word
 import           Numeric
 
@@ -34,12 +35,8 @@ buildState s (a:as) run =
    in buildState s' as run
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
-partitionWith f as = M.toList . buildState M.empty as $ \a -> do
-  s <- get
-  let k = f a
-  case M.lookup k s of
-    Nothing -> put (M.insert k [a] s)
-    Just _  -> put (M.update (Just . (++ [a])) k s)
+partitionWith f = M.toList . foldr g M.empty
+  where g a = M.alter (Just . (a:) . fromMaybe []) (f a)
 
 showHex4 :: Word256 -> String
 showHex4 i = replicate (4 - length rawOutput) '0' ++ rawOutput

@@ -61,12 +61,9 @@ binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
 accumStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
 accumStateT s as f = evalStateT (mapM f as) s
 
-buildStateT :: Monad m => s -> [a] -> (a -> StateT s m ()) -> m s
-buildStateT s as f = execStateT (mapM_ f as) s
-
-partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
-partitionWith f as = Map.toList . fmap reverse . runIdentity . buildStateT Map.empty as $ \a ->
-  modify $ Map.alter (Just . (a:) . fromMaybe []) (f a)
+partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
+partitionWith f = M.toList . foldr g M.empty
+  where g a = M.alter (Just . (a:) . fromMaybe []) (f a)
 
 waitFor :: Text.Text -> Bloc Bool -> Bloc ()
 waitFor msg action = go 20
