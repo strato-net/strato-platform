@@ -32,7 +32,6 @@ dependencies:
   - merkle-patricia-db
   - monad-alter
   - mtl
-  - ordered-containers
   - prometheus-client
   - resourcet
   - solid-vm

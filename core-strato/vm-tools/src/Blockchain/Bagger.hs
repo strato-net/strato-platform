@@ -17,9 +17,8 @@ import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.Class          (lift)
 import           Control.Monad.Trans.Except
-import           Data.Foldable                      (foldl')
+import qualified Data.DList                         as DL
 import qualified Data.Map                           as M
-import qualified Data.Map.Ordered                   as OMap
 import           Data.Proxy
 import qualified Data.Text                          as T
 import           Data.Time.Clock
@@ -97,9 +96,7 @@ class ( Monad m
         sequence_ (addToQueued Insertion <$> publicTxs)
         state <- getBaggerState
         let cache = B.miningCache state
-            hashes' = B.privateHashes cache
-            f hashMap tx = hashMap OMap.|> (txHash (otBaseTx tx), tx)
-            hashes = foldl' f hashes' privateTxs
+            hashes = B.privateHashes cache `DL.append` DL.fromList privateTxs
         putBaggerState state{ B.miningCache = cache{ B.privateHashes = hashes } }
         promoteExecutables
         setStateDBStateRoot existingStateDbStateRoot
@@ -114,7 +111,9 @@ class ( Monad m
         -- Really, it should just be Int and then we wouldn't need to worry about leap seconds.
         time  <- posixSecondsToUTCTime . fromInteger . round . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
         let pHashes = B.privateHashes $ B.miningCache state
-            hashMap = OMap.fromList $ map (\a -> (a,a)) txShas -- why is this not a standard function?
+            shaSet = S.fromList txShas
+            f = not . (`S.member` shaSet) . txHash . otBaseTx
+            hashMap = DL.fromList . filter f $ DL.toList pHashes
         let newMiningCache = B.MiningCache { B.bestBlockSHA          = bh
                                            , B.bestBlockHeader       = bd
                                            , B.bestBlockTxHashes     = txShas
@@ -122,7 +121,7 @@ class ( Monad m
                                            , B.remainingGas          = nextGasLimit $ DD.blockDataGasLimit bd
                                            , B.lastExecutedTxs       = []
                                            , B.promotedTransactions  = []
-                                           , B.privateHashes         = pHashes OMap.\\ hashMap
+                                           , B.privateHashes         = hashMap
                                            , B.startTimestamp        = time
                                            }
         putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
@@ -410,7 +409,7 @@ buildFromMiningCache = do
     let parentHash   = B.bestBlockSHA cache
     let parentHeader = B.bestBlockHeader cache
     let stateRoot    = B.lastExecutedStateRoot cache
-    let txs          = (trrTransaction <$> B.lastExecutedTxs cache) ++ (snd <$> OMap.assocs (B.privateHashes cache))
+    let txs          = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
     let parentNum    = DD.blockDataNumber parentHeader
     let parentDiff   = DD.blockDataDifficulty parentHeader
     let parentTS     = DD.blockDataTimestamp parentHeader
