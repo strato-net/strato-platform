@@ -66,23 +66,23 @@ readUnseqEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [IngestE
 readUnseqEventsFromTopic = readFromTopic'
 {-# INLINE readUnseqEventsFromTopic #-}
 
-readSeqVmEvents :: K.Kafka k => KP.Offset -> k [OutputEvent]
+readSeqVmEvents :: K.Kafka k => KP.Offset -> k [VmEvent]
 readSeqVmEvents off = do
   events <- readSeqVmEventsFromTopic seqVmEventsTopicName off
   recordEvents seqVMReads events
   return events
 
-readSeqVmEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [OutputEvent]
+readSeqVmEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [VmEvent]
 readSeqVmEventsFromTopic = readFromTopic'
 {-# INLINE readSeqVmEventsFromTopic #-}
 
-readSeqP2pEvents :: K.Kafka k => KP.Offset -> k [OutputEvent]
+readSeqP2pEvents :: K.Kafka k => KP.Offset -> k [P2pEvent]
 readSeqP2pEvents off = do
   events <- readSeqP2pEventsFromTopic seqP2pEventsTopicName off
   recordEvents seqP2PReads events
   return events
 
-readSeqP2pEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [OutputEvent]
+readSeqP2pEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [P2pEvent]
 readSeqP2pEventsFromTopic = readFromTopic'
 {-# INLINE readSeqP2pEventsFromTopic #-}
 
@@ -92,13 +92,13 @@ writeUnseqEvents events = do
   KW.produceMessages $
       (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
-writeSeqVmEvents :: K.Kafka k => [OutputEvent] -> k [KP.ProduceResponse]
+writeSeqVmEvents :: K.Kafka k => [VmEvent] -> k [KP.ProduceResponse]
 writeSeqVmEvents events = do
   recordEvents seqVMWrites events
   KW.produceMessages $
       (K.TopicAndMessage seqVmEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
-writeSeqP2pEvents :: K.Kafka k => [OutputEvent] -> k [KP.ProduceResponse]
+writeSeqP2pEvents :: K.Kafka k => [P2pEvent] -> k [KP.ProduceResponse]
 writeSeqP2pEvents events = do
   recordEvents seqP2PWrites events
   KW.produceMessages $
