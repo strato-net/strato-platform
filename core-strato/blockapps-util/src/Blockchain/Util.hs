@@ -7,7 +7,6 @@ module Blockchain.Util
   , module Blockchain.Strato.Model.Util
   ) where
 
-import           Control.Monad.State.Lazy (State, execState)
 import           Data.Bits
 import qualified Data.ByteString          as B
 import           Data.ByteString.Internal
@@ -27,12 +26,6 @@ import qualified Data.Binary              as Binary
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
-
-buildState :: s -> [a] -> (a -> State s ()) -> s
-buildState s [] _ = s
-buildState s (a:as) run =
-  let s' = execState (run a) s
-   in buildState s' as run
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
 partitionWith f = M.toList . foldr g M.empty

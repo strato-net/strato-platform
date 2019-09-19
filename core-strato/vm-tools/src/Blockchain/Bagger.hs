@@ -15,10 +15,10 @@ import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Blockchain.Output
-import           Control.Monad.State.Lazy           (get, put, lift)
+import           Control.Monad.Trans.Class          (lift)
 import           Control.Monad.Trans.Except
+import           Data.Foldable                      (foldl')
 import qualified Data.Map                           as M
-import           Data.Map.Ordered                   (OMap)
 import qualified Data.Map.Ordered                   as OMap
 import           Data.Proxy
 import qualified Data.Text                          as T
@@ -47,7 +47,6 @@ import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Util
 import qualified Blockchain.Verification            as V
 
 import           Executable.EVMFlags                (flags_maxTxsPerBlock)
@@ -99,10 +98,8 @@ class ( Monad m
         state <- getBaggerState
         let cache = B.miningCache state
             hashes' = B.privateHashes cache
-            hashes = buildState hashes' privateTxs $ \tx -> do
-              (st :: OMap SHA OutputTx) <- get
-              let st' = st OMap.|> (txHash (otBaseTx tx), tx)
-              put st'
+            f hashMap tx = hashMap OMap.|> (txHash (otBaseTx tx), tx)
+            hashes = foldl' f hashes' privateTxs
         putBaggerState state{ B.miningCache = cache{ B.privateHashes = hashes } }
         promoteExecutables
         setStateDBStateRoot existingStateDbStateRoot
