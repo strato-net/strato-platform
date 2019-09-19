@@ -10,10 +10,9 @@ MONITORING_TIMER=5;
 function newnode {
   initialize=false
 
-  mkdir -p logs/rotation
-
   if [[ ! -d .ethereumH ]]
   then initialize=true
+       mkdir logs
        cleanupDB
        doInit
   else
@@ -153,8 +152,8 @@ function newnode {
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
     runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
 
-  echo "Configuring log maintenance"
-  runBackgroundProcess cleanupLogs
+  echo "Configuring log rotation..."
+  runBackgroundProcess logRotation
 
   set +x
   if [ "${PROCESS_MONITORING}" = true ] ; then
@@ -243,11 +242,12 @@ function doInit {
 }
 
 # Find all logs greater than 10M, then copy and truncate
-function cleanupLogs {
+function logRotation {
+  mkdir -p logs/rotation
   while true
   do
     sleep 900 ;
-    find $PWD/logs/ -maxdepth 1 -type f -size +10M -exec /bin/cp -rf {} $PWD/logs/rotation/ \; -exec truncate -s 0 {} \;
+    find logs/ -maxdepth 1 -type f -size +10M -exec /bin/cp -rf {} logs/rotation/ \; -exec truncate -s 0 {} \;
   done
 }
 

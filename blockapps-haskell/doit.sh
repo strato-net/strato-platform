@@ -91,7 +91,7 @@ if [ ! -f initialized ]; then
     # Create the database for slipstream
     PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
     # Create logs directory
-    mkdir logs
+    mkdir /logs
     # Create the 'initialized' sentinel file
     date '+%Y-%m-%d %H:%M:%S' > initialized
 
@@ -105,12 +105,22 @@ function runBackgroundProcess {
   disown %
 }
 
-runBackgroundProcess logserver "--directory=${PWD}/logs" --uri_root=/logs/bloc/ &>> logs/logserver
+# Find all logs greater than 10M, then copy and truncate
+function logRotation {
+  mkdir -p /logs/rotation
+  while true
+  do
+    sleep 900 ;
+    find /logs/ -maxdepth 1 -type f -size +10M -exec /bin/cp -rf {} /logs/rotation/ \; -exec truncate -s 0 {} \;
+  done
+}
 
-runBackgroundProcess blockapps-strato-server >> logs/strato-server 2>&1
+runBackgroundProcess logserver "--directory=/logs" --uri_root=/logs/bloc/ &>> /logs/logserver
+
+runBackgroundProcess blockapps-strato-server >> /logs/strato-server 2>&1
 
 runBackgroundProcess blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" +RTS -N1 &>> logs/bloc
+           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" +RTS -N1 &>> /logs/bloc
 
 until curl localhost:8000 &> /dev/null; do
   echo "Slipstream is waiting for bloc to come up..."
@@ -124,11 +134,13 @@ SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
   --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel}"
 
 if [ ${SLIPSTREAM_OPTIONAL:-true} = true ]; then
-  $SLIPSTREAM_CMD &>> logs/slipstream &
+  $SLIPSTREAM_CMD &>> /logs/slipstream &
 else
-  runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
+  runBackgroundProcess $SLIPSTREAM_CMD &>> /logs/slipstream
 fi
 
+echo "Configuring log rotation..."
+runBackgroundProcess logRotation
 
 set +x
 if [ "${PROCESS_MONITORING}" = true ] ; then
