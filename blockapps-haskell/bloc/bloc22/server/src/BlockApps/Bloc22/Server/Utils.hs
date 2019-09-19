@@ -19,8 +19,7 @@ import           Control.Monad.Except             (throwError)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.State.Strict
 import qualified Data.ByteString.Base16           as BS16
-import           Data.Functor.Identity
-import qualified Data.Map.Strict                  as Map
+import qualified Data.Map.Strict                  as M
 import           Data.Maybe
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -35,7 +34,7 @@ import           BlockApps.Strato.Types
 maybeTxBatchResult :: Maybe ChainId -> [Keccak256] -> Bloc [Maybe TransactionResult]
 maybeTxBatchResult chainId hashes = maybeHeads <$> (blocStrato (postTxResultBatch chainId hashes))
   where maybeHeads btxr =
-          let list = map (flip Map.lookup $ unBatchTransactionResult btxr) hashes
+          let list = map (flip M.lookup $ unBatchTransactionResult btxr) hashes
           in flip map list $ \mtrs -> case mtrs of
             Nothing -> Nothing
             Just trs -> listToMaybe trs
