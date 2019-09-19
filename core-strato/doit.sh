@@ -248,6 +248,7 @@ function logRotation {
   do
     sleep 900 ;
     find logs/ -maxdepth 1 -type f -size +10M -exec /bin/cp -rf {} logs/rotation/ \; -exec truncate -s 0 {} \;
+    echo "Log files were rotated at $(date '+%Y-%m-%d %H:%M:%S')"
   done
 }
 
