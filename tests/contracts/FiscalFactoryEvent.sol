@@ -1,10 +1,11 @@
   /***************************************************************
   *                                                              *
-  *      FISCAL FACTORY CONTRACT WITH GENERATOR FUNCTION         *
+  *      FISCAL FACTORY CONTRACT WITH GENERATOR FUNCTION  
+  *                 USING SOLDITIY EVENTS
   *                                                              *
   ***************************************************************/
 
-contract FiscalFactory {
+contract FiscalFactoryEvent {
     
     
     event FiscalEvent(
