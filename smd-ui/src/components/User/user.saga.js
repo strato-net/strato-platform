@@ -13,11 +13,20 @@ import {
   firstTimeLoginSuccess,
   firstTimeLoginFailure,
   resetFirstTimeUser,
+  GET_KEY_REQUEST,
+  getKeySuccess,
+  getKeyFailure,
+  CREATE_OAUTH_USER_REQUEST,
+  createOauthUserRequest,
+  createOauthUserSuccess,
+  createOauthUserFailure,
 } from './user.actions';
 import { env } from '../../env';
 import { resetTemporarypassword } from '../VerifyAccount/verifyAccount.actions';
 import { handleErrors } from '../../lib/handleErrors';
 
+const oauthUserUrl = env.APEX_URL + "/user";
+const keyUrl = env.STRATO_URL_V23 + "/key";
 const loginUrl = env.APEX_URL + "/login";
 const logoutUrl = env.APEX_URL + "/logout";
 const verifyEmailUrl = env.APEX_URL + "/verify-email";
@@ -83,6 +92,45 @@ function firstTimeLoginRequest(email) {
     });
 }
 
+function getKeyApi() {
+  return fetch(
+    keyUrl,
+    {
+      method: 'GET',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
+
+function createOauthUserApi() {
+  return fetch(
+    oauthUserUrl,
+    {
+      method: 'POST',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
+
 function* firstTimeLogin(action) {
   try {
     const response = yield call(firstTimeLoginRequest, action.email);
@@ -122,10 +170,36 @@ function* logout() {
   }
 }
 
+function* getKey() {
+  try {
+    const response = yield call(getKeyApi);
+
+    if (response.includes("doesn't exist")) {
+      yield put(createOauthUserRequest());
+      yield put(getKeyFailure(response));
+    } else {
+      yield put(getKeySuccess(response));
+    }
+  } catch (err) {
+    yield put(getKeyFailure(err));
+  }
+}
+
+function* createOauthUser() {
+  try {
+    const response = yield call(createOauthUserApi);
+    yield put(createOauthUserSuccess(response));
+  } catch (e) {
+    yield put(createOauthUserFailure(e));
+  }
+}
+
 export default function* watchFetchUser() {
   yield [
     takeEvery(LOGIN_REQUEST, login),
     takeEvery(LOGOUT_REQUEST, logout),
-    takeEvery(FIRST_TIME_LOGIN_REQUEST, firstTimeLogin)
+    takeEvery(FIRST_TIME_LOGIN_REQUEST, firstTimeLogin),
+    takeEvery(GET_KEY_REQUEST, getKey),
+    takeEvery(CREATE_OAUTH_USER_REQUEST, createOauthUser)
   ];
 }

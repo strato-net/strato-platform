@@ -8,7 +8,9 @@ var rp = require('request-promise');
 const appConfig = require('../config/app.config');
 const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
-
+const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
+const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
+const { waitFaucet } = require(`${process.cwd()}/lib/oAuth/oAuth`);
 
 const sendLoginResponse = function (res, user) {
   let tokenData;
@@ -87,6 +89,33 @@ module.exports = {
     res.clearCookie(appConfig.jwtConfig.authCookieName);
     res.status(200).json({
       message: 'logout successful'
+    });
+  },
+
+  createUser: function (req, res, next) {
+    co(function* () {
+      const username = req.headers['x-user-unique-name'];
+      const userParams = {};
+
+      if (!username) {
+        let err = new Error("invalid param, expected username to be a non-empty string");
+        err.status = RestStatus.BAD_REQUEST;
+        return next(err);
+      }
+
+      try {
+        const user = yield ax.post(process.env.vaultWrapperHttpHost, userParams, '/strato/v2.3/key', {
+          "x-user-unique-name": username,
+        });
+
+        yield waitFaucet(user.address);
+
+        res.status(200).json(user);
+      } catch (blocError) {
+        let err = new Error('could not create bloc account: ' + blocError);
+        console.error(err);
+        return next(err);
+      }
     });
   },
 

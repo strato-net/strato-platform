@@ -107,4 +107,5 @@ module.exports = {
   createKey,
   getKey,
   getOrCreateKey,
+  waitFaucet
 };
