@@ -334,7 +334,7 @@ rowToHistories gref abiid row actions cont details oldState = do
   hist <- isHistoric gref $ actionCodeHash row
   second join . unzip <$> if not hist
     then pure []
-    else accumStateT oldState actions $ \hRow -> do
+    else flip evalStateT oldState . forM actions $ \hRow -> do
       modify $ case actionStorage hRow of
                   BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
                   BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp

@@ -6,7 +6,6 @@
 {-# LANGUAGE RecordWildCards   #-}
 module BlockApps.Bloc22.Server.Utils
   ( getBatchBlocTxStatus
-  , accumStateT
   , partitionWith
   , binRuntimeToCodeHash
   , emptyTxParams
@@ -17,7 +16,6 @@ import           Control.Concurrent               (threadDelay)
 import           Control.Monad                    (forM, unless, when)
 import           Control.Monad.Except             (throwError)
 import           Control.Monad.IO.Class           (liftIO)
-import           Control.Monad.Trans.State.Strict
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.Map.Strict                  as M
 import           Data.Maybe
@@ -56,9 +54,6 @@ emptyTxParams = TxParams Nothing Nothing Nothing
 
 binRuntimeToCodeHash :: Text.Text -> Keccak256
 binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
-
-accumStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
-accumStateT s as f = evalStateT (mapM f as) s
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
 partitionWith f = M.toList . foldr g M.empty
