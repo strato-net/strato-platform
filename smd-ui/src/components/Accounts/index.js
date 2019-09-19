@@ -9,6 +9,7 @@ import Account from '../Account';
 import CreateBlocUser from '../CreateBlocUser';
 import { env } from '../../env';
 import './accounts.css';
+import HexText from '../HexText';
 
 const tourSteps = [/* {
     title: 'Create User',
@@ -58,6 +59,19 @@ class Accounts extends Component {
       mixpanelWrapper.track('accounts_row_click');
       this.props.fetchUserAddresses(user, true, this.props.selectedChain)
     }
+  }
+
+  renderOauthAccounts() {
+    return this.props.oauthAccounts.map((account) => {
+      return (<div className="smd-margin-8" key={account.address}>
+        <div className="row">
+          <div className="pt-card pt-elevation-2">
+            <b><span>{account.username}</span></b> <br />
+            <HexText value={account.address} classes="smd-pad-4" />
+          </div>
+        </div>
+      </div>)
+    })
   }
 
   render() {
@@ -135,7 +149,7 @@ class Accounts extends Component {
           <div className="row">
             <div className="col-sm-4 main-div">
               <div className="accounts-margin-top">
-                {rows.length === 0
+                {!env.OAUTH_ENABLED && rows.length === 0
                   ?
                   <table>
                     <tbody>
@@ -145,6 +159,7 @@ class Accounts extends Component {
                     </tbody>
                   </table>
                   : rows}
+                {env.OAUTH_ENABLED && this.renderOauthAccounts()}
               </div>
             </div>
             <div className="col-sm-8 account-details">
@@ -161,6 +176,7 @@ class Accounts extends Component {
 
 export function mapStateToProps(state) {
   return {
+    oauthAccounts: state.accounts.oauthAccounts,
     accounts: state.accounts.accounts,
     filter: state.accounts.filter,
     selectedChain: state.chains.selectedChain
