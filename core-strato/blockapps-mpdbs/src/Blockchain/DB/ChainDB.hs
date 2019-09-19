@@ -82,7 +82,7 @@ import           Text.Format
 |  (chain id, (creation block hash, genesis state root))                        |
 | It's important to note that each block hash may have a unique chain root,     |
 | but the genesis root only gets updated when the VM receives a new             |
-| OEGenesis message.                                                            |
+| VmGenesis message.                                                            |
 |                                                                               |
 | When the VM receives a new block, it will insert it into the block hash       |
 | trie, with the same chain root as its parent.                                 |
