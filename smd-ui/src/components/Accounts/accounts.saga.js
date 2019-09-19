@@ -227,7 +227,6 @@ export function* getBalance(action) {
 export function* getOauthAccounts() {
   try {
     const response = yield call(getOauthAccountsApi);
-    console.log("----------------------------------", response)
     yield put(fetchOauthAccountsSuccess(response));
   }
   catch (err) {
