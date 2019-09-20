@@ -7,7 +7,7 @@
       {
         "metric": {
           "__name__": "health_check",
-          "instance": "bloc:10777",
+          "instance": "localhost",
           "job": "bloc",
           "location": "blockapps-bloc"
         },
@@ -19,7 +19,7 @@
       {
         "metric": {
           "__name__": "health_check",
-          "instance": "bloc:10777",
+          "instance": "localhost",
           "job": "slipstream",
           "location": "slipstream_main"
         },
@@ -31,7 +31,7 @@
       {
         "metric": {
           "__name__": "health_check",
-          "instance": "bloc:10777",
+          "instance": "localhost",
           "job": "strato-api",
           "location": "strato-api"
         },
@@ -43,7 +43,7 @@
       {
         "metric": {
           "__name__": "health_check",
-          "instance": "strato:10248",
+          "instance": "localhost",
           "job": "strato-p2p",
           "location": "strato_p2p"
         },
@@ -55,7 +55,7 @@
       {
         "metric": {
           "__name__": "health_check",
-          "instance": "strato:8000",
+          "instance": "localhost",
           "job": "vm-runner",
           "location": "vm_main"
         },
@@ -67,7 +67,7 @@
       {
         "metric": {
           "__name__": "health_check",
-          "instance": "bloc:10777",
+          "instance": "localhost",
           "job": "vault-wrapper",
           "location": "blockapps-vault-wrapper-server"
         },
@@ -79,7 +79,7 @@
       {
         "metric": {
           "__name__": "health_check",
-          "instance": "strato:8050",
+          "instance": "localhost",
           "job": "strato-sequencer",
           "location": "seq_main"
         },
