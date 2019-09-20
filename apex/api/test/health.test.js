@@ -20,7 +20,6 @@ const timeout = config.healthCheck.pollFrequency;
 describe('Tests - Node-level Health Check', function () {
   this.timeout(timeout);
   before(async function () {
-
     const currentTime = Date.now();
     sampleResponse2.data.result.forEach((elem) => {
       elem.value[0] = currentTime / 1000;
