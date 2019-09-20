@@ -4,6 +4,7 @@ const router = express.Router();
 
 const authHandler = require('../middlewares/authHandler.js');
 const authController = require('../controllers/auth');
+const oAuthController = require('../controllers/oAuth');
 // const oAuthController = require('../lib/oAuth/oAuth');
 const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
@@ -35,7 +36,7 @@ const multerMiddleware = (req, res, next) => {
   })
 };
 
-const checkUID = async (req,res,next) => {
+const checkUID = async (req, res, next) => {
   if (!isOAuth()) {
     return next();
   }
@@ -51,7 +52,7 @@ const checkUID = async (req,res,next) => {
   try {
     await oAuth.getOrCreateKey(uID);
     return next()
-  } catch(error) {
+  } catch (error) {
     let err = new Error('server misconfigured: could not post transaction');
     console.error(err);
     err.status = RestStatus.SERVICE_UNAVAILABLE;
@@ -64,7 +65,7 @@ router.post('/dapps', dappController.upload);
 // router.get('/dapps', dappController.list);
 
 router.post('/login', checkMode, authController.login);
-router.post('/user', checkMode, authController.createUser);
+router.post('/user', checkMode, oAuthController.createUser);
 router.post('/users', checkMode, authController.create);
 router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
 router.post('/verify-email', checkMode, authController.verifyEmail);
@@ -94,7 +95,7 @@ router.get('/_ping', healthHandler.ping);
 router.get('/_track', trackHandler._track);
 
 
-function isOAuth(){
+function isOAuth() {
   return process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
 }
 

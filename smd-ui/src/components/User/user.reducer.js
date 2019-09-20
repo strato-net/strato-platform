@@ -11,10 +11,8 @@ import {
   FIRST_TIME_LOGIN_REQUEST_SUCCESS,
   FIRST_TIME_LOGIN_REQUEST_FAILURE,
   RESET_FIRST_TIME_USER,
-  GET_KEY_SUCCESS,
-  GET_KEY_FAILURE,
-  CREATE_OAUTH_USER_SUCCESS,
-  CREATE_OAUTH_USER_FAILURE,
+  GET_OR_CREATE_OAUTH_USER_SUCCESS,
+  GET_OR_CREATE_OAUTH_USER_FAILURE,
 } from './user.actions';
 import { currentUser } from '../../lib/localStorage';
 
@@ -108,22 +106,12 @@ const reducer = function (state = initialState, action) {
         ...state,
         firstTimeUser: null
       }
-    case GET_KEY_SUCCESS:
+    case GET_OR_CREATE_OAUTH_USER_SUCCESS:
       return {
         ...state,
         oauthUser: action.data
       }
-    case GET_KEY_FAILURE:
-      return {
-        ...state,
-        oauthUser: null
-      }
-    case CREATE_OAUTH_USER_SUCCESS:
-      return {
-        ...state,
-        oauthUser: action.data
-      }
-    case CREATE_OAUTH_USER_FAILURE:
+    case GET_OR_CREATE_OAUTH_USER_FAILURE:
       return {
         ...state,
         oauthUser: null

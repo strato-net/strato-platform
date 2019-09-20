@@ -11,12 +11,9 @@ export const FIRST_TIME_LOGIN_REQUEST = 'FIRST_TIME_LOGIN_REQUEST';
 export const FIRST_TIME_LOGIN_REQUEST_SUCCESS = 'FIRST_TIME_LOGIN_REQUEST_SUCCESS';
 export const FIRST_TIME_LOGIN_REQUEST_FAILURE = 'FIRST_TIME_LOGIN_REQUEST_FAILURE';
 export const RESET_FIRST_TIME_USER = 'RESET_FIRST_TIME_USER';
-export const GET_KEY_REQUEST = 'GET_KEY_REQUEST';
-export const GET_KEY_SUCCESS = 'GET_KEY_SUCCESS';
-export const GET_KEY_FAILURE = 'GET_KEY_FAILURE';
-export const CREATE_OAUTH_USER_REQUEST = 'CREATE_OAUTH_USER_REQUEST';
-export const CREATE_OAUTH_USER_SUCCESS = 'CREATE_OAUTH_USER_SUCCESS';
-export const CREATE_OAUTH_USER_FAILURE = 'CREATE_OAUTH_USER_FAILURE';
+export const GET_OR_CREATE_OAUTH_USER_REQUEST = 'GET_OR_CREATE_OAUTH_USER_REQUEST';
+export const GET_OR_CREATE_OAUTH_USER_SUCCESS = 'GET_OR_CREATE_OAUTH_USER_SUCCESS';
+export const GET_OR_CREATE_OAUTH_USER_FAILURE = 'GET_OR_CREATE_OAUTH_USER_FAILURE';
 
 export const login = function (payload) {
   return {
@@ -108,42 +105,22 @@ export const resetFirstTimeUser = function () {
   }
 }
 
-export const getKeyRequest = function () {
+export const getOrCreateOauthUserRequest = function () {
   return {
-    type: GET_KEY_REQUEST
+    type: GET_OR_CREATE_OAUTH_USER_REQUEST
   }
 }
 
-export const getKeySuccess = function (data) {
+export const getOrCreateOauthUserSuccess = function (data) {
   return {
-    type: GET_KEY_SUCCESS,
+    type: GET_OR_CREATE_OAUTH_USER_SUCCESS,
     data
   }
 }
 
-export const getKeyFailure = function (error) {
+export const getOrCreateOauthUserFailure = function (error) {
   return {
-    type: GET_KEY_FAILURE,
-    error
-  }
-}
-
-export const createOauthUserRequest = function () {
-  return {
-    type: CREATE_OAUTH_USER_REQUEST
-  }
-}
-
-export const createOauthUserSuccess = function (data) {
-  return {
-    type: CREATE_OAUTH_USER_SUCCESS,
-    data
-  }
-}
-
-export const createOauthUserFailure = function (error) {
-  return {
-    type: CREATE_OAUTH_USER_FAILURE,
+    type: GET_OR_CREATE_OAUTH_USER_FAILURE,
     error
   }
 }
