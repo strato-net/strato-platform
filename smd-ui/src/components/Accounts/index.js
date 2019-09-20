@@ -1,5 +1,13 @@
 import React, { Component } from 'react';
-import { fetchAccounts, changeAccountFilter, fetchUserAddresses, fetchAccountDetail, resetUserAddress, fetchOauthAccounts } from './accounts.actions';
+import {
+  fetchAccounts,
+  changeAccountFilter,
+  fetchUserAddresses,
+  fetchAccountDetail,
+  resetUserAddress,
+  fetchOauthAccounts,
+  faucetRequest
+} from './accounts.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -62,12 +70,27 @@ class Accounts extends Component {
   }
 
   renderOauthAccounts() {
+
     return this.props.oauthAccounts.map((account) => {
+      const faucetStatus = (this.props.faucet.accountAddress === account.address) && this.props.faucet.status;
+
       return (<div className="smd-margin-8" key={account.address}>
         <div className="row">
           <div className="pt-card pt-elevation-2">
             <b><span>{account.username}</span></b> <br />
             <HexText value={account.address} classes="smd-pad-4" />
+            <button
+              className={`pt-button ${faucetStatus ? 'pt-intent-warning' : 'pt-intent-primary'} pt-small`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.props.faucetRequest(account.address, account.username, 'faucet');
+              }}
+              disabled={faucetStatus}
+            >
+              {faucetStatus ? 'Pending' : 'Faucet'}
+              {/* Faucet */}
+            </button>
           </div>
         </div>
       </div>)
@@ -149,7 +172,7 @@ class Accounts extends Component {
           <div className="row">
             <div className="col-sm-4 main-div">
               <div className="accounts-margin-top">
-                {!env.OAUTH_ENABLED && rows.length === 0
+                {!env.OAUTH_ENABLED && (rows.length === 0
                   ?
                   <table>
                     <tbody>
@@ -158,7 +181,7 @@ class Accounts extends Component {
                       </tr>
                     </tbody>
                   </table>
-                  : rows}
+                  : rows)}
                 {env.OAUTH_ENABLED && this.renderOauthAccounts()}
               </div>
             </div>
@@ -176,6 +199,7 @@ class Accounts extends Component {
 
 export function mapStateToProps(state) {
   return {
+    faucet: state.accounts.faucet,
     oauthAccounts: state.accounts.oauthAccounts,
     accounts: state.accounts.accounts,
     filter: state.accounts.filter,
@@ -191,6 +215,7 @@ export default withRouter(
       fetchAccounts,
       changeAccountFilter,
       resetUserAddress,
-      fetchOauthAccounts
+      fetchOauthAccounts,
+      faucetRequest
     }
   )(Accounts));

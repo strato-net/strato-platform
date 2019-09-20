@@ -8,9 +8,6 @@ var rp = require('request-promise');
 const appConfig = require('../config/app.config');
 const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
-const ax = require(`${process.cwd()}/lib/rest-utils/axios-wrapper`);
-const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
-const { getOrCreateKey } = require(`${process.cwd()}/lib/oAuth/oAuth`);
 
 const sendLoginResponse = function (res, user) {
   let tokenData;
@@ -89,27 +86,6 @@ module.exports = {
     res.clearCookie(appConfig.jwtConfig.authCookieName);
     res.status(200).json({
       message: 'logout successful'
-    });
-  },
-
-  createUser: function (req, res, next) {
-    co(function* () {
-      const username = req.headers['x-user-unique-name'];
-
-      if (!username) {
-        let err = new Error("invalid param, expected username to be a non-empty string");
-        err.status = RestStatus.BAD_REQUEST;
-        return next(err);
-      }
-
-      try {
-        const user = yield getOrCreateKey(username);
-        res.status(200).json(user);
-      } catch (error) {
-        let err = new Error('could not create bloc account: ' + error);
-        console.error(err);
-        return next(err);
-      }
     });
   },
 
