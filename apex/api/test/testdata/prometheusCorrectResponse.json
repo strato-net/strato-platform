@@ -8,8 +8,32 @@
         "metric": {
           "__name__": "health_check",
           "instance": "bloc:10777",
+          "job": "bloc",
+          "location": "blockapps-bloc"
+        },
+        "value": [
+          1553824884.792,
+          "1"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "health_check",
+          "instance": "bloc:10777",
           "job": "slipstream",
           "location": "slipstream_main"
+        },
+        "value": [
+          1553824884.792,
+          "1"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "health_check",
+          "instance": "bloc:10777",
+          "job": "strato-api",
+          "location": "strato-api"
         },
         "value": [
           1553824884.792,
@@ -34,6 +58,18 @@
           "instance": "strato:8000",
           "job": "vm-runner",
           "location": "vm_main"
+        },
+        "value": [
+          1553824884.792,
+          "1"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "health_check",
+          "instance": "bloc:10777",
+          "job": "vault-wrapper",
+          "location": "blockapps-vault-wrapper-server"
         },
         "value": [
           1553824884.792,
