@@ -886,7 +886,7 @@ constructArgValuesAndSource args argNamesTypes = do
         let valsAsText = map valueToText vals
         return $
           (
-            toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
+            "",
             "(" <> Text.intercalate "," valsAsText <> ")"
           )
 
