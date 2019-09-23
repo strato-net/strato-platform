@@ -13,10 +13,10 @@ module Blockchain.Data.GenesisInfo (
 
 import           GHC.Generics (Generic)
 import           Data.Aeson
+import           Data.Aeson.Casing (aesonDrop, camelCase)
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.JsonStream.Parser             as JS
-import           Data.Monoid ((<>))
 import           Data.Time
 import           Data.Word
 
@@ -34,7 +34,7 @@ data GenesisInfo =
     genesisInfoCoinbase         :: Address,
     genesisInfoAccountInfo      :: [AccountInfo],
     genesisInfoCodeInfo         :: [CodeInfo],
-    genesisInfoTransactionsRoot :: StateRoot,
+    genesisInfoTransactionRoot  :: StateRoot, -- Misspelled to match the existing parser
     genesisInfoReceiptsRoot     :: StateRoot,
     genesisInfoLogBloom         :: B.ByteString,
     genesisInfoDifficulty       :: Integer,
@@ -50,6 +50,7 @@ data GenesisInfo =
 nullStateRoot :: StateRoot
 nullStateRoot = StateRoot . fst . B16.decode $
     "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+
 defaultGenesisInfo :: GenesisInfo
 defaultGenesisInfo =
   GenesisInfo {
@@ -58,7 +59,7 @@ defaultGenesisInfo =
     genesisInfoCoinbase = Address 0,
     genesisInfoAccountInfo = [],
     genesisInfoCodeInfo = [],
-    genesisInfoTransactionsRoot = nullStateRoot,
+    genesisInfoTransactionRoot = nullStateRoot,
     genesisInfoReceiptsRoot = nullStateRoot,
     genesisInfoLogBloom = B.replicate 512 0,
     genesisInfoDifficulty = 131072,
@@ -78,7 +79,7 @@ instance FromJSON GenesisInfo where
     o .: "unclesHash" <*>
     o .: "coinbase" <*>
     o .: "accountInfo" <*>
-    o .:? "codeInfo" .!= [] <*>
+    o .:? "codeInfo" .!= [] <*> -- This is manual to account for GenesisInfos missing codeInfo
     o .: "transactionRoot" <*>
     o .: "receiptsRoot" <*>
     o .: "logBloom" <*>
@@ -93,24 +94,8 @@ instance FromJSON GenesisInfo where
   parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
 
 instance ToJSON GenesisInfo where
-  toEncoding x = pairs (
-      "parentHash" .= genesisInfoParentHash x <>
-      "unclesHash" .= genesisInfoUnclesHash x <>
-      "coinbase" .= genesisInfoCoinbase x <>
-      "codeInfo" .= genesisInfoCodeInfo x <>
-      "transactionRoot" .= genesisInfoTransactionsRoot x <>
-      "receiptsRoot" .= genesisInfoReceiptsRoot x <>
-      "logBloom" .= genesisInfoLogBloom x <>
-      "difficulty" .= genesisInfoDifficulty x <>
-      "number" .= genesisInfoNumber x <>
-      "gasLimit" .= genesisInfoGasLimit x <>
-      "gasUsed" .= genesisInfoGasUsed x <>
-      "timestamp" .= genesisInfoTimestamp x <>
-      "extraData" .= genesisInfoExtraData x <>
-      "mixHash" .= genesisInfoMixHash x <>
-      "nonce" .= genesisInfoNonce x <>
-      "accountInfo" .= genesisInfoAccountInfo x
-    )
+  toJSON = genericToJSON (aesonDrop (B.length "genesisInfo") camelCase)
+  toEncoding = genericToEncoding (aesonDrop (B.length "genesisInfo") camelCase)
 
 genesisParser :: JS.Parser GenesisInfo
 genesisParser = GenesisInfo

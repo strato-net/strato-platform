@@ -49,9 +49,9 @@ data SetupDBs =
     localAddressStateBlock :: IORef (M.Map Address AddressStateModification)
     }
 
-type SetupDBM = ReaderT SetupDBs (LoggingT (ResourceT IO))
+type SetupDBM = ReaderT SetupDBs (ResourceT (LoggingT IO))
 
-runSetupDBM :: SetupDBM a -> LoggingT (ResourceT IO) a
+runSetupDBM :: SetupDBM a -> ResourceT (LoggingT IO) a
 runSetupDBM mv = do
   let open path = DB.open (".ethereumH" ++ path) DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
   sdb <- open stateDBPath

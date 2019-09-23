@@ -12,6 +12,7 @@ github: blockapps/strato-platform/core-strato/strato-genesis
 
 dependencies:
   - aeson
+  - aeson-casing
   - base
   - base16-bytestring
   - binary
