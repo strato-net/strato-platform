@@ -13,6 +13,7 @@ import Blockchain.Data.Transaction
 import Blockchain.Blockstanbul
 import qualified Blockchain.Blockstanbul.BenchmarkLib as PBFT
 import Blockchain.Sequencer
+import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Monad
 
 import Criterion.Main
@@ -30,9 +31,11 @@ runFakeSequencerM cfg ctx mv =
 benchConfig :: IO SequencerConfig
 benchConfig = do
   ch <- atomically newTMChan
+  cp <- atomically newCablePackage
   return SequencerConfig { blockstanbulBlockPeriod = 0
                          , blockstanbulRoundPeriod = 1000000
                          , blockstanbulTimeouts = ch
+                         , cablePackage = cp
                          }
 
 benchContext :: SequencerContext
