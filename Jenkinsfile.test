@@ -210,6 +210,333 @@ pipeline {
           export OAUTH_CLIENT_SECRET=5718a315-2beb-487f-87a8-413cd88e6a5d
           export OAUTH_TEMPORARY_MIXED_AUTH=true
           export PASSWORD=123
+          rm docker-compose.yml
+          cat << EOF > ./docker-compose.yml
+          #strato-getting-started-min-version:2.7
+          version: "3"
+          volumes:
+            dapps:
+              driver: local
+            pgdata:
+              driver: local
+            prometheusdata:
+              driver: local
+            kafkadata:
+              driver: local
+            redisdata:
+              driver: local
+            stratodata:
+              driver: local
+            zookeeperdata:
+              driver: local
+
+          networks:
+            static:
+              ipam:
+                config:
+                  - subnet: 172.20.0.0/16
+          services:
+            smd:
+              depends_on:
+              - apex
+              - bloc
+              - postgrest
+              - prometheus
+              - strato
+              environment:
+              - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+              - NODE_HOST=${NODE_HOST}
+              - NODE_NAME=${NODE_NAME}
+              - OAUTH_ENABLED=${OAUTH_ENABLED}
+              - SINGLE_NODE=${SINGLE_NODE}
+              - SMD_MODE=${SMD_MODE}
+              - ssl=${ssl:-false}
+              - STRATO_GS_MODE=${STRATO_GS_MODE}
+              image: ${SMD_IMAGE:-registry-aws.blockapps.net:5000/blockapps-repo/smd:4.5.1}
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.1
+            apex:
+              depends_on:
+              - bloc
+              - postgres
+              - postgrest
+              - strato
+              environment:
+              - blocHost=bloc:8000
+              - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+              - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
+              - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
+              - NODE_HOST=${NODE_HOST}
+              - OAUTH_ENABLED=${OAUTH_ENABLED}
+              - postgres_host=postgres
+              - postgres_password=${postgres_password:-api}
+              - postgres_port=5432
+              - postgres_user=postgres
+              - postgrestHost=postgrest:3001
+              - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
+              - SINGLE_NODE=${SINGLE_NODE}
+              - SMD_MODE=${SMD_MODE}
+              - STRATO_GS_MODE=${STRATO_GS_MODE}
+              - stratoHost=strato:3000
+              - vaultWrapperHost=vault-wrapper:8000
+              image: ${APEX_IMAGE:-registry-aws.blockapps.net:5000/blockapps-repo/apex:4.5.1}
+              volumes:
+              - dapps:/usr/src/app/apps
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.2
+            dappstore:
+              depends_on:
+              - bloc
+              - postgrest
+              - strato
+              environment:
+              - NODE_HOST=${NODE_HOST}
+              - ssl=${ssl:-false}
+              image: ${DAPPSTORE_IMAGE:-registry-aws.blockapps.net:5000/blockapps-repo/dappstore:4.5.1}
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.3
+            bloc:
+              depends_on:
+              - postgres
+              - strato
+              - vault-wrapper
+              environment:
+              - BLOC_DEBUG=${BLOC_DEBUG}
+              - kafkaHost=kafka
+              - kafkaPort=9092
+              - postgres_host=postgres
+              - postgres_password=${postgres_password:-api}
+              - postgres_port=5432
+              - postgres_slipstream_db=cirrus
+              - postgres_user=postgres
+              - PROCESS_MONITORING=${PROCESS_MONITORING}
+              - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
+              - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
+              - SMD_MODE=${SMD_MODE}
+              #    - stateDiffTopic=${stateDiffTopic}
+              - stratoHost=strato:3000
+              - vaultWrapperHost=vault-wrapper:8000
+              - zookeeper_conn=zookeeper
+              image: ${BLOC_IMAGE:-registry-aws.blockapps.net:5000/blockapps-repo/bloc:4.5.1}
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.4
+            redis:
+              command: [redis-server, --appendonly, "yes"]
+              image: redis:3.2
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.5
+              volumes:
+                - redisdata:/data
+            vault-wrapper:
+              depends_on:
+              - postgres
+              environment:
+              - postgres_host=postgres
+              - postgres_password=${postgres_password:-api}
+              - postgres_port=5432
+              - postgres_user=postgres
+              - postgres_vault_wrapper_db=oauth
+              - VAULTWRAPPER_DEBUG=${VAULTWRAPPER_DEBUG}
+              image: ${VAULTWRAPPER_IMAGE:-registry-aws.blockapps.net:5000/blockapps-repo/vault-wrapper:4.5.1}
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.6
+            strato:
+              depends_on:
+              - kafka
+              - postgres
+              - redis
+              environment:
+              - addBootnodes=${addBootnodes}
+              - averageTxsPerBlock=${averageTxsPerBlock}
+              - blockstanbul=${blockstanbul}
+              - blockstanbulAdmins=${blockstanbulAdmins}
+              - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
+              - blockstanbulPrivateKey=${blockstanbulPrivateKey}
+              - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
+              - blockstanbulSkipCheck=${blockstanbulSkipCheck}
+              - blockTime=${blockTime}
+              - bootnode=${bootnode}
+              - brokenRefundReenable=${brokenRefundReenable}
+              - cacheTransactionResults=${cacheTransactionResults}
+              - connectionTimeout=${connectionTimeout}
+              - debugFail=${debugFail}
+              - evmDebugMode=${evmDebugMode}
+              - evmTraceMode=${evmTraceMode}
+              - genesis=${genesis}
+              - genesisBlock=${genesisBlock}
+              - kafkaHost=kafka
+              - lazyBlocks=${lazyBlocks}
+              - maxConn=${maxConn}
+              - maxReturnedHeaders=${maxReturnedHeaders}
+              - maxTxsPerBlock=${maxTxsPerBlock}
+              - minBlockDifficulty=${minBlockDifficulty}
+              - mineBlocks=${mineBlocks:-true}
+              - miningAlgorithm=${miningAlgorithm}
+              - miningThreads=${miningThreads}
+              - networkID=${networkID}
+              - numMinPeers=${numMinPeers}
+              - postgres_host=postgres
+              - postgres_password=${postgres_password:-api}
+              - postgres_user=postgres
+              - privateChainAuthorizationMode=${privateChainAuthorizationMode}
+              - PROCESS_MONITORING=${PROCESS_MONITORING}
+              - redisBDBNumber=${redisBDBNumber}
+              - redisHost=redis
+              - redisPort=6379
+              - seqDebugMode=${seqDebugMode}
+              - seqEventsBatchSize=${seqEventsBatchSize}
+              - seqEventsCostHeuristic=${seqEventsCostHeuristic}
+              - seqMaxEventsPerIter=${seqMaxEventsPerIter}
+              - seqMaxUsPerIter=${seqMaxUsPerIter}
+              - seqRTSOPTs=${seqRTSOPTs}
+              - svmTrace=${svmTrace}
+              - sqlDiff=${sqlDiff}
+              - svmDev=${svmDev}
+              - useSyncMode=${useSyncMode}
+              - validators=${validators}
+              - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
+              - zkHost=zookeeper
+              image: ${STRATO_IMAGE:-registry-aws.blockapps.net:5000/blockapps-repo/strato:4.5.1}
+              ports:
+              - 30303:30303
+              - 30303:30303/udp
+              - 3333:3000
+              - 8888:8000
+              - 8484:8000
+              - 5433:5432
+              - 3434:3001
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.7
+              volumes:
+                - stratodata:/var/lib/strato
+            postgrest:
+              depends_on:
+              - bloc
+              - postgres
+              environment:
+              - blocHost=bloc:8000
+              - PG_ENV_POSTGRES_DB=cirrus
+              - PG_ENV_POSTGRES_HOST=postgres
+              - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
+              - PG_ENV_POSTGRES_USER=postgres
+              - PG_PORT_5432_TCP_PORT=5432
+              image: ${POSTGREST_IMAGE:-registry-aws.blockapps.net:5000/blockapps-repo/postgrest:4.5.1}
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.8
+            postgres:
+              environment:
+              - POSTGRES_PASSWORD=${postgres_password:-api}
+              image: postgres:9.6
+              volumes:
+              - pgdata:/var/lib/postgresql/data
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.9
+            nginx:
+              depends_on:
+              - apex
+              - bloc
+              - postgrest
+              - prometheus
+              - smd
+              - strato
+              - vault-wrapper
+              environment:
+              - authBasic=${authBasic}
+              - blockstanbul=${blockstanbul}
+              - blockTime=${blockTime}
+              - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+              - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+              - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+              - OAUTH_ENABLED=${OAUTH_ENABLED}
+              - OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY}
+              - OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false} # for backwards-compatibility with 4.2
+              - OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL} # for backwards-compatibility with 4.2
+              - OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK} # for backwards-compatibility with 4.2
+              - OAUTH_TEMPORARY_MIXED_AUTH=${OAUTH_TEMPORARY_MIXED_AUTH} # To allow gradual migration of tests to oauth
+              - SMD_MODE=${SMD_MODE}
+              - SERVE_LOGS=${SERVE_LOGS}
+              - ssl=${ssl}
+              - sslCertFileType=${sslCertFileType}
+              - STRATO_GS_MODE=${STRATO_GS_MODE}
+              - uiPassword=${uiPassword}
+              image: ${NGINX_IMAGE:-registry-aws.blockapps.net:5000/blockapps-repo/nginx:4.5.1}
+              ports:
+              - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+              - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
+              volumes:
+              - ./ssl:/tmp/ssl:ro
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.10
+            docs:
+              environment:
+              - API_URL=/strato-api/eth/v1.2/swagger.json
+              image: swaggerapi/swagger-ui:v3.22.1
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.11
+            zookeeper:
+              image: wurstmeister/zookeeper:3.4.6
+              restart: always
+              volumes:
+                - zookeeperdata:/opt/zookeeper-3.4.6/data
+              networks:
+                static:
+                  ipv4_address: 172.20.20.12
+            kafka:
+              depends_on:
+              - zookeeper
+              environment:
+                KAFKA_ADVERTISED_HOST_NAME: kafka
+                KAFKA_ADVERTISED_PORT: 9092
+                KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+                KAFKA_DELETE_TOPIC_ENABLE: "true"
+                KAFKA_LOG_CLEANER_ENABLE: "false"
+                KAFKA_LOG_DIRS: '/kafka/kafka-logs'
+                KAFKA_LOG_RETENTION_HOURS: 2147483647
+                KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
+                KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
+                KAFKA_MAX_REQUEST_SIZE: 33554432
+                KAFKA_MESSAGE_MAX_BYTES: 33554432
+              image: wurstmeister/kafka:1.1.0
+              restart: always
+              volumes:
+              - /var/run/docker.sock:/var/run/docker.sock
+              - kafkadata:/kafka
+              networks:
+                static:
+                  ipv4_address: 172.20.20.13
+            prometheus:
+              environment:
+                - NODE_HOST=${NODE_HOST}
+              image: ${PROMETHEUS_IMAGE:-registry-aws.blockapps.net:5000/blockapps-repo/prometheus:4.5.1}
+              volumes:
+              - prometheusdata:/prometheus
+              restart: always
+              networks:
+                static:
+                  ipv4_address: 172.20.20.14
+          EOF
           ./strato.sh -m 1 --single
           docker ps
           # Few quick tests
