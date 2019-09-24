@@ -13,7 +13,9 @@ async function createUser(req, res, next) {
   }
 
   try {
-    const user = await getOrCreateKey(username);
+    const response = await getOrCreateKey(username);
+    const user = Object.assign({}, response.user, { username });
+
     res.status(200).json(user);
   } catch (error) {
     let err = new Error('could not create bloc account: ' + error);

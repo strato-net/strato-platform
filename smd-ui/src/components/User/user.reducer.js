@@ -14,7 +14,7 @@ import {
   GET_OR_CREATE_OAUTH_USER_SUCCESS,
   GET_OR_CREATE_OAUTH_USER_FAILURE,
 } from './user.actions';
-import { currentUser } from '../../lib/localStorage';
+import { currentUser, getUserFromLocal } from '../../lib/localStorage';
 
 const initialState = {
   username: null,
@@ -24,7 +24,7 @@ const initialState = {
   isOpen: false,
   spinning: false,
   firstTimeUser: null,
-  oauthUser: null
+  oauthUser: getUserFromLocal()
 };
 
 const reducer = function (state = initialState, action) {

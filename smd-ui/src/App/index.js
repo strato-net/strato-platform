@@ -13,11 +13,19 @@ import LoadingBar from 'react-redux-loading-bar'
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { isModePublic } from '../lib/checkMode';
+import { getOrCreateOauthUserRequest } from '../components/User/user.actions';
+import { getUserFromLocal } from '../lib/localStorage';
 
 mixpanelWrapper.init('62f1bec01cdb0096be8e8bdd693e0081');
 mixpanelWrapper.identify(env.NODE_NAME);
 
 class App extends Component {
+
+  componentDidMount() {
+    if (env.OAUTH_ENABLED && !getUserFromLocal()) {
+      this.props.getOrCreateOauthUserRequest();
+    }
+  }
 
   sideBar() {
     return (this.props.isLoggedIn || !isModePublic()) ? <SideBar /> : null
@@ -43,4 +51,6 @@ export function mapStateToProps(state) {
   };
 }
 
-export default withRouter(connect(mapStateToProps)(App));
+export default withRouter(connect(mapStateToProps, {
+  getOrCreateOauthUserRequest
+})(App));

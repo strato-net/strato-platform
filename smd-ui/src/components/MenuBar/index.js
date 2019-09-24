@@ -47,7 +47,7 @@ class MenuBar extends Component {
               <button className="pt-button pt-minimal pt-small" onClick={() => { this.props.logout() }}>Logout</button>
             </a></span>}
           {isModeOauth() && <span><span className="pt-navbar-divider" />
-            <small className="pt-text-muted welcome-user"> {Cookies.get('strato_user_name')} </small>
+            <small className="pt-text-muted welcome-user"> {this.props.oauthUser ? this.props.oauthUser.username : ''} </small>
             <span className="pt-navbar-divider" />
             <a target="_blank" rel="noopener noreferrer">
               <button className="pt-button pt-minimal pt-small" onClick={() => { window.location.href = '/auth/logout' }}>Logout</button>
@@ -140,6 +140,7 @@ export function mapStateToProps(state) {
     isLoggedIn: state.user.isLoggedIn,
     currentUser: state.user.currentUser,
     chainIds: state.chains.chainIds,
+    oauthUser: state.user.oauthUser
   };
 }
 

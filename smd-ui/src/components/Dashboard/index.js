@@ -30,7 +30,6 @@ import {
   GET_SYSTEM_INFO
 } from '../../sockets/rooms'
 import {sec2Date} from "../../lib/formatSeconds";
-import { getOrCreateOauthUserRequest } from '../User/user.actions';
 
 const socket = io(env.SOCKET_SERVER, { path: '/apex-ws', transports: ['websocket'] });
 // TODO: these should be part of a reducer state. Do the same for other global variables.
@@ -61,7 +60,6 @@ class Dashboard extends Component {
     }
   }
   componentDidMount() {
-    this.props.getOrCreateOauthUserRequest();
     this.props.subscribeRoom(LAST_BLOCK_NUMBER)
     this.props.subscribeRoom(USERS_COUNT)
     this.props.subscribeRoom(CONTRACTS_COUNT)
@@ -215,8 +213,7 @@ const connected = connect(
     hideLoading,
     endTour,
     subscribeRoom,
-    unSubscribeRoom,
-    getOrCreateOauthUserRequest
+    unSubscribeRoom
   }
 )(Dashboard)
 
