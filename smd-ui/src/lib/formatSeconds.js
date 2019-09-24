@@ -1,5 +1,5 @@
 export function sec2Date(sec){
-    if (sec == 0){
+    if (sec === 0){
         return " ";
     }
     let seconds = sec;

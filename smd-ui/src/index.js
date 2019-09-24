@@ -41,6 +41,7 @@ import verifyReducer from './components/ExternalStorage/Verify/verify.reducer';
 import downloadReducer from './components/ExternalStorage/Download/download.reducer';
 import chainsReducer from './components/Chains/chains.reducer'
 import createChainReducer from './components/CreateChain/createChain.reducer';
+import oauthAccountsReducer from './components/Accounts/components/OauthAccounts/oauthAccounts.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -72,6 +73,7 @@ import watchFetchUpload from './components/ExternalStorage/externalStorage.saga'
 import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.saga';
 import watchFetchChains from './components/Chains/chains.saga';
 import watchCreateChain from './components/CreateChain/createChain.saga';
+import watchOauthAccountActions from './components/Accounts/components/OauthAccounts/oauthAccounts.saga';
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
 
@@ -117,7 +119,8 @@ const rootReducer = combineReducers({
   attest: attestReducer,
   verify: verifyReducer,
   download: downloadReducer,
-  createChain: createChainReducer
+  createChain: createChainReducer,
+  oauthAccounts: oauthAccountsReducer
 });
 
 const rootSaga = function* startForeman() {
@@ -148,7 +151,8 @@ const rootSaga = function* startForeman() {
     fork(watchUploadFile),
     fork(watchFetchUpload),
     fork(watchFetchChains),
-    fork(watchCreateChain)
+    fork(watchCreateChain),
+    fork(watchOauthAccountActions),
   ])
 };
 
@@ -164,7 +168,7 @@ const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
 // mount it on the Store
 const store = createStore(rootReducer, process.env.NODE_ENV !== 'production'
   ? composeEnhancers(applyMiddleware(sagaMiddleware, loadingMiddleware)) //
-  : applyMiddleware(sagaMiddleware, loadingMiddleware), );
+  : applyMiddleware(sagaMiddleware, loadingMiddleware));
 
 // then run the saga
 sagaMiddleware.run(rootSaga);
