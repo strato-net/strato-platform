@@ -4,6 +4,7 @@ export const FETCH_OAUTH_ACCOUNT_DETAIL_FAILURE = 'FETCH_OAUTH_ACCOUNT_DETAIL_FA
 export const OAUTH_FAUCET_REQUEST = 'OAUTH_FAUCET_REQUEST';
 export const OAUTH_FAUCET_SUCCESS = 'OAUTH_FAUCET_SUCCESS';
 export const OAUTH_FAUCET_FAILURE = 'OAUTH_FAUCET_FAILURE';
+export const OAUTH_ACCOUNTS_FILTER = 'OAUTH_ACCOUNTS_FILTER';
 
 export const RESET_OAUTH_USER_ACCOUNT = 'RESET_OAUTH_USER_ACCOUNT';
 
@@ -57,3 +58,10 @@ export const oauthFaucetFailure = function (err) {
     err
   }
 }
+
+export const oauthAccountsFilter = function (filter) {
+  return {
+    type: OAUTH_ACCOUNTS_FILTER,
+    filter
+  }
+};

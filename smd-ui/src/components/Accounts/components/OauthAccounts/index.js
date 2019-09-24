@@ -1,20 +1,16 @@
 import React, { Component } from 'react';
-import {
-  changeAccountFilter,
-  fetchUserAddresses,
-  fetchAccountDetail,
-  resetUserAddress,
-  fetchOauthAccounts,
-  faucetRequest
-} from '../../accounts.actions';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import SendTokens from '../SendTokens';
 import AccountDetail from '../../../AccountDetail';
-import { fetchOauthAccountDetail, resetOauthUserAccount } from './oauthAccounts.actions';
+import {
+  fetchOauthAccountDetail,
+  resetOauthUserAccount,
+  oauthAccountsFilter
+} from './oauthAccounts.actions';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 
-class Accounts extends Component {
+class OauthAccounts extends Component {
 
   constructor() {
     super()
@@ -24,7 +20,7 @@ class Accounts extends Component {
   }
 
   updateFilter(filter) {
-    this.props.changeAccountFilter(filter);
+    this.props.oauthAccountsFilter(filter);
   };
 
   onUserClick(user, index) {
@@ -38,37 +34,43 @@ class Accounts extends Component {
   }
 
   render() {
-    // const filter = this.props.filter;
+    const filter = this.props.filter;
     const users = this.props.oauthAccounts;
     const rows = [];
 
-    users.forEach(function (user, index) {
-      const position = index + 1;
-
-      let userClasseName = '';
-      if (this.state.selected === position) {
-        userClasseName = ' selected';
+    users.filter(user => {
+      if (!filter) {
+        return true;
       }
+      return user.username.toLowerCase().indexOf(filter) > -1
+    })
+      .forEach(function (user, index) {
+        const position = index + 1;
 
-      rows.push(
-        <div className="smd-margin-8" key={user.username}>
-          <div className="row">
-            <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {
-              this.setState({ selected: position });
-              this.onUserClick(user, position);
-            }}>
-              {user.username}
+        let userClasseName = '';
+        if (this.state.selected === position) {
+          userClasseName = ' selected';
+        }
+
+        rows.push(
+          <div className="smd-margin-8" key={user.username}>
+            <div className="row">
+              <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {
+                this.setState({ selected: position });
+                this.onUserClick(user, position);
+              }}>
+                {user.username}
+              </div>
             </div>
           </div>
-        </div>
-      );
-    }.bind(this));
+        );
+      }.bind(this));
 
     return (
       <div>
         <div className="row">
           <div className="col-sm-4 text-left">
-            <h3>Oauth Accounts</h3>
+            <h3>Accounts</h3>
           </div>
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">
@@ -120,8 +122,7 @@ class Accounts extends Component {
 export function mapStateToProps(state) {
   return {
     oauthAccounts: state.accounts.oauthAccounts,
-    accounts: state.accounts.accounts,
-    filter: state.accounts.filter,
+    filter: state.oauthAccounts.filter,
     selectedChain: state.chains.selectedChain,
     oauthAccount: state.oauthAccounts.account
   };
@@ -130,13 +131,8 @@ export function mapStateToProps(state) {
 export default withRouter(
   connect(mapStateToProps,
     {
-      fetchAccountDetail,
-      fetchUserAddresses,
-      changeAccountFilter,
-      resetUserAddress,
-      fetchOauthAccounts,
-      faucetRequest,
       fetchOauthAccountDetail,
-      resetOauthUserAccount
+      resetOauthUserAccount,
+      oauthAccountsFilter
     }
-  )(Accounts));
+  )(OauthAccounts));

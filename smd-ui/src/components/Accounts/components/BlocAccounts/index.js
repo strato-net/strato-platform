@@ -82,7 +82,7 @@ class BlocAccounts extends Component {
       <div>
         <div className="row">
           <div className="col-sm-4 text-left">
-            <h3>Bloc Accounts</h3>
+            <h3>Accounts</h3>
           </div>
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">

@@ -5,13 +5,15 @@ import {
   FETCH_OAUTH_ACCOUNT_DETAIL_REQUEST,
   OAUTH_FAUCET_REQUEST,
   OAUTH_FAUCET_SUCCESS,
-  OAUTH_FAUCET_FAILURE
+  OAUTH_FAUCET_FAILURE,
+  OAUTH_ACCOUNTS_FILTER
 } from './oauthAccounts.actions';
 
 const initialState = {
   account: null,
   name: null,
   error: null,
+  filter: '',
   faucet: {
     status: false,
     accountAddress: null
@@ -67,6 +69,11 @@ const reducer = function (state = initialState, action) {
           status: false,
           accountAddress: null
         }
+      }
+    case OAUTH_ACCOUNTS_FILTER:
+      return {
+        ...state,
+        filter: action.filter
       }
     default:
       return state;
