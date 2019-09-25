@@ -1,7 +1,6 @@
 import React, { Component } from 'react';
 import { withRouter, Link } from 'react-router-dom';
 import { connect } from 'react-redux';
-import Cookies from 'js-cookie';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
 import logo from './blockapps-cube-color-430x500.png';
@@ -40,6 +39,7 @@ class MenuBar extends Component {
           {/*<a href={env.STRATO_DOC_URL} target="_blank" rel="noopener noreferrer">*/}
             {/*<button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("strato_docs_click") }}>STRATO API</button>*/}
           {/*</a>*/}
+          {/* TODO: remove public mode and remove logout (unused code) */}
           {this.props.isLoggedIn && <span><span className="pt-navbar-divider" />
             <small className="pt-text-muted welcome-user"> Welcome, {this.props.currentUser.username} </small>
             <span className="pt-navbar-divider" />
@@ -50,7 +50,10 @@ class MenuBar extends Component {
             <small className="pt-text-muted welcome-user"> {this.props.oauthUser ? this.props.oauthUser.username : ''} </small>
             <span className="pt-navbar-divider" />
             <a target="_blank" rel="noopener noreferrer">
-              <button className="pt-button pt-minimal pt-small" onClick={() => { window.location.href = '/auth/logout' }}>Logout</button>
+              <button className="pt-button pt-minimal pt-small" onClick={() => { 
+                localStorage.removeItem('user');
+                window.location.href = '/auth/logout' 
+              }}>Logout</button>
             </a></span>}
         </div>
       );
