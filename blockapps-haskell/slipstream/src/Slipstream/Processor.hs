@@ -336,13 +336,21 @@ parseActions = sortOn withSourceFirst
              . filter matters
              . concatMap (flatten . toAction . BL.fromStrict)
 
+parseEvents :: [B.ByteString] -> [AggregateEvent]
+parseEvents = concatMap (squash . toAction . BL.fromStrict)
+
 processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> LoggingT IO ()
 processTheMessages env conn g messages = do
 
   let changes = parseActions messages
+      events = parseEvents messages
 
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
+
+  case length events of
+   0 -> return()
+   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " events arrived"
 
   case length messages of
    0 -> return ()

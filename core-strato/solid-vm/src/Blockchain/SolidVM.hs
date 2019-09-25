@@ -42,7 +42,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
-import           Blockchain.Data.Event
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.ExtWord
@@ -57,6 +56,7 @@ import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Event
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM

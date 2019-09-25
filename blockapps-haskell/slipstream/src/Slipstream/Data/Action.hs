@@ -20,6 +20,7 @@ import           Control.DeepSeq
 import           Data.Map.Strict         (Map)
 import qualified Data.Map.Strict         as M
 import           Data.Maybe              (fromMaybe,listToMaybe)
+import           Data.Foldable           (toList)
 import           Data.Text               (Text)
 import qualified Data.Text               as T
 import           Data.Time
@@ -27,7 +28,7 @@ import           GHC.Generics
 
 import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
                                                 , CallType(..), CallData(..))
-
+import           Blockchain.Strato.Model.Event
 
 data AggregateAction = AggregateAction
   { actionBlockHash      :: SHA
@@ -43,6 +44,7 @@ data AggregateAction = AggregateAction
   , actionCallData       :: [CallData]
   , actionMetadata       :: Map Text Text
   } deriving (Show, Generic, NFData)
+
 
 flatten :: Action -> [AggregateAction]
 flatten Action{..} = flip map (M.toList _actionData) $
@@ -90,3 +92,31 @@ formatAction AggregateAction{..} = T.concat
   ]
   where tshow :: Show a => a -> Text
         tshow = T.pack . show
+
+
+data AggregateEvent = AggregateEvent
+  { eventBlockHash       :: SHA
+  , eventBlockTimestamp  :: UTCTime
+  , eventBlockNumber      :: Integer
+  , eventTxHash          :: SHA
+  , eventTxChainId       :: Maybe ChainId
+  , eventTxSender        :: Address
+  , eventName            :: Text
+  , eventArgs            :: Text
+  } deriving (Show, Generic, NFData)
+
+
+squash :: Action -> [AggregateEvent]
+squash Action{..} = flip map (toList _actionEvents)
+  (\ev -> AggregateEvent 
+    { eventBlockHash        = _actionBlockHash
+    , eventBlockTimestamp   = _actionBlockTimestamp
+    , eventBlockNumber      = _actionBlockNumber
+    , eventTxHash           = _actionTransactionHash
+    , eventTxChainId        = ChainId <$> _actionTransactionChainId
+    , eventTxSender         = _actionTransactionSender
+    , eventName             = T.pack (evName ev)
+    , eventArgs             = T.intercalate "," $ (map T.pack (evArgs ev))
+    }
+  )
+ 

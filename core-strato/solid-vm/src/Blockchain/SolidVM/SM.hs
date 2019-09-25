@@ -58,7 +58,6 @@ import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
-import           Blockchain.Data.Event
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
@@ -68,6 +67,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
@@ -268,6 +268,7 @@ startingAction maybeCode env' = Action
         Just theCode ->
           Just $ M.insert "src" (T.pack $ BC.unpack theCode) $ fromMaybe M.empty $ Env.metadata env'
         Nothing -> Env.metadata env'
+  , _actionEvents             = S.empty
   }
 
 

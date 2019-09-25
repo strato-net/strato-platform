@@ -9,6 +9,7 @@ import qualified Data.ByteString.Base16 as B16
 import Data.Either
 import qualified Data.Map.Strict as M
 import Data.Time.Clock.POSIX
+import qualified Data.Sequence as S
 import Test.QuickCheck
 import Test.Hspec
 
@@ -29,7 +30,7 @@ emptySolidVMData :: BS.ActionData
 emptySolidVMData = BS.ActionData (SolidVMCode "ContractName" $ SHA 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
 
 emptyAction :: BS.Action
-emptyAction = BS.Action (SHA 0) (posixSecondsToUTCTime 0) 0 (SHA 0) Nothing 0x0 M.empty Nothing
+emptyAction = BS.Action (SHA 0) (posixSecondsToUTCTime 0) 0 (SHA 0) Nothing 0x0 M.empty Nothing S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -134,4 +135,5 @@ spec = describe "Action conversions" $ do
             }]
           }
         , SS._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
+        , SS._actionEvents = S.empty
       })

@@ -12,12 +12,13 @@ import qualified Data.ByteString.Short   as BSS
 import qualified Data.Set                as S
 import           GHC.Generics
 
+import           Blockchain.Strato.Model.Event
+
 import           Blockchain.VM.SolidException
 import           Blockchain.VM.VMException
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.Log
-import           Blockchain.Data.Event
 import           Blockchain.Data.Transaction
 import           Blockchain.SolidVM.Model
 import           Blockchain.VMOptions
