@@ -15,8 +15,8 @@ const path = require('path');
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
-const contractName = 'FiscalFactory';
-const contractFilename = path.join(config.contractsPath,"FiscalFactory.sol");
+const contractName = 'FiscalFactoryEvent';
+const contractFilename = path.join(config.contractsPath,"FiscalFactoryEvent.sol");
 
 let txs = [];
 let txResults = [];
@@ -116,7 +116,7 @@ function factory_createCallList(contractAddress, batchSize, batchIndex, batchCop
     if (batchCopies <= 1) {
       txs.push({
         contractAddress: contractAddress,
-        contractName: 'FiscalFactory',
+        contractName: 'FiscalFactoryEvent',
         methodName: 'createFiscal',
         args: {
             src_countryCode: `src_countryCode_${batchIndex}_${i}`
@@ -150,7 +150,7 @@ function factory_createCallList(contractAddress, batchSize, batchIndex, batchCop
     } else {
       txs.push({
         contractAddress: contractAddress,
-        contractName: 'FiscalFactory',
+        contractName: 'FiscalFactoryEvent',
         methodName: 'generateFiscal',
         args: {
             src_countryCode: `src_countryCode_${batchIndex}_${i}`
