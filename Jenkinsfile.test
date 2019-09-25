@@ -196,6 +196,14 @@ pipeline {
 
     stage('Redeploy with OAuth') {
       steps {
+        dir ('strato-getting-started') {
+          sh 'rm -rf strato_logs*'
+          sh './fetchlogs --as-dir'
+          sh 'rm -rf strato_pipeline_logs'
+          sh 'mkdir strato_pipeline_logs'
+          sh 'mv strato_logs strato_logs_nonoauth'
+          sh 'mv strato_logs_nonoauth strato_pipeline_logs/'
+        }
         sh '''#!/bin/bash -le
           set -x
           cd strato-getting-started
@@ -375,9 +383,11 @@ pipeline {
   post {
     always {
       dir ('strato-getting-started') {
-        sh 'rm -rf strato_logs*'
-        sh './fetchlogs --as-dir'
-        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
+          sh 'rm -rf strato_logs*'
+          sh './fetchlogs --as-dir'
+          sh 'mv strato_logs strato_logs_oauth'
+          sh 'mv strato_logs_oauth strato_pipeline_logs/'
+          archiveArtifacts artifacts: 'strato_pipeline_logs/**', fingerprint: true
       }
     }
 
