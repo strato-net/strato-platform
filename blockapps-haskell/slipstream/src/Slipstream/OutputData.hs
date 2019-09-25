@@ -374,7 +374,7 @@ insertHistoryTableQuery contracts@(x:_) =
 insertEventTableQuery :: [AggregateEvent] -> Text
 insertEventTableQuery evs = 
  let conVals AggregateEvent{..} = wrapAndEscape . map escapeQuotes $
-        [ T.pack . shaToHex $ eventBlockHash
+        [ T.pack . shaToHex $ eventTxHash
         , eventName
         , eventArgs
         ]
