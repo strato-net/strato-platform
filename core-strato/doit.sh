@@ -116,8 +116,12 @@ function newnode {
     "${baFlag}" "${scFlag}" --minLogLevel=$seqMinLogLevel \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
+  if [ "${apiIndexOff}" = true ]; then
+    ioFlag="--api_index_off=${apiIndexOff}"
+  fi
+
   echo "Starting strato-api-indexer"
-  runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
+  runBackgroundProcess strato-api-indexer "${ioFlag}" +RTS -N1 >> logs/strato-api-indexer 2>&1
 
   echo "Starting strato-p2p-indexer"
   runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
@@ -146,7 +150,7 @@ function newnode {
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
+                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" "${ioFlag}"\
                          +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
