@@ -34,6 +34,7 @@ import           BlockApps.Logging
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.SHA
 
+import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Metrics
@@ -368,3 +369,18 @@ insertHistoryTableQuery contracts@(x:_) =
         , inserts
         , "\n  ON CONFLICT DO NOTHING;"
         ]
+
+
+insertEventTableQuery :: [AggregateEvent] -> Text
+insertEventTableQuery evs = 
+ let conVals AggregateEvent{..} = wrapAndEscape . map escapeQuotes $
+        [ T.pack . shaToHex $ eventBlockHash
+        , eventName
+        , eventArgs
+        ]
+   in T.concat
+        [ "INSERT INTO event (transaction_hash, name, args)\n  VALUES "
+        , T.intercalate "," $ map conVals evs
+        , "\n  ON CONFLICT DO NOTHING;"
+        ]
+

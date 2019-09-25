@@ -254,7 +254,7 @@ getStorageItem mTypeHint apt@(AddressedPath loc key) = do
 showSM :: Value -> SM String
 showSM SNULL = return "NULL"
 showSM (SInteger v) = return $ show v
-showSM (SString v) = return $ show v
+showSM (SString v) = return v 
 showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) = return
     $ printf "%s.%s (= %x)" enumName valName num

@@ -83,7 +83,7 @@ main = do
     migrateCirrus  [r|create table if not exists
                       contract (id serial primary key, "codeHash" text, contract text, abi text)|]
     migrateCirrus [r|create table if not exists
-                      events ("txHash" text, "name" text, "args" text)|]
+                      event ("transaction_hash" text, "name" text, "args" text)|]
     migrateCirrus [r|alter table contract add column if not exists "chainId" text|]
 
     -- There are three permanent connections/pools to postgres:

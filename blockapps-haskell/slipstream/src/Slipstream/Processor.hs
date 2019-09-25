@@ -28,10 +28,11 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Short as SB
+import Data.Conduit
 import Data.Either (lefts, rights)
+import Data.Function
 import Data.Int (Int32)
 import Data.IORef
-import Data.Function
 import Data.List (foldl', sortOn)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
@@ -345,13 +346,12 @@ processTheMessages env conn g messages = do
   let changes = parseActions messages
       events = parseEvents messages
 
+
+  outputData conn . yield $ insertEventTableQuery $ events
+
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
-
-  case length events of
-   0 -> return()
-   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " events arrived"
-
+  
   case length messages of
    0 -> return ()
    1 -> $logInfoS "processTheMessages" "1 message has arrived"

@@ -562,4 +562,4 @@ addEvent :: Event -> SM ()
 addEvent newEvent = do
   sstate <- get 
   put sstate { events = events sstate |> newEvent }
-
+  action . actionEvents %= (|> newEvent) 
