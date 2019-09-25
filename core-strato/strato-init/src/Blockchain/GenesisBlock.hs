@@ -233,7 +233,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
        Left err -> error . show $ err
 
 bootstrapIndexer :: SQL.Key BlockDataRef -> OutputBlock -> IO ()
-bootstrapIndexer key obGB  =
+bootstrapIndexer key obGB =
     let clientId = fst ApiIndexer.kafkaClientIds
         consumer = snd ApiIndexer.kafkaClientIds
         topic    = IContext.targetTopicName
