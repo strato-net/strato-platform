@@ -16,14 +16,15 @@ import { env } from '../../../../env.js'
 import { handleErrors } from '../../../../lib/handleErrors';
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress?:chainid";
-const methodUrl = env.BLOC_URL + "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve&:chainid";
+const blocMethodUrl = env.BLOC_URL + "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve&:chainid";
+const transactionUrl = env.STRATO_URL_V23 + "/transaction?resolve=true"
 
 export function getArgs(contractName, contractAddress, symbol, chainId) {
-    const localContractUrl = contractsUrl
-              .replace(':contractName', contractName)
-              .replace(':contractAddress', contractAddress);
+  const localContractUrl = contractsUrl
+    .replace(':contractName', contractName)
+    .replace(':contractAddress', contractAddress);
   return fetch(
-      chainId ? localContractUrl.replace(":chainid", `chainid=${chainId}`) : localContractUrl.replace("?:chainid", ''),
+    chainId ? localContractUrl.replace(":chainid", `chainid=${chainId}`) : localContractUrl.replace("?:chainid", ''),
     {
       method: 'GET',
       credentials: "include",
@@ -41,14 +42,42 @@ export function getArgs(contractName, contractAddress, symbol, chainId) {
 }
 
 export function postMethodCall(payload) {
-  const localMethodUrl = methodUrl
+  const localMethodUrl = blocMethodUrl
     .replace(':username', payload.username)
     .replace(':userAddress', payload.userAddress)
     .replace(":contractName", payload.contractName)
     .replace(":contractAddress", payload.contractAddress);
+  const chainUrl = payload.chainId ? localMethodUrl.replace(":chainid", `chainid=${payload.chainId}`) : localMethodUrl.replace("&:chainid", '');
+
+  const url = env.OAUTH_ENABLED ? transactionUrl : chainUrl;
+
+  const blocBody = {
+    password: payload.password,
+    method: payload.methodName,
+    value: payload.value && !isNaN(parseFloat(payload.value)) ? parseFloat(payload.value) : 0,
+    args: payload.args
+  };
+
+  const oauthBody = {
+    "txs": [
+      {
+        "payload": {
+          "contractName": payload.contractName,
+          "contractAddress": payload.contractAddress,
+          "value": payload.value,
+          "method": payload.methodName,
+          "args": payload.args,
+          "metadata": {}
+        },
+        "type": "FUNCTION"
+      }
+    ]
+  }
+
+  const body = env.OAUTH_ENABLED ? oauthBody : blocBody;
 
   return fetch(
-    payload.chainId ? localMethodUrl.replace(":chainid", `chainid=${payload.chainId}`) : localMethodUrl.replace("&:chainid", ''),
+    url,
     {
       method: 'POST',
       credentials: "include",
@@ -56,12 +85,7 @@ export function postMethodCall(payload) {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        password: payload.password,
-        method: payload.methodName,
-        value: payload.value && !isNaN(parseFloat(payload.value)) ? parseFloat(payload.value) : 0,
-        args: payload.args
-      })
+      body: JSON.stringify(body)
     })
     .then(handleErrors)
     .then(function (response) {
@@ -85,7 +109,7 @@ export function* methodCall(action) {
 
 export function* fetchArgs(action) {
   try {
-      const response = yield call(getArgs, action.name, action.address, action.symbol, action.chainId);
+    const response = yield call(getArgs, action.name, action.address, action.symbol, action.chainId);
     const args = response.xabi.funcs[action.symbol].args;
     yield put(methodCallFetchArgsSuccess(action.key, args));
   }

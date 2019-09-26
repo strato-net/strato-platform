@@ -11,11 +11,10 @@ import {
   methodCallOpenModal,
   methodCallCloseModal
 } from './contractMethodCall.actions';
-import { required } from '../../../../lib/reduxFormsValidations'
 import './contractMethodCall.css';
 import ValueInput from "../../../ValueInput";
-import { isModePublic } from '../../../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
+import { env } from '../../../../env';
 
 class ContractMethodCall extends Component {
 
@@ -27,10 +26,10 @@ class ContractMethodCall extends Component {
       this.props.contractName,
       address,
       this.props.symbolName,
-        this.props.lookup,
-        this.props.chainId
+      this.props.lookup,
+      this.props.chainId
     );
-    !isModePublic() && this.props.fetchAccounts(false, false);
+    !env.OAUTH_ENABLED && this.props.fetchAccounts(false, false);
   }
 
   handleCloseModal = (e) => {
@@ -42,20 +41,19 @@ class ContractMethodCall extends Component {
   }
 
   submit = (values) => {
-
     const payload = {
       contractName: this.props.contractName,
       contractAddress: this.props.contractAddress,
       methodName: this.props.symbolName,
       username: values.modalUsername,
       userAddress: values.modalAddress,
-      password: values.modalPassword,
+      password: env.OAUTH_ENABLED ? '' : values.modalPassword,
       value: values.modalValue,
-      args: Object.getOwnPropertyNames(this.props.modal.args)
+      args: this.props.modal.args ? Object.getOwnPropertyNames(this.props.modal.args)
         .reduce((args, arg) => {
           args[arg] = values[arg];
           return args;
-        }, {}),
+        }, {}) : {},
       chainId: values.chainId
     }
     mixpanelWrapper.track("method_call_submit");
@@ -66,20 +64,19 @@ class ContractMethodCall extends Component {
     this.props.fetchUserAddresses(e.target.value, false)
   }
 
-  renderUsername = (isPublicMode) => {
+  renderUsername = (isOauthEnabled) => {
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    return (<div className={isPublicMode ? "" : "pt-select"}>
+    return (<div className={isOauthEnabled ? "" : "pt-select"}>
       <Field
         className="pt-input"
         name="modalUsername"
         component="select"
         onChange={this.handleUsernameChange}
-        validate={required}
-        disabled={isPublicMode}
+        disabled={isOauthEnabled}
         required
       >
-        <option value={isPublicMode ? this.props.currentUser.username : null}>
-          {isPublicMode && this.props.currentUser.username}
+        <option value={isOauthEnabled ? this.props.oAuthUser.username : null}>
+          {isOauthEnabled && this.props.oAuthUser.username}
         </option>
         {
           users.map((user, i) => {
@@ -92,21 +89,20 @@ class ContractMethodCall extends Component {
     </div>)
   }
 
-  renderAddress = (isPublicMode) => {
+  renderAddress = (isOauthEnabled) => {
     const userAddresses = Object.keys(this.props.accounts).length && this.props.modalUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
       : [];
-    return (<div className={isPublicMode ? "" : "pt-select"}>
+    return (<div className={isOauthEnabled ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="modalAddress"
-        validate={required}
-        disabled={isPublicMode}
+        disabled={isOauthEnabled}
         required
       >
-        <option value={isPublicMode ? this.props.currentUser.accountAddress : null}>
-          {isPublicMode && this.props.currentUser.accountAddress}
+        <option value={isOauthEnabled ? this.props.oAuthUser.address : null}>
+          {isOauthEnabled && this.props.oAuthUser.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -188,7 +184,7 @@ class ContractMethodCall extends Component {
   render() {
     const params = [];
     const handleSubmit = this.props.handleSubmit;
-    const isPublicMode = isModePublic();
+    const isOauthEnabled = env.OAUTH_ENABLED;
 
     if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
       const args = Object.getOwnPropertyNames(this.props.modal.args);
@@ -204,7 +200,6 @@ class ContractMethodCall extends Component {
                 type="text"
                 placeholder={self.props.modal.args[arg].type}
                 className="pt-input"
-                validate={required}
                 required
               />
             </td>
@@ -255,7 +250,7 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9">
-                  {this.renderUsername(isPublicMode)}
+                  {this.renderUsername(isOauthEnabled)}
                 </div>
               </div>
               <div className="row">
@@ -265,10 +260,10 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderAddress(isPublicMode)}
+                  {this.renderAddress(isOauthEnabled)}
                 </div>
               </div>
-              <div className="row">
+              {!env.OAUTH_ENABLED && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
                     Password
@@ -281,11 +276,10 @@ class ContractMethodCall extends Component {
                     placeholder="Password"
                     component="input"
                     type="password"
-                    validate={required}
                     required
                   />
                 </div>
-              </div>
+              </div>}
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
@@ -371,7 +365,8 @@ export function mapStateToProps(state, ownProps) {
     currentUser: state.user.currentUser,
     modalUsername: selector(state, 'modalUsername'),
     chainLabel: state.chains.listChain,
-    chainLabelIds: state.chains.listLabelIds
+    chainLabelIds: state.chains.listLabelIds,
+    oAuthUser: state.user.oauthUser
   };
 }
 
