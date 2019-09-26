@@ -1,4 +1,4 @@
-import { isModePublic } from "../../../../lib/checkMode";
+import { env } from "../../../../env";
 
 export const validate = (values) => {
   const errors = {};
@@ -11,11 +11,15 @@ export const validate = (values) => {
     errors.value = 'Please select a address';
   }
 
-  if (!values.password) {
-    errors.value = 'Please enter a password';
+  if (env.OAUTH_ENABLED && !values.address) {
+    errors.value = "Please enter address"
   }
 
-  if (!isModePublic()) {
+  if (!env.OAUTH_ENABLED) {
+
+    if (!values.password) {
+      errors.value = 'Please enter a password';
+    }
     if (!values.radio && !values.toAddress) {
       errors.value = "Please select address"
     }
@@ -23,6 +27,7 @@ export const validate = (values) => {
     if (values.radio === "0" && !values.toAddress) {
       errors.value = "Please select address"
     }
+
     if (values.radio === "1" && !values.address) {
       errors.value = "Please enter address"
     }

@@ -6,13 +6,6 @@ export const SEND_TOKENS_CLOSE_MODAL = "SEND_TOKENS_CLOSE_MODAL";
 export const FROM_USERNAME_CHANGE = 'FROM_USERNAME_CHANGE';
 export const TO_USERNAME_CHANGE = 'TO_USERNAME_CHANGE';
 
-export const sendTokens = function(payload) {
-  return {
-    ...payload,
-    type : SEND_TOKENS_REQUEST,
-  }
-};
-
 export const fromUsernameChange = function(from) {
   return {
     fromUsername: from,
@@ -24,6 +17,13 @@ export const toUsernameChange = function(to) {
   return {
     toUsername: to,
     type: TO_USERNAME_CHANGE
+  }
+};
+
+export const sendTokens = function(payload) {
+  return {
+    ...payload,
+    type : SEND_TOKENS_REQUEST,
   }
 };
 
