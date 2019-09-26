@@ -25,7 +25,7 @@ export const env = {
   NODE_HOST: node_host,
   OAUTH_ENABLED: oauth_enabled,
   STRATO_URL: `${http_protocol}://${node_host}${strato_uri}`,
-  STRATO_URL_V23: `${http_protocol}://${node_host}${strato_v23_uri}`,
+  STRATO_URL_V23: `${http_protocol}://${node_host}${strato_v23_uri}//`,
   STRATO_DOC_URL: `${http_protocol}://${node_host}${strato_doc_uri}`,
   SOCKET_SERVER: `${ws_protocol}://${node_host}/`,
   POLLING_FREQUENCY: window.POLLING_FREQUENCY && window.POLLING_FREQUENCY !== '__POLLING_FREQUENCY__' ? window.POLLING_FREQUENCY : 5 * 1000,
