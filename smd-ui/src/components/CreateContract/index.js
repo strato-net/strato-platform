@@ -113,8 +113,7 @@ class CreateContract extends Component {
 
   submit = (values) => {
     const args = {};
-    const contractname = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName
-    console.log("--------------------------------------------------------------", this.props.abi);
+    const contractname = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName;
     const abi = this.props.sourceFromEditor ? this.props.sourceFromEditor : this.props.abi.src;
     Object.values(abi).forEach(val => {
       if (val.constr && val.constr.args !== undefined) {
