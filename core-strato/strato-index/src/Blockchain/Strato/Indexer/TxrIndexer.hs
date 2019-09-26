@@ -30,6 +30,7 @@ import qualified Blockchain.Data.EventDB            as EventDB
 import           Blockchain.Data.TransactionDef     (formatChainId)
 import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
+import           Blockchain.ExtWord
 
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
@@ -57,6 +58,27 @@ terminateTopic = hash $ C8.pack "ChainTerminated()"
 logF :: MonadLogger m => [String] -> m ()
 logF = $logInfoS "txrIndexer" . T.pack . concat
 
+doAddMember :: Word256 -> Address -> Enode -> IContextM ()
+doAddMember chainId address enode = do
+  logF [ "Adding member "
+       , format address
+       , " on chain "
+       , formatChainId $ Just chainId
+       ]
+  lift $ addMember chainId address (showEnode enode) -- We only need the Text version for Postgres
+  void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
+  void . withKafkaRetry1s $ writeUnseqEvents [IENewChainMember chainId address enode]
+
+doRemoveMember :: Word256 -> Address -> IContextM ()
+doRemoveMember chainId address = do
+  logF [ "Removing member "
+       , format address
+       , " on chain "
+       , formatChainId $ Just chainId
+       ]
+  lift $ removeMember chainId address
+  void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
+
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
     $logInfoS "txrIndexer" "About to fetch IndexEvents"
@@ -81,24 +103,10 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                     eEnode :: Either SomeException Enode <- liftIO . try . evaluate . force $ readEnode enode' --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
                     case eEnode of
                       Left err -> $logErrorS "txrIndexer" . T.pack $ "failed to parse enode: " ++ show err
-                      Right enode -> do
-                        logF [ "Adding member "
-                             , format address
-                             , " on chain "
-                             , formatChainId $ Just chainId
-                             ]
-                        lift $ addMember chainId address enode' -- We only need the Text version for Postgres
-                        void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
-                        void . withKafkaRetry1s $ writeUnseqEvents [IENewChainMember chainId address enode]
+                      Right enode -> doAddMember chainId address enode
                   Just x | SHA x == removeTopic -> do
                     let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
-                    logF [ "Removing member "
-                         , format address
-                         , " on chain "
-                         , formatChainId $ Just chainId
-                         ]
-                    lift $ removeMember chainId address
-                    void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
+                    doRemoveMember chainId address
                   Just x | SHA x == terminateTopic -> do
                     logF ["Terminating chain ", formatChainId $ Just chainId]
                     lift $ terminateChain chainId
@@ -121,25 +129,10 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                       eNode :: Either SomeException Enode <- liftIO . try . evaluate . force $ readEnode enodeStr --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
                       case eNode of
                         Left err -> $logErrorS "txrIndexer" . T.pack $ "failed to parse enode" ++ show err
-                        Right enode -> do
-                          logF [ "Adding member "
-                               , format address
-                               , " on chain "
-                               , formatChainId $ Just chainId
-                               ]
-                          lift $ addMember chainId address enodeStr
-                          void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
-                          void . withKafkaRetry1s $ writeUnseqEvents [IENewChainMember chainId address enode]
+                        Right enode -> doAddMember chainId address enode
                   ("MemberRemoved", [addressStr]) -> case stringAddress addressStr of
                     Nothing -> $logErrorS "txrIndexer" . T.pack $ "failed to parse address for MemberRemoved event: " ++ addressStr
-                    Just address -> do
-                      logF [ "Removing member "
-                           , format address
-                           , " on chain "
-                           , formatChainId $ Just chainId
-                           ]
-                      lift $ removeMember chainId address
-                      void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
+                    Just address -> doRemoveMember chainId address
                   _ -> return ()
                 void . lift $ EventDB.putEventDB ev
             TxResult r -> do
