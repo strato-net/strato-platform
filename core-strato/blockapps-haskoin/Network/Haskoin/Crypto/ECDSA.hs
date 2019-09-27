@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 -- | ECDSA Signatures
 module Network.Haskoin.Crypto.ECDSA
 ( SecretT
@@ -28,6 +30,8 @@ import Data.Maybe (fromJust, fromMaybe)
 import Data.Binary (Binary, get, put)
 import Data.Binary.Put (putWord8, putByteString)
 import Data.Binary.Get (getWord8)
+import Data.ByteString.Arbitrary (slowRandBs)
+import Data.Data
 
 import qualified Data.ByteString as BS
     ( ByteString
@@ -96,6 +100,9 @@ nextSecret = do
 genPrvKey :: Monad m => SecretT m PrvKey
 genPrvKey = liftM (fromJust . makePrvKey . toInteger) nextSecret
 
+instance Arbitrary PrvKey where
+  arbitrary = withSource slowRandBs genPrvKey
+
 -- Section 3.2.1 http://www.secg.org/download/aid-780/sec1-v2.pdf
 -- Produce a new private/public key pair from the 'SecretT' monad.
 genKeyPair :: Monad m => SecretT m (FieldN, Point)
@@ -112,7 +119,7 @@ data Signature =
     Signature { sigR :: !FieldN
               , sigS :: !FieldN
               }
-    deriving (Read, Show, Eq)
+    deriving (Read, Show, Eq, Data)
 
 instance NFData Signature where
     rnf (Signature r s) = rnf r `seq` rnf s

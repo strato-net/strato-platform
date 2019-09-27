@@ -4,13 +4,18 @@ const Promise = require('bluebird');
 const rp = require('request-promise');
 const env = process.env.NODE_ENV || 'development';
 const moment = require('moment');
-
+const si = require('systeminformation');
+const disk = require('diskusage');
 const config = require('../config/app.config');
+
 const neededJobs = {
     "slipstream_main":"slipstream",
     "strato_p2p":"strato-p2p",
     "vm_main":"vm-runner",
-    "seq_main":"strato-sequencer"
+    "seq_main":"strato-sequencer",
+    "blockapps-vault-wrapper-server":"vault-wrapper",
+    "blockapps-bloc":"bloc",
+    "strato-api":"strato-api"
 }
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -25,7 +30,6 @@ setInterval(async () => {
         winston.error(' Health Status error: ' + err.message);
     }
 }, config.healthCheck.pollFrequency);
-
 
 function queryHealthStatus() {
     return new Promise(async (resolve, _void) => {
@@ -83,7 +87,6 @@ function compareTimeStamp(obj) {
                 winston.warn(`Jobs are updated? The following prometheus job is not in the check list required: `, loc);
             }
 
-            value = formatPromethusTimestamp(elem.value[0]);
             ret[name] = (Math.abs(timeNow - elem.value[0]) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy /1000 ) && (elem.value[1] == 1) ? true : false;
         } else {
             winston.info(`Metric format is updated; need to update its handling`);
@@ -120,24 +123,45 @@ async function updateHealthStat(healthStatus) {
 
 async function updateCurrentHealth(overallStat) {
     let currentTime = Date.now();
-    await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
+    let [systemInfoStatus, systemInfo] = await checkSystemInfo();
+
+    let [stat, created] = await models.CurrentHealth.findOrCreate({where: {processName: 'HealthStat'}, defaults: {
             latestHealthStatus: overallStat[0],
             latestCheckTimestamp: currentTime,
             additionalInfo: overallStat[1].toString(),
             lastFailureTimestamp: currentTime  // default first time marked as failure
-        }}).then(([stat, created]) => {
-        if (!created){
-            stat.update(
-                {latestCheckTimestamp: currentTime,
-                    latestHealthStatus: overallStat[0],
-                    additionalInfo: overallStat[1].toString(),
-                    lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
-                }, {where: {processName: 'HealthStat'}})
-            stat;
         }
-    }).catch(err => {
-        winston.warn(`Error ${err.message ? err.message : ''} occurred while creating and updating tables`);
-    });
+    })
+    if (!created) {
+      await stat.update(
+          {
+            latestCheckTimestamp: currentTime,
+            latestHealthStatus: overallStat[0],
+            additionalInfo: overallStat[1].toString(),
+            lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
+          },
+          {
+            where: {processName: 'HealthStat'}
+          }
+      );
+    }
+    let [statSys, createdSys] = await models.CurrentHealth.findOrCreate({where: {processName: 'SystemInfoStat'}, defaults: {
+          latestHealthStatus: systemInfoStatus,
+          latestCheckTimestamp: currentTime,
+          additionalInfo: JSON.stringify(systemInfo),
+          lastFailureTimestamp: currentTime  // default first time marked as failure
+    }})
+    if (!createdSys){
+      await statSys.update(
+          {latestCheckTimestamp: currentTime,
+            latestHealthStatus: systemInfoStatus,
+            additionalInfo: JSON.stringify(systemInfo),
+            lastFailureTimestamp: systemInfoStatus ? statSys.lastFailureTimestamp : currentTime
+          },
+          {where: {processName: 'SystemInfoStat'}
+          })
+    }
+    return
 }
 
 function formatPromethusTimestamp(timestamp) {
@@ -145,26 +169,110 @@ function formatPromethusTimestamp(timestamp) {
 }
 
 async function checkLatest() {
-  const healthInfo = await models.CurrentHealth.findOne({
-    where: {
-      processName: "HealthStat"
-    },
-    attributes: [
-      'latestHealthStatus',
-      'latestCheckTimestamp',
-      'lastFailureTimestamp'
-    ],
-    raw: true,
-  }).catch(err => next(err));
+  try {
+    const healthInfo = await models.CurrentHealth.findOne({
+      where: {
+        processName: "HealthStat"
+      },
+      attributes: [
+        'latestHealthStatus',
+        'latestCheckTimestamp',
+        'lastFailureTimestamp'
+      ],
+      raw: true,
+    })
 
 
-  const currentTime = Date.now();
-  if (healthInfo) {
-    const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy);
-    if (!nodeUp) {
-      const currentStatus = [false, 'Last Check Not Recent'];
-      await updateCurrentHealth(currentStatus);
+    const currentTime = Date.now();
+    if (healthInfo) {
+      const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy);
+      if (!nodeUp) {
+        const currentStatus = [false, 'Last Check Not Recent'];
+        await updateCurrentHealth(currentStatus);
+      }
     }
+  } catch (e) {
+    winston.warn(`Error ${e.message ? e.message : ''} occurred while checking and comparing the latest health`)
+    const currentStatus = [false, 'Could not calculate the health status'];
+    await updateCurrentHealth(currentStatus);
+  }
+}
+
+
+async function checkSystemInfo() {
+  try {
+    let additional_info = [];
+    let sysInfoCollected = {}
+    let isHealthy = true;
+    const memdata = await si.mem();
+    sysInfoCollected.mem_active = memdata.active;
+    sysInfoCollected.mem_active = memdata.active;
+    sysInfoCollected.mem_free = memdata.free;
+    sysInfoCollected.mem_available = memdata.available;
+
+    if (memdata.available / memdata.total * 100 < config.healthCheck.memoryUsageBound) {
+      isHealthy = false;
+      additional_info.push("Low Memory")
+    }
+    // FIXME: the callback function is async and the response may come late and be unprocessed!
+    // Why checking the disk space with both - `diskspace` and `si` ?? Can we fully remove this faulty `diskspace` code block?
+    disk.check('/', function(err, info) {
+      if (err) {
+        winston.warn("Error when checking for disk usage", err);
+        isHealthy = false;
+        additional_info.push("Could not check disk space")
+      } else {
+        const diskUsageRatio = info.free / info.total *100;
+        sysInfoCollected.disk_usage = diskUsageRatio;
+        if (diskUsageRatio < config.healthCheck.diskUsageBound) {
+          isHealthy = false;
+          additional_info.push("Low Disk Space")
+        }
+      }
+    })
+    const metadataLoad = await si.currentLoad();
+    sysInfoCollected.currentLoad = metadataLoad.currentload;
+
+    const fss = []
+    const metadataFs = await si.fsSize()
+    metadataFs.forEach(function (fs) {
+      const fsDetails = {}
+      fsDetails.name = fs.fs;
+      fsDetails.fsSize = fs.size;
+      fsDetails.fsSize_use = fs.use;
+      fsDetails.fsSize_used = fs.used;
+      fsDetails.fsSize_size = fs.size;
+      fss.push(fsDetails)
+      if ((100 - fsDetails.fsSize_use) <= config.healthCheck.diskUsageBound) {
+        isHealthy = false;
+        additional_info.push(`Low Disk Space on ${fsDetails.name}`)
+      }
+    })
+    sysInfoCollected.fsSize = fss;
+    const metadataFsStat = await si.fsStats()
+    sysInfoCollected.fsStats_rx = metadataFsStat.rx;
+    sysInfoCollected.fsStats_wx = metadataFsStat.wx;
+
+    const nwStats = []
+    const metadataNetwork = await si.networkStats();
+    metadataNetwork.forEach(function (ntStat) {
+      const nsStatDetails = {}
+      nsStatDetails.iface = ntStat.iface;
+      nsStatDetails.networkStats_rx_bytes = ntStat.rx_bytes;
+      nsStatDetails.networkStats_tx_bytes = ntStat.tx_bytes;
+      nwStats.push(nsStatDetails)
+    })
+    sysInfoCollected.networkStats = nwStats;
+
+    if (additional_info) {
+      sysInfoCollected.Alerts = additional_info
+    }
+    winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)
+    return [isHealthy, sysInfoCollected];
+  } catch (e) {
+    winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
+    const currentStatus = [false, ['Error when checking System Information']];
+    await updateCurrentHealth(currentStatus);
   }
 }
 

@@ -27,13 +27,13 @@ dependencies:
   - bytestring
   - generic-random
   - gitrev
+  - haskoin-shim
   - http-api-data
   - http-media
   - lens
   - QuickCheck
   - quickcheck-instances
   - saltine
-  - secp256k1
   - servant
   - servant-server
   - servant-swagger

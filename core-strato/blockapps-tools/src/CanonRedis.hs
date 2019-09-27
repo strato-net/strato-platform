@@ -7,8 +7,7 @@ import           Data.Monoid                           ((<>))
 import           Database.Redis
 
 -- import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
-import           Blockchain.Data.BlockHeader
-import           Blockchain.Strato.Model.Class
+import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB
 import           Blockchain.Strato.RedisBlockDB.Models
@@ -28,8 +27,8 @@ canonRedis ip start range = do
               starts = [start,start+chunkSize..start+range'-1]
           forM_ starts $ \s -> do
             hs <- getCanonicalHeaderChain (fromIntegral $ s) chunkSize
-            let pHash = parentHash . snd . head $ hs
-                pNum  = (number . snd . head $ hs) - 1
+            let pHash = blockDataParentHash . snd $ head hs
+                pNum  = (blockDataNumber . snd . head $ hs) - 1
             parentIsCanon <- isCanonical pHash pNum
             if parentIsCanon
               then validateChainAndLogInvalid hs
@@ -41,15 +40,15 @@ canonRedis ip start range = do
     getBestBlockNumber :: Redis (Maybe Int)
     getBestBlockNumber = ((fromIntegral . bestBlockNumber) <$>) <$>  getBestBlockInfo
 
-    validateChainAndLogInvalid :: [(SHA,BlockHeader)] -> Redis ()
+    validateChainAndLogInvalid :: [(SHA,BlockData)] -> Redis ()
     validateChainAndLogInvalid hs = do
       let b = head hs
           bs = tail hs
       foldM_ validateMethod b bs
 
-    validateMethod :: (SHA,BlockHeader) -> (SHA,BlockHeader) -> Redis (SHA,BlockHeader)
+    validateMethod :: (SHA,BlockData) -> (SHA,BlockData) -> Redis (SHA,BlockData)
     validateMethod prev curr = do
-      if (fst prev == (parentHash . snd $ curr) )
+      if (fst prev == (blockDataParentHash . snd $ curr) )
         then return ()
         else do
           liftIO $ putStrLn "Invalid Parent Header relation."
@@ -60,12 +59,12 @@ canonRedis ip start range = do
     isCanonical :: SHA -> Integer -> Redis Bool
     isCanonical hsh num = (== Just hsh) <$> getCanonical num
 
-    printBlockHeader :: (SHA,BlockHeader) -> IO ()
+    printBlockHeader :: (SHA,BlockData) -> IO ()
     printBlockHeader (sha, h) = do
       putStrLn $ "Number "
-        <> show (blockHeaderBlockNumber h)
+        <> show (blockDataNumber h)
         <> " -- Hash "
-        <>show (shaToHex $ sha)
+        <> show (shaToHex $ sha)
         <> " -- Parent hash "
-        <> show (shaToHex $ blockHeaderParentHash h)
+        <> show (shaToHex $ blockDataParentHash h)
 

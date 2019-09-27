@@ -9,10 +9,6 @@ license: Apache-2.0
 description:
     The client described in the Ethereum Yellowpaper
 
-default-extensions:
-  - DeriveGeneric
-  - DeriveAnyClass
-
 dependencies:
   - base >= 4 && < 5
   - ansi-wl-pprint
@@ -41,6 +37,7 @@ dependencies:
   - merkle-patricia-db
   - monad-alter
   - mtl
+  - nibblestring
   - primitive
   - resourcet
   - strato-model

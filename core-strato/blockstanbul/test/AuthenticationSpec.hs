@@ -63,7 +63,7 @@ spec = do
     it "verifies the signatures" $ do
       let digest = SHA 0x1234
           want = Just . prvKey2Address $ private
-      sig <- commitmentSeal digest private
+          sig = commitmentSeal digest private
       let got = verifyCommitmentSeal digest sig
       got `shouldBe` want
 
@@ -71,8 +71,7 @@ spec = do
     it "verifies the signatures, without including the seals" $ do
       let istExtra = IstanbulExtra testValidators Nothing []
           initialExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
-      sig <- proposerSeal (set extraLens initialExtra testBlock) private
-      let
+          sig = proposerSeal (set extraLens initialExtra testBlock) private
           sealedExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
           sealedBlock = set extraLens sealedExtra testBlock
           got = verifyProposerSeal sealedBlock sig
@@ -136,35 +135,35 @@ spec = do
     it "Rejects a block with a bad proposer's signature" $ do
       let vals = S.singleton 0xdeadbeef
           blk' = addValidators vals testBlock
-      seal <- proposerSeal blk' private
-      let blk = addProposerSeal seal blk'
+          seal = proposerSeal blk' private
+          blk = addProposerSeal seal blk'
           got = replayHistoricBlock vals 39 blk
       got `shouldBe` Left "proposer 80976e7d04c8ae9b3a1c08278a5c385e5b0ff446 not a validator"
 
     it "Rejects a block without commit seals" $ do
       let vals = S.fromList $ map prvKey2Address [private]
           blk' = addValidators vals testBlock
-      seal <- proposerSeal blk' private
-      let blk = addProposerSeal seal blk'
+          seal = proposerSeal blk' private
+          blk = addProposerSeal seal blk'
           got = replayHistoricBlock vals 39 blk
       got `shouldBe` Left "not enough commit seals (have 0 out of 1)"
 
     it "Rejects a block with an unknown seal" $ do
       let vals = S.fromList $ map prvKey2Address [private]
           blk'' = addValidators vals testBlock
-      pSeal <- proposerSeal blk'' private
-      let blk' = addProposerSeal pSeal blk''
-      cSeal <- commitmentSeal (blockHash blk') (head keys)
-      let blk = addCommitmentSeals [cSeal] blk'
+          pSeal = proposerSeal blk'' private
+          blk' = addProposerSeal pSeal blk''
+          cSeal = commitmentSeal (blockHash blk') (head keys)
+          blk = addCommitmentSeals [cSeal] blk'
           got = replayHistoricBlock vals 39 blk
       got `shouldBe` Left "unknown signers: 807da1d7f5286530d0a71a2e87df146b8fefec96"
 
     it "Accepts a block with 1 validator" $ do
       let vals = S.fromList $ map prvKey2Address [private]
           blk'' = addValidators vals testBlock
-      pSeal <- proposerSeal blk'' private
-      let blk' = addProposerSeal pSeal blk''
-      cSeal <- commitmentSeal (blockHash blk') private
-      let blk = addCommitmentSeals [cSeal] blk'
+          pSeal = proposerSeal blk'' private
+          blk' = addProposerSeal pSeal blk''
+          cSeal = commitmentSeal (blockHash blk') private
+          blk = addCommitmentSeals [cSeal] blk'
           got = replayHistoricBlock vals 39 blk
       got `shouldBe` Right (40, S.elemAt 0 vals)

@@ -10,19 +10,23 @@ dependencies:
   - base
   - blockapps-bloc22-api
   - blockapps-bloc22-server
+  - blockapps-init
   - blockapps-strato-api
   - blockapps-strato-client
+  - clock
   - common-log
   - hflags
   - http-client
   - http-types
   - postgresql-simple
+  - prometheus-client
   - resource-pool
   - servant-client
   - servant-options
   - servant-server
   - servant-swagger
   - servant-swagger-ui
+  - text
   - wai
   - wai-cors
   - wai-extra

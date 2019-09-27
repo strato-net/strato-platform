@@ -1,8 +1,6 @@
 {-# LANGUAGE
       OverloadedStrings
-    , DeriveGeneric
     , FlexibleContexts
-    , LambdaCase
     , TemplateHaskell
 #-}
 
@@ -30,6 +28,7 @@ import qualified Network.Kafka.Protocol as K hiding (Message)
 
 import BlockApps.Bloc22.Monad (BlocEnv)
 import BlockApps.Logging
+import Blockchain.MilenaTools
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.Options
@@ -60,17 +59,19 @@ runKafka s k = runExceptT $ evalStateT k s
 
 makeKafkaState :: KafkaClientId -> KafkaAddress -> K.MaxBytes -> KafkaState
 makeKafkaState cid addy maxBytes =
-    KafkaState cid
-               defaultRequiredAcks
-               defaultRequestTimeout
-               defaultMinBytes
-               maxBytes
-               defaultMaxWaitTime
-               defaultCorrelationId
-               M.empty
-               M.empty
-               M.empty
-               (addy NE.:| [])
+  let waitTime = 100000 -- 100s
+      minBytes = 1      -- Awaken from sleep only if there is at least one message
+  in KafkaState cid
+                defaultRequiredAcks
+                defaultRequestTimeout
+                minBytes
+                maxBytes
+                waitTime
+                defaultCorrelationId
+                M.empty
+                M.empty
+                M.empty
+                (addy NE.:| [])
 
 mkConfiguredKafkaState :: KafkaClientId -> K.MaxBytes -> KafkaState
 mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
@@ -80,6 +81,37 @@ mkConfiguredKafkaState cid = makeKafkaState cid (kh, kp)
 
 lookupTopic :: K.TopicName
 lookupTopic = fromString "statediff"
+
+lookupPartition :: K.Partition
+lookupPartition = K.Partition 0
+
+lookupGroup :: K.ConsumerGroup
+lookupGroup = "slipstream"
+
+getStatediffOffset :: SlipKafka K.Offset
+getStatediffOffset = do
+  resp <- fetchSingleOffset lookupGroup lookupTopic lookupPartition
+  $logDebugLS "getStateDiffOffset/resp" resp
+  case resp of
+    Left K.UnknownTopicOrPartition -> do
+      $logInfoS "getStatediffOffset" "No offset found, creating one from 0"
+      putStatediffOffset 0 >> getStatediffOffset
+    Left err -> do
+      $logErrorLS "getStatediffOffset" err
+      error $ show err
+    Right (off, _) -> return off
+
+putStatediffOffset :: K.Offset -> SlipKafka ()
+putStatediffOffset off = do
+    $logInfoLS "putStateDiffOffset/req" off
+    resp <- commitSingleOffset lookupGroup lookupTopic lookupPartition off ""
+    $logDebugLS "putStateDiffOffset/resp" resp
+    case resp of
+      Left err -> do
+        $logErrorLS "putStatediffOffset" err
+        error $ show err
+      Right () -> return ()
+
 
 getTheMessages :: K.Offset -> SlipKafka [B.ByteString]
 getTheMessages offset = do
@@ -102,20 +134,37 @@ getTheMessages offset = do
               Left e -> error $ "getTheMessages: " ++ e
               Right bs -> bs
 
-getAndProcessMessages :: BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
-getAndProcessMessages env conn cache offset errorCounter = do
+getAndProcessMessages :: BlocEnv -> PGConnection -> IORef Globals -> SlipKafka ()
+getAndProcessMessages env conn cache = do
+  let errorCount = 0
+  offset <- getStatediffOffset
+  getAndProcessMessages' env conn cache offset errorCount
+
+getAndProcessMessages' :: BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
+getAndProcessMessages' env conn cache offset errorCounter = do
+  recordOffset offset
   eMessages <- try $ getTheMessages offset
   case eMessages of
     Left e -> do
-      liftIO $ threadDelay 1000000
       $logErrorLS "getTheMessages" (e :: KafkaClientError)
+      liftIO $ threadDelay 1000000
       if (errorCounter > exceptionMaxCount )
            then error $ "Slipstream reached exceptionMaxCount."
-           else getAndProcessMessages env conn cache offset (errorCounter + 1)
+           else getAndProcessMessages' env conn cache offset (errorCounter + 1)
     Right messages -> do
+      $logDebugLS "getAndProcessMessages'" messages
       recordKafkaMessages messages
       forceGlobalEval cache
       lift . lift $ processTheMessages env conn cache messages
-      when (null messages) $
-        liftIO $ threadDelay 1000000
-      getAndProcessMessages env conn cache (offset + fromIntegral (length messages)) errorCounter
+      let newOffset = offset + fromIntegral (length messages)
+      currentOffset <- getStatediffOffset
+      offset' <- if currentOffset /= offset
+                    then do
+                      $logInfoLS "getAndProcessMessages'/manual_offset" currentOffset
+                      recordOffsetOverride
+                      return currentOffset
+                    else do
+                      putStatediffOffset newOffset
+                      return newOffset
+
+      getAndProcessMessages' env conn cache offset' errorCounter

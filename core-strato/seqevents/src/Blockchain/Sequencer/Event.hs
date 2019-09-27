@@ -1,14 +1,16 @@
-{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 module Blockchain.Sequencer.Event where
 
 import           Control.DeepSeq
+import           Data.Aeson                                hiding (encode)
 import           Data.Binary
+import           Data.Data
+import           Data.Functor.Identity
 import           Data.List                                 (intercalate)
-import           Data.Maybe                                (fromJust)
+import           Data.Maybe                                (fromJust, isNothing)
 import           Data.DeriveTH
 import           Test.QuickCheck
 
@@ -18,6 +20,7 @@ import qualified Blockchain.Data.BlockDB                   as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
+import           Blockchain.Data.Json
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO
@@ -41,6 +44,53 @@ import           Blockchain.Sequencer.BinaryInstances      ()
 import qualified Text.Colors                               as CL
 import           Text.Format
 
+data AnchorChain = Public
+                 | UnknownPrivate       -- TODO: It's possible these two aren't needed,
+                 | KnownPrivate Word256 --       but I'm leaving them in for now.
+                 | AnchoredPrivate Word256
+                 deriving (Eq, Ord, Show, Read, GHCG.Generic, NFData, Data, ToJSON, FromJSON)
+
+getAnchorChain :: (Monad m, TransactionLike t) => (SHA -> m (Maybe Word256)) -> t -> m AnchorChain
+getAnchorChain f tx =
+  if txType tx == PrivateHash
+    then f (txChainHash tx) >>= \case
+      Just anchor -> return $ AnchoredPrivate anchor
+      Nothing -> return UnknownPrivate
+    else return . maybe Public KnownPrivate $ txChainId tx
+
+getAnchorChainUnanchored :: TransactionLike t => t -> AnchorChain
+getAnchorChainUnanchored = runIdentity . getAnchorChain (const (Identity Nothing))
+
+isAnchored :: AnchorChain -> Bool
+isAnchored Public              = True
+isAnchored (AnchoredPrivate _) = True
+isAnchored _                   = False
+
+isAnchoredPrivate :: AnchorChain -> Bool
+isAnchoredPrivate (AnchoredPrivate _) = True
+isAnchoredPrivate _                   = False
+
+-- Transactions that are anchored (Public or AnchoredPrivate), and the anchors are correct
+isAnchoredCorrectly :: TransactionLike t => AnchorChain -> t -> Bool
+isAnchoredCorrectly Public                tx = isNothing (txChainId tx) && (txType tx /= PrivateHash)
+isAnchoredCorrectly (AnchoredPrivate cId) tx = txChainId tx == Just cId
+isAnchoredCorrectly _                     _  = False
+
+-- Transactions that may or may not be anchored, but that status matches the transaction payload
+hasCorrectAnchor :: TransactionLike t => AnchorChain -> t -> Bool
+hasCorrectAnchor Public                tx = isNothing (txChainId tx) && (txType tx /= PrivateHash)
+hasCorrectAnchor (AnchoredPrivate cId) tx = txChainId tx == Just cId
+hasCorrectAnchor UnknownPrivate        tx = txType tx == PrivateHash
+hasCorrectAnchor _                     _  = False
+
+fromAnchorChain :: AnchorChain -> Maybe Word256
+fromAnchorChain (AnchoredPrivate cId) = Just cId
+fromAnchorChain _                     = Nothing
+
+filterAnchoredTxs :: OutputBlock -> OutputBlock
+filterAnchoredTxs ob = ob{obReceiptTransactions = filter f (obReceiptTransactions ob)}
+  where f otx = hasCorrectAnchor (otAnchorChain otx) otx
+
 data SeqLoopEvent = TimerFire PBFT.RoundNumber
                   | VoteMade PBFT.CandidateReceived
                   | UnseqEvent IngestEvent
@@ -59,7 +109,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IENewChainMember Word256 A.Address Enode
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
-                 deriving (Eq, Show, GHCG.Generic)
+                 deriving (Eq, Show, GHCG.Generic, Data)
 
 data IngestEventType = IETTransaction
                      | IETBlock
@@ -90,17 +140,17 @@ type Timestamp = Microtime
 
 data IngestTx = IngestTx { itOrigin      :: TO.TXOrigin
                          , itTransaction :: TX.Transaction
-                         } deriving (Eq, Read, Show, GHCG.Generic)
+                         } deriving (Eq, Read, Show, GHCG.Generic, Data)
 
 data IngestBlock = IngestBlock { ibOrigin              :: TO.TXOrigin
                                , ibBlockData           :: DD.BlockData
                                , ibReceiptTransactions :: [TX.Transaction]
                                , ibBlockUncles         :: [DD.BlockData]
-                               } deriving (Eq, Read, Show, GHCG.Generic)
+                               } deriving (Eq, Read, Show, GHCG.Generic, Data)
 
 data IngestGenesis = IngestGenesis { igOrigin          :: TO.TXOrigin
                                    , igGenesisInfo     :: (Word256, ChainInfo)
-                                   } deriving (Eq, Show, GHCG.Generic)
+                                   } deriving (Eq, Show, GHCG.Generic, Data)
 
 data SequencedBlock = SequencedBlock { sbOrigin              :: TO.TXOrigin
                                      , sbHash                :: SHA
@@ -115,50 +165,95 @@ data JsonRpcCommand
     | JRCGetTransactionCount { jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String }
     | JRCGetStorageAt { jrcAddress :: A.Address, jrcKey :: BS.ByteString, jrcId :: String, jrcBlockString :: String }
     | JRCCall { jrcCode :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
-    deriving (Eq, Read, Show, GHCG.Generic)
+    deriving (Eq, Read, Show, GHCG.Generic, Data)
 
-data OutputEvent = OETx Timestamp OutputTx
-                 | OEBlock OutputBlock
-                 | OEGenesis OutputGenesis
-                 | OEJsonRpcCommand JsonRpcCommand
-                 | OEGetChain [Word256]
-                 | OEGetTx [SHA]
-                 | OENewChainMember Word256 A.Address Enode
-                 | OEBlockstanbul PBFT.WireMessage
-                 | OECreateBlockCommand
-                 -- Ask and push for inclusive ranges of blocks
-                 | OEAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
-                 | OEPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
-                 | OEVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
-                 deriving (Eq, Show, GHCG.Generic)
+data P2pEvent =
+    P2pTx OutputTx
+  | P2pBlock OutputBlock
+  | P2pGenesis OutputGenesis
+  | P2pGetChain [Word256]
+  | P2pGetTx [SHA]
+  | P2pNewChainMember Word256 A.Address Enode
+  | P2pBlockstanbul PBFT.WireMessage
+  -- Ask and push for inclusive ranges of blocks
+  | P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
+  | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
+  deriving (Eq, Show, GHCG.Generic, Data)
 
-instance Format OutputEvent where
-  format (OETx ts o)              = show ts ++ " " ++ format o
-  format (OEBlock o)              = format o
-  format (OEGenesis o)            = show o
-  format (OEGetChain cids)        = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
-  format (OEGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format (OENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
-  format (OEBlockstanbul o)       = format o
-  format x                        = show x
+instance Format P2pEvent where
+  format (P2pTx o)                 = format o
+  format (P2pBlock o)              = format o
+  format (P2pGenesis o)            = show o
+  format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
+  format (P2pNewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
+  format (P2pBlockstanbul o)       = format o
+  format x                          = show x
 
-data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
-                         , otHash   :: SHA
-                         , otSigner :: A.Address
-                         , otBaseTx :: TX.Transaction
-                         } deriving (Eq, Read, Show, GHCG.Generic)
-instance NFData OutputTx
+data VmEvent =
+    VmTx Timestamp OutputTx
+  | VmBlock OutputBlock
+  | VmGenesis OutputGenesis
+  | VmJsonRpcCommand JsonRpcCommand
+  | VmCreateBlockCommand
+  | VmVoteToMake { voteRecipient :: A.Address, voteVotingDir :: Bool, voteSender :: A.Address }
+  | VmPrivateTx OutputTx
+  deriving (Eq, Show, GHCG.Generic, Data)
+
+instance Format VmEvent where
+  format (VmTx ts o)              = show ts ++ " " ++ format o
+  format (VmBlock o)              = format o
+  format (VmGenesis o)            = show o
+  format x                          = show x
+
+data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
+                         , otHash        :: SHA
+                         , otSigner      :: A.Address
+                         , otAnchorChain :: AnchorChain
+                         , otBaseTx      :: TX.Transaction
+                         } deriving (Eq, Read, Show, GHCG.Generic, NFData, Data)
+
+data OutputTx' = OutputTx' { ot'Origin      :: TO.TXOrigin
+                           , ot'Hash        :: SHA
+                           , ot'Signer      :: A.Address
+                           , ot'AnchorChain :: AnchorChain
+                           , ot'BaseTx      :: Transaction'
+                           } deriving (Eq, Show, GHCG.Generic)
+
+otxToOtxPrime :: OutputTx -> OutputTx'
+otxToOtxPrime (OutputTx o h s a b) = (OutputTx' o h s a (Transaction' b))
+
+otxPrimeToOtx :: OutputTx' -> OutputTx
+otxPrimeToOtx (OutputTx' o h s a (Transaction' b)) = OutputTx o h s a b
 
 data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
                                , obTotalDifficulty     :: Integer
                                , obBlockData           :: DD.BlockData
                                , obReceiptTransactions :: [OutputTx]
                                , obBlockUncles         :: [DD.BlockData]
-                               } deriving (Eq, Read, Show, GHCG.Generic)
+                               } deriving (Eq, Read, Show, GHCG.Generic, Data)
+
+data OutputBlock' = OutputBlock' { ob'Origin              :: TO.TXOrigin
+                                 , ob'TotalDifficulty     :: Integer
+                                 , ob'BlockData           :: BlockData'
+                                 , ob'ReceiptTransactions :: [OutputTx']
+                                 , ob'BlockUncles         :: [BlockData']
+                                 } deriving (Eq, Show, GHCG.Generic)
+
+obToObPrime :: OutputBlock -> OutputBlock'
+obToObPrime (OutputBlock o td bd rt bu) =
+  OutputBlock' o td (BlockData' bd)
+                    (otxToOtxPrime <$> rt)
+                    (BlockData' <$> bu)
+
+obPrimeToOb :: OutputBlock' -> OutputBlock
+obPrimeToOb (OutputBlock' o td (BlockData' bd) rt bu) =
+  OutputBlock o td bd (otxPrimeToOtx <$> rt)
+                      ((\(BlockData' b) -> b) <$> bu)
 
 data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
                                    , ogGenesisInfo     :: (Word256, ChainInfo)
-                                   } deriving (Eq, Show, GHCG.Generic)
+                                   } deriving (Eq, Show, GHCG.Generic, Data)
 
 ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
 ingestGenesisToOutputGenesis (IngestGenesis o g) = OutputGenesis o g
@@ -171,17 +266,19 @@ ingestBlockToBlock :: IngestBlock -> BDB.Block
 ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBlockUncles = us} =
     BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us}
 
-ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
-ingestBlockToSequencedBlock ib =
-    let theHash = (BDB.blockHeaderHash . ibBlockData $ ib)
-            in case sequence $ wrapIngestBlockTransaction theHash <$> ibReceiptTransactions ib of
-                Nothing -> Nothing
-                Just outputTxs -> Just SequencedBlock { sbOrigin              = ibOrigin ib
-                                                      , sbHash                = theHash
-                                                      , sbBlockData           = ibBlockData ib
-                                                      , sbReceiptTransactions = outputTxs
-                                                      , sbBlockUncles         = ibBlockUncles ib
-                                                      }
+ingestBlockToSequencedBlock :: Monad m => (SHA -> m (Maybe Word256)) -> IngestBlock -> m (Maybe SequencedBlock)
+ingestBlockToSequencedBlock f ib = do
+  let theHash = (BDB.blockHeaderHash . ibBlockData $ ib)
+  otxs <- traverse (wrapIngestBlockTransaction f theHash) $ ibReceiptTransactions ib
+  return $ case sequence otxs of
+    Nothing -> Nothing
+    Just outputTxs -> Just SequencedBlock
+      { sbOrigin              = ibOrigin ib
+      , sbHash                = theHash
+      , sbBlockData           = ibBlockData ib
+      , sbReceiptTransactions = outputTxs
+      , sbBlockUncles         = ibBlockUncles ib
+      }
 
 sequencedBlockToOutputBlock :: SequencedBlock -> Integer -> OutputBlock
 sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin              = sbOrigin sb
@@ -202,25 +299,63 @@ sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
     "Block #" ++ CL.yellow(show . DD.blockDataNumber $ d) ++ "/" ++ CL.blue(format theHash)
 
-wrapTransaction :: IngestTx -> Maybe OutputTx
-wrapTransaction tx@IngestTx{} =
-    let baseTx = itTransaction tx in case TX.whoSignedThisTransaction baseTx of
-            Nothing -> Nothing
-            Just signer -> Just OutputTx { otOrigin = itOrigin tx
-                                         , otHash   = TX.transactionHash baseTx
-                                         , otSigner = signer
-                                         , otBaseTx = baseTx
-                                         }
+wrapTransaction :: Monad m => (SHA -> m (Maybe Word256)) -> IngestTx -> m (Maybe OutputTx)
+wrapTransaction f tx@IngestTx{} = do
+  let baseTx = itTransaction tx
+  case TX.whoSignedThisTransaction baseTx of
+    Nothing -> return Nothing
+    Just signer -> do
+      anchor <- getAnchorChain f baseTx
+      return $ Just OutputTx
+        { otOrigin = itOrigin tx
+        , otHash   = TX.transactionHash baseTx
+        , otSigner = signer
+        , otAnchorChain = anchor
+        , otBaseTx = baseTx
+        }
 
-wrapIngestBlockTransaction :: SHA -> TX.Transaction -> Maybe OutputTx
-wrapIngestBlockTransaction hash tx =
-    case TX.whoSignedThisTransaction tx of
+wrapTransactionUnanchored :: IngestTx -> Maybe OutputTx
+wrapTransactionUnanchored tx@IngestTx{} =
+  let baseTx = itTransaction tx
+   in case TX.whoSignedThisTransaction baseTx of
         Nothing -> Nothing
-        Just signer -> Just OutputTx { otOrigin = TO.BlockHash hash
-                                     , otSigner = signer
-                                     , otBaseTx = tx
-                                     , otHash   = TX.transactionHash tx
-                                     }
+        Just signer ->
+          let anchor = getAnchorChainUnanchored baseTx
+           in Just OutputTx
+                { otOrigin = itOrigin tx
+                , otHash   = TX.transactionHash baseTx
+                , otSigner = signer
+                , otAnchorChain = anchor
+                , otBaseTx = baseTx
+                }
+
+wrapIngestBlockTransaction :: Monad m => (SHA -> m (Maybe Word256)) -> SHA -> TX.Transaction -> m (Maybe OutputTx)
+wrapIngestBlockTransaction f hash tx =
+  case TX.whoSignedThisTransaction tx of
+    Nothing -> return Nothing
+    Just signer -> do
+      anchor <- getAnchorChain f tx
+      return $ Just OutputTx
+        { otOrigin = TO.BlockHash hash
+        , otSigner = signer
+        , otBaseTx = tx
+        , otAnchorChain = anchor
+        , otHash   = TX.transactionHash tx
+        }
+
+wrapIngestBlockTransactionUnanchored :: SHA -> TX.Transaction -> Maybe OutputTx
+wrapIngestBlockTransactionUnanchored hash tx =
+  case TX.whoSignedThisTransaction tx of
+    Nothing -> Nothing
+    Just signer ->
+      let anchor = getAnchorChainUnanchored tx
+       in Just OutputTx
+            { otOrigin = TO.BlockHash hash
+            , otSigner = signer
+            , otBaseTx = tx
+            , otAnchorChain = anchor
+            , otHash   = TX.transactionHash tx
+            }
 
 parentHashBS :: SequencedBlock -> BS.ByteString
 parentHashBS = B.toStrict . encode . DD.blockDataParentHash . sbBlockData
@@ -247,20 +382,26 @@ outputBlockToBlock :: OutputBlock -> Block
 outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}=
     BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions=otBaseTx <$> txs, BDB.blockBlockUncles=us}
 
-quarryBlockToOutputBlock :: BDB.Block -> OutputBlock
-quarryBlockToOutputBlock BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
-    OutputBlock { obOrigin              = TO.Quarry
-                , obBlockData           = bd
-                , obBlockUncles         = us
-                , obReceiptTransactions = wrapQuarryReceipt <$> txs
-                , obTotalDifficulty     = 0
-                }
+quarryBlockToOutputBlock :: Monad m => (SHA -> m (Maybe Word256)) -> BDB.Block -> m OutputBlock
+quarryBlockToOutputBlock f BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} = do
+  rtxs <- mapM wrapQuarryReceipt txs
+  return OutputBlock
+    { obOrigin              = TO.Quarry
+    , obBlockData           = bd
+    , obBlockUncles         = us
+    , obReceiptTransactions = rtxs
+    , obTotalDifficulty     = 0
+    }
 
-    where wrapQuarryReceipt t = OutputTx { otOrigin = TO.Quarry
-                                         , otBaseTx = t
-                                         , otSigner = fromJust . TX.whoSignedThisTransaction $ t
-                                         , otHash   = TX.transactionHash t
-                                         }
+    where wrapQuarryReceipt t = do
+            anchor <- getAnchorChain f t
+            return OutputTx
+              { otOrigin = TO.Quarry
+              , otBaseTx = t
+              , otSigner = fromJust . TX.whoSignedThisTransaction $ t
+              , otAnchorChain = anchor
+              , otHash   = TX.transactionHash t
+              }
 
 instance Witnessable IngestTx where
     witnessableHash = TX.partialTransactionHash . itTransaction
@@ -277,6 +418,7 @@ instance Eq SequencedBlock where
 instance Ord OutputTx where
     compare OutputTx{otHash = hA} OutputTx{otHash = hB} = compare hA hB
 
+instance Binary AnchorChain where
 instance Binary IngestTx where
 instance Binary IngestBlock where
 instance Binary IngestGenesis where
@@ -284,81 +426,10 @@ instance Binary SequencedBlock where
 instance Binary OutputTx where
 instance Binary OutputBlock where
 instance Binary OutputGenesis where
-
 instance Binary IngestEvent where
-    -- put (IETx t)    = putWord8 0 >> put t -- legacy IETx
-    put (IETx ts t) = putWord8 2 >> put ts >> put t
-    put (IEBlock b) = putWord8 1 >> put b
-    put (IEGenesis g) = putWord8 3 >> put g
-    put (IEBlockstanbul m) = putWord8 4 >> put m
-    put (IENewChainMember c a e) = putWord8 5 >> put c >> put a >> put e
-    put (IEForcedConfigChange cc) = putWord8 6 >> put cc
-    get = do
-        tag <- getWord8
-        case tag of
-            0 -> IETx 0 <$> get -- legacy IETx
-            1 -> IEBlock  <$> get
-            2 -> IETx <$> get <*> get
-            3 -> IEGenesis <$> get
-            4 -> IEBlockstanbul <$> get
-            5 -> IENewChainMember <$> get <*> get <*> get
-            6 -> IEForcedConfigChange <$> get
-            x -> error $ "unknown InputEvent tag " ++ show x
-
 instance Binary JsonRpcCommand where
-  put JRCGetBalance{jrcAddress=a, jrcId=i, jrcBlockString=b} =
-    putWord8 0 >> put a >> put i >> put b
-  put JRCGetCode{jrcAddress=a, jrcId=i, jrcBlockString=b} =
-    putWord8 1 >> put a >> put i >> put b
-  put JRCGetTransactionCount {jrcAddress=a, jrcId=i, jrcBlockString=b} =
-    putWord8 2 >> put a >> put i >> put b
-  put JRCGetStorageAt {jrcAddress=a, jrcKey=k, jrcId=i, jrcBlockString=b} =
-    putWord8 3 >> put a >> put k >> put i >> put b
-  put JRCCall{jrcCode=c,jrcId=i,jrcBlockString=b} =
-    putWord8 4 >> put c >> put i >> put b
-  get = do
-        tag <- getWord8
-        case tag of
-            0 -> JRCGetBalance <$> get <*> get <*> get
-            1 -> JRCGetCode <$> get <*> get <*> get
-            2 -> JRCGetTransactionCount <$> get <*> get <*> get
-            3 -> JRCGetStorageAt <$> get <*> get <*> get <*> get
-            4 -> JRCCall <$> get <*> get <*> get
-            x -> error $ "unknown JsonRpcCommand tag " ++ show x
-
-instance Binary OutputEvent where
-    -- Reserved tags: 0, 9, 10
-    put (OETx ts t)          = putWord8 3 >> put ts >> put t
-    put (OEBlock b)          = putWord8 1 >> put b
-    put (OEJsonRpcCommand c) = putWord8 2 >> put c
-    put (OEGenesis g)        = putWord8 4 >> put g
-    put (OEGetChain cid)     = putWord8 5 >> put cid
-    put (OEGetTx tx)         = putWord8 6 >> put tx
-    put (OEBlockstanbul m)   = putWord8 7 >> put m
-    put (OECreateBlockCommand) = putWord8 8
-    put (OEAskForBlocks s e p) = putWord8 11 >> put s >> put e >> put p
-    put (OEPushBlocks s e p) = putWord8 12 >> put s >> put e >> put p
-    put (OENewChainMember c a e) = putWord8 13 >> put c >> put a >> put e
-    put (OEVoteToMake r d s) = putWord8 14 >> put r >> put d >> put s
-    get = do
-        tag <- getWord8
-        case tag of
-            0 -> OETx 0 <$> get -- legacy OETx
-            1 -> OEBlock <$> get
-            2 -> OEJsonRpcCommand <$> get
-            3 -> OETx <$> get <*> get
-            4 -> OEGenesis <$> get
-            5 -> OEGetChain <$> get
-            6 -> OEGetTx <$> get
-            7 -> OEBlockstanbul <$> get
-            8 -> pure OECreateBlockCommand
-            9 -> OEAskForBlocks <$> get <*> get <*> pure 0x0 -- legacy OEAFB
-            10 -> OEPushBlocks <$> get <*> get <*> pure 0x0 -- legacy OEPB
-            11 -> OEAskForBlocks <$> get <*> get <*> get
-            12 -> OEPushBlocks <$> get <*> get <*> get
-            13 -> OENewChainMember <$> get <*> get <*> get
-            14 -> OEVoteToMake <$> get <*> get <*> get
-            x -> error $ "unknown OutputEvent tag " ++ show x
+instance Binary P2pEvent where
+instance Binary VmEvent where
 
 instance Format IngestBlock where
     format b@IngestBlock { ibOrigin              = origin
@@ -396,9 +467,10 @@ instance Format OutputBlock where
 instance Format OutputTx where
     format OutputTx{ otOrigin = origin
                    , otSigner = signer
+                   , otAnchorChain = anchor
                    , otBaseTx = base
                    } =
-           CL.red("OutputTx from address " ++ format signer)
+           CL.red("OutputTx from address " ++ format signer ++ " on chain " ++ show anchor)
                 ++ tab (" via " ++ format origin ++ "\n" ++ format (txHash base))
 
 instance Format IngestTx where
@@ -429,10 +501,12 @@ instance TransactionLike OutputTx where
     txData        = txData . otBaseTx
     txChainId     = txChainId . otBaseTx
     txMetadata    = txMetadata . otBaseTx
+    txAnchorChain = fromAnchorChain . otAnchorChain
 
     morphTx t = OutputTx { otOrigin = TO.Direct -- todo: introduce a "morph" conversion?
                          , otHash   = txHash t
                          , otSigner = fromJust (txSigner t) -- todo: D A N G E R
+                         , otAnchorChain = runIdentity $ getAnchorChain (const (Identity Nothing)) t
                          , otBaseTx = morphTx t
                          }
 
@@ -448,15 +522,22 @@ instance BlockLike DD.BlockData OutputTx OutputBlock where
     blockOrdering = DD.blockDataNumber . obBlockData
     buildBlock = OutputBlock TO.Morphism 0
 
+derive makeArbitrary ''AnchorChain
 derive makeArbitrary ''IngestEvent
 derive makeArbitrary ''IngestTx
 derive makeArbitrary ''IngestBlock
 derive makeArbitrary ''IngestGenesis
 derive makeArbitrary ''SequencedBlock
-derive makeArbitrary ''OutputEvent
+derive makeArbitrary ''P2pEvent
+derive makeArbitrary ''VmEvent
 derive makeArbitrary ''OutputTx
 derive makeArbitrary ''OutputBlock
 derive makeArbitrary ''OutputGenesis
+
+instance ToJSON OutputBlock' where
+instance FromJSON OutputBlock' where
+instance ToJSON OutputTx' where
+instance FromJSON OutputTx' where
 
 -- just end me fam
 instance Arbitrary JsonRpcCommand where

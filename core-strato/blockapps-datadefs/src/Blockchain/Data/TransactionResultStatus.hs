@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -21,7 +19,8 @@ data TransactionResultStatus = Success
                                        }
                              deriving (Eq, Read, Show, Generic, NFData)
 
-data TransactionFailureType = IncorrectNonce
+data TransactionFailureType = IncorrectChainId
+                            | IncorrectNonce
                             | InsufficientFunds
                             | IntrinsicGasExceedsLimit
                             | TrumpedByMoreLucrative

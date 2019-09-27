@@ -54,3 +54,6 @@ scrubCommitmentSeals :: RawExtraData -> RawExtraData
 scrubCommitmentSeals = uncookRawExtra
                      . set (istanbul . _Just . commitment) []
                      . cookRawExtra
+
+scrubConsensus :: RawExtraData -> RawExtraData
+scrubConsensus = B.take 32

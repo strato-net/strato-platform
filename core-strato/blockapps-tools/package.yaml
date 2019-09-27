@@ -12,26 +12,38 @@ description:
 
 dependencies:
   - base >= 4 && < 5
+  - aeson
   - ansi-wl-pprint
   - base16-bytestring
+  - base64-bytestring
   - binary
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
   - blockapps-mpdbs
+  - blockapps-privacy
   - blockapps-util
+  - blockstanbul
   - bytestring
   - cmdargs
+  - common-log
+  - conduit
   - data-default
+  - ethereum-discovery
+  - ethereum-encryption
   - ethereum-rlp
   - filepath
   - format
+  - hflags
+  - lens
   - leveldb-haskell
+  - memory
   - merkle-patricia-db
   - monad-alter
   - blockapps-milena
   - monad-loops
   - nibblestring
+  - persistent
   - persistent-postgresql
   - resourcet
   - time
@@ -40,8 +52,13 @@ dependencies:
   - strato-index
   - strato-redis-blockdb
   - strato-model
+  - strato-p2p
+  - strato-sequencer
+  - strato-statediff
+  - text
   - transformers
   - hedis
+  - unliftio
 
 library:
   source-dirs: src/
@@ -73,3 +90,14 @@ executables:
       - hflags
       - time
     other-modules: []
+
+tests:
+  blockapps-tools-test:
+    source-dirs: test/
+    main: KafkaSpec.hs
+    dependencies:
+      - QuickCheck
+      - blockapps-tools
+      - bytestring-arbitrary
+      - hspec
+      - temporary

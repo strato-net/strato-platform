@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE IncoherentInstances #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -38,6 +35,7 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
+import Blockchain.Output
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA
 import qualified Data.NibbleString as N
@@ -57,13 +55,13 @@ data CachedStorage = CS
   } deriving (Generic, NFData)
 makeLenses ''CachedStorage
 
-type StorM = StateT CachedStorage (ResourceT IO)
+type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
 
-instance HasRawStorageDB StorM where
-  getRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
-  putRawStorageTxMap = assign stx
-  getRawStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
-  putRawStorageBlockMap = assign sbs
+instance HasMemRawStorageDB StorM where
+  getMemRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
+  putMemRawStorageTxMap = assign stx
+  getMemRawStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
+  putMemRawStorageBlockMap = assign sbs
 
 instance HasMemAddressStateDB StorM where
   getAddressStateTxDBMap = use atx
@@ -81,12 +79,20 @@ instance (MP.StateRoot `Alters` MP.NodeData) StorM where
   insert _ = MP.genericInsertDB $ use sdb
   delete _ = MP.genericDeleteDB $ use sdb
 
+instance (N.NibbleString `Alters` N.NibbleString) StorM where
+  lookup _ = genericLookupHashDB $ use hdb
+  insert _ = genericInsertHashDB $ use hdb
+  delete _ = genericDeleteHashDB $ use hdb
+
+instance (RawStorageKey `Alters` RawStorageValue) StorM where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
+
 instance Mod.Modifiable MP.StateRoot StorM where
   get _ = use sdbsr
   put _ = assign sdbsr
-
-instance HasHashDB StorM where
-  getHashDB = use hdb
 
 initialEnv :: IO (FilePath, CachedStorage)
 initialEnv = do
@@ -94,14 +100,14 @@ initialEnv = do
   let ldbOptions = DB.defaultOptions { DB.createIfMissing = True }
       openDB b = DBB.open (tmpdir ++ b) ldbOptions
   s <- openDB "/state/"
-  h <- openDB "/hash/"
+  h <- HashDB <$> openDB "/hash/"
   let st = CS s MP.emptyTriePtr h M.empty M.empty M.empty M.empty
-  fmap (tmpdir,) . runResourceT $ execStateT MP.initializeBlank st
+  fmap (tmpdir,) . runLoggingT . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
 runStorM mv = bracket initialEnv
                        (removePathForcibly . fst)
-                       (runResourceT . evalStateT mv . snd)
+                       (runLoggingT . runResourceT . evalStateT mv . snd)
 
 storageSpec :: Spec
 storageSpec = do
@@ -113,7 +119,7 @@ storageSpec = do
 
     it "gets its puts after a partial flush" . runStorM $ do
       putStorageKeyVal' 0x1 0x2 0x3
-      flushStorageTxDBToBlockDB
+      flushMemStorageTxDBToBlockDB
       use stx `shouldReturn` M.empty
       getStorageKeyVal' 0x1 0x2 `shouldReturn` 0x3
       putStorageKeyVal' 0x1 0x2 0x77777
@@ -167,8 +173,8 @@ storageSpec = do
 
   describe "RawStorageDB" $ do
     it "should get its puts" . runStorM $ do
-      putRawStorageKeyVal' 0x888 "aKey" "aValue"
-      getRawStorageKeyVal' 0x888 "aKey" `shouldReturn` "aValue"
+      putRawStorageKeyVal' (0x888, "aKey") "aValue"
+      getRawStorageKeyVal' (0x888, "aKey") `shouldReturn` "aValue"
 
   describe "SolidStorageDB" $ do
     it "should get its puts" . runStorM $ do

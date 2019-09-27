@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module Blockchain.Data.Block (
   Block(..),
   blockDataLens,
@@ -6,22 +6,24 @@ module Blockchain.Data.Block (
   setBlockNo
   ) where
 
-import Control.DeepSeq
-import Data.Binary
-import Blockchain.Data.DataDefs
-import Blockchain.Data.Transaction
-import GHC.Generics
 
+import Control.DeepSeq
 import Control.Lens
 import Control.Lens.TH (makeLensesFor)
+import Data.Binary
 import qualified Data.ByteString as BS
+import Data.Data
+import GHC.Generics
+
+import Blockchain.Data.DataDefs
+import Blockchain.Data.Transaction
 
 data Block =
   Block{
     blockBlockData::BlockData,
     blockReceiptTransactions::[Transaction],
     blockBlockUncles::[BlockData]
-    } deriving (Eq, Read, Show, Generic)
+    } deriving (Eq, Read, Show, Generic, Binary, NFData, Data)
 
 makeLensesFor [("blockBlockData", "blockDataLens")] ''Block
 
@@ -30,6 +32,3 @@ extraLens = blockDataLens . extraDataLens
 
 setBlockNo :: Integer -> Block -> Block
 setBlockNo n blk = blk{blockBlockData = (blockBlockData blk){blockDataNumber = n}}
-
-instance Binary Block where
-instance NFData Block

@@ -52,11 +52,13 @@ import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
 import           Data.IORef.Unboxed
 import           Data.Maybe                         (fromMaybe)
+import qualified Data.NibbleString                  as N
 import qualified Data.Set                           as S
 import           MonadUtils
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -101,34 +103,46 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) VMM where
   insert _ = MP.genericInsertDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
   delete _ = MP.genericDeleteDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
 
-instance HasHashDB VMM where
-    getHashDB = lift $ fmap (contextHashDB . dbs) get
+instance (N.NibbleString `A.Alters` N.NibbleString) VMM where
+  lookup _ = genericLookupHashDB $ lift $ gets $ contextHashDB . dbs
+  insert _ = genericInsertHashDB $ lift $ gets $ contextHashDB . dbs
+  delete _ = genericDeleteHashDB $ lift $ gets $ contextHashDB . dbs
 
 instance Mod.Modifiable MP.StateRoot VMM where
   get _    = lift $ gets (MP.stateRoot . contextStateDB . dbs)
   put _ sr = lift $ get >>= \c -> put c{dbs=(dbs c){contextStateDB=(contextStateDB $ dbs c){MP.stateRoot=sr}}}
 
-instance HasRawStorageDB VMM where
-    getRawStorageTxDB = do
+instance HasMemRawStorageDB VMM where
+    getMemRawStorageTxDB = do
       cxt <- lift get
       return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
               contextStorageTxMap $ dbs cxt)
-    putRawStorageTxMap theMap = do
+    putMemRawStorageTxMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageTxMap=theMap}}
-    getRawStorageBlockDB = do
+    getMemRawStorageBlockDB = do
       cxt <- lift get
       return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
               contextStorageBlockMap $ dbs cxt)
-    putRawStorageBlockMap theMap = do
+    putMemRawStorageBlockMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
 
-instance HasCodeDB VMM where
-    getCodeDB = lift $ fmap (contextCodeDB . dbs) get
+instance (RawStorageKey `A.Alters` RawStorageValue) VMM where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance HasBlockSummaryDB VMM where
-    getBlockSummaryDB = lift $ fmap (contextBlockSummaryDB . dbs) get
+instance (SHA `A.Alters` DBCode) VMM where
+  lookup _ = genericLookupCodeDB $ lift $ gets $ contextCodeDB . dbs
+  insert _ = genericInsertCodeDB $ lift $ gets $ contextCodeDB . dbs
+  delete _ = genericDeleteCodeDB $ lift $ gets $ contextCodeDB . dbs
+
+instance (SHA `A.Alters` BlockSummary) VMM where
+  lookup _ = genericLookupBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
+  insert _ = genericInsertBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
+  delete _ = genericDeleteBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
 
 class Word256Storable a where
   fromWord256::Word256->a

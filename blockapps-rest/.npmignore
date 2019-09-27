@@ -1,0 +1,17 @@
+lib
+config
+node_modules
+
+.idea
+.vscode
+.babelrc
+.editorconfig
+.eslintrc.json
+.dockerignore
+.oauth-test-config
+.oauth-test-env
+.releaseignore
+Dockerfile.test
+Jenkinsfile.release
+
+*.log

@@ -12,6 +12,7 @@ description:
 github: blockapps/strato-platform/core-strato/strato-p2p
 
 dependencies:
+  - alarmclock
   - array
   - async
   - base >= 4 && < 5
@@ -20,9 +21,11 @@ dependencies:
   - aeson
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-init
   - blockapps-util
   - bytestring
   - classy-prelude
+  - common-log
   - conduit
   - conduit-combinators
   - conduit-extra
@@ -42,6 +45,7 @@ dependencies:
   - ghc
   - blockapps-haskoin
   - hflags
+  - http-client
   - iproute
   - json-rpc-server
   - json-rpc-client
@@ -58,6 +62,8 @@ dependencies:
   - random
   - resourcet
   - SafeSemaphore
+  - servant-client
+  - servant-server
   - split
   - stm
   - stm-conduit
@@ -102,7 +108,7 @@ tests:
       - QuickCheck
       - hspec
       - hspec-expectations-lifted
-      - persistent-sqlite
+      - persistent-postgresql
       - stm-chans
       - stm-conduit
       - strato-p2p

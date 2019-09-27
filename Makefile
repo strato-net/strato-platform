@@ -61,7 +61,7 @@ prometheus:
 
 smd:
 	@echo building smd...
-	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/
+	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
 
 get_solcs:
 	mkdir -p ${TMPDIR} ${FAKEROOT}/usr/local/bin

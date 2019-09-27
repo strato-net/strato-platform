@@ -25,7 +25,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.Data.TransactionDef
 import           Blockchain.DB.SQLDB
-import           Blockchain.SHA
 
 import           Handler.Filters
 import           Handler.TransactionInfo
@@ -79,12 +78,11 @@ setNum :: Integer -> Block -> Block
 setNum n b = let bd = blockBlockData b
              in b { blockBlockData = bd { blockDataNumber = n} }
 
-insertRandomBlocks :: (HasSQLDB m) => Integer -> Int -> m [Key BlockDataRef]
+insertRandomBlocks :: HasSQLDB m => Integer -> Int -> m [Key BlockDataRef]
 insertRandomBlocks start size = do
         blocks <- liftIO . generate . vectorOf size $ (arbitrary :: Gen Block)
-        let numberedBlocks = zipWith setNum [start..] blocks
-        let difficulties = map (\b -> (blockDataParentHash . blockBlockData $ b, 10)) numberedBlocks
-        putBlocks difficulties numberedBlocks False
+        let numberedBlocks = flip zip [10,20..] $ zipWith setNum [start..] blocks
+        putBlocks numberedBlocks False
 
 insertRandomTransactions :: Int -> YesodExample App ()
 insertRandomTransactions size = do
@@ -132,7 +130,7 @@ spec = withApp $ do
     describe "JSON Query string" $ do
       describe "Blocks" $ do
         it "Genesis block" $ do
-          blockKeys <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+          blockKeys <- putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
           length blockKeys `equiv` 1
           YT.request $ do
             setUrl BlockInfoR
@@ -140,7 +138,7 @@ spec = withApp $ do
           statusIs 200
           bodyContains' "9178d0f23c965d81f0834a4c72c6253ce6830f4022b1359aaebfc1ecba442d4e"
       it "Indexing" $ do
-        _ <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+        _ <- putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
         _ <- insertRandomBlocks 1 10
         YT.request $ do
           setUrl BlockInfoR

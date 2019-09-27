@@ -21,7 +21,6 @@ default-extensions:
   - DeriveDataTypeable
   - DeriveFoldable
   - DeriveFunctor
-  - DeriveGeneric
   - DeriveTraversable
   - EmptyDataDecls
   - FlexibleContexts
@@ -29,7 +28,6 @@ default-extensions:
   - FunctionalDependencies
   - GADTs
   - GeneralizedNewtypeDeriving
-  - LambdaCase
   - LiberalTypeSynonyms
   - MagicHash
   - MultiParamTypeClasses
@@ -78,7 +76,16 @@ benchmarks:
   rlpserial:
     source-dirs: bench/
     main: RLPShootout.hs
+    other-modules: []
     dependencies:
       - ethereum-rlp
       - criterion
       - random-bytestring
+  zipbench:
+    source-dirs: bench/
+    main: ZipBench.hs
+    other-modules: []
+    dependencies:
+      - ethereum-rlp
+      - criterion
+      - zlib

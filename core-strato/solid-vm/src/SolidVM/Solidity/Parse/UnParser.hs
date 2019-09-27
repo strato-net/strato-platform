@@ -117,7 +117,7 @@ unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
 unparseFuncWithoutName :: Func -> Text
 unparseFuncWithoutName Func{..} =
        "("
-    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
+    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" maybeName , v)) funcArgs))
     <> ") "
     <> case funcStateMutability of
         Just sm -> tShow sm <> " "
@@ -132,11 +132,11 @@ unparseFuncWithoutName Func{..} =
         Just [] -> ""
         Just xs -> Text.pack $ List.intercalate " " xs <> " "
         _ -> ""
-    <> case Map.toList funcVals of
+    <> case funcVals of
         [] -> ""
         vals ->
               "returns ("
-          <> Text.intercalate ", " (List.map unparseVals vals)
+          <> Text.intercalate ", " (List.map unparseVals $ map (\(maybeName, v) -> (fromMaybe "" maybeName , v)) vals)
           <> ") "
     <> "{\n        "
     <> case funcContents of
@@ -165,25 +165,39 @@ unparseStatement (Return (Just e)) = "return " ++ unparseExpression e ++ ";"
 unparseStatement Break = "break;"
 unparseStatement Continue = "continue;"
 unparseStatement (AssemblyStatement (MloadAdd32 dst src)) = printf "assembly { %s := mload(add(%s, 32)) }" dst src
---unparseStatement x = show x
+
+unparseStatement (EmitStatement eventName extups) = 
+  let 
+    expVals = map (unparseExpression . snd) extups
+  in
+    "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
+
 unparseStatement x = error $ "missing case in call to unparseStatement: " ++ show x
 
+unparseVarDefEntry :: VarDefEntry -> String
+unparseVarDefEntry BlankEntry = ""
+unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName) =
+  let typeString = case maybeType of
+                       Nothing -> "var" -- TODO: This isn't exactly correct to put "var" inside a tuple
+                       Just theType -> unparseVarType theType
+      locString = case maybeLoc of
+                      Nothing -> " "
+                      Just Memory -> " memory "
+                      Just Storage -> " storage "
+  in typeString ++ locString ++ theName
+
+
+
 unparseSimpleStatement :: SimpleStatement -> String
-unparseSimpleStatement (VariableDefinition maybeType names maybeVal) =
-  let typeString =
-        case maybeType of
-          Nothing -> "var"
-          Just theType -> unparseVarType theType
-      nameString =
-        case names of
-          [Just n] -> n
-          _ -> "(" ++ List.intercalate ", " (map (fromMaybe "") names) ++ ")"
+unparseSimpleStatement (VariableDefinition entries maybeVal) =
+  let entriesString = case entries of
+                        [e] -> unparseVarDefEntry e
+                        _ -> "(" ++ List.intercalate ", " (map unparseVarDefEntry entries) ++ ")"
       assignmentString =
         case maybeVal of
           Nothing -> ""
           Just e -> " = " ++ unparseExpression e
-  in
-    typeString ++ " " ++ nameString ++ assignmentString
+  in entriesString ++ assignmentString
 unparseSimpleStatement (ExpressionStatement e) = unparseExpression e
 
 -- TODO- deal with parenthesis properly....  this is a bit difficult to do
@@ -199,14 +213,13 @@ unparseExpression (NumberLiteral x Nothing) = show x
 unparseExpression (BoolLiteral False) = "false"
 unparseExpression (BoolLiteral True) = "true"
 unparseExpression (StringLiteral s) = show s
-unparseExpression (TupleExpression vals) = "(" ++ List.intercalate ", " (map unparseExpression vals) ++ ")"
+unparseExpression (TupleExpression vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
 unparseExpression (IndexAccess e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
 unparseExpression (FunctionCall e args) =
-  let
-    showArg (Nothing, x) = unparseExpression x
-    showArg (Just name, x) = name ++ ": " ++ unparseExpression x
-  in
-    unparseExpression e ++ "(" ++ List.intercalate "," (map showArg args) ++ ")"
+    let shownArgs = case args of
+                      OrderedArgs xs -> List.intercalate "," $ map unparseExpression xs
+                      NamedArgs xs -> "{" ++ List.intercalate "," (map (\(n, x) -> printf "%s:%s" n $ unparseExpression x) xs) ++ "}"
+    in unparseExpression e ++ "(" ++ shownArgs ++ ")"
 unparseExpression (Ternary x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression x) = "new " ++ unparseVarType x
 unparseExpression (ArrayExpression xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"

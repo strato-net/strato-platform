@@ -1,6 +1,4 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 module Network.Haskoin.Crypto.BigWord
 (
 -- Useful type aliases
@@ -103,14 +101,14 @@ type FieldP  = BigWord ModP
 -- | Data type representing an Integer modulo curve order N.
 type FieldN  = BigWord ModN
 
-data Mod512
-data Mod256 deriving (Data, Typeable)
-data Mod256Tx
-data Mod256Block
-data Mod160
-data Mod128
-data ModP
-data ModN
+data Mod512      deriving (Data, Typeable)
+data Mod256      deriving (Data, Typeable)
+data Mod256Tx    deriving (Data, Typeable)
+data Mod256Block deriving (Data, Typeable)
+data Mod160      deriving (Data, Typeable)
+data Mod128      deriving (Data, Typeable)
+data ModP        deriving (Data, Typeable)
+data ModN        deriving (Data, Typeable)
 
 newtype BigWord n = BigWord { getBigWordInteger :: Integer }
     deriving (Eq, Ord, Data, Typeable, Generic, Hashable)

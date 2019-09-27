@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImplicitParams             #-}
-{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -43,7 +42,7 @@ newtype Bloc x = Bloc
         ( LoggingT
           ( ExceptT BlocError IO ) -- throw and catch errors
         ) x
-  } deriving
+  } deriving newtype
   ( Functor
   , Applicative
   , Monad
@@ -180,7 +179,9 @@ enterBloc env x
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
-          VaultWrapperError (FailureResponse Response{..}) | statusIsClientError responseStatusCode ->
+          VaultWrapperError (FailureResponse Response{..}) | responseStatusCode == status503 ->
+            err503{errBody = responseBody}
+                                                           | statusIsClientError responseStatusCode ->
             err400{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           VaultWrapperError (ConnectionError _) ->
             err500{errBody = JSON.encode $ unlines

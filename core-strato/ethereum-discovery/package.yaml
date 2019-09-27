@@ -12,6 +12,7 @@ dependencies:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
+  - blockapps-init
   - blockapps-util
   - bytestring
   - classy-prelude
@@ -26,6 +27,7 @@ dependencies:
   - exceptions
   - format
   - lifted-base
+  - monad-alter
   - mtl
   - network
   - network-uri
@@ -50,6 +52,7 @@ library:
   exposed-modules:
     - Blockchain.Strato.Discovery.Data.Peer
     - Blockchain.Strato.Discovery.UDP
+    - Blockchain.Strato.Discovery.P2PUtil
     - Executable.EthereumDiscovery
     - Executable.EthDiscoverySetup
 

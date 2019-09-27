@@ -3,14 +3,20 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# OPTIONS_GHC -Wall #-}
 
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as BC
+import           Data.Int
 import           System.Console.CmdArgs
 
 import           Block
 import           BlockGO
 import           Checkpoints
 import           Code
-import           DumpKafkaBlocks
 import           CanonRedis
+import           ChainHash
+import           DeriveEnode
+import           DumpKafkaBlocks
 import           DumpKafkaRaw
 import           DumpKafkaSequencer
 import           DumpKafkaStateDiff
@@ -19,17 +25,25 @@ import           DumpKafkaUnSequencer
 import           DumpRedis
 import           FRawMP
 import           Hash
+import           InsertP2P
+import           InsertSeq
 import           InsertTX
+import           Kafka
+import           Privacy
 import           Psql
 import           Raw
 import           RawMP
+import           Redis
 import           RLP
+import           RSVP
 import           State
 
 import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Data.ByteString.Base16             as B16
-import qualified Data.ByteString.Char8              as BC
-import           Data.Int
+import           Blockchain.Participation
+import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.SHA hiding (hash)
 
 data Options = State{root::String, db::String}
              | Block{hash::String, db::String}
@@ -53,6 +67,26 @@ data Options = State{root::String, db::String}
              | CanonRedis{ipAddress::String, start::Int, range::Int}
              | Psql{}
              | InsertTX{}
+             | AskForBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
+             | PushBlocks{startBlock::Integer, endBlock::Integer, peer::Address}
+             | AskForTxs
+             | RSVP {chainId :: Word256, memberId :: String, address::Address}
+             | Redis { key :: String }
+             | RedisMatch { pattern :: String }
+             | Migrate { tables :: String }
+             | AddTx { txJson :: String}
+             | AddBlocksFromFile { fileName :: String}
+             | AddGenesisFromFile { fileName :: String}
+             | AddTxsFromFile { fileName :: String}
+             | SaveKafka { topic :: String, filename :: String }
+             | LoadKafka { topic :: String, filename :: String }
+             | VerifyKafkaFile { filename :: String }
+             | SetParticipationMode { mode :: ParticipationMode }
+             | ChainHash
+             | DeriveEnode { privatekey :: String, ip :: String }
+             | CompressRoundChanges { infilename :: String, outfilename :: String }
+             | GetPrivacy { registry :: String, key :: String }
+             | PutPrivacy { registry :: String, key :: String , value :: String }
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -69,9 +103,9 @@ canonRedisOptions =
     start := def += typ "STARTINGBLOCK" += argPos 1,
     range := def += typ "RANGE" += argPos 2
   ]
-  
-redisOptions :: Annotate Ann
-redisOptions =
+
+dumpRedisOptions :: Annotate Ann
+dumpRedisOptions =
   record DumpRedis{databaseNumber=undefined} [
     databaseNumber := 0 += typ "INT"
   ]
@@ -197,6 +231,121 @@ checkpointOptions =
         ]
     where nil = undefined
 
+askOptions :: Annotate Ann
+askOptions =
+  record AskForBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = 0x0}
+         [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block"
+         , endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block"
+         , peer := 0x0 += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
+         ]
+
+pushOptions :: Annotate Ann
+pushOptions =
+  record PushBlocks{startBlock=error "unused start block", endBlock=error "unused end block", peer = 0x0}
+         [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block"
+         , endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block"
+         , peer := 0x0 += typ "ETHEREUM_ADDRESS" += explicit += name "peer"
+         ]
+
+txOptions :: Annotate Ann
+txOptions = record AskForTxs []
+
+
+rsvpOptions :: Annotate Ann
+rsvpOptions = record RSVP { chainId = error "unused chain id", memberId = error "unused member", address = error "unused address"}
+            [ chainId := error "--chain-id required" += typ "NUMBER" += explicit += name "chain-id"
+            , memberId := error "--member required" += typ "MEMBER ID" += explicit += name "member"
+            , address := error "--address required" += typ "ADDRESS" += explicit += name "address"
+            ]
+
+redisOptions :: Annotate Ann
+redisOptions = record Redis {key = error "unused key"}
+             [ key := error "redis <KEY>" += typ "KEY" += argPos 0
+             ]
+
+redisMatchOptions :: Annotate Ann
+redisMatchOptions = record RedisMatch {pattern = error "unused pattern"}
+                  [ pattern := error "redis <PATTERN>" += typ "PATTERN" += argPos 0
+                  ]
+
+migrateOptions :: Annotate Ann
+migrateOptions = record Migrate { tables = error "unused tables"}
+               [ tables := error "migrate (data|global|peer|all)" += typ "TABLES" += argPos 0
+               ]
+
+addTxOptions :: Annotate Ann
+addTxOptions = record AddTx { txJson = error "unused txJson"}
+             [ txJson := error "addtx --tx=<json>" += typ "JSON" += explicit += name "tx"
+             ]
+
+addBlocksFromFileOptions :: Annotate Ann
+addBlocksFromFileOptions = record AddBlocksFromFile { fileName = error "unused fileName"}
+             [ fileName := error "addblocksfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "file-name"
+             ]
+
+addGenesisFromFileOptions :: Annotate Ann
+addGenesisFromFileOptions = record AddGenesisFromFile { fileName = error "unused fileName"}
+             [ fileName := error "addgenesisfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "file-name"
+             ]
+
+addTxsFromFileOptions :: Annotate Ann
+addTxsFromFileOptions = record AddTxsFromFile { fileName = error "unused fileName"}
+             [ fileName := error "addtxsfromfile --file-name=<file-name>" += typ "STRING" += explicit += name "file-name"
+             ]
+
+saveKafkaOptions :: Annotate Ann
+saveKafkaOptions = record SaveKafka { filename = error "unused filename", topic = error "unused topic"}
+                 [ filename := error "savekafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename"
+                 , topic := error "savekafka --filename=<file> --topic=<topic>" += typ "TOPIC" += explicit += name "topic"
+                 ]
+
+loadKafkaOptions :: Annotate Ann
+loadKafkaOptions = record LoadKafka { filename = error "unused filename", topic = error "unused topic"}
+                 [ filename := error "loadkafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename"
+                 , topic := error "loadkafka --filename=<file> --topic=<topic>" += typ "TOPIC" += explicit += name "topic"
+                 ]
+
+verifyKafkaFileOptions :: Annotate Ann
+verifyKafkaFileOptions = record VerifyKafkaFile { filename = error "unused filename"}
+                       [ filename := error "verifykafkafile --filename=<file>" += typ "PATH" += explicit += name "filename"
+                       ]
+
+setParticipationModeOptions :: Annotate Ann
+setParticipationModeOptions = record SetParticipationMode {mode = error "unused participationMode"}
+                            [ mode := error "setparticipationmode --mode=(Full|None|NoConsensus)"
+                                   += typ "PARTICIPTIONMODE"
+                                   += explicit
+                                   += name "mode"
+                            ]
+
+chainHashOptions :: Annotate Ann
+chainHashOptions = record ChainHash []
+
+deriveEnodeOptions :: Annotate Ann
+deriveEnodeOptions = record DeriveEnode { privatekey = error "unused privatekey", ip = error "unused ip"}
+                   [ privatekey := error "--private-key required" += typ "BASE64 Private Key" += explicit += name "private-key"
+                   , ip := error "--ip required" += typ "IP address" += explicit += name "ip"
+                   ]
+
+compressRoundChangesOptions :: Annotate Ann
+compressRoundChangesOptions = record CompressRoundChanges { infilename = error "unused infilename", outfilename = error "unused outfilename"}
+                            [ infilename := error "compressroundchanges --infilename=<file>" += typ "PATH" += explicit += name "infilename"
+                            , outfilename := error "compressroundchanges --outfilename=<file>" += typ "PATH" += explicit += name "outfilename"
+                            ]
+
+getPrivacyOptions :: Annotate Ann
+getPrivacyOptions = record GetPrivacy { registry = error "unused registry", key = error "unused key"}
+                            [ registry := error "getprivacy --registry=<registry>" += typ "STRING" += explicit += name "registry"
+                            , key := error "getprivacy --key=<key>" += typ "STRING" += explicit += name "key"
+                            ]
+
+putPrivacyOptions :: Annotate Ann
+putPrivacyOptions = record PutPrivacy { registry = error "unused registry", key = error "unused key", value = error "unused value"}
+                            [ registry := error "putprivacy --registry=<registry>" += typ "STRING" += explicit += name "registry"
+                            , key := error "putprivacy --key=<key>" += typ "STRING" += explicit += name "key"
+                            , value := error "putprivacy --value=<value>" += typ "STRING" += explicit += name "value"
+                            ]
+
 options::Annotate Ann
 options = modes_ [blockGoOptions
                 , blockOptions
@@ -211,15 +360,36 @@ options = modes_ [blockGoOptions
                 , dumpKafkaStateDiffOptions
                 , dumpKafkaUnSequencerOptions
                 , dumpKafkaUnminedBlocksOptions
+                , dumpRedisOptions
                 , fRawMPOptions
                 , hashOptions
                 , insertTXOptions
                 , psqlOptions
                 , rawMPOptions
                 , rawOptions
-                , redisOptions
                 , rlpOptions
-                , stateOptions]
+                , stateOptions
+                , askOptions
+                , pushOptions
+                , txOptions
+                , rsvpOptions
+                , redisOptions
+                , redisMatchOptions
+                , migrateOptions
+                , addTxOptions
+                , addBlocksFromFileOptions
+                , addGenesisFromFileOptions
+                , addTxsFromFileOptions
+                , saveKafkaOptions
+                , loadKafkaOptions
+                , verifyKafkaFileOptions
+                , setParticipationModeOptions
+                , chainHashOptions
+                , deriveEnodeOptions
+                , compressRoundChangesOptions
+                , getPrivacyOptions
+                , putPrivacyOptions
+                ]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
 
@@ -253,6 +423,29 @@ run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
 run Psql{}                     = psql
 run InsertTX{}                 = insertTX
 run Checkpoints{..}            = case operation of
-    Get           -> doCheckpointGet service
-    Put           -> doCheckpointPut service (fromIntegral <$> offset) cp
-    NullOperation -> doCheckpointUsage
+      Get           -> doCheckpointGet service
+      Put           -> doCheckpointPut service (fromIntegral <$> offset) cp
+      NullOperation -> doCheckpointUsage
+run AskForBlocks{..}           = insertP2P (P2pAskForBlocks startBlock endBlock peer)
+run PushBlocks{..}             = insertP2P (P2pPushBlocks startBlock endBlock peer)
+run AskForTxs                  = insertP2P . P2pGetTx
+                                           . map (SHA . bytesToWord256 . fst . B16.decode)
+                                           . filter (not . B.null)
+                                           . BC.split '\n' =<< B.getContents
+run RSVP{..}                   = rsvp chainId memberId address
+run Redis{..}                  = redis $ BC.pack key
+run RedisMatch{..}             = redisMatch $ BC.pack pattern
+run Migrate{..}                = migrate tables
+run AddTx{..}                  = addTx txJson
+run AddBlocksFromFile{..}      = addBlocksFromFile fileName
+run AddGenesisFromFile{..}     = addGenesisFromFile fileName
+run AddTxsFromFile{..}         = addTxsFromFile fileName
+run SaveKafka{..}              = saveKafka topic filename
+run LoadKafka{..}              = loadKafka topic filename
+run VerifyKafkaFile{..}        = verifyKafkaFile filename
+run SetParticipationMode{..}   = remoteSetParticipationMode mode
+run ChainHash                  = chainHash
+run DeriveEnode{..}            = deriveEnode privatekey ip
+run CompressRoundChanges{..}   = compressRoundChanges infilename outfilename
+run GetPrivacy{..}             = putStrLn =<< getPrivacy registry key True
+run PutPrivacy{..}             = putStrLn =<< putPrivacy registry key value True

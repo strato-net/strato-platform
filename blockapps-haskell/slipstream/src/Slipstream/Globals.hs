@@ -153,3 +153,8 @@ setContractState gref address chainId values = do
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force
+
+flushPendingWrites :: MonadIO m => IORef Globals -> m ()
+flushPendingWrites gref = do
+  Globals{..} <- readIORef gref
+  syncStorage csHandle

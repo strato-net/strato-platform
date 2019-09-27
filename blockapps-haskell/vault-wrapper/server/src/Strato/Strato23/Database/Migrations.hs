@@ -11,7 +11,7 @@ import           Data.Maybe                        (maybe, listToMaybe)
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Simple.SqlQQ
 
-import           Strato.Strato23.Database.Create  (createTables)
+import           Strato.Strato23.Database.Create  (createTables, messageTable)
 
 data MigrationErrorBehavior = Throw | Catch
 
@@ -32,6 +32,8 @@ migrations :: [(MigrationErrorBehavior, Query)]
 migrations = [ (Throw, createTables)
              , (Throw, insertSchemaVersion)
              , (Throw, insertAddress)
+             , (Throw, messageTable)
+             , (Throw, insertSecPrvKey)
              ]
 
 getSchemaVersion :: Query
@@ -45,3 +47,6 @@ updateSchemaVersion = [sql| UPDATE vault_wrapper_schema_version SET schema_versi
 
 insertAddress :: Query
 insertAddress = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS address bytea; |]
+
+insertSecPrvKey :: Query
+insertSecPrvKey = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS enc_sec_prv_key bytea NOT NULL; |]

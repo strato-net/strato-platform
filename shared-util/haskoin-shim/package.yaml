@@ -1,0 +1,31 @@
+name: haskoin-shim
+description: "Bindings to make blockapps-haskoin appear like secp256k1"
+
+dependencies:
+  - base
+  - binary
+  - blockapps-haskoin
+  - bytestring
+  - extra
+  - ethereum-encryption
+  - fast-ecrecover
+  - QuickCheck
+  - strato-model
+
+library:
+  source-dirs:
+    src/
+
+tests:
+  stolen-secp256k1-tests:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - HUnit
+      - base16-bytestring
+      - cereal
+      - entropy
+      - haskoin-shim
+      - hspec
+      - mtl
+      - string-conversions

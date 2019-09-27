@@ -1,8 +1,6 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
-const nodeHealthCheck = require('../daemons/node-health-check')
-const config = require('../config/app.config');
-
+const winston = require('winston-color');
 module.exports = {
   ping: function (req, res) {
     res.status(200).send('pong');
@@ -27,45 +25,27 @@ module.exports = {
         raw: true,
       });
 
-      let healthStatus, stallStatus, uptime, isInc, isPending;
-
-      const healthInfo = await models.CurrentHealth.findOne({
-        where: {
-          processName: "HealthStat"
-        },
-        attributes: [
-          'latestHealthStatus',
-          'latestCheckTimestamp',
-          'lastFailureTimestamp'
-        ],
-        raw:true,
-      }).catch(err => next(err));
-      const stallInfo = await models.CurrentHealth.findOne({
-        where: {
-          processName: "StallStat"
-        },
-        attributes: [
-          'latestHealthStatus',
-          'latestCheckTimestamp',
-          'lastFailureTimestamp',
-          'isBlocksValidInc',
-          'isLastPending'
-        ],
-        raw:true,
-      }).catch(err => next(err));
+      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus, warningMessages, systemInfoBody;
 
       const currentTime = Date.now();
 
-      if (healthInfo && stallInfo){
+      const [healthInfo, stallInfo, systemInfo] = await getLatestHealth();
+      if (healthInfo && stallInfo) {
         healthStatus = healthInfo.latestHealthStatus;
         stallStatus = stallInfo.latestHealthStatus;
         uptime = (healthStatus) ? currentTime - healthInfo.lastFailureTimestamp : 0;
         isInc = stallInfo.isBlocksValidInc;
         isPending = stallInfo.isLastPending;
+        healthAI = healthInfo.additionalInfo;
+        systemInfoAI = JSON.parse(systemInfo.additionalInfo);
+        systemInfoStatus = systemInfo.latestHealthStatus;
+        warningMessages = systemInfoStatus ? "" : systemInfoAI.Alerts;
+        systemInfoBody = systemInfoAI
+        if (systemInfoStatus) {
+          delete systemInfoBody.Alerts
+        }
       } else {
-        let err = new Error("Not Doing Health Check");
-        err.status = 500;
-        return next(err);
+        winston.warn(`Health table has no entries; Health endpoint is called too soon`)
       }
 
       res.status(200).json(
@@ -78,12 +58,18 @@ module.exports = {
             nonce: lastBlock.nonce,
           },
           healthInfo: {
-            uptime: uptime/1000,
+            uptime: uptime / 1000,
             isHealthy: healthStatus,
             isNotStalled: stallStatus,
-            isValidBlocksInc: isInc || false,
-            isLastPending: isPending
-          }
+            isValidBlocksInc: isInc,
+            isLastPending: isPending,
+            unhealthyProcess: healthAI
+          },
+          warnings: {
+            warningsActive: !systemInfoStatus,
+            messages: warningMessages
+          },
+          systemInfo: systemInfoBody
         }
       )
     } catch (error) {
@@ -91,59 +77,87 @@ module.exports = {
     }
   },
 
-  healthStatus: async function (req, res, next){
+  healthStatus: async function (req, res, next) {
     try {
-        let healthStatus, stallStatus, uptime, isInc, isPending;
+      let healthStatus, stallStatus, uptime, isInc, isPending;
 
-        const healthInfo = await models.CurrentHealth.findOne({
-            where: {
-                processName: "HealthStat"
-            },
-            attributes: [
-                'latestHealthStatus',
-                'latestCheckTimestamp',
-                'lastFailureTimestamp'
-            ]}).catch(err => next(err));
-        const stallInfo = await models.CurrentHealth.findOne({
-            where: {
-                processName: "StallStat"
-            },
-            attributes: [
-                'latestHealthStatus',
-                'latestCheckTimestamp',
-                'lastFailureTimestamp',
-                'isBlocksValidInc',
-                'isLastPending'
-            ]}).catch(err => next(err));
 
-        const currentTime = Date.now();
+      const currentTime = Date.now();
 
-        if (healthInfo && stallInfo){
-            healthStatus = healthInfo.dataValues.latestHealthStatus;
-            stallStatus = stallInfo.dataValues.latestHealthStatus;
-            uptime = (healthStatus) ? currentTime - healthInfo.dataValues.lastFailureTimestamp : 0;
-            isInc = stallInfo.dataValues.isBlocksValidInc;
-            isPending = stallInfo.dataValues.isLastPending;
-        } else {
-            let err = new Error("Not Doing Health Check");
-            err.status = 500;
-            return next(err);
-        }
+      const [healthInfo, stallInfo] = await getLatestHealth();
 
-        res.status(200).json(
-            {
-                healthInfo: {
-                    uptime: uptime/1000,
-                    isHealthy: healthStatus,
-                    isNotStalled: stallStatus,
-                    isValidBlocksInc: isInc || false,
-                    isLastPending: isPending
-                }
+      if (healthInfo && stallInfo) {
+        healthStatus = healthInfo.latestHealthStatus;
+        stallStatus = stallInfo.latestHealthStatus;
+        uptime = (healthStatus) ? currentTime - healthInfo.lastFailureTimestamp : 0;
+        isInc = stallInfo.isBlocksValidInc;
+        isPending = stallInfo.isLastPending;
+      } else {
+        winston.warn(`Health table has no entires; Health endpoint is called too soon`)
+      }
+
+      res.status(200).json(
+          {
+            healthInfo: {
+              uptime: uptime / 1000,
+              isHealthy: healthStatus,
+              isNotStalled: stallStatus,
+              isValidBlocksInc: isInc ,
+              isLastPending: isPending
             }
-        )
+          }
+      )
     } catch (error) {
-        return next(new Error('could not get data from database: ' + error));
+      return next(new Error('could not get data from database: ' + error));
     }
 
   }
 };
+
+async function getLatestHealth() {
+
+  const healthInfo = await models.CurrentHealth.findOne({
+    where: {
+      processName: "HealthStat"
+    },
+    attributes: [
+      'latestHealthStatus',
+      'latestCheckTimestamp',
+      'lastFailureTimestamp',
+      'additionalInfo'
+    ],
+    raw:true,
+  }).catch(err => next(err));
+
+  const stallInfo = await models.CurrentHealth.findOne({
+    where: {
+      processName: "StallStat"
+    },
+    attributes: [
+      'latestHealthStatus',
+      'latestCheckTimestamp',
+      'lastFailureTimestamp',
+      'isBlocksValidInc',
+      'isLastPending'
+    ],
+
+    raw: true,
+  }).catch(err => next(err));
+
+  const systemInfo = await models.CurrentHealth.findOne({
+    where: {
+      processName: "SystemInfoStat"
+    },
+    attributes: [
+      'latestHealthStatus',
+      'latestCheckTimestamp',
+      'lastFailureTimestamp',
+      'isBlocksValidInc',
+      'isLastPending',
+      'additionalInfo'
+    ],
+    raw:true,
+  }).catch(err => next(err));
+
+  return [healthInfo, stallInfo, systemInfo]
+}

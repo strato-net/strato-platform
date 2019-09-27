@@ -1,7 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+import           BlockApps.Init
 import           Blockchain.Output
 import           Blockchain.Strato.Indexer.TxrIndexer
 import           HFlags
 
 main :: IO ()
-main = $initHFlags "Strato TxResults Indexer" >> runLoggingT txrIndexer
+main = do
+  blockappsInit "strato-txr-indexer"
+  _ <- $initHFlags "Strato TxResults Indexer"
+  runLoggingT txrIndexer

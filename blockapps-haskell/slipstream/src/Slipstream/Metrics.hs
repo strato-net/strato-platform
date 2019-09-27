@@ -12,6 +12,8 @@ module Slipstream.Metrics
   , recordCacheMiss
   , recordStorageHit
   , recordStorageMiss
+  , recordOffset
+  , recordOffsetOverride
   ) where
 
 import Control.Monad
@@ -21,6 +23,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Network.Kafka.Protocol (Offset)
 import Prometheus
 
 import Blockapps.Crossmon
@@ -83,7 +86,7 @@ recordGlobals g = liftIO $ do
 recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length
 
-recordActionOn :: MonadIO m => T.Text -> Action -> m ()
+recordActionOn :: MonadIO m => T.Text -> AggregateAction -> m ()
 recordActionOn stage act = do
   let kind = case actionType act of
               Create -> "create"
@@ -92,10 +95,10 @@ recordActionOn stage act = do
   liftIO $ withLabel actionCount (stage, kind) incCounter
   recordMaxBlockNumber "slipstream_processor" . actionBlockNumber $ act
 
-recordAction :: MonadIO m => Action -> m ()
+recordAction :: MonadIO m => AggregateAction -> m ()
 recordAction = recordActionOn "raw"
 
-recordCombinedAction :: MonadIO m => Action -> m ()
+recordCombinedAction :: MonadIO m => AggregateAction -> m ()
 recordCombinedAction = recordActionOn "combined"
 
 incNumTables :: MonadIO m => m ()
@@ -131,3 +134,29 @@ recordStorageHit = recCache ("storage_hit", "")
 
 recordStorageMiss :: MonadIO m => T.Text -> m ()
 recordStorageMiss reason = recCache ("storage_miss", reason)
+
+{-# NOINLINE offsetChanges #-}
+offsetChanges :: Counter
+offsetChanges = unsafeRegister
+              . counter
+              $ Info "slipstream_offset_changes" "Number of times the kafka offset has changed"
+
+{-# NOINLINE currentOffset #-}
+currentOffset :: Gauge
+currentOffset = unsafeRegister
+              . gauge
+              $ Info "slipstream_statediff_offset" "Offset into the statediff topic"
+
+recordOffset :: MonadIO m => Offset -> m ()
+recordOffset off = liftIO $ do
+  incCounter offsetChanges
+  setGauge currentOffset $ fromIntegral off
+
+{-# NOINLINE offsetOverrides #-}
+offsetOverrides :: Counter
+offsetOverrides = unsafeRegister
+                . counter
+                $ Info "slipstream_offset_overrides" "Number of manual changes to the offset"
+
+recordOffsetOverride :: MonadIO m => m ()
+recordOffsetOverride = liftIO $ incCounter offsetOverrides

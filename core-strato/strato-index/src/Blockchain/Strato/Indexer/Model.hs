@@ -1,11 +1,10 @@
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Strato.Indexer.Model
     ( IndexEvent(..)
     ) where
 
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.DataDefs                (LogDB, TransactionResult)
+import           Blockchain.Data.DataDefs                (LogDB, EventDB, TransactionResult)
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.ExtWord                      (Word256)
 import           Blockchain.Sequencer.Event
@@ -19,9 +18,12 @@ data IndexEvent = RanBlock OutputBlock
                 | UpdateTxResult (SHA, SHA, SHA, Bool) -- Deprecated
                 | NewChainInfo Word256 ChainInfo
                 | IndexTransaction Timestamp OutputTx
+                | EventDBEntry EventDB
+                | IndexPrivateTx OutputTx
                 deriving (Eq, Show)
 
 instance Binary LogDB
+instance Binary EventDB
 instance Binary TransactionResult
 instance Binary TransactionFailureType
 instance Binary TransactionResultStatus
@@ -37,6 +39,8 @@ instance Binary IndexEvent where
             4 -> UpdateTxResult <$> get
             5 -> NewChainInfo <$> get <*> get
             6 -> IndexTransaction <$> get <*> get
+            7 -> EventDBEntry <$> get
+            8 -> IndexPrivateTx <$> get
             x -> error $ "Unknown IndexEvent tag in decode `" ++ show x ++ "`"
 
     put (RanBlock b)           = putWord8 0 >> put b
@@ -46,3 +50,5 @@ instance Binary IndexEvent where
     put (UpdateTxResult s)     = putWord8 4 >> put s
     put (NewChainInfo w c)     = putWord8 5 >> put w >> put c
     put (IndexTransaction t x) = putWord8 6 >> put t >> put x
+    put (EventDBEntry e)       = putWord8 7 >> put e 
+    put (IndexPrivateTx x)     = putWord8 8 >> put x

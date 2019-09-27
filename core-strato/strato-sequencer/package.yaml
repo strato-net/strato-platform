@@ -20,6 +20,7 @@ dependencies:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
+  - blockapps-init
   - blockapps-milena
   - blockapps-privacy
   - blockapps-util
@@ -31,6 +32,7 @@ dependencies:
   - conduit-combinators
   - containers
   - cross-monitoring
+  - data-default
   - deepseq
   - directory
   - ethereum-rlp

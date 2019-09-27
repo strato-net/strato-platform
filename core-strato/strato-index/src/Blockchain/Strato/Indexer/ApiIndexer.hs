@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -8,6 +7,7 @@ module Blockchain.Strato.Indexer.ApiIndexer
     , kafkaClientIds
     ) where
 
+import           Control.Arrow                      ((&&&))
 import           Control.Concurrent.MVar
 import           Control.Monad
 import           Control.Monad.IO.Class             (liftIO)
@@ -31,7 +31,6 @@ import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
-import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Sequencer.Event
 
@@ -62,7 +61,7 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         then do
             insertStartTime <- liftIO $ getTime Realtime
             $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
-            bids <- lift $ putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
+            bids <- lift $ putBlocks ((outputBlockToBlock &&& obTotalDifficulty) <$> blocks) False
             resultsTime <- liftIO $ getTime Realtime
             IndexerBestBlockInfo bestBid <- getIndexerBestBlockInfo
             bestBidTime <- liftIO $ getTime Realtime

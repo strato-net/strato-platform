@@ -1,7 +1,6 @@
 {-# LANGUAGE Arrows              #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,6 +12,7 @@ module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Monad.Except
 import           Crypto.Random.Entropy
+import qualified Data.ByteString.Char8             as BC
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe, isJust)
@@ -21,11 +21,12 @@ import qualified Data.Text                         as Text
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum
+import           BlockApps.Ethereum                hiding (keccak256)
 import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
+import           Blockchain.Strato.Model.SHA
 import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
@@ -57,11 +58,13 @@ replaceMembers Struct{..} addrs m =
 
 postChainInfo :: ChainInput -> Bloc ChainId
 postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = do
+  let theVM = fromMaybe "EVM" $ join $ fmap (Map.lookup "VM") mmd
+  
   when (null members) $ throwError $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
   idsAndDetails <- if (Text.null src)
                      then return Map.empty
-                     else sourceToContractDetails True src
+                     else sourceToContractDetails (theVM == "EVM") src
   mContract <- case Map.toList idsAndDetails of
             [] -> return Nothing
             [(_, x)] -> return $ Just x
@@ -85,8 +88,16 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
                           (Map.toList argsText')
               balMap = Map.fromList $ map toTuple balances
               govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
-              contractAcctInfo = ContractWithStorage governanceAddress govBal contractdetailsCodeHash storage
-              codeInfo' = CodeInfo contractdetailsBinRuntime src contractdetailsName
+              
+          (contractHash, b, s) <-
+            case theVM of
+              "EVM" -> return (EVMCode $ keccak256SHA contractdetailsCodeHash, contractdetailsBinRuntime, src)
+              "SolidVM" -> do
+                return (SolidVMCode (Text.unpack contractdetailsName) $ hash (BC.pack $ Text.unpack src), "", src)
+              _ -> throwError . UserError . Text.pack $ "Unknown VM: " ++ show theVM
+              
+          let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
+              codeInfo' = CodeInfo b s contractdetailsName
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let maybeNonContract a b | a == governanceAddress = Nothing

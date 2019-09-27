@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -83,7 +82,7 @@ import           Text.Format
 |  (chain id, (creation block hash, genesis state root))                        |
 | It's important to note that each block hash may have a unique chain root,     |
 | but the genesis root only gets updated when the VM receives a new             |
-| OEGenesis message.                                                            |
+| VmGenesis message.                                                            |
 |                                                                               |
 | When the VM receives a new block, it will insert it into the block hash       |
 | trie, with the same chain root as its parent.                                 |
@@ -97,13 +96,16 @@ import           Text.Format
 -}
 
 newtype BlockHashRoot = BlockHashRoot { unBlockHashRoot :: MP.StateRoot }
-  deriving (Eq, Ord, Show, Format, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic)
+  deriving newtype (Format, NFData)
 
 newtype GenesisRoot = GenesisRoot { unGenesisRoot :: MP.StateRoot }
-  deriving (Eq, Ord, Show, Format, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic)
+  deriving newtype (Format, NFData)
 
 newtype BestBlockRoot = BestBlockRoot { unBestBlockRoot :: MP.StateRoot }
-  deriving (Eq, Ord, Show, Format, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic)
+  deriving newtype (Format, NFData)
 
 word256ToMPKey :: Word256 -> N.NibbleString
 word256ToMPKey = N.EvenNibbleString . word256ToBytes
@@ -127,7 +129,6 @@ bootstrapChainDB :: ( Modifiable BlockHashRoot m
 bootstrapChainDB genesisHash = putChainBlockHashInfo genesisHash (SHA 0) MP.emptyTriePtr
 
 putBlockHeaderInChainDB :: ( BlockHeaderLike h
-                           , Format h
                            , Modifiable BlockHashRoot m
                            , (MP.StateRoot `Alters` MP.NodeData) m
                            )
@@ -137,10 +138,7 @@ putBlockHeaderInChainDB b = do
       h = blockHeaderHash b
   mExistingChainRoot <- getChainRoot h     -- if we've seen this block before,
   when (isNothing mExistingChainRoot) $ do -- its chain root will already exist
-    mChainRoot <- getChainRoot p
-    case mChainRoot of
-      Nothing -> error $ "putBlockHeaderInChainDB: No parent block with hash " ++ format p ++ " found.\n" ++ format b
-      Just chainRoot -> putChainBlockHashInfo h p chainRoot
+    putChainBlockHashInfo h p MP.emptyTriePtr
 
 getChainRoot :: ( Modifiable BlockHashRoot m
                 , (MP.StateRoot `Alters` MP.NodeData) m
@@ -193,21 +191,22 @@ getChainStateRoot :: ( Modifiable BlockHashRoot m
                      , (MP.StateRoot `Alters` MP.NodeData) m
                      )
                   => Word256 -> SHA -> m (Maybe MP.StateRoot)
-getChainStateRoot chainId bHash = do
-  mChainRoot <- getChainBlockHashInfo bHash
-  fmap join . for mChainRoot $ \(parentHash, chainRoot) -> do
-    mStateRoot <- getkv chainRoot (word256ToMPKey chainId)
-    case mStateRoot of
-      Just (_ :: Word256, stateRoot) -> return $ Just stateRoot
-      Nothing -> do
-        mGenStateRoot <- getChainGenesisInfo chainId
-        fmap join . for mGenStateRoot $ \(creationBlock, genStateRoot) -> do
-          mStateRoot' <- if parentHash == creationBlock
-            then return $ Just genStateRoot
-            else getChainStateRoot chainId parentHash
-          for mStateRoot' $ \stateRoot -> do
-            putChainStateRoot chainId bHash stateRoot
-            return stateRoot
+getChainStateRoot chainId bh = do
+  mGenStateRoot <- getChainGenesisInfo chainId
+  fmap join . for mGenStateRoot $ uncurry $ go bh
+  where go bHash creationBlock genStateRoot = do
+          mChainRoot <- getChainBlockHashInfo bHash
+          fmap join . for mChainRoot $ \(parentHash, chainRoot) -> do
+            mStateRoot <- getkv chainRoot (word256ToMPKey chainId)
+            case mStateRoot of
+              Just (_ :: Word256, stateRoot) -> return $ Just stateRoot
+              Nothing -> do
+                mStateRoot' <- if parentHash == creationBlock
+                  then return $ Just genStateRoot
+                  else go parentHash creationBlock genStateRoot
+                for mStateRoot' $ \stateRoot -> do
+                  putChainStateRoot chainId bHash stateRoot
+                  return stateRoot
 
 putChainStateRoot :: ( Modifiable BlockHashRoot m
                      , (MP.StateRoot `Alters` MP.NodeData) m

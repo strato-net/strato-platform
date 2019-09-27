@@ -1,16 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RecordWildCards #-}
 module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
 import Control.Lens
-import Blockchain.Output
+import Control.Monad (liftM2)
+import qualified Data.Aeson as Ae
 import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as LB
+import Data.Data
+import Data.Default
 import Data.DeriveTH
+import qualified Data.Map as M
 import Data.Text
 import GHC.Generics
 import Test.QuickCheck
@@ -22,6 +27,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
+import Blockchain.Output
 import Blockchain.Strato.Model.SHA
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Text.Colors as CL
@@ -32,8 +38,14 @@ type SequenceNumber = Word256
 data View = View {
   _round :: RoundNumber,
   _sequence :: SequenceNumber
-} deriving (Eq, Show, Ord, Generic, Binary, NFData)
+} deriving (Eq, Show, Ord, Generic, Binary, NFData, Data)
 makeLenses ''View
+
+instance Ae.ToJSON View where
+  toJSON View{..} = Ae.object ["round" Ae..= _round, "sequence" Ae..= _sequence]
+
+instance Ae.FromJSON View where
+  parseJSON = Ae.withObject "View" $ \v -> liftM2 View (v Ae..: "round") (v Ae..: "sequence")
 
 instance Format View where
   format (View r s) = printf "View (round = %d, sequence = %d)" r s
@@ -41,13 +53,13 @@ instance Format View where
 data MsgAuth = MsgAuth {
   sender :: Address,
   signature :: ExtendedSignature
-} deriving (Eq, Show, Generic, Binary, NFData)
+} deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 data TrustedMessage = Preprepare View Block
                     | Prepare View SHA
                     | Commit View SHA ExtendedSignature
                     | RoundChange {roundchangeView :: View }
-                    deriving (Eq, Show, Generic, Binary, NFData)
+                    deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 instance Format TrustedMessage where
   format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
@@ -67,12 +79,12 @@ categorize = \case
 data WireMessage = WireMessage {
   _msgAuth :: MsgAuth,
   _message :: TrustedMessage
-} deriving (Eq, Show, Generic, Binary, NFData)
+} deriving (Eq, Show, Generic, Binary, NFData, Data)
 makeLenses ''WireMessage
 
 -- TODO: Allow changing blockstanbul admins without a restart
 data ForcedConfigChange = ForcedRound RoundNumber
-                        deriving (Eq, Show, Generic, Binary, NFData)
+                        deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 instance Format ForcedConfigChange where
   format = show
@@ -130,7 +142,7 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               -- the coinbase is modified to hold the vote.
               | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool, pendingVoteSender :: Address}
               | VoteResponse HA.VoteResult
-
+              | NewCheckpoint Checkpoint
               deriving (Eq, Show, Generic)
 
 instance Format OutEvent where
@@ -142,6 +154,7 @@ instance Format OutEvent where
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
   format (PendingVote reci dir s) = "PendingVote " ++ show (reci, dir, s)
   format (VoteResponse resp) = "VoteResponse " ++ show resp
+  format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -174,6 +187,7 @@ outShortLog loc oev = $logInfoS loc . pack $
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
     VoteResponse resp -> CL.blue "VOTE_RESPONSE " ++ show resp
+    NewCheckpoint ckpt -> CL.blue "NEW_CHECKPOINT " ++ show ckpt
 
 instance NFData OutEvent
 
@@ -265,3 +279,22 @@ instance RLPSerializable OutEvent where
   rlpEncode x = error $ "cannot rlpencode non-message OutEvent: " ++ show x
 
 data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
+
+data Checkpoint = Checkpoint
+                { checkpointView :: View
+                , checkpointVoteRecord :: M.Map Address (M.Map Address Bool)
+                , checkpointValidators :: [Address]
+                , checkpointAdmins :: [Address]
+                } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
+
+instance Default Checkpoint where
+  def = Checkpoint (View 0 0) M.empty [] []
+
+derive makeArbitrary ''Checkpoint
+
+-- JSON was chosen to allow manual inspection and override during outages
+encodeCheckpoint :: Checkpoint -> B.ByteString
+encodeCheckpoint = LB.toStrict . Ae.encode
+
+decodeCheckpoint :: B.ByteString -> Either String Checkpoint
+decodeCheckpoint = Ae.eitherDecode . LB.fromStrict

@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MonoLocalBinds        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
@@ -10,17 +10,16 @@ module FastMP where
 
 import Control.Monad (when)
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Change.Modify (Outputs(..))
-import Control.Monad.IO.Class
 import Control.Monad.Loops
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as BC
 import Data.List
 import qualified Data.NibbleString as N
-import Data.Proxy
+import qualified Data.Text as T
 import qualified Database.LevelDB as LDB
 
 import Blockchain.Data.RLP
+import Blockchain.Output
 import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
 import           Blockchain.Database.MerklePatricia          ()
@@ -36,12 +35,9 @@ import ReverseOrderedKVs
 debug :: Bool
 debug = False
 
-instance MonadIO m => m `Outputs` String where
-  output = liftIO . putStrLn
-
 createMPFast :: LDB.DB -> ReverseOrderedKVs -> IO MP.StateRoot
 createMPFast db rOrderedKVs = do
-  nr <- flip runReaderT db $ do
+  nr <- runLoggingT . flip runReaderT db $ do
     nd <- createMPFast_NodeData rOrderedKVs
     MP.nodeData2NodeRef nd
 
@@ -50,7 +46,7 @@ createMPFast db rOrderedKVs = do
     MP.SmallRef v -> error $ "The whole trie is too small to fit in a level db key: " ++ show v
 
 
-createMPFast_NodeData :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
+createMPFast_NodeData :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
                       => ReverseOrderedKVs -> m MP.NodeData
 createMPFast_NodeData rOrderedKVs = doit $ getTheKVs rOrderedKVs
 
@@ -67,7 +63,7 @@ kvToStdout = do
 -}
 
 
-doit :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String) =>
+doit :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m) =>
         [KV] -> m MP.NodeData
 doit kvs = getFinalPartialNode <$> iterateUntilM inputIsExhausted processNext (kvs, [])
   where inputIsExhausted :: ([KV], [([N.Nibble], PartialNode)]) -> Bool
@@ -99,7 +95,7 @@ partialToNode (PartialNode b v) =
     spreadOut [] [] = []
     spreadOut _ [] = error "internal error: spreadOut was given input out of order or out of range"
 
-processNext :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String) =>
+processNext :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m) =>
                ([KV], [([N.Nibble], PartialNode)]) -> m ([KV], [([N.Nibble], PartialNode)])
 
 --Create new Partial Node
@@ -138,7 +134,12 @@ processNext (input, ((prefix, partialNode):partialrest)) = do
   nodePtr <- nodeData2NodeRef node
 
   when debug $
-    output $ "#### Flush Partial(" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
+    $logDebugS "processNext" . T.pack $ concat
+      [ "#### Flush Partial("
+      , show (pretty nodePtr)
+      , "):\n"
+      , show (pretty node)
+      ]
 
   return ((KV prefix (Left nodePtr)):input, partialrest)
 
@@ -152,7 +153,7 @@ processNext _ = error "it should be impossible to arrive here"
 
 
 
-nodeData2NodeRef :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
+nodeData2NodeRef :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
                  => MP.NodeData -> m MP.NodeRef
 nodeData2NodeRef nodeData =
   case rlpSerialize $ rlpEncode nodeData of
@@ -163,15 +164,16 @@ nodeData2NodeRef nodeData =
 
 
 
-putNodeData :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
+putNodeData :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
             => MP.NodeData -> m MP.StateRoot
 putNodeData nd = do
   let bytes = rlpSerialize $ rlpEncode nd
       ptr = keccak256 bytes
       sr = MP.StateRoot ptr
   when debug $
-    output $ ">>>> " ++ formatLevelKV (LevelKV ptr bytes)
-  A.insert Proxy sr nd
+    $logDebugS "putNodeData" . T.pack $
+      ">>>> " ++ formatLevelKV (LevelKV ptr bytes)
+  A.insert A.Proxy sr nd
   return sr
 
 
@@ -179,7 +181,7 @@ putNodeData nd = do
 
 
 
-addToPartial :: ((MP.StateRoot `A.Alters` MP.NodeData) m, m `Outputs` String)
+addToPartial :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
              => PartialNode -> KV -> m PartialNode
 addToPartial partialNode (KV [] (Right val)) =
   return $ partialNode{value = Just val}
@@ -189,7 +191,12 @@ addToPartial partialNode (KV x@(_:rest) val) = do
   let node = MP.ShortcutNodeData (N.pack rest) val
   nodePtr <- nodeData2NodeRef node
   when debug $
-    output $ "####addToPartial (" ++ show (pretty nodePtr) ++ "):\n" ++ show (pretty node)
+    $logDebugS "addToPartial" . T.pack $ concat
+      [ "####addToPartial ("
+      , show (pretty nodePtr)
+      , "):\n"
+      , show (pretty node)
+      ]
 
   return $ partialNode{branches = (head x, nodePtr):branches partialNode}
 addToPartial _ (KV [] (Left _)) =

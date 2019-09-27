@@ -50,7 +50,7 @@ addVote addr nonc = do
     { blockDataCoinbase = addr
     , blockDataNonce = nonc}}
   let blk'' = addValidators (S.singleton 0x88) blk'
-  pSeal <- proposerSeal blk'' prvKey
+      pSeal = proposerSeal blk'' prvKey
   return $ addProposerSeal pSeal blk''
 
 

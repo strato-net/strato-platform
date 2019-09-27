@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Data.TransactionResult
     ( HasMemTXResultDB(..)
@@ -9,6 +10,7 @@ module Blockchain.Data.TransactionResult
 import           Database.Persist             hiding (get)
 import qualified Database.Persist.Postgresql  as SQL
 
+import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
 import           Control.Monad.Trans.Resource
 
 import           Blockchain.Data.DataDefs
@@ -30,4 +32,5 @@ putTransactionResult = fmap head . putTransactionResults . pure
 putTransactionResults :: HasSQLDB m
                       => [TransactionResult]
                       -> m [Key TransactionResult]
-putTransactionResults trs = getSQLDB >>= runResourceT . SQL.runSqlPool (SQL.insertMany trs)
+putTransactionResults trs = access (Proxy @SQLDB) >>=
+  runResourceT . SQL.runSqlPool (SQL.insertMany trs)

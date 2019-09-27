@@ -137,7 +137,9 @@ expressionCrawler = \case
     expressionCrawler expr
   Xabi.MemberAccess expr _ -> "MemberAccess":expressionCrawler expr
   Xabi.FunctionCall func args -> "FunctionCall" : do
-    expr <- func:map snd args
+    expr <- case args of
+      Xabi.OrderedArgs args' -> func:args'
+      Xabi.NamedArgs args' -> func:map snd args'
     expressionCrawler expr
   Xabi.Unitary n expr -> T.pack ("Unitary: " ++ n):expressionCrawler expr
   Xabi.Binary n lhs rhs -> T.pack ("Binary: " ++ n) : do
@@ -150,7 +152,7 @@ expressionCrawler = \case
   Xabi.NumberLiteral{} -> ["NumberLiteral"]
   Xabi.StringLiteral{} -> ["StringLiteral"]
   Xabi.TupleExpression subexprs -> "TupleExpression" : do
-    expr <- subexprs
+    expr <- catMaybes subexprs
     expressionCrawler expr
   Xabi.ArrayExpression subexprs -> "ArrayExpression" : do
     expr <- subexprs
@@ -160,7 +162,7 @@ expressionCrawler = \case
 simpleStatementCrawler :: Xabi.SimpleStatement -> [T.Text]
 simpleStatementCrawler = \case
   Xabi.ExpressionStatement expr -> expressionCrawler expr
-  Xabi.VariableDefinition _ _ mExpr -> maybe [] expressionCrawler mExpr
+  Xabi.VariableDefinition _ mExpr -> maybe [] expressionCrawler mExpr
 
 funcCrawler :: Xabi.Func -> [T.Text]
 funcCrawler = maybe [] (concatMap statementCrawler) . Xabi.funcContents

@@ -106,7 +106,7 @@ main = do
       pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
       optSender = prvKey2Address pkey
   putStrLn $ "Sender: " ++ show optSender
-  esign <- signBenfInfo pkey (optRecipient, not optRemove, optNonce)
+  let esign = signBenfInfo pkey (optRecipient, not optRemove, optNonce)
   putStrLn $ "Signature: " ++ show esign
   let esignStr = C8.unpack
                . B16.encode

@@ -1,10 +1,11 @@
-{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Data.TXOrigin where
 
-import           Data.Binary
 import           Data.Aeson
+import           Data.Binary
+import           Data.Data
 import           Database.Persist.TH
 
 import           Blockchain.Data.PersistTypes ()
@@ -13,7 +14,8 @@ import           Text.Format
 
 import           GHC.Generics
 
-data TXOrigin = Direct | API | Quarry | BlockHash SHA | PeerString String | Morphism | Blockstanbul deriving (Show, Read, Eq, Generic)
+data TXOrigin = Direct | API | Quarry | BlockHash SHA | PeerString String | Morphism | Blockstanbul
+              deriving (Show, Read, Eq, Generic, Data)
 
 derivePersistField "TXOrigin"
 

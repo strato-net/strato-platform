@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -97,9 +96,7 @@ fetchVMEvents = fetchVMEventsFromTopic defaultVMEventsTopicName
 
 -- | Same as `fetchVMEvents`, except sets our commonly-used Milena state configurations
 fetchVMEvents' :: Kafka k => Offset -> k [VMEvent]
-fetchVMEvents' ofs = do
-    setDefaultKafkaState
-    fetchVMEventsFromTopic defaultVMEventsTopicName ofs
+fetchVMEvents' ofs = fetchVMEventsFromTopic defaultVMEventsTopicName ofs
 
 fetchVMEventsFromTopic :: Kafka k => TopicName -> Offset -> k [VMEvent]
 fetchVMEventsFromTopic topic offset = map bytesToVMEvent <$> fetchBytes topic offset
@@ -131,7 +128,6 @@ fetchLastVMEvents::Offset->IO [VMEvent]
 fetchLastVMEvents n = do
   ret <-
     runKafkaConfigured "strato-p2p-client" $ do
-      setDefaultKafkaState
       lastOffset <- getLastOffset LatestTime 0 (lookupTopic "block")
       when (lastOffset == 0) $ error "Block stream is empty, you need to run strato-setup to insert the genesis block."
       let offset = max (lastOffset - n) 0
@@ -146,9 +142,7 @@ lookback = 1000
 
 getBestKafkaBlockNumber:: IO Integer
 getBestKafkaBlockNumber = do
-  lastOffset <-
-    runKafkaConfigured "strato-p2p-client" $
-      setDefaultKafkaState >> getLastOffset LatestTime 0 (lookupTopic "block")
+  lastOffset <- runKafkaConfigured "strato-p2p-client" $ getLastOffset LatestTime 0 (lookupTopic "block")
 
   case lastOffset of
     Left e       -> error $ show e
@@ -165,9 +159,7 @@ getBestKafkaBlockNumber = do
 getBestKafkaBlockHelper::Offset->Offset->IO (Maybe Integer)
 getBestKafkaBlockHelper lower upper = do
   vmEventsErr <-
-    runKafkaConfigured "strato-p2p-client" $ do
-      setDefaultKafkaState
-      fetchVMEventsRange lower upper
+    runKafkaConfigured "strato-p2p-client" $ fetchVMEventsRange lower upper
 
   case vmEventsErr of
     Left e -> error $ show e

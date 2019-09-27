@@ -1,0 +1,140 @@
+pipeline {
+  agent {
+    label "test"
+  }
+  options { disableConcurrentBuilds() }
+  parameters {
+    string(name: 'REFSPEC', defaultValue: 'origin/develop', description: 'The strato-platform refspec to release blockapps-rest from. Use `tags/<tag_name>` to release from specific tag or origin/<branch_name> to release from the branch.')
+  }
+  stages {
+    stage('Prepare') {
+      steps {
+        withEnv([
+          "REFSPEC=${env.REFSPEC}",
+        ]) {
+          sh '''#!/bin/bash -le
+            set -x
+
+            git worktree remove --force strato-worktree || true
+            git worktree add strato-worktree develop
+            cd strato-worktree
+            git checkout ${REFSPEC}
+            git worktree list
+            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+            docker ps
+          '''
+        }
+      }
+    }
+
+    stage('Deploy STRATO') {
+      steps {
+        withCredentials([
+          usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+          usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+        ]) {
+            sh '''#!/bin/bash -le
+              set -x
+              rm -rf strato-getting-started
+              git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-getting-started
+              cd strato-getting-started
+              ./strato --compose
+              ./strato --pull
+              OAUTH_ENABLED=true \
+                OAUTH_CLIENT_ID=localhost-80-infinite \
+                OAUTH_CLIENT_SECRET=adac9a89-ee8b-4683-b043-084ae14ef776 \
+                OAUTH_JWT_USERNAME_PROPERTY=email \
+                OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
+                PASSWORD=123 \
+                ./strato --single
+              docker ps
+              counter=0
+              # Few quick tests
+              until curl --silent --output /dev/null --fail --location http://localhost/health
+              do
+                if [[ "$counter" -gt 120 ]]; then
+                  echo "STRATO took longer than 2 minutes to initialize! aborting."
+                  exit 73
+                fi
+                echo "waiting for STRATO to be available through nginx"
+                counter=$((counter+1))
+                sleep 1
+              done
+              echo "STRATO is available through nginx - node is running"
+            '''
+        }
+      }
+    }
+
+    stage('Test ba-rest') {
+      steps {
+        sh '''#!/bin/bash -le
+          set -x
+          echo "Running ba-rest E2E tests"
+          cd strato-worktree/blockapps-rest
+          DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead 
+          docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} .
+        '''
+      }
+    }
+      
+    stage('Release') {
+      steps {
+        withEnv(["REFSPEC=${env.REFSPEC}"]) {
+          withCredentials([
+            usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+            usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+          ]) {
+            sh '''#!/bin/bash -le
+              set -x
+              
+              rm -rf blockapps-rest
+              git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/blockapps-rest
+              cd blockapps-rest
+              rm -rf $(ls -A . | grep -v .git)
+              
+              cd ../strato-worktree/blockapps-rest/
+              BA_REST_VERSION=$(node -p "require('./package.json').version")
+              cp -r $(ls -A . | grep -v -E "$(cat .releaseignore)") ../../blockapps-rest/
+              
+              cd ../../blockapps-rest
+              if [ $(git tag --list v${BA_REST_VERSION}) ]; then
+                echo "Version ${BA_REST_VERSION} was already released previously. Please check the version tag in package.json"
+                exit 1
+              fi
+              
+              git add *
+              git -c "user.name=cd-blockapps" -c "user.email=support@blockapps.net" commit -m "v${BA_REST_VERSION}"
+              git push
+              git -c "user.name=cd-blockapps" -c "user.email=support@blockapps.net" tag "v${BA_REST_VERSION}"
+              git push --tags
+            '''
+            //TODO: release from blockapps/blockapps-rest to npm here
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      slackSend (
+        color: 'good',
+        message: "blockapps-rest release build successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+
+      slackSend (
+        channel: '#the-core',
+        color: 'good',
+        message: "blockapps-rest is released (https://github.com/blockapps/blockapps-rest/releases)"
+      )
+    }
+
+    failure {
+      slackSend (
+        color: 'danger',
+        message: "blockapps-rest release build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+  }
+}

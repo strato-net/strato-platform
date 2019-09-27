@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE MonoLocalBinds    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
@@ -20,10 +21,12 @@ import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import           Crypto.Util                          (i2bs_unsized)
+import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.Map                             as Map
 import           Data.Maybe                           (catMaybes)
 import           Data.List.Split                      (chunksOf)
+import qualified Data.Text                            as T
 import           Data.Time.Clock.POSIX
 import           Numeric
 
@@ -42,6 +45,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf                   (runKafkaConfigured)
+import           Blockchain.Output
 import           Blockchain.SHA
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
@@ -57,22 +61,26 @@ import           Text.Format
 initializeBlankStateDB :: (Modifiable StateRoot m, (StateRoot `A.Alters` NodeData) m) => m ()
 initializeBlankStateDB = initializeBlank >> setStateDBStateRoot emptyTriePtr
 
-putStorageTrie :: ( HasHashDB m
+putStorageTrie :: ( MonadLogger m
+                  , HasHashDB m
                   , Mem.HasMemAddressStateDB m
                   , HasStateDB m
                   , HasStorageDB m
+                  , HasMemStorageDB m
                   , (Ad.Address `A.Alters` AddressState) m
                   ) =>
                   Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
 putStorageTrie address slots = do
-    mapM_ (\(k, v) -> putStorageKeyVal' address k v) slots
+    mapM_ (uncurry $ putStorageKeyVal' address) slots
     flushMemStorageDB
     Mem.flushMemAddressStateDB
 
-putAccount :: ( HasHashDB m
+putAccount :: ( MonadLogger m
+              , HasHashDB m
               , Mem.HasMemAddressStateDB m
               , HasStateDB m
               , HasStorageDB m
+              , HasMemStorageDB m
               , (Ad.Address `A.Alters` AddressState) m
               )
            => AccountInfo
@@ -82,18 +90,20 @@ putAccount acc = case acc of
     A.insert A.Proxy address blankAddressState{addressStateBalance=balance'}
   ContractNoStorage address balance' codeHash' -> do
     A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
-                                              , addressStateCodeHash=EVMCode codeHash'
+                                              , addressStateCodeHash=codeHash'
                                               }
   ContractWithStorage address balance' codeHash' slots -> do
     A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
-                                              , addressStateCodeHash=EVMCode codeHash'
+                                              , addressStateCodeHash=codeHash'
                                               }
     putStorageTrie address slots
 
-initializeStateDB :: ( HasHashDB m
+initializeStateDB :: ( MonadLogger m
+                     , HasHashDB m
                      , Mem.HasMemAddressStateDB m
                      , HasStateDB m
                      , HasStorageDB m
+                     , HasMemStorageDB m
                      , (Ad.Address `A.Alters` AddressState) m
                      )
                   => [AccountInfo]
@@ -103,12 +113,15 @@ initializeStateDB addressInfo = do
     mapM_ putAccount addressInfo
     Mem.flushMemAddressStateDB
 
-initializeStateDBAndAccountInfos :: ( HasHashDB m
+initializeStateDBAndAccountInfos :: ( MonadLogger m
+                                    , HasHashDB m
                                     , Mem.HasMemAddressStateDB m
                                     , HasStorageDB m
+                                    , HasMemStorageDB m
                                     , Modifiable StateRoot m
                                     , (Ad.Address `A.Alters` AddressState) m
                                     , (StateRoot `A.Alters` NodeData) m
+                                    , MonadIO m
                                     )
                                  => [AccountInfo]
                                  -> String
@@ -118,14 +131,12 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
 
     let accountInfoFilename = genesisBlockName ++ "AccountInfo"
 
-    liftIO $ putStrLn $ "Attempting to read account info from file: " ++ accountInfoFilename
+    $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
+      "Attempting to read account info from file: " ++ accountInfoFilename
 
-    accountInfoString <-
+    accountInfoBatches <- fmap (chunksOf 10000 . BLC.lines) $
       liftIO $
       fmap (either (const ""::SomeException->BLC.ByteString) id) $ try $ BLC.readFile accountInfoFilename
-    let accountinfo = BLC.lines accountInfoString
-
-    let accountInfoBatches = chunksOf 10000 accountinfo
 
     forM_ (zip [(1::Integer)..] accountInfoBatches) $ \(batchCount, batch) -> do
       forM_ batch $ \theLine -> do
@@ -136,20 +147,23 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
            putStorageKeyVal' address (parseHex k) (parseHex v)
          ["a", a, b]  -> do
            let address = Ad.Address $ parseHex a
-           liftIO $ putStrLn $ "adding account: " ++ format address
+           $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
+             "adding account: " ++ format address
            A.insert A.Proxy address blankAddressState{addressStateBalance= read b}
          ["a", a, b, c]  -> do
            let address = Ad.Address $ parseHex a
-           liftIO $ putStrLn $ "adding account: " ++ format address
+           $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
+             "adding account: " ++ format address
            A.insert A.Proxy address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ SHA $ parseHex c}
          _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
 
-      liftIO $ putStrLn $ "flushing batch: " ++ show batchCount
+      $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
+        "flushing batch: " ++ show batchCount
       flushMemStorageDB
       Mem.flushMemAddressStateDB
 
     forM_ addressInfo $ \account -> do
-      liftIO $ print account
+      $logInfoS "initializeStateDBAndAccountInfos" . T.pack $ show account
       putAccount account
     Mem.flushMemAddressStateDB
 
@@ -160,20 +174,26 @@ parseHex theString =
    [(value, "")] -> value
    _ -> error $ "parseHex: error parsing string: " ++ theString
 
-initializeCodeDB :: HasCodeDB m => [CodeInfo] -> m ()
-initializeCodeDB = mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin))
+initializeCodeDB :: HasCodeDB m => String -> [CodeInfo] -> m ()
+initializeCodeDB "EVM" x = do
+  mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin)) x
+initializeCodeDB "SolidVM" x = do
+  mapM_ (addCode SolidVM . (\(CodeInfo _ src _) -> BC.pack $ T.unpack src)) x
+initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
-chainInfoToGenesisState :: ( HasCodeDB m
+chainInfoToGenesisState :: ( MonadLogger m
+                           , HasCodeDB m
                            , HasHashDB m
                            , Mem.HasMemAddressStateDB m
                            , HasStateDB m
                            , HasStorageDB m
+                           , HasMemStorageDB m
                            , (Ad.Address `A.Alters` AddressState) m
-                           )
-                          => ChainInfo
-                          -> m StateRoot
-chainInfoToGenesisState ci = do
-    initializeCodeDB (codeInfo $ chainInfo ci)
+                           ) =>
+                           String -> ChainInfo -> m StateRoot
+chainInfoToGenesisState vmType ci = do
+    initializeCodeDB vmType (codeInfo $ chainInfo ci)
+    
     initializeStateDB (accountInfo $ chainInfo ci)
     get (Proxy @StateRoot)
 
@@ -183,16 +203,21 @@ zipSourceInfo accounts codes =
       codeMap = Map.fromList . map hashPair $ codes
       findCodeFor :: AccountInfo -> Maybe (AccountInfo, CodeInfo)
       findCodeFor (NonContract _ _) = Nothing
-      findCodeFor acc@(ContractNoStorage _ _ hsh) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(ContractWithStorage _ _ hsh _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractNoStorage _ _ (EVMCode hsh)) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractWithStorage _ _ (EVMCode hsh) _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
   in catMaybes . map findCodeFor $ accounts
 
-genesisInfoToGenesisBlock :: ( HasCodeDB m
+genesisInfoToGenesisBlock :: ( MonadLogger m
+                             , HasCodeDB m
                              , HasHashDB m
                              , Mem.HasMemAddressStateDB m
                              , HasStateDB m
                              , HasStorageDB m
+                             , HasMemStorageDB m
                              , (Ad.Address `A.Alters` AddressState) m
+                             , MonadIO m
                              )
                           => GenesisInfo
                           -> String
@@ -201,7 +226,7 @@ genesisInfoToGenesisBlock :: ( HasCodeDB m
 genesisInfoToGenesisBlock gi gn as = do
     let codes = genesisInfoCodeInfo gi
     let accounts = genesisInfoAccountInfo gi
-    initializeCodeDB codes
+    initializeCodeDB "EVM" codes
     initializeStateDBAndAccountInfos accounts gn
     sr <- get (Proxy @StateRoot)
     let sourceInfo = zipSourceInfo (accounts ++ as) codes
@@ -211,7 +236,7 @@ genesisInfoToGenesisBlock gi gn as = do
             blockDataUnclesHash = genesisInfoUnclesHash gi,
             blockDataCoinbase = genesisInfoCoinbase gi,
             blockDataStateRoot = sr,
-            blockDataTransactionsRoot = genesisInfoTransactionsRoot gi,
+            blockDataTransactionsRoot = genesisInfoTransactionRoot gi,
             blockDataReceiptsRoot = genesisInfoReceiptsRoot gi,
             blockDataLogBloom = genesisInfoLogBloom gi,
             blockDataDifficulty = genesisInfoDifficulty gi,
@@ -231,6 +256,7 @@ initializeChainDBs :: ( HasCodeDB (t m)
                       , HasHashDB (t m)
                       , WrapsSQLDB t m
                       , HasStateDB (t m)
+                      , MonadIO (t m)
                       )
                    => Ext.Word256
                    -> ChainInfo
@@ -263,11 +289,11 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
         , A._actionTransactionSender = Ad.Address 0
         , A._actionData = Map.singleton a $
                            A.ActionData
-                             (EVMCode ch)
-                             EVM
+                             (codeHash d)
+                             vmType
                              (case storage d of
                                 EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
-                                SolidVMDiff _ -> error "TODO(tim): solid vm genesisblock support")
+                                SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map fromDiff m)
                              [A.emptyCallData]
         , A._actionMetadata = getMetadata ch
         }
@@ -276,7 +302,9 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
                case codeHash d of
                  EVMCode ch' -> ch'
                  SolidVMCode _ ch' -> ch'
-
+             vmType = case codeHash d of
+                 EVMCode _ -> EVM
+                 SolidVMCode _ _ -> SolidVM
       fromDiff (Value v) = v
       squashMap f = map (uncurry f) . Map.toList
       actions = squashMap toAction accountDiffs

@@ -8,7 +8,6 @@ module Blockchain.Blockstanbul.Authentication
 
 import Control.Applicative ((<|>))
 import Control.Monad (liftM2, liftM3, unless)
-import Control.Monad.IO.Class
 import Control.Lens
 import Data.Binary
 import Data.List (intercalate)
@@ -16,7 +15,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
-import MonadUtils (liftIO1)
 import Test.QuickCheck
 import Text.Printf
 
@@ -42,7 +40,7 @@ instance Arbitrary ExtraData where
 
 
 truncateExtra :: Block -> Block
-truncateExtra = over extraLens $ B.take 32
+truncateExtra = over extraLens scrubConsensus
 
 addValidators :: S.Set Address -> Block -> Block
 addValidators vs = over extraLens $
@@ -89,10 +87,10 @@ proposalMessage = unSHA
                 . over extraDataLens scrubAllSeals
                 . blockBlockData
 
-proposerSeal :: (MonadIO m) => Block -> HK.PrvKey -> m ExtendedSignature
+proposerSeal :: Block -> HK.PrvKey -> ExtendedSignature
 proposerSeal blk pk =
   let msg = proposalMessage blk
-  in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
+  in detExtSignMsg msg pk
 
 
 verifyProposerSeal :: Block -> ExtendedSignature -> Maybe Address
@@ -103,10 +101,10 @@ verifyProposerSeal blk sig =
 commitmentMessage :: SHA -> HK.Word256
 commitmentMessage (SHA dig) = unSHA . hash . (<> B.singleton 2) . word256ToBytes $ dig
 
-commitmentSeal :: (MonadIO m) => SHA -> HK.PrvKey -> m ExtendedSignature
+commitmentSeal :: SHA -> HK.PrvKey -> ExtendedSignature
 commitmentSeal sha pk =
   let msg = commitmentMessage sha
-  in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
+  in detExtSignMsg msg pk
 
 verifyCommitmentSeal :: SHA -> ExtendedSignature -> Maybe Address
 verifyCommitmentSeal sha sig =
@@ -120,23 +118,23 @@ finalHash = hash
           . over extraDataLens scrubCommitmentSeals
           . blockBlockData
 
-signBenfInfo  :: (MonadIO m) => HK.PrvKey -> (Address, Bool, Int) -> m ExtendedSignature
+signBenfInfo  :: HK.PrvKey -> (Address, Bool, Int) -> ExtendedSignature
 signBenfInfo pk bnf =
   let msg = unSHA . hash . BL.toStrict $ encode (bnf)
       -- addr = prvKey2Address pk
-  in HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
+  in detExtSignMsg msg pk
 
 verifyBenfInfo :: (Address, Bool, Int) -> ExtendedSignature -> Maybe Address
 verifyBenfInfo bnf sign =
   let msg = unSHA . hash . BL.toStrict $ encode (bnf)
   in pubKey2Address <$> getPubKeyFromSignature_fast sign msg
 
-signMessage :: (MonadIO m) => HK.PrvKey -> TrustedMessage -> m OutEvent
-signMessage pk tm = do
+signMessage :: HK.PrvKey -> TrustedMessage -> OutEvent
+signMessage pk tm =
   let msg = getHash tm
       addr = prvKey2Address pk
-  sig <- HK.withSource (liftIO1 HK.devURandom) $ extSignMsg msg pk
-  return . OMsg (MsgAuth addr sig) $ tm
+      sig = detExtSignMsg msg pk
+  in OMsg (MsgAuth addr sig) $ tm
 
 authenticate :: InEvent -> Bool
 authenticate (IMsg (MsgAuth addr sig) tm) =

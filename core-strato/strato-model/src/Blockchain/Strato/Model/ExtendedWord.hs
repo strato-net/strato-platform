@@ -106,7 +106,7 @@ slowBytesToWord256 bytes | length bytes == 32 =
                         "slowBytesToWord256 was called with the wrong number of bytes: " ++ show bytes
 
 bytesToWord256 :: B.ByteString -> Word256
-bytesToWord256 bytes | B.length bytes /= 32 = error $ "slowBytesToWord256f called with the wrong number of bytes: " ++ show bytes
+bytesToWord256 bytes | B.length bytes /= 32 = error $ "bytesToWord256 called with the wrong number of bytes: " ++ show bytes
                          | otherwise = unsafePerformIO $
   (BA.withByteArray bytes :: (Ptr Word64 -> IO Word256) -> IO Word256) $ \src -> do
     hh <- fromBE64 <$!> FS.peekElemOff src 0

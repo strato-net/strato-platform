@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE NoDeriveAnyClass           #-}
 {-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -26,6 +27,7 @@ import           Database.Persist.TH
 import qualified Data.Binary                             as BIN
 import qualified Data.ByteString                         as BS
 import qualified Data.ByteString.Short                   as BSS
+import           Data.Data
 import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
@@ -34,6 +36,7 @@ import           GHC.Generics
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.StateRoot
 import           Blockchain.SolidVM.Model
@@ -68,6 +71,26 @@ migrateAll = do
   exec "ALTER TABLE IF EXISTS transaction_result ALTER COLUMN response TYPE bytea USING response::bytea;"
   migrateAuto
 
+indexAll :: Migration
+indexAll = do
+  let exec = lift . lift . flip rawExecute []
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (number);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (total_difficulty);"
+
+  exec "CREATE INDEX CONCURRENTLY ON address_state_ref (address);"
+
+  exec "CREATE INDEX CONCURRENTLY ON raw_transaction (from_address);"
+  exec "CREATE INDEX CONCURRENTLY ON raw_transaction (to_address);"
+  exec "CREATE INDEX CONCURRENTLY ON raw_transaction (block_number);"
+  exec "CREATE INDEX CONCURRENTLY ON raw_transaction (tx_hash);"
+
+  exec "CREATE INDEX CONCURRENTLY ON storage (key);"
+
+  exec "CREATE INDEX CONCURRENTLY ON transaction_result (transaction_hash);"
+
 -- todo newtype me
 type Difficulty = Integer
 
@@ -87,3 +110,4 @@ instance NFData TXOrigin
 instance NFData RawTransaction
 instance NFData TransactionResult
 instance NFData LogDB
+instance NFData EventDB

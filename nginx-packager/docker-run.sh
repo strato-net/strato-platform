@@ -59,7 +59,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   else
     sed -i '/#TEMPLATE_MARK_NO_OAUTH/d' /tmp/nginx.conf
   fi
-  
+
   if [ "$OAUTH_STRATO42_FALLBACK" = true ]; then
     sed -i '/#TEMPLATE_MARK_OAUTH_STRATO_43_AND_ABOVE/d' /tmp/nginx.conf
   fi
@@ -115,6 +115,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
       sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
       sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
     fi
+    sed -i "s/<OAUTH_TEMPORARY_MIXED_AUTH>/${OAUTH_TEMPORARY_MIXED_AUTH:-false}/g" /tmp/openid.lua
   fi
 
   ########

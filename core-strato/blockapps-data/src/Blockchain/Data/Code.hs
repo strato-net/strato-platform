@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveGeneric #-}
 
-module Blockchain.Data.Code (Code(..)) where
+module Blockchain.Data.Code
+  ( module Blockchain.Strato.Model.Code
+  ) where
 
 import           Blockchain.Strato.Model.Code

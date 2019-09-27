@@ -1,6 +1,7 @@
 name: seqevents
 
 dependencies:
+  - aeson
   - base
   - binary
   - blockapps-data
@@ -14,9 +15,13 @@ dependencies:
   - derive
   - ethereum-rlp
   - format
+  - monad-alter
+  - prometheus-client
   - strato-conf
   - strato-model
   - QuickCheck
+  - text
+  - util
 
 library:
   source-dirs: src/

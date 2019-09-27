@@ -11,7 +11,7 @@ module Blockchain.SeqEventNotify (
   ) where
 
 import           Conduit
-import           Control.Monad.Change.Modify
+import           Control.Monad.Change.Modify (Modifiable(..))
 import           Control.Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import           Blockchain.Output
@@ -31,7 +31,7 @@ seqEventNotificationSource :: ( MonadIO m
                               , MonadResource m
                               , MonadLogger m
                               )
-                           => K.KafkaState -> ConduitM () OutputEvent m ()
+                           => K.KafkaState -> ConduitM () P2pEvent m ()
 seqEventNotificationSource ks = evalStateC ks $ do
     ofs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
     loop ofs'

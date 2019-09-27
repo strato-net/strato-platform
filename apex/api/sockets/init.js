@@ -10,8 +10,9 @@ const {
   BLOCKS_DIFFICULTY,
   GET_COINBASE,
   GET_HEALTH,
-  GET_NODE_UPTIME
- } = require('./rooms')
+  GET_NODE_UPTIME,
+  GET_SYSTEM_INFO
+} = require('./rooms')
 
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('./eventBroker')
 const userCountAggregator = require('./aggregators/userCount')
@@ -60,9 +61,11 @@ function init(server) {
     // register request for node health check
     registerRoomAllocation(socket, GET_HEALTH, getHealthAggregator.initialHydrateHealthStatus)
 
-
     // register request for node uptime duration
     registerRoomAllocation(socket, GET_NODE_UPTIME, getHealthAggregator.initialHydrateUptime)
+
+    // register request for node uptime duration
+    registerRoomAllocation(socket, GET_SYSTEM_INFO, getHealthAggregator.initialHydrateSystemInfo)
   });
 }
 

@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -19,6 +18,7 @@ module Blockchain.Data.RawTransaction (
 
 import           UnliftIO.Exception
 import           Control.Monad
+import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Reader
@@ -31,8 +31,8 @@ import           Blockchain.DBM
 
 
 insertRawTX :: HasSQLDB m => DebugMode -> [RawTransaction] -> m ()
-insertRawTX m rawTXs= do
-  db <- getSQLDB
+insertRawTX m rawTXs = do
+  db <- access Proxy
   runResourceT $ SQL.runSqlPool (insertRawTX' m rawTXs) db
 
 

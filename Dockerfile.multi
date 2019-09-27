@@ -34,6 +34,7 @@ COPY ./strato /strato
 EXPOSE 30303 30303/udp 3000
 HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
   CMD pgrep vm-runner || exit 1
+WORKDIR /var/lib/strato
 ENTRYPOINT ["/strato/doit.sh"]
 
 

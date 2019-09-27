@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+DNAME=$(docker exec -it strato_postgres_1 psql -h localhost -U postgres -t \
+  -c "select datname from pg_database where datname like '%eth_%';" | tr -d '[:space:]')
+spsql -d "${DNAME}" "$@"

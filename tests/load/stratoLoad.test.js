@@ -122,7 +122,8 @@ function factory_createUploadList(batchSize, batchIndex) {
         gasLimit: 10000000,
         gasPrice: 1,
         nonce: batchSize * batchIndex + i
-      }
+      },
+      metadata: {"VM": "SolidVM"}
     });
   }
   return txs;

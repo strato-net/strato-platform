@@ -1,10 +1,11 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module Blockchain.ExtendedECDSA.Model.ExtendedSignature where
 
 import Control.DeepSeq
 import Control.Monad
 import Data.Binary
 import qualified Data.ByteString as B
+import Data.Data
 import GHC.Generics
 import Test.QuickCheck
 
@@ -12,7 +13,7 @@ import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Internals as HK
 
-data ExtendedSignature = ExtendedSignature HK.Signature Bool deriving (Show, Eq, Generic)
+data ExtendedSignature = ExtendedSignature HK.Signature Bool deriving (Show, Eq, Generic, Data)
 
 instance Binary ExtendedSignature where
 

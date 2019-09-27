@@ -1,3 +1,4 @@
+{-# LANGUAGE NoDeriveAnyClass #-}
 module Network.Kafka.Protocol
   ( module Network.Kafka.Protocol
   ) where

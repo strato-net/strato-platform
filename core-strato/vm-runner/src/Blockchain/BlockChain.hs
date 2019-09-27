@@ -30,6 +30,7 @@ import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans.Except
+import           Data.Bifunctor                          (bimap)
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Short                   as BSS
 import           Data.Either.Extra
@@ -40,8 +41,8 @@ import           Data.Proxy
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
 import           Data.Time.Clock
-import           Blockchain.MilenaTools                  (withKafkaViolently)
 import           Prometheus                                as P
+import           System.Exit
 import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 import           UnliftIO.IORef
@@ -58,7 +59,10 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import           Blockchain.Data.LogDB
+import           Blockchain.Data.Event
+import           Blockchain.Data.EventDB
 import           Blockchain.Data.Transaction
+import           Blockchain.Data.TransactionDef          (formatChainId)
 import           Blockchain.Data.TransactionResult
 import           Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia      as MP
@@ -72,6 +76,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
 import           Blockchain.ExtWord
+import           Blockchain.MilenaTools                  (withKafkaViolently)
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM                      as SolidVM
@@ -97,6 +102,7 @@ import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
 import           Blockchain.Timing
+import qualified Blockchain.TxRunResultCache             as TRC
 
 import qualified Text.Colors                             as CL
 import           Text.Format
@@ -129,6 +135,7 @@ instance Bagger.MonadBagger ContextM where
             Just TFBlockGasLimitExceeded{}  -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
             Just f@TFInsufficientFunds{} -> recoverable f
             Just f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
+            Just f@TFChainIdMismatch{} -> recoverable f
             Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
 
     rewardCoinbases sr us uncles ourNumber = do
@@ -173,8 +180,39 @@ instance Bagger.MonadBagger ContextM where
                                        , transactionResultKind             = Nothing
                                        }
 
+    cacheRunResults bd (sr, gasRemaining, trrs) = when flags_cacheTransactionResults $ do
+      -- Private run results should not be cached, as on the second run
+      -- the hydrated transaction will reach a different stateroot.
+      -- Filtering them out makes the assumption that the inclusion of the unhydrated
+      -- private txs reach the same stateroot as the public txs alone.
+      let publicTrrs = filter ((== Nothing) . txChainId . trrTransaction) trrs
+          bhash = blockHeaderPartialHash bd
+      $logInfoLS "cacheRunResults" (bhash, length publicTrrs)
+      $logDebugLS "cacheRunResults" bd
+      cache <- State.gets contextTxRunResultsCache
+      liftIO $ TRC.insert cache bhash (sr, gasRemaining, publicTrrs)
+
+    getCachedRunResults bd =
+      if not flags_cacheTransactionResults
+        then return Nothing
+        else do
+          cache <- State.gets contextTxRunResultsCache
+          let pHash = blockHeaderPartialHash bd
+          mres <- liftIO $ TRC.lookup cache pHash
+          case mres of
+            Nothing -> do
+              $logInfoLS "getCachedRunResults/cache_miss" . T.pack $ format pHash
+              $logDebugLS "getCacheRunResults/cache_miss" bd
+              return Nothing
+            Just (sr, gasRemaining, trrs) -> do
+              $logInfoLS "getCachedRunResults/cache_hit" . T.pack $ format pHash
+              let trrs' = map (rewriteBlockHash (blockHeaderHash bd)) trrs
+              return $ Just (sr, gasRemaining, trrs')
+
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, SHA) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
+    WrongChainId   s q OutputTx{otHash=hsh, otBaseTx=bt} ->
+        (p' s q ++ "chainId (expected: main, actual: " ++ formatChainId (txChainId bt) ++ ")", hsh)
     NonceTooLow    s q expected OutputTx{otHash=hsh, otBaseTx=bt} ->
         (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hsh)
     BalanceTooLow  s q needed actual OutputTx{otHash=hsh} ->
@@ -190,17 +228,21 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
 -- todo: lovely!
 
 addBlocks :: [OutputBlock] -> ContextM [Action]
-addBlocks [] = return []
-addBlocks blocks' = do
+addBlocks unfiltered = do
+  let filtered = filter ((/= 0) . blockDataNumber . obBlockData) unfiltered
+      timerToUse = Just vmBlockInsertionMined
+  unless (null unfiltered) $
+    -- emit all blocks to the indexers
+    timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> unfiltered)
   bbi <- getContextBestBlockInfo
-  case bbi of
-    Unspecified -> return [] -- TODO: bootstrap private chains
-    ContextBestBlockInfo (_, oldHeader, _, _, _) -> do
-      let filtered = filter ((/= 0) . blockDataNumber . obBlockData) blocks'
+  case (filtered, bbi) of
+    ([], _) -> return []
+    (_, Unspecified) -> return []
+    (firstBlock:_, ContextBestBlockInfo (_, oldHeader, _, _, _)) -> do
       $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
-                                             (show . blockDataNumber . obBlockData $ head filtered))
+                                             (show . blockDataNumber . obBlockData $ firstBlock))
       didReplaceBest   <- liftIO (newIORef False)
-      ranPrivateTxs    <- liftIO (newIORef S.empty)
+      ranPrivateTxs    <- liftIO (newIORef M.empty)
       replacedBest     <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
       (actions, srLog') <- flip State.runStateT [] $ forM filtered $ \block ->
           let blockNo = blockDataNumber $! obBlockData block
@@ -210,36 +252,28 @@ addBlocks blocks' = do
         (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift $ replaceBestIfBetter block
         when didReplaceThisTime $ do
           writeIORef didReplaceBest True
-          writeIORef replacedBest (block, replacedBits)
+          writeIORef replacedBest replacedBits
           -- Gather a chain of better block stateroots. The last one found should be the best block,
           -- and the intermediate ones increase the granularity at which we can compute a sequence
           -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
           -- the diff between them, which is estimated by the number of transactions.
           id %= ((blockDataStateRoot $ obBlockData block, hsh, num, txCount):)
-        unless (S.null ranPriv) . liftIO $ do
-          modifyIORef' ranPrivateTxs (S.union ranPriv)
-          drb <- liftIO (readIORef didReplaceBest)
-          unless drb $ do
-            writeIORef replacedBest (block, replacedBits)
+        unless (M.null ranPriv) . liftIO $
+          modifyIORef' ranPrivateTxs $ flip M.unionWith ranPriv $
+            \(n1,s1) (n2,s2) -> if n1 > n2 then (n1,s1) else (n2,s2)
         return actions
       let srLog = reverse srLog'
       $logDebugLS "addBlocks/srLog" srLog
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
-      timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks') -- emit all blocks to the indexers
-      when (didReplaceBest' || not (S.null ranPrivateTxs')) $ do
+      when didReplaceBest' $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-        (theBlock, nbb) <- liftIO (readIORef replacedBest)
+        nbb <- liftIO (readIORef replacedBest)
         timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
         when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
-          calculateAndEmitStateDiffs srLog
-                                     (if didReplaceBest' then Just oldHeader else Nothing)
-                                     ranPrivateTxs'
-                                     theBlock
+          calculateAndEmitStateDiffs srLog oldHeader
+      when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
       return $ concat actions
-
-  where
-    timerToUse = Just vmBlockInsertionMined
 
 setParentStateRoot :: OutputBlock -> ContextM BlockSummary
 setParentStateRoot OutputBlock{..} = do
@@ -273,38 +307,21 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
-    s1 <- addToBalance (blockDataCoinbase bd) (rewardBase flags_testnet)
-    unless s1 $ error "addToBalance failed even after a check in addBlock"
-
-    forM_ uncles $ \uncle -> do
-        s2 <- addToBalance (blockDataCoinbase bd) (rewardBase flags_testnet `quot` 32)
-        unless s2 $ error "addToBalance failed even after a check in addBlock"
-
-        s3 <- addToBalance
-              (blockDataCoinbase uncle)
-            ((rewardBase flags_testnet * (8+blockDataNumber uncle - blockDataNumber bd )) `quot` 8)
-        unless s3 $ error "addToBalance failed even after a check in addBlock"
-
-    flushMemAddressStateDB -- needed in case there are no transactions in the block
 
     actions <- addBlockTransactions True b
 
-    sr <- Mod.get (Proxy @MP.StateRoot)
+    preRewardSR <- Mod.get (Proxy @MP.StateRoot)
+    postRewardSR <- Bagger.rewardCoinbases preRewardSR (blockDataCoinbase bd) uncles (blockDataNumber bd)
+    flushMemAddressStateDB
 
     -- If there are no transactions in th
     -- TODO: this should be handled more officially,
     -- e.g. adding a chainId to the block
     let skipCheck = (not $ null otxs)
                  && (isNothing . listToMaybe $ filter (isNothing . txChainId) otxs)
-                 -- TODO: Move vote setting into Bagger.
-                 -- Currently when a PBFT vote is set in the sequencer, the rewarded
-                 -- coinbases will change and the stateroot mismatches. If bagger
-                 -- sets the coinbase to the recipient of the vote, the initial stateroot
-                 -- it calculates will match the final one when the block is committed.
-                 || (blockDataMixHash bd == blockstanbulMixHash && blockDataCoinbase bd /= 0x0)
     unless skipCheck $ do
-      when (blockDataStateRoot (obBlockData b) /= sr) $ do
-        $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format sr
+      when (blockDataStateRoot (obBlockData b) /= postRewardSR) $ do
+        $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
         error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
 
       valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
@@ -326,24 +343,25 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 addBlockTransactions :: Bool -> OutputBlock -> ContextM [Action]
 addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
-  let chains' = partitionWith (txChainId . otBaseTx) . filter ((/= PrivateHash) . txType . otBaseTx) $ transactions
-      chains  = if runPublicTxs then chains' else filter (isJust . fst) chains'
-  fmap concat . forM chains $ \(chainId, txs) -> do
-    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ show chainId ++ " with " ++ show txs
+  $logDebugS "addBlockTransactions" . T.pack $ "AnchorChains: " ++ show (map (otAnchorChain &&& txType) transactions)
+  let f = if runPublicTxs then isAnchored else isAnchoredPrivate
+      chains = partitionWith otAnchorChain
+             . filter ((/= PrivateHash) . txType)
+             $ filter (f . otAnchorChain) transactions
+  fmap concat . forM chains $ \(anchor, txs) -> do
+    let chainId = fromAnchorChain anchor
+    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ formatChainId chainId ++ " with txs: " ++ show txs
     withBlockchain (blockHeaderHash bd) chainId $ do
       when flags_debug $ do
         sr <- Mod.get (Proxy @MP.StateRoot)
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "Old chain state root: " ++ format sr
-      $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ show chainId
-      actions <- addTransactions bd (blockDataGasLimit $ obBlockData b) txs -- TODO: Run the checks Bagger does reject invalid transactions for private chains
-
-      flushMemAddressStateTxToBlockDB
-
-
+      $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ formatChainId chainId
+      let canUseCache = chainId == Nothing
+      -- TODO: Run the checks Bagger does reject invalid transactions for private chains
+      (actions, asm) <- addTransactions chainId canUseCache bd (blockDataGasLimit $ obBlockData b) txs
       when (not flags_sqlDiff) $ timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $ do
-        asm <- getAddressStateBlockDBMap
-        lift $ updateSQLBalanceAndNonce $ [((theAddress, chainId), (addressStateBalance asMod, addressStateNonce asMod)) | (theAddress, ASModification asMod) <- M.toList asm]
---        lift $ updateSQLBalanceAndNonce $ map (fmap (\(ASModification x) -> (addressStateBalance x, addressStateNonce x))) $ M.toList asm
+        lift $ updateSQLBalanceAndNonce $ [((theAddress, chainId), (addressStateBalance asMod, addressStateNonce asMod))
+                                        | (theAddress, ASModification asMod) <- M.toList asm]
 
       timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
       timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
@@ -352,29 +370,52 @@ addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTrans
         $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "New chain state root: " ++ format sr'
       return actions
 
-addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM [Action]
-addTransactions bd bg ts = timeit ("addTransactions, " ++ show (length ts) ++ " TXs") (Just vmBlockInsertionMined) $
-  go bd bg ts []
+addTransactions :: Maybe Word256
+                -> Bool
+                -> BlockData
+                -> Integer
+                -> [OutputTx]
+                -> ContextM ([Action], M.Map Address AddressStateModification)
+addTransactions chainId canCache blockData blockGas0 txs =
+ timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
+  mtrrs <- if canCache
+            then Bagger.getCachedRunResults blockData
+            else return Nothing
+  trrs <- case mtrrs of
+    Nothing -> go blockGas0 txs []
+    Just (cachedSR, _, cachedTRRs) -> do
+      let cachedTXs = map trrTransaction cachedTRRs
+      when (flags_debug && txs /= cachedTXs) $ do
+        $logErrorS "addTransactions" "Invalid transaction cache entry"
+        $logErrorLS "addTransactions/cached" cachedTXs
+        $logErrorLS "addTransactions/from_block" txs
+        liftIO exitFailure
+      Mod.put Proxy cachedSR
+      return cachedTRRs
+  otrs <- mapM (outputTransactionResult blockData blockHeaderHash) trrs
+  let asms = M.unions . reverse $ map trrAfterMap trrs
+  return (catMaybes otrs, asms)
+
   where
-    go _ _ [] as = return . reverse $ catMaybes as
-    go b blockGas (t@OutputTx{otBaseTx=bt}:rest) as = do
+    go _ [] trrs = return $ reverse trrs
+    go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs = do
       flushMemAddressStateTxToBlockDB
-      flushStorageTxDBToBlockDB
+      flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
-      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction False b blockGas t
+      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
       afterMap <- getAddressStateTxDBMap
 
-      printTransactionMessage t result deltaT
+      printTransactionMessage t result deltaT (txChainId bt)
       P.setGauge vmTxMined (realToFrac deltaT)
 
-      mAction <- outputTransactionResult b blockHeaderHash $ TxRunResult t result deltaT beforeMap afterMap
+      trr <- setNewAddresses $ TxRunResult t result deltaT beforeMap afterMap []
 
       let remainingBlockGas =
             case result of
             Left _           -> blockGas
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
-      go b remainingBlockGas rest (mAction : as)
+      go remainingBlockGas rest (trr : trrs)
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
                                      , tmrRanTxs   :: [TxRunResult]
@@ -386,13 +427,13 @@ mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> Cont
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     flushMemAddressStateTxToBlockDB
-    flushStorageTxDBToBlockDB
+    flushMemStorageTxDBToBlockDB
     beforeMap <- getAddressStateTxDBMap
-    (!time', !result) <- timeIt . runExceptT $ addTransaction False header remGas tx
+    (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
-    printTransactionMessage tx result time'
-    let trr = TxRunResult tx result time' beforeMap afterMap
+    printTransactionMessage tx result time' (txChainId bt)
+    trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
         Right execResult -> do
           let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
@@ -403,8 +444,13 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
 
-addTransaction :: Bool -> BlockData -> Integer -> OutputTx -> ExceptT TransactionFailureCause ContextM ExecResults
-addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
+addTransaction :: Maybe Word256
+               -> Bool
+               -> BlockData
+               -> Integer
+               -> OutputTx
+               -> ExceptT TransactionFailureCause ContextM ExecResults
+addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
 
     nonceValid <- lift $ isNonceValid t
 
@@ -423,6 +469,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         realIG = fromIntegral intrinsicGas'
         maxGas = fromIntegral (maxBound :: Int)
+    when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
     when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
     when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
     when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
@@ -511,13 +558,13 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
 
   let owner = transactionTo ut
 
-
   codeHash <- addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
 
   let call =
         case codeHash of
           EVMCode _ -> EVM.call
-          SolidVMCode _ _ -> SolidVM.call
+          SolidVMCode _ _ ->  SolidVM.call
+
 
   call isRunningTests'
        isHomestead
@@ -560,12 +607,30 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
       txCost t' | isMessageTX t' = gTX
       txCost _  = if isHomestead then gCREATETX else gTX
 
---outputTransactionMessage::IO ()
+setNewAddresses :: TxRunResult -> ContextM TxRunResult
+setNewAddresses trr@(TxRunResult _ result _ before after _) = do
+  let isMod ASModification{} = True
+      isMod ASDeleted = False
+
+      split :: M.Map Address AddressStateModification -> (S.Set Address, S.Set Address)
+      split = bimap (S.fromList . M.keys) (S.fromList . M.keys) . M.partition isMod
+      (beforeAddresses, beforeDeletes) = split before
+      (afterAddresses, afterDeletes) = split after
+      modified = (afterAddresses S.\\ afterDeletes) S.\\ (beforeAddresses S.\\ beforeDeletes)
+      moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
+      moveToFront _ = S.toList modified
+  case result of
+    Left{} -> return trr
+    Right erResult -> do
+      unseen <- filterM (fmap not . NoCache.addressStateExists) . moveToFront $ erNewContractAddress erResult
+      return trr{trrNewAddresses = unseen}
+
+
 outputTransactionResult :: BlockData
                         -> (BlockData -> SHA)
                         -> TxRunResult
                         -> ContextM (Maybe Action)
-outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t} result deltaT beforeMap afterMap) = do
+outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t} result deltaT beforeMap afterMap newAddresses) = do
   let (txrStatus, message, gasRemaining) =
         case result of
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
@@ -583,24 +648,17 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
           afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
           afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
-          modified = (afterAddresses S.\\ afterDeletes) S.\\ (beforeAddresses S.\\ beforeDeletes)
-          defaultNewAddrs = S.toList modified
-          moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
-          moveToFront _ = defaultNewAddrs
           ranBlockHash = hashFunction b
           mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-          (!response, theTrace', theLogs) =
+          mkEventEntry Event{..} = EventDB chainId evName evArgs
+          (!response, theTrace', theLogs, theEvents) =
             case result of
-              Left _ -> (BSS.empty, [], []) --TODO keep the trace when the run fails
+              Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
               Right r ->
-                (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r)
-
-      newAddresses <-
-          case result of
-              Left _ -> return []
-              Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
+                (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
       enqueueLogEntries $ mkLogEntry <$> theLogs
+      enqueueEventEntries $ mkEventEntry <$> theEvents
       enqueueTransactionResult $
              TransactionResult { transactionResultBlockHash        = ranBlockHash
                                , transactionResultTransactionHash  = theHash
@@ -630,18 +688,19 @@ multilineLog source theLines = do
     $logInfoS source $ T.pack theLine
 
 printTransactionMessage::MonadLogger m=>
-                         OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->m ()
-printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash} (Left errMsg) deltaT = do
+                         OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->Maybe Word256 ->  m ()
+printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash} (Left errMsg) deltaT cid = do
   let tNonce = transactionNonce baseTx
   multilineLog "printTx/err" $ boringBox
     [ "Adding transaction signed by: " ++ format tAddr
     , "Tx hash:  " ++ format theHash
     , "Tx nonce: " ++ show tNonce
+    , "Chain Id: " ++ formatChainId cid
     , CL.red "Transaction failure: " ++ CL.red (format errMsg)
     , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
     ]
 
-printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Right results) deltaT = do
+printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Right results) deltaT cid = do
     let tNonce = transactionNonce t
         extra =
           if isMessageTX t
@@ -652,6 +711,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Ri
       [ "Adding transaction signed by: " ++ format tAddr
       , "Tx hash:  " ++ format theHash
       , "Tx nonce: " ++ show tNonce
+      , "Chain Id: " ++ formatChainId cid
       , shortDescription t ++ " " ++ extra
       , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
       ]
@@ -664,7 +724,7 @@ indexMaybe (_:rest) i = indexMaybe rest (i-1)
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> ContextM (Bool, S.Set Word256, (SHA, Integer, Integer))
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, M.Map Word256 (Integer, SHA), (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     bbi <- getContextBestBlockInfo
 
@@ -685,7 +745,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
                             || (newNumber > oldNumber)
                             || ((newNumber == oldNumber) && (td > oldBestDifficulty))
                             || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
-            ranPriv = S.fromList . catMaybes $ map txChainId txs
+            ranPriv = M.fromSet (const (newNumber, bH)) . S.fromList . catMaybes $ map txChainId txs
 
         $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
@@ -712,28 +772,23 @@ splitCreateDiffs =
      in S.toList . S.fromList . srch
 
 calculateAndEmitStateDiffs :: [(MP.StateRoot, SHA, Integer, Int)]
-                           -> Maybe BlockData
-                           -> S.Set Word256
-                           -> OutputBlock
+                           -> BlockData
                            -> ContextM ()
-calculateAndEmitStateDiffs srLog mOldPubHeader chainIds newBlock = do
-    case mOldPubHeader of
-      Nothing -> return ()
-      Just oldHeader -> do
-        let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
-            diffLog = compactDiffs base srLog
-        runConduit $ yieldMany diffLog
-                  .| mapMC completeDiff
-                  .| mapM_C (lift . commitSqlDiffs)
-    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show (S.map (format . SHA) chainIds)
-    let newHeader    = blockHeader newBlock
-        newHash      = blockHash newBlock
-        newNumber    = blockHeaderOrdering newHeader
-    chainDiffs <- chainDiff newNumber newHash $ S.toList chainIds
+calculateAndEmitStateDiffs srLog oldHeader = do
+  let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
+      diffLog = compactDiffs base srLog
+  runConduit $ yieldMany diffLog
+            .| mapMC completeDiff
+            .| mapM_C (lift . commitSqlDiffs)
 
-    $logInfoS "calculateAndEmitStateDiffs" "Calculating all new code hashes"
-
-    forM_ chainDiffs $ lift . commitSqlDiffs
+calculateAndEmitChainDiffs :: M.Map Word256 (Integer, SHA) -> ContextM ()
+calculateAndEmitChainDiffs chainMap = do
+  let chainList = M.toList chainMap
+      chainIds = format . SHA . fst <$> chainList
+  $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
+  chainDiffs <- fmap catMaybes . forM chainList $
+    \(cId, (newNumber, newHash)) -> chainDiff cId newNumber newHash
+  forM_ chainDiffs $ lift . commitSqlDiffs
 
 diffMaxCost :: Int
 diffMaxCost = 500
