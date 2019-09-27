@@ -12,14 +12,14 @@ import {
 import { env } from '../../../../env';
 import { handleErrors } from '../../../../lib/handleErrors';
 
-const blocUrl = env.BLOC_URL + "/users/:user/:address/send?resolve&:chainid"
-const transactionUrl = env.STRATO_URL_V23 + "/transaction?resolve=true"
+const blocSendUrl = env.BLOC_URL + "/users/:user/:address/send?resolve&:chainid"
+const transactionUrl = env.STRATO_URL_V23 + "/transaction?resolve=true&:chainid"
 
 export function sendTokensAPICall(from, fromAddress, toAddress, value, password, chainId) {
-
-  const sendUrl = blocUrl.replace(":user", from).replace(":address", fromAddress);
-  const chainUrl = chainId ? sendUrl.replace(":chainid", `chainid=${chainId}`) : sendUrl.replace("&:chainid", '');
-  const url = env.OAUTH_ENABLED ? transactionUrl : chainUrl;
+  const sendUrl = blocSendUrl.replace(":user", from).replace(":address", fromAddress);
+  const blocUrl = chainId ? sendUrl.replace(":chainid", `chainid=${chainId}`) : sendUrl.replace("&:chainid", '');
+  const oauthUrl = chainId ? transactionUrl.replace(":chainid", `chainid=${chainId}`) : transactionUrl.replace("&:chainid", '');
+  const url = env.OAUTH_ENABLED ? oauthUrl : blocUrl;
 
   const blocBody = { value, password, toAddress };
   const oauthBody = {
@@ -27,7 +27,10 @@ export function sendTokensAPICall(from, fromAddress, toAddress, value, password,
       {
         "payload": {
           "toAddress": toAddress,
-          "value": value
+          "value": value,
+          "metadata": {
+
+          }
         },
         "type": "TRANSFER"
       }

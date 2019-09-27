@@ -17,12 +17,10 @@ import { handleErrors } from '../../../../lib/handleErrors';
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress?:chainid";
 const blocMethodUrl = env.BLOC_URL + "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve&:chainid";
-const transactionUrl = env.STRATO_URL_V23 + "/transaction?resolve=true"
+const transactionUrl = env.STRATO_URL_V23 + "/transaction?resolve=true&:chainid"
 
 export function getArgs(contractName, contractAddress, symbol, chainId) {
-  const localContractUrl = contractsUrl
-    .replace(':contractName', contractName)
-    .replace(':contractAddress', contractAddress);
+  const localContractUrl = contractsUrl.replace(':contractName', contractName).replace(':contractAddress', contractAddress);
   return fetch(
     chainId ? localContractUrl.replace(":chainid", `chainid=${chainId}`) : localContractUrl.replace("?:chainid", ''),
     {
@@ -47,9 +45,11 @@ export function postMethodCall(payload) {
     .replace(':userAddress', payload.userAddress)
     .replace(":contractName", payload.contractName)
     .replace(":contractAddress", payload.contractAddress);
-  const chainUrl = payload.chainId ? localMethodUrl.replace(":chainid", `chainid=${payload.chainId}`) : localMethodUrl.replace("&:chainid", '');
 
-  const url = env.OAUTH_ENABLED ? transactionUrl : chainUrl;
+  const methodUrl = payload.chainId ? localMethodUrl.replace(":chainid", `chainid=${payload.chainId}`) : localMethodUrl.replace("&:chainid", '');
+  const oauthUrl = payload.chainId ? transactionUrl.replace(":chainid", `chainid=${payload.chainId}`) : transactionUrl.replace("&:chainid", '');
+
+  const url = env.OAUTH_ENABLED ? oauthUrl : methodUrl;
 
   const blocBody = {
     password: payload.password,
