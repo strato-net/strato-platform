@@ -354,5 +354,4 @@ until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
   sleep 1
 done
 
-global-db --pghost $pgHost || { echo "Ignoring."; true; } # If it fails, it just means we already created the global db
 newnode
