@@ -120,6 +120,7 @@ pipeline {
           'Track And Trace': {
             sh 'rm -rf track-and-trace && git clone https://github.com/blockapps/track-and-trace.git'
             dir('track-and-trace') {
+              sh 'git checkout oauth42style'
               sh 'git submodule update --init --recursive'
               sh 'sed -i "s/localhost:8080/localhost/g" server/config/localhost.config.yaml'
               dir('server') {
@@ -196,17 +197,15 @@ pipeline {
 
     stage('Redeploy with OAuth') {
       steps {
-        dir ('strato-getting-started') {
+        sh '''#!/bin/bash -le
+          set -x
+          cd strato-getting-started
           sh 'rm -rf strato_logs*'
           sh './fetchlogs --as-dir'
           sh 'rm -rf strato_pipeline_logs'
           sh 'mkdir strato_pipeline_logs'
           sh 'mv strato_logs strato_logs_nonoauth'
           sh 'mv strato_logs_nonoauth strato_pipeline_logs/'
-        }
-        sh '''#!/bin/bash -le
-          set -x
-          cd strato-getting-started
          ./strato.sh --wipe
           export NODE_HOST=$(</host)
           export genesis=smokeTest
@@ -240,7 +239,6 @@ pipeline {
           echo "Restarting docker containers to simulate computer restart..."
           docker-compose -p strato --log-level ERROR stop
           docker-compose -p strato --log-level ERROR start
-          PASSWORD=${PASSWORD} ./strato --set-password
           check_bloc
           docker exec strato_bloc_1 curl http://vault-wrapper:8000/strato/v2.3/password -H "Content-Type: application/json" -d '"testPassword"'
         '''
@@ -250,20 +248,6 @@ pipeline {
     stage('Test with OAuth Node') {
       steps {
         parallel (
-          'Push images': {
-            withCredentials([
-              usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
-            ]) {
-              archiveArtifacts artifacts: "strato-worktree/docker-compose.yml"
-              sh '''#!/bin/bash -le
-                set -x
-                docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                cd strato-worktree
-                docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
-              '''
-            }
-          },
-
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -276,9 +260,8 @@ pipeline {
           'Track And Trace': {
             sh 'rm -rf track-and-trace && git clone https://github.com/blockapps/track-and-trace.git'
             dir('track-and-trace') {
-              sh 'git checkout oauth42style'
+              sh 'git checkout STRATO-1561_OAuth_compat'
               sh 'git submodule update --init --recursive'
-              sh 'sed -i "s/localhost:8080/localhost/g" server/config/localhost.config.yaml'
               dir('server') {
                 sh 'touch .env'
                 sh 'yarn build'
@@ -320,25 +303,6 @@ pipeline {
                 }
               }
             }
-          },
-
-
-          'Core Strato tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo "Running core-strato unit tests"
-              cd strato-worktree/core-strato
-              ./run_unit_tests.sh
-            '''
-          },
-
-          'Bloch tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running BlockApps Haskell tests'
-              cd strato-worktree/blockapps-haskell
-              ./run_unit_tests.sh
-            '''
           },
 
           'Shared tests': {
