@@ -143,8 +143,6 @@ txAndTime2RawTX origin tx blkNum time =
   case tx of
     (MessageTX nonce' gp gl to' val dat cid r s v md) ->
         RawTransaction time signer nonce' gp gl (Just to') val dat (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
-    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _ _ _) ->
-        error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
     (ContractCreationTX nonce' gp gl val (Code init') cid r s v md) ->
         RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (PrivateHashTX h ch) ->

@@ -46,7 +46,9 @@ local authenticate_opts = {
   renew_access_token_on_expiry = true,
   access_token_expires_in = 300,
   logout_path = "/auth/logout",
-  post_logout_redirect_uri = node_host_with_protocol
+  post_logout_redirect_uri = node_host_with_protocol,
+  -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
+  revoke_tokens_on_logout = true
 }
 
 -- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)

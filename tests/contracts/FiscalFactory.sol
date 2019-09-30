@@ -76,7 +76,6 @@ contract Fiscal {
 
 contract FiscalFactory {
 
-  event FiscalEvent(Fiscal x);
 
   function createFiscal( string src_countryCode
                        , string src_currencyCode
@@ -119,8 +118,6 @@ contract FiscalFactory {
                          , fakeTransaction
                          );   
 
-     emit FiscalEvent(t);
-     emit MemberAdded("1234567", "123457");
   } 
 
   function generateFiscal( string src_countryCode

@@ -8,16 +8,13 @@ declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
 function newnode {
-  initialize=false
 
-  mkdir -p logs/rotation
-
-  if [[ ! -d .ethereumH ]]
-  then initialize=true
-       cleanupDB
-       doInit
+  if [[ ! -d .ethereumH ]] ; then
+    mkdir logs
+    cleanupDB
+    doInit
   else
-       sleep 10
+    sleep 10
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
@@ -153,8 +150,8 @@ function newnode {
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
     runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
 
-  echo "Configuring log maintenance"
-  runBackgroundProcess cleanupLogs
+  echo "Configuring log rotation..."
+  runBackgroundProcess logRotation
 
   set +x
   if [ "${PROCESS_MONITORING}" = true ] ; then
@@ -227,27 +224,49 @@ function doInit {
   else
     actualMinPeers=$numMinPeers
   fi
-  cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
-                    --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-                    --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
-                    --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty $xfFlag"
+  args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
+        --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
+        --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
+        --addBootnodes=$addBootnodes $stratoBootnode \
+        --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty $xfFlag"
 
-  echo "strato-setup command: $cmd"
-  # logging to stdout and log file:
-  NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
-  if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-    tail -f /dev/null
+  if ${splitinit:-false} ; then
+    #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
+    cmd="tabula-rasa $args"
+
+    echo "init event source: $cmd"
+    # logging to stdout and log file:
+    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+      tail -f /dev/null
+    fi
+    init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+      tail -f /dev/null
+    fi
+  else
+    cmd="strato-setup $args"
+
+    echo "strato-setup command: $cmd"
+    # logging to stdout and log file:
+    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+      tail -f /dev/null
+    fi
   fi
 }
 
 # Find all logs greater than 10M, then copy and truncate
-function cleanupLogs {
+function logRotation {
+  mkdir -p logs/rotation
   while true
   do
     sleep 900 ;
-    find $PWD/logs/ -maxdepth 1 -type f -size +10M -exec /bin/cp -rf {} $PWD/logs/rotation/ \; -exec truncate -s 0 {} \;
+    find logs/ -maxdepth 1 -type f -size +10M -exec /bin/cp -rf {} logs/rotation/ \; -exec truncate -s 0 {} \;
+    echo "Log files were rotated at $(date '+%Y-%m-%d %H:%M:%S')"
   done
 }
 

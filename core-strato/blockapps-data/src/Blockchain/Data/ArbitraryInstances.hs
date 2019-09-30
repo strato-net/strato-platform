@@ -126,10 +126,7 @@ instance Arbitrary Transaction where
                           createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId md prvKey
 
 instance Arbitrary Code where
-    -- PrecompiledCode can't be serialized!
-    arbitrary = do
-        randomCode <- arbitrary
-        return $ Code { codeBytes = randomCode }
+  arbitrary = Code <$> arbitrary
 
 instance Arbitrary StateRoot where
     arbitrary = StateRoot <$> fastRandBs 32
