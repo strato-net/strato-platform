@@ -11,7 +11,7 @@ const sinon = require('sinon');
 const rp = require('request-promise');
 const rewire = require('rewire');
 
-const tools = require('../migrations/init-script/initdb.js');
+const tools = require('../migrations/init-script/createdb.js');
 const models = require('../models');
 const createInitialData = require('../migrations/init-script/init');
 const appConfig = require('../config/app.config');
@@ -70,7 +70,7 @@ describe('non-OAuth/public Auth tests', function () {
         throw error;
       }
     }
-    await tools.initdb();
+    await tools.createdb();
     await models.sequelize.sync();
     await createInitialData();
     await models.User.create({

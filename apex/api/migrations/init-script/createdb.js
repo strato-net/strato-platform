@@ -1,10 +1,10 @@
 const env       = process.env.NODE_ENV || 'development';
 const config    = require(__dirname + '/../../config/config.json')[env];
-config.port = process.env.postgresPort || config.port;
+config.port = process.env.postgres_port || config.port;
 
 const pgtools = require('pgtools');
 
-function initdb() {
+function createdb() {
   // create db in postgres if does not exist
   const pgToolsConfig = {
     user: config.username,
@@ -41,6 +41,6 @@ function dropdb() {
 };
 
 module.exports = {
-  initdb,
-  dropdb
-}
+  createdb,
+  dropdb,
+};

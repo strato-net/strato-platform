@@ -11,12 +11,24 @@ const config = require('../config/app.config');
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-setTimeout(queryHealthStatus, config.healthCheck.initialDatabaseTimout);
-setInterval(queryHealthStatus, config.healthCheck.progressWindow);
 
+(async() => {
+    await singleCheck()
+    setInterval(async () => {
+        await singleCheck()
+    }, config.healthCheck.stallCheckProgressWindow);
+})();
+
+async function singleCheck() {
+    try {
+        await queryHealthStatus();
+        winston.info('Stall check made at ' + moment().format());
+    } catch (err) {
+        winston.error('Stall check error: ' + err.message);
+    }
+}
 
 function queryHealthStatus() {
-    winston.info('Stalling Status Checked at ' + moment().format());
     return new Promise(async (resolve, _void) => {
 
         try {

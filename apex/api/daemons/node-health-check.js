@@ -2,7 +2,6 @@ const winston = require('winston-color');
 const models = require('../models');
 const Promise = require('bluebird');
 const rp = require('request-promise');
-const env = process.env.NODE_ENV || 'development';
 const moment = require('moment');
 const si = require('systeminformation');
 const disk = require('diskusage');
@@ -22,14 +21,22 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 // DAEMON - query node-health-check every N sec
 winston.info('Starting node-health-check with a delay of', config.healthCheck.pollFrequency);
-setInterval(async () => {
-    try {
-        await queryHealthStatus();
-        winston.info('Health Status queried at ' + moment().format());
-    } catch (err) {
-        winston.error(' Health Status error: ' + err.message);
-    }
-}, config.healthCheck.pollFrequency);
+
+(async() => {
+  await singleCheck()
+  setInterval(async () => {
+    await singleCheck()
+  }, config.healthCheck.pollFrequency);
+})();
+
+async function singleCheck() {
+  try {
+    await queryHealthStatus();
+    winston.info('Health Status queried at ' + moment().format());
+  } catch (err) {
+    winston.error(' Health Status error: ' + err.message);
+  }
+}
 
 function queryHealthStatus() {
     return new Promise(async (resolve, _void) => {
@@ -41,24 +48,22 @@ function queryHealthStatus() {
             await updateCurrentHealth(overallStatus);
             return resolve();
         } catch (error) {
-            winston.warn(`Error ${error.message ? error.message : ''} occurred while querying health status`);
+            winston.error(`Error occurred while querying some of the health info: "${error.message ? error.message : 'no message'}"`);
+            return resolve();
         }
     }).timeout(config.healthCheck.requestTimeout - 80);
 }
 
 function getHealthPrometheus() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost';
+  if (!process.env['prometheusHost']) {
+    throw Error('prometheusHost env var is not set - unable to get prometheus data');
+  }
     const options = {
         method: 'GET',
-        url: `http://${ipaddr}/prometheus/api/v1/query?query=health_check`,
+        url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=health_check`,
         followRedirects: false,
         timeout: config.healthCheck.requestTimeout-100,
         json: true,
-        // TODO: Modify to work with secured networks
-        auth: {
-            'user': 'admin',
-            'pass': 'admin'
-        }
     };
     return rp(options);
 }
