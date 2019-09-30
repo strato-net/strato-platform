@@ -61,17 +61,7 @@ describe('non-OAuth/public Auth tests', function () {
     if(SKIP_TEST_BLOCK){
         this.skip();
     }
-
-    try {
-      await tools.dropdb();
-    } catch (error) {
-      // Ignore errors about dropping nonexistent dbs.
-      if (error.name != 'invalid_catalog_name') {
-        throw error;
-      }
-    }
-    await tools.createdb();
-    await models.sequelize.sync();
+    
     await createInitialData();
     await models.User.create({
       username: 'test@test.com',
