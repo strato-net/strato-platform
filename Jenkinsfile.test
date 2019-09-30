@@ -199,12 +199,12 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           cd strato-getting-started
-          sh 'rm -rf strato_logs*'
-          sh './fetchlogs --as-dir'
-          sh 'rm -rf strato_pipeline_logs'
-          sh 'mkdir strato_pipeline_logs'
-          sh 'mv strato_logs strato_logs_nonoauth'
-          sh 'mv strato_logs_nonoauth strato_pipeline_logs/'
+          rm -rf strato_logs*
+          ./fetchlogs --as-dir
+          rm -rf strato_pipeline_logs
+          mkdir strato_pipeline_logs
+          mv strato_logs strato_logs_nonoauth
+          mv strato_logs_nonoauth strato_pipeline_logs/
          ./strato.sh --wipe
           export NODE_HOST=$(</host)
           export genesis=smokeTest
