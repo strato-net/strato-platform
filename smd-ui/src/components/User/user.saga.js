@@ -149,8 +149,12 @@ function* logout() {
 function* getOrCreateOauthUser() {
   try {
     const user = yield call(getOrCreateOauthUserApi);
-    localStorage.setItem('user', JSON.stringify(user));
-    yield put(getOrCreateOauthUserSuccess(user));
+    if (user.error) {
+      window.location.href = '/auth/logout'
+    } else {
+      localStorage.setItem('user', JSON.stringify(user));
+      yield put(getOrCreateOauthUserSuccess(user));
+    }
   } catch (e) {
     yield put(getOrCreateOauthUserFailure(e));
   }
