@@ -14,16 +14,37 @@ Object {
     "nonce": 0,
     "source": "",
   },
-  "currentUser": Object {
+  "faucet": Object {
     "accountAddress": "5d04537908d44f458acb24b0f2c863ccd2bd3a13",
+    "status": true,
   },
+  "name": "name",
+  "oauthAccount": Object {
+    "address": "5d04537908d44f458acb24b0f2c863ccd2bd3a13",
+    "balance": "1000000000000000000000",
+    "code": "",
+    "codeHash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+    "contractRoot": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    "kind": "AddressStateRef",
+    "latestBlockNum": 26,
+    "next": "/eth/v1.2/account?address=5d04537908d44f458acb24b0f2c863ccd2bd3a13&index=18",
+    "nonce": 0,
+    "source": "",
+  },
+  "selectedChain": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
 }
 `;
 
 exports[`Account: index mapStateToProps without values 1`] = `
 Object {
   "account": null,
-  "currentUser": null,
+  "faucet": Object {
+    "accountAddress": null,
+    "status": true,
+  },
+  "name": null,
+  "oauthAccount": null,
+  "selectedChain": null,
 }
 `;
 

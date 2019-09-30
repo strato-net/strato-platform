@@ -81,7 +81,6 @@ export function mapStateToProps(state) {
     account: state.accounts.currentAccountDetail,
     oauthAccount: state.oauthAccounts.account,
     name: state.oauthAccounts.name,
-    currentUser: state.user.currentUser,
     selectedChain: state.chains.selectedChain,
     faucet: state.oauthAccounts.faucet,
   };

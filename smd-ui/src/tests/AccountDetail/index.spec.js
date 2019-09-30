@@ -10,7 +10,10 @@ describe('Account: index', () => {
       const props = {
         currentUser: {},
         account: null,
-        fetchCurrentAccountDetail: jest.fn()
+        fetchCurrentAccountDetail: jest.fn(),
+        faucet: {
+          accountAddress: null
+        }
       };
 
       const wrapper = shallow(
@@ -44,10 +47,16 @@ describe('Account: index', () => {
     test('with values', () => {
       const state = {
         accounts: { currentAccountDetail: accountDetails[0] },
-        user: {
-          currentUser: {
-            accountAddress: "5d04537908d44f458acb24b0f2c863ccd2bd3a13",
-          }
+        oauthAccounts: {
+          name: 'name',
+          faucet: {
+            accountAddress: '5d04537908d44f458acb24b0f2c863ccd2bd3a13',
+            status: true
+          },
+          account: accountDetails[0]
+        },
+        chains: {
+          selectedChain: 'ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9'
         }
       };
 
@@ -57,8 +66,16 @@ describe('Account: index', () => {
     test('without values', () => {
       const state = {
         accounts: { currentAccountDetail: null },
-        user: {
-          currentUser: null
+        oauthAccounts: {
+          name: null,
+          faucet: {
+            accountAddress: null,
+            status: true
+          },
+          account: null
+        },
+        chains: {
+          selectedChain: null
         }
       };
 
