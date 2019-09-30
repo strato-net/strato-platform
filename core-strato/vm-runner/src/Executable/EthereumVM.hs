@@ -110,10 +110,10 @@ ethereumVM = void . execContextM $ do
         let txPairs = [(ts,t) | VmTx ts t <- seqEvents]
             allTxs = map (uncurry VmTx) txPairs
             blocks = [b | VmBlock b <- seqEvents]
-       -- when (not $ null txPairs) . void
-       --                           . K.withKafkaViolently
-       --                           . writeIndexEvents
-       --                           $ map (uncurry IndexTransaction) txPairs
+        when (not $ null txPairs) . void
+                                  . K.withKafkaViolently
+                                  . writeIndexEvents
+                                  $ map (uncurry IndexTransaction) txPairs
         let ptxs = [IndexPrivateTx t | VmPrivateTx t <- seqEvents]
         when (not $ null ptxs) . void
                                . K.withKafkaViolently
