@@ -12,7 +12,7 @@ import { env } from '../env';
 import LoadingBar from 'react-redux-loading-bar'
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { isModePublic } from '../lib/checkMode';
+import { isModePublic, isOauthEnabled } from '../lib/checkMode';
 import { getOrCreateOauthUserRequest } from '../components/User/user.actions';
 import { getUserFromLocal } from '../lib/localStorage';
 
@@ -22,7 +22,7 @@ mixpanelWrapper.identify(env.NODE_NAME);
 class App extends Component {
 
   componentDidMount() {
-    if (env.OAUTH_ENABLED && !getUserFromLocal()) {
+    if (isOauthEnabled() && !getUserFromLocal()) {
       this.props.getOrCreateOauthUserRequest();
     }
   }

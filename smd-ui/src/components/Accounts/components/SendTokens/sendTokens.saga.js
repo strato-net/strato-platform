@@ -11,6 +11,7 @@ import {
 
 import { env } from '../../../../env';
 import { handleErrors } from '../../../../lib/handleErrors';
+import { isOauthEnabled } from '../../../../lib/checkMode';
 
 const blocSendUrl = env.BLOC_URL + "/users/:user/:address/send?resolve&:chainid"
 const transactionUrl = env.STRATO_URL_V23 + "/transaction?resolve=true&:chainid"
@@ -19,7 +20,7 @@ export function sendTokensAPICall(from, fromAddress, toAddress, value, password,
   const sendUrl = blocSendUrl.replace(":user", from).replace(":address", fromAddress);
   const blocUrl = chainId ? sendUrl.replace(":chainid", `chainid=${chainId}`) : sendUrl.replace("&:chainid", '');
   const oauthUrl = chainId ? transactionUrl.replace(":chainid", `chainid=${chainId}`) : transactionUrl.replace("&:chainid", '');
-  const url = env.OAUTH_ENABLED ? oauthUrl : blocUrl;
+  const url = isOauthEnabled() ? oauthUrl : blocUrl;
 
   const blocBody = { value, password, toAddress };
   const oauthBody = {
@@ -37,7 +38,7 @@ export function sendTokensAPICall(from, fromAddress, toAddress, value, password,
     ]
   }
 
-  const body = env.OAUTH_ENABLED ? oauthBody : blocBody;
+  const body = isOauthEnabled() ? oauthBody : blocBody;
 
   return fetch(
     url,
@@ -70,7 +71,7 @@ export function* sendTokens(action) {
       action.password,
       action.chainId
     );
-    const data = env.OAUTH_ENABLED ? response[0] : response;
+    const data = isOauthEnabled() ? response[0] : response;
     yield put(sendTokensSuccess(data));
   }
   catch (err) {

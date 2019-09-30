@@ -15,6 +15,7 @@ import { fetchCirrusInstances } from '../Contracts/components/ContractCard/contr
 import { env } from '../../env';
 import { COMPILE_CHAIN_CONTRACT_REQUEST, compileChainContractSuccess, compileChainContractFailure } from '../CreateChain/createChain.actions';
 import { handleErrors } from '../../lib/handleErrors';
+import { isOauthEnabled } from '../../lib/checkMode';
 
 const userContractUrl = env.BLOC_URL + "/users/:user/:address/contract?resolve&:chainid"
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
@@ -27,7 +28,7 @@ export function createContractApiCall(contract, src, username, address, password
   const blocUrl = chainId ? contractUrl.replace(":chainid", `chainid=${chainId}`) : contractUrl.replace("&:chainid", '')
   const oauthUrl = chainId ? transactionUrl.replace(":chainid", `chainid=${chainId}`) : transactionUrl.replace("&:chainid", '');
 
-  const url = env.OAUTH_ENABLED ? oauthUrl : blocUrl;
+  const url = isOauthEnabled() ? oauthUrl : blocUrl;
 
   const blocBody = { contract, value: 0, password, src, args, metadata };
   const oauthBody = {
@@ -44,7 +45,7 @@ export function createContractApiCall(contract, src, username, address, password
     ]
   }
 
-  const body = env.OAUTH_ENABLED ? oauthBody : blocBody;
+  const body = isOauthEnabled() ? oauthBody : blocBody;
 
   return fetch(
     url,

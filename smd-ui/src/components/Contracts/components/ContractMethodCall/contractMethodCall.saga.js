@@ -14,6 +14,7 @@ import {
 import { fetchState } from '../ContractCard/contractCard.actions';
 import { env } from '../../../../env.js'
 import { handleErrors } from '../../../../lib/handleErrors';
+import { isOauthEnabled } from '../../../../lib/checkMode';
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress?:chainid";
 const blocMethodUrl = env.BLOC_URL + "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve&:chainid";
@@ -49,7 +50,7 @@ export function postMethodCall(payload) {
   const methodUrl = payload.chainId ? localMethodUrl.replace(":chainid", `chainid=${payload.chainId}`) : localMethodUrl.replace("&:chainid", '');
   const oauthUrl = payload.chainId ? transactionUrl.replace(":chainid", `chainid=${payload.chainId}`) : transactionUrl.replace("&:chainid", '');
 
-  const url = env.OAUTH_ENABLED ? oauthUrl : methodUrl;
+  const url = isOauthEnabled() ? oauthUrl : methodUrl;
 
   const blocBody = {
     password: payload.password,
@@ -74,7 +75,7 @@ export function postMethodCall(payload) {
     ]
   }
 
-  const body = env.OAUTH_ENABLED ? oauthBody : blocBody;
+  const body = isOauthEnabled() ? oauthBody : blocBody;
 
   return fetch(
     url,

@@ -14,7 +14,7 @@ import { withRouter } from 'react-router-dom';
 import SendTokens from '../SendTokens';
 import Account from '../../../Account';
 import CreateBlocUser from '../../../CreateBlocUser';
-import { env } from '../../../../env';
+import { isOauthEnabled } from '../../../../lib/checkMode';
 
 class BlocAccounts extends Component {
 
@@ -45,6 +45,7 @@ class BlocAccounts extends Component {
     const users = Object.getOwnPropertyNames(accounts);
     const rows = [];
     const selectedAddresses = [];
+    const isModeOauth = isOauthEnabled();
 
     users.filter(user => {
       if (!filter) {
@@ -108,7 +109,7 @@ class BlocAccounts extends Component {
           <div className="row">
             <div className="col-sm-4 main-div">
               <div className="accounts-margin-top">
-                {!env.OAUTH_ENABLED && (rows.length === 0
+                {!isModeOauth && (rows.length === 0
                   ?
                   <table>
                     <tbody>
@@ -118,7 +119,7 @@ class BlocAccounts extends Component {
                     </tbody>
                   </table>
                   : rows)}
-                {env.OAUTH_ENABLED && this.renderOauthAccounts()}
+                {isModeOauth && this.renderOauthAccounts()}
               </div>
             </div>
             <div className="col-sm-8 account-details">

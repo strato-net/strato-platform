@@ -14,7 +14,7 @@ import {
 import './contractMethodCall.css';
 import ValueInput from "../../../ValueInput";
 import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
-import { env } from '../../../../env';
+import { isOauthEnabled } from '../../../../lib/checkMode';
 
 class ContractMethodCall extends Component {
 
@@ -29,7 +29,7 @@ class ContractMethodCall extends Component {
       this.props.lookup,
       this.props.chainId
     );
-    !env.OAUTH_ENABLED && this.props.fetchAccounts(false, false);
+    !isOauthEnabled() && this.props.fetchAccounts(false, false);
   }
 
   handleCloseModal = (e) => {
@@ -47,7 +47,7 @@ class ContractMethodCall extends Component {
       methodName: this.props.symbolName,
       username: values.modalUsername,
       userAddress: values.modalAddress,
-      password: env.OAUTH_ENABLED ? '' : values.modalPassword,
+      password: isOauthEnabled() ? '' : values.modalPassword,
       value: values.modalValue,
       args: this.props.modal.args ? Object.getOwnPropertyNames(this.props.modal.args)
         .reduce((args, arg) => {
@@ -64,19 +64,19 @@ class ContractMethodCall extends Component {
     this.props.fetchUserAddresses(e.target.value, false)
   }
 
-  renderUsername = (isOauthEnabled) => {
+  renderUsername = (isModeOauth) => {
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    return (<div className={isOauthEnabled ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         name="modalUsername"
         component="select"
         onChange={this.handleUsernameChange}
-        disabled={isOauthEnabled}
+        disabled={isModeOauth}
         required
       >
-        <option value={isOauthEnabled ? this.props.oAuthUser.username : null}>
-          {isOauthEnabled && this.props.oAuthUser.username}
+        <option value={isModeOauth ? this.props.oAuthUser.username : null}>
+          {isModeOauth && this.props.oAuthUser.username}
         </option>
         {
           users.map((user, i) => {
@@ -89,20 +89,20 @@ class ContractMethodCall extends Component {
     </div>)
   }
 
-  renderAddress = (isOauthEnabled) => {
+  renderAddress = (isModeOauth) => {
     const userAddresses = Object.keys(this.props.accounts).length && this.props.modalUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
       : [];
-    return (<div className={isOauthEnabled ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="modalAddress"
-        disabled={isOauthEnabled}
+        disabled={isModeOauth}
         required
       >
-        <option value={isOauthEnabled ? this.props.oAuthUser.address : null}>
-          {isOauthEnabled && this.props.oAuthUser.address}
+        <option value={isModeOauth ? this.props.oAuthUser.address : null}>
+          {isModeOauth && this.props.oAuthUser.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -184,7 +184,7 @@ class ContractMethodCall extends Component {
   render() {
     const params = [];
     const handleSubmit = this.props.handleSubmit;
-    const isOauthEnabled = env.OAUTH_ENABLED;
+    const isModeOauth = isOauthEnabled();
 
     if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
       const args = Object.getOwnPropertyNames(this.props.modal.args);
@@ -250,7 +250,7 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9">
-                  {this.renderUsername(isOauthEnabled)}
+                  {this.renderUsername(isModeOauth)}
                 </div>
               </div>
               <div className="row">
@@ -260,10 +260,10 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderAddress(isOauthEnabled)}
+                  {this.renderAddress(isModeOauth)}
                 </div>
               </div>
-              {!env.OAUTH_ENABLED && <div className="row">
+              {!isModeOauth && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
                     Password

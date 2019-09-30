@@ -19,10 +19,9 @@ import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
-import { isModePublic } from '../../lib/checkMode';
+import { isOauthEnabled } from '../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
 import './createContract.css';
-import { env } from '../../env';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -170,7 +169,7 @@ class CreateContract extends Component {
       contract: contractname,
       username: values.username,
       address: values.address,
-      password: env.OAUTH_ENABLED ? null : values.password,
+      password: isOauthEnabled() ? null : values.password,
       searchable: values.searchable,
       fileText: fileText,
       arguments: args,
@@ -183,9 +182,9 @@ class CreateContract extends Component {
     this.props.reset();
   };
 
-  renderUsername = (isOauthEnabled) => {
+  renderUsername = (isModeOauth) => {
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    return (<div className={isOauthEnabled ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
@@ -193,10 +192,10 @@ class CreateContract extends Component {
         onChange={this.handleUsernameChange}
         validate={required}
         required
-        disabled={isOauthEnabled}
+        disabled={isModeOauth}
       >
-        <option value={isOauthEnabled ? this.props.initialValues.username : null}>
-          {isOauthEnabled && this.props.initialValues.username}
+        <option value={isModeOauth ? this.props.initialValues.username : null}>
+          {isModeOauth && this.props.initialValues.username}
         </option>
         {
           users.map((user, i) => {
@@ -209,21 +208,21 @@ class CreateContract extends Component {
     </div>)
   };
 
-  renderAddress = (isOauthEnabled) => {
+  renderAddress = (isModeOauth) => {
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
       : [];
-    return (<div className={isOauthEnabled ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="address"
         validate={required}
         required
-        disabled={isOauthEnabled}
+        disabled={isModeOauth}
       >
-        <option value={isOauthEnabled ? this.props.initialValues.address : null}>
-          {isOauthEnabled && this.props.initialValues.address}
+        <option value={isModeOauth ? this.props.initialValues.address : null}>
+          {isModeOauth && this.props.initialValues.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -239,7 +238,7 @@ class CreateContract extends Component {
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
-    !isModePublic() && this.props.fetchAccounts(true, false);
+    !isOauthEnabled() && this.props.fetchAccounts(true, false);
   }
 
   compilation() {
@@ -353,7 +352,7 @@ class CreateContract extends Component {
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-    const isOauthEnabled = env.OAUTH_ENABLED;
+    const isModeOauth = isOauthEnabled();
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
@@ -384,7 +383,7 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderUsername(isOauthEnabled)}
+                  {this.renderUsername(isModeOauth)}
                 </div>
               </div>
               <div className="row">
@@ -394,10 +393,10 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderAddress(isOauthEnabled)}
+                  {this.renderAddress(isModeOauth)}
                 </div>
               </div>
-              {!isOauthEnabled && <div className="row">
+              {!isModeOauth && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
                     Password

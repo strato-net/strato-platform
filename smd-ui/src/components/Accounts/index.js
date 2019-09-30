@@ -7,10 +7,10 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import Tour from '../Tour';
-import { env } from '../../env';
 import BlocAccounts from './components/BlocAccounts';
 import OauthAccounts from './components/OauthAccounts';
 import './accounts.css';
+import { isOauthEnabled } from '../../lib/checkMode';
 
 const tourSteps = [/* {
     title: 'Create User',
@@ -40,7 +40,7 @@ class Accounts extends Component {
   }
 
   componentDidMount() {
-    if (env.OAUTH_ENABLED) {
+    if (isOauthEnabled()) {
       this.props.fetchOauthAccounts();
     } else {
       this.props.fetchAccounts(true, true, this.props.selectedChain);
@@ -56,7 +56,7 @@ class Accounts extends Component {
           steps={tourSteps}
           finalStepSelector='#contracts'
           nextPage='chains' />
-        {env.OAUTH_ENABLED ? <OauthAccounts /> : <BlocAccounts />}
+        {isOauthEnabled() ? <OauthAccounts /> : <BlocAccounts />}
       </div>
     );
   }

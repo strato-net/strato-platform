@@ -1,4 +1,4 @@
-import { env } from "../../../../env";
+import { isOauthEnabled } from "../../../../lib/checkMode";
 
 export const validate = (values) => {
   const errors = {};
@@ -11,11 +11,11 @@ export const validate = (values) => {
     errors.value = 'Please select a address';
   }
 
-  if (env.OAUTH_ENABLED && !values.address) {
+  if (isOauthEnabled() && !values.address) {
     errors.value = "Please enter address"
   }
 
-  if (!env.OAUTH_ENABLED) {
+  if (!isOauthEnabled()) {
 
     if (!values.password) {
       errors.value = 'Please enter a password';

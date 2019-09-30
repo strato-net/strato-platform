@@ -3,14 +3,15 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import HexText from '../HexText';
 import './accountDetail.css';
-import { env } from '../../env';
 import { oauthFaucetRequest } from '../Accounts/components/OauthAccounts/oauthAccounts.actions';
+import { isOauthEnabled } from '../../lib/checkMode';
 
 // Public mode is depricated now this component is used for OAUTH
 class AccountDetail extends Component {
   render() {
 
-    const account = env.OAUTH_ENABLED ? this.props.oauthAccount : this.props.account;
+    const isModeOauth = isOauthEnabled();
+    const account = isModeOauth ? this.props.oauthAccount : this.props.account;
     const faucetStatus = (this.props.faucet.accountAddress === account.address) && this.props.faucet.status;
 
     return (

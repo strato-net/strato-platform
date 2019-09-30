@@ -15,7 +15,7 @@ import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import ValueInput from '../../../ValueInput';
 import validate from './validate';
 import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
-import { env } from '../../../../env';
+import { isOauthEnabled } from '../../../../lib/checkMode';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -33,16 +33,16 @@ class SendTokens extends Component {
   closeModal = () => {
     this.props.sendTokensCloseModal();
     // TODO: Remove this public mode feature
-    !env.OAUTH_ENABLED && this.props.fetchAccounts(true, true);
+    !isOauthEnabled() && this.props.fetchAccounts(true, true);
   }
 
   submit = (values) => {
-    const toAddress = env.OAUTH_ENABLED ? values.address : (this.state.form.userSelected ? values.toAddress : values.address)
+    const toAddress = isOauthEnabled() ? values.address : (this.state.form.userSelected ? values.toAddress : values.address)
 
     const payload = {
       from: values.from,
       fromAddress: values.fromAddress,
-      password: env.OAUTH_ENABLED ? '' : values.password,
+      password: isOauthEnabled() ? '' : values.password,
       toAddress: toAddress,
       value: values.value,
       chainId: values.chainId
@@ -59,7 +59,7 @@ class SendTokens extends Component {
     mixpanelWrapper.track("send_ether_loaded");
   }
 
-  userNameField = (users, isOauthEnabled) => {
+  userNameField = (users, isModeOauth) => {
     return (
       <Field
         className="pt-input"
@@ -69,12 +69,12 @@ class SendTokens extends Component {
           (e) => this.props.fetchUserAddresses(e.target.value, true)
         }
         required
-        disabled={isOauthEnabled}
+        disabled={isModeOauth}
       >
-        {isOauthEnabled && <option value={isOauthEnabled ? this.props.initialValues.from : null}>{this.props.initialValues.from}</option>}
-        {!isOauthEnabled && <option />}
+        {isModeOauth && <option value={isModeOauth ? this.props.initialValues.from : null}>{this.props.initialValues.from}</option>}
+        {!isModeOauth && <option />}
         {
-          !isOauthEnabled && users.map((user, i) => {
+          !isModeOauth && users.map((user, i) => {
             return (
               <option key={'user' + i} value={user}>{user}</option>
             )
@@ -84,7 +84,7 @@ class SendTokens extends Component {
     )
   }
 
-  addressField = (isOauthEnabled) => {
+  addressField = (isModeOauth) => {
     const fromUserAddresses = Object.keys(this.props.accounts).length && this.props.fromUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
       : [];
@@ -95,11 +95,11 @@ class SendTokens extends Component {
         component="select"
         name="fromAddress"
         required
-        disabled={isOauthEnabled}
+        disabled={isModeOauth}
       >
-        <option value={isOauthEnabled ? this.props.initialValues.fromAddress : null}>{this.props.initialValues.fromAddress}</option>
+        <option value={isModeOauth ? this.props.initialValues.fromAddress : null}>{this.props.initialValues.fromAddress}</option>
         {
-          (!isOauthEnabled && fromUserAddresses.length) ?
+          (!isModeOauth && fromUserAddresses.length) ?
             fromUserAddresses.map((address, i) => {
               return (
                 <option key={address} value={address}>{address}</option>
@@ -111,8 +111,8 @@ class SendTokens extends Component {
     )
   }
 
-  checkMode = (users, toUserAddresses) => {
-    if (env.OAUTH_ENABLED) {
+  checkMode = (isModeOauth, users, toUserAddresses) => {
+    if (isModeOauth) {
       return (<div className="row">
         <div className="col-sm-4 text-right">
           <label className="pt-label smd-pad-4">
@@ -329,7 +329,7 @@ class SendTokens extends Component {
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    const isOauthEnabled = env.OAUTH_ENABLED;
+    const isModeOauth = isOauthEnabled();
 
     const toUserAddresses = this.props.accounts && this.props.toUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.toUsername])
@@ -340,7 +340,7 @@ class SendTokens extends Component {
         <Button onClick={() => {
           mixpanelWrapper.track("send_ether_open_click");
           // TODO: remove public mode
-          isOauthEnabled && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
+          isModeOauth && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
           this.props.fetchChainIds();
           this.props.sendTokensOpenModal();
           this.props.reset();
@@ -367,7 +367,7 @@ class SendTokens extends Component {
                 </div>
                 <div className="col-sm-8 smd-pad-4">
                   <div className="pt-select">
-                    {this.userNameField(users, isOauthEnabled)}
+                    {this.userNameField(users, isModeOauth)}
                   </div>
                 </div>
               </div>
@@ -379,11 +379,11 @@ class SendTokens extends Component {
                 </div>
                 <div className="col-sm-8 smd-pad-4">
                   <div className="pt-select">
-                    {this.addressField(isOauthEnabled)}
+                    {this.addressField(isModeOauth)}
                   </div>
                 </div>
               </div>
-              {!isOauthEnabled && <div className="row">
+              {!isModeOauth && <div className="row">
                 <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
                     Password
@@ -404,7 +404,7 @@ class SendTokens extends Component {
                 </div>
               </div>}
 
-              {this.checkMode(users, toUserAddresses)}
+              {this.checkMode(isModeOauth, users, toUserAddresses)}
 
               <div className="row">
                 <div className="col-sm-4 text-right">
