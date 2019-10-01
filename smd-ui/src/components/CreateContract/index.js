@@ -621,7 +621,6 @@ export function mapStateToProps(state) {
     username: state.createContract.username,
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
-    currentUser: state.user.currentUser,
     searchable: selector(state, 'searchable'),
     initialValues: {
       username: state.user.oauthUser ? state.user.oauthUser.username : '',
