@@ -109,7 +109,13 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (functionpayloadMetadata p)
                         chainId
                         resolve
-            fmap (:[]) $ postUsersContractMethod' bfp (callSignature userName)
+            let poster = case Map.lookup "VM" =<< (functionpayloadMetadata p) of
+                  Nothing -> postUsersContractMethodEVM'
+                  Just "EVM" -> postUsersContractMethodEVM'
+                  Just "SolidVM" -> postUsersContractMethodSolidVM'
+                  Just vm -> \_ _ -> throwError $ UserError $ Text.pack
+                                   $ "Invalid value for VM choice: " ++ show vm
+            fmap (:[]) $ poster bfp (callSignature userName)
           xs -> do
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
@@ -117,7 +123,14 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (map (\(FunctionPayload (ContractName n) a m r v md) -> MethodCall n a m r (fromMaybe (Strung 0) v) txParams md) p)
                         chainId
                         resolve
-            postUsersContractMethodList' bflp (callSignature userName)
+            let md = functionpayloadMetadata (head p)
+            let poster = case Map.lookup "VM" =<< md of
+                  Nothing -> postUsersContractMethodListEVM'
+                  Just "EVM" -> postUsersContractMethodListEVM'
+                  Just "SolidVM" -> postUsersContractMethodListSolidVM'
+                  Just vm -> \_ _ -> throwError $ UserError $ Text.pack
+                    $ "Invalid value for VM choice: " ++ show vm
+            poster bflp (callSignature userName)
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwError $ UserError "Could not decode transfer arguments from body"

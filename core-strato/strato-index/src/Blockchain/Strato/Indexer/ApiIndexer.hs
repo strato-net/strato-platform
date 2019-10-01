@@ -31,6 +31,7 @@ import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Executable.IndexerFlags
 
 import           Blockchain.Sequencer.Event
 
@@ -46,16 +47,17 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
         startTime <- liftIO $ getTime Realtime
         putIndexerBestBlockInfo bbi
         putIndexerBestBlockInfoTime <- liftIO $ getTime Realtime
-
         $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
 
-        let txs = [tx | IndexTransaction _ tx <- idxEvents]
-        lift $ forM_ txs $ \OutputTx{..} -> insertTX Log otOrigin Nothing [otBaseTx]
+        unless flags_api_index_off $ do
+          let txs = [tx | IndexTransaction _ tx <- idxEvents]
+          lift $ forM_ txs $ \OutputTx{..} -> insertTX Log otOrigin Nothing [otBaseTx]
 
         let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
         lift $ forM_ chainInfos . uncurry $ putChainInfo
-
-        let blocks = [b | RanBlock b <- idxEvents]
+        let blocks = case flags_api_index_off of
+                       True -> []
+                       False -> [b | RanBlock b <- idxEvents]
         blocksTime <- liftIO $ getTime Realtime
         let nums = map (blockDataNumber . obBlockData) blocks
             nextOffset' = offset + fromIntegral (length idxEvents)
@@ -103,7 +105,6 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
                     , "put new best bid:         "
                     ])
         else return ([],[])
-
         startKafkaTime <- liftIO $ getTime Realtime
         setKafkaCheckpoint nextOffset' =<< getIndexerBestBlockInfo
         stopKafkaTime <- liftIO $ getTime Realtime
@@ -116,7 +117,6 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
                 ] ++ icMsgs ++ ["insert to Kafka:          "]
         $logDebug "----- apiIndexer -----"
         $logDebug . T.pack . unlines $ zipWith (\s t -> "Time to " ++ s ++ n2s t) tags times
-
 
 n2s :: Integer -> String
 n2s i =

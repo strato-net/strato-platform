@@ -31,10 +31,7 @@ app.set('port', port);
 var server = http.createServer(app);
 
 co(function*(){
-  yield initDb();
 
-  // sync() will create all table if they don't exist in database
-  yield models.sequelize.sync();
   yield createInitialData();
 
   yield registerAppMetadata();
