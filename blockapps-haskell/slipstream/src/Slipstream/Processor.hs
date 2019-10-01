@@ -389,19 +389,29 @@ processTheMessages env conn g messages = do
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs
         BS.ActionSolidVMDiff{} -> do
-          mName <- getCachedSolidVMDetails g row
-          case mName of
+          mDetails <- detailsForRow row
+          case mDetails of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in metadata"
-            Just (name, abi) -> do
-              let abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
-                  cont = error "internal error: contract should be unused for solidvm"
-                  details = error "internal error: details should be unused for solidvm"
-              oldState <- readPreviousSolidVMState g addr chainId
-              indexContract <- rowToInsert g abiid row cont oldState
-              (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              pure . Right $ BatchedInserts indexContract hs fhs
+            Just (cmId, _) -> do
+              ensureContractInstance cmId row
+
+              mName <- getCachedSolidVMDetails g row
+              case mName of
+                Nothing -> pure . Left $ "No SolidVM details for code hash "
+                            <> (T.pack . show $ actionCodeHash row)
+                            <> " and no 'src' field found in metadata"
+                Just (name, abi) -> do
+                  let abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
+                      cont = error "internal error: contract should be unused for solidvm"
+                      details = error "internal error: details should be unused for solidvm"
+              
+              
+                  oldState <- readPreviousSolidVMState g addr chainId
+                  indexContract <- rowToInsert g abiid row cont oldState
+                  (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
+                  pure . Right $ BatchedInserts indexContract hs fhs
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
