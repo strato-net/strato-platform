@@ -588,7 +588,7 @@ exports[`SendTokens: index render enterprise mode with values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button className=\\"pt-intent-primary\\" onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
+          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
         </div>
       </div>
     </Blueprint.Dialog>
@@ -713,7 +713,7 @@ exports[`SendTokens: index render enterprise mode without values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button className=\\"pt-disabled\\" onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
+          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
         </div>
       </div>
     </Blueprint.Dialog>
@@ -864,16 +864,6 @@ exports[`SendTokens: index render public mode with values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-4 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              Password
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <Field id=\\"password\\" className=\\"form-width pt-input\\" placeholder=\\"Password\\" name=\\"password\\" type=\\"password\\" component=\\"input\\" dir=\\"auto\\" title=\\"Password\\" required={true} />
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
               Address
             </label>
           </div>
@@ -909,7 +899,7 @@ exports[`SendTokens: index render public mode with values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button className=\\"pt-intent-primary\\" onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
+          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
         </div>
       </div>
     </Blueprint.Dialog>
@@ -1056,16 +1046,6 @@ exports[`SendTokens: index render public mode without values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-4 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              Password
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <Field id=\\"password\\" className=\\"form-width pt-input\\" placeholder=\\"Password\\" name=\\"password\\" type=\\"password\\" component=\\"input\\" dir=\\"auto\\" title=\\"Password\\" required={true} />
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
               Address
             </label>
           </div>
@@ -1101,7 +1081,7 @@ exports[`SendTokens: index render public mode without values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button className=\\"pt-disabled\\" onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
+          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
         </div>
       </div>
     </Blueprint.Dialog>
