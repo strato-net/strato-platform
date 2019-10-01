@@ -18,9 +18,12 @@ import {
   fetchBalanceFailure,
   fetchCurrentAccountDetail,
   fetchCurrentAccountDetailSuccess,
-  fetchCurrentAccountDetailFailure
+  fetchCurrentAccountDetailFailure,
+  fetchOauthAccounts,
+  fetchOauthAccountsSuccess,
+  fetchOauthAccountsFailure
 } from '../../components/Accounts/accounts.actions';
-import { accountsMock, accountDetail, error } from './accountsMock';
+import { accountsMock, accountDetail, error, oauthAccounts } from './accountsMock';
 
 describe('Accounts: action', () => {
 
@@ -171,6 +174,23 @@ describe('Accounts: action', () => {
     test('failure', () => {
       let address = '76a3192ce9aa0531fe7e0e3489a469018c0bff03';
       expect(fetchCurrentAccountDetailFailure(address, error)).toMatchSnapshot();
+    });
+
+  });
+
+  describe('fetch Oauth accounts', () => {
+
+    test('request', () => {
+      expect(fetchOauthAccounts()).toMatchSnapshot();
+    });
+
+    test('success', () => {
+      let data = oauthAccounts; 
+      expect(fetchOauthAccountsSuccess(data)).toMatchSnapshot();
+    });
+
+    test('failure', () => {
+      expect(fetchOauthAccountsFailure()).toMatchSnapshot();
     });
 
   });

@@ -8,7 +8,9 @@ import watchFetchContracts, {
   getAccountDetailApi,
   postFaucet,
   getBalance,
-  getCurrentAccountDetail
+  getCurrentAccountDetail,
+  getOauthAccounts,
+  getOauthAccountsApi
 } from '../../components/Accounts/accounts.saga';
 import {
   takeEvery,
@@ -50,12 +52,17 @@ import {
   fetchCurrentAccountDetailSuccess,
   fetchCurrentAccountDetailFailure,
   FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS,
-  FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE
+  FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE,
+  FETCH_OAUTH_ACCOUNTS_REQUEST,
+  fetchOauthAccounts,
+  fetchOauthAccountsSuccess,
+  fetchOauthAccountsFailure,
+  FETCH_OAUTH_ACCOUNTS_SUCCESS,
+  FETCH_OAUTH_ACCOUNTS_FAILURE
 } from '../../components/Accounts/accounts.actions';
 import { expectSaga } from 'redux-saga-test-plan';
-import { accountsMock, userAddresses, error, accountDetail, getBalanceMock } from './accountsMock';
+import { accountsMock, userAddresses, error, accountDetail, getBalanceMock, oauthAccounts } from './accountsMock';
 import { hideLoading } from 'react-redux-loading-bar';
-import { deepClone } from '../helper/testHelper';
 import { delay } from 'redux-saga';
 
 describe('Accounts: saga', () => {
@@ -68,7 +75,8 @@ describe('Accounts: saga', () => {
       takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
       takeEvery(FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST, getCurrentAccountDetail),
       takeLatest(FAUCET_REQUEST, faucetAccount),
-      takeEvery(GET_BALANCE, getBalance)
+      takeEvery(GET_BALANCE, getBalance),
+      takeEvery(FETCH_OAUTH_ACCOUNTS_REQUEST, getOauthAccounts)
     ]
     expect(gen.next().value).toEqual(match);
   });
@@ -252,7 +260,7 @@ describe('Accounts: saga', () => {
 
     test('inspection', () => {
       const gen = faucetAccount(action);
-        expect(gen.next().value).toEqual(call(postFaucet, action.name, action.address));
+      expect(gen.next().value).toEqual(call(postFaucet, action.name, action.address));
       expect(gen.next().value).toEqual(call(delay, 100));
       expect(gen.next().value).toEqual(put(fetchAccountDetail(action.name, action.address, undefined, action.flag)));
       expect(gen.throw(error).value).toEqual(put(faucetFailure(error)));
@@ -306,6 +314,40 @@ describe('Accounts: saga', () => {
       expect(gen.throw(error).value).toEqual(put(fetchBalanceFailure(error)));
       expect(gen.next().done).toBe(true);
     });
+
+  });
+
+  describe('getOauthAccounts generator', () => {
+
+    const action = {
+      type: FETCH_OAUTH_ACCOUNTS_REQUEST
+    }
+
+    test('inspection', () => {
+      const gen = getOauthAccounts(action);
+      expect(gen.next().value).toEqual(call(getOauthAccountsApi));
+      expect(gen.next(oauthAccounts).value).toEqual(put(fetchOauthAccountsSuccess(oauthAccounts)));
+      expect(gen.throw('failed to fetch oauth accounts').value).toEqual(put(fetchOauthAccountsFailure('failed to fetch oauth accounts')));
+      expect(gen.next().done).toBe(true);
+    });
+
+    describe('getOauthAccountsApi', () => {
+
+      test('success', (done) => {
+        fetch.mockResponse(JSON.stringify(oauthAccounts));
+        expectSaga(getOauthAccounts)
+          .call.fn(getOauthAccountsApi).put.like({ action: { type: FETCH_OAUTH_ACCOUNTS_SUCCESS } })
+          .run().then((result) => { done() });
+      });
+
+      test('failure', (done) => {
+        fetch.mockReject('error');
+        expectSaga(getOauthAccounts)
+          .call.fn(getOauthAccountsApi).put.like({ action: { type: FETCH_OAUTH_ACCOUNTS_FAILURE } })
+          .run().then((result) => { done() });
+      });
+
+    })
 
   });
 
