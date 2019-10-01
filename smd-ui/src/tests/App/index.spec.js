@@ -2,6 +2,7 @@ import React from 'react';
 import App, { mapStateToProps } from '../../App';
 import * as checkMode from '../../lib/checkMode';
 import * as scenes from '../../routes';
+import * as localStorage from '../../lib/localStorage';
 
 describe('App: index', () => {
 
@@ -37,6 +38,32 @@ describe('App: index', () => {
 
     expect(wrapper.debug()).toMatchSnapshot();
   })
+
+  describe('render in Oauth mode', () => {
+
+    test('componentDidMount', () => {
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
+      checkMode.getUserFromLocal = jest.fn().mockReturnValue(false);
+      scenes.routes = "ENTERPRISE";
+      const wrapper = shallow(
+        <App.WrappedComponent />
+      );
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    })
+
+    test('componentDidMount', () => {
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
+      checkMode.getUserFromLocal = jest.fn().mockReturnValue(false);
+      scenes.routes = "ENTERPRISE";
+      const wrapper = shallow(
+        <App.WrappedComponent getOrCreateOauthUserRequest={jest.fn()}/>
+      );
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    })
+    
+  });
 
   describe('mapStateToProps', () => {
     test('without values', () => {
