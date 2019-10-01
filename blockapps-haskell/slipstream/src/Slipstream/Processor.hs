@@ -246,14 +246,14 @@ getCachedSolidVMDetails g row = liftM2 (<|>)
   )
  where codePtr = actionCodeHash row
 
-detailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
-detailsForRow row = liftM2 (<|>)
+detailsForRow :: AggregateAction -> Bool -> Bloc (Maybe (Int32, ContractDetails))
+detailsForRow row shouldCompile = liftM2 (<|>)
   (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
     name <- lookupT "name" md
-    detailsMap <- lift $ sourceToContractDetails True src
+    detailsMap <- lift $ sourceToContractDetails shouldCompile src
     lookupT name detailsMap)
 
 adjustGlobals :: IORef Globals -> AggregateAction -> ContractDetails -> Bloc ()
@@ -367,7 +367,7 @@ processTheMessages env conn g messages = do
 
       case actionStorage row of
         BS.ActionEVMDiff{} -> do
-          mDetails <- detailsForRow row
+          mDetails <- detailsForRow row True
           case mDetails of
             Nothing -> pure . Left $ "No details found for code hash "
                             <> (T.pack . show $ actionCodeHash row)
@@ -389,7 +389,8 @@ processTheMessages env conn g messages = do
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs
         BS.ActionSolidVMDiff{} -> do
-          mDetails <- detailsForRow row
+          mDetails <- detailsForRow row False
+
           case mDetails of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
