@@ -1,16 +1,19 @@
 import React from 'react';
 import AccountDetail, { mapStateToProps } from '../../components/AccountDetail';
 import { accountDetails } from '../Account/accountMock';
+import * as checkMode from '../../lib/checkMode';
 
 describe('Account: index', () => {
 
-  describe('renders correctly ', () => {
+  describe('renders correctly (Oauth) ', () => {
+
+    beforeAll(() => {
+      checkMode.isModeOauth = jest.fn().mockReturnValue(false);
+    })
 
     test('with empty values', () => {
       const props = {
-        currentUser: {},
-        account: null,
-        fetchCurrentAccountDetail: jest.fn(),
+        account: {},
         faucet: {
           accountAddress: null
         }
@@ -21,17 +24,16 @@ describe('Account: index', () => {
       );
 
       expect(wrapper.debug()).toMatchSnapshot();
-      expect(props.fetchCurrentAccountDetail).toHaveBeenCalled();
-      expect(props.fetchCurrentAccountDetail).toHaveBeenCalledTimes(1);
     });
 
     test('with values', () => {
       const props = {
+        oauthAccount: accountDetails[0],
         account: accountDetails[0],
-        currentUser: {
-          accountAddress: "5d04537908d44f458acb24b0f2c863ccd2bd3a13",
-        },
-        fetchCurrentAccountDetail: jest.fn()
+        faucet: {
+          accountAddress: accountDetails[0].address,
+          status: false
+        }
       };
 
       const wrapper = shallow(
@@ -39,7 +41,44 @@ describe('Account: index', () => {
       );
 
       expect(wrapper.debug()).toMatchSnapshot();
-      expect(props.fetchCurrentAccountDetail).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('renders correctly (non-oauth)', () => {
+
+    beforeAll(() => {
+      checkMode.isModeOauth = jest.fn().mockReturnValue(false);
+    })
+
+    test('with empty values', () => {
+      const props = {
+        account: {},
+        faucet: {
+          accountAddress: null
+        }
+      };
+
+      const wrapper = shallow(
+        <AccountDetail.WrappedComponent {...props} />
+      );
+
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
+    test('with values', () => {
+      const props = {
+        account: accountDetails[0],
+        faucet: {
+          accountAddress: accountDetails[0].address,
+          status: false
+        }
+      };
+
+      const wrapper = shallow(
+        <AccountDetail.WrappedComponent {...props} />
+      );
+
+      expect(wrapper.debug()).toMatchSnapshot();
     });
   });
 
