@@ -16,7 +16,7 @@ describe('CreateChain: index', () => {
   describe('render component (enterprise mode)', () => {
 
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     })
 
     test('with empty values', () => {
@@ -127,7 +127,7 @@ describe('CreateChain: index', () => {
   describe('render component (public mode)', () => {
 
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     })
 
     test('with empty values', () => {
@@ -169,6 +169,7 @@ describe('CreateChain: index', () => {
 
       test('with values', () => {
         const props = {
+          isOpen: true,
           accounts: indexAccountsMock,
           initialValues: {
             fromAddress: '370adf114257cb0e0025eedf0a96261b51af23e3',
@@ -290,9 +291,9 @@ describe('CreateChain: index', () => {
         accounts: indexAccountsMock
       },
       user: {
-        currentUser: {
+        oauthUser: {
           username: 'Supplier2_1301_46441',
-          accountAddress: '57f2ed9058d2e868d7bbae9db03af12d27675117'
+          address: '57f2ed9058d2e868d7bbae9db03af12d27675117'
         }
       }
     }
