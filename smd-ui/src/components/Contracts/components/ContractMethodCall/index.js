@@ -362,7 +362,6 @@ export function mapStateToProps(state, ownProps) {
       && state.methodCall.modals[ownProps.lookup] ?
       state.methodCall.modals[ownProps.lookup] : {},
     accounts: state.accounts.accounts,
-    currentUser: state.user.currentUser,
     modalUsername: selector(state, 'modalUsername'),
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,

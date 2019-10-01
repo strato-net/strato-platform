@@ -85,13 +85,9 @@ Object {
     "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
     "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
   },
-  "currentUser": Object {
-    "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
-    "id": 6,
-    "username": "tanuj41",
-  },
   "modal": Object {},
   "modalUsername": undefined,
+  "oAuthUser": undefined,
 }
 `;
 
@@ -232,7 +228,7 @@ exports[`ContractMethodCall: index renders contracts card (enterprise mode) 1`] 
           </div>
           <div className=\\"col-sm-9\\">
             <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} validate={[Function: required]} disabled={false} required={true}>
+              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} disabled={false} required={true}>
                 <option value={{...}} />
                 <option value=\\"Admin_1085_64667\\">
                   Admin_1085_64667
@@ -321,7 +317,7 @@ exports[`ContractMethodCall: index renders contracts card (enterprise mode) 1`] 
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" validate={[Function: required]} disabled={false} required={true}>
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" disabled={false} required={true}>
                 <option value={{...}} />
                 <option value=\\"044eda43ba9c76fc36b9183c96f7a8fad8d21fe6\\">
                   044eda43ba9c76fc36b9183c96f7a8fad8d21fe6
@@ -337,7 +333,7 @@ exports[`ContractMethodCall: index renders contracts card (enterprise mode) 1`] 
             </label>
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field name=\\"modalPassword\\" className=\\"pt-input\\" placeholder=\\"Password\\" component=\\"input\\" type=\\"password\\" validate={[Function: required]} required={true} />
+            <Field name=\\"modalPassword\\" className=\\"pt-input\\" placeholder=\\"Password\\" component=\\"input\\" type=\\"password\\" required={true} />
           </div>
         </div>
         <div className=\\"row\\">
@@ -545,7 +541,7 @@ exports[`ContractMethodCall: index renders contracts card (public mode) 1`] = `
           </div>
           <div className=\\"col-sm-9\\">
             <div className=\\"\\">
-              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} validate={[Function: required]} disabled={true} required={true}>
+              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} disabled={true} required={true}>
                 <option value=\\"Supplier1\\">
                   Supplier1
                 </option>
@@ -561,20 +557,12 @@ exports[`ContractMethodCall: index renders contracts card (public mode) 1`] = `
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" validate={[Function: required]} disabled={true} required={true}>
-                <option value={[undefined]} />
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" disabled={true} required={true}>
+                <option value=\\"370adf114257cb0e0025eedf0a96261b51af23e3\\">
+                  370adf114257cb0e0025eedf0a96261b51af23e3
+                </option>
               </Field>
             </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label label-margin\\">
-              Password
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field name=\\"modalPassword\\" className=\\"pt-input\\" placeholder=\\"Password\\" component=\\"input\\" type=\\"password\\" validate={[Function: required]} required={true} />
           </div>
         </div>
         <div className=\\"row\\">
