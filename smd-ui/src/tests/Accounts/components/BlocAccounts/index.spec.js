@@ -1,7 +1,6 @@
 import React from 'react';
 import BlocAccounts, { mapStateToProps } from '../../../../components/Accounts/components/BlocAccounts';
-import { accountDetails, indexAccountsMock, filter } from '../../accountsMock';
-import * as checkMode from '../../../../lib/checkMode';
+import { indexAccountsMock, filter } from '../../accountsMock';
 
 describe('BlocAccounts: index', () => {
 
