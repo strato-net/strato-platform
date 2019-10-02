@@ -151,7 +151,6 @@ services:
     environment:
     - addBootnodes=${addBootnodes}
     - averageTxsPerBlock=${averageTxsPerBlock}
-    - apiIndexOff=${apiIndexOff:-false}
     - blockstanbul=${blockstanbul}
     - blockstanbulAdmins=${blockstanbulAdmins}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
