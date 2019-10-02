@@ -13,7 +13,6 @@ import           Blockchain.Output
 import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
-import           Executable.IndexerFlags()
 
 main :: IO ()
 main = do

@@ -85,7 +85,7 @@ describe('Strato Load Test', function() {
 
 function * waitResult(address, batchSize, batchCount) {
   let nonce = 0;
-  while(nonce < batchSize*batchCount + 1) {
+  while(nonce < batchSize*batchCount + 2) {
     yield promiseTimeout(500);
     try {
       console.log(`Current Nonce is: ${nonce}`)
@@ -142,7 +142,7 @@ function factory_createCallList(contractAddress, batchSize, batchIndex, batchCop
         txParams: {
           gasLimit: 10000000,
           gasPrice: 1,
-          nonce: (batchSize * batchIndex) + i + 1
+          nonce: (batchSize * batchIndex) + i + 2
         },
         value: 0,
 		metadata: {"VM": "SolidVM"},
@@ -177,7 +177,7 @@ function factory_createCallList(contractAddress, batchSize, batchIndex, batchCop
         txParams: {
           gasLimit: 10000000*batchCopies,
           gasPrice: 1,
-          nonce: (batchSize * batchIndex) + i + 1
+          nonce: (batchSize * batchIndex) + i + 2
         },
 		metadata: {"VM": "SolidVM"},
         value: 0,
