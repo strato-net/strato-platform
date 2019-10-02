@@ -11,8 +11,6 @@ const co = require('co');
 
 const sockets = require('../sockets/init');
 
-const initDb = require('../migrations/init-script/initdb.js');
-const models = require('../models');
 const createInitialData = require('../migrations/init-script/init');
 const registerAppMetadata = require('../migrations/init-script/registerAppMetadata');
 

@@ -8,7 +8,7 @@ const Sequelize = require('sequelize');
 const basename  = path.basename(module.filename);
 const env       = process.env.NODE_ENV || 'development';
 const config    = require(__dirname + '/../config/config.json')[env];
-config.port     = process.env.postgresPort || config.port;
+config.port     = process.env.postgres_port || config.port;
 const db        = {};
 
 const sequelize = config.use_env_variable ?
