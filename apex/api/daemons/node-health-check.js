@@ -12,7 +12,10 @@ const neededJobs = {
     "slipstream_main":"slipstream",
     "strato_p2p":"strato-p2p",
     "vm_main":"vm-runner",
-    "seq_main":"strato-sequencer"
+    "seq_main":"strato-sequencer",
+    "blockapps-vault-wrapper-server":"vault-wrapper",
+    "blockapps-bloc":"bloc",
+    "strato-api":"strato-api"
 }
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";

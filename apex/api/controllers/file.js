@@ -214,7 +214,8 @@ module.exports = {
 
         var options = {
           Bucket: appConfig.s3.bucket.Bucket,
-          Key: data.fileKey,
+          // Keeping the 2nd part (using data.uri) for backwards-compatibility with older ExternalStorage contracts on the blockchain (for nodes upgraded from pre-4.5.1)
+          Key: data.fileKey || /[^/]*$/.exec(data.uri)[0],
           Expires: 3600
         };
 

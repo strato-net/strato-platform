@@ -6,6 +6,8 @@ import           Blockchain.Output
 import           Blockchain.Strato.Indexer.ApiIndexer
 import           HFlags
 
+import           Executable.IndexerFlags()  -- HFlags
+
 main :: IO ()
 main = do
   blockappsInit "strato-api-indexer"

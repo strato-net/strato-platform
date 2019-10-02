@@ -497,7 +497,12 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
                postmethodlistrequestTxs
                chainId
                (resolve || postmethodlistrequestResolve)
-  postUsersContractMethodList' bflp (return . signTransaction sk)
+  case join $ fmap (Map.lookup "VM") $ methodcallMetadata (head postmethodlistrequestTxs) of
+    Just "EVM" -> postUsersContractMethodListEVM' bflp (return . signTransaction sk)
+    Just "SolidVM" -> postUsersContractMethodListSolidVM' bflp (return . signTransaction sk)
+    Nothing -> postUsersContractMethodListEVM' bflp (return . signTransaction sk) -- The EVM is the default VM
+    Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
+
 
 genNonces :: (Show a, Monad m) => m Nonce -> Lens' a (Maybe TxParams) -> [a] -> m [a]
 genNonces n l as = do
@@ -517,8 +522,8 @@ genNonces n l as = do
         id <<+= 1
     return $ (l .~ Just params'{txparamsNonce = Just newNonce }) a
 
-postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
-postUsersContractMethodList' FunctionListParameters{..} sign = do
+postUsersContractMethodListEVM' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersContractMethodListEVM' FunctionListParameters{..} sign = do
   if null txs
     then return []
     else do
@@ -544,7 +549,63 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
              Just (_, TypeFunction selector _ _) -> return selector
              _ -> lift $ throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
           let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
-          (argsBin, argsAsSource) <-
+          argsBin <- lift $ constructArgValues (Just (fmap argValueToText methodcallArgs)) xabiArgs
+          let methodcallMetadataWithCallInfo = Just $
+                Map.insert "funcName" methodcallMethodName
+                $ Map.insert "src" ""
+                $ fromMaybe Map.empty methodcallMetadata
+          tx <- lift . signAndPrepare sign fromAddr methodcallMetadataWithCallInfo $
+            TransactionHeader
+              (Just methodcallContractAddress)
+              fromAddr
+              (fromMaybe emptyTxParams _methodcallTxParams)
+              (Wei (fromIntegral $ unStrung methodcallValue))
+              (sel <> argsBin)
+              chainId
+          -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+          return (tx,mapKey,methodcallMethodName)
+      let txs' = [tx | (tx,_,_) <- txsCmIdsFuncNames]
+      mapM_ ($logInfoLS "postUsersContractMethodList'/txs") txs'
+      hashes <- blocStrato $ postTxList txs'
+      void . blocModify $ \conn -> runInsertMany conn hashNameTable
+        [( Nothing
+        , constant hash
+        , constant cmId
+        , constant (2 :: Int32)
+        , constant funcName
+        )
+        | (hash,(_,cmId, funcName)) <- zip hashes txsCmIdsFuncNames
+        ]
+      getBatchBlocTransactionResult' chainId hashes resolve
+
+postUsersContractMethodListSolidVM' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersContractMethodListSolidVM' FunctionListParameters{..} sign = do
+  if null txs
+    then return []
+    else do
+      txsWithParams <- genNonces (getAccountNonce fromAddr chainId) methodcallTxParams txs
+      txsCmIdsFuncNames <- fmap fst . forStateT Map.empty txsWithParams $
+        \(MethodCall{..}) -> do
+          mtuple <- use $ at methodcallContractName
+          (mapKey, xabi) <- case mtuple of
+            Just (cmId, x) -> return (cmId, x)
+            Nothing -> do
+              (mapKey' :: Int32,x') <- lift $ blocQuery1 "postUsersContractMethodList'" $ proc () -> do
+                (_,_,_,_,_,_,cmId,x'') <- getContractsContractLatestQuery methodcallContractName -< ()
+                returnA -< (cmId,x'')
+              x <- lift $ deserializeXabi x'
+              at methodcallContractName <?= (mapKey', x)
+          contract' <- case xAbiToContract xabi of
+            Left err -> throwError . AnError $ Text.pack err
+            Right c -> return c
+          let maybeFunc = OMap.lookup methodcallMethodName (fields $ C.mainStruct contract')
+
+          sel <-
+            case maybeFunc of
+             Just (_, TypeFunction selector _ _) -> return selector
+             _ -> lift $ throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+          let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
+          (_, argsAsSource) <-
             lift $ constructArgValuesAndSource (Just (fmap argValueToText methodcallArgs)) xabiArgs
           let methodcallMetadataWithCallInfo = Just $
                 Map.insert "funcName" methodcallMethodName
@@ -556,7 +617,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
               fromAddr
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
-              (sel <> argsBin)
+              (sel <> Text.encodeUtf8 argsAsSource)
               chainId
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
@@ -603,10 +664,14 @@ postUsersContractMethod
                 md
                 chainId
                 resolve
-    postUsersContractMethod' bfp (return . signTransaction sk)
+    case join $ fmap (Map.lookup "VM") $ md of
+      Just "EVM" -> postUsersContractMethodEVM' bfp (return . signTransaction sk)
+      Just "SolidVM" -> postUsersContractMethodSolidVM' bfp (return . signTransaction sk)
+      Nothing -> postUsersContractMethodEVM' bfp (return . signTransaction sk) -- The EVM is the default VM
+      Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
-postUsersContractMethod' :: FunctionParameters -> Signer -> Bloc BlocTransactionResult
-postUsersContractMethod' FunctionParameters{..} sign = do
+postUsersContractMethodEVM' :: FunctionParameters -> Signer -> Bloc BlocTransactionResult
+postUsersContractMethodEVM' FunctionParameters{..} sign = do
     params <- getAccountTxParams fromAddr chainId txParams
 
     let err = UserError $ Text.concat
@@ -632,7 +697,59 @@ postUsersContractMethod' FunctionParameters{..} sign = do
        Just (_, TypeFunction selector _ _) -> return selector
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
-    (argsBin, argsAsSource) <- constructArgValuesAndSource (Just (fmap argValueToText args)) xabiArgs
+    argsBin <- constructArgValues (Just (fmap argValueToText args)) xabiArgs
+    let metadataWithCallInfo =
+          Map.insert "funcName" funcName
+          $ Map.insert "src" ""
+          $ fromMaybe Map.empty metadata
+
+    tx <- signAndPrepare sign fromAddr (Just metadataWithCallInfo) $
+      TransactionHeader
+        (Just contractAddr)
+        fromAddr
+        params
+        (Wei (maybe 0 (fromIntegral . unStrung) value))
+        ((sel::ByteString) <> (argsBin::ByteString))
+        chainId
+    $logInfoLS "postUsersContractMethod'" tx
+    hash <- blocStrato $ postTx tx
+    void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+      ( Nothing
+      , constant hash
+      , constant cmId
+      , constant (2 :: Int32)
+      , constant funcName
+      )]
+    getBlocTransactionResult' chainId [hash] resolve
+
+postUsersContractMethodSolidVM' :: FunctionParameters -> Signer -> Bloc BlocTransactionResult
+postUsersContractMethodSolidVM' FunctionParameters{..} sign = do
+    params <- getAccountTxParams fromAddr chainId txParams
+
+    let err = UserError $ Text.concat
+                [ "postUsersContractMethod': Couldn't find contract details for "
+                , contractName
+                , " at address "
+                , Text.pack $ addressString contractAddr
+                ]
+    (cmId,xabi) <- maybe (throwError err) (return . fmap contractdetailsXabi) =<<
+      getContractDetailsAndMetadataId
+        (ContractName contractName)
+        (Unnamed contractAddr)
+        chainId
+    contract' <- case xAbiToContract xabi of
+      Left e -> throwError . AnError $ Text.pack e
+      Right c -> return c
+
+    let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
+        xabiArgs = maybe Map.empty funcArgs . Map.lookup funcName $ xabiFuncs xabi
+
+    sel <-
+      case maybeFunc of
+       Just (_, TypeFunction selector _ _) -> return selector
+       _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
+
+    (_, argsAsSource) <- constructArgValuesAndSource (Just (fmap argValueToText args)) xabiArgs
     let metadataWithCallInfo =
           Map.insert "funcName" funcName
           $ Map.insert "args" argsAsSource
@@ -644,7 +761,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
         fromAddr
         params
         (Wei (maybe 0 (fromIntegral . unStrung) value))
-        ((sel::ByteString) <> (argsBin::ByteString))
+        (sel <> Text.encodeUtf8 argsAsSource)
         chainId
     $logInfoLS "postUsersContractMethod'" tx
     hash <- blocStrato $ postTx tx
@@ -886,7 +1003,7 @@ constructArgValuesAndSource args argNamesTypes = do
         let valsAsText = map valueToText vals
         return $
           (
-            toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
+            "",
             "(" <> Text.intercalate "," valsAsText <> ")"
           )
 

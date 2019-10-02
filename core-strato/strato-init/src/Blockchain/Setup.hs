@@ -33,9 +33,9 @@ import           Blockchain.APIFiles
 import           Blockchain.Constants
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
-import           Blockchain.GenesisBlock
 import           Blockchain.DB.CodeDB
-import           Blockchain.EthConf.Model
+import           Blockchain.EthConf
+import           Blockchain.GenesisBlock
 import           Blockchain.Init.EthConf
 import           Blockchain.Init.Monad
 import           Blockchain.Init.Options
@@ -179,7 +179,6 @@ oneTimeSetup genesisBlockName = do
       runLoggingT $ withPostgresqlConn localConn $ runReaderT $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
          liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show localConn
-
          runMigration DataDefs.migrateAll
          liftIO $ putStrLn $ CL.yellow ">>>> Indexing SQL DB"
          runMigration DataDefs.indexAll
@@ -190,7 +189,7 @@ oneTimeSetup genesisBlockName = do
 
      {- create directory and dbs -}
 
-      void . runResourceT . runLoggingT . runSetupDBM $ do
+      void . runLoggingT . runResourceT . runSetupDBM $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
          void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
          liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"

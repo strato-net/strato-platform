@@ -29,6 +29,7 @@ import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
+import qualified Data.List                            as List
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
@@ -43,6 +44,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Event
 import qualified Blockchain.Database.MerklePatricia   as MP
+import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
@@ -96,7 +98,7 @@ create :: Bool
        -> ContextM ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId' metadata = do
+create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash' chainId' metadata = do
   recordCreate
   let env' = Env.Environment {
         Env.blockHeader = blockData,
@@ -116,12 +118,10 @@ create _ _ _ blockData _ sender' origin' _ _ _ _ (Code initCode) txHash' chainId
         !args = either (parseError "create arguments") Xabi.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource initCode
-    create' sender' hsh cc contractName' args
+    create' sender' newAddress hsh cc contractName' args
 
-create' :: Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> SM ExecResults
-create' creator ch cc contractName' argExps = do
-  newAddress <- getNewAddress creator
-
+create' :: Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> SM ExecResults
+create' creator newAddress ch cc contractName' argExps = do
   initializeAction newAddress contractName' ch
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
@@ -208,6 +208,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         Env.chainId=chainId',
         Env.metadata=metadata
         }
+
   fmap (either solidvmErrorResults id) . runSM Nothing env' $ do
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
@@ -215,7 +216,9 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
+    
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
+  
     finalAct <- use action
     sstate <- get
     return $ ExecResults {
@@ -250,7 +253,7 @@ getCodeAndCollection address' = do
     return (c', hsh, cc')
     else do
     codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
-
+    
     (contractName', ch, cc) <-
       case codeHash of
         SolidVMCode cn ch' -> do
@@ -545,8 +548,12 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
 
 runStatement (Xabi.EmitStatement eventName exptups) = do
   exps <- mapM (expToVar . snd) exptups
-  expVals <- mapM (getVar) exps
-  addEvent $ Event eventName (map show expVals)
+  expVals <- mapM getVar exps
+  expStrs <- mapM showSM expVals
+  addEvent $ Event eventName expStrs
+
+  onTraced $ liftIO $ putStrLn $ "Event Emission Parsed: " ++ eventName ++ " (" ++ List.intercalate "," expStrs ++ ")"
+
   return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
@@ -936,8 +943,8 @@ expToVar' x@(Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array{})) Xabi.NamedArg
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
   creator <- getCurrentAddress
   (hsh, cc) <- getCurrentCodeCollection
-  incrementNonce creator
-  execResults <- create' creator hsh cc contractName' args
+  newAddress <- getNewAddress creator
+  execResults <- create' creator newAddress hsh cc contractName' args
   return $ Constant $ SContract contractName' $ fromIntegral
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAddress execResults
@@ -952,14 +959,17 @@ expToVar' (Xabi.FunctionCall e args) = do
     Constant (SReference (AddressedPath address (MS.StoragePath pieces))) -> do
       val' <- getVar $ Constant $ SReference $ AddressedPath address $MS.StoragePath $ init pieces
       case (val', last pieces) of
+        
         (SContract _ toAddress, MS.Field funcName) -> do
           fromAddress <- getCurrentAddress
           res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
           case res of
             Just v -> return $ Constant $ v
             Nothing -> return $ Constant SNULL
+        
         (SAddress toAddress, MS.Field funcName) -> do
           fromAddress <- getCurrentAddress
+
           res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
           case res of
             Just v -> return $ Constant $ v
@@ -998,6 +1008,14 @@ expToVar' (Xabi.FunctionCall e args) = do
           return $ Constant $ SContract contractName' $ addr
         _ -> typeError "contract variable creation" argVals
 
+    Constant (SContractItem address "transfer") -> do
+      from <- getCurrentAddress
+      success <- case argVals of
+        OrderedVals [SInteger amount] -> do
+          pay "built-in transfer function" from address amount
+        _ -> return False
+      return . Constant $ SBool success
+
     Constant (SContractItem address itemName) -> do
 
       from <- getCurrentAddress
@@ -1005,6 +1023,7 @@ expToVar' (Xabi.FunctionCall e args) = do
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SContractFunction name address functionName) -> do
+      
       from <- getCurrentAddress
       result <- callWrapper from address name functionName args
       return . Constant . fromMaybe SNULL $ result
