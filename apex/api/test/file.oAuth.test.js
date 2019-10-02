@@ -8,13 +8,7 @@ const assert = chai.assert;
 const expect = chai.expect;
 const sinon = require('sinon');
 
-const initDb = require('../migrations/init-script/initdb.js');
-const models = require('../models');
-const createInitialData = require('../migrations/init-script/init');
-const externalStorage = require(`${process.cwd()}/lib/externalStorage/externalStorage.oAuth`);
 const uploader = require('../lib/uploader');
-const bcrypt = require('bcrypt');
-const checkMode = require('../lib/checkMode');
 const appConfig = require('../config/app.config');
 
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
