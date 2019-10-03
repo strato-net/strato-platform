@@ -4,7 +4,7 @@
     "password": "api",
     "database": "apex_dev",
     "host": "localhost",
-    "port": "5432",
+    "port": "15433",
     "dialect": "postgres"
   },
   "test": {
