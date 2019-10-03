@@ -291,7 +291,6 @@
                   rm -rf track-and-trace
                   git clone https://github.com/blockapps/track-and-trace.git
                   cd track-and-trace
-                  git checkout STRATO-1561_OAuth_compat
                   git submodule update --init --recursive
                   sed -i "s/localhost:8080/localhost/g" server/config/localhost.config.yaml
                   cd server
