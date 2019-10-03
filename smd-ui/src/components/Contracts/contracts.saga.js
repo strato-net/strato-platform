@@ -10,17 +10,16 @@ import {
 } from './contracts.actions';
 import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
-
+import { createUrl } from '../../lib/url';
 
 const contractsUrl = env.BLOC_URL + "/contracts";
 
-export function getContracts(chainId) {
-  let localContractsUrl = contractsUrl;
-  if (chainId) {
-    localContractsUrl += `?chainid=${chainId}`
-  }
+export function getContracts(chainid) {
+  const options = { query: { chainid } };
+  const url = createUrl(contractsUrl, options);
+
   return fetch(
-    localContractsUrl,
+    url,
     {
       method: 'GET',
       credentials: "include",

@@ -12,15 +12,15 @@ import {
 import { env } from '../../../../env';
 import { handleErrors } from '../../../../lib/handleErrors';
 import { isOauthEnabled } from '../../../../lib/checkMode';
+import { createUrl } from '../../../../lib/url';
 
-const blocSendUrl = env.BLOC_URL + "/users/:user/:address/send?resolve&:chainid"
-const transactionUrl = env.STRATO_URL_V23 + "/transaction?resolve=true&:chainid"
+const blocSendUrl = env.BLOC_URL + "/users/:user/:address/send";
+const transactionUrl = env.STRATO_URL_V23 + "/transaction";
 
-export function sendTokensAPICall(from, fromAddress, toAddress, value, password, chainId) {
-  const sendUrl = blocSendUrl.replace(":user", from).replace(":address", fromAddress);
-  const blocUrl = chainId ? sendUrl.replace(":chainid", `chainid=${chainId}`) : sendUrl.replace("&:chainid", '');
-  const oauthUrl = chainId ? transactionUrl.replace(":chainid", `chainid=${chainId}`) : transactionUrl.replace("&:chainid", '');
-  const url = isOauthEnabled() ? oauthUrl : blocUrl;
+export function sendTokensAPICall(from, fromAddress, toAddress, value, password, chainid) {
+
+  const options = isOauthEnabled() ? { query: { resolve: true, chainid } } : { params: { user: from, address: fromAddress }, query: { resolve: true, chainid } };
+  const url = createUrl(isOauthEnabled() ? transactionUrl : blocSendUrl, options);
 
   const blocBody = { value, password, toAddress };
   const oauthBody = {

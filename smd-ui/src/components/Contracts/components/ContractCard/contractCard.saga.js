@@ -16,18 +16,18 @@ import {
 } from './contractCard.actions';
 import { env } from '../../../../env.js'
 import { handleErrors } from '../../../../lib/handleErrors';
+import { createUrl } from '../../../../lib/url';
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress/state";
 const cirrusUrl = env.CIRRUS_URL + '/:contractName'
-const accountUrl = env.STRATO_URL + '/account?address=:address'
+const accountUrl = env.STRATO_URL + '/account'
 
-export function getState(contractName, contractAddress, chainId) {
-  let localUrl = contractsUrl.replace(":contractName", contractName).replace(":contractAddress", contractAddress);
-  if (chainId) {
-    localUrl += `?chainid=${chainId}`
-  }
+export function getState(contractName, contractAddress, chainid) {
+  const options = { params: { contractName, contractAddress }, query: { chainid } };
+  const url = createUrl(contractsUrl, options);
+
   return fetch(
-    localUrl,
+    url,
     {
       method: 'GET',
       credentials: "include",
@@ -45,8 +45,11 @@ export function getState(contractName, contractAddress, chainId) {
 }
 
 export function getCirrusInstances(contractName) {
+  const options = { params: { contractName } };
+  const url = createUrl(cirrusUrl, options);
+
   return fetch(
-    cirrusUrl.replace(':contractName', contractName),
+    url,
     {
       method: 'GET',
       credentials: "include",
@@ -67,8 +70,11 @@ export function getCirrusInstances(contractName) {
 }
 
 export function getAccount(address) {
+  const options = { query: { address } };
+  const url = createUrl(accountUrl, options);
+
   return fetch(
-    accountUrl.replace(":address", address),
+    url,
     {
       method: 'GET',
       credentials: "include",

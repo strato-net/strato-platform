@@ -15,14 +15,17 @@ import {
   OAUTH_FAUCET_REQUEST
 } from './oauthAccounts.actions';
 import { delay } from 'redux-saga';
+import { createUrl } from '../../../../lib/url';
 
-const accountDataUrl = env.STRATO_URL + "/account?address=:address&:chainid";
-const faucetUrl = env.BLOC_URL + "/users/:user/:address/fill?resolve"
+const accountDataUrl = env.STRATO_URL + "/account";
+const faucetUrl = env.BLOC_URL + "/users/:user/:address/fill"
 
 export function postFaucet(username, address) {
+  const options = { params: { user: username, address }, query: { resolve: true } };
+  const url = createUrl(faucetUrl, options);
+
   return fetch(
-    faucetUrl.replace(":user", username)
-      .replace(":address", address),
+    url,
     {
       method: 'POST',
       credentials: "include",
@@ -40,10 +43,12 @@ export function postFaucet(username, address) {
     })
 }
 
-export function getOauthAccountDetailApi(address, chainId) {
-  const localAccountDataUrl = chainId ? accountDataUrl.replace(":address", address).replace(":chainid", `chainid=${chainId}`) : accountDataUrl.replace(":address", address).replace("&:chainid", '')
+export function getOauthAccountDetailApi(address, chainid) {
+  const options = { query: { address, chainid } };
+  const url = createUrl(accountDataUrl, options);
+
   return fetch(
-    localAccountDataUrl,
+    url,
     {
       method: 'GET',
       credentials: 'include',

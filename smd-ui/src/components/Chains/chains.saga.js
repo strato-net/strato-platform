@@ -17,13 +17,14 @@ import {
 } from './chains.actions';
 import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
+import { createUrl } from '../../lib/url';
 
-const chainUrl = env.STRATO_URL + "/chain";
-const chainUrl2 = env.BLOC_URL + "/chain";
+const stratoChainUrl = env.STRATO_URL + "/chain";
+const blocChainUrl = env.BLOC_URL + "/chain";
 
 export function getChainsApi() {
   return fetch(
-    chainUrl,
+    stratoChainUrl,
     {
       method: 'GET',
       credentials: "include",
@@ -41,8 +42,11 @@ export function getChainsApi() {
 }
 
 export function getChainDetailApi(chainid) {
+  const options = { query: { chainid } };
+  const url = createUrl(blocChainUrl, options);
+
   return fetch(
-    chainUrl2.concat("?chainid=", chainid),
+    url,
     {
       method: 'GET',
       credentials: "include",

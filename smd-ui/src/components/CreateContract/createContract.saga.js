@@ -16,19 +16,17 @@ import { env } from '../../env';
 import { COMPILE_CHAIN_CONTRACT_REQUEST, compileChainContractSuccess, compileChainContractFailure } from '../CreateChain/createChain.actions';
 import { handleErrors } from '../../lib/handleErrors';
 import { isOauthEnabled } from '../../lib/checkMode';
+import { createUrl } from '../../lib/url';
 
-const userContractUrl = env.BLOC_URL + "/users/:user/:address/contract?resolve&:chainid"
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
-const transactionUrl = env.STRATO_URL_V23 + "/transaction?resolve=true&:chainid"
+const userContractUrl = env.BLOC_URL + "/users/:username/:address/contract";
+const transactionUrl = env.STRATO_URL_V23 + "/transaction"
 
-export function createContractApiCall(contract, src, username, address, password, args, chainId, metadata) {
-  const contractUrl = userContractUrl.replace(":user", username).replace(":address", address);
+export function createContractApiCall(contract, src, username, address, password, args, chainid, metadata) {
 
-  const blocUrl = chainId ? contractUrl.replace(":chainid", `chainid=${chainId}`) : contractUrl.replace("&:chainid", '')
-  const oauthUrl = chainId ? transactionUrl.replace(":chainid", `chainid=${chainId}`) : transactionUrl.replace("&:chainid", '');
-
-  const url = isOauthEnabled() ? oauthUrl : blocUrl;
+  const options = isOauthEnabled() ? { query: { resolve: true, chainid } } : { params: { username, address }, query: { resolve: true, chainid } };
+  const url = createUrl(isOauthEnabled() ? transactionUrl : userContractUrl, options);
 
   const blocBody = { contract, value: 0, password, src, args, metadata };
   const oauthBody = {
