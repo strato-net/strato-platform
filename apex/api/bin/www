@@ -11,8 +11,6 @@ const co = require('co');
 
 const sockets = require('../sockets/init');
 
-const initDb = require('../migrations/init-script/initdb.js');
-const models = require('../models');
 const createInitialData = require('../migrations/init-script/init');
 const registerAppMetadata = require('../migrations/init-script/registerAppMetadata');
 
@@ -31,10 +29,7 @@ app.set('port', port);
 var server = http.createServer(app);
 
 co(function*(){
-  yield initDb();
 
-  // sync() will create all table if they don't exist in database
-  yield models.sequelize.sync();
   yield createInitialData();
 
   yield registerAppMetadata();

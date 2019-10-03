@@ -1,10 +1,10 @@
 const env       = process.env.NODE_ENV || 'development';
 const config    = require(__dirname + '/../../config/config.json')[env];
-config.port = process.env.postgresPort || config.port;
+config.port = process.env.postgres_port || config.port;
 
 const pgtools = require('pgtools');
 
-module.exports = function initdb() {
+function createdb() {
   // create db in postgres if does not exist
   const pgToolsConfig = {
     user: config.username,
@@ -26,7 +26,7 @@ module.exports = function initdb() {
   })
 };
 
-module.exports.dropdb = function() {
+function dropdb() {
   const pgToolsConfig = {
     user: config.username,
     password: config.password,
@@ -34,9 +34,13 @@ module.exports.dropdb = function() {
     host: config.host,
   };
   return new Promise((resolve, reject) => {
-      pgtools.dropdb(pgToolsConfig, config.database, function (err, res) {
-        return err ? reject(err) : resolve();
-      })
+    pgtools.dropdb(pgToolsConfig, config.database, function (err, res) {
+      return err ? reject(err) : resolve();
+    })
   })
 };
 
+module.exports = {
+  createdb,
+  dropdb,
+};

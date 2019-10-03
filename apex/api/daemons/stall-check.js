@@ -11,12 +11,24 @@ const config = require('../config/app.config');
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-queryHealthStatus();
-setInterval(queryHealthStatus, config.healthCheck.progressWindow);
 
+(async() => {
+    await singleCheck()
+    setInterval(async () => {
+        await singleCheck()
+    }, config.healthCheck.stallCheckProgressWindow);
+})();
+
+async function singleCheck() {
+    try {
+        await queryHealthStatus();
+        winston.info('Stall check made at ' + moment().format());
+    } catch (err) {
+        winston.error('Stall check error: ' + err.message);
+    }
+}
 
 function queryHealthStatus() {
-    winston.info('Stalling Status Checked at ' + moment().format());
     return new Promise(async (resolve, _void) => {
 
         try {
@@ -58,18 +70,16 @@ function queryHealthStatus() {
 }
 
 async function getVmBlocksValid() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost';
+    if (!process.env['prometheusHost']) {
+      throw Error('prometheusHost env var is not set - unable to get prometheus data');
+    }
+  
     const options = {
         method: 'GET',
-        url: `http://${ipaddr}/prometheus/api/v1/query?query=vm_blocks_valid`,
+        url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=vm_blocks_valid`,
         followRedirects: false,
         timeout: config.healthCheck.requestTimeout-100,
         json: true,
-        // TODO: Modify to work with secured networks
-        auth: {
-            'user': 'admin',
-            'pass': 'admin'
-        }
     };
 
     const response = await rp(options);
@@ -89,18 +99,16 @@ async function getVmBlocksValid() {
 }
 
 async function getBaggerPending() {
-    const ipaddr = (env == 'production') ? 'prometheus:9090' : 'localhost';
+    if (!process.env['prometheusHost']) {
+      throw Error('prometheusHost env var is not set - unable to get prometheus data');
+    }
+    
     const options = {
         method: 'GET',
-        url: `http://${ipaddr}/prometheus/api/v1/query?query=vm_bagger_txs`,
+        url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=vm_bagger_txs`,
         followRedirects: false,
         timeout: config.healthCheck.requestTimeout-100,
         json: true,
-        // TODO: Modify to work with secured networks
-        auth: {
-            'user': 'admin',
-            'pass': 'admin'
-        }
     };
 
     const response = await rp(options);
@@ -163,6 +171,17 @@ async function updateStallStat(blocksValid, blocksPending){
         blockCount: blocksPending,
         timestamp: currentTime
     });
+}
+
+async function initialCreate(){
+  let currentTime = Date.now();
+  await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
+      latestHealthStatus: true,
+      latestCheckTimestamp: currentTime,
+      lastFailureTimestamp: currentTime,   //default first time marked as failure
+      isBlocksValidInc: false,
+      isLastPending: false
+    }})
 }
 
 module.exports = {
