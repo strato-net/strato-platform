@@ -176,7 +176,7 @@ addToPromotionCache tx s@BaggerState{ miningCache = mc@MiningCache{ promotedTran
 
 upsertPT :: OutputTx -> [OutputTx] -> [OutputTx]
 upsertPT tx@OutputTx{otSigner=addr, otBaseTx=bt} pt = ret
-    where filtered = filter (not . (\t -> otSigner t == addr && nonce (otBaseTx t) == nonce bt)) pt
+    where filtered = filter (not . (\t -> otSigner t == addr && nonce (otBaseTx t) <= nonce bt)) pt
           nonce = TD.transactionNonce
           !ret = tx : filtered
 

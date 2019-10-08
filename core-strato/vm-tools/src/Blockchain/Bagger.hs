@@ -329,12 +329,12 @@ demoteUnexecutables = do
         forM_ pDiscardedByCost $ logDiscard "demoteUnexecutables Pending Balance" address addressBalance
 
         state'''' <- getBaggerState
-        let !(qDiscardedByNonce, state''''') = B.trimBelowNonceFromPending address addressNonce state''''
+        let !(qDiscardedByNonce, state''''') = B.trimBelowNonceFromQueued address addressNonce state''''
         putBaggerState state'''''
         forM_ qDiscardedByNonce removeFromSeen
         forM_ qDiscardedByNonce $ logDiscard "demoteUnexecutables Queued Nonce" address addressNonce
 
-        let !(qDiscardedByCost, state'''''') = B.trimAboveCostFromPending address addressBalance state'''''
+        let !(qDiscardedByCost, state'''''') = B.trimAboveCostFromQueued address addressBalance state'''''
         putBaggerState state''''''
         forM_ qDiscardedByCost removeFromSeen
         forM_ qDiscardedByCost $ logDiscard "demoteUnexecutables Queued Balance" address addressBalance
