@@ -30,6 +30,7 @@ data Contract =
     _storageDefs :: Map String VariableDecl,
     _enums :: Map String [String],
     _structs :: Map String [(T.Text, Xabi.FieldType)],
+    _events :: Map T.Text Xabi.Event,
     _functions :: Map String Func,
     _constructor :: Maybe Func
   } deriving (Show, Read, Generic, NFData, Binary)
@@ -59,6 +60,7 @@ xabiToContract contractName' parents' xabi = validateXabi xabi `seq`
   _constants = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiConstants xabi,
   _enums = M.fromList [(T.unpack name, map T.unpack vals) | (name, Xabi.Enum vals _) <- M.toList $ Xabi.xabiTypes xabi],
   _structs = M.fromList [(T.unpack name, vals) | (name, Xabi.Struct vals _) <- M.toList $ Xabi.xabiTypes xabi],
+  _events = Xabi.xabiEvents xabi,
   _functions = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiFuncs xabi,
   _constructor =
       case M.toList $ Xabi.xabiConstr xabi of
