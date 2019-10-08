@@ -63,6 +63,7 @@ services:
     - postgres_user=postgres
     - postgrestHost=postgrest:3001
     - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
+    - prometheusHost=prometheus:9090
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
     - STRATO_GS_MODE=${STRATO_GS_MODE}

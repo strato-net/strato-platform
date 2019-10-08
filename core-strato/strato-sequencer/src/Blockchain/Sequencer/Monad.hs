@@ -64,7 +64,7 @@ import qualified Data.ByteString                           as B
 import qualified Data.ByteString.Lazy                      as BL
 import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue
-import           Data.Foldable                             (toList)
+import           Data.Foldable                             (foldl',toList)
 import           Data.IORef
 import           Data.Map                                  (Map)
 import qualified Data.Map                                  as M
@@ -409,7 +409,7 @@ clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
 addLdbBatchOps :: [LDB.BatchOp] -> SequencerM ()
 addLdbBatchOps ops = do
   existingOps <- use ldbBatchOps
-  let newOps = foldl (Q.|>) existingOps ops
+  let newOps = foldl' (Q.|>) existingOps ops
   ldbBatchOps .= newOps
 
 fuseChannels ::SequencerM (ConduitM () SeqLoopEvent SequencerM ())

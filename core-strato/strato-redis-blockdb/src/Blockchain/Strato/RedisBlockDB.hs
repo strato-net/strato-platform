@@ -585,7 +585,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                 let oldSha = head oldShaChain
                     newSha = head newShaChain
                 ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
-                let seen' = foldl (flip S.insert) seen (filter (/= (SHA 0)) ps) -- todo double S.insert is probably more optimal
+                let seen' = foldl' (flip S.insert) seen (filter (/= (SHA 0)) ps) -- todo double S.insert is probably more optimal
                 if newParent `S.member` seen
                 then complete newParent (mkParentChain newParent newShaChain)
                 else if oldParent `S.member` seen

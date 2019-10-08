@@ -2,21 +2,10 @@
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const assert = chai.assert;
-const expect = chai.expect;
-const should = chai.should();
-const fs = require('fs');
 const process = require('process');
-const bcrypt = require('bcrypt');
-const sinon = require('sinon');
-const rp = require('request-promise');
-const rewire = require('rewire');
 const co = require('co');
 
-const initDb = require('../migrations/init-script/initdb.js');
-const models = require('../models');
-const createInitialData = require('../migrations/init-script/init');
 const appConfig = require('../config/app.config');
-const checkMode = require('../lib/checkMode');
 
 const testFactory = require(`${process.cwd()}/test/factory`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
