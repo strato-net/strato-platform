@@ -152,7 +152,7 @@ create' creator newAddress ch cc contractName' argExps = do
     erReturnVal = Just BSS.empty,
     erTrace = [],
     erLogs = [],
-    erEvents = toList $ events sstate,
+    erEvents = toList $ ssEvents sstate,
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
     erAction = Just $ sstate ^. action,
@@ -227,7 +227,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       erReturnVal = BSS.toShort <$> returnVal,
       erTrace = [],
       erLogs = [],
-      erEvents = toList $ events sstate,
+      erEvents = toList $ ssEvents sstate,
       erNewContractAddress = Nothing,
       erSuicideList = S.empty,
       erAction = Just $ finalAct,
@@ -552,7 +552,9 @@ runStatement (Xabi.EmitStatement eventName exptups) = do
   expStrs <- mapM showSM expVals
   addEvent $ Event eventName expStrs
 
-  onTraced $ liftIO $ putStrLn $ "Event Emission Parsed: " ++ eventName ++ " (" ++ List.intercalate "," expStrs ++ ")"
+  curInfo <- getCurrentCallInfo
+  curCnct <- getCurrentContract
+  onTraced $ liftIO $ putStrLn $ "Event Emission Parsed: " ++ eventName ++ " (" ++ List.intercalate "," expStrs ++ ")" ++ " for contract " ++ _contractName curCnct ++ " with address " ++ (format $ currentAddress curInfo)
 
   return Nothing
 
