@@ -85,6 +85,7 @@ data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
   , functionInserts :: [ProcessedContract]
+  , eventCreations    :: [EventTable]
   } deriving (Show)
 
 toAction :: BL.ByteString -> Action
@@ -326,6 +327,24 @@ rowToHistories gref abiid row actions cont details oldState = do
                                   hRow
       pure (hInsert, fInserts)
 
+
+-- Parses xabi event declarations to create a table,
+-- ignoring indexes and anonymous flag
+createEvents :: ContractDetails -> Bloc [EventTable]
+createEvents details = do
+  let events = xabiEvents $ contractdetailsXabi details
+  $logInfoS "createEvents" . T.pack $ "creating the following events: " ++ (show events)
+  return $ map makeEvent $ Map.toList events
+  where
+    makeEvent :: (Text, Event) -> EventTable 
+    makeEvent (name, event) = 
+      EventTable
+      { eventContractName = contractdetailsName details
+      , eventName = name
+      , eventFields = map fst $ eventLogs event
+      }
+      
+
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
@@ -345,7 +364,7 @@ processTheMessages env conn g messages = do
 
   let changes = parseActions messages
       events = parseEvents messages
-
+      
 
   outputData conn . yield $ insertEventTableQuery $ events
 
@@ -387,32 +406,33 @@ processTheMessages env conn g messages = do
               oldState <- readPreviousEVMState g addr chainId cont
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              pure . Right $ BatchedInserts indexContract hs fhs
+              eventTables <- createEvents details
+              pure . Right $ BatchedInserts indexContract hs fhs eventTables
         BS.ActionSolidVMDiff{} -> do
           mDetails <- detailsForRow row False
 
+          -- TODO (Dan): why are these details only there on creation for solidVM contracts?
           case mDetails of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in metadata"
-            Just (cmId, _) -> do
+            Just (cmId, details) -> do
               ensureContractInstance cmId row
-
+              
               mName <- getCachedSolidVMDetails g row
               case mName of
-                Nothing -> pure . Left $ "No SolidVM details for code hash "
+                Nothing -> pure . Left $ "No cached SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in metadata"
                 Just (name, abi) -> do
                   let abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
                       cont = error "internal error: contract should be unused for solidvm"
-                      details = error "internal error: details should be unused for solidvm"
-              
               
                   oldState <- readPreviousSolidVMState g addr chainId
                   indexContract <- rowToInsert g abiid row cont oldState
                   (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-                  pure . Right $ BatchedInserts indexContract hs fhs
+                  eventTables <- createEvents details  
+                  pure . Right $ BatchedInserts indexContract hs fhs eventTables
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -426,4 +446,5 @@ processTheMessages env conn g messages = do
     outputData conn . createInsertIndexTable g $ map indexInsert ins
     outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
     outputData conn . createInsertFunctionHistoryTable g $ concatMap functionInserts ins
+    outputData conn . createEventTables g $ concatMap eventCreations ins 
   flushPendingWrites g

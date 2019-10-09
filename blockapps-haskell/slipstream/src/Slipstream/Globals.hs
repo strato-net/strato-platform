@@ -35,7 +35,7 @@ import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
 newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
+newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -74,6 +74,11 @@ isContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m Bool
 isContractCreated globalsIORef codeHash = do
   Globals{..} <- readIORef globalsIORef
   return $ codeHash `Set.member` createdContracts
+
+setEventCreated :: MonadIO m => IORef Globals -> (Text, Text) -> m ()
+setEventCreated globalsIORef evTup = do
+  globals@Globals{..} <- readIORef globalsIORef
+  updateGlobals globalsIORef globals{createdEvents=Set.insert evTup createdEvents}
 
 isHistoric :: MonadIO m => IORef Globals -> CodePtr -> m Bool
 isHistoric globalsIORef name = do

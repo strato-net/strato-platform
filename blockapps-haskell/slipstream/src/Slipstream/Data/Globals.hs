@@ -17,7 +17,8 @@ instance NFData (LRU key val) where
   rnf = (`seq` ()) -- LRU is already pretty strict
 
 
-data Globals = Globals { createdContracts :: S.Set CodePtr -- list of contacts with a table
+data Globals = Globals { createdEvents :: S.Set (Text, Text) -- (contractName, eventName)
+                       , createdContracts :: S.Set CodePtr -- list of contacts with a table
                        , historyList :: S.Set CodePtr
                        , noIndexList :: S.Set CodePtr
                        , functionHistoryList :: S.Set CodePtr

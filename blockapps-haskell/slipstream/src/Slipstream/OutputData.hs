@@ -17,7 +17,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromMaybe)
+import           Data.Maybe                      (fromMaybe, catMaybes)
 import           Data.Monoid                     ((<>))
 import qualified Data.Set                        as Set
 import           Data.Text                       (Text)
@@ -225,6 +225,38 @@ createHistoryTable globalsIORef contract = do
     yield $ createHistoryTableQuery contract
     yield $ addHistoryUnique contract
 
+
+createEventTables :: OutputM m
+                  => IORef Globals
+                  -> [EventTable]
+                  -> ConduitM () Text m ()
+createEventTables globalsIORef events = do 
+  yieldMany . catMaybes =<< lift (mapM (createEventTable globalsIORef) events)
+   
+createEventTable :: OutputM m
+                 => IORef Globals
+                 -> EventTable
+                 -> m (Maybe Text)
+createEventTable globalsIORef ev = do
+  globals <- readIORef globalsIORef
+  let eventTuple = (eventContractName ev, eventName ev)
+      eventAlreadyCreated = eventTuple `Set.member` createdEvents globals
+  if eventAlreadyCreated
+  then
+    return Nothing
+  else do
+    setEventCreated globalsIORef eventTuple 
+    return (Just $ createEventTableQuery ev) 
+
+createEventTableQuery :: EventTable -> Text
+createEventTableQuery ev =
+  let tableName = T.concat [(eventContractName ev),  ".", (eventName ev)]
+  in T.concat   
+      [ "CREATE TABLE IF NOT EXISTS " , wrapDoubleQuotes tableName , " ("
+        , csv $ ["id SERIAL NOT NULL", "address text"] ++ (map (\t -> T.concat [t, " text"]) $ eventFields ev)
+        , ");"]
+      
+
 insertIndexTable :: OutputM m
                  => IORef Globals
                  -> [ProcessedContract]
@@ -374,9 +406,9 @@ insertHistoryTableQuery contracts@(x:_) =
 insertEventTableQuery :: [AggregateEvent] -> Text
 insertEventTableQuery evs = 
  let conVals AggregateEvent{..} = wrapAndEscape . map escapeQuotes $
-        [ T.pack . shaToHex $ eventTxHash
-        , eventName
-        , eventArgs
+        [ T.pack . shaToHex $ agEventTxHash
+        , agEventName
+        , agEventArgs
         ]
    in T.concat
         [ "INSERT INTO event (transaction_hash, name, args)\n  VALUES "
