@@ -4,25 +4,26 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 import           Prelude hiding (print)
-import           ClassyPrelude (print)
 
 import           Test.Hspec
+import qualified Test.Hspec.Expectations.Lifted as L
+import           Test.Hspec.Runner
 import           HFlags
 import           Control.Monad
+import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import qualified Data.ByteString         as B
-import qualified Data.ByteString.Char8   as C8
 import qualified Data.ByteString.Base16  as B16
 import qualified Data.ByteString.Short   as BSS
 import           Data.Maybe
 import qualified Data.Set                as S
-import qualified Data.Text.Encoding      as Text
 
+import           Blockchain.BlockChain (compactDiffs)
 import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.Block as BDB
-import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
@@ -31,13 +32,11 @@ import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.Opcodes
 import           Blockchain.Output
 import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
 
 import           Executable.EVMFlags ()
-
---noLog :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
---noLog _ _ _ _ = return ()
 
 {-# NOINLINE exampleCode #-}
 exampleCode :: B.ByteString
@@ -46,13 +45,16 @@ exampleCode = B.pack $ [0..255]
 main :: IO ()
 main = do
   void $ $initHFlags "Yeah Buddy"
-  hspec spec
+  let predicate :: Path -> Bool
+      predicate (_:_, _) = True
+      predicate _ = False
+  hspecWith (configAddFilter predicate defaultConfig) spec
 
 spec :: Spec
 spec = do
   describe "monad transformer over map tests" $ do
     it "stateT get its puts for a map" $ do
-      (execResults,_) <- runLoggingT $ runTestContextM $ do
+      (execResults,_) <- runNoLoggingT $ runTestContextM $ do
         let
           isRunningTests = False
           isHomestead = False
@@ -62,7 +64,7 @@ spec = do
           newAddress = (Address 0xdeadbeef)
           txValue = 0
           txGasPrice = 10000000
-          (i,_) = B16.decode "606060405234610000575b5b5b6101748061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063ec6306431461003e575b610000565b346100005761004b6100d4565b604051808060200182810382528381815181526020019150805190602001908083836000831461009a575b80518252602083111561009a57602082019150602081019050602083039250610076565b505050905090810190601f1680156100c65780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6020604051908101604052806000815250606060405190810160405280602f81526020017f636f6e7472616374204c6f7474657279207b0a0a0966756e6374696f6e204c6f81526020017f74746572792829207b0a097d0a0a7d000000000000000000000000000000000081525090505b905600a165627a7a72305820b42b9b4bfc4b8e1dca667748b387dad2822afdf716ae22a127a0150b31ce7a960029"
+          (i,"") = B16.decode "606060405234610000575b5b5b6101748061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063ec6306431461003e575b610000565b346100005761004b6100d4565b604051808060200182810382528381815181526020019150805190602001908083836000831461009a575b80518252602083111561009a57602082019150602081019050602083039250610076565b505050905090810190601f1680156100c65780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6020604051908101604052806000815250606060405190810160405280602f81526020017f636f6e7472616374204c6f7474657279207b0a0a0966756e6374696f6e204c6f81526020017f74746572792829207b0a097d0a0a7d000000000000000000000000000000000081525090505b905600a165627a7a72305820b42b9b4bfc4b8e1dca667748b387dad2822afdf716ae22a127a0150b31ce7a960029"
           txInit = Code i
 
         _ <- create isRunningTests
@@ -80,13 +82,20 @@ spec = do
                     (SHA 0)
                     Nothing
                     Nothing
-        addressState <- getAddressState newAddress
-        liftIO . putStrLn $ show addressState
+        addressState <- A.lookupWithDefault A.Proxy newAddress
+        addressState `L.shouldBe` AddressState
+           { addressStateNonce = 0
+           , addressStateBalance = 0
+           , addressStateCodeHash = EVMCode (SHA 0x1b2d3c7f0269f98c8e9b627cc564b7d23a2c0c0501518d83e757c518135b7e51)
+           , addressStateContractRoot = MP.StateRoot $ word256ToBytes 0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421
+           , addressStateChainId = Nothing
+           }
+
         code <- getEVMCode $
                 case addressStateCodeHash addressState of
                   EVMCode x -> x
                   _ -> error "vm-runner tests only support EVMCode"
-        liftIO . putStrLn $ show $ B16.encode code
+        code `L.shouldBe` B.drop 27 i -- I'd like this better if I knew why 27 was the offset of the payload, but disassembling wasn't helpful
         call isRunningTests
              isHomestead
              True
@@ -105,17 +114,46 @@ spec = do
              Nothing
              Nothing
       erException execResults `shouldSatisfy` isNothing
-      print $ erTrace execResults
-      print $ erException execResults
-      print $ B16.encode "ec630643"
+      erTrace execResults `shouldBe` []
+      B16.encode "ec630643" `shouldBe` "6563363330363433" -- I have no idea why this is tested
       case erReturnVal execResults of
         Nothing -> liftIO $ putStrLn "No return value"
         Just short -> do
           let code = BSS.fromShort short
-          print code
-          print . fst . B16.decode $ code
-          print . Text.decodeUtf8 $ code
-          print . C8.takeWhile (/= '\0') . C8.drop 64 $ code
+          code `shouldBe` mconcat [ B.replicate 31 0x0, B.singleton 0x20
+                                  , B.replicate 31 0x0, B.singleton 0x2f
+                                  , "contract Lottery {\n\n\tfunction Lottery() {\n\t}\n\n}", B.replicate 17 0x0
+                                  ]
+
+  describe "BatchedDiffs" $ do
+    let toRoot = MP.StateRoot . word256ToBytes
+        base = toRoot 0
+        costForN :: Int -> Word256 -> (MP.StateRoot, SHA, Integer, Int)
+        costForN c n = (toRoot n, SHA n, fromIntegral n, c)
+
+    it "will leave a single block alone, no matter the cost" $ do
+      let want = [(base, toRoot 1, SHA 1, 1)]
+      compactDiffs base [costForN 0 1] `shouldBe` want
+      compactDiffs base [costForN 10000 1] `shouldBe` want
+
+    it "will group small blocks together" $ do
+      compactDiffs base (map (costForN 1) [1..50]) `shouldBe`
+        [(base, toRoot 50, SHA 50, 50)]
+
+    it "will separate huge blocks" $ do
+      compactDiffs base [costForN 10000 1, costForN 10000 2] `shouldBe`
+        [ (base, toRoot 1, SHA 1, 1)
+        , (toRoot 1, toRoot 2, SHA 2, 2)]
+
+    it "will combine moderately sized blocks" $ do
+      -- Assume that maxCost is 500, so 10 blocks per diff
+      let input = map (costForN 50) [1..30]
+      compactDiffs base input `shouldBe`
+        [(base, toRoot 10, SHA 10, 10)
+        ,(toRoot 10, toRoot 20, SHA 20, 20)
+        ,(toRoot 20, toRoot 30, SHA 30, 30)
+        ]
+
   describe "Mutable Stack" $ do
     it "can push elements" $ do
       s <- MS.empty :: IO (MS.MutableStack Int)

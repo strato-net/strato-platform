@@ -14,11 +14,12 @@ import Test.Hspec
 
 import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.SHA
 import Blockchain.SolidVM.Model
 import qualified Slipstream.Data.Action as SS
 
-convert :: BS.Action -> Either String SS.Action'
+convert :: BS.Action -> Either String SS.Action -- 🤔
 convert = eitherDecode . encode
 
 emptyEVMData :: BS.ActionData
@@ -104,15 +105,15 @@ spec = describe "Action conversions" $ do
          }
        }|]
 
-     eitherDecode (encode oldStyle) `shouldBe` Right (SS.Action'
-        { SS._blockHash = forceHash "53fe605019e925357f1077cf753b17384e56379fa4dca1064cbb5e956d76e32f"
-        , SS._blockTimestamp = posixSecondsToUTCTime 1550858759
-        , SS._blockNumber = 9
-        , SS._transactionHash = forceHash "3d5069c6b8f6e3922f8a98bef4f23c2d73794403172c12d6915d51ad47a9e827"
-        , SS._transactionChainId = Nothing
-        , SS._transactionSender = 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c
+     eitherDecode (encode oldStyle) `shouldBe` Right (SS.Action
+        { SS._actionBlockHash = forceHash "53fe605019e925357f1077cf753b17384e56379fa4dca1064cbb5e956d76e32f"
+        , SS._actionBlockTimestamp = posixSecondsToUTCTime 1550858759
+        , SS._actionBlockNumber = 9
+        , SS._actionTransactionHash = forceHash "3d5069c6b8f6e3922f8a98bef4f23c2d73794403172c12d6915d51ad47a9e827"
+        , SS._actionTransactionChainId = Nothing
+        , SS._actionTransactionSender = 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c
         , SS._actionData = M.singleton 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 $ SS.ActionData
-          { SS._storageDiffs = BS.ActionEVMDiff . M.fromList $
+          { SS._actionDataStorageDiffs = BS.ActionEVMDiff . M.fromList $
             [ (0, 0x5c703a07)
             , (1, 0x76696e5f305f300000000000000000000000000000000000000000000000000e)
             , (2, 0x73305f305f30000000000000000000000000000000000000000000000000000c)
@@ -120,17 +121,17 @@ spec = describe "Action conversions" $ do
             , (4, 0x73325f305f30000000000000000000000000000000000000000000000000000c)
             , (5, 0x73335f305f30000000000000000000000000000000000000000000000000000c)
             ]
-          , SS._codeHash = EVMCode $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9"
-          , SS._codeKind = EVM
-          , SS._callData = [SS.CallData
-            { SS._callType = SS.Create
-            , SS._sender = 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c
-            , SS._owner = 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6
-            , SS._gasPrice = 1
-            , SS._value = 0
-            , SS._input = ""
-            , SS._output = Just "\x60\x80\x60"
+          , SS._actionDataCodeHash = EVMCode $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9"
+          , SS._actionDataCodeKind = EVM
+          , SS._actionDataCallData = [SS.CallData
+            { SS._callDataType = SS.Create
+            , SS._callDataSender = 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c
+            , SS._callDataOwner = 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6
+            , SS._callDataGasPrice = 1
+            , SS._callDataValue = 0
+            , SS._callDataInput = ""
+            , SS._callDataOutput = Just "\x60\x80\x60"
             }]
           }
-        , SS._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
+        , SS._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
       })

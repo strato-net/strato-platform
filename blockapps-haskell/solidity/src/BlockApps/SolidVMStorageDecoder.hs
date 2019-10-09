@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -14,9 +12,11 @@ module BlockApps.SolidVMStorageDecoder
 
 import Control.DeepSeq
 import Control.Monad.Extra
+import Data.Char
 import Data.Bifunctor
 import Data.Bitraversable
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as C8
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import qualified Data.Map as M
@@ -45,12 +45,15 @@ bimapValue f (name', value') = do
 
 
 decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
-decodeCacheValues hxs prevState = either (error . printf "SVM.decodeCacheValues: %s" . show) id $ do
+decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValues: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
+      isBasic (StoragePath [Field _]) = True
+      isBasic _ = False
   pathValues <- mapM parseM $ M.toList hxs
+  let pathValues' = filter (isBasic . fst) pathValues
   finalState <- bimap show HM.toList $ case prevState of
-    [] -> synthesize pathValues
-    tvs -> replayDeltas pathValues . HM.fromList . map (first encodeUtf8) $ tvs
+    [] -> synthesize pathValues'
+    tvs -> replayDeltas pathValues' . HM.fromList . map (first encodeUtf8) $ tvs
   mapM (bimapM bsToText return) finalState
 
 bsToText :: B.ByteString -> Either String T.Text
@@ -89,7 +92,13 @@ valueToSolidityValue = \case
           ValueInt _ _ n -> Right . T.pack . show $ n
           ValueAddress a -> Right . T.pack . show $ a
           ValueString t -> Right t
-          ValueBytes _ bs -> error $ "bytes index" ++ show bs
+          -- The collapse of bytes and str to a single types means that selecting an encoding
+          -- for keys is not obvious. bytestrings may contain non UTF8 text, and at the same time
+          -- we wouldn't want to hex encode user readable strings. Unprintable characters are
+          -- escaped, so that the text will maintain readability and data is not lost on encoding
+          -- (c.f. T.pack . C8.unpack, which will silently truncate non-UTF8 byte sequences)
+          ValueBytes _ bs -> Right . T.pack . (foldr showLitChar "") . C8.unpack $ bs
+
           ValueBool True -> Right "true"
           ValueBool False -> Right "false"
 

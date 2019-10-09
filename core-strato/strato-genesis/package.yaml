@@ -12,6 +12,7 @@ github: blockapps/strato-platform/core-strato/strato-genesis
 
 dependencies:
   - aeson
+  - aeson-casing
   - base
   - base16-bytestring
   - binary
@@ -34,6 +35,7 @@ dependencies:
   - memory
   - merkle-patricia-db
   - merkle-patricia-db
+  - monad-alter
   - persistent-postgresql
   - resourcet
   - scientific

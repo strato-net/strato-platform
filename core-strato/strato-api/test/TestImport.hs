@@ -6,6 +6,7 @@ module TestImport
     ) where
 
 import           Application           (makeFoundation, makeLogware)
+import           Control.Monad.Change.Modify (Accessible(..))
 import           ClassyPrelude         as XX hiding (delete, deleteBy)
 import           Database.Persist      as XX hiding (get)
 import           Database.Persist.Sql  (SqlBackend, SqlPersistM, connEscapeName, rawExecute,
@@ -20,8 +21,8 @@ import qualified Blockchain.Data.DataDefs as DataDefs
 import qualified Blockchain.DB.SQLDB as SQL
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 
-instance SQL.HasSQLDB (YesodExample App) where
-  getSQLDB = appConnPool <$> getTestYesod
+instance Accessible SQL.SQLDB (YesodExample App) where
+  access _ = appConnPool <$> getTestYesod
 
 runDB :: SqlPersistM a -> YesodExample App a
 runDB query = do

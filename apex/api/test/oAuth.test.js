@@ -2,21 +2,10 @@
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const assert = chai.assert;
-const expect = chai.expect;
-const should = chai.should();
-const fs = require('fs');
 const process = require('process');
-const bcrypt = require('bcrypt');
-const sinon = require('sinon');
-const rp = require('request-promise');
-const rewire = require('rewire');
 const co = require('co');
 
-const initDb = require('../migrations/init-script/initdb.js');
-const models = require('../models');
-const createInitialData = require('../migrations/init-script/init');
 const appConfig = require('../config/app.config');
-const checkMode = require('../lib/checkMode');
 
 const testFactory = require(`${process.cwd()}/test/factory`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
@@ -84,10 +73,7 @@ describe('OAuth tests', function () {
   it('creates new user', async function () {
     const username = util.uid(userData.userName); //fixme - small chance of collision if not run w/ fresh system, should clear db in before block
 
-    const user = await co.wrap(oAuth.createKey)({
-      'X-USER-UNIQUE-NAME': username,
-      'X-USER-ID': userData.hash
-    })
+    const user = await co.wrap(oAuth.createKey)(username);
 
     assert.equal(user.status,RestStatus.OK,'user created')
   });
@@ -96,20 +82,14 @@ describe('OAuth tests', function () {
   it('finds existing user', async function () {
     const username = util.uid(userData.userName); //fixme - small chance of collision if not run w/ fresh system, should clear db in before block
 
-    const result = await co.wrap(oAuth.createKey)({
-      'X-USER-UNIQUE-NAME': username,
-      'X-USER-ID': userData.hash
-    })
+    const result = await co.wrap(oAuth.createKey)(username);
 
     if(result.status == RestStatus.OK){ //user created, faucet em
       userAccountAddress = result.user.address;
       await waitFaucet(userAccountAddress);
     }
 
-    const user = await co.wrap(oAuth.getKey)({
-      'X-USER-UNIQUE-NAME': username,
-      'X-USER-ID': userData.hash
-    })
+    const user = await co.wrap(oAuth.getKey)(username)
 
     assert.equal(user.status,RestStatus.OK,'user found')
   });

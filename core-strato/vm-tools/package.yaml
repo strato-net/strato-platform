@@ -6,10 +6,6 @@ maintainer:    jamshidnh@gmail.com
 synopsis: types and tools needed to write a VM for Strato
 category:      Data Structures
 
-default-extensions:
-  - DeriveGeneric
-  - DeriveAnyClass
-
 dependencies:
   - base >= 4 && < 5
   - ansi-wl-pprint
@@ -19,9 +15,11 @@ dependencies:
   - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
+  - blockstanbul
   - bytestring
   - containers
   - cross-monitoring
+  - data-default
   - deepseq
   - directory
   - ethereum-rlp
@@ -32,8 +30,11 @@ dependencies:
   - hflags
   - lens
   - leveldb-haskell
+  - lrucache
   - merkle-patricia-db
+  - monad-alter
   - mtl
+  - nibblestring
   - ordered-containers
   - persistent-postgresql
   - persistent-sqlite
@@ -45,6 +46,7 @@ dependencies:
   - strato-model
   - strato-redis-blockdb
   - seqevents
+  - split
   - text
   - temporary
   - time
@@ -61,6 +63,7 @@ library:
     - Blockchain.Data.ExecResults
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
+    - Blockchain.TxRunResultCache
     - Blockchain.VMContext
     - Blockchain.VMOptions
     - Blockchain.VM.SolidException
@@ -69,3 +72,13 @@ library:
     - Executable.EVMFlags
   ghc-options: -Wall -O2
 
+
+tests:
+  contextm-test:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - blockapps-haskoin
+      - hspec
+      - hspec-expectations-lifted
+      - vm-tools

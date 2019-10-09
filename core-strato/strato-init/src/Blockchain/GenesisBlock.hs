@@ -1,17 +1,19 @@
 {-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.GenesisBlock (
   initializeGenesisBlock,
-  BackupType(..)
 ) where
 
 
 import           Control.Monad
 import           Blockchain.Output
+import           Control.Monad.Change.Alter                   (Alters)
+import           Control.Monad.Change.Modify                  (Accessible)
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
@@ -24,8 +26,7 @@ import           Data.Text                                    (Text)
 import qualified Data.Text                                    as T
 import           System.Directory
 
-import           Blockchain.BackupBlocks
-import qualified Blockchain.Strato.Model.Action                       as A
+import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
@@ -87,12 +88,20 @@ readSupplementaryAccounts genesisBlockName = do
                                   [] -> []
                                   "s":_ -> []
                                   ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (SHA (parseHex c))]
+                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ SHA (parseHex c))]
                                   _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
-getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
-                                         HasStateDB m, HasStorageDB m)
+getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
+                                        , MonadLogger m
+                                        , HasCodeDB m
+                                        , HasHashDB m
+                                        , Mem.HasMemAddressStateDB m
+                                        , HasStateDB m
+                                        , HasStorageDB m
+                                        , HasMemStorageDB m
+                                        , (Ad.Address `Alters` AddressState) m
+                                        )
                                      => String
                                      -> [Ad.Address]
                                      -> m ([(AccountInfo, CodeInfo)], Block)
@@ -108,44 +117,28 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
     extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
     genesisInfoToGenesisBlock theJSON' genesisBlockName extraAccounts
 
-data BackupType = NoBackup | BlockBackup | MPBackup
-
 initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
                           , Mem.HasMemAddressStateDB m
-                          , RBDB.HasRedisBlockDB m
+                          , Accessible RBDB.RedisConnection m
                           , HasSQLDB m
                           , HasStateDB m
                           , HasStorageDB m
+                          , HasMemStorageDB m
                           , MonadLogger m
+                          , (Ad.Address `Alters` AddressState) m
                           )
-                       => BackupType
-                       -> String
+                       => String
                        -> [Ad.Address]
                        -> m ()
-initializeGenesisBlock backupType genesisBlockName extraFaucets = do
+initializeGenesisBlock genesisBlockName extraFaucets = do
     $logInfoS "initgen" "Begin of initgen"
-    (srcInfo, genesisBlock, obGB) <-
-        case backupType of
-            NoBackup -> do
-                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
-                _ <- produceVMEvents [ChainBlock gb]
-                obGB <- liftIO $ bootstrapSequencer gb
-                putGenesisHash $ blockHash gb
-                return (si, gb, obGB)
-            BlockBackup -> do
-                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
-                _ <- produceVMEvents [ChainBlock gb]
-                obGB <- liftIO $ bootstrapSequencer gb
-                backupBlocks
-                putGenesisHash $ blockHash gb
-                return (si, gb, obGB)
-            MPBackup -> error "MPBackup called"
-            --    gb <- backupMP
-            --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
-            --    return (gb, undefined)
-    $logInfoS "initgen" "Initial merkle patricia tries succussfully created"
-    [genBId] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+    (srcInfo, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
+    _ <- produceVMEvents [ChainBlock genesisBlock]
+    obGB <- liftIO $ bootstrapSequencer genesisBlock
+    putGenesisHash $ blockHash genesisBlock
+    $logInfoS "initgen" "Initial merkle patricia tries successfully created"
+    [genBId] <- putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
     $logInfoS "initgen" "Genesis Block put"
     $logInfoS "initgen" "State diff has been generated"
 

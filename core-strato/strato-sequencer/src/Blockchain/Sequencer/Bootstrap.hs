@@ -1,7 +1,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
-import ClassyPrelude (atomically, newTMChan, fromMaybe)
+import ClassyPrelude (atomically, newTMChan, newTQueue, fromMaybe)
 import qualified Data.ByteString.Char8 as C8
 
 import Blockchain.Constants
@@ -41,16 +41,18 @@ bootstrapSequencer Block{blockBlockData = bd,
                }
   hash       = blockHeaderHash bd
   difficulty = blockDataDifficulty bd
-  kludge t   = fromMaybe fallback (wrapIngestBlockTransaction hash t)
+  kludge t   = fromMaybe fallback (wrapIngestBlockTransactionUnanchored hash t)
     where fallback = OutputTx { otOrigin = TO.BlockHash hash
                    , otSigner = Address 0
                    , otBaseTx = t
                    , otHash   = TX.transactionHash t
+                   , otAnchorChain = Public
                    }
   initLevelDB :: CablePackage -> IO ()
   initLevelDB pkg = do
       tch <- atomically newTMChan
-      vch <- atomically newTMChan
+      vch <- atomically newTQueue
+      rch <- atomically newTQueue
       let dummySequencerCfg = SequencerConfig
             { depBlockDBCacheSize   = 0
             , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
@@ -59,6 +61,7 @@ bootstrapSequencer Block{blockBlockData = bd,
             , blockstanbulBlockPeriod = 0
             , blockstanbulRoundPeriod = 0
             , blockstanbulBeneficiary = vch
+            , blockstanbulVoteResps = rch
             , blockstanbulTimeouts = tch
             , cablePackage = pkg
             , maxEventsPerIter = 65
@@ -77,5 +80,5 @@ bootstrapSequencer Block{blockBlockData = bd,
             }
       runGregorM dummyGregorCfg $ do
         assertTopicCreation
-        writeSeqVmEvents [OEBlock shortCircuit]  -- todo handle the error :)
-        writeSeqP2pEvents [OEBlock shortCircuit]  -- todo handle the error :)
+        writeSeqVmEvents [VmBlock shortCircuit]  -- todo handle the error :)
+        writeSeqP2pEvents [P2pBlock shortCircuit]  -- todo handle the error :)

@@ -6,10 +6,6 @@ maintainer:    jamshidnh@gmail.com
 synopsis: The executable that runs VMs for transactions
 category:      Data Structures
 
-default-extensions:
-  - DeriveGeneric
-  - DeriveAnyClass
-
 dependencies:
   - base >= 4 && < 5
   - ansi-wl-pprint
@@ -17,19 +13,23 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-init
   - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - classy-prelude
+  - conduit
   - containers
   - cross-monitoring
   - ethereum-rlp
   - ethereum-vm
+  - extra
   - format
   - hflags
   - lens
   - merkle-patricia-db
+  - monad-alter
   - mtl
   - ordered-containers
   - prometheus-client
@@ -50,7 +50,8 @@ dependencies:
   - wai-middleware-prometheus
   - warp
   - async
-
+  - unliftio
+  - util
   - blockstanbul # This dependency doesn't appear to be used at all, except for one symbol that doesn't exist.
                  # To avoid breaking builds, please leave this here: https://blockapps.atlassian.net/browse/OPS-65
 
@@ -79,7 +80,9 @@ tests:
       - aeson
       - data-default
       - ethereum-vm
+      - vm-runner
       - hspec
+      - hspec-expectations-lifted
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
 
 benchmarks:

@@ -33,7 +33,7 @@ data OrderValidateable t => ValidationResult t = InvalidOrder { ioParentSHA :: S
 isValid :: OrderValidateable t => OrderValidatorState t -> Bool
 isValid = isValid' . runState
 
-isValid' :: OrderValidateable t => ValidationResult t -> Bool
+isValid' :: ValidationResult t -> Bool
 isValid' Valid = True
 isValid' _     = False
 
@@ -45,7 +45,7 @@ data OrderValidateable t => OrderValidatorState t =
 
 type OrderValidatorM t = StateT (OrderValidatorState t) IO
 
-instance (Format t, OrderValidateable t) => Format (OrderValidatorState t) where
+instance (OrderValidateable t) => Format (OrderValidatorState t) where
     format (OrderValidatorState sb usb rs) =
         if (isValid' rs) then CL.green body else CL.red body
             where body =    ("runState -> " ++ (show rs) ++ "\n")

@@ -2,7 +2,6 @@
 {-# LANGUAGE Arrows                #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
@@ -15,9 +14,9 @@ import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Except
 import           Crypto.Hash
+import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
-import           Crypto.Secp256k1
 import           Data.Aeson                      (Result(..), fromJSON, decode, encode)
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
@@ -937,7 +936,6 @@ getContractXabiByMetadataId cmId = do
   deserializeXabi xabi'
   where ninth (_,_,_,_,_,_,_,_,x) = x
 
-getContractXabi :: HasCallStack =>
-                   ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Xabi)
+getContractXabi :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Xabi)
 getContractXabi contractName contractId =
   fmap (fmap contractdetailsXabi) . getContractDetails contractName contractId

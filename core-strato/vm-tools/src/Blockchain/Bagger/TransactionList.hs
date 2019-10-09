@@ -11,6 +11,7 @@ module Blockchain.Bagger.TransactionList
 
 import           Blockchain.Data.TransactionDef
 import           Blockchain.Sequencer.Event     (OutputTx (..))
+import           Data.Foldable                  (foldl')
 import qualified Data.Map.Strict                as M
 
 type TransactionList = M.Map Integer OutputTx
@@ -48,7 +49,7 @@ trimAboveCost maxCost calcCost tl =
 
 popSequential :: Integer -> TransactionList -> ([OutputTx], TransactionList)
 popSequential nonce' tl = (popped, M.fromList kept)
-    where (_, popped, kept) = foldl theFold initialFoldState (M.toAscList tl)
+    where (_, popped, kept) = foldl' theFold initialFoldState (M.toAscList tl)
           initialFoldState  = (nonce' - 1, [], [])
           theFold (lastNonce, popped', kept') e@(elemNonce, elemTx) =
             if elemNonce == lastNonce + 1

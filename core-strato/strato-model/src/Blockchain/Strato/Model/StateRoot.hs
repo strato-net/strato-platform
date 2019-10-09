@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
@@ -16,6 +16,7 @@ import           Data.Binary
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8  as BC
+import           Data.Data
 import           Data.String
 
 import           Blockchain.Data.RLP
@@ -34,7 +35,8 @@ import           GHC.Generics
 -- (ie- the pointer to the full set of key/value pairs at a particular time in history), and
 -- will be of interest if you need to refer to older or parallel version of the data.
 
-newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Ord, Read, Generic, IsString)
+newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Ord, Read, Generic, Data)
+                                           deriving newtype (IsString)
 
 instance Format StateRoot where
   format x             | x == emptyTriePtr = CL.yellow "<empty>"

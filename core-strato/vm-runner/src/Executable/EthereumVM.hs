@@ -1,7 +1,8 @@
 {-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Executable.EthereumVM (
   ethereumVM
@@ -9,32 +10,42 @@ module Executable.EthereumVM (
 
 import           Control.Lens                          ((.=), (||=), use)
 import           Control.Monad
+import qualified Control.Monad.Change.Modify             as Mod
 import           Control.Monad.IO.Class
+import qualified Blockchain.Database.MerklePatricia      as MP
 import           Blockchain.Output
 import           Control.Monad.Trans.State.Lazy        (gets)
+import qualified Data.ByteString                       as BS
+import           Data.List
+import           Data.Proxy
 import qualified Data.Text                             as T
 import qualified Data.Map.Ordered                      as O
 import qualified Data.Map                              as M
-import           Data.Maybe                            (isNothing)
-import qualified Data.ByteString                       as BS
-import qualified Blockchain.MilenaTools                as K
+import           Data.Maybe                            (isNothing, fromMaybe)
+import qualified Data.Set                              as S
+import           Data.Time.Clock.POSIX
 import qualified Network.Kafka.Protocol                as KP
 import           Text.Printf
+import           Util                                  hiding (intercalate)
 
 import           Blockapps.Crossmon
-
 import           Blockchain.BlockChain
-import           Blockchain.Data.DataDefs              (blockDataNumber)
+import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber, BlockData(..))
+import           Blockchain.Data.BlockHeader           (extraData2TxsLen)
 import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.LogDB
+import           Blockchain.Data.EventDB
 import           Blockchain.Data.TransactionResult
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
 import           Blockchain.EthConf
 import           Blockchain.JsonRpcCommand
+import qualified Blockchain.MilenaTools                as K
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
@@ -45,9 +56,14 @@ import           Executable.EVMFlags
 
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
+import           Blockchain.Data.ExecResults
+import qualified Blockchain.DB.MemAddressStateDB      as Mem
+import           Blockchain.DB.StorageDB
+import qualified Blockchain.SolidVM                      as SolidVM
 import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
@@ -64,9 +80,12 @@ ethereumVM = void . execContextM $ do
 
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI) <- getCheckpoint
+    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpMSR) <- getCheckpoint
+    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpMSR)
+
     putContextBestBlockInfo cpBBI
-    bootstrapChainDB cpHash -- TODO: Move main chain genesis block creation to strato-genesis, and move this there too
+    mapM_ (Mod.put Proxy . BlockHashRoot) cpMSR
+
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
@@ -75,28 +94,37 @@ ethereumVM = void . execContextM $ do
         recordBaggerMetrics =<< gets contextBaggerState
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
-        seqEvents <- loopTimeit "waiting for new events " $ getUnprocessedKafkaEvents cpOffset
+        seqEvents <- loopTimeit "======>>>> waiting for new events <<<<======" $ getUnprocessedKafkaEvents cpOffset
+
+        logEventSummaries seqEvents
 
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
         insertNewChains seqEvents
 
-        let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
+        mapM_ (uncurry3 queuePendingVote) [(r, d, s) | VmVoteToMake r d s <- seqEvents]
+        let newCommands = [c | VmJsonRpcCommand c <- seqEvents]
         forM_ newCommands runJsonRpcCommand
 
-        let txPairs = [(ts,t) | OETx ts t <- seqEvents]
-            allTxs = map (uncurry OETx) txPairs
-            blocks = [b | OEBlock b <- seqEvents]
+        let txPairs = [(ts,t) | VmTx ts t <- seqEvents]
+            allTxs = map (uncurry VmTx) txPairs
+            blocks = [b | VmBlock b <- seqEvents]
         when (not $ null txPairs) . void
                                   . K.withKafkaViolently
                                   . writeIndexEvents
                                   $ map (uncurry IndexTransaction) txPairs
 
-        $logInfoS "evm/loop" $ T.pack $ "#### incoming events ==> " ++ show (length allTxs) ++ " TXs, " ++ show (length blocks) ++ " new blocks"
+        let ptxs = [IndexPrivateTx t | VmPrivateTx t <- seqEvents]
+        when (not $ null ptxs) . void
+                               . K.withKafkaViolently
+                               $ writeIndexEvents ptxs
+
+        let (bLen, tLen) = (length blocks, length allTxs)
+        recordSeqEventCount bLen tLen
 
         $logDebugS "evm/loop" $ T.pack $ "allTxs :: " ++ show allTxs
-        let allNewTxs = [(ts, t) | OETx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
+        let allNewTxs = [(ts, t) | VmTx ts t <- allTxs, isNothing (txChainId $ otBaseTx t)] -- PrivateHashTXs have chainId = Nothing
         forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
         let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
@@ -109,10 +137,11 @@ ethereumVM = void . execContextM $ do
                 txCount = length . obReceiptTransactions $ b
             recordMaxBlockNumber "vm_seqevents" number
             $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
+            clearPendingVote (outputBlockToBlock b)
             writeBlockSummary b
         actions <- addBlocks blocks
 
-        contextBlockRequested ||= (OECreateBlockCommand `elem` seqEvents)
+        contextBlockRequested ||= (VmCreateBlockCommand `elem` seqEvents)
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
@@ -137,28 +166,41 @@ ethereumVM = void . execContextM $ do
         $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-            newBlock <- loopTimeit "Bagger.makeNewBlock" Bagger.makeNewBlock
+            newBlock <- --loopTimeit "Bagger.makeNewBlock"
+                        Bagger.makeNewBlock
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
             loopTimeit "produceUnminedBlocksM" $ K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
         -- todo: is this the best place to put this?
         loopTimeit "flushLogEntries" $ flushLogEntries
+        loopTimeit "flushEventEntries" $ flushEventEntries
         loopTimeit "flushTransactionResults" $ flushTransactionResults
         loopTimeit "writeActionJSONToKafka" $ void . K.withKafkaViolently $ writeActionJSONToKafka actions
+        loopTimeit "compactContextM" $ compactContextM
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
-        setCheckpoint newOffset checkpointData
+        withChainroot <- checkpointData . Just . unBlockHashRoot <$> Mod.get Proxy
+        setCheckpoint newOffset withChainroot
 
-insertNewChains :: [OutputEvent] -> ContextM ()
+insertNewChains :: [VmEvent] -> ContextM ()
 insertNewChains events = do
-  let newChainInfos = [c | OEGenesis (OutputGenesis _ c) <- events]
+  let newChainInfos = [c | VmGenesis (OutputGenesis _ c) <- events]
 
   newChains <- forM newChainInfos $ \(cId, cInfo) -> do
     $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
     $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
-    sr <- chainInfoToGenesisState cInfo
+    let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
+    sr' <- chainInfoToGenesisState theVM cInfo
+    let maybeSource =
+          case codeInfo $ chainInfo cInfo of
+            [] -> Nothing
+            (s:_) -> Just $ codeInfoSource s
+    sr <-
+      case theVM of
+        "SolidVM" -> runChainConstructor cId maybeSource
+        _ -> return sr'
     mGSR <- getGenesisStateRoot cId
     case mGSR of
       Just gsr -> do
@@ -171,12 +213,70 @@ insertNewChains events = do
 
   void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo) $ concat newChains
 
+
+
+runChainConstructor :: Word256 -> Maybe T.Text -> ContextM MP.StateRoot
+runChainConstructor cId maybeSource = do
+  -- We are inventing the rules of how the constructor should run when a chain is created.
+  -- Since all VM runs need some environment variables passed in, we need to define what all of
+  -- those variables should be.  The truth is, most of these variables are rarely used, but we
+  -- still need to pre-decide what they should be else the VM would crash whenever they are used.
+  -- I've set most of these variables to default dummy values below...  We might decide to refine
+  -- some of these variables in the future.
+
+  ExecResults {erAction=maybeAction} <- SolidVM.call
+         False --isRunningTests
+         True --isHomestead
+         False --noValueTransfer
+         S.empty --pre-existing suicide list
+         (BlockData
+            (SHA 0)
+            (SHA 0)
+            (Address 0)
+            MP.emptyTriePtr
+            MP.emptyTriePtr
+            MP.emptyTriePtr
+            ""
+            0
+            0 --block number
+            100000000000
+            0
+            (posixSecondsToUTCTime 0)
+            ""
+            0
+            (SHA 0))
+         0 --callDepth
+         (Address 0) --receiveAddress
+         (Address 0x100) --codeAddress
+         (Address 0) --sender
+         0 --value
+         1 --gasPrice
+         ""
+         1000000000000 --availableGas
+         (Address 0)
+         (SHA 0)
+         (Just cId)
+         (Just $ M.fromList $
+           [("args", "()"), ("funcName", "<constructor>")]
+           ++ case maybeSource of Nothing -> []; Just s -> [("src", s)])
+
+  flushMemStorageDB
+  Mem.flushMemAddressStateDB
+
+  case maybeAction of
+    Nothing -> return ()
+    Just action -> 
+      void . K.withKafkaViolently $ writeActionJSONToKafka [action]
+  
+  Mod.get (Proxy @MP.StateRoot)
+
+
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
 
 getFirstBlockFromSequencer :: ContextM OutputBlock
 getFirstBlockFromSequencer = do
-    (OEBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
+    (VmBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
     return block
 
 -- this one starts at 1, 0 is reserved for genesis block and is used to
@@ -193,7 +293,8 @@ initializeCheckpointAndBlockSummary = do
         txL    = length txs
         uncL   = length (obBlockUncles block)
         cbbi   = ContextBestBlockInfo (sha, header, td, txL, uncL)
-    setCheckpoint 1 (EVMCheckpoint sha header cbbi)
+    bootstrapChainDB sha
+    setCheckpoint 1 (EVMCheckpoint sha header cbbi Nothing)
 
 
 writeBlockSummary :: OutputBlock -> ContextM ()
@@ -246,12 +347,30 @@ setCheckpointNoMetadata ofs = do
     ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
     either (error . show) return ret
 
-getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]
+getUnprocessedKafkaEvents :: KP.Offset -> ContextM [VmEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
     ret <- K.withKafkaViolently (readSeqVmEvents offset)
-    $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret) ++ " unprocessed blocks/txs"
-    return ret
+    let countLimit = if flags_seqEventsBatchSize > 0
+                         then take flags_seqEventsBatchSize
+                         else id
+        eventLimit = if flags_seqEventsCostHeuristic > 0
+                         then take num
+                         else id
+        num = length
+            . takeWhile (<= flags_seqEventsCostHeuristic)
+            . scanl (+) 0
+            . map approxCost
+            $ ret
+        approxCost :: VmEvent -> Int
+        approxCost = \case
+          VmBlock OutputBlock{..} -> fromMaybe (length obReceiptTransactions)
+                                     . extraData2TxsLen
+                                     $ blockDataExtraData obBlockData
+          _ -> 1
+
+        ret' = eventLimit . countLimit $ ret
+    return ret'
 
 shouldProcessNewTransactions :: ContextM Bool -- todo: probably shouldn't do it by number, but tdiff.
 shouldProcessNewTransactions =
@@ -272,3 +391,30 @@ shouldProcessNewTransactions =
     else do
         $logInfoS "shouldProcessNewTransactions" "flags_useSyncMode == false, will process all new TXs"
         return True
+
+
+
+
+
+logEventSummaries :: [VmEvent] -> ContextM ()
+logEventSummaries events = do
+  let names = map getNames events
+      numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
+
+  $logInfoS "getUnprocessedKafkaEvents" . T.pack $
+    "#### Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"
+
+  where
+    getNames :: VmEvent -> String
+    getNames (VmTx _ _) = "TX"
+    getNames (VmBlock _) = "Block"
+    getNames (VmGenesis _) = "GenesisBlock"
+    getNames (VmJsonRpcCommand _) = "JsonRpcCommand"
+
+    getNames VmCreateBlockCommand = "CreateBlockCommand"
+    getNames (VmVoteToMake _ _ _) = "VoteToMake"
+    getNames (VmPrivateTx _) = "PrivateTx"
+
+    numberIt :: Int -> String -> String
+    numberIt 1 x = "1 " ++ x
+    numberIt i x = show i ++ " " ++ x ++ "s"

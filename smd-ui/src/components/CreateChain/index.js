@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError, compileChainContract } from './createChain.actions';
+import { openCreateChainOverlay, closeCreateChainOverlay, createChain, resetError, compileChainContract, resetContract } from './createChain.actions';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -198,15 +198,19 @@ class CreateChain extends Component {
   };
 
   handleContractFile = (file) => {
-    let reader = new FileReader();
-    const self = this;
-    reader.onload = function (event) {
-      const fileName = file.name.substring(0, file.name.indexOf('.'));
-      const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
-      mixpanelWrapper.track("create_contract_file_upload");
-      self.updateGovernanceContract(fileName, fileContents);
-    };
-    reader.readAsText(file);
+    if (file) {
+      let reader = new FileReader();
+      const self = this;
+      reader.onload = function (event) {
+        const fileName = file.name.substring(0, file.name.indexOf('.'));
+        const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
+        mixpanelWrapper.track("create_contract_file_upload");
+        self.updateGovernanceContract(fileName, fileContents);
+      };
+      reader.readAsText(file);
+    } else {
+      this.props.resetContract();
+    }
   }
 
   updateGovernanceContract = (fileName, fileContents) => {
@@ -518,7 +522,8 @@ const connected = connect(
     closeCreateChainOverlay,
     createChain,
     resetError,
-    compileChainContract
+    compileChainContract,
+    resetContract
   }
 )(formed);
 

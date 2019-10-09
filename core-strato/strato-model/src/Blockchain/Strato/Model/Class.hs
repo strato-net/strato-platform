@@ -6,7 +6,7 @@ import           Data.Text                       (Text)
 import           Data.Time
 import           Data.Word
 
-import           Blockchain.Blockstanbul.Model.Authentication (scrubCommitmentSeals)
+import           Blockchain.Blockstanbul.Model.Authentication (scrubCommitmentSeals, scrubConsensus)
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
@@ -22,7 +22,7 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock #-}
 
     blockOrdering :: b -> Integer
-    blockOrdering = blockHeaderBlockNumber . blockHeader
+    blockOrdering = blockHeaderOrdering . blockHeader
 
     blockHash :: b -> SHA
     blockHash = blockHeaderHash . blockHeader
@@ -31,7 +31,7 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     buildBlock' head' txs' uncles' =
         buildBlock (morphBlockHeader head') (morphTx <$> txs') (morphBlockHeader <$> uncles')
 
-    morphBlock :: (BlockHeaderLike h2, TransactionLike t2, BlockLike h2 t2 b2) => b2 -> b
+    morphBlock :: (BlockLike h2 t2 b2) => b2 -> b
     morphBlock b2 = buildBlock' (blockHeader b2) (blockTransactions b2) (blockUncleHeaders b2)
 
 class RLPSerializable h => BlockHeaderLike h where
@@ -68,21 +68,12 @@ class RLPSerializable h => BlockHeaderLike h where
                     . rlpEncode
                     . blockHeaderModifyExtra scrubCommitmentSeals
 
+    -- This is a PBFT style partial hash. PoW style partial hash should remove the nonce instead.
     blockHeaderPartialHash :: h -> SHA
-    blockHeaderPartialHash h = superProprietaryStratoSHAHash . rlpSerialize $ RLPArray
-      [ rlpEncode $ blockHeaderParentHash       h
-      , rlpEncode $ blockHeaderOmmersHash       h
-      , rlpEncode $ blockHeaderBeneficiary      h
-      --, rlpEncode $ blockHeaderStateRoot        h
-      --, rlpEncode $ blockHeaderTransactionsRoot h
-      --, rlpEncode $ blockHeaderReceiptsRoot     h
-      , rlpEncode $ blockHeaderDifficulty       h
-      , rlpEncode $ blockHeaderBlockNumber      h
-      , rlpEncode $ blockHeaderGasLimit         h
-      , rlpEncode $ blockHeaderGasUsed          h
-      -- , rlpEncode (round $ utcTimeToPOSIXSeconds (blockHeaderTimestamp h)::Integer)
-      , rlpEncode $ blockHeaderExtraData        h
-      ]
+    blockHeaderPartialHash = blockHeaderHash . blockHeaderModifyExtra scrubConsensus
+
+    blockHeaderOrdering :: h -> Integer
+    blockHeaderOrdering = blockHeaderBlockNumber
 
 data TransactionType = ContractCreation | Message | PrivateHash deriving (Eq, Ord, Read, Show)
 
@@ -103,10 +94,11 @@ class (RLPSerializable t) => TransactionLike t where
     txData        :: t -> Maybe B.ByteString -- todo make a `Code` newtype
     txChainId     :: t -> Maybe Word256
     txMetadata    :: t -> Maybe (Map Text Text)
+    txAnchorChain :: t -> Maybe Word256
 
     morphTx :: (TransactionLike t2) => t2 -> t
     {-# MINIMAL txHash, txPartialHash, txChainHash, txSigner, txNonce, txType, txSignature, txValue,
-        txDestination, txGasPrice, txGasLimit, txCode, txData, txChainId, txMetadata, morphTx #-}
+        txDestination, txGasPrice, txGasLimit, txCode, txData, txChainId, txMetadata, txAnchorChain, morphTx #-}
 
     txSigR :: t -> Integer
     txSigR t = let (r, _, _) = txSignature t in r

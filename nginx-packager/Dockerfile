@@ -4,10 +4,11 @@ MAINTAINER BlockApps Inc.
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -y apache2-utils curl && \
+    apt-get install -y apache2-utils curl wget && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/local/openresty/nginx/lua && \
+    wget -P /usr/local/openresty/nginx/lua https://raw.githubusercontent.com/knyar/nginx-lua-prometheus/master/prometheus.lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
     opm get zmartzone/lua-resty-openidc=1.7.1
 

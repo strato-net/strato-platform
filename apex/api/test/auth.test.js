@@ -11,7 +11,7 @@ const sinon = require('sinon');
 const rp = require('request-promise');
 const rewire = require('rewire');
 
-const initDb = require('../migrations/init-script/initdb.js');
+const tools = require('../migrations/init-script/createdb.js');
 const models = require('../models');
 const createInitialData = require('../migrations/init-script/init');
 const appConfig = require('../config/app.config');
@@ -61,17 +61,7 @@ describe('non-OAuth/public Auth tests', function () {
     if(SKIP_TEST_BLOCK){
         this.skip();
     }
-
-    try {
-      await initDb.dropdb();
-    } catch (error) {
-      // Ignore errors about dropping nonexistent dbs.
-      if (error.name != 'invalid_catalog_name') {
-        throw error;
-      }
-    }
-    await initDb();
-    await models.sequelize.sync();
+    
     await createInitialData();
     await models.User.create({
       username: 'test@test.com',

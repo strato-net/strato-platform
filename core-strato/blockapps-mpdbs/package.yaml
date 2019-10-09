@@ -25,12 +25,14 @@ dependencies:
   - format
   - leveldb-haskell
   - merkle-patricia-db
+  - monad-alter
   - monad-loops
   - mtl
   - nibblestring
   - resourcet
   - solid-vm-model
   - strato-model
+  - transformers
 
 ghc-options: -Wall -O2
 

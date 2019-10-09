@@ -8,6 +8,7 @@ const cors = require('cors');
 const appConfig = require('./config/app.config');
 const acquireDapp = require('./controllers/dapp').acquireDapp;
 var index = require('./routes/index');
+const { attachMetricsEndpoint } = require('./lib/promClient');
 // var users = require('./routes/users');
 
 var app = express();
@@ -18,7 +19,7 @@ app.set('views', path.join(__dirname, 'views'));
 // uncomment after placing your favicon in /public // TODO
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev', { stream: process.stdout }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '50mb', parameterLimit:50000 }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb', parameterLimit: 50000 }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
@@ -48,7 +49,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Serve uploaded dApps
 app.locals.acquiresInProgress = {};
 app.use('/apps/', express.static('apps'), acquireDapp);
-
+attachMetricsEndpoint({ app });
 app.use('/', index);
 // app.use('/users', users);
 

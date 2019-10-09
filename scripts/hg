@@ -1,0 +1,2 @@
+#!/usr/bin/env zsh
+$HOME/.stack/global-project/.stack-work/install/x86_64-linux/lts-13.14/8.6.4/bin/hoogle "$@"

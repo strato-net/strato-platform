@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-missing-signatures #-}
 module Main where
@@ -9,7 +10,6 @@ import           Data.Foldable
 import           Data.List
 import           Data.Maybe
 import           Data.Ord
---import           Data.Traversable
 import           Data.Tree
 import           Database.Redis                            hiding (sortBy)
 import           Lens.Family2                              hiding (set)
@@ -19,7 +19,7 @@ import           Test.QuickCheck
 
 import           Blockchain.Data.ArbitraryInstances        ()
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.Transaction
+import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB            as RDB
@@ -66,26 +66,26 @@ specTest = around (withConn 1) $ do
     flushDB
 
     it "Should not have a header for SHA 0" $ \c -> do
-      r <- runRedis c (RDB.getHeader $ SHA 0 :: Redis (Maybe BlockData))
+      r <- runRedis c (RDB.getHeader $ SHA 0)
       HUnit.assertBool "Found header for SHA 0" $ isNothing r
 
     it "Should not have a block for SHA 0" $ \c -> do
-      r <- runRedis c (RDB.getBlock $ SHA 0 :: Redis (Maybe Block))
+      r <- runRedis c (RDB.getBlock $ SHA 0)
       HUnit.assertBool "Found block for SHA 0" $ isNothing r
 
     it "Should put and get a header" $ \c -> do
-      b <- generate arbitrary :: IO BlockData
+      b <- generate arbitrary
       let theHash = blockHeaderHash b
       r <- runRedis c $ do
           void $ RDB.putHeader b
-          b' <- RDB.getHeader theHash :: Redis (Maybe BlockData)
+          b' <- RDB.getHeader theHash
           return $ isJust b'
       HUnit.assertBool "Couldn't recover header after put" r
 
     it "Should put a BlockHeader with parent and get back the parent" $ \conn -> do
-      p <- generate arbitrary :: IO BlockData
+      p <- generate arbitrary
       let pHash = blockHeaderHash p
-      c <- generate arbitrary :: IO BlockData
+      c <- generate arbitrary
       let c' = over _blockDataParentHash (const $ blockHeaderHash p) c
       let cHash = blockHeaderParentHash c'
       p' <- runRedis conn $ do
@@ -97,21 +97,21 @@ specTest = around (withConn 1) $ do
           (Just pHash) p'
 
     it "Should put and get a block" $ \c -> do
-      b <- generate arbitrary :: IO Block
+      b <- generate arbitrary
       let theHash = blockHash b
       r <- runRedis c $ do
           void $ RDB.putBlock b
-          b' <- RDB.getBlock theHash :: Redis (Maybe Block)
+          b' <- RDB.getBlock theHash
           return $ isJust b'
       HUnit.assertBool ("Couldn't recover block after put for hash: " ++ format theHash) r
 
     it "Should put a block and get its transactions" $ \c -> do
-      b <- generate arbitrary :: IO Block
+      b <- generate arbitrary
       let theHash = blockHash b
       let txCount = length $ blockTransactions b
       r <- runRedis c $ do
           void $ RDB.putBlock b
-          ts <- RDB.getTransactions theHash :: Redis (Maybe [Transaction])
+          ts <- RDB.getTransactions theHash
           return $ case ts of
               Nothing  -> -1
               Just tss -> length tss
@@ -120,12 +120,12 @@ specTest = around (withConn 1) $ do
           txCount r
 
     it "Should put a block and get its uncles" $ \c -> do
-      b <- generate arbitrary :: IO Block
+      b <- generate arbitrary
       let theHash = blockHash b
       let uCount = length $ blockUncleHeaders b
       r <- runRedis c $ do
           void $ RDB.putBlock b
-          ts <- RDB.getUncles theHash :: Redis (Maybe [BlockData])
+          ts <- RDB.getUncles theHash
           return $ case ts of
               Nothing  -> -1
               Just tss -> length tss
@@ -134,10 +134,10 @@ specTest = around (withConn 1) $ do
           uCount r
 
     it "Should put a block with parent and get back the parent" $ \conn -> do
-      p <- generate arbitrary :: IO Block
+      p <- generate arbitrary
       let pHash = blockHash p
-      c <- generate arbitrary :: IO Block
-      let c' = over (_blockBlockData . _blockDataParentHash) (const pHash) c
+      c@OutputBlock{..} <- generate arbitrary
+      let c' = c{obBlockData = obBlockData{blockDataParentHash = pHash}}
       let cHash = blockHash c'
       r <- runRedis conn $ do
           void $ RDB.putBlock p
@@ -145,7 +145,7 @@ specTest = around (withConn 1) $ do
           cph <- RDB.getParent cHash :: Redis (Maybe SHA)
           case cph of
               Nothing -> pure Nothing
-              Just pp -> RDB.getBlock pp :: Redis (Maybe Block)
+              Just pp -> RDB.getBlock pp
       HUnit.assertEqual
           ("Couldn't recover parent hash for child " ++ format cHash ++ " and parent " ++ format pHash)
           (Just pHash) (blockHash <$> r)
@@ -156,7 +156,7 @@ specTest = around (withConn 1) $ do
       chain <- liftIO $ buildChain g 2 2
       r <- runRedis conn $ do
           void $ RDB.putHeaders chain
-          RDB.getHeader genHash :: Redis (Maybe BlockData)
+          RDB.getHeader genHash
       HUnit.assertEqual
           "Couldn't find header for genesis block from chain generated from genesis block"
           (Just genHash) (blockHeaderHash <$> r)
@@ -316,7 +316,7 @@ specTest = around (withConn 1) $ do
       chain <- extendChain 10 [g]
       canon <- runRedis conn $ do
         void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
-        forM_ chain $ RDB.putBlock . (\b -> Block b [] [])
+        forM_ chain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
         _ <- putBestBlockInfo (last chain)
         let maxN = (+1) . fromIntegral . blockDataNumber . last $ chain
         canonical <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
@@ -427,8 +427,8 @@ callCommonAncestor old new =
 insertAndUpdateChain :: BlockData -> [BlockData] -> [BlockData] -> Redis [(SHA, BlockData)]
 insertAndUpdateChain g oldChain newChain = do
         void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
-        forM_ oldChain $ RDB.putBlock . (\b -> Block b [] [])
-        forM_ newChain $ RDB.putBlock . (\b -> Block b [] [])
+        forM_ oldChain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
+        forM_ newChain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
         forM_ oldChain $ \b -> set (RDB.inNamespace Canonical $ blockDataNumber b) (toValue $ blockHeaderHash b)
         Right (mods, dels) <- callCommonAncestor oldChain newChain
         forM_ mods $ \(sha, num) -> set (RDB.inNamespace Canonical $ num) (toValue sha)

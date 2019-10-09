@@ -16,6 +16,7 @@ dependencies:
   - base >= 4 && < 5
   - aeson
   - base16-bytestring
+  - base64-bytestring
   - binary
   - blockapps-data
   - blockapps-datadefs
@@ -24,25 +25,33 @@ dependencies:
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
+  - common-log
+  - conduit
   - containers
   - cryptohash
   - cryptonite
   - crypto-api
   - csv
   - directory
+  - either
   - entropy
   - ethereum-discovery
   - ethereum-rlp
+  - extra
   - file-embed
   - filepath
   - format
   - hedis
   - hflags
   - json-stream
+  - lens
   - leveldb-haskell
   - memory
   - merkle-patricia-db
+  - monad-control
+  - monad-alter
   - mtl
+  - nibblestring
   - persistent-postgresql
   - resourcet
   - scientific
@@ -57,13 +66,17 @@ dependencies:
   - strato-statediff
   - stm
   - stm-chans
+  - temporary
   - text
   - time
   - transformers
+  - transformers-base
+  - turtle
   - unliftio-core
   - unordered-containers
   - utf8-string
   - vector
+  - unliftio
   - yaml
 
 library:
@@ -77,31 +90,25 @@ executables:
       - strato-init
     other-modules: []
 
-  strato-backup:
+  tabula-rasa:
     source-dirs: exec_src/
-    main: Backup.hs
-    dependencies:
-      - monad-control
-    other-modules: []
-
-  strato-block-backup:
-    source-dirs: exec_src/
-    main: BlockBackup.hs
-    other-modules: []
-
-  strato-ez-restore:
-    source-dirs: exec_src/
-    main: RestoreTool.hs
+    main: TabulaRasa.hs
     dependencies:
       - strato-init
-      - monad-control
     other-modules: []
 
-  mkCoinbase:
+  from-restore:
     source-dirs: exec_src/
-    main: MkCoinbase.hs
+    main: FromRestore.hs
     dependencies:
-      - base64-bytestring
+      - strato-init
+    other-modules: []
+
+  init-worker:
+    source-dirs: exec_src/
+    main: InitWorker.hs
+    dependencies:
+      - strato-init
     other-modules: []
 
 tests:

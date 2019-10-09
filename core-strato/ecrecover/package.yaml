@@ -28,7 +28,6 @@ default-extensions:
   - DeriveDataTypeable
   - DeriveFoldable
   - DeriveFunctor
-  - DeriveGeneric
   - DeriveTraversable
   - EmptyDataDecls
   - FlexibleContexts
@@ -36,7 +35,6 @@ default-extensions:
   - FunctionalDependencies
   - GADTs
   - GeneralizedNewtypeDeriving
-  - LambdaCase
   - LiberalTypeSynonyms
   - MagicHash
   - MultiParamTypeClasses

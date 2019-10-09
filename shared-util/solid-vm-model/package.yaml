@@ -11,6 +11,7 @@ dependencies:
   - deepseq
   - derive
   - ethereum-rlp
+  - format
   - hashable
   - QuickCheck
   - scientific
@@ -20,8 +21,6 @@ dependencies:
 
 default-extensions:
   - BangPatterns
-  - DeriveAnyClass
-  - DeriveGeneric
   - OverloadedStrings
 
 library:

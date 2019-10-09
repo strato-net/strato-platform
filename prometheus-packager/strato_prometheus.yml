@@ -1,20 +1,7 @@
 # Strato Prometheus Configuration
 global:
   scrape_interval:     15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
-  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
-  # scrape_timeout is set to the global default (10s).
-
-# Alertmanager configuration
-alerting:
-  alertmanagers:
-  - static_configs:
-    - targets:
-      # - alertmanager:9093
-
-# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
-rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
+  evaluation_interval: 60s
 
 # Processes to scrape
 scrape_configs:
@@ -22,28 +9,78 @@ scrape_configs:
     metrics_path: '/prometheus/metrics'
     static_configs:
     - targets: ['localhost:9090']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
   - job_name: 'strato-sequencer'
     metrics_path: '/metrics'
     static_configs:
       - targets: ['strato:8050']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
+  - job_name: 'strato-api'
+    metrics_path: '/metrics'
+    static_configs:
+    - targets: ['strato:3000']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
   - job_name: 'strato-p2p'
+    metrics_path: '/metrics'
     static_configs:
       - targets: ['strato:10248']
-  - job_name: 'ethereum-vm'
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
+  - job_name: 'vm-runner'
     metrics_path: '/metrics'
     static_configs:
       - targets: ['strato:8000']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
   - job_name: 'slipstream'
     metrics_path: '/metrics'
     static_configs:
       - targets: ['bloc:10777']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
 
-#   metric_relabel_configs:
-#   - source_labels: [__name__]
-#     regex: '(prometheus)_(.*)'
-#     replacement: '${2}'
-#     target_label: pool
-#
-#  - source_labels: [__name__]
-#   regex: '(go|time_)'
-#   action: drop
+  - job_name: 'bloc'
+    metrics_path: '/bloc/v2.2/metrics'
+    static_configs:
+      - targets: ['bloc:8000']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
+  - job_name: 'vault-wrapper'
+    metrics_path: '/strato/v2.3/metrics'
+    static_configs:
+      - targets: ['vault-wrapper:8000']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
+  - job_name: 'apex'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['apex:3001']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
+  - job_name: 'nginx'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['nginx:80']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'

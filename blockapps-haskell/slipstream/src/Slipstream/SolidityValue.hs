@@ -1,7 +1,6 @@
 {-# LANGUAGE
       OverloadedStrings
     , RecordWildCards
-    , DeriveGeneric
     , QuasiQuotes
     , ScopedTypeVariables
     , DataKinds

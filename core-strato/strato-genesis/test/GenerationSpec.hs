@@ -13,6 +13,7 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Generation
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.SHA
 
 start :: GenesisInfo
@@ -69,7 +70,7 @@ spec = do
 
     it "should insert 1 contract" $
       let input = defaultGenesisInfo
-          want = [ContractWithStorage sharedStart 0 emptyHash []]
+          want = [ContractWithStorage sharedStart 0 (EVMCode emptyHash) []]
           got = insertContracts [[]] "x" emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 
@@ -77,7 +78,7 @@ spec = do
       let total = 1000000 :: Int
           slots = replicate total []
           input = defaultGenesisInfo
-          want = map (\n -> ContractWithStorage (sharedStart + fromIntegral n) 0 emptyHash [])  [0..total-1]
+          want = map (\n -> ContractWithStorage (sharedStart + fromIntegral n) 0 (EVMCode emptyHash) [])  [0..total-1]
           got = insertContracts slots "x" emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 

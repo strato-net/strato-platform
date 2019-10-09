@@ -4,7 +4,7 @@
 module BlockApps.EthereumSpec where
 
 import Control.Applicative (liftA2)
-import Crypto.Secp256k1
+import Crypto.HaskoinShim
 import Data.Aeson
 import qualified Data.ByteString.Base16 as Base16
 import Data.RLP

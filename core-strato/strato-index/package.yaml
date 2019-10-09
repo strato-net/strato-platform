@@ -12,14 +12,18 @@ dependencies:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-init
   - blockapps-milena
   - blockapps-util
   - bytestring
   - clock
   - containers
+  - deepseq
   - format
   - hedis
   - hflags
+  - lens
+  - monad-alter
   - persistent
   - persistent-postgresql
   - resourcet

@@ -244,14 +244,12 @@ functionXabi = do
   functionArgs <- tupleDeclaration
   (functionRet, visibility, mutability, constructorCalls, modifiers) <- functionModifiers
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
-  let nameUnnamed (name,ty) i = if Text.null name then (Text.pack ('#' : show i),ty) else (name,ty)
+  let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
   return Xabi.Func{
         Xabi.funcArgs =
-           Map.fromList $
-           zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x i)) functionArgs [0..]
+           zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x)) functionArgs [0..]
       , Xabi.funcVals =
-           Map.fromList $
-           zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
+           zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v)) functionRet [0..]
       , Xabi.funcContents = contents
       , Xabi.funcVisibility = Just visibility
       , Xabi.funcStateMutability = mutability

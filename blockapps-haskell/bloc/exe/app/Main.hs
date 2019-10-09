@@ -17,6 +17,7 @@ import           Network.HTTP.Types (hContentType, status400)
 import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
+import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Servant.Options
 import           Servant
@@ -32,7 +33,9 @@ import qualified BlockApps.Bloc22.Database.Create as Bloc22
 import qualified BlockApps.Bloc22.Database.Migration as Bloc22
 import qualified BlockApps.Bloc22.Monad as Bloc22
 import qualified BlockApps.Bloc22.Server as Bloc22
+import           BlockApps.Init
 import           BlockApps.Logging (LogLevel(..), flags_minLogLevel)
+import           HTTPQuantiles
 
 import           Options
 
@@ -41,6 +44,7 @@ import           Options
 
 main :: IO ()
 main = do
+  blockappsInit "blockapps-bloc"
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
   putStrLn . unlines $
     [ "██████╗ ██╗      ██████╗  ██████╗"
@@ -84,10 +88,13 @@ serveErrorsPlain app req respond = app req $ \resp -> respond $
     then resp
     else mapResponseHeaders ((hContentType, "text/plain"):) resp
 
-
 appBloc :: Bloc22.BlocEnv -> Application
 appBloc env22 =
-  (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
+    prometheus def{ prometheusEndPoint = ["bloc", "v2.2", "metrics"]
+                  , prometheusInstrumentApp = False}
+  . instrumentAppQuantiles "bloc22"
+  . instrumentApp "bloc22"
+  . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
   . serveErrorsPlain
   . cors (const $ Just policy)
   . provideOptions (Proxy @ Bloc22.BlocAPI)

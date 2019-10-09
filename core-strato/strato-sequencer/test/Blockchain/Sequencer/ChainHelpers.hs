@@ -61,15 +61,3 @@ setIngestBlockGasUsed amount = mapIngestHeader $ \h -> h { blockDataGasUsed = am
 
 setIngestBlockNonce :: Integer -> IngestBlock -> IngestBlock
 setIngestBlockNonce val = mapIngestHeader $ \h -> h { blockDataNonce = fromIntegral val }
-
-extractBlocksFromOutputEvents :: [OutputEvent] -> [OutputBlock]
-extractBlocksFromOutputEvents = join . (map convert)
-    where convert (OETx _ _)  = []
-          convert (OEBlock b) = [b]
-          convert _           = error "partial function inf extractBlocksFromOutputEvents"
-
-extractTxsFromOutputEvents :: [OutputEvent] -> [OutputTx]
-extractTxsFromOutputEvents = join . (map convert)
-    where convert (OETx _ t)  = [t]
-          convert (OEBlock _) = []
-          convert _           = error "partial function in extractTxsFromOutputEvents"

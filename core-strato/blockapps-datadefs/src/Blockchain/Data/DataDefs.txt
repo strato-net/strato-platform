@@ -14,7 +14,7 @@ BlockData
     extraData BS.ByteString
     nonce Word64
     mixHash SHA
-    deriving Eq Read Show Generic
+    deriving Eq Read Show Generic Data
 
 BlockDataRef
     parentHash SHA
@@ -51,8 +51,9 @@ AddressStateRef
     contractRoot StateRoot
     code BS.ByteString
     codeHash SHA
-    chainId Word256 Maybe
+    chainId Word256 default='0000000000000000000000000000000000000000000000000000000000000000'
     latestBlockDataRefNumber Integer
+    UniqueAddress address chainId
     deriving Eq Read Show
 
 RawTransaction
@@ -77,7 +78,7 @@ RawTransaction
 
 Storage json
     addressStateRefId AddressStateRefId
-    kind CodeKind
+    kind CodeKind default='EVM'
     key HexStorage
     value HexStorage
     deriving Eq Read Show
@@ -98,6 +99,7 @@ TransactionResult json
     deletedStorage String
     status TransactionResultStatus Maybe
     chainId Word256 Maybe
+    kind CodeKind Maybe
     deriving Eq Read Show Generic
 
 UserN json
@@ -153,6 +155,12 @@ LogDB
     bloom Word512
     deriving Eq Read Show Generic
 
+EventDB
+    chainId Word256 Maybe
+    name String
+    args [String]
+    deriving Eq Read Show Generic
+
 ChainInfoRef
     chainId Word256
     chainLabel String
@@ -178,7 +186,7 @@ AccountInfoRef
     chainInfoId ChainInfoRefId
     address Address
     balance Integer
-    codeHash SHA Maybe
+    codeHash CodePtr Maybe
     map [MapPair] Maybe
     deriving Eq Generic Show
 

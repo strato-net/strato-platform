@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveAnyClass       #-}
-{-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE RecordWildCards      #-}
@@ -30,6 +28,7 @@ import           Blockchain.MiscJSON()
 import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord (Word256, bytesToWord256)
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.SHA
 
 data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData)

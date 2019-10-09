@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports    #-}
 {-# LANGUAGE RankNTypes        #-}
@@ -56,7 +55,7 @@ updateMac theMac theKey value =
   rawUpdateMac theMac $
     value `bXor` (encryptECB (initAES theKey) (B.take 16 . convert . hashFinalize $ theMac))
 
-ethEncrypt :: (MonadLogger m, Monad m)
+ethEncrypt :: MonadLogger m
            => EthCryptState
            -> ConduitM B.ByteString B.ByteString m ()
 ethEncrypt ethCryptState = do
@@ -98,7 +97,7 @@ cbSafeTake i = do
        then return Nothing
        else return . Just $ BL.toStrict ret
 
-ethDecrypt :: (MonadLogger m, Monad m)
+ethDecrypt :: MonadLogger m
            => EthCryptState
            -> ConduitM B.ByteString B.ByteString m ()
 ethDecrypt ethCryptState = do

@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -17,8 +16,6 @@ module BlockApps.Ethereum
   , word256ToBytes
   , bytesToWord256
   , lastWord64
-  , removeThisConversion
-  , alsoRemoveThisOne
   , Hex (..)
   -- * Addresses
   , Address (..)
@@ -75,7 +72,7 @@ import           Control.Lens.Operators
 import           Control.DeepSeq (NFData)
 import           Crypto.Hash
 import           Crypto.Random.Entropy
-import           Crypto.Secp256k1
+import           Crypto.HaskoinShim
 import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson             as Aeson
 import qualified Data.Aeson.Encoding    as AesonEnc
@@ -111,21 +108,14 @@ import           Text.Read              hiding (String)
 import           Text.Read.Lex
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
-import qualified Data.LargeWord as LW
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.SHA (CodePtr(..), shaToHex, SHA(..))
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.SHA (shaToHex, SHA(..))
 
 
 lastWord64 :: Word256 -> Word64
 lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
-
--- TODO(tim): Convert Secp256k1 to avoid the LargeWord usage entirely
-removeThisConversion :: Word256 -> LW.Word256
-removeThisConversion = fromIntegral
-
-alsoRemoveThisOne :: LW.Word256 -> Word256
-alsoRemoveThisOne = fromIntegral
 
 instance ToSchema Word256 where
   declareNamedSchema _ = return $
@@ -532,6 +522,7 @@ rlpMsg :: RLPEncodable x => x -> Msg
 rlpMsg
   = fromMaybe (error "rlpMsg failure")
   . msg
+  . bytesToWord256
   . rlpHash
 
 rlpHash :: RLPEncodable x => x -> ByteString
@@ -557,8 +548,8 @@ signTransactionWithMetadata md sk u@UnsignedTransaction{..} =
     , transactionTo = unsignedTransactionTo
     , transactionValue = unsignedTransactionValue
     , transactionV = testV + 0x1b
-    , transactionR = alsoRemoveThisOne r
-    , transactionS = alsoRemoveThisOne s
+    , transactionR = r
+    , transactionS = s
     , transactionInitOrData = unsignedTransactionInitOrData
     , transactionChainId = unsignedTransactionChainId
     , transactionMetadata = md
@@ -585,7 +576,7 @@ verifyTransaction pk t@Transaction{transactionR = r, transactionS = s} =
   let
     message = rlpMsg $ unsignTransaction t
   in
-    case importCompactSig (CompactSig (removeThisConversion r) (removeThisConversion s)) of
+    case importCompactSig (CompactSig r s) of
       Nothing  -> False
       Just sig -> verifySig pk sig message
 
@@ -594,7 +585,7 @@ recoverTransaction t@Transaction{transactionR = r, transactionS = s, transaction
   let
     message = rlpMsg $ unsignTransaction t
     v' = v - 0x1b
-    compactRecSig = CompactRecSig (removeThisConversion r) (removeThisConversion s) v'
+    compactRecSig = CompactRecSig r s v'
   recSig <- importCompactRecSig compactRecSig
   recover recSig message
 
@@ -750,8 +741,8 @@ instance ToSchema CodeInfo where
         & description ?~ "Code Info" )
 
 data AccountInfo = NonContract Address Integer
-                 | ContractNoStorage Address Integer Keccak256
-                 | ContractWithStorage Address Integer Keccak256 (Map Word256 Word256)
+                 | ContractNoStorage Address Integer CodePtr
+                 | ContractWithStorage Address Integer CodePtr (Map Word256 Word256)
    deriving (Show, Eq, Generic)
 
 instance ToJSON AccountInfo where

@@ -50,29 +50,16 @@ packages:
 - core-strato/blockstanbul/
 - core-strato/privacy/
 - core-strato/fastMP/
+- monad-alter/
+- shared-util/blockapps-init/
 - shared-util/common-log/
 - shared-util/cross-monitoring/
 - shared-util/format
+- shared-util/haskoin-shim/
 - shared-util/solid-vm-model/
 - clockwork
 - logserver
-- location:
-    git: https://github.com/echatav/secp256k1-haskell/
-    commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
-  extra-dep: true
-- location:
-    git: https://github.com/iostat/relapse
-    commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
-  extra-dep: true
-- location:
-    git: https://github.com/bitemyapp/esqueleto.git
-    commit: b81e0d951e510ebffca03c5a58658ad884cc6fbd
-  extra-dep: true
 
-- location:
-    git: https://github.com/ababkin/semver-range
-    commit: fc56a310eaac1d2dbbd7a7ef2ee94cf05f4464f5
-  extra-dep: true
 
 extra-deps:
 - Crypto-4.2.5.1
@@ -98,6 +85,13 @@ extra-deps:
 - logging-effect-1.3.3
 - bloomfilter-2.0.1.0
 - servant-aeson-specs-0.6.2.0
+- strings-1.1
+- git: https://github.com/iostat/relapse
+  commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
+- git: https://github.com/bitemyapp/esqueleto.git
+  commit: b81e0d951e510ebffca03c5a58658ad884cc6fbd
+- git: https://github.com/ababkin/semver-range
+  commit: fc56a310eaac1d2dbbd7a7ef2ee94cf05f4464f5
 
 resolver: lts-12.4 #also duplicated in docker section below
 compiler-check: newer-minor
@@ -108,7 +102,7 @@ extra-lib-dirs:
 - /usr/local/lib
 
 ghc-options:
-  "$locals": -Wall -Werror
+  "$locals": -Wall -Werror -fwarn-redundant-constraints -XDeriveAnyClass -XDeriveGeneric -XLambdaCase -XDerivingStrategies
   strato-api: -Wall -Werror -fno-warn-orphans
   strato-p2p: -Wall -Werror  -XMonoLocalBinds
   strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing

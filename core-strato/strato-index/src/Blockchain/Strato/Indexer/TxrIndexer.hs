@@ -1,21 +1,21 @@
 {-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Strato.Indexer.TxrIndexer where
 
+import           Control.DeepSeq
 import           Control.Exception
 import           Control.Monad
-import           Blockchain.Output
 import           Control.Monad.IO.Class             (liftIO)
 import           Control.Monad.Trans.Class          (lift)
-import           Control.Exception                  (catch, SomeException)
+import           Control.Exception                  (SomeException)
 import           Data.Binary
 import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Lazy               as BL
-import           Data.Maybe                         (isJust)
+import           Data.Foldable                      (for_)
+import qualified Data.List                          as List
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8)
 import           Network.Kafka
@@ -23,21 +23,26 @@ import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.ChainInfoDB        (addMember, removeMember, terminateChain)
-import           Blockchain.Data.DataDefs           (LogDB (..), TransactionResult (..))
+import           Blockchain.Data.DataDefs           (LogDB (..), EventDB (..), TransactionResult (..))
 import           Blockchain.Data.Enode
 import qualified Blockchain.Data.LogDB              as LogDB
+import qualified Blockchain.Data.EventDB            as EventDB
+import           Blockchain.Data.TransactionDef     (formatChainId)
 import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
+import           Blockchain.ExtWord
 
+import           Blockchain.Output
+import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Kafka
 import           Blockchain.SHA                     (hash)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Util                    (byteString2Integer)
-
-import           Numeric
 
 import           Text.Format
 
@@ -50,6 +55,30 @@ removeTopic = hash $ C8.pack "MemberRemoved(address)"
 terminateTopic :: SHA
 terminateTopic = hash $ C8.pack "ChainTerminated()"
 
+logF :: MonadLogger m => [String] -> m ()
+logF = $logInfoS "txrIndexer" . T.pack . concat
+
+doAddMember :: Word256 -> Address -> Enode -> IContextM ()
+doAddMember chainId address enode = do
+  logF [ "Adding member "
+       , format address
+       , " on chain "
+       , formatChainId $ Just chainId
+       ]
+  lift $ addMember chainId address (showEnode enode) -- We only need the Text version for Postgres
+  void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
+  void . withKafkaRetry1s $ writeUnseqEvents [IENewChainMember chainId address enode]
+
+doRemoveMember :: Word256 -> Address -> IContextM ()
+doRemoveMember chainId address = do
+  logF [ "Removing member "
+       , format address
+       , " on chain "
+       , formatChainId $ Just chainId
+       ]
+  lift $ removeMember chainId address
+  void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
+
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
     $logInfoS "txrIndexer" "About to fetch IndexEvents"
@@ -58,36 +87,60 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
     let zipIdxEvents = zip [offset+1..] idxEvents
     forM_ zipIdxEvents $ \(nextIdx, e) -> do -- todo: don't insert one-by-one?
         case e of
-            LogDBEntry l -> do
-                let mChainId = logDBChainId l
-                    topic1 = logDBTopic1 l
-                $logInfoS "txrIndexer" . T.pack $ "Inserting LogDB entry for tx: " ++ format (logDBTransactionHash l) ++ " on chain " ++ show (flip showHex "" <$> mChainId) ++ " at block " ++ format (logDBBlockHash l)
-                when (isJust mChainId) $ do
-                  let Just chainId = mChainId
-                  case topic1 of
-                    Just x | SHA x == addTopic -> do
-                      let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l --TODO: unhack
-                          enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
-                          enode' = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
-                      mEnode <- liftIO $ (Just <$> evaluate (readEnode enode')) `catch` (\(_ :: SomeException) -> return Nothing)
-                      when (isJust mEnode) $ do
-                        let Just enode = mEnode
-                        $logInfoS "txrIndexer" . T.pack $ "Adding member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
-                        lift $ addMember chainId address enode' -- We only need the Text version for Postgres
-                        void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId address enode
-                    Just x | SHA x == removeTopic -> do
-                      let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
-                      $logInfoS "txrIndexer" . T.pack $ "Removing member " ++ (showHex address "") ++ " on chain " ++ showHex chainId ""
-                      lift $ removeMember chainId address
-                      void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
-                    Just x | SHA x == terminateTopic -> do
-                      $logInfoS "txrIndexer" . T.pack $ "Terminating chain " ++ showHex chainId ""
-                      lift $ terminateChain chainId
-                    _ -> return ()
+            LogDBEntry l -> for_ (logDBChainId l) $ \chainId -> do
+                logF [ "Inserting LogDB entry for tx: "
+                     , format $ logDBTransactionHash l
+                     , " on chain "
+                     , formatChainId $ Just chainId
+                     , " at block "
+                     , format $ logDBBlockHash l
+                     ]
+                case logDBTopic1 l of
+                  Just x | SHA x == addTopic -> do
+                    let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l --TODO: unhack
+                        enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
+                        enode' = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
+                    eEnode :: Either SomeException Enode <- liftIO . try . evaluate . force $ readEnode enode' --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
+                    case eEnode of
+                      Left err -> $logErrorS "txrIndexer" . T.pack $ "failed to parse enode: " ++ show err
+                      Right enode -> doAddMember chainId address enode
+                  Just x | SHA x == removeTopic -> do
+                    let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
+                    doRemoveMember chainId address
+                  Just x | SHA x == terminateTopic -> do
+                    logF ["Terminating chain ", formatChainId $ Just chainId]
+                    lift $ terminateChain chainId
+                  _ -> return ()
                 void . lift $ LogDB.putLogDB l
+            EventDBEntry ev -> for_ (eventDBChainId ev) $ \chainId -> do
+                let evName = eventDBName ev
+                    evArgs = eventDBArgs ev
+                logF [ "Inserting EventDB entry for Event: "
+                     , evName
+                     , " with args: "
+                     , List.intercalate "," evArgs
+                     , " for chainID: "
+                     , formatChainId $ Just chainId
+                     ]
+                case (evName, evArgs) of
+                  ("MemberAdded", [addressStr, enodeStr]) -> case stringAddress addressStr of
+                    Nothing -> $logErrorS "txrIndexer" . T.pack $ "failed to parse address for MemberAdded event: " ++ addressStr
+                    Just address -> do
+                      eNode :: Either SomeException Enode <- liftIO . try . evaluate . force $ readEnode enodeStr --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
+                      case eNode of
+                        Left err -> $logErrorS "txrIndexer" . T.pack $ "failed to parse enode" ++ show err
+                        Right enode -> doAddMember chainId address enode
+                  ("MemberRemoved", [addressStr]) -> case stringAddress addressStr of
+                    Nothing -> $logErrorS "txrIndexer" . T.pack $ "failed to parse address for MemberRemoved event: " ++ addressStr
+                    Just address -> doRemoveMember chainId address
+                  _ -> return ()
+                void . lift $ EventDB.putEventDB ev
             TxResult r -> do
-                $logInfoS "txrIndexer" . T.pack $
-                    "Inserting TXResult for tx " ++ format (transactionResultTransactionHash r) ++ " at block " ++ format (transactionResultBlockHash r)
+                logF [ "Inserting TXResult for tx "
+                     , format $ transactionResultTransactionHash r
+                     , " at block "
+                     , format $ transactionResultBlockHash r
+                     ]
                 void . lift $ TxrDB.putTransactionResult r
             _ -> return ()
         setKafkaCheckpoint nextIdx

@@ -11,6 +11,7 @@ module.exports = {
     '409': 'CONFLICT',
     '500': 'INTERNAL_SERVER_ERROR',
     '502': 'BAD_GATEWAY',
+    '503': 'SERVICE_UNAVAILABLE',
     '504': 'GATEWAY_TIMEOUT',
     OK: 200,
     CREATED: 201,
@@ -24,5 +25,6 @@ module.exports = {
     SERVER_ERROR: 500,
     INTERNAL_SERVER_ERROR: 500,
     BAD_GATEWAY: 502,
+    SERVICE_UNAVAILABLE: 503,
     GATEWAY_TIMEOUT: 504
 }

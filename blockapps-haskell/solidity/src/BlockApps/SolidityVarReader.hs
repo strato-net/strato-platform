@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
@@ -579,7 +578,7 @@ decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ B
 decodeCacheByteString :: Cache -> Word256 -> Int -> Int -> Value -> Value
 decodeCacheByteString storage offset byte size value = fromMaybe value $ SimpleValue . ValueBytes Nothing . B16.encode . ByteString.take size . ByteString.drop (32 - byte - size) . word256ToByteString <$> storage offset
 
-encodeInt :: (Num t, Integral t, Bits t) => Word256 -> Int -> t -> [(Word256,Word256)]
+encodeInt :: (Integral t, Bits t) => Word256 -> Int -> t -> [(Word256,Word256)]
 encodeInt offset byte val = return $ fmap (fromIntegral . (`shiftL` (byte*8))) (offset,val)
 
 arrayPosition :: Integer -> Integer -> Storage.Position

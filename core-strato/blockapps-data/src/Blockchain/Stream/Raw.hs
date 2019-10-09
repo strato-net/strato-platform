@@ -3,7 +3,6 @@
 
 module Blockchain.Stream.Raw (
   produceBytes,
-  produceBytes',
   fetchBytes,
   fetchBytesIO,
   fetchBytesOneIO,
@@ -11,8 +10,6 @@ module Blockchain.Stream.Raw (
   ) where
 
 import           Control.Lens
-import           Control.Monad          (void)
-import           Control.Monad.IO.Class
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Char8  as BC
 import           Data.List
@@ -23,14 +20,10 @@ import           Network.Kafka.Producer
 import           Network.Kafka.Protocol hiding (Message)
 
 import           Blockchain.EthConf
-import           Blockchain.KafkaTopics
 
 
-produceBytes :: MonadIO m => String -> [B.ByteString] -> m ()
-produceBytes topic items = void . liftIO . runKafkaConfigured "blockapps-data" $ produceBytes' topic items
-
-produceBytes' :: (Kafka k) => String -> [B.ByteString] -> k [ProduceResponse]
-produceBytes' topic = produceMessages . fmap (TopicAndMessage (lookupTopic topic) . makeMessage)
+produceBytes :: (Kafka k) => TopicName -> [B.ByteString] -> k [ProduceResponse]
+produceBytes topic = produceMessages . fmap (TopicAndMessage topic . makeMessage)
 
 fetchBytes :: Kafka k => TopicName -> Offset -> k [B.ByteString]
 fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> ts)
@@ -38,7 +31,7 @@ fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> 
 fetchBytes' :: Kafka k => TopicName -> Offset -> k [(Offset, B.ByteString)]
 fetchBytes' topic offset = do
   fetched <- fetch offset 0 topic
-  
+
   let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. fetchResponseFields)
   --If the Kafka fetch fails, this is a critical error, we have no choice but to halt the program.
   --Also, since the Kafka fetch is typically in a loop, by not halting, we will often create a
@@ -46,7 +39,7 @@ fetchBytes' topic offset = do
   case find (/= NoError) errorStatuses of
    Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
    _ -> return ()
-   
+
   let datas = (map tamPayload' . fetchMessages) fetched
   return $ zip [offset..] datas
 

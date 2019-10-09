@@ -1,7 +1,7 @@
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Blockchain.VM.TestEthereum
     ( runAllTests
@@ -11,6 +11,7 @@ module Blockchain.VM.TestEthereum
     ) where
 
 import           Control.Monad
+import qualified Control.Monad.Change.Alter                  as A
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Reader
@@ -76,7 +77,7 @@ populateAndConvertAddressState cid owner addressState' = do
   forM_ (M.toList $ storage' addressState') $
     \(key, val) -> putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
 
-  addressState <- getAddressState owner
+  addressState <- A.lookupWithDefault (A.Proxy @AddressState) owner
 
   return $
     AddressState
@@ -105,10 +106,9 @@ getDataAndRevertAddressState _ addressState = do
   -- since that function requires an unhashed owner.
   -- This piece of code really should be in the lib somewhere
   storage <- do
-    dbs' <- get
-    let mpdb = (contextStateDB dbs'){stateRoot=addressStateContractRoot addressState}
-    kvs <- lift $ unsafeGetKeyVals mpdb ""
-    let toInt = fromInteger . rlpDecode . rlpDeserialize . rlpDecode
+    let sr = addressStateContractRoot addressState
+        toInt = fromInteger . rlpDecode . rlpDeserialize . rlpDecode
+    kvs <- unsafeGetKeyVals sr ""
     return $ map (fmap toInt) kvs :: ContextM [(Key, Integer)]
 
   return $
@@ -140,7 +140,6 @@ showInfo (key,AddressState'{nonce'=n, balance'=b, storage'=s, contractCode'=Code
           else (", " ++) . show . M.toList . M.map showHexInt . M.mapKeys showHash $ s
          ) ++
          (if B.null c then "" else ", CODE:[" ++ C.blue (format c) ++ "]")
-showInfo _ = undefined
 
 addressStates::ContextM [(Address, AddressState')]
 addressStates = do
@@ -151,7 +150,7 @@ addressStates = do
   return $ zip addrs states'
 
 txToOutputTx :: Transaction -> OutputTx
-txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct
+txToOutputTx = fromJust . wrapTransactionUnanchored . IngestTx TO.Direct
 
 runTest::Test-> ContextM ()
 runTest test = do
@@ -159,7 +158,7 @@ runTest test = do
     liftIO . print $ test
   let cid = Nothing
 
-  MP.initializeBlank =<< getStateDB
+  MP.initializeBlank
   setStateDBStateRoot emptyTriePtr
 
   forM_ (M.toList $ pre test) $
@@ -267,7 +266,7 @@ runTest test = do
         signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
         let signedTransaction = txToOutputTx signedTransaction'
         result <-
-          runExceptT $ addTransaction True (blockBlockData block) (currentGasLimit $ env test) signedTransaction
+          runExceptT $ addTransaction Nothing True (blockBlockData block) (currentGasLimit $ env test) signedTransaction
         when flags_debugEnabled $
           liftIO . putStrLn . ("addTransaction: " ++) . show $ result
 
@@ -275,7 +274,7 @@ runTest test = do
         flushMemAddressStateDB
 
         return $ case result of
-            Right (er@(ExecResults _ _ retVal _ rLogs _ _ _ _)) ->
+            Right er@ExecResults{erReturnVal=retVal, erLogs=rLogs} ->
                       (Right (), BSS.fromShort <$> retVal,
                        fromIntegral $ currentGasLimit (env test) - (transactionGasLimit signedTransaction' - calculateReturned signedTransaction' er),
                        rLogs, Just [], Nothing)

@@ -70,17 +70,15 @@ sender = 0xdeadbeef
 
 origin :: Address
 origin = 0x8341
--- TODO: It's not clear what the difference between newAddress and uploadAddress,
--- aside from the fact that one is an argument to create and the other is generated
--- by SolidVM's create'
-newAddress :: Address
-newAddress = 0x0ddba11
 
 uploadAddress :: Address
 uploadAddress = getNewAddress_unsafe sender 0
 
 secondAddress :: Address
 secondAddress = getNewAddress_unsafe sender 1
+
+recursiveAddr :: Address
+recursiveAddr = getNewAddress_unsafe uploadAddress 0
 
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
@@ -95,6 +93,9 @@ runTest f = do
 
 runFile :: FilePath -> ContextM ()
 runFile fp = void $ runBS =<< liftIO (B.readFile fp)
+
+runFileArgs :: T.Text -> FilePath -> ContextM ()
+runFileArgs args fp = void $ runArgs args =<< liftIO (B.readFile fp)
 
 runBS :: B.ByteString -> ContextM ()
 runBS = void . runBS'
@@ -136,6 +137,7 @@ runArgs args bs = do
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
+  newAddress <- getNewAddress sender
   er <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
           value gasPrice availableGas newAddress code txHash chainId metadata
   rethrowEx er
@@ -174,11 +176,12 @@ runCall funcName callArgs bs = do
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
+  newAddress <- getNewAddress sender
   er1 <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
     value gasPrice availableGas newAddress code txHash chainId createMetadata
   rethrowEx er1
   er2 <- SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
-    uploadAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+    newAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
   rethrowEx er2
   return $ erReturnVal er2
 
@@ -238,8 +241,7 @@ spec :: Spec
 spec = do
   describe "Ballot" $ do
     it "can be created" . runTest $ do
-      liftIO $ pendingWith "storage vs memory, struct kwargs"
-      runFile "testdata/Ballot.sol"
+      runFileArgs [r|(["a","b","c"])|] "testdata/Ballot.sol"
 
   describe "Create" $ do
     it "should be able to run an empty contract" . runTest $ do
@@ -294,6 +296,7 @@ spec = do
                          , BInteger 0xffff]
 
     it "should be able to insert into a mapping" . runTest $ do
+      liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
       runFile "testdata/MappingSet.sol"
       st <- checkStorage
       st `shouldSatisfy` (== 3) . length
@@ -305,6 +308,7 @@ spec = do
         ] `shouldReturn` [BMappingSentinel, BInteger 4, BInteger 21, BDefault]
 
     it "should be able to read from a map" . runTest $ do
+      liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
       runFile "testdata/MappingRead.sol"
       st <- checkStorage
       -- The z assignment doesn't count, as at is set to the empty string
@@ -353,6 +357,22 @@ spec = do
         , BString (fst $ B16.decode "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a")
         , BString (fst $ B16.decode "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868")
         ]
+
+    it "can hash multiple arguments" . runTest $ do
+      liftIO $ pendingWith "TODO(blockapps.atlassian.net/browse/STRATO-1520)"
+      runBS [r|
+contract qq {
+  bytes32 hsh;
+  constructor() public {
+    string username = "uname";
+    string nodeIp = "enode://8814738274@127.0.0.1:30303";
+    string chainId = "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868";
+    hsh = keccak256(username, nodeIp, chainId);
+  }
+}
+|]
+      getFields ["hsh"] `shouldReturn` [BString $ word256ToBytes 0x4ebc701886e9562cf7998b9ab563c6d3ca5ad243b547f11f31ae1ae156b2ff97]
+
 
     it "can create a struct" . runTest $ do
       runBS [r|
@@ -510,12 +530,14 @@ contract qq {
     it "should be able to return the time from the header" . runTest $ do
       runBS [r|
 contract qq {
- uint ts;
+ uint ts1;
+ uint ts2;
  constructor() {
-   ts = block.timestamp;
+   ts1 = block.timestamp;
+   ts2 = now;
  }
 }|]
-      getAll [ [Field "ts"] ] `shouldReturn` [BInteger 0x4000]
+      getFields ["ts1", "ts2"] `shouldReturn` [BInteger 0x4000, BInteger 0x4000]
 
     it "can parse one specific assembly block" . runTest $ do
       runBS [r|
@@ -703,6 +725,7 @@ contract qq {
     getFields ["found"] `shouldReturn` [BBool False]
 
   it "compares equal againts default" . runTest $ do
+    liftIO $ pendingWith "add static typing" --TODO- Jim
     runBS [r|
 contract qq {
   uint x = 0;
@@ -977,6 +1000,7 @@ contract qq is P {
     getFields ["x"] `shouldReturn` [BInteger 908]
 
   it "can treat 0 literals as strings" . runTest $ do
+    liftIO $ pendingWith "add static typing" --TODO- Jim
     runBS [r|
 contract qq {
   bytes32 text = "ok";
@@ -993,6 +1017,7 @@ contract qq {
               [BString "ok", BString "", BString "", BBool False, BBool True]
 
   it "can treat integer literals as addresses" . runTest $ do
+    liftIO $ pendingWith "add static typing" --TODO- Jim
     runBS [r|
 contract qq {
   address a = 0xdeadbeef;
@@ -1235,7 +1260,6 @@ contract qq {
 
 
   it "can assign to tuples" . runTest $ do
-    liftIO $ pendingWith "tuple assignment"
     runBS [r|
 contract qq {
   uint x;
@@ -1247,6 +1271,7 @@ contract qq {
     getFields ["x", "y"] `shouldReturn` [BInteger 10, BInteger 17]
 
   it "can assign numeric to bytes32" . runTest $ do
+    liftIO $ pendingWith "add static typing" --TODO- Jim
     runBS [r|
 contract qq {
    bytes32 x = 0x5816f723b08edfdb4148b98e7be9d2e8000bab79b78e4e1615865eb92b1d7068;
@@ -1360,7 +1385,6 @@ contract qq is A, B {
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xb)
 
   it "selects the correct super when parents are missing methods" . runTest $ do
-    liftIO $ pendingWith "TODO: ADL in MRO"
     runCall "value" "()" [r|
 contract A {
   function value() public returns (uint) {
@@ -1375,7 +1399,6 @@ contract qq is A, B {
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0 <> B.singleton 0xa)
 
   it "can determine super instance by function name" . runTest $ do
-    liftIO $ pendingWith "MRO by ADL"
     runBS [r|
 contract A {
   function a() public pure returns (uint) { return 0xaaaa;}
@@ -1513,7 +1536,17 @@ contract qq {
   }
 }|] `shouldReturn` Just (SB.toShort want)
 
+  it "can return an enum" . runTest $ do
+    runCall "a" "()" [r|
+contract qq {
+  enum Letter { a, b, c }
+  function a() public returns (Letter) {
+    return Letter.c;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
   it "will initialize contracts as such" . runTest $ do
+    liftIO $ pendingWith "add static typing" --TODO- Jim
     runBS [r|
 contract X {}
 
@@ -1523,6 +1556,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BContract "X" 0x0]
 
   it "will initialize fields of indirect constructions" . runTest $ do
+    liftIO $ pendingWith "add static typing" --TODO- Jim
     runBS [r|
 contract X {
   uint i;
@@ -1540,6 +1574,7 @@ contract qq {
     getSolidStorageKeyVal' x (singleton "s") `shouldReturn` BString ""
 
   it "will create a sentinel for mappings" . runTest $ do
+    liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
     runBS [r|
 contract qq {
   mapping(string => uint) assoc;
@@ -1588,7 +1623,6 @@ contract qq {
   }
 }|]
     let diffs = fmap _actionDataStorageDiffs . _actionData <$> erAction xr
-        recursiveAddr = getNewAddress_unsafe uploadAddress 1
     diffs `shouldBe` Just (M.fromList
       [ (uploadAddress, ActionSolidVMDiff $ M.singleton ".s"
             (rlpSerialize $ rlpEncode $ BContract "Sub" recursiveAddr))
@@ -1753,7 +1787,6 @@ contract qq {
     x = new X();
   }
 }|]
-    let recursiveAddr = getNewAddress_unsafe uploadAddress 1
     -- qq should become the `owner` in X
     getFields ["x"] `shouldReturn` [BContract "X" recursiveAddr]
     getSolidStorageKeyVal' recursiveAddr (MS.singleton "owner") `shouldReturn`
@@ -1812,3 +1845,334 @@ contract qq {
 
   it "catches missing function errors" $
     (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc
+
+  it "can cast to int" . runTest $ do
+    runBS [r|
+contract qq {
+  int z;
+  constructor() public {
+    z = int(123456);
+  }
+}|]
+    getFields ["z"] `shouldReturn` [BInteger 123456]
+
+  it "can create storage references to structs" . runTest $ do
+    runBS [r|
+contract qq {
+  struct Nom {
+    string id;
+    uint nomType;
+  }
+  Nom[] noms;
+
+  constructor() public {
+    noms.push(Nom("239847", 7777));
+    Nom storage n = noms[0];
+    n.nomType = 13;
+  }
+}|]
+    getAll [ [Field "noms", Field "length"]
+           , [Field "noms", ArrayIndex 0, Field "id" ]
+           , [Field "noms", ArrayIndex 0, Field "nomType" ]
+           ] `shouldReturn` [BInteger 1, BString "239847", BInteger 13]
+
+  it "can create memory copies of structs" . runTest $ do
+    liftIO $ pendingWith "add the memory keyword" --TODO- Jim
+    runBS [r|
+contract qq {
+  struct Nom {
+    string id;
+    uint nomType;
+  }
+  Nom[] noms;
+  uint newType;
+
+  constructor() public {
+    noms.push(Nom("ok", 41));
+    Nom memory n = noms[0];
+    n.nomType = 92;
+    newType = n.nomType;
+  }
+}|]
+    getAll [ [Field "noms", Field "length"]
+           , [Field "noms", ArrayIndex 0, Field "id"]
+           , [Field "noms", ArrayIndex 0, Field "nomType"]
+           , [Field "newType"]
+           ] `shouldReturn` [BInteger 1, BString "ok", BInteger 41, BInteger 92]
+
+  it "can multiply return" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  string y;
+  function f() public returns (uint, string) {
+    return (24, "hello");
+  }
+  constructor() public {
+    (x, y) = f();
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 24, BString "hello"]
+
+  it "can set local vars" . runTest $ do
+    runBS [r|
+contract Rest {
+  enum Status {
+    OK,
+    NOT_FOUND
+  }
+}
+
+contract qq is Rest {
+  uint sum;
+  struct Permit {
+    uint p;
+  }
+  function f() public returns (uint, uint) {
+    Permit memory perm;
+    perm.p = 400;
+    return (uint(Status.OK), perm.p);
+  }
+  constructor() public {
+    var (a, b) = f();
+    sum = a + b;
+  }
+}
+|]
+    getFields ["sum"] `shouldReturn` [BInteger 400]
+
+  it "does stuff after an if" . runTest $ do
+    liftIO $ pendingWith "loop control fix"
+    runBS [r|
+contract qq {
+  uint x = 40;
+  constructor() public {
+    x++;
+    if (true) {
+    } else {
+    }
+    x++;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 42]
+
+  it "can parse a singleton tuple" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    var (z) = 247;
+    x = z;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 247]
+
+  it "doesn't need var for variables in scope" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  uint y;
+  constructor() public {
+    (x, y) = (10, 20);
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 10, BInteger 20]
+
+  it "can array convert for index" . runTest $ do
+    liftIO $ pendingWith "TODO: creating references into strings"
+    runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    string txt = "hello, world";
+    x = bytes(txt)[3];
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0x6c]
+
+  it "can increment array members" . runTest $ do
+    runBS [r|
+contract qq {
+    uint[] xs = [1,1,3];
+    constructor() public {
+        xs[1]++;
+    }
+}|]
+    getAll [ [Field "xs", Field "length"]
+           , [Field "xs", ArrayIndex 0]
+           , [Field "xs", ArrayIndex 1]
+           , [Field "xs", ArrayIndex 2]
+           ] `shouldReturn` [BInteger 3, BInteger 1, BInteger 2, BInteger 3]
+
+  it "can reference characters" . runTest $ do
+    liftIO $ pendingWith "TODO: something"
+    runBS [r|
+contract qq {
+    string public xs = "ok";
+    constructor() public {
+      bytes(xs)[0] = 't';
+      bytes(xs)[1] = 'y';
+    }
+}|]
+    getFields ["xs"] `shouldReturn` [BString "ty"]
+
+  it "can parse named arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  constructor() public {
+    x = f({y: 99});
+  }
+
+  function f(uint y) public returns (uint) {
+    return y + 2;
+  }
+}
+|]
+    getFields ["x"] `shouldReturn` [BInteger 101]
+
+  it "can call named argument constructors" . runTest $ do
+    runBS [r|
+contract X {
+  uint public y;
+  string public z;
+
+  constructor(uint _y, string _z) public {
+    y = _y;
+    z = _z;
+  }
+}
+
+contract qq {
+  X public x;
+  constructor() public {
+    x = new X({_z: "ok", _y: 0x777777});
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BContract "X" recursiveAddr]
+    mapM (getSolidStorageKeyVal' recursiveAddr) [MS.singleton "y", MS.singleton "z"]
+      `shouldReturn` [BInteger 0x777777, BString "ok"]
+
+  it "can cast a struct from named arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  struct S {
+    uint x;
+    uint y;
+    string z;
+  }
+  S s;
+  constructor() public {
+    s = S({y: 87, z: "goodbye", x: 33});
+  }
+}|]
+    getAll [ [Field "s", Field "x"]
+           , [Field "s", Field "y"]
+           , [Field "s", Field "z"]
+           ] `shouldReturn` [BInteger 33, BInteger 87, BString "goodbye"]
+
+  it "should be able to adjust arrayed structs" . runTest $ do
+    runBS [r|
+contract qq {
+  struct X {
+    uint x;
+  }
+  X[] xs;
+  constructor() public {
+    xs.push(X({x: 55}));
+    xs[0].x *= 2;
+  }
+}|]
+    getAll [ [Field "xs", ArrayIndex 0, Field "x" ]] `shouldReturn` [BInteger 110]
+
+  it "can resolve variables for named arguments" . runTest $ do
+    void $ runArgs "(\"stref\")" [r|
+contract qq {
+  struct X {
+    string n;
+  }
+  X[] public names;
+  constructor(string input_name) public {
+    names.push(X({n: input_name}));
+  }
+}|]
+    getAll [ [Field "names", ArrayIndex 0, Field "n"] ] `shouldReturn` [BString "stref"]
+
+  it "can declare types for a tuple" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  string y;
+  function f() returns (uint, string) {
+    return (0x42, "ok");
+  }
+
+  constructor() public {
+    (uint _x, string _y) = f();
+    x = _x;
+    y = _y;
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 0x42, BString "ok"]
+
+  it "can create new bytes" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  bytes xs;
+  constructor() public {
+    xs = new bytes(3);
+  }
+}|]
+    getFields ["xs"] `shouldReturn` [BString "\x00\x00\x00"]
+
+  it "overrides addressToAsciiString" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  string xs;
+  constructor() public {
+    xs = addressToAsciiString(this);
+  }
+}|]
+    getFields ["xs"] `shouldReturn` [BString "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe"]
+
+  it "can cast empty bytes32 to int" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint public x;
+  constructor() public {
+    x = uint(bytes(""));
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0x0]
+
+  it "can store nested structs" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  struct Inner {
+    uint value;
+  }
+  struct Outer {
+    Inner inner;
+  }
+  Outer public outer;
+  constructor() public {
+    Inner memory inner = Inner({value: 0x732});
+    outer = Outer(inner);
+  }
+}
+|]
+    getAll [[Field "outer", Field "inner", Field "value"]] `shouldReturn` [BInteger 0x732]
+
+  it "can not declare part of a tuple" . runTest $ do
+    void $ runBS [r|
+contract qq {
+  uint x;
+  function ab() returns (uint, uint) {
+    return (71, 833);
+  }
+  constructor() public {
+    var (_, b) = ab();
+    x = b;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 833]

@@ -7,6 +7,20 @@ volumes:
     driver: local
   prometheusdata:
     driver: local
+  kafkadata:
+    driver: local
+  redisdata:
+    driver: local
+  stratodata:
+    driver: local
+  zookeeperdata:
+    driver: local
+
+networks:
+  static:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 services:
   smd:
     depends_on:
@@ -27,6 +41,9 @@ services:
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.1
   apex:
     depends_on:
     - bloc
@@ -46,6 +63,7 @@ services:
     - postgres_user=postgres
     - postgrestHost=postgrest:3001
     - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
+    - prometheusHost=prometheus:9090
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
@@ -56,6 +74,9 @@ services:
     volumes:
     - dapps:/usr/src/app/apps
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.2
   dappstore:
     depends_on:
     - bloc
@@ -67,6 +88,9 @@ services:
     build: .
     image: ${DAPPSTORE_IMAGE:-<REPO_URL>dappstore:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.3
   bloc:
     depends_on:
     - postgres
@@ -85,7 +109,6 @@ services:
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
     - SMD_MODE=${SMD_MODE}
-    - ssl=${ssl:-false}
     #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
     - vaultWrapperHost=vault-wrapper:8000
@@ -93,10 +116,18 @@ services:
     build: .
     image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.4
   redis:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.5
+    volumes:
+      - redisdata:/data
   vault-wrapper:
     depends_on:
     - postgres
@@ -110,6 +141,9 @@ services:
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.6
   strato:
     depends_on:
     - kafka
@@ -117,14 +151,17 @@ services:
     - redis
     environment:
     - addBootnodes=${addBootnodes}
-    - backupblocks=${backupblocks}
+    - averageTxsPerBlock=${averageTxsPerBlock}
     - blockstanbul=${blockstanbul}
+    - blockstanbulAdmins=${blockstanbulAdmins}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
     - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockstanbulSkipCheck=${blockstanbulSkipCheck}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
+    - brokenRefundReenable=${brokenRefundReenable}
+    - cacheTransactionResults=${cacheTransactionResults}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
@@ -145,16 +182,22 @@ services:
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_user=postgres
+    - privateChainAuthorizationMode=${privateChainAuthorizationMode}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
     - seqDebugMode=${seqDebugMode}
+    - seqEventsBatchSize=${seqEventsBatchSize}
+    - seqEventsCostHeuristic=${seqEventsCostHeuristic}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
+    - splitinit=true
+    - svmTrace=${svmTrace}
+    - sqlDiff=${sqlDiff}
+    - svmDev=${svmDev}
     - useSyncMode=${useSyncMode}
-    - blockstanbulAdmins=${blockstanbulAdmins:-}
     - validators=${validators}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - zkHost=zookeeper
@@ -164,6 +207,11 @@ services:
     - 30303:30303
     - 30303:30303/udp
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.7
+    volumes:
+      - stratodata:/var/lib/strato
   postgrest:
     depends_on:
     - bloc
@@ -178,6 +226,9 @@ services:
     build: .
     image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.8
   postgres:
     environment:
     - POSTGRES_PASSWORD=${postgres_password:-api}
@@ -185,6 +236,9 @@ services:
     volumes:
     - pgdata:/var/lib/postgresql/data
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.9
   nginx:
     depends_on:
     - apex
@@ -206,6 +260,7 @@ services:
     - OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false} # for backwards-compatibility with 4.2
     - OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL} # for backwards-compatibility with 4.2
     - OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK} # for backwards-compatibility with 4.2
+    - OAUTH_TEMPORARY_MIXED_AUTH=${OAUTH_TEMPORARY_MIXED_AUTH} # To allow gradual migration of tests to oauth
     - SMD_MODE=${SMD_MODE}
     - SERVE_LOGS=${SERVE_LOGS}
     - ssl=${ssl}
@@ -220,14 +275,25 @@ services:
     volumes:
     - ./ssl:/tmp/ssl:ro
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.10
   docs:
     environment:
     - API_URL=/strato-api/eth/v1.2/swagger.json
-    image: swaggerapi/swagger-ui
+    image: swaggerapi/swagger-ui:v3.22.1
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.11
   zookeeper:
     image: wurstmeister/zookeeper:3.4.6
     restart: always
+    volumes:
+      - zookeeperdata:/opt/zookeeper-3.4.6/data
+    networks:
+      static:
+        ipv4_address: 172.20.20.12
   kafka:
     depends_on:
     - zookeeper
@@ -237,17 +303,28 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_LOG_CLEANER_ENABLE: "false"
+      KAFKA_LOG_DIRS: '/kafka/kafka-logs'
       KAFKA_LOG_RETENTION_HOURS: 2147483647
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
+      KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
       KAFKA_MAX_REQUEST_SIZE: 33554432
       KAFKA_MESSAGE_MAX_BYTES: 33554432
     image: wurstmeister/kafka:1.1.0
     restart: always
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
+    - kafkadata:/kafka
+    networks:
+      static:
+        ipv4_address: 172.20.20.13
   prometheus:
     build: .
+    environment:
+      - NODE_HOST=${NODE_HOST}
     image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
     volumes:
     - prometheusdata:/prometheus
     restart: always
+    networks:
+      static:
+        ipv4_address: 172.20.20.14

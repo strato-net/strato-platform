@@ -78,7 +78,7 @@ main = do
   let signedTransaction = txToOutputTx signedTransaction'
 
   (result, _) <- runLoggingT $ runTestContextM $ do
-    MP.initializeBlank =<< getStateDB
+    MP.initializeBlank
     setStateDBStateRoot MP.emptyTriePtr
 
     let addr = Address 0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed
@@ -90,7 +90,7 @@ main = do
         addressStateChainId=Nothing
       }
 
-    runExceptT $ addTransaction True blockData 10000000000000000000000000000 signedTransaction
+    runExceptT $ addTransaction Nothing True blockData 10000000000000000000000000000 signedTransaction
 
   case result of
     Left e -> putStrLn $ show e
@@ -99,7 +99,7 @@ main = do
 
 
 txToOutputTx :: Transaction -> OutputTx
-txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct
+txToOutputTx = fromJust . wrapTransactionUnanchored . IngestTx TO.Direct
 
 
 

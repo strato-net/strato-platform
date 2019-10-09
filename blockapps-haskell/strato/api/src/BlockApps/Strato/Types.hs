@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -450,6 +448,7 @@ data TransactionResult = TransactionResult
   , transactionresultNewStorage       :: Text
   , transactionresultDeletedStorage   :: Text
   , transactionresultChainId          :: Maybe ChainId
+  , transactionresultKind             :: Maybe CodeKind
   } deriving (Show, Generic, Eq)
 
 instance Arbitrary TransactionResult where
@@ -483,7 +482,21 @@ instance ToSchema TransactionResult where
     where ex = exampleTxResult
 
 exampleTxResult :: TransactionResult
-exampleTxResult = TransactionResult (keccak256 "blockHask") (keccak256 "txhash") "I'm a tx result message" "I'm a tx result response" "tx trace" (Hex 0xFFFFFFFFFFFFFFFF) (Hex 0x000000000000000A)  "[MyNewContractA, MyNewContractB]" "[MyOldContract]" "I am a state Diff" 0.2321 "New Storage" "Deleted Storage" Nothing
+exampleTxResult = TransactionResult (keccak256 "blockHask")
+                                    (keccak256 "txhash")
+                                    "I'm a tx result message"
+                                    "I'm a tx result response"
+                                    "tx trace"
+                                    (Hex 0xFFFFFFFFFFFFFFFF)
+                                    (Hex 0x000000000000000A)
+                                    "[MyNewContractA, MyNewContractB]"
+                                    "[MyOldContract]"
+                                    "I am a state Diff"
+                                    0.2321
+                                    "New Storage"
+                                    "Deleted Storage"
+                                    Nothing
+                                    (Just EVM)
 
 stratoSchemaOptions :: SchemaOptions
 stratoSchemaOptions = defaultSchemaOptions {Sw.fieldLabelModifier = camelCase . dropFPrefix}

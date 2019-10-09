@@ -2,16 +2,9 @@
 set -e
 set -x
 
-# exported values are accessible in the app via process.env[]
-export blocRoot=http://${blocHost}/bloc/v2.2
-export stratoRoot=http://${stratoHost}/eth/v1.2
-export STRATO_GS_MODE=${STRATO_GS_MODE}
-export PROD_DEV_MODE=${PROD_DEV_MODE:-false}
-export vaultWrapperHttpHost=http://${vaultWrapperHost}
-export blocHttpHost=http://${blocHost}
-export postgrestHttpHost=http://${postgrestHost}
+source set-aux-env-vars.sh
 
-if [[ ${OAUTH_ENABLED} = true && ${SMD_MODE} = public ]]; then
+if [[ "${OAUTH_ENABLED}" = true && "${SMD_MODE}" = public ]]; then
   echo "SMD public mode is incompatible with OAuth"
   exit 1
 fi
@@ -61,7 +54,7 @@ do
   echo "Check at $(date)"
   sleep 1
 done
-echo 'cirrus is available'
+echo 'postgrest is available'
 
 echo 'Waiting for postgres to be available...'
 until pg_isready -h ${postgres_host} -p ${postgres_port}

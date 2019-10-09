@@ -11,15 +11,13 @@ module Blockchain.Data.RLP (
   RLPSerializable(..),
   rlpSplit,
   rlpSerialize,
-  rlpSerialize_slow,
-  rlpDeserialize
+  rlpDeserialize,
+  int2Bytes
   ) where
 
 import           Control.DeepSeq
-import           Data.Binary.Put
 import           Data.Bits
 import qualified Data.ByteString                    as B
-import qualified Data.ByteString.Lazy               as BL
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 import           Data.ByteString.Internal
@@ -110,22 +108,6 @@ int2Bytes val | val < 0x100000000 = map (fromIntegral . (val `shiftR`)) [24, 16.
 int2Bytes val | val < 0x10000000000 = map (fromIntegral . (val `shiftR`)) [32, 24..0]
 int2Bytes _ = error "int2Bytes not defined for val >= 0x10000000000."
 
-rlp2Bytes::RLPObject->[Word8]
-rlp2Bytes (RLPScalar val) = [fromIntegral val]
-rlp2Bytes (RLPString s) | B.length s <= 55 = 0x80 + fromIntegral (B.length s):B.unpack s
-rlp2Bytes (RLPString s) =
-  [0xB7 + fromIntegral (length lengthAsBytes)] ++ lengthAsBytes ++ B.unpack s
-  where
-    lengthAsBytes = int2Bytes $ B.length s
-rlp2Bytes (RLPArray innerObjects) =
-  if length innerBytes <= 55
-  then 0xC0 + fromIntegral (length innerBytes):innerBytes
-  else let lenBytes = int2Bytes $ length innerBytes
-       in [0xF7 + fromIntegral (length lenBytes)] ++ lenBytes ++ innerBytes
-  where
-    innerBytes = concat $ rlp2Bytes <$> innerObjects
-
---TODO- Probably should just use Data.Binary's 'Binary' class for this
 
 -- | Converts bytes to 'RLPObject's.
 --
@@ -140,37 +122,26 @@ rlpDeserialize s =
 -- | Converts 'RLPObject's to bytes.
 --
 -- Full serialization of an object can be obtained using @rlpSerialize . rlpEncode@.
-rlpSerialize_slow::RLPObject->B.ByteString
-rlpSerialize_slow = B.pack . rlp2Bytes
 
 rlpSerialize :: RLPObject -> B.ByteString
-rlpSerialize = BL.toStrict . rlpSerialize'
-
-rlpSerialize':: RLPObject -> BL.ByteString
-rlpSerialize' = runPut . rlpToPut
-
-rlpToPut :: RLPObject -> Put
-rlpToPut = \case
-  (RLPScalar val) -> putWord8 val
-  (RLPString s) -> do
+rlpSerialize = \case
+  RLPScalar val -> B.singleton val
+  RLPString s ->
     let l = B.length s
+    in if l <= 55
+         then B.cons (0x80 + fromIntegral l) s
+         else let ibs = int2Bytes l
+                  ll = length ibs
+              in (B.pack $ 0xb7 + fromIntegral ll:ibs) <> s
+  RLPArray innerObjects -> do
+    let innerBytes = B.concat . map rlpSerialize $ innerObjects
+        l = B.length innerBytes
     if l <= 55
-      then putWord8 $ 0x80 + fromIntegral l
-      else
-        let ibs = int2Bytes l
-            ll = length ibs
-        in putWord8 (0xb7 + fromIntegral ll) >> mapM_ putWord8 ibs
-    putByteString s
-  (RLPArray innerObjects) -> do
-    let innerBytes = BL.concat . map rlpSerialize' $ innerObjects
-        l = BL.length innerBytes
-    if l <= 55
-      then putWord8 (0xc0 + fromIntegral l)
+      then B.cons (0xc0 + fromIntegral l) innerBytes
       else
         let ibs = int2Bytes . fromIntegral $ l
             ll = length ibs
-        in putWord8 (0xf7 + fromIntegral ll) >> mapM_ putWord8 ibs
-    putLazyByteString innerBytes
+        in (B.pack $ 0xf7 + fromIntegral ll:ibs) <> innerBytes
 
 
 instance RLPSerializable Integer where
@@ -182,7 +153,7 @@ instance RLPSerializable Integer where
   rlpDecode (RLPString s) = byteString2Integer s
   rlpDecode (RLPArray _)  = error "rlpDecode called for Integer for array"
 
-instance RLPSerializable String where
+instance {-# OVERLAPPING #-} RLPSerializable String where
   rlpEncode s = rlpEncode $ BC.pack s
 
   rlpDecode (RLPString s) = BC.unpack s
@@ -200,6 +171,11 @@ instance RLPSerializable B.ByteString where
 instance RLPSerializable T.Text where
   rlpEncode = rlpEncode . T.unpack
   rlpDecode = T.pack . rlpDecode
+
+instance RLPSerializable a => RLPSerializable [a] where
+  rlpEncode as = RLPArray $ map rlpEncode as
+  rlpDecode (RLPArray as) = map rlpDecode as
+  rlpDecode x = error $ "rlpDecode [a]: Expected RLPArray, got " ++ show x
 
 -- serialization for tuples, triples, etc. of serializable types
 instance (RLPSerializable a, RLPSerializable b) => RLPSerializable (a,b) where
@@ -257,7 +233,7 @@ instance (RLPSerializable a) => RLPSerializable (Maybe a) where
 
 
 -- generic instance for Data.Map
-instance (RLPSerializable k, RLPSerializable v, Ord k, Ord v)
+instance (RLPSerializable k, RLPSerializable v, Ord k)
   => RLPSerializable (M.Map k v) where
   rlpEncode mp = RLPArray $ map rlpEncode (M.toList mp)
   rlpDecode (RLPArray rp) = M.fromList (map rlpDecode rp)

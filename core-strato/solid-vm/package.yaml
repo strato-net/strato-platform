@@ -9,12 +9,6 @@ license: Apache-2.0
 description:
     The client described in the Ethereum Yellowpaper
 
-default-extensions:
-  - DeriveGeneric
-  - DeriveAnyClass
-  - LambdaCase
-
-
 dependencies:
   - base >= 4 && < 5
   - aeson
@@ -29,15 +23,19 @@ dependencies:
   - bytestring
   - containers
   - cryptonite
+  - data-default
   - deepseq
   - extra
   - format
   - generic-random
   - hashable
   - lens
+  - leveldb-haskell
   - memory
   - merkle-patricia-db
+  - monad-alter
   - monad-control
+  - nibblestring
   - parsec
   - prometheus-client
   - QuickCheck
@@ -99,6 +97,7 @@ library:
     - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Parse.Declarations
     - SolidVM.Solidity.Xabi.Statement
+    - SolidVM.Solidity.Xabi.Type
     - CodeCollection
   ghc-options: -Wall -O2
 

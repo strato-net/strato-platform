@@ -16,10 +16,12 @@ dependencies:
   - cross-monitoring
   - crypto-api
   - cryptonite
+  - data-default
   - deepseq
   - derive
   - ethereum-encryption
   - ethereum-rlp
+  - extra
   - format
   - ghc
   - fast-ecrecover
@@ -39,6 +41,7 @@ dependencies:
   - warp
   - http-client
   - prometheus-client
+  - unliftio
 
 library:
   source-dirs: src/
@@ -47,12 +50,16 @@ executables:
   blockstanbul-vote:
     source-dirs: exec-src/
     main: Main.hs
+    other-modules: []
     dependencies:
       - blockstanbul
       - base16-bytestring
       - base64-bytestring
       - hflags
+      - HTTP
       - extra
+      - strings
+      - curl
 
 tests:
   blockstanbul-test:
@@ -61,6 +68,7 @@ tests:
     dependencies:
       - base16-bytestring
       - blockstanbul
+      - hflags
       - hspec
       - hspec-expectations-lifted
       - time

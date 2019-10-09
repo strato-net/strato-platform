@@ -2,15 +2,21 @@ name: blockapps-privacy
 ghc-options: -Wall -Werror
 
 dependencies:
+  - aeson
   - base
+  - binary
   - blockapps-data
   - blockapps-util
   - containers
+  - data-default
+  - ethereum-rlp
   - format
   - lens
+  - monad-alter
   - prometheus-client
   - QuickCheck
   - resourcet
+  - seqevents
   - strato-model
   - text
   - transformers

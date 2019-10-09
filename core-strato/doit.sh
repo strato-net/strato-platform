@@ -8,14 +8,13 @@ declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
 function newnode {
-  initialize=false
 
-  mkdir -p logs/rotation
-
-  if [[ ! -d .ethereumH ]]
-  then initialize=true
-       cleanupDB
-       doInit
+  if [[ ! -d .ethereumH ]] ; then
+    mkdir logs
+    cleanupDB
+    doInit
+  else
+    sleep 10
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
@@ -46,6 +45,15 @@ function newnode {
   if [[ -n "${blockstanbul}" || -n "${txGossipFanout}" ]]; then
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
+  if [ -n "${averageTxsPerBlock}" ]; then
+    atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
+  fi
+  if [ -n "${privateChainAuthorizationMode}" ]; then
+    pcamFlag="--privateChainAuthorizationMode=${privateChainAuthorizationMode}"
+  fi
+  if [ -n "${participationMode}" ]; then
+    pmFlag="--participationMode=${participationMode}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -56,6 +64,9 @@ function newnode {
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
      ${txgFlag} \
+     ${atbFlag} \
+     ${pcamFlag} \
+     ${pmFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
@@ -111,20 +122,36 @@ function newnode {
   echo "Starting strato-txr-indexer"
   runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
+  if [ -n "${brokenRefundReenable}" ]; then
+    breFlag="--brokenRefundReenable=${brokenRefundReenable}"
+  fi
+  if [ -n "${svmDev}" ]; then
+    svdFlag="--svmDev=${svmDev}"
+  fi
+  if [ -n "${seqEventsBatchSize}" ]; then
+    sebFlag="--seqEventsBatchSize=${seqEventsBatchSize}"
+  fi
+  if [-n "${seqEventsCostHeuristic}" ]; then
+      sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
+  fi
+  if [-n "${cacheTransactionResults}"] ; then
+      ctrFlag="--cacheTransactionResults=${cacheTransactionResults}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
-                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
+                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
-                         "${tbFlag}" +RTS "${vmRunnerRTSOPTs:-}" -N1 >> logs/vm-runner 2>&1
+                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
+                         +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
     runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
 
-  echo "Configuring log maintenance"
-  runBackgroundProcess cleanupLogs
+  echo "Configuring log rotation..."
+  runBackgroundProcess logRotation
 
   set +x
   if [ "${PROCESS_MONITORING}" = true ] ; then
@@ -139,11 +166,21 @@ function newnode {
           # Kill all the rest of monitored processes
           for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
             if ps -p ${pid_to_kill} > /dev/null; then
-              echo "killing process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
-              kill -9 ${pid_to_kill} || true
+              echo "Sending SIGTERM to process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
+              kill -TERM ${pid_to_kill} || true
               echo "done"
             fi
           done
+          # Allow 10s for cleanup of processes
+          sleep 10
+          for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
+            if ps -p ${pid_to_kill} > /dev/null; then
+              echo "Sending SIGKILL to process ${MONITORED_PID[${pid_to_kill}]} (pid: ${pid_to_kill})"
+              kill -KILL ${pid_to_kill} || true
+              echo "done"
+            fi
+          done
+
           FILE_NAME="/var/lib/strato/logs/$(echo ${DEAD_PROCESS} | cut -d ' ' -f 1)"
           echo "Tail of logs for crashed process:"
           echo "+tail -n 20 ${FILE_NAME}"
@@ -175,32 +212,11 @@ function cleanupDB {
 }
 
 function doInit {
-  export blockTime=${blockTime:-13}
-  export minBlockDifficulty=${minBlockDifficulty:-131072}
+  blockTime=${blockTime:-13}
+  minBlockDifficulty=${minBlockDifficulty:-131072}
   if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
     xfFlag="--extraFaucets=${extraFaucets:-$validators}"
   fi
-  cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
-                    --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-                    --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
-                    --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty $xfFlag"
-# For backup_restore; the environment var is set during strato-admin.sh invocation.
-# Required: Backup file to be accessible to strato container at /tmp/backup
-  if [[ $backupblocks ]] ; then
-     cmd="${cmd} --backupblocks=true < /var/lib/strato/backup_strato_block"
-     echo "# of lines in block-backup-file: " `cat $backupLocation | wc -l`
-  fi
-
-  echo "strato-setup command: $cmd"
-  # logging to stdout and log file:
-  $cmd 2>&1 | tee logs/strato-setup
-  if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-    tail -f /dev/null
-  fi
-
-
   if [[ -n "${validators}" ]]; then
     # Keep active discovery until all other validators are peers
     echo "Overriding minAvailablePeers with number of consensus peers"
@@ -208,18 +224,49 @@ function doInit {
   else
     actualMinPeers=$numMinPeers
   fi
-  sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$actualMinPeers"'/' .ethereumH/ethconf.yaml
+  args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
+        --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
+        --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
+        --addBootnodes=$addBootnodes $stratoBootnode \
+        --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty $xfFlag"
 
-  echo "Creating a random coinbase"
-  mkCoinbase
+  if ${splitinit:-false} ; then
+    #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
+    cmd="tabula-rasa $args"
+
+    echo "init event source: $cmd"
+    # logging to stdout and log file:
+    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+      tail -f /dev/null
+    fi
+    init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+      tail -f /dev/null
+    fi
+  else
+    cmd="strato-setup $args"
+
+    echo "strato-setup command: $cmd"
+    # logging to stdout and log file:
+    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+      tail -f /dev/null
+    fi
+  fi
 }
 
 # Find all logs greater than 10M, then copy and truncate
-function cleanupLogs {
+function logRotation {
+  mkdir -p logs/rotation
   while true
   do
     sleep 900 ;
-    find $PWD/logs/ -maxdepth 1 -type f -size +10M -exec /bin/cp -rf {} $PWD/logs/rotation/ \; -exec truncate -s 0 {} \;
+    find logs/ -maxdepth 1 -type f -size +10M -exec /bin/cp -rf {} logs/rotation/ \; -exec truncate -s 0 {} \;
+    echo "Log files were rotated at $(date '+%Y-%m-%d %H:%M:%S')"
   done
 }
 
@@ -275,10 +322,9 @@ setEnv minQuorumSize 1
 setEnv maxConn 20
 setEnv difficultyBomb false
 
-setEnv sqlDiff true
+setEnv sqlDiff ${sqlDiff:-true}
+setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
-
-setEnv backupLocation /var/lib/strato/backup_strato_block
 
 setEnv evmDebugMode false
 setEnv evmTraceMode false
@@ -286,6 +332,7 @@ setEnv evmTraceMode false
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 
+mkdir -p /var/lib/strato
 cd /var/lib/strato
 
 if [[ -n $genesisBlock ]]

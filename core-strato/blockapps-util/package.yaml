@@ -24,6 +24,7 @@ library:
     - hflags
     - lens
     - lifted-base
+    - monad-alter
     - monad-control
     - mtl
     - network

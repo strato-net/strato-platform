@@ -1,25 +1,33 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RecordWildCards #-}
 module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
 import Control.Lens
-import Blockchain.Output
+import Control.Monad (liftM2)
+import qualified Data.Aeson as Ae
 import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as LB
+import Data.Data
+import Data.Default
 import Data.DeriveTH
+import qualified Data.Map as M
 import Data.Text
 import GHC.Generics
 import Test.QuickCheck
 import Text.Printf
 
+import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Data.RLP
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
+import Blockchain.Output
 import Blockchain.Strato.Model.SHA
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Text.Colors as CL
@@ -30,8 +38,14 @@ type SequenceNumber = Word256
 data View = View {
   _round :: RoundNumber,
   _sequence :: SequenceNumber
-} deriving (Eq, Show, Ord, Generic)
+} deriving (Eq, Show, Ord, Generic, Binary, NFData, Data)
 makeLenses ''View
+
+instance Ae.ToJSON View where
+  toJSON View{..} = Ae.object ["round" Ae..= _round, "sequence" Ae..= _sequence]
+
+instance Ae.FromJSON View where
+  parseJSON = Ae.withObject "View" $ \v -> liftM2 View (v Ae..: "round") (v Ae..: "sequence")
 
 instance Format View where
   format (View r s) = printf "View (round = %d, sequence = %d)" r s
@@ -39,13 +53,13 @@ instance Format View where
 data MsgAuth = MsgAuth {
   sender :: Address,
   signature :: ExtendedSignature
-} deriving (Eq, Show, Generic)
+} deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 data TrustedMessage = Preprepare View Block
                     | Prepare View SHA
                     | Commit View SHA ExtendedSignature
                     | RoundChange {roundchangeView :: View }
-                    deriving (Eq, Show, Generic)
+                    deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 instance Format TrustedMessage where
   format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
@@ -65,26 +79,25 @@ categorize = \case
 data WireMessage = WireMessage {
   _msgAuth :: MsgAuth,
   _message :: TrustedMessage
-} deriving (Eq, Show, Generic)
+} deriving (Eq, Show, Generic, Binary, NFData, Data)
 makeLenses ''WireMessage
+
+-- TODO: Allow changing blockstanbul admins without a restart
+data ForcedConfigChange = ForcedRound RoundNumber
+                        deriving (Eq, Show, Generic, Binary, NFData, Data)
+
+instance Format ForcedConfigChange where
+  format = show
+
 
 blockstanbulSender :: WireMessage -> Address
 blockstanbulSender (WireMessage a _) = sender a
-
-instance Binary MsgAuth where
-instance Binary View where
-instance Binary TrustedMessage where
-instance Binary WireMessage where
-
-instance NFData MsgAuth
-instance NFData View
-instance NFData TrustedMessage
-instance NFData WireMessage
 
 derive makeArbitrary ''MsgAuth
 derive makeArbitrary ''View
 derive makeArbitrary ''TrustedMessage
 derive makeArbitrary ''WireMessage
+derive makeArbitrary ''ForcedConfigChange
 
 instance Format WireMessage where
   format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
@@ -102,6 +115,7 @@ data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | UnannouncedBlock Block
              | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
+             | ForcedConfigChange ForcedConfigChange
              deriving (Eq, Show)
 
 instance Format InEvent where
@@ -112,6 +126,7 @@ instance Format InEvent where
   format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
   format (NewBeneficiary (MsgAuth s _) ben) = "NewBeneficiary " ++ show ben ++ " " ++ format s
+  format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
 
 data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | ToCommit Block
@@ -122,6 +137,12 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
                 -- will erase the gap with PreviousBlocks.
               | GapFound {have :: Integer, require :: Integer, peer :: Address}
               | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
+              -- A PendingVote should be authenticated by blockstanbul, but applied
+              -- by a Bagger monad. This is so that the stateroot is computed after
+              -- the coinbase is modified to hold the vote.
+              | PendingVote { pendingRecipient :: Address, pendingVotingDir :: Bool, pendingVoteSender :: Address}
+              | VoteResponse HA.VoteResult
+              | NewCheckpoint Checkpoint
               deriving (Eq, Show, Generic)
 
 instance Format OutEvent where
@@ -131,6 +152,9 @@ instance Format OutEvent where
   format (ResetTimer rn) = "ResetTimer " ++ format rn
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
+  format (PendingVote reci dir s) = "PendingVote " ++ show (reci, dir, s)
+  format (VoteResponse resp) = "VoteResponse " ++ show resp
+  format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
 
 blkNum :: Block -> String
 blkNum = show . blockDataNumber . blockBlockData
@@ -150,6 +174,7 @@ inShortLog loc iev = $logInfoS loc . pack $
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     NewBeneficiary (MsgAuth s _) b -> CL.blue "NEW_BENEFICIARY " ++ format s ++ " " ++ show b
+    ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
 
 outShortLog :: MonadLogger m => Text -> OutEvent -> m ()
 outShortLog loc oev = $logInfoS loc . pack $
@@ -160,6 +185,9 @@ outShortLog loc oev = $logInfoS loc . pack $
     ResetTimer rn -> CL.blue "RESET_TIMER " ++ show rn
     GapFound h r p -> CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
     LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
+    PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
+    VoteResponse resp -> CL.blue "VOTE_RESPONSE " ++ show resp
+    NewCheckpoint ckpt -> CL.blue "NEW_CHECKPOINT " ++ show ckpt
 
 instance NFData OutEvent
 
@@ -249,3 +277,24 @@ instance RLPSerializable OutEvent where
   rlpDecode _ = error "cannot rlpdecode OutEvents"
   rlpEncode (OMsg a m) = rlpEncode (WireMessage a m)
   rlpEncode x = error $ "cannot rlpencode non-message OutEvent: " ++ show x
+
+data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
+
+data Checkpoint = Checkpoint
+                { checkpointView :: View
+                , checkpointVoteRecord :: M.Map Address (M.Map Address Bool)
+                , checkpointValidators :: [Address]
+                , checkpointAdmins :: [Address]
+                } deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
+
+instance Default Checkpoint where
+  def = Checkpoint (View 0 0) M.empty [] []
+
+derive makeArbitrary ''Checkpoint
+
+-- JSON was chosen to allow manual inspection and override during outages
+encodeCheckpoint :: Checkpoint -> B.ByteString
+encodeCheckpoint = LB.toStrict . Ae.encode
+
+decodeCheckpoint :: B.ByteString -> Either String Checkpoint
+decodeCheckpoint = Ae.eitherDecode . LB.fromStrict

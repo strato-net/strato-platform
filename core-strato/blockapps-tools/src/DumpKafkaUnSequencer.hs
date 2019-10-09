@@ -8,7 +8,6 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.EthConf
 import           Blockchain.Sequencer.Kafka
-import           Blockchain.Stream.Raw
 
 import           Text.Format
 
@@ -20,7 +19,6 @@ dumpKafkaUnSequencer startingBlock = do
     Right _ -> return ()
   where
     doConsume' offset = do
-      setDefaultKafkaState
       unseqEvents <- readUnseqEvents offset
       liftIO . putStrLn . unlines $ format <$> unseqEvents
       doConsume' (offset + fromIntegral (length unseqEvents))

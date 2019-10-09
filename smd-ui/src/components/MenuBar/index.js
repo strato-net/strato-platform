@@ -31,15 +31,15 @@ class MenuBar extends Component {
       return (
         <div>
           <span className="pt-navbar-divider" />
-          <a href='/prometheus/consoles/index.html.example' target="_black" rel="noopener noreferrer">
+          <a href='/prometheus' target="_black" rel="noopener noreferrer">
             <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("prometheus_graphs_click") }}>Prometheus Graphs</button>
           </a>
-          <a href={env.BLOC_DOC_URL} target="_blank" rel="noopener noreferrer" id="tour-bloc-api-button">
-            <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("bloc_docs_click") }}>Bloc API</button>
-          </a>
-          <a href={env.STRATO_DOC_URL} target="_blank" rel="noopener noreferrer">
-            <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("strato_docs_click") }}>STRATO API</button>
-          </a>
+          {/*<a href={env.BLOC_DOC_URL} target="_blank" rel="noopener noreferrer" id="tour-bloc-api-button">*/}
+            {/*<button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("bloc_docs_click") }}>Bloc API</button>*/}
+          {/*</a>*/}
+          {/*<a href={env.STRATO_DOC_URL} target="_blank" rel="noopener noreferrer">*/}
+            {/*<button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("strato_docs_click") }}>STRATO API</button>*/}
+          {/*</a>*/}
           {this.props.isLoggedIn && <span><span className="pt-navbar-divider" />
             <small className="pt-text-muted welcome-user"> Welcome, {this.props.currentUser.username} </small>
             <span className="pt-navbar-divider" />
@@ -98,6 +98,7 @@ class MenuBar extends Component {
               </Field>
             </div>
           </small>
+          <span className="pt-navbar-divider" />
         </span>
       );
     }
@@ -124,8 +125,7 @@ class MenuBar extends Component {
         <div className="pt-navbar-group pt-align-right">
           {this.renderDeveloperButton()}
           {this.renderChainDropDown()}
-          <span className="pt-navbar-divider" />
-          <small className="pt-text-muted">SMD v{process.env.REACT_APP_VERSION} - {isModePublic() ? "Public" : "Enterprise"} </small>
+          <small className="pt-text-muted">STRATO {env.STRATO_VERSION}</small>
           {this.afterLoggedIn()}
         </div>
         {isModePublic() && <div><Login />

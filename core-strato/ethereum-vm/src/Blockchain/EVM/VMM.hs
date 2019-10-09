@@ -1,8 +1,10 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 module Blockchain.EVM.VMM (
   VMM,
@@ -41,7 +43,8 @@ module Blockchain.EVM.VMM (
   ) where
 
 import           Control.Monad
-import           Blockchain.Output
+import qualified Control.Monad.Change.Alter         as A
+import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Resource
@@ -49,25 +52,27 @@ import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
 import           Data.IORef.Unboxed
 import           Data.Maybe                         (fromMaybe)
+import qualified Data.NibbleString                  as N
 import qualified Data.Set                           as S
 import           MonadUtils
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
-import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
+import           Blockchain.Output
 import           Blockchain.SHA
 import           Blockchain.VM.VMException
 import           Blockchain.VMContext
@@ -88,47 +93,56 @@ instance HasMemAddressStateDB VMM where
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextAddressStateBlockDBMap=theMap}}
 
-instance HasHashDB VMM where
-    getHashDB = lift $ fmap (contextHashDB . dbs) get
+instance (Address `A.Alters` AddressState) VMM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
-instance HasStateDB VMM where
-    getStateDB = lift $ fmap (contextStateDB . dbs) get
-    setStateDBStateRoot x = do
-      vmState <- lift get
-      lift $ put vmState{dbs=(dbs vmState){contextStateDB=(contextStateDB $ dbs vmState){MP.stateRoot=x}}}
+instance (MP.StateRoot `A.Alters` MP.NodeData) VMM where
+  lookup _ = MP.genericLookupDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
+  insert _ = MP.genericInsertDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
+  delete _ = MP.genericDeleteDB $ lift $ gets (MP.ldb . contextStateDB . dbs)
 
-instance HasChainDB VMM where
-  getBlockHashRoot = lift $ fmap (contextBlockHashRoot . dbs) get
-  putBlockHashRoot sr = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextBlockHashRoot = sr}}
-  getGenesisRoot = lift $ fmap (contextGenesisRoot . dbs) get
-  putGenesisRoot sr = do
-    vmState <- lift get
-    lift $ put vmState{dbs=(dbs vmState){contextGenesisRoot = sr}}
+instance (N.NibbleString `A.Alters` N.NibbleString) VMM where
+  lookup _ = genericLookupHashDB $ lift $ gets $ contextHashDB . dbs
+  insert _ = genericInsertHashDB $ lift $ gets $ contextHashDB . dbs
+  delete _ = genericDeleteHashDB $ lift $ gets $ contextHashDB . dbs
 
-instance HasRawStorageDB VMM where
-    getRawStorageTxDB = do
+instance Mod.Modifiable MP.StateRoot VMM where
+  get _    = lift $ gets (MP.stateRoot . contextStateDB . dbs)
+  put _ sr = lift $ get >>= \c -> put c{dbs=(dbs c){contextStateDB=(contextStateDB $ dbs c){MP.stateRoot=sr}}}
+
+instance HasMemRawStorageDB VMM where
+    getMemRawStorageTxDB = do
       cxt <- lift get
       return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
               contextStorageTxMap $ dbs cxt)
-    putRawStorageTxMap theMap = do
+    putMemRawStorageTxMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageTxMap=theMap}}
-    getRawStorageBlockDB = do
+    getMemRawStorageBlockDB = do
       cxt <- lift get
       return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
               contextStorageBlockMap $ dbs cxt)
-    putRawStorageBlockMap theMap = do
+    putMemRawStorageBlockMap theMap = do
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
 
+instance (RawStorageKey `A.Alters` RawStorageValue) VMM where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance HasCodeDB VMM where
-    getCodeDB = lift $ fmap (contextCodeDB . dbs) get
+instance (SHA `A.Alters` DBCode) VMM where
+  lookup _ = genericLookupCodeDB $ lift $ gets $ contextCodeDB . dbs
+  insert _ = genericInsertCodeDB $ lift $ gets $ contextCodeDB . dbs
+  delete _ = genericDeleteCodeDB $ lift $ gets $ contextCodeDB . dbs
 
-instance HasBlockSummaryDB VMM where
-    getBlockSummaryDB = lift $ fmap (contextBlockSummaryDB . dbs) get
+instance (SHA `A.Alters` BlockSummary) VMM where
+  lookup _ = genericLookupBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
+  insert _ = genericInsertBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
+  delete _ = genericDeleteBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
 
 class Word256Storable a where
   fromWord256::Word256->a

@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Data.LogDB
     ( HasMemLogDB(..)
@@ -6,6 +7,7 @@ module Blockchain.Data.LogDB
     , putLogDBs
     ) where
 
+import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
 import           Control.Monad.Trans.Resource
 import           Database.Persist             hiding (get)
 import qualified Database.Persist.Postgresql  as SQL
@@ -24,4 +26,4 @@ putLogDB :: HasSQLDB m => LogDB -> m (Key LogDB)
 putLogDB = fmap head . putLogDBs . pure
 
 putLogDBs :: HasSQLDB m => [LogDB] -> m [Key LogDB]
-putLogDBs ls = getSQLDB >>= runResourceT . SQL.runSqlPool (SQL.insertMany ls)
+putLogDBs ls = access (Proxy @SQLDB) >>= runResourceT . SQL.runSqlPool (SQL.insertMany ls)

@@ -1,12 +1,13 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
 
-module Strato.Strato23.API.Types where
+module Strato.Strato23.API.Types
+  ( module Strato.Strato23.API.Types
+  , Address(..)
+  ) where
 
 import           BlockApps.Ethereum
 import           Control.Lens                 ((&), (?~), mapped)
@@ -55,3 +56,8 @@ instance ToSchema (Hex Word256) where
 
 instance ToSchema (Hex Word8) where
   declareNamedSchema = const . pure $ named "hex word8" binarySchema
+
+data User = User
+  { username :: Text
+  , address :: Address
+  } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)

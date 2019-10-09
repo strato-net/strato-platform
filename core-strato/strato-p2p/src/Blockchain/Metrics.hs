@@ -1,18 +1,31 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Blockchain.Metrics ( recordEvent
                           , recordMessage
                           , recordGossipRNG
                           , recordGossipFinal
+                          , addCanary
+                          , killCanary
+                          , recordException
+                          , recordQueuedTxs
+                          , recordEmptyQueue
+                          , recordWatchdogPet
+                          , recordWatchdogWake
+                          , recordTraffic
                           ) where
 
+import Control.Exception
 import Control.Monad.IO.Class
+import qualified Data.ByteString as B
 import Data.Text
+import Data.Typeable
 import Prometheus
 
+import Blockchain.Display (MsgDirection(..))
 import Blockchain.EventModel
 import Blockchain.Data.Wire
+import Blockchain.Strato.Discovery.Data.Peer (PPeer(..))
 import qualified Blockchain.Blockstanbul as PBFT
 
 -- TODO(tim): Add peer to labels
@@ -88,3 +101,68 @@ recordGossipFinal :: (MonadIO m) => Bool -> m Bool
 recordGossipFinal dec = liftIO $ do
   withLabel gossipDecisions (if dec then "approve_final" else "reject_final") incCounter
   return $! dec
+
+{-# NOINLINE canaryCount #-}
+canaryCount :: Gauge
+canaryCount = unsafeRegister
+            . gauge
+            $ Info "p2p_canary_count" "Rough approximation of the number of kafka threads running"
+
+addCanary :: MonadIO m => m ()
+addCanary = liftIO $ incGauge canaryCount
+
+killCanary :: MonadIO m => m ()
+killCanary = liftIO $ decGauge canaryCount
+
+{-# NOINLINE exceptionCount #-}
+exceptionCount :: Vector (Text, Text, Text) Counter
+exceptionCount = unsafeRegister
+               . vector ("ip", "port", "type")
+               . counter
+               $ Info "p2p_peer_exceptions" "Counters for exceptions thrown by peer connections"
+
+recordException :: (Exception e, MonadIO m) => PPeer -> e -> m ()
+recordException PPeer{..} e =
+  let ty = pack . show $ typeOf e
+      port = pack $ show pPeerTcpPort
+  in liftIO $ withLabel exceptionCount (pPeerIp, port, ty) incCounter
+
+{-# NOINLINE txQueueDepth #-}
+txQueueDepth :: Gauge
+txQueueDepth = unsafeRegister
+             . gauge
+             $ Info "p2p_queue_depth" "Number of queued transactions to send"
+
+recordQueuedTxs :: MonadIO m => [a] -> m ()
+recordQueuedTxs = liftIO . addGauge txQueueDepth . fromIntegral . Prelude.length
+
+recordEmptyQueue :: MonadIO m => m ()
+recordEmptyQueue = liftIO $ setGauge txQueueDepth 0
+
+{-# NOINLINE watchdogActions #-}
+watchdogActions :: Vector Text Counter
+watchdogActions = unsafeRegister
+                . vector "action"
+                . counter
+                $ Info "p2p_watchdog_actions" "Number of wakes/pets that the watchdog has endured"
+
+recordWatchdogPet :: MonadIO m => m ()
+recordWatchdogPet = liftIO $ withLabel watchdogActions "pet" incCounter
+
+recordWatchdogWake :: MonadIO m => m ()
+recordWatchdogWake = liftIO $ withLabel watchdogActions "wake" incCounter
+
+
+{-# NOINLINE traffic #-}
+traffic :: Vector (Text, Text) Counter
+traffic = unsafeRegister
+        . vector ("direction", "type")
+        . counter
+        $ Info "p2p_traffic" "Number and lengths of inbound/outbound messages"
+
+
+recordTraffic :: MonadIO m => MsgDirection -> B.ByteString -> m ()
+recordTraffic dir msg = liftIO $ do
+  let dirLabel = if dir == Inbound then "recv" else "send"
+  withLabel traffic (dirLabel, "count") incCounter
+  withLabel traffic (dirLabel, "bytes") $ \c -> unsafeAddCounter c (fromIntegral $ B.length msg)

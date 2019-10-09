@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Strato.Model.Code where
 
@@ -6,6 +6,7 @@ import           Control.DeepSeq
 import           Data.Binary
 import qualified Data.ByteString     as B
 import qualified Data.ByteString.Base16     as B16
+import           Data.Data
 import qualified Data.Text as T
 import           Data.Text.Encoding  (encodeUtf8, decodeUtf8)
 import           GHC.Generics
@@ -14,21 +15,18 @@ import           Data.Aeson.Types
 
 import           Blockchain.Data.RLP
 
-data Code = Code{codeBytes::B.ByteString}
-          | PrecompiledCode Int
-          deriving (Show, Eq, Read, Ord, Generic)
+newtype Code = Code { codeBytes :: B.ByteString }
+  deriving (Show, Eq, Read, Ord, Generic, Data)
 
 instance Binary Code where
 instance NFData Code
 
 instance RLPSerializable Code where
     rlpEncode (Code bytes) = rlpEncode bytes
-    rlpEncode (PrecompiledCode _) = error "Error in call to rlpEncode for Code: Precompiled contracts can not be serialized."
     rlpDecode = Code . rlpDecode
 
 instance ToJSON Code where
   toJSON (Code bytes) = String . decodeUtf8 . B16.encode $ bytes
-  toJSON (PrecompiledCode _) = error "cannot serialize precompiled codes"
 
 instance FromJSON Code where
   parseJSON (String text) = return . Code . fst . B16.decode . encodeUtf8 . drop0x $ text
@@ -37,3 +35,22 @@ instance FromJSON Code where
                        then T.drop 2 t
                        else t
   parseJSON x = typeMismatch "Code" x
+
+data PrecompiledCode = NullContract
+                     | ECRecover
+                     | SHA256
+                     | RIPEMD160
+                     | IdentityContract
+          deriving (Show, Eq, Enum, Bounded, Read, Ord, Generic, Data)
+
+precompiledCodeNumber :: PrecompiledCode -> Int
+precompiledCodeNumber = fromEnum
+
+getPrecompiledCode_unsafe :: Int -> PrecompiledCode
+getPrecompiledCode_unsafe = toEnum
+
+getPrecompiledCode :: Int -> Maybe PrecompiledCode
+getPrecompiledCode n =
+  if (n >= precompiledCodeNumber minBound) && (n <= precompiledCodeNumber maxBound)
+    then Just $ getPrecompiledCode_unsafe n
+    else Nothing

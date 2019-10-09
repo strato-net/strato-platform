@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 import Criterion.Main
 

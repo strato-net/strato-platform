@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators          #-}
 {-# OPTIONS_GHC -fno-warn-orphans   #-}
 module Blockchain.Strato.StateDiff
     ( StateDiff(..)
@@ -26,23 +27,18 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
-import           Control.Monad                               (when)
-
+import           Control.Applicative
+import           Control.Monad.Change
+import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString                             as B
 import           Data.Function
 import           Data.Maybe
 import           Data.String
-import           Data.Text                                   (Text)
-
-import           Data.ByteString                             (ByteString)
-
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as Map
-
 import qualified Data.NibbleString                           as N
-
+import           Data.Text                                   (Text)
 import           GHC.Generics
-
 import           Text.Format
 
 -- | Describes all the changes that have occurred in the blockchain
@@ -160,41 +156,29 @@ instance Detailed StorageDiff where
   incrementalToEventual (EVMDiff m) = EVMDiff $ Map.map incrementalToEventual m
   incrementalToEventual (SolidVMDiff m) = SolidVMDiff $ Map.map incrementalToEventual m
 
-chainDiff :: (HasStateDB m, HasChainDB m, HasCodeDB m, HasHashDB m) =>
-             Integer -> SHA -> SHA -> m [StateDiff]
-chainDiff blockNumber oldBlockHash newBlockHash = do
-  mChainRoots <- (,) <$> getChainRoot oldBlockHash <*> getChainRoot newBlockHash
-  case mChainRoots of
-    (Just old, Just new) -> do
-      db <- getStateDB
-      diffs <- Diff.dbDiff db old new
-      go [] diffs
-    (Nothing, _) -> error $ "chainDiff: Missing chain root for block hash " ++ format oldBlockHash
-    (_, Nothing) -> error $ "chainDiff: Missing chain root for block hash " ++ format newBlockHash
-  where
-    go sds [] = return sds
-    go sds (Diff.Create _ v : rest) = do
-      let (chainId, sr) = rlpDecode v
-      genSR <- maybe emptyTriePtr id <$> getGenesisStateRoot chainId
-      sd <- stateDiff (Just chainId) blockNumber newBlockHash genSR sr
-      go (sd:sds) rest
-    go sds (Diff.Delete _ v : rest) = do
-      let (chainId, sr) = rlpDecode v
-      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr emptyTriePtr
-      go (sd:sds) rest
-    go sds (Diff.Update _ v1 v2 : rest) = do
-      let (chainId, sr1) = rlpDecode v1
-          (chainId2, sr2) = rlpDecode v2
-      when (chainId /= chainId2) $
-        error $ "chainDiff.Update: decoded two different chainIds for Update: " ++ show chainId ++ " and " ++ show chainId2
-      sd <- stateDiff (Just chainId) blockNumber newBlockHash sr1 sr2
-      go (sd:sds) rest
+chainDiff :: ( HasStateDB m
+             , HasCodeDB m
+             , HasHashDB m
+             , Modifiable BlockHashRoot m
+             , Modifiable GenesisRoot m
+             , Modifiable BestBlockRoot m
+             )
+          => Word256 -> Integer -> SHA -> m (Maybe StateDiff)
+chainDiff chainId newBlockNum newBlockHash = do
+  newSR <- fromMaybe emptyTriePtr <$> getChainStateRoot chainId newBlockHash
+  ~(bHash, bNum) <- fromMaybe (SHA 0, 0) <$> getChainBestBlock chainId
+  if newBlockNum < bNum
+    then return Nothing
+    else do
+      mSR <- liftA2 (<|>) (getChainStateRoot chainId bHash) (getGenesisStateRoot chainId)
+      let sr = fromMaybe emptyTriePtr mSR
+      putChainBestBlock chainId newBlockHash newBlockNum
+      Just <$> stateDiff (Just chainId) newBlockNum newBlockHash sr newSR
 
-stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m) =>
+stateDiff :: (HasCodeDB m, HasHashDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
              Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
-  db <- getStateDB
-  diffs <- Diff.dbDiff db oldRoot newRoot
+  diffs <- Diff.dbDiff oldRoot newRoot
   collectModes diffs $
     \createdAccounts deletedAccounts updatedAccounts ->
       StateDiff
@@ -221,7 +205,7 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
       updateDiff <- accountUpdate k v1 v2
       coll c d (updateDiff : u) rest
 
-accountEnd :: (HasHashDB m, HasCodeDB m, HasStateDB m) =>
+accountEnd :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
               [N.Nibble] -> Val -> m (Address, AccountDiff 'Eventual)
 accountEnd k v = do
   address <- lookupAddress k
@@ -229,7 +213,7 @@ accountEnd k v = do
   accountDiff <- eventualAccountState addrState
   return (address, accountDiff)
 
-accountUpdate :: (HasHashDB m, HasCodeDB m, HasStateDB m) =>
+accountUpdate :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
                  [N.Nibble] -> Val -> Val -> m (Address, AccountDiff 'Incremental)
 accountUpdate k vOld vNew = do
   address <- lookupAddress k
@@ -238,7 +222,7 @@ accountUpdate k vOld vNew = do
   accountDiff <- incrementalAccountState oldAddrState newAddrState
   return (address, accountDiff)
 
-eventualAccountState :: (HasHashDB m, HasCodeDB m, HasStateDB m) =>
+eventualAccountState :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
                         AddressState -> m (AccountDiff 'Eventual)
 eventualAccountState
   AddressState{
@@ -261,7 +245,7 @@ eventualAccountState
       }
 
 
-incrementalAccountState :: (HasHashDB m, HasStateDB m, HasCodeDB m) =>
+incrementalAccountState :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
                            AddressState -> AddressState -> m (AccountDiff 'Incremental)
 incrementalAccountState oldState newState = do
   let codeKind = case addressStateCodeHash newState of
@@ -282,12 +266,10 @@ incrementalAccountState oldState newState = do
     diff :: (Eq a) => a -> a -> Maybe (Diff a 'Incremental)
     diff x y = if x == y then Nothing else Just Update{oldValue = x, newValue = y}
 
-eventualStorage :: (HasHashDB m, HasCodeDB m, HasStateDB m) =>
+eventualStorage :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
                    CodeKind -> StateRoot -> m (StorageDiff 'Eventual)
 eventualStorage kind storageRoot = do
-  db <- getStateDB
-  let storageDB = db{MP.stateRoot = storageRoot}
-  allStorageKV <- unsafeGetAllKeyVals storageDB
+  allStorageKV <- unsafeGetAllKeyVals storageRoot
   let decodeAll :: (HasCodeDB m, HasHashDB m, StorableKey a, StorableValue b)
                 => [(Key, Val)] -> m (Map a (Diff b 'Eventual))
       decodeAll = fmap (Map.map Value . Map.fromList) . (mapM (uncurry $ decodeStorageKV))
@@ -295,11 +277,10 @@ eventualStorage kind storageRoot = do
       EVM -> fmap EVMDiff . decodeAll
       SolidVM -> fmap SolidVMDiff . decodeAll) allStorageKV
 
-incrementalStorage :: (HasHashDB m, HasStateDB m, HasCodeDB m) =>
+incrementalStorage :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
                       CodeKind -> StateRoot -> StateRoot -> m (StorageDiff 'Incremental)
 incrementalStorage kind oldRoot newRoot = do
-  db <- getStateDB
-  storageDiffs <- Diff.dbDiff db oldRoot newRoot
+  storageDiffs <- Diff.dbDiff oldRoot newRoot
   let decodeAll :: (HasCodeDB m, HasHashDB m, StorableKey a, StorableValue b)
                 => [Diff.DiffOp] -> m (Map a (Diff b 'Incremental))
       decodeAll = fmap Map.fromList . mapM decodeDiffKV
@@ -330,14 +311,14 @@ decodeStorageKV k v = do
   let val = decodeMPDBValue v
   return (key, val)
 
-lookupAddress :: (HasCodeDB m, HasHashDB m) => [N.Nibble] -> m Address
+lookupAddress :: HasHashDB m => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
 lookupCode :: (HasHashDB m, HasCodeDB m) => CodePtr -> m (CodeKind, ByteString)
 lookupCode (EVMCode ch) = lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = lookupInMPDB "contract code" getCode ch
 
-lookupInMPDB :: (HasHashDB m, HasCodeDB m, Format a) =>
+lookupInMPDB :: (HasHashDB m, Format a) =>
                 String -> (a -> m (Maybe b)) -> a -> m b
 lookupInMPDB name f k = do
   v <- f k

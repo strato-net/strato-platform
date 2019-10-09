@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -10,13 +9,13 @@ module BlockApps.Bloc22.Crypto where
 import           Control.Lens.Operators            hiding ((.=))
 import           Control.Lens                      (mapped, (&), (?~))
 import           Control.Monad.IO.Class
+import           Crypto.HaskoinShim
 import qualified Crypto.KDF.BCrypt                 as BCrypt
 import qualified Crypto.KDF.Scrypt                 as Scrypt
 import           Crypto.Random.Entropy
 import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
-import           Crypto.Secp256k1
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.ByteString                   (ByteString)

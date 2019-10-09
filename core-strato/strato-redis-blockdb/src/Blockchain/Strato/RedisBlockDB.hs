@@ -1,20 +1,25 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( inNamespace, getSHAsByNumber
+    ( RedisConnection(..), inNamespace, findNamespace
+    , getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
+    , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
+    , getIPChains, addIPChain, removeIPChain
+    , getOrgIdChains, addOrgIdChain, removeOrgIdChain
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
-    , getTransactions, getPrivateTransactions, getUncles
+    , getTransactions, getPrivateTransactions, addPrivateTransactions, getUncles
     , getParent, getParents
     , getParentChain, getHeaderChain, getBlockChain
     , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
@@ -22,32 +27,41 @@ module Blockchain.Strato.RedisBlockDB
     , getGenesisHash
     , putHeader, putHeaders, putBlock, putBlocks
     , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo
-    , HasRedisBlockDB(..), withRedisBlockDB
+    , withRedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
     ) where
 
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.ExtWord                    (Word256)
 import           Blockchain.Output
+import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
+import           Blockchain.Util                       (partitionWith)
 
-import           Control.Arrow                         ((&&&), second)
+import           Control.Arrow                         ((&&&), (***), second)
 import           Control.Concurrent                    (threadDelay)
+import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
+import           Data.Foldable                         (foldl')
+import           Data.Functor                          ((<&>))
+import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
 import           System.Random                         (randomIO)
+
+newtype RedisConnection = RedisConnection { unRedisConnection :: Connection }
 
 -- todo: move this somewhere?
 zipMapM :: (Traversable t, Monad m)
@@ -59,14 +73,11 @@ zipMapM f = mapM (\x -> (,) x <$> f x)
 liftLog :: LoggingT m a -> m a
 liftLog = runLoggingT
 
-class (Monad m) => HasRedisBlockDB m where
-    getRedisBlockDB :: m Connection
-
-withRedisBlockDB :: (MonadIO m, HasRedisBlockDB m)
+withRedisBlockDB :: (MonadIO m, Accessible RedisConnection m)
                  => Redis a
                  -> m a
 withRedisBlockDB m = do
-    db <- getRedisBlockDB
+    db <- unRedisConnection <$> access (Proxy @RedisConnection)
     liftIO $ runRedis db m
 
 inNamespace :: RedisDBKeyable k
@@ -85,6 +96,26 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateChainInfo    -> "x:"
             PrivateChainMembers -> "m:"
             PrivateTransactions -> "pt:"
+            PrivateTxsInBlocks  -> "pb:"
+            PrivateIPChains     -> "pic:"
+            PrivateOrgIdChains  -> "poc:"
+
+findNamespace :: S8.ByteString -> BlockDBNamespace
+findNamespace key = case S8.takeWhile (/= ':') key of
+  "h" -> Headers
+  "t" -> Transactions
+  "n" -> Numbers
+  "u" -> Uncles
+  "p" -> Parent
+  "c" -> Children
+  "q" -> Canonical
+  "x" -> PrivateChainInfo
+  "m" -> PrivateChainMembers
+  "pt" -> PrivateTransactions
+  "pb" -> PrivateTxsInBlocks
+  "pic" -> PrivateIPChains
+  "poc" -> PrivateOrgIdChains
+  wut -> error $ "unknown namespace: " ++ show wut
 
 getChainInfo :: Word256
              -> Redis (Maybe ChainInfo)
@@ -120,9 +151,11 @@ putChainMembers :: Word256
 putChainMembers cId mems = do
     let rmems    = RedisChainMembers mems
 
-    res <- multiExec $ setnx (inNamespace PrivateChainMembers cId) (toValue rmems)
+    res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
     case res of
-        TxSuccess _ -> pure $ Right Ok
+        TxSuccess _ -> fmap (foldl' (>>) (Right Ok)) . forM (M.elems mems) $ \e -> getCompose $
+          Compose (addIPChain (ipAddress e) cId) *>
+          Compose (addOrgIdChain (pubKey e) cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
 
@@ -135,7 +168,9 @@ addChainMember cId address enode = do
     let mems' = RedisChainMembers $ M.insert address enode mems
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
     case res of
-        TxSuccess _ -> pure $ Right Ok
+        TxSuccess _ -> getCompose $
+          Compose (addIPChain (ipAddress enode) cId) *>
+          Compose (addOrgIdChain (pubKey enode) cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
 
@@ -144,12 +179,112 @@ removeChainMember :: Word256
                   -> Redis (Either Reply Status)
 removeChainMember cId address = do
     mems <- getChainMembers cId
-    let mems' = RedisChainMembers $ M.delete address mems
+    let mEnode = M.lookup address mems
+        mems' = RedisChainMembers $ M.delete address mems
     res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue mems')
     case res of
-        TxSuccess _ -> pure $ Right Ok
+        TxSuccess _ -> case mEnode of
+          Nothing -> pure $ Right Ok -- TODO: Maybe this should return a Left?
+          Just enode -> getCompose $
+            Compose (removeIPChain (ipAddress enode) cId) *>
+            Compose (removeOrgIdChain (pubKey enode) cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
+
+getChainTxsInBlock :: SHA
+                   -> Redis (M.Map Word256 [SHA])
+getChainTxsInBlock bHash = getInNamespace PrivateTxsInBlocks bHash >>= \case
+    Left _             -> return M.empty
+    Right Nothing      -> return M.empty
+    Right (Just rmems) -> let RedisChainTxsInBlocks mems = fromValue rmems
+                           in return mems
+
+putChainTxsInBlock :: SHA
+                   -> M.Map Word256 [SHA]
+                   -> Redis (Either Reply Status)
+putChainTxsInBlock bHash chainIdTxHashMap = do
+    let rmems    = RedisChainTxsInBlocks chainIdTxHashMap
+
+    res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue rmems)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Error" ++ e)
+
+addChainTxsInBlock :: SHA
+                   -> Word256
+                   -> [SHA]
+                   -> Redis (Either Reply Status)
+addChainTxsInBlock bHash cId shas = do
+    mems <- getChainTxsInBlock bHash
+    let mems' = RedisChainTxsInBlocks $ M.insertWith (++) cId shas mems
+    res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue mems')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
+
+getIPChains :: IPAddress
+            -> Redis (S.Set Word256)
+getIPChains ip = getInNamespace PrivateIPChains ip <&> \case
+    Right (Just rchains) -> let RedisIPChains chains = fromValue rchains
+                             in chains
+    _                    -> S.empty
+
+addIPChain :: IPAddress
+           -> Word256
+           -> Redis (Either Reply Status)
+addIPChain ip cId = do
+    chains <- getIPChains ip
+    let chains' = RedisIPChains $ S.insert cId chains
+    res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Error" ++ e)
+
+removeIPChain :: IPAddress
+              -> Word256
+              -> Redis (Either Reply Status)
+removeIPChain ip cId = do
+    chains <- getIPChains ip
+    let chains' = RedisIPChains $ S.delete cId chains
+    res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeIPChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeIPChain - Error" ++ e)
+
+getOrgIdChains :: S8.ByteString
+               -> Redis (S.Set Word256)
+getOrgIdChains ip = getInNamespace PrivateOrgIdChains ip <&> \case
+    Right (Just rchains) -> let RedisOrgIdChains chains = fromValue rchains
+                             in chains
+    _                    -> S.empty
+
+addOrgIdChain :: S8.ByteString
+              -> Word256
+              -> Redis (Either Reply Status)
+addOrgIdChain ip cId = do
+    chains <- getOrgIdChains ip
+    let chains' = RedisOrgIdChains $ S.insert cId chains
+    res <- multiExec $ set (inNamespace PrivateOrgIdChains ip) (toValue chains')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgIdChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgIdChain - Error" ++ e)
+
+removeOrgIdChain :: S8.ByteString
+                 -> Word256
+                 -> Redis (Either Reply Status)
+removeOrgIdChain ip cId = do
+    chains <- getOrgIdChains ip
+    let chains' = RedisOrgIdChains $ S.delete cId chains
+    res <- multiExec $ set (inNamespace PrivateOrgIdChains ip) (toValue chains')
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Error" ++ e)
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
@@ -177,53 +312,57 @@ getSHAsByNumber n = getMembersInNamespace Numbers n >>= \case
     Right hs -> let hashes = fromValue <$> hs in
         return (Just hashes)
 
-getHeader :: BlockHeaderLike h
-          => SHA
-          -> Redis (Maybe h)
+getHeader :: SHA
+          -> Redis (Maybe BlockData)
 getHeader sha = getInNamespace Headers sha >>= \case
     Left _             -> return Nothing
     Right Nothing      -> return Nothing
     Right (Just rhead) -> let (RedisHeader h) = fromValue rhead in
         return . Just $ morphBlockHeader h
 
-getHeaders :: BlockHeaderLike h
-           => [SHA]
-           -> Redis [(SHA, Maybe h)]
+getHeaders :: [SHA]
+           -> Redis [(SHA, Maybe BlockData)]
 getHeaders = zipMapM getHeader
 
-getHeadersByNumber :: BlockHeaderLike h
-                   => Integer
-                   -> Redis [(SHA, Maybe h)]
+getHeadersByNumber :: Integer
+                   -> Redis [(SHA, Maybe BlockData)]
 getHeadersByNumber n = getMembersInNamespace Numbers n >>= \case
     Left _       -> return []
     Right hashes -> getHeaders (fromValue <$> hashes)
 
-getHeadersByNumbers :: BlockHeaderLike h
-                    => [Integer]
-                    -> Redis [(Integer, [(SHA, Maybe h)])]
+getHeadersByNumbers :: [Integer]
+                    -> Redis [(Integer, [(SHA, Maybe BlockData)])]
 getHeadersByNumbers = zipMapM getHeadersByNumber
 
-getTransactions :: TransactionLike t
-                => SHA
-                -> Redis (Maybe [t])
+getTransactions :: SHA
+                -> Redis (Maybe [OutputTx])
 getTransactions sha = getInNamespace Transactions sha >>= \case
     Left _            -> return Nothing
     Right Nothing     -> return Nothing
     Right (Just rtxs) -> let (RedisTxs txs) = fromValue rtxs in
         return . Just $ morphTx <$> txs
 
-getPrivateTransactions :: TransactionLike t
-                       => SHA
-                       -> Redis (Maybe t)
+getPrivateTransactions :: SHA
+                       -> Redis (Maybe (Word256, OutputTx))
 getPrivateTransactions sha = getInNamespace PrivateTransactions sha >>= \case
     Left _            -> return Nothing
     Right Nothing     -> return Nothing
-    Right (Just rtx) -> let (RedisTx tx) = fromValue rtx in
-        return . Just $ morphTx tx
+    Right (Just rtx) -> let (anchor, RedisTx tx) = fromValue rtx in
+        return . Just $ (anchor, morphTx tx)
 
-getUncles :: BlockHeaderLike h
-          => SHA
-          -> Redis (Maybe [h])
+addPrivateTransactions :: [(SHA, (Word256, OutputTx))]
+                       -> Redis (Either Reply Status)
+addPrivateTransactions ptxs = do
+  res <- multiExec
+       . mset
+       $ map (inNamespace PrivateTransactions *** toValue) ptxs
+  case res of
+      TxSuccess _ -> pure $ Right Ok
+      TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Aborted")
+      TxError e   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Error" ++ e)
+
+getUncles :: SHA
+          -> Redis (Maybe [BlockData])
 getUncles sha = getInNamespace Uncles sha >>= \case
     Left _           -> return Nothing
     Right Nothing    -> return Nothing
@@ -265,16 +404,14 @@ getZippedParentChain mapper start limit = do
     mapChain <- zipMapM mapper shaChain
     return $ second fromJust <$> takeWhile (isJust . snd) mapChain
 
-getHeaderChain :: (BlockHeaderLike h)
-               => SHA
+getHeaderChain :: SHA
                -> Int
-               -> Redis [(SHA, h)]
+               -> Redis [(SHA, BlockData)]
 getHeaderChain = getZippedParentChain getHeader
 
-getBlockChain :: (BlockLike h t b)
-              => SHA
+getBlockChain :: SHA
               -> Int
-              -> Redis [(SHA, b)]
+              -> Redis [(SHA, OutputBlock)]
 getBlockChain = getZippedParentChain getBlock
 
 getCanonical :: Integer
@@ -284,9 +421,8 @@ getCanonical n = getInNamespace Canonical n >>= \case
     Right Nothing    -> return Nothing
     Right (Just sha) -> return . Just $ fromValue sha
 
-getCanonicalHeader :: (BlockHeaderLike h)
-                   => Integer
-                   -> Redis (Maybe h)
+getCanonicalHeader :: Integer
+                   -> Redis (Maybe BlockData)
 getCanonicalHeader n = getCanonical n >>= \case
     Nothing  -> return Nothing
     Just sha -> getHeader sha
@@ -307,10 +443,9 @@ getZippedCanonicalChain mapper start limit = do
     mapChain <- zipMapM mapper shaChain
     return $ second fromJust <$> takeWhile (isJust . snd) mapChain
 
-getCanonicalHeaderChain :: (BlockHeaderLike h)
-                        => Integer
+getCanonicalHeaderChain :: Integer
                         -> Int
-                        -> Redis [(SHA, h)]
+                        -> Redis [(SHA, BlockData)]
 getCanonicalHeaderChain = getZippedCanonicalChain getHeader
 
 getChildren :: SHA
@@ -319,9 +454,8 @@ getChildren sha = getMembersInNamespace Children sha >>= \case
     Left _    -> return Nothing
     Right chs -> return . Just $ fromValue <$> chs
 
-getBlock :: BlockLike h t b
-         => SHA
-         -> Redis (Maybe b)
+getBlock :: SHA
+         -> Redis (Maybe OutputBlock)
 getBlock sha = do
     mybHeader <- getHeader sha
     if isNothing mybHeader
@@ -339,25 +473,21 @@ getBlock sha = do
                      uncles = fromJust mybUncles
                  in return . Just $ buildBlock header txs uncles
 
-getBlocks :: BlockLike h t b
-          => [SHA]
-          -> Redis [(SHA, Maybe b)]
+getBlocks :: [SHA]
+          -> Redis [(SHA, Maybe OutputBlock)]
 getBlocks = zipMapM getBlock
 
-getBlocksByNumber :: (BlockLike h t b)
-                  => Integer
-                  -> Redis [(SHA, Maybe b)]
+getBlocksByNumber :: Integer
+                  -> Redis [(SHA, Maybe OutputBlock)]
 getBlocksByNumber n = getMembersInNamespace Numbers n >>= \case
     Left _       -> return []
     Right hashes -> getBlocks (fromValue <$> hashes)
 
-getBlocksByNumbers :: (BlockLike h t b)
-                   => [Integer]
-                   -> Redis [(Integer, [(SHA, Maybe b)])]
+getBlocksByNumbers :: [Integer]
+                   -> Redis [(Integer, [(SHA, Maybe OutputBlock)])]
 getBlocksByNumbers = zipMapM getBlocksByNumber
 
-putHeader :: (BlockHeaderLike h)
-          => h
+putHeader :: BlockData
           -> Redis (Either Reply Status)
 putHeader h = do
     let sha       = blockHeaderHash h
@@ -376,13 +506,12 @@ putHeader h = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Error" ++ e)
 
-putHeaders :: (Traversable f, BlockHeaderLike h)
-           => f h
-           -> Redis (f (Either Reply Status))
+putHeaders :: Traversable t
+           => t BlockData
+           -> Redis (t (Either Reply Status))
 putHeaders = mapM putHeader
 
-putBlock :: (BlockLike h t b, BlockHeaderLike h, TransactionLike t)
-         => b
+putBlock :: OutputBlock
          -> Redis (Either Reply Status)
 putBlock b = do
     let sha     = blockHash b
@@ -392,13 +521,16 @@ putBlock b = do
         header' = morphBlockHeader header :: RedisHeader
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
         ptxs    = filter
-                    (isJust . txChainId)
-                    (morphTx <$> blockTransactions b :: [Models.RedisTx])
+                    (isJust . txAnchorChain)
+                    (obReceiptTransactions b)
         uncles  = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
         inNS'   = flip inNamespace sha
-    unless (null ptxs) $
-      void . multiExec . msetnx $
-        map ((inNamespace PrivateTransactions . txHash) &&& toValue) ptxs
+    unless (null ptxs) $ do
+      void . addPrivateTransactions $
+        map (txHash &&& ((fromJust . txAnchorChain) &&& id)) ptxs
+      forM_ (partitionWith txAnchorChain ptxs) $ \(cId, ptxs') ->
+                         -- ^-- already filtered on (isJust . txChainId)
+        addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
     res <- multiExec $ do
         void $ setnx (inNS' Headers) (toValue header')
         void $ setnx (inNS' Transactions) (toValue txs)
@@ -412,9 +544,9 @@ putBlock b = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack e)
 
-putBlocks :: (Traversable f, BlockLike h t b, BlockHeaderLike h, TransactionLike t)
-          => f b
-          -> Redis (f (Either Reply Status))
+putBlocks :: Traversable t
+          => t OutputBlock
+          -> Redis (t (Either Reply Status))
 putBlocks = mapM putBlock
 
 putBestBlockInfo :: SHA
@@ -453,7 +585,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                 let oldSha = head oldShaChain
                     newSha = head newShaChain
                 ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
-                let seen' = foldl (flip S.insert) seen (filter (/= (SHA 0)) ps) -- todo double S.insert is probably more optimal
+                let seen' = foldl' (flip S.insert) seen (filter (/= (SHA 0)) ps) -- todo double S.insert is probably more optimal
                 if newParent `S.member` seen
                 then complete newParent (mkParentChain newParent newShaChain)
                 else if oldParent `S.member` seen
@@ -478,7 +610,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                                      then return . Left . SingleLine . S8.pack $
                                               "Could not get ancestor header for SHA " ++ shaToHex lca
                                      else complete (head newShaChain) newShaChain
-                      Just (ancestor :: RedisHeader) -> do
+                      Just ancestor -> do
                           --liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
@@ -501,11 +633,11 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 --validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
-forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
+forceBestBlockInfo :: RedisCtx m f => SHA -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
         forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
-forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> RedisBestBlock -> m (f Status)
+forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
 forceBestBlockInfo' key = set key . toValue
 
 getBestBlockInfo :: Redis (Maybe RedisBestBlock)

@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Blockchain.SolidVM.Model where
@@ -8,6 +5,7 @@ module Blockchain.SolidVM.Model where
 import Control.DeepSeq
 import Data.Aeson
 import Data.Aeson.Types
+import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import Data.DeriveTH
@@ -41,7 +39,7 @@ instance FromJSON HexStorage where
 
 data CodeKind = EVM
               | SolidVM
-              deriving (Eq, Show, Enum, Ord, Read, Generic, NFData, ToSchema)
+              deriving (Eq, Show, Enum, Ord, Read, Generic, NFData, ToSchema, Binary)
 
 instance ToJSON CodeKind where
   toJSON = String . T.pack . show

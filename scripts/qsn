@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+docker exec -i -w /var/lib/strato strato_strato_1 queryStrato "$@"

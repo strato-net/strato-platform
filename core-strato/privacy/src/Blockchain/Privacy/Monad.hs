@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE LambdaCase             #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE RecordWildCards        #-}
 {-# LANGUAGE StrictData             #-}
 {-# LANGUAGE TemplateHaskell        #-}
@@ -9,28 +5,33 @@
 module Blockchain.Privacy.Monad where
 
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.RLP
 import           Blockchain.ExtWord            (Word256)
+import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Util
 import           Control.Lens
-import           Control.Monad                 (join, void)
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.State
+import           Data.Aeson
+import           Data.Binary
+import           Data.Default
+import           Data.Foldable                 (toList)
 import           Data.Function                 (on)
-import           Data.Maybe                    (fromJust)
 import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
-import           Data.Traversable              (for)
-
-import           Blockchain.Output
+import           GHC.Generics
+import           Text.Format
 
 data CircularBuffer a = CircularBuffer
   { _capacity :: Int
   , _size     :: Int
   , _queue    :: Q.Seq a
-  } deriving (Show)
+  } deriving (Show, Generic, Binary)
 makeLenses ''CircularBuffer
+
+instance ToJSON a => ToJSON (CircularBuffer a) where
+instance FromJSON a => FromJSON (CircularBuffer a) where
 
 maxBufferCapacity :: Int
 maxBufferCapacity = 4096
@@ -38,177 +39,110 @@ maxBufferCapacity = 4096
 emptyCircularBuffer :: CircularBuffer a
 emptyCircularBuffer = CircularBuffer maxBufferCapacity 0 Q.empty
 
-data ChainHashEntry = ChainHashEntry
-  { _used         :: Bool
-  , _onChainId    :: Maybe Word256
-  , _inBlocks     :: Q.Seq SHA
-  } deriving (Show)
-makeLenses ''ChainHashEntry
+instance Default (CircularBuffer a) where
+  def = emptyCircularBuffer
 
-chainHashEntryUsed :: ChainHashEntry
-chainHashEntryUsed = ChainHashEntry True Nothing Q.empty
-
-chainHashEntryWithChainId :: Word256 -> ChainHashEntry
-chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) Q.empty
-
-chainHashEntryInBlock :: SHA -> ChainHashEntry
-chainHashEntryInBlock bHash = ChainHashEntry True Nothing (Q.singleton bHash)
+instance Format a => Format (CircularBuffer a) where
+  format CircularBuffer{..} = unlines
+    [ "CircularBuffer"
+    , "--------------"
+    , tab $ "Capacity: " ++ show _capacity
+    , tab $ "Size:     " ++ show _size
+    , tab $ "Queue:    " ++ format (toList _queue)
+    ]
 
 data BlockInfo = BlockInfo
   { _bhash     :: SHA
   , _bordering :: Integer
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic, Binary)
 makeLenses ''BlockInfo
+
+instance ToJSON BlockInfo where
+instance FromJSON BlockInfo where
+
+instance Format BlockInfo where
+  format BlockInfo{..} = unlines
+    [ "BlockInfo"
+    , "---------"
+    , tab $ "Block hash:     " ++ format _bhash
+    , tab $ "Block ordering: " ++ show _bordering
+    ]
 
 instance Ord BlockInfo where
   compare = compare `on` _bordering
+
+data ChainHashEntry = ChainHashEntry
+  { _used         :: Bool
+  , _onChainId    :: Maybe Word256
+  , _inBlocks     :: Set BlockInfo
+  } deriving (Show, Generic, Binary)
+makeLenses ''ChainHashEntry
+
+instance ToJSON ChainHashEntry where
+instance FromJSON ChainHashEntry where
+
+blankChainHashEntry :: ChainHashEntry
+blankChainHashEntry = ChainHashEntry False Nothing S.empty
+
+instance Default ChainHashEntry where
+  def = blankChainHashEntry
+
+instance Format ChainHashEntry where
+  format ChainHashEntry{..} = unlines
+    [ "ChainHashEntry"
+    , "--------------"
+    , tab $ "Used:      " ++ show _used
+    , tab $ "On chain:  " ++ format (SHA <$> _onChainId)
+    , tab $ "In blocks: " ++ format (toList _inBlocks)
+    ]
+
+chainHashEntryUsed :: ChainHashEntry
+chainHashEntryUsed = ChainHashEntry True Nothing S.empty
+
+chainHashEntryWithChainId :: Word256 -> ChainHashEntry
+chainHashEntryWithChainId chainId = ChainHashEntry False (Just chainId) S.empty
+
+chainHashEntryInBlock :: BlockInfo -> ChainHashEntry
+chainHashEntryInBlock bInfo = ChainHashEntry True Nothing (S.singleton bInfo)
 
 data ChainIdEntry = ChainIdEntry
   { _chainIdInfo :: ChainInfo
   , _chainHashes :: CircularBuffer SHA
   , _blocksToRun :: Set BlockInfo
-  } deriving (Show)
+  } deriving (Show, Generic, Binary)
 makeLenses ''ChainIdEntry
+
+instance ToJSON ChainIdEntry where
+instance FromJSON ChainIdEntry where
 
 chainIdEntry :: ChainInfo -> ChainIdEntry
 chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
 
-class (BlockLike h t b, MonadIO m, MonadLogger m) => HasPrivateHashDB h t b m | m -> h t b where
-  getChainId               :: ChainInfo -> m SHA
-  generateInitialChainHash :: ChainInfo -> m SHA
-  generateChainHashes      :: t -> m [SHA]
+instance Format ChainIdEntry where
+  format ChainIdEntry{..} = unlines
+    [ "ChainIdEntry"
+    , "------------"
+    , tab $ "Chain info:"
+    , tab $ format _chainIdInfo
+    , tab $ "Chain hashes:  " ++ format _chainHashes
+    , tab $ "Blocks to run: " ++ format (toList _blocksToRun)
+    ]
+
+class HasPrivateHashDB m where
   requestChain             :: Word256 -> m ()
   requestTransaction       :: SHA -> m ()
-  alterBlockHashEntry      :: SHA -> (Maybe b -> m (Maybe b)) -> m (Maybe b)
-  alterTxHashEntry         :: SHA -> (Maybe t -> m (Maybe t)) -> m (Maybe t)
-  alterChainHashEntry      :: SHA -> (Maybe ChainHashEntry -> m (Maybe ChainHashEntry)) -> m (Maybe ChainHashEntry)
-  alterChainIdEntry        :: Word256 -> (Maybe ChainIdEntry -> m (Maybe ChainIdEntry)) -> m (Maybe ChainIdEntry)
 
-ffor :: (Applicative f, Monad t, Traversable t) => t a -> (a -> f (t b)) -> f (t b)
-ffor t = fmap join . for t
+getChainId :: ChainInfo -> SHA
+getChainId = hash . rlpSerialize . rlpEncode
 
-{-
-  GUIDE:
-  All the following functions follow this pattern, for key type K and value type V:
-  - alterX takes a K, a function (Maybe V -> m (Maybe V)), and returns m (Maybe V)
-    - similar to Map.alter, which reads a (maybe non-existent) value from the Map,
-      then either inserts, updates, or deletes it.
-    - if the input value is Nothing, the value doesn't exist in the Map.
-    - if the return value is Nothing, the (k,v) pair is deleted from the Map.
-  - updateX takes a K, a function (V -> m (Maybe V)), and returns m (Maybe V)
-    - similar to Map.update, which takes an existing value for the Map, and either
-      updates or deletes it.
-    - if the return value is Nothing, the (k,v) pair is deleted from the Map.
-    - if the (k,v) pair is not in the Map, the function is not applied.
-  - modifyX takes a K, a function (V -> m V), and returns m V.
-    - similar to State.modify
-    - takes an existing v from the Map, and modifies it with f.
-    - cannot be used to insert or delete items from the Map
-    - if the (k,v) pair is not in the Map, the function is not applied.
-  - repsertX takes a K, a function (Maybe V -> m V), and returns m V.
-    - can be used to insert, modify, or overwrite an existing element of the Map.
-    - cannot be used to delete an item from the Map
-  - insertX takes a K, a V, and returns m ()
-  - getX takes a K, returns m (Maybe V)
-  - updateXState takes a K, a StateT V m (Maybe V) action, and returns m (Maybe V)
-    - same as updateX, but run in the StateT monad
-    - allows for nicer lens operations, and implicit state updates
-    - if the return value of the action is Nothing, the item is deleted from the Map
-    - uses evalStateT
-  - modifyXState takes a K, a StateT V m () action, and returns m V.
-    - same as modifyX, but run in the StateT monad
-    - allows for nicer lens operations, and implicit state updates
-    - action has no return value (m ())
-    - uses execStateT
-  - quiet versions of each function had an underscore appended (e.g. alterX_, modifyXState_)
--}
+generateInitialChainHash :: ChainInfo -> SHA
+generateInitialChainHash = hash . rlpSerialize . rlpEncode
 
-insertBlockHashEntry :: HasPrivateHashDB h t b m => SHA -> b -> m ()
-insertBlockHashEntry bHash bhe = void $ alterBlockHashEntry bHash (return . const (Just bhe))
-
-getBlockHashEntry :: HasPrivateHashDB h t b m => SHA -> m (Maybe b)
-getBlockHashEntry bHash = alterBlockHashEntry bHash return
-
-insertTxHashEntry :: HasPrivateHashDB h t b m => SHA -> t -> m ()
-insertTxHashEntry tHash the = void $ alterTxHashEntry tHash (return . const (Just the))
-
-getTxHashEntry :: HasPrivateHashDB h t b m => SHA -> m (Maybe t)
-getTxHashEntry tHash = alterTxHashEntry tHash return
-
-updateChainHashEntry :: HasPrivateHashDB h t b m => SHA -> (ChainHashEntry -> m (Maybe ChainHashEntry)) -> m (Maybe ChainHashEntry)
-updateChainHashEntry cHash = alterChainHashEntry cHash . flip ffor
-
-updateChainHashEntryState :: HasPrivateHashDB h t b m => SHA -> StateT ChainHashEntry m (Maybe ChainHashEntry) -> m (Maybe ChainHashEntry)
-updateChainHashEntryState cHash = updateChainHashEntry cHash . evalStateT
-
-modifyChainHashEntry :: HasPrivateHashDB h t b m => SHA -> (ChainHashEntry -> m ChainHashEntry) -> m ChainHashEntry
-modifyChainHashEntry cHash f = fmap fromJust $ updateChainHashEntry cHash (fmap Just . f)
-
-modifyChainHashEntryState :: HasPrivateHashDB h t b m => SHA -> StateT ChainHashEntry m () -> m ChainHashEntry
-modifyChainHashEntryState cHash = modifyChainHashEntry cHash . execStateT
-
-repsertChainHashEntry :: HasPrivateHashDB h t b m => SHA -> (Maybe ChainHashEntry -> m ChainHashEntry) -> m ChainHashEntry
-repsertChainHashEntry cHash f = fmap fromJust $ alterChainHashEntry cHash (fmap Just . f)
-
-insertChainHashEntry :: HasPrivateHashDB h t b m => SHA -> ChainHashEntry -> m ()
-insertChainHashEntry cHash che = alterChainHashEntry_ cHash (return . const (Just che))
-
-getChainHashEntry :: HasPrivateHashDB h t b m => SHA -> m (Maybe ChainHashEntry)
-getChainHashEntry cHash = alterChainHashEntry cHash return
-
-alterChainHashEntry_ :: HasPrivateHashDB h t b m => SHA -> (Maybe ChainHashEntry -> m (Maybe ChainHashEntry)) -> m ()
-alterChainHashEntry_ cHash = void . alterChainHashEntry cHash
-
-updateChainHashEntry_ :: HasPrivateHashDB h t b m => SHA -> (ChainHashEntry -> m (Maybe ChainHashEntry)) -> m ()
-updateChainHashEntry_ cHash = void . updateChainHashEntry cHash
-
-updateChainHashEntryState_ :: HasPrivateHashDB h t b m => SHA -> StateT ChainHashEntry m (Maybe ChainHashEntry) -> m ()
-updateChainHashEntryState_ cHash = void . updateChainHashEntryState cHash
-
-modifyChainHashEntry_ :: HasPrivateHashDB h t b m => SHA -> (ChainHashEntry -> m ChainHashEntry) -> m ()
-modifyChainHashEntry_ cHash = void . modifyChainHashEntry cHash
-
-modifyChainHashEntryState_ :: HasPrivateHashDB h t b m => SHA -> StateT ChainHashEntry m () -> m ()
-modifyChainHashEntryState_ cHash = void . modifyChainHashEntryState cHash
-
-repsertChainHashEntry_ :: HasPrivateHashDB h t b m => SHA -> (Maybe ChainHashEntry -> m ChainHashEntry) -> m ()
-repsertChainHashEntry_ cHash = void . repsertChainHashEntry cHash
-
-updateChainIdEntry :: HasPrivateHashDB h t b m => Word256 -> (ChainIdEntry -> m (Maybe ChainIdEntry)) -> m (Maybe ChainIdEntry)
-updateChainIdEntry cId = alterChainIdEntry cId . flip ffor
-
-updateChainIdEntryState :: HasPrivateHashDB h t b m => Word256 -> StateT ChainIdEntry m (Maybe ChainIdEntry) -> m (Maybe ChainIdEntry)
-updateChainIdEntryState cId = updateChainIdEntry cId . evalStateT
-
-modifyChainIdEntry :: HasPrivateHashDB h t b m => Word256 -> (ChainIdEntry -> m ChainIdEntry) -> m ChainIdEntry
-modifyChainIdEntry cId f = fmap fromJust $ updateChainIdEntry cId (fmap Just . f)
-
-modifyChainIdEntryState :: HasPrivateHashDB h t b m => Word256 -> StateT ChainIdEntry m () -> m ChainIdEntry
-modifyChainIdEntryState cId = modifyChainIdEntry cId . execStateT
-
-repsertChainIdEntry :: HasPrivateHashDB h t b m => Word256 -> (Maybe ChainIdEntry -> m ChainIdEntry) -> m ChainIdEntry
-repsertChainIdEntry cId f = fmap fromJust $ alterChainIdEntry cId (fmap Just . f)
-
-insertChainIdEntry :: HasPrivateHashDB h t b m => Word256 -> ChainIdEntry -> m ()
-insertChainIdEntry cId cie = alterChainIdEntry_ cId (return . const (Just cie))
-
-getChainIdEntry :: HasPrivateHashDB h t b m => Word256 -> m (Maybe ChainIdEntry)
-getChainIdEntry cId = alterChainIdEntry cId return
-
-alterChainIdEntry_ :: HasPrivateHashDB h t b m => Word256 -> (Maybe ChainIdEntry -> m (Maybe ChainIdEntry)) -> m ()
-alterChainIdEntry_ cId = void . alterChainIdEntry cId
-
-updateChainIdEntry_ :: HasPrivateHashDB h t b m => Word256 -> (ChainIdEntry -> m (Maybe ChainIdEntry)) -> m ()
-updateChainIdEntry_ cId = void . updateChainIdEntry cId
-
-updateChainIdEntryState_ :: HasPrivateHashDB h t b m => Word256 -> StateT ChainIdEntry m (Maybe ChainIdEntry) -> m ()
-updateChainIdEntryState_ cId = void . updateChainIdEntryState cId
-
-modifyChainIdEntry_ :: HasPrivateHashDB h t b m => Word256 -> (ChainIdEntry -> m ChainIdEntry) -> m ()
-modifyChainIdEntry_ cId = void . modifyChainIdEntry cId
-
-modifyChainIdEntryState_ :: HasPrivateHashDB h t b m => Word256 -> StateT ChainIdEntry m () -> m ()
-modifyChainIdEntryState_ cId = void . modifyChainIdEntryState cId
-
-repsertChainIdEntry_ :: HasPrivateHashDB h t b m => Word256 -> (Maybe ChainIdEntry -> m ChainIdEntry) -> m ()
-repsertChainIdEntry_ cId = void . repsertChainIdEntry cId
+-- Point-free with permutations is less readable, but more fun
+generateChainHashes :: OutputTx -> [SHA]
+generateChainHashes tx =
+  let r = txSigR tx
+      s = txSigS tx
+      rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s]
+      sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r]
+   in [rs,sr]

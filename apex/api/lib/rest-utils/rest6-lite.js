@@ -62,11 +62,10 @@ function* callMethodOAuth(userHeaders, contract, methodName, args, options={}) {
 }
 
 function* getState(contract, options={}) {
-  const state = yield state(contract.name, contract.address, options.chainId, options.node)
+  return yield state(contract.name, contract.address, options.chainId, options.node)
       .catch(function(e) {
         throw (e instanceof Error) ? e : new HttpError(e);
       });
-  return state;
 }
 
 function* isSearchable(codeHash) {
@@ -402,4 +401,5 @@ module.exports = {
   isSearchable,
   uploadContract,
   waitQuery,
+  query,
 }

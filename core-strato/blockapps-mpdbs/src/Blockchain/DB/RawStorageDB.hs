@@ -1,22 +1,39 @@
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE MonoLocalBinds    #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeOperators     #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.DB.RawStorageDB (
-  HasRawStorageDB(..),
-  putRawStorageKeyVal',
-  getRawStorageKeyVal',
-  getAllRawStorageKeyVals',
-  flushRawStorageTxDBToBlockDB,
-  flushMemRawStorageDB
- ) where
+module Blockchain.DB.RawStorageDB
+  ( RawStorageKey
+  , RawStorageValue
+  , HasRawStorageDB
+  , HasMemRawStorageDB(..)
+  , FullRawStorage
+  , genericLookupRawStorageDB
+  , genericInsertRawStorageDB
+  , genericDeleteRawStorageDB
+  , genericLookupWithDefaultRawStorageDB
+  , putRawStorageKeyVal'
+  , getRawStorageKeyVal'
+  , getAllRawStorageKeyVals'
+  , flushMemRawStorageTxDBToBlockDB
+  , flushMemRawStorageDB
+  ) where
 
+import           Control.Arrow                               ((***))
+import qualified Control.Monad.Change.Alter                  as A
 import           Control.Monad.Loops
 import           Control.Monad.State
 import           Data.ByteString                             (ByteString)
-import qualified Data.ByteString                             as B
+import           Data.Default
+import           Data.Foldable                               (for_)
 import           Data.List
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as M
+import           Data.Traversable                            (for)
 import qualified Database.LevelDB                            as DB
 
 import           Blockchain.Strato.Model.Address
@@ -27,67 +44,127 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
+import           Blockchain.Output
 import qualified Data.NibbleString                           as N
 
 import BatchMerge
 
-class MonadIO m => HasRawStorageDB m where
-  getRawStorageTxDB     :: m (DB.DB, M.Map (Address, B.ByteString) B.ByteString)
-  putRawStorageTxMap    :: M.Map (Address, B.ByteString) B.ByteString -> m ()
-  getRawStorageBlockDB  :: m (DB.DB, M.Map (Address, B.ByteString) B.ByteString)
-  putRawStorageBlockMap :: M.Map (Address, B.ByteString) B.ByteString -> m ()
+instance Default ByteString where
+  def = blankVal
 
-type FullRawStorage m = (HasMemAddressStateDB m, HasRawStorageDB m, HasStateDB m, HasHashDB m)
+type RawStorageKey = (Address, ByteString)
+type RawStorageValue = ByteString
+type HasRawStorageDB m = (RawStorageKey `A.Alters` RawStorageValue) m
 
-putRawStorageKeyVal' :: FullRawStorage m => Address -> B.ByteString -> B.ByteString -> m ()
+class Monad m => HasMemRawStorageDB m where
+  getMemRawStorageTxDB     :: m (DB.DB, M.Map RawStorageKey RawStorageValue)
+  putMemRawStorageTxMap    :: M.Map RawStorageKey RawStorageValue -> m ()
+  getMemRawStorageBlockDB  :: m (DB.DB, M.Map RawStorageKey RawStorageValue)
+  putMemRawStorageBlockMap :: M.Map RawStorageKey RawStorageValue -> m ()
+
+type FullRawStorage m = ( HasMemAddressStateDB m
+                        , HasRawStorageDB m
+                        , HasMemRawStorageDB m
+                        , HasStateDB m
+                        , HasHashDB m
+                        , (Address `A.Alters` AddressState) m
+                        )
+
+putRawStorageKeyVal' :: HasRawStorageDB m => RawStorageKey -> RawStorageValue -> m ()
 putRawStorageKeyVal' = putRawStorageKeyValMC
 
-getRawStorageKeyVal' :: FullRawStorage m => Address -> B.ByteString -> m B.ByteString
+getRawStorageKeyVal' :: HasRawStorageDB m => RawStorageKey -> m RawStorageValue
 getRawStorageKeyVal' = getRawStorageKeyValMC
 
-getAllRawStorageKeyVals' :: FullRawStorage m => Address -> m [(MP.Key, B.ByteString)]
+getAllRawStorageKeyVals' :: FullRawStorage m => Address -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyVals' = getAllRawStorageKeyValsMC
 
 --The following are the memory cache versions of the functions
 
-putRawStorageKeyValMC :: FullRawStorage m => Address -> B.ByteString -> B.ByteString -> m ()
-putRawStorageKeyValMC owner key val = do
-  theMap <- fmap snd getRawStorageTxDB
-  putRawStorageTxMap $ M.insert (owner, key) val theMap
+putRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> RawStorageValue -> m ()
+putRawStorageKeyValMC = A.insert (A.Proxy @RawStorageValue)
 
-getRawStorageKeyValMC :: FullRawStorage m => Address -> B.ByteString -> m B.ByteString
-getRawStorageKeyValMC owner key = do
-  theMap <- fmap snd getRawStorageTxDB
-  case M.lookup (owner, key) theMap of
+getRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> m RawStorageValue
+getRawStorageKeyValMC key = A.lookupWithDefault (A.Proxy @RawStorageValue) key
+
+genericLookupRawStorageDB :: ( HasMemRawStorageDB m
+                             , (Address `A.Alters` AddressState) m
+                             , (MP.StateRoot `A.Alters` MP.NodeData) m
+                             )
+                          => RawStorageKey
+                          -> m (Maybe RawStorageValue)
+genericLookupRawStorageDB key = do
+  theMap <- snd <$> getMemRawStorageTxDB
+  case M.lookup key theMap of
+   Just val -> return $ Just val
+   Nothing  -> do
+     theBMap <- snd <$> getMemRawStorageBlockDB
+     case M.lookup key theBMap of
+       Just val' -> return $ Just val'
+       Nothing -> do
+         mVal <- getRawStorageKeyValDBMaybe key
+         --put in the TX cache for fast future lookups
+         for_ mVal $ \v -> putMemRawStorageTxMap $ M.insert key v theMap
+         return mVal
+
+genericLookupWithDefaultRawStorageDB
+  :: ( HasMemRawStorageDB m
+     , (Address `A.Alters` AddressState) m
+     , (MP.StateRoot `A.Alters` MP.NodeData) m
+     )
+  => RawStorageKey
+  -> m RawStorageValue
+genericLookupWithDefaultRawStorageDB key = do
+  theMap <- snd <$> getMemRawStorageTxDB
+  case M.lookup key theMap of
    Just val -> return val
    Nothing  -> do
-     theBMap <- fmap snd getRawStorageBlockDB
-     case M.lookup (owner, key) theBMap of
+     theBMap <- snd <$> getMemRawStorageBlockDB
+     case M.lookup key theBMap of
        Just val' -> return val'
-       Nothing -> getRawStorageKeyValDB owner key
+       Nothing -> do
+         v <- getRawStorageKeyValDB key
+         --put in the TX cache for fast future lookups
+         putMemRawStorageTxMap $ M.insert key v theMap
+         return v
 
-getAllRawStorageKeyValsMC :: FullRawStorage m  => Address -> m [(MP.Key, B.ByteString)]
+genericInsertRawStorageDB :: HasMemRawStorageDB m
+                          => RawStorageKey
+                          -> RawStorageValue
+                          -> m ()
+genericInsertRawStorageDB key val = do
+  theMap <- snd <$> getMemRawStorageTxDB
+  putMemRawStorageTxMap $ M.insert key val theMap
+
+genericDeleteRawStorageDB :: HasMemRawStorageDB m
+                          => RawStorageKey
+                          -> m ()
+genericDeleteRawStorageDB key = do
+  theMap <- snd <$> getMemRawStorageTxDB
+  putMemRawStorageTxMap $ M.insert key blankVal theMap
+
+getAllRawStorageKeyValsMC :: FullRawStorage m  => Address -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyValsMC = getAllRawStorageKeyValsDB
 
-flushRawStorageTxDBToBlockDB :: FullRawStorage m => m ()
-flushRawStorageTxDBToBlockDB = do
-  txMap <- snd <$> getRawStorageTxDB
-  blkMap <- snd <$> getRawStorageBlockDB
-  putRawStorageBlockMap $ txMap `M.union` blkMap
-  putRawStorageTxMap M.empty
+flushMemRawStorageTxDBToBlockDB :: HasMemRawStorageDB m => m ()
+flushMemRawStorageTxDBToBlockDB = do
+  txMap <- snd <$> getMemRawStorageTxDB
+  blkMap <- snd <$> getMemRawStorageBlockDB
+  putMemRawStorageBlockMap $ txMap `M.union` blkMap
+  putMemRawStorageTxMap M.empty
 
-flushMemRawStorageDB :: FullRawStorage m => m ()
+flushMemRawStorageDB :: (MonadLogger m, FullRawStorage m) => m ()
 flushMemRawStorageDB = do
-  flushRawStorageTxDBToBlockDB
-  theMap <- fmap snd getRawStorageBlockDB
+  flushMemRawStorageTxDBToBlockDB
+  theMap <- fmap snd getMemRawStorageBlockDB
 
-  let changesByAddress :: Map Address [(ByteString, ByteString)]
+  let changesByAddress :: Map Address [(ByteString, RawStorageValue)]
       changesByAddress = M.fromListWith (++)  $ map (\((a, k), v) -> (a, [(k, v)])) $ M.toList theMap
 
   forM_ (M.toList changesByAddress) $ \(a, changes) ->
     putAllRawStorageKeyValForAddress a changes
 
-  putRawStorageBlockMap M.empty
+  putMemRawStorageBlockMap M.empty
 
 
 
@@ -100,66 +177,66 @@ flushMemRawStorageDB = do
 -- as the default bytestring, but that would break stateroot compatibility for
 -- the word256 based storage.
 {-# NOINLINE blankVal #-}
-blankVal :: B.ByteString
+blankVal :: RawStorageValue
 blankVal = rlpSerialize $ RLPString ""
 
 
-putAllRawStorageKeyValForAddress :: FullRawStorage m =>
-                                    Address -> [(B.ByteString, B.ByteString)] -> m ()
+putAllRawStorageKeyValForAddress :: (MonadLogger m, FullRawStorage m) =>
+                                    Address -> [(ByteString, RawStorageValue)] -> m ()
 putAllRawStorageKeyValForAddress owner rawChanges = do
   let changes :: [(MP.Key, MP.Val)]
-      changes = map (\(k, v) -> (N.EvenNibbleString k, rlpEncode v)) rawChanges
+      changes = map (N.EvenNibbleString *** rlpEncode) rawChanges
       blankValRLP = rlpEncode blankVal
       (allDeletes, allInserts) = partition ((== blankValRLP) . snd) changes
       deleteKeys = map fst allDeletes
-  
-  addressState <- getAddressState owner
-  db <- fmap fst getRawStorageBlockDB
-  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
-  
-  forM_ (map fst allInserts) hashDBPut
-  
-  mpdb' <-
-    if False
-    then putManyKeyVal mpdb allInserts
-    else putManyKeyValSlow mpdb allInserts
 
-  mpdb'' <- deleteManyKeyVal mpdb' deleteKeys
+  addressState <- A.lookupWithDefault A.Proxy owner
+  let sr = addressStateContractRoot addressState
 
-  putAddressState owner addressState{addressStateContractRoot=MP.stateRoot mpdb''}
+  for_ allInserts $ hashDBPut . fst
+
+  sr' <-
+    if True                                 -- FEATUREFLAG  speed up putManyKeyVal
+    then putManyKeyVal sr allInserts
+    else putManyKeyValSlow sr allInserts
+
+  sr'' <- deleteManyKeyVal sr' deleteKeys
+
+  A.insert A.Proxy owner addressState{addressStateContractRoot=sr''}
 
 
-deleteManyKeyVal :: MonadIO m=>
-                    MP.MPDB -> [MP.Key] -> m MP.MPDB
-deleteManyKeyVal mpdb listOfDeletes = do
-  concatM (map (flip deleteRawStorageKeyValDB) listOfDeletes) mpdb
+deleteManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
+deleteManyKeyVal sr listOfDeletes =
+  concatM (map (flip deleteRawStorageKeyValDB) listOfDeletes) sr
 
-putManyKeyValSlow :: MonadIO m=>
-                     MP.MPDB -> [(MP.Key, MP.Val)] -> m MP.MPDB
-putManyKeyValSlow mpdb listOfInserts = do
-  concatM (map (flip putRawStorageKeyValDB) listOfInserts) mpdb
-  
-putRawStorageKeyValDB :: MonadIO m =>
-                         MP.MPDB -> (MP.Key, MP.Val) -> m MP.MPDB
-putRawStorageKeyValDB mpdb (key, val) = do
-  MP.putKeyVal mpdb key val
+putManyKeyValSlow :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
+putManyKeyValSlow sr listOfInserts =
+  concatM (map (flip putRawStorageKeyValDB) listOfInserts) sr
 
-deleteRawStorageKeyValDB :: MonadIO m =>
-                            MP.MPDB -> MP.Key -> m MP.MPDB
-deleteRawStorageKeyValDB mpdb key =
-  MP.deleteKey mpdb key
+putRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> (MP.Key, MP.Val) -> m MP.StateRoot
+putRawStorageKeyValDB sr (key, val) = MP.putKeyVal sr key val
 
-getRawStorageKeyValDB :: FullRawStorage m => Address -> B.ByteString -> m B.ByteString
-getRawStorageKeyValDB owner key = do
-  addressState <- getAddressState owner
-  db <- fmap fst getRawStorageBlockDB
-  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
-  maybe blankVal rlpDecode <$> MP.getKeyVal mpdb (N.EvenNibbleString key)
+deleteRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> MP.Key -> m MP.StateRoot
+deleteRawStorageKeyValDB sr key = MP.deleteKey sr key
 
-getAllRawStorageKeyValsDB :: FullRawStorage m => Address -> m [(MP.Key, B.ByteString)]
+getRawStorageKeyValDBMaybe :: ( (Address `A.Alters` AddressState) m
+                              , (MP.StateRoot `A.Alters` MP.NodeData) m
+                              )
+                           => RawStorageKey -> m (Maybe RawStorageValue)
+getRawStorageKeyValDBMaybe (owner, key) = do
+  mContractRoot <- fmap addressStateContractRoot <$> A.lookup (A.Proxy @AddressState) owner
+  fmap (fmap rlpDecode . join) . for mContractRoot $ \cr -> MP.getKeyVal cr (N.EvenNibbleString key)
+
+getRawStorageKeyValDB :: ( (Address `A.Alters` AddressState) m
+                         , (MP.StateRoot `A.Alters` MP.NodeData) m
+                         )
+                      => RawStorageKey -> m RawStorageValue
+getRawStorageKeyValDB (owner, key) = do
+  contractRoot <- addressStateContractRoot <$> A.lookupWithDefault (A.Proxy @AddressState) owner
+  maybe def rlpDecode <$> MP.getKeyVal contractRoot (N.EvenNibbleString key)
+
+getAllRawStorageKeyValsDB :: FullRawStorage m => Address -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyValsDB owner = do
-  addressState <- getAddressState owner
-  db <- fmap fst getRawStorageBlockDB
-  let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
-  kvs <- MP.unsafeGetAllKeyVals mpdb
+  contractRoot <- addressStateContractRoot <$> A.lookupWithDefault (A.Proxy @AddressState) owner
+  kvs <- MP.unsafeGetAllKeyVals contractRoot
   return $ map (fmap rlpDecode) kvs

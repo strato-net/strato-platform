@@ -32,36 +32,46 @@ pipeline {
 
     stage('Deploy') {
       steps {
-        sh '''#!/bin/bash -le
-          set -x
-          rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started
-          cp strato-worktree/docker-compose.yml strato-getting-started/
-          cd strato-getting-started
-          NODE_HOST=localhost
-          NODE_HOST=${NODE_HOST} genesis=smokeTest ./strato.sh -m 1 --single
-          docker ps
-          # Few quick tests
-          check_bloc() {
-            counter=0
-            until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
-            do
-              if [[ "$counter" -gt 120 ]]; then
-                echo "bloc took longer than 2 minutes to initialize! aborting."
-                exit 73
-              fi
-              echo "waiting for bloc to be available through nginx"
-              counter=$((counter+1))
-              sleep 1
-            done
-            echo "bloc is available through nginx - node is running"
-          }
-          check_bloc
-          echo "Restarting docker containers to simulate computer restart..."
-          docker-compose -p strato --log-level ERROR stop
-          docker-compose -p strato --log-level ERROR start
-          check_bloc
-        '''
+        withCredentials([
+            usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+        ]) {
+          sh '''#!/bin/bash -le
+            set -x
+            rm -rf strato-getting-started
+            git clone https://github.com/blockapps/strato-getting-started
+            cp strato-worktree/docker-compose.yml strato-getting-started/
+            cd strato-getting-started
+            export genesis=smokeTest
+            export NODE_HOST=localhost
+            export PASSWORD=123
+            export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
+            export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            export EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+            ./strato -m 1 --single
+            docker ps
+            # Few quick tests
+            check_bloc() {
+              counter=0
+              until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
+              do
+                if [[ "$counter" -gt 120 ]]; then
+                  echo "bloc took longer than 2 minutes to initialize! aborting."
+                  exit 73
+                fi
+                echo "waiting for bloc to be available through nginx"
+                counter=$((counter+1))
+                sleep 1
+              done
+              echo "bloc is available through nginx - node is running"
+            }
+            check_bloc
+            echo "Restarting docker containers to simulate computer restart..."
+            docker-compose -p strato --log-level ERROR stop
+            docker-compose -p strato --log-level ERROR start
+            PASSWORD=${PASSWORD} ./strato --set-password
+            check_bloc
+          '''
+        }
       }
     }
 

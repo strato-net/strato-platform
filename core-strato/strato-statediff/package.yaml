@@ -26,6 +26,7 @@ library:
     - blockapps-util
     - ethereum-rlp
     - merkle-patricia-db
+    - monad-alter
     - monad-control
     - persistent
     - persistent-postgresql
@@ -39,11 +40,9 @@ library:
     - FlexibleInstances
     - GeneralizedNewtypeDeriving
     - GADTs
-    - LambdaCase
     - RecordWildCards
     - FunctionalDependencies
     - DataKinds
-    - DeriveGeneric
     - ExplicitForAll
     - NamedFieldPuns
     - OverloadedStrings

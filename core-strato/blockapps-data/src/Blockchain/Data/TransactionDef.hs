@@ -1,26 +1,28 @@
-{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
 module Blockchain.Data.TransactionDef (
   Transaction(..),
+  isMessageTX,
   partialRLPEncode,
-  partialRLPDecode
+  partialRLPDecode,
+  formatChainId
   ) where
 
 import           Control.Arrow                ((***))
 import           Control.DeepSeq
 import           Data.Binary
 import qualified Data.ByteString              as B
+import           Data.Data
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (listToMaybe, maybeToList)
 import           Data.Text                    (Text)
+import qualified Data.Text                    as T
 import           Data.Text.Encoding           (decodeUtf8, encodeUtf8)
 import           Database.Persist.TH
 import           GHC.Generics
-
-import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
@@ -31,6 +33,7 @@ import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import qualified Text.Colors                  as CL
 import           Text.Format
 import           Text.ShortDescription
+import           Text.Tools                   (shorten)
 
 derivePersistField "Transaction"
 
@@ -63,21 +66,24 @@ data Transaction =
   PrivateHashTX {
     transactionTxHash    :: Word256,
     transactionChainHash :: Word256
-    } deriving (Show, Read, Eq, Ord, Generic)
-
-instance NFData Transaction
+    } deriving (Show, Read, Eq, Ord, Generic, Data, NFData)
 
 instance Binary Transaction where
   put = put . rlpSerialize . rlpEncode
   get = (rlpDecode . rlpDeserialize) <$> get
+
+formatChainId :: Maybe Word256 -> String
+formatChainId = \case
+  Nothing -> "<main chain>"
+  Just cid -> format $ SHA cid
 
 instance Format Transaction where
   format PrivateHashTX{transactionTxHash=h, transactionChainHash=ch} =
     CL.blue "Private Transaction Hash" ++
     tab (
       "\n" ++
-      "Transaction Hash:       " ++ show h ++ "\n" ++
-      "Transaction Chain Hash: " ++ show ch ++ "\n")
+      "Transaction Hash:       " ++ format (SHA h) ++ "\n" ++
+      "Transaction Chain Hash: " ++ format (SHA ch) ++ "\n")
   format t@MessageTX
              { transactionNonce=n
              , transactionGasPrice=gp
@@ -94,10 +100,10 @@ instance Format Transaction where
       "tNonce: " ++ show n ++ "\n" ++
       "gasPrice: " ++ show gp ++ "\n" ++
       "tGasLimit: " ++ show gl ++ "\n" ++
-      "to: " ++ show (pretty to') ++ "\n" ++
+      "to: " ++ format to' ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
       "tData: " ++ ("\n" ++ format d) ++ "\n" ++
-      "chainId: " ++ show cid ++ "\n" ++
+      "chainId: " ++ formatChainId cid ++ "\n" ++
       "metadata: " ++ show md ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
   format t@ContractCreationTX
@@ -117,12 +123,11 @@ instance Format Transaction where
       "tGasLimit: " ++ show gl ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
       "tInit: " ++ codeToString theCode ++ "\n" ++
-      "chainId: " ++ show cid ++ "\n" ++
+      "chainId: " ++ formatChainId cid ++ "\n" ++
       "metadata: " ++ show md ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
     where
       codeToString (Code init')        = format init'
-      codeToString (PrecompiledCode _) = "<precompiledCode>"
 
 instance RLPSerializable Transaction where
   rlpDecode (RLPArray (n:gp:gl:toAddr:val:i:vVal:rVal:sVal:xs)) =
@@ -190,7 +195,20 @@ instance RLPSerializable Transaction where
 
 
 instance ShortDescription Transaction where
-  shortDescription = format
+  shortDescription t | isMessageTX t = shorten 90 $
+    case (M.lookup "funcName" =<< transactionMetadata t, M.lookup "args" =<< transactionMetadata t, transactionData t) of
+      (Just n, Just a, _) -> "calling " ++ format (transactionTo t) ++ "/" ++ T.unpack n ++ T.unpack a
+      (_, _, "") -> "Value transfer of " ++ show (transactionValue t) ++ " to " ++ shortDescription (transactionTo t)
+      _ -> "MessageTX to " ++ format (transactionTo t)
+  shortDescription t = shorten 40 $
+    case (M.lookup "name" =<< transactionMetadata t, M.lookup "args" =<< transactionMetadata t) of
+      (Just n, Just "") -> "Create Contract " ++ T.unpack n
+      (Just n, Just a) -> "Create Contract " ++ T.unpack n ++ T.unpack a
+      _ -> "Create Contract"
+
+isMessageTX::Transaction->Bool
+isMessageTX MessageTX{} = True
+isMessageTX _           = False
 
 
 

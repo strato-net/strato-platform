@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+docker exec -it strato_strato_1 tail -c+1 -f "/var/lib/strato/logs/${1}"

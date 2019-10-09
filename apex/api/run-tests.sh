@@ -2,76 +2,48 @@
 set -o
 set -e
 
+if [[ -z $blocHost || -z $stratoHost || -z $vaultWrapperHost || -z $postgrestHost || -z $prometheusHost || -z $EXT_STORAGE_S3_BUCKET || -z $EXT_STORAGE_S3_ACCESS_KEY_ID || -z $EXT_STORAGE_S3_SECRET_ACCESS_KEY ]]; then
+  echo "ERROR: One of the required variables is not set or empty. See README.md for details.
+Vars required to run tests: 
+- blocHost, 
+- postgrestHost,
+- prometheusHost,
+- stratoHost,
+- vaultWrapperHost,
+- EXT_STORAGE_S3_BUCKET,
+- EXT_STORAGE_S3_ACCESS_KEY_ID,
+- EXT_STORAGE_S3_SECRET_ACCESS_KEY"
+  exit 1
+fi
+  
+source set-aux-env-vars.sh
+
 # Prepare testdata
 cd test/testdata
 rm -rf testdata.zip addresses.js
 zip -r testdata.zip .
 cd -
 
+if [[ ! "$NODE_ENV" = development  && ! "$NODE_ENV" = test ]]; then
+  echo "NODE_ENV should be either 'development' or 'test' to run the tests. It is ${NODE_ENV:-unset} instead."
+fi
+
+# Create and migrate db for the corresponding NODE_ENV (test/development):
+npm run db-create
+npm run db-migrate
+
+# When running tests on the host (for development)
 if [ "$NODE_ENV" == development ]; then
-
-  echo " "
-  echo "==========="
-  echo "Fixme: Have you run start:dev yet to create the apex_dev database?"
-  echo "Todo: maybe create that here instead..."
-  echo "==========="
-  echo " "
-
-  # Check if postgres client is installed
-  if ! command -v psql &> /dev/null; then
-    echo "no postgres-client installed, please install"
-    exit 20
+  postgres_port=${postgres_port:-15433}
+  config_dev_postgres_port=$(node -e 'console.log(require("./config/config.json")["development"]["port"])')
+  if [ ! "$postgres_port" = "$config_dev_postgres_port" ]; then 
+    echo "ERROR: postgres_port is altered and does not match with config/config.json ->development->port value"
+    exit 2
   fi
-
-  # Set environment variables
-  export SINGLE_NODE=true
-  export NODE_HOST=localhost
-  export OAUTH_ENABLED=${OAUTH_ENABLED:-}
-
-  #strato:3000 , bloc:8000 & vault-wrapper:8000 ports should be mapped locally in your docker-compose.yml
-  export blocRoot=http://${BLOC_HOST}/bloc/v2.2
-  export stratoRoot=http://${STRATO_HOST}/eth/v1.2
-  export vaultRoot=http://${VAULT_HOST}/strato/v2.3
-  export postgresPort=${POSTGRES_PORT:-5432}
-  export blocHttpHost=http://${BLOC_HOST}
-  export vaultWrapperHttpHost=http://${VAULT_HOST}
-  export postgrestHttpHost=http://${POSTGREST_HOST}
-
-  export PG_HOST=localhost
-  export PG_PORT=5432
-  export PG_USER=postgres
-  # Different syntax because this is read by psql
-  export PGPASSWORD=api
-
-  POSTGRES_NAME=apex_tests_postgres
-  trap "docker rm -f ${POSTGRES_NAME}" EXIT
-  docker run -d -p 5432:5432 --name="${POSTGRES_NAME}" \
-    -e POSTGRES_PASSWORD=api \
-    -e POSTGRES_DB=cirrus \
-    -v "/var/lib/postgresql/data" \
-    postgres:9.6
-
-  until psql -h "${PG_HOST}" \
-             -p "${PG_PORT}" \
-             -U "${PG_USER}" \
-             -c "SELECT 1;" \
-             >/dev/null \
-             2>/dev/null
-  do
-    echo 'Waiting for postgres to be available...'
-      sleep 1
-  done
-  echo 'postgres is available'
-
-
-
-
   ./node_modules/mocha/bin/mocha $NODE_DEBUG_OPTION --config=config-local.yaml test/
 fi
 
-# For jenkins, we expect a running environment
+# When running tests inside the apex container
 if [ "$NODE_ENV" == test ]; then
-  export stratoRoot="http://${stratoHost}/eth/v1.2"
-  export blocRoot="http://${blocHost}/bloc/v2.2"
   ./node_modules/mocha/bin/mocha $NODE_DEBUG_OPTION --config=config-prod.yaml test/
 fi

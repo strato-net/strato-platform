@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveDataTypeable     #-}
-{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE EmptyDataDecls         #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -48,12 +47,12 @@ getStorageInfoR = do
 
                                         E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
-                                        let matchChainId cid = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.just $ E.val $ fromHexText cid))
+                                        let matchChainId cid = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.val $ fromHexText cid))
 
                                         let chainCriteria = case chainIds of
-                                              [] -> [(E.isNothing $ addrStRef E.^. AddressStateRefChainId)]
+                                              [] -> [(addrStRef E.^. AddressStateRefChainId) E.==. E.val 0]
                                               [cid] -> if (T.unpack cid == "main")
-                                                           then  [(E.isNothing $ addrStRef E.^. AddressStateRefChainId)]
+                                                           then  [(addrStRef E.^. AddressStateRefChainId) E.==. E.val 0]
                                                            else if (T.unpack cid == "all")
                                                                     then []
                                                                     else [matchChainId cid]

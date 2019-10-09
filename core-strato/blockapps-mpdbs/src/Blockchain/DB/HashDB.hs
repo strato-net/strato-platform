@@ -1,37 +1,63 @@
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
 module Blockchain.DB.HashDB (
-  HashDB,
-  HasHashDB(..),
+  HashDB(..),
+  HasHashDB,
+  genericLookupHashDB,
+  genericInsertHashDB,
+  genericDeleteHashDB,
   hashDBPut,
   hashDBGet
   ) where
 
+import           Control.Arrow                               ((&&&))
 import           Control.DeepSeq
+import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader
 import           Data.Default
 import qualified Database.LevelDB                            as DB
+import           Prelude                                     hiding (lookup)
 
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.Util
 import qualified Data.NibbleString                           as N
 
-type HashDB = DB.DB
+newtype HashDB = HashDB { unHashDB :: DB.DB }
 
 instance NFData HashDB where
-  rnf a = a `seq` ()
+  rnf (HashDB a) = a `seq` ()
 
-class MonadIO m => HasHashDB m where
-  getHashDB :: m HashDB
+type HasHashDB m = (N.NibbleString `Alters` N.NibbleString) m
 
-hashDBPut::HasHashDB m => N.NibbleString->m ()
-hashDBPut unsafeKey = do
-  db <- getHashDB
+genericLookupHashDB :: MonadIO m => m HashDB -> N.NibbleString -> m (Maybe N.NibbleString)
+genericLookupHashDB f key = do
+  db <- unHashDB <$> f
+  fmap byteString2NibbleString <$> DB.get db def (nibbleString2ByteString key)
+
+genericInsertHashDB :: MonadIO m => m HashDB -> N.NibbleString -> N.NibbleString -> m ()
+genericInsertHashDB f key value = do
+  db <- unHashDB <$> f
   DB.put db def
-    (nibbleString2ByteString $ MP.keyToSafeKey unsafeKey)
-    (nibbleString2ByteString unsafeKey)
+    (nibbleString2ByteString key)
+    (nibbleString2ByteString value)
+
+genericDeleteHashDB :: MonadIO m => m HashDB -> N.NibbleString -> m ()
+genericDeleteHashDB f key = do
+  db <- unHashDB <$> f
+  DB.delete db def (nibbleString2ByteString key)
+
+instance MonadIO m => (N.NibbleString `Alters` N.NibbleString) (ReaderT HashDB m) where
+  lookup _ = genericLookupHashDB ask
+  insert _ = genericInsertHashDB ask
+  delete _ = genericDeleteHashDB ask
+
+hashDBPut :: HasHashDB m => N.NibbleString -> m ()
+hashDBPut = uncurry (insert (Proxy @N.NibbleString)) . (MP.keyToSafeKey &&& id)
 
 hashDBGet :: HasHashDB m => N.NibbleString -> m (Maybe N.NibbleString)
-hashDBGet key = do
-  db <- getHashDB
-  fmap byteString2NibbleString <$> DB.get db def (nibbleString2ByteString key)
+hashDBGet = lookup (Proxy @N.NibbleString)

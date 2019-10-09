@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImplicitParams             #-}
-{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -11,22 +10,25 @@
 module Strato.Strato23.Monad where
 
 import           Control.Exception.Lifted        hiding (Handler, handle)
-import           Data.Pool                       (Pool, withResource)
 import           Control.Monad.Base
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
+import qualified Data.ByteString.Lazy            as LB
 import           Data.Foldable
+import           Data.IORef
+import           Data.Pool                       (Pool, withResource)
 import           Data.Profunctor.Product.Default
 import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
-import           Database.PostgreSQL.Simple      (Connection,
-                                                  withTransaction)
+import           Data.Text.Encoding
+import           Database.PostgreSQL.Simple      (Connection, withTransaction)
 import           GHC.Stack
 import           Network.HTTP.Client
 import           Opaleye
 import           Servant
+import           Strato.Strato23.Crypto
 
 import           BlockApps.Logging
 
@@ -36,7 +38,7 @@ newtype VaultM x = VaultM
         ( LoggingT
           ( ExceptT VaultWrapperError IO )
         ) x
-  } deriving
+  } deriving newtype
   ( Functor
   , Applicative
   , Monad
@@ -48,6 +50,14 @@ newtype VaultM x = VaultM
 
 
 instance MonadError VaultWrapperError VaultM where
+  throwError NoPasswordError = do
+    $logErrorS "throwError/NoPasswordError"
+               "Password has not been set. Please set password by calling POST /strato/v2.3/password for node to function properly"
+    VaultM $ throwError NoPasswordError
+  throwError IncorrectPasswordError = do
+    $logErrorS "throwError/IncorrectPasswordError"
+      "The password has been set incorrectly. Please restart the node and supply the correct password."
+    VaultM $ throwError IncorrectPasswordError
   throwError err@(RuntimeError _) = do
     $logErrorS "throwError/RuntimeError" . Text.pack
         $ show err ++ "\n  callstack missing for runtime errors"
@@ -86,18 +96,22 @@ instance MonadBaseControl IO VaultM where
   restoreM = VaultM . restoreM
 
 data VaultWrapperEnv = VaultWrapperEnv
-  { httpManager  :: Manager
-  , dbPool       :: Pool Connection
+  { httpManager         :: Manager
+  , dbPool              :: Pool Connection
+  , superSecretPassword :: IORef (Maybe Text)
   }
 
 data VaultWrapperError
   = DBError Text
   | UserError Text
+  | NoPasswordError
+  | IncorrectPasswordError
   | CouldNotFind Text
   | AnError Text
   | Unimplemented Text
   | AlreadyExists Text
   | RuntimeError SomeException
+  | UserDoesNotExist Text
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -123,35 +137,55 @@ enterVaultWrapper env x
             err500{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "Something is broken in the Vault Wrapper Server database.",
-                     "Please contact your network administrator to have this problem fixed.",
-                     "(More information can be found in the Vault Wrapper logs.)"
+                     "Something is broken in the STRATO database.",
+                     "Please contact your network administrator to have this problem fixed."
                    ]}
           UserError err -> err400{errBody = fromString $ show err}
+          UserDoesNotExist t -> err401{errBody = LB.fromStrict $ encodeUtf8 t}
+          NoPasswordError ->
+            err503{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "STRATO has not been initialized properly.",
+                     "Please contact your network administrator to have this problem fixed."
+                   ]}
+          IncorrectPasswordError ->
+            err503{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "STRATO has not been initialized properly.",
+                     "Please contact your network administrator to have this problem fixed."
+                   ]}
           AlreadyExists err -> err409{errBody = fromString $ show err}
           CouldNotFind err -> err404{errBody = fromString $ show err}
           AnError _ ->
             err500{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "Something is broken in the Vault Wrapper Server.",
-                     "Please contact your network administrator to have this problem fixed.",
-                     "(More information can be found in the Vault Wrapper logs.)"
+                     "Something is broken in STRATO.",
+                     "Please contact your network administrator to have this problem fixed."
                    ]}
           Unimplemented err ->
             err501{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "You are using a feature of the Vault Wrapper Server that has not yet been implemented.",
+                     "You are using a feature that has not yet been implemented.",
                      Text.unpack err
                    ]}
           RuntimeError _ -> err500{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "Something wrong has happened inside of Vault Wrapper.",
-                     "Please contact your network administrator to have this problem fixed.",
-                     "(More information can be found in the Vault Wrapper logs.)"
+                     "Something wrong has happened inside of STRATO.",
+                     "Please contact your network administrator to have this problem fixed."
                    ]}
+
+withPassword :: (Password -> VaultM a) -> VaultM a
+withPassword f = do
+  pwioref <- asks superSecretPassword
+  password <- liftIO $ readIORef pwioref
+  case password of
+    Nothing -> vaultWrapperError NoPasswordError
+    Just pw -> f (textPassword pw)
 
 formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"

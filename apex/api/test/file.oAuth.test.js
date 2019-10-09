@@ -8,13 +8,7 @@ const assert = chai.assert;
 const expect = chai.expect;
 const sinon = require('sinon');
 
-const initDb = require('../migrations/init-script/initdb.js');
-const models = require('../models');
-const createInitialData = require('../migrations/init-script/init');
-const externalStorage = require(`${process.cwd()}/lib/externalStorage/externalStorage.oAuth`);
 const uploader = require('../lib/uploader');
-const bcrypt = require('bcrypt');
-const checkMode = require('../lib/checkMode');
 const appConfig = require('../config/app.config');
 
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
@@ -239,8 +233,6 @@ describe('File - ExternalStorage - OAuth', function () {
       it('replies OK with data exists', async function () {
         const res = await chai.request(app)
           .get('/bloc/file/verify')
-            .set('X-USER-UNIQUE-NAME',userData.userName)
-            .set('X-USER-ID',userData.hash)
             .query({
               'contractAddress': _contractAddress
             })
@@ -357,15 +349,11 @@ describe('File - ExternalStorage - OAuth', function () {
 
       it('replies OK with valid data', async function () {
         const username = util.uid(userData.userName)
-        const { user } = await co.wrap(oAuth.createKey)({
-          'X-USER-UNIQUE-NAME': username,
-          'X-USER-ID': userData.hash
-        })
+        const { user } = await co.wrap(oAuth.createKey)(username)
 
         const res = await chai.request(app)
           .post('/bloc/file/attest')
             .set('X-USER-UNIQUE-NAME',username)
-            .set('X-USER-ID',userData.hash)
             .send({
               contractAddress: _contractAddress,
             })

@@ -1,4 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE NoDeriveAnyClass #-}
 
 module Blockchain.Util
   ( module Blockchain.Util
@@ -10,6 +12,7 @@ import           Data.Bits
 import qualified Data.ByteString          as B
 import           Data.ByteString.Internal
 import           Data.Char
+import           Data.Data
 import qualified Data.Map.Strict          as M
 import           Data.Word
 import           Numeric
@@ -100,7 +103,7 @@ isContiguous [_]        = True
 isContiguous (x:y:rest) | y == x + 1 = isContiguous $ y:rest
 isContiguous _          = False
 
-newtype Microtime = Microtime Integer deriving (Read, Show, Eq, Ord, Num, Enum, Real, Integral)
+newtype Microtime = Microtime Integer deriving (Read, Show, Eq, Ord, Num, Enum, Real, Integral, Data, Typeable)
 
 posixTimeToMicrotime :: POSIXTime -> Microtime
 posixTimeToMicrotime = Microtime . round . (* 1000000)

@@ -2,7 +2,7 @@
 module SolidVM.Solidity.Parse.Statement where
 
 import           Control.Monad
-import           Data.Foldable (asum)
+import           Data.Foldable (asum, foldl')
 import           Data.Functor.Identity
 import qualified Data.Text as T
 import           Text.Parsec
@@ -12,6 +12,7 @@ import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
 import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Solidity.Xabi.Type
 
 
 
@@ -80,34 +81,32 @@ forStatement = do
 
 --ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
 
+location :: SolidityParser (Maybe Location)
+location = optionMaybe $ asum [ reserved "memory" >> return Memory
+                              , reserved "storage" >> return Storage
+                              ]
+
+varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
+varDefEntry tpar = liftM3 VarDefEntry tpar location identifier
+
 variableDefinitionStatement :: SolidityParser SimpleStatement
 variableDefinitionStatement = do
-  theType <- ((reserved "var" >> return Nothing) <|> Just <$> simpleTypeExpression)
-  _ <- optional $ reserved "memory"
-  names <- fmap ((:[]) . Just) identifier <|> parens (commaSep2 $ optionMaybe identifier)
-  expr <- optionMaybe (reservedOp "=" >> expression)
-  return $ VariableDefinition theType names expr
-
---TODO- someday we need to clean up this parser to avoid using any "try"s
-commaSep2 :: SolidityParser a -> SolidityParser [a]
-commaSep2 x = do
-  first <- try $ x <* comma
-  rest <- commaSep1 x
-  return $ first:rest
+  -- If "var", parse a standalone vardef or a type free tuple
+  -- If there's a type, this must not be a tuple
+  -- Otherwise, we have a tuple that needs to have a type on each entry
+  vardefs <- choice $ map try
+      [ reserved "var" >> fmap (:[]) (varDefEntry (return Nothing))
+      , reserved "var" >> parens (commaSep1 $ option BlankEntry $ varDefEntry (return Nothing))
+      , (:[]) <$> varDefEntry (Just <$> simpleTypeExpression)
+      , parens (commaSep1 $ varDefEntry (Just <$> simpleTypeExpression))
+      ]
+  VariableDefinition vardefs <$> optionMaybe (reservedOp "=" >> expression)
 
 expression :: SolidityParser Expression
 expression =
   buildExpressionParser
   [
-    [Postfix $ do
-      idxs <- many1 . brackets $ optionMaybe expression
-      return $ \x -> foldl IndexAccess x idxs],
-    [postfix $ choice
-     [
-       (do { name <- (reservedOp "." >> memberName); return $ flip MemberAccess name}),
-       (do { exps <- parens $ commaSep expression; return (\e -> FunctionCall e (map ((,) Nothing) exps))})
-     ]
-    ],
+    [postfix $ choice [functionCall, memberAccess, arrayIndex]],
     [Postfix (do { reservedOp "++"; return PlusPlus})],
     [Postfix (reservedOp "--" >> return MinusMinus)],
     [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
@@ -127,6 +126,28 @@ expression =
   ]
   (tuple <|> array <|> primaryExpression)
 
+functionCall :: SolidityParser (Expression -> Expression)
+functionCall = do
+  args <- parens $ choice
+    [ fmap NamedArgs . braces $ commaSep $ do
+        fieldName <- identifier
+        void colon -- haha
+        fieldExpr <- expression
+        return (fieldName, fieldExpr)
+    , OrderedArgs <$> commaSep expression
+    ]
+  return $ flip FunctionCall args
+
+memberAccess :: SolidityParser (Expression -> Expression)
+memberAccess = do
+  name <- reservedOp "." >> memberName
+  return $ flip MemberAccess name
+
+arrayIndex :: SolidityParser (Expression -> Expression)
+arrayIndex = do
+  idxs <- many1 . brackets $ optionMaybe expression
+  return $ \x -> foldl' IndexAccess x idxs
+
 binary :: String -> Operator String u Identity Expression
 binary x = Infix (do { reservedOp x; return (Binary x)}) AssocLeft
 
@@ -144,9 +165,9 @@ memberName = do
 
 tuple :: SolidityParser Expression -- includes the case of a 1-tuple, ie- parens...  but just returns as a simple expression
 tuple = do
-  exps <- parens $ commaSep1 expression
+  exps <- parens $ commaSep1 $ optionMaybe expression
   case exps of
-    [exp'] -> return exp'
+    [Just exp'] -> return exp'
     _ -> return $ TupleExpression exps
 
 array :: SolidityParser Expression
@@ -195,6 +216,7 @@ primaryExpression = do
   <|> (reserved "block" >> return (Variable "block"))
   <|> (reserved "tx" >> return (Variable "tx"))
   <|> (reserved "uint" >> return (Variable "uint"))
+  <|> (reserved "int" >> return (Variable "int"))
   <|> (reserved "byte" >> return (Variable "byte"))
   <|> (reserved "bytes" >> return (Variable "bytes"))
   <|> (reserved "string" >> return (Variable "string"))
