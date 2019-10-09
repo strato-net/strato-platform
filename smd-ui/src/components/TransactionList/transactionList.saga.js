@@ -14,7 +14,9 @@ import { handleErrors } from '../../lib/handleErrors';
 const url = env.STRATO_URL + "/transaction";
 
 export function getTx(last, chainId) {
-  const localUrl = chainId ? `${url}?chainid=${chainId}` : `${url}/last/15`;
+  const urlwithLastTag = last ? `${url}/last/${last}` : url;
+  const localUrl = chainId ? `${urlwithLastTag}?chainid=${chainId}` : urlwithLastTag;
+
   return fetch(
     localUrl,
     {

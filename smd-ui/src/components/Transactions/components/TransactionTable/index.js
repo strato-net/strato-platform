@@ -13,9 +13,9 @@ import HexText from '../../../HexText';
 class TransactionTable extends Component {
 
   componentDidMount() {
-    this.props.fetchTx(null, this.props.selectedChain);
-    const query = this.props.selectedChain ? {} : this.props.query;
-    this.props.executeQuery(RESOURCE_TYPES.transaction, query, this.props.selectedChain);
+    const { last } = this.props.query;
+    this.props.fetchTx(last, this.props.selectedChain);
+    this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
   }
 
   componentWillUnmount() {
@@ -23,7 +23,7 @@ class TransactionTable extends Component {
   }
 
   componentWillReceiveProps(newProps) {
-    const query = newProps.selectedChain ? {} : newProps.query;
+    const query = newProps.query;
     if (newProps.query !== this.props.query) {
       newProps.executeQuery(RESOURCE_TYPES.transaction, query, newProps.selectedChain);
     }
@@ -45,9 +45,8 @@ class TransactionTable extends Component {
   // }
 
   refresh = () => {
-    const query = this.props.selectedChain ? {} : this.props.query;
     this.props.clearQuery();
-    this.props.executeQuery(RESOURCE_TYPES.transaction, query, this.props.selectedChain);
+    this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
   };
 
   render() {
@@ -148,7 +147,7 @@ class TransactionTable extends Component {
         </div>
       </div>
 
-    const query = this.props.selectedChain ? {} : this.props.query;
+    const query = this.props.query;
     const removeQuery = this.props.removeQuery;
     const tags = Object.getOwnPropertyNames(query).map((queryType, i) => {
       const queryValue = query[queryType];
