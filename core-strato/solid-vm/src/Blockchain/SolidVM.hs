@@ -29,7 +29,7 @@ import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
-import qualified Data.List                            as List
+--import qualified Data.List                            as List
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
@@ -550,12 +550,12 @@ runStatement (Xabi.EmitStatement eventName exptups) = do
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
-  addEvent $ Event eventName expStrs
 
+  -- TODO: check that the events/args match the decls!!
   curInfo <- getCurrentCallInfo
   curCnct <- getCurrentContract
-  onTraced $ liftIO $ putStrLn $ "Event Emission Parsed: " ++ eventName ++ " (" ++ List.intercalate "," expStrs ++ ")" ++ " for contract " ++ _contractName curCnct ++ " with address " ++ (format $ currentAddress curInfo)
 
+  addEvent $ Event (_contractName curCnct) (currentAddress curInfo) eventName expStrs
   return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x

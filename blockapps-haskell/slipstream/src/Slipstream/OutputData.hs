@@ -225,38 +225,7 @@ createHistoryTable globalsIORef contract = do
     yield $ createHistoryTableQuery contract
     yield $ addHistoryUnique contract
 
-
-createEventTables :: OutputM m
-                  => IORef Globals
-                  -> [EventTable]
-                  -> ConduitM () Text m ()
-createEventTables globalsIORef events = do 
-  yieldMany . catMaybes =<< lift (mapM (createEventTable globalsIORef) events)
-   
-createEventTable :: OutputM m
-                 => IORef Globals
-                 -> EventTable
-                 -> m (Maybe Text)
-createEventTable globalsIORef ev = do
-  globals <- readIORef globalsIORef
-  let eventTuple = (eventContractName ev, eventName ev)
-      eventAlreadyCreated = eventTuple `Set.member` createdEvents globals
-  if eventAlreadyCreated
-  then
-    return Nothing
-  else do
-    setEventCreated globalsIORef eventTuple 
-    return (Just $ createEventTableQuery ev) 
-
-createEventTableQuery :: EventTable -> Text
-createEventTableQuery ev =
-  let tableName = T.concat [(eventContractName ev),  ".", (eventName ev)]
-  in T.concat   
-      [ "CREATE TABLE IF NOT EXISTS " , wrapDoubleQuotes tableName , " ("
-        , csv $ ["id SERIAL NOT NULL", "address text"] ++ (map (\t -> T.concat [t, " text"]) $ eventFields ev)
-        , ");"]
       
-
 insertIndexTable :: OutputM m
                  => IORef Globals
                  -> [ProcessedContract]
@@ -402,17 +371,71 @@ insertHistoryTableQuery contracts@(x:_) =
         , "\n  ON CONFLICT DO NOTHING;"
         ]
 
+-- Creates tables for all event declarations, stores table name in
+-- globals{createdEvents}
+createEventTables :: OutputM m
+                  => IORef Globals
+                  -> [EventTable]
+                  -> ConduitM () Text m ()
+createEventTables globalsIORef events = do 
+  yieldMany . catMaybes =<< lift (mapM (createEventTable globalsIORef) events)
+   
+createEventTable :: OutputM m
+                 => IORef Globals
+                 -> EventTable
+                 -> m (Maybe Text)
+createEventTable globalsIORef ev = do
+  globals <- readIORef globalsIORef
+  let eventTuple = (eventContractName ev, eventName ev)
+      eventAlreadyCreated = eventTuple `Set.member` createdEvents globals
+  if eventAlreadyCreated then 
+    return Nothing
+  else do
+    setEventCreated globalsIORef eventTuple 
+    return (Just $ createEventTableQuery ev) 
 
-insertEventTableQuery :: [AggregateEvent] -> Text
-insertEventTableQuery evs = 
- let conVals AggregateEvent{..} = wrapAndEscape . map escapeQuotes $
-        [ T.pack . shaToHex $ agEventTxHash
-        , agEventName
-        , agEventArgs
-        ]
-   in T.concat
-        [ "INSERT INTO event (transaction_hash, name, args)\n  VALUES "
-        , T.intercalate "," $ map conVals evs
+createEventTableQuery :: EventTable -> Text
+createEventTableQuery ev =
+  let tableName = T.concat [(eventContractName ev),  ".", (eventName ev)]
+  in T.concat   
+      [ "CREATE TABLE IF NOT EXISTS " , wrapDoubleQuotes tableName , " ("
+        , csv $ ["id SERIAL NOT NULL", "address text"] ++ (map (\t -> T.concat [t, " text"]) $ eventFields ev)
+        , ");"]
+
+-- Inserts rows for all event emissions into their respective tables
+--   Though this function checks that the tables exist before
+--   generating the insert query, the VM should prevent undeclared
+--   events from being emitted (it should also do an argument check)
+insertEventTables :: OutputM m
+                  => IORef Globals
+                  -> [AggregateEvent]
+                  -> ConduitM () Text m ()
+insertEventTables globalsIORef events = do
+  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) events)
+
+insertEventTable :: OutputM m
+                 => IORef Globals
+                 -> AggregateEvent
+                 -> m (Maybe Text)
+insertEventTable globalsIORef ev = do
+  globals <- readIORef globalsIORef
+  let eventTuple = (agContractName ev, agEventName ev)
+      eventExists = eventTuple `Set.member` createdEvents globals
+  $logInfoS "insertEventTable" . T.pack $ "eventExists: " ++ (show eventExists)
+  if eventExists then return (Just $ insertEventTableQuery ev)
+  else return Nothing 
+
+insertEventTableQuery :: AggregateEvent -> Text
+insertEventTableQuery ev = 
+ let tableName = T.concat [(agContractName ev), ".", (agEventName ev)]
+ in T.concat
+        [ "INSERT INTO "
+        ,  wrapDoubleQuotes tableName
+        , " VALUES "
+        , "( DEFAULT,\n" -- id, set by Postgres
+        , wrapSingleQuotes $ tshow $ agContractAddress ev
+        , ",\n"
+        , csv $ map wrapSingleQuotes $ agEventArgs ev
+        ,  " )"
         , "\n  ON CONFLICT DO NOTHING;"
         ]
-

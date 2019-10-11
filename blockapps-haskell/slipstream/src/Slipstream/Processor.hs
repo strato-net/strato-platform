@@ -28,7 +28,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Short as SB
-import Data.Conduit
+--import Data.Conduit
 import Data.Either (lefts, rights)
 import Data.Function
 import Data.Int (Int32)
@@ -85,7 +85,7 @@ data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
   , functionInserts :: [ProcessedContract]
-  , eventCreations    :: [EventTable]
+  , eventCreations  :: [EventTable]
   } deriving (Show)
 
 toAction :: BL.ByteString -> Action
@@ -366,8 +366,6 @@ processTheMessages env conn g messages = do
       events = parseEvents messages
       
 
-  outputData conn . yield $ insertEventTableQuery $ events
-
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
   
@@ -412,6 +410,7 @@ processTheMessages env conn g messages = do
           mDetails <- detailsForRow row False
 
           -- TODO (Dan): why are these details only there on creation for solidVM contracts?
+          --    also...it (at least EVM) will try to create event table per action...
           case mDetails of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
@@ -427,7 +426,8 @@ processTheMessages env conn g messages = do
                 Just (name, abi) -> do
                   let abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
                       cont = error "internal error: contract should be unused for solidvm"
-              
+--                      details = error "internal error: details should be unused for solidvm"
+
                   oldState <- readPreviousSolidVMState g addr chainId
                   indexContract <- rowToInsert g abiid row cont oldState
                   (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
@@ -447,4 +447,7 @@ processTheMessages env conn g messages = do
     outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
     outputData conn . createInsertFunctionHistoryTable g $ concatMap functionInserts ins
     outputData conn . createEventTables g $ concatMap eventCreations ins 
+  
+  outputData conn $ insertEventTables g events
   flushPendingWrites g
+  

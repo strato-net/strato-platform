@@ -95,28 +95,20 @@ formatAction AggregateAction{..} = T.concat
 
 
 data AggregateEvent = AggregateEvent
-  { agEventBlockHash       :: SHA
-  , agEventBlockTimestamp  :: UTCTime
-  , agEventBlockNumber      :: Integer
-  , agEventTxHash          :: SHA
-  , agEventTxChainId       :: Maybe ChainId
-  , agEventTxSender        :: Address
+  { agContractName         :: Text
+  , agContractAddress      :: Address
   , agEventName            :: Text
-  , agEventArgs            :: Text
+  , agEventArgs            :: [Text]
   } deriving (Show, Generic, NFData)
 
 
 squash :: Action -> [AggregateEvent]
 squash Action{..} = flip map (toList _actionEvents)
-  (\ev -> AggregateEvent 
-    { agEventBlockHash        = _actionBlockHash
-    , agEventBlockTimestamp   = _actionBlockTimestamp
-    , agEventBlockNumber      = _actionBlockNumber
-    , agEventTxHash           = _actionTransactionHash
-    , agEventTxChainId        = ChainId <$> _actionTransactionChainId
-    , agEventTxSender         = _actionTransactionSender
-    , agEventName             = T.pack (evName ev)
-    , agEventArgs             = T.intercalate "," $ (map T.pack (evArgs ev))
+  (\ev -> AggregateEvent
+    { agContractName          = T.pack $ evContractName ev
+    , agContractAddress       = evContractAddress ev
+    , agEventName             = T.pack $ evName ev
+    , agEventArgs             = map T.pack (evArgs ev)
     }
   )
  
