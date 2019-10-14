@@ -109,7 +109,7 @@ spec = describe "Action conversions" $ do
          },
          "events" : 
          [ { "eventContractName" : "Vehicle",
-             "eventContractAddress" : "2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6",
+             "eventContractAddress" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
              "eventArgs" : ["x", "y"]
            }
