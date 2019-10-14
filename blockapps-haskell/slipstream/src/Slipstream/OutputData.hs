@@ -421,9 +421,8 @@ insertEventTable globalsIORef ev = do
   globals <- readIORef globalsIORef
   let eventTuple = (agContractName ev, agEventName ev)
       eventExists = eventTuple `Set.member` createdEvents globals
-  $logInfoS "insertEventTable" . T.pack $ "eventExists: " ++ (show eventExists)
   if eventExists then return (Just $ insertEventTableQuery ev)
-  else return Nothing 
+  else return Nothing
 
 insertEventTableQuery :: AggregateEvent -> Text
 insertEventTableQuery ev = 

@@ -333,7 +333,6 @@ rowToHistories gref abiid row actions cont details oldState = do
 createEvents :: ContractDetails -> Bloc [EventTable]
 createEvents details = do
   let events = xabiEvents $ contractdetailsXabi details
-  $logInfoS "createEvents" . T.pack $ "creating the following events: " ++ (show events)
   return $ map makeEvent $ Map.toList events
   where
     makeEvent :: (Text, Event) -> EventTable 
@@ -364,6 +363,7 @@ processTheMessages env conn g messages = do
 
   let changes = parseActions messages
       events = parseEvents messages
+      -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
       
 
   unless (null messages) $
@@ -407,32 +407,26 @@ processTheMessages env conn g messages = do
               eventTables <- createEvents details
               pure . Right $ BatchedInserts indexContract hs fhs eventTables
         BS.ActionSolidVMDiff{} -> do
-          mDetails <- detailsForRow row False
-
-          -- TODO (Dan): why are these details only there on creation for solidVM contracts?
-          --    also...it (at least EVM) will try to create event table per action...
-          case mDetails of
-            Nothing -> pure . Left $ "No SolidVM details for code hash "
-                            <> (T.pack . show $ actionCodeHash row)
-                            <> " and no 'src' field found in metadata"
-            Just (cmId, details) -> do
-              ensureContractInstance cmId row
-              
-              mName <- getCachedSolidVMDetails g row
-              case mName of
-                Nothing -> pure . Left $ "No cached SolidVM details for code hash "
-                            <> (T.pack . show $ actionCodeHash row)
-                            <> " and no 'src' field found in metadata"
-                Just (name, abi) -> do
-                  let abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
-                      cont = error "internal error: contract should be unused for solidvm"
---                      details = error "internal error: details should be unused for solidvm"
-
-                  oldState <- readPreviousSolidVMState g addr chainId
-                  indexContract <- rowToInsert g abiid row cont oldState
-                  (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-                  eventTables <- createEvents details  
-                  pure . Right $ BatchedInserts indexContract hs fhs eventTables
+          mName <- getCachedSolidVMDetails g row
+          case mName of
+             Nothing -> pure . Left $ "No cached SolidVM details for code hash "
+                         <> (T.pack . show $ actionCodeHash row)
+                         <> " and no 'src' field found in metadata"
+             Just (name, abi) -> do
+               let abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
+                   cont = error "internal error: contract should be unused for solidvm"
+                   details = error "internal error: details should be unused for solidvm"
+               
+               mDetails <- detailsForRow row False
+               eventTables <- case mDetails of
+                 Nothing -> return []
+                 Just (cmId, deets) -> do
+                   ensureContractInstance cmId row
+                   createEvents deets
+               oldState <- readPreviousSolidVMState g addr chainId
+               indexContract <- rowToInsert g abiid row cont oldState
+               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
+               pure . Right $ BatchedInserts indexContract hs fhs eventTables
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -446,8 +440,10 @@ processTheMessages env conn g messages = do
     outputData conn . createInsertIndexTable g $ map indexInsert ins
     outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
     outputData conn . createInsertFunctionHistoryTable g $ concatMap functionInserts ins
-    outputData conn . createEventTables g $ concatMap eventCreations ins 
+    when (length (concatMap eventCreations ins) > 0) $
+      outputData conn . createEventTables g $ concatMap eventCreations ins
   
-  outputData conn $ insertEventTables g events
+  when (length events > 0) $ 
+    outputData conn $ insertEventTables g events
   flushPendingWrites g
   
