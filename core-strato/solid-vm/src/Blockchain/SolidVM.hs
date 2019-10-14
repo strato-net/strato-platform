@@ -546,17 +546,33 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   setVar dstVar =<< getString srcVar
   return Nothing
 
-runStatement (Xabi.EmitStatement eventName exptups) = do
+runStatement st@(Xabi.EmitStatement eventName exptups) = do
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
 
-  -- TODO: check that the events/args match the decls!!
+  -- checks that the event is declared and that the number of args match
+  --   DOES NOT check consistency of arg types
   curInfo <- getCurrentCallInfo
   curCnct <- getCurrentContract
+  let evs = _events curCnct
+      mEv = M.lookup (T.pack eventName) evs
+  case mEv of
+    Nothing -> do 
+      liftIO $ putStrLn $ "runStatement" ++ ": ignoring emit statement: " ++ 
+          (unparseStatement st) ++ ": NO corresponding event declaration exists" 
+      return Nothing
+    Just ev -> do
+      if (length exptups) /= (length $ Xabi.eventLogs ev) then do
+        liftIO $ putStrLn $ "runStatement" ++ ": ignoring emit statement: " ++ 
+            (unparseStatement st) ++ ": arguments are inconsistent with those" ++
+            " in the event's declaration" 
+        return Nothing
+      else do
+        addEvent $ Event (_contractName curCnct) (currentAddress curInfo) eventName expStrs
+        return Nothing
 
-  addEvent $ Event (_contractName curCnct) (currentAddress curInfo) eventName expStrs
-  return Nothing
+
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
 
