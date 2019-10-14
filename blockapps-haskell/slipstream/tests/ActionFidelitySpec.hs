@@ -7,6 +7,7 @@ import Data.Aeson.QQ
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import Data.Either
+import Data.Maybe (fromJust)
 import qualified Data.Map.Strict as M
 import Data.Time.Clock.POSIX
 import qualified Data.Sequence as S
@@ -144,5 +145,5 @@ spec = describe "Action conversions" $ do
             }]
           }
         , SS._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
-        , SS._actionEvents = S.singleton $ Event "Vehicle" (stringAddress "2e385b6a3aea46d4172df98617b5385c13b7100d") "Vehicle Event" ["x", "y"]
+        , SS._actionEvents = S.singleton $ Event "Vehicle" (fromJust $ stringAddress "2e385b6a3aea46d4172df98617b5385c13b7100d") "Vehicle Event" ["x", "y"]
       })
