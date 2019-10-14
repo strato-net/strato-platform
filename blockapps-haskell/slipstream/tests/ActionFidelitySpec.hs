@@ -17,6 +17,8 @@ import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Event
+import Blockchain.Strato.Model.Address
 import Blockchain.SolidVM.Model
 import qualified Slipstream.Data.Action as SS
 
@@ -142,5 +144,5 @@ spec = describe "Action conversions" $ do
             }]
           }
         , SS._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
-        , SS._actionEvents = S.empty
+        , SS._actionEvents = S.singleton $ Event "Vehicle" (stringAddress "2e385b6a3aea46d4172df98617b5385c13b7100d") "Vehicle Event" ["x", "y"]
       })
