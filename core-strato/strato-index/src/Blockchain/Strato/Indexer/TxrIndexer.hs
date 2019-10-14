@@ -136,7 +136,7 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                   _ -> return ()
                 -- void . lift $ EventDB.putEventDB ev
                 -- ^^^ NOTE: not actually putting events into eth database, but still need
-                --       them so we can check process governance changes
+                --       them so we can process governance changes
             TxResult r -> do
 
                 logF [ "Inserting TXResult for tx "

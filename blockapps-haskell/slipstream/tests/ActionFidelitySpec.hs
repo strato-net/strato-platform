@@ -103,7 +103,14 @@ spec = describe "Action conversions" $ do
          "metadata": {
            "name": "Vehicle",
            "src": "contract Vehicle {}"
-         }
+         },
+         "events" : 
+         [ { "eventContractName" : "Vehicle",
+             "eventContractAddress" : "2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6",
+             "eventName" : "Vehicle Event",
+             "eventArgs" : ["x", "y"]
+           }
+         ]
        }|]
 
      eitherDecode (encode oldStyle) `shouldBe` Right (SS.Action
