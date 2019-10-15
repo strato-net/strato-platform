@@ -310,7 +310,7 @@ services:
       KAFKA_MAX_REQUEST_SIZE: 33554432
       KAFKA_MESSAGE_MAX_BYTES: 33554432
       KAFKA_COMPRESSION_TYPE: gzip
-      KAFKA_LOG_RETENTION_BYTES: 10737418240  #10G per stream
+#      KAFKA_LOG_RETENTION_BYTES: 10737418240  #10G per stream
     image: wurstmeister/kafka:1.1.0
     restart: always
     volumes:
