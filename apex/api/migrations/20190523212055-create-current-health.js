@@ -18,7 +18,7 @@ module.exports = {
       lastFailureTimestamp : {
         type: Sequelize.DATE, //'TIMESTAMP',
         allowNull: false},
-      additionalInfo: {type: Sequelize.STRING, allowNull: true},
+      additionalInfo: {type: Sequelize.JSONB, allowNull: true},
       isBlocksValidInc: {type: Sequelize.BOOLEAN, allowNull: true},
       isLastPending: {type: Sequelize.BOOLEAN, allowNull: true},
       createdAt: {

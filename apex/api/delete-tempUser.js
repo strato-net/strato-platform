@@ -2,7 +2,7 @@
 
 const env       = process.env.NODE_ENV || 'development';
 const config    = require('./config/config.json')[env];
-config.port     = process.env.postgresPort || config.port;
+config.port     = process.env.postgres_port || config.port;
 const Sequelize = require('sequelize');
 
 const sequelize = new Sequelize(config.database, config.username, config.password, config);

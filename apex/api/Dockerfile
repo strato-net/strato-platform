@@ -21,4 +21,4 @@ RUN npm install
 
 COPY . /usr/src/app
 
-CMD [ "sh", "/usr/src/app/docker-run.sh" ]
+CMD [ "bash", "-c", "/usr/src/app/docker-run.sh" ]

@@ -53,7 +53,6 @@ import           Blockchain.VMOptions
 
 import           Executable.EVMCheckpoint
 import           Executable.EVMFlags
-import           Executable.IndexerFlags
 
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
@@ -111,10 +110,11 @@ ethereumVM = void . execContextM $ do
         let txPairs = [(ts,t) | VmTx ts t <- seqEvents]
             allTxs = map (uncurry VmTx) txPairs
             blocks = [b | VmBlock b <- seqEvents]
-        when (not $ null txPairs || flags_api_index_off) . void
+        when (not $ null txPairs) . void
                                   . K.withKafkaViolently
                                   . writeIndexEvents
                                   $ map (uncurry IndexTransaction) txPairs
+
         let ptxs = [IndexPrivateTx t | VmPrivateTx t <- seqEvents]
         when (not $ null ptxs) . void
                                . K.withKafkaViolently
