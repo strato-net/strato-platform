@@ -302,7 +302,7 @@ services:
       KAFKA_ADVERTISED_PORT: 9092
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_DELETE_TOPIC_ENABLE: "true"
-#      KAFKA_LOG_CLEANER_ENABLE: "false"
+      KAFKA_LOG_CLEANER_ENABLE: "false"
       KAFKA_LOG_DIRS: '/kafka/kafka-logs'
       KAFKA_LOG_RETENTION_HOURS: 2147483647
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
@@ -310,7 +310,6 @@ services:
       KAFKA_MAX_REQUEST_SIZE: 33554432
       KAFKA_MESSAGE_MAX_BYTES: 33554432
       KAFKA_COMPRESSION_TYPE: gzip
-#      KAFKA_LOG_RETENTION_BYTES: 10737418240  #10G per stream
     image: wurstmeister/kafka:1.1.0
     restart: always
     volumes:
