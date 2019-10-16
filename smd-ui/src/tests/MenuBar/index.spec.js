@@ -10,10 +10,9 @@ import * as checkMode from '../../lib/checkMode';
 const PROMETHEUS_OFFSET = 0;
 const BLOC_DOCS_OFFSET = 1;
 const STRATO_DOCS_OFFSET = 2;
-const LOGOUT_OFFSET = 3;
 
 // FIXME: enable after ^ fixed
-xdescribe('MenuBar: index', () => {
+describe('MenuBar: index', () => {
 
   let store = createStore(combineReducers({ form: formReducer }));
 
@@ -70,91 +69,6 @@ xdescribe('MenuBar: index', () => {
     });
 
     describe('button', () => {
-
-      test('execute block api', () => {
-        const props = {
-          currentUser: { username: 'tanuj44' },
-          isLoggedIn: true,
-          chainIds: [
-            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
-            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
-            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
-          selectChain: jest.fn(),
-          fetchChainIds: jest.fn(),
-          openOverlay: jest.fn(),
-          openLoginOverlay: jest.fn(),
-          logout: jest.fn(),
-          openWalkThroughOverlay: jest.fn(),
-          location: {
-            search: '?developer'
-          },
-          store: store
-        }
-
-        let wrapper = shallow(
-          <MenuBar.WrappedComponent {...props} />
-        ).dive().dive().dive();
-
-        wrapper.find('button').first().simulate('click');
-        expect(wrapper.find('button').get(BLOC_DOCS_OFFSET)).toMatchSnapshot();
-      });
-
-      test('execute strato api', () => {
-        const props = {
-          currentUser: { username: 'tanuj44' },
-          isLoggedIn: true,
-          chainIds: [
-            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
-            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
-            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
-          selectChain: jest.fn(),
-          fetchChainIds: jest.fn(),
-          openOverlay: jest.fn(),
-          openLoginOverlay: jest.fn(),
-          logout: jest.fn(),
-          openWalkThroughOverlay: jest.fn(),
-          location: {
-            search: "?developer"
-          },
-          store: store
-        }
-
-        let wrapper = shallow(
-          <MenuBar.WrappedComponent {...props} />
-        ).dive().dive().dive();
-
-        wrapper.find('button').at(STRATO_DOCS_OFFSET).simulate('click');
-        expect(wrapper.find('button').get(STRATO_DOCS_OFFSET)).toMatchSnapshot();
-      });
-
-      test('execute logout', () => {
-        const props = {
-          currentUser: { username: 'tanuj44' },
-          isLoggedIn: true,
-          chainIds: [
-            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
-            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
-            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
-          selectChain: jest.fn(),
-          fetchChainIds: jest.fn(),
-          openOverlay: jest.fn(),
-          openLoginOverlay: jest.fn(),
-          logout: jest.fn(),
-          openWalkThroughOverlay: jest.fn(),
-          location: {
-            search: "?developer"
-          },
-          store: store
-        }
-
-        let wrapper = shallow(
-          <MenuBar.WrappedComponent {...props} />
-        ).dive().dive().dive();
-
-        wrapper.find('button').at(LOGOUT_OFFSET).simulate('click');
-        expect(wrapper.find('button').get(LOGOUT_OFFSET)).toMatchSnapshot();
-        expect(props.logout).toHaveBeenCalled();
-      });
 
       test('execute for developer', () => {
         const props = {
@@ -292,66 +206,6 @@ xdescribe('MenuBar: index', () => {
       ).dive().dive().dive();
 
       expect(wrapper.debug()).toMatchSnapshot();
-    });
-
-    describe('button', () => {
-
-      test('execute block api', () => {
-        const props = {
-          isLoggedIn: false,
-          currentUser: { username: null },
-          chainIds: [
-            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
-            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
-            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
-          selectChain: jest.fn(),
-          fetchChainIds: jest.fn(),
-          openOverlay: jest.fn(),
-          openLoginOverlay: jest.fn(),
-          logout: jest.fn(),
-          openWalkThroughOverlay: jest.fn(),
-          location: {
-            search: '?developer'
-          },
-          store: store
-        }
-
-        let wrapper = shallow(
-          <MenuBar.WrappedComponent {...props} />
-        ).dive().dive().dive();
-
-        wrapper.find('button').first().simulate('click');
-        expect(wrapper.find('button').get(BLOC_DOCS_OFFSET)).toMatchSnapshot();
-      });
-
-      test('execute strato api', () => {
-        const props = {
-          isLoggedIn: false,
-          currentUser: { username: null },
-          chainIds: [
-            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
-            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
-            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
-          selectChain: jest.fn(),
-          fetchChainIds: jest.fn(),
-          openOverlay: jest.fn(),
-          openLoginOverlay: jest.fn(),
-          logout: jest.fn(),
-          openWalkThroughOverlay: jest.fn(),
-          location: {
-            search: "?developer"
-          },
-          store: store
-        }
-
-        let wrapper = shallow(
-          <MenuBar.WrappedComponent {...props} />
-        ).dive().dive().dive();
-
-        wrapper.find('button').at(STRATO_DOCS_OFFSET).simulate('click');
-        expect(wrapper.find('button').get(STRATO_DOCS_OFFSET)).toMatchSnapshot();
-      });
-
     });
 
   });
