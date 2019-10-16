@@ -25,24 +25,6 @@ Object {
 }
 `;
 
-exports[`MenuBar: index renders enterprise mode button execute block api 1`] = `
-<button
-  className="pt-button pt-minimal pt-small"
-  onClick={[Function]}
->
-  Bloc API
-</button>
-`;
-
-exports[`MenuBar: index renders enterprise mode button execute strato api 1`] = `
-<button
-  className="pt-button pt-minimal pt-small"
-  onClick={[Function]}
->
-  STRATO API
-</button>
-`;
-
 exports[`MenuBar: index renders enterprise mode component with values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
   <div className=\\"pt-navbar-group pt-align-left\\">
@@ -78,8 +60,8 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
           </Field>
         </div>
       </small>
+      <span className=\\"pt-navbar-divider\\" />
     </span>
-    <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
       STRATO 
       N/A
@@ -89,16 +71,6 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
       <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Prometheus Graphs
-        </button>
-      </a>
-      <a href=\\"http://localhost/docs/?url=/bloc/v2.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\" id=\\"tour-bloc-api-button\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Bloc API
-        </button>
-      </a>
-      <a href=\\"http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          STRATO API
         </button>
       </a>
       <span>
@@ -155,8 +127,8 @@ exports[`MenuBar: index renders enterprise mode component without values 1`] = `
           </Field>
         </div>
       </small>
+      <span className=\\"pt-navbar-divider\\" />
     </span>
-    <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
       STRATO 
       N/A
@@ -168,49 +140,12 @@ exports[`MenuBar: index renders enterprise mode component without values 1`] = `
           Prometheus Graphs
         </button>
       </a>
-      <a href=\\"http://localhost/docs/?url=/bloc/v2.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\" id=\\"tour-bloc-api-button\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Bloc API
-        </button>
-      </a>
-      <a href=\\"http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          STRATO API
-        </button>
-      </a>
     </div>
   </div>
 </nav>"
 `;
 
-exports[`MenuBar: index renders public mode button execute block api 1`] = `
-<button
-  className="pt-button pt-minimal pt-small"
-  onClick={[Function]}
->
-  Bloc API
-</button>
-`;
-
 exports[`MenuBar: index renders public mode button execute for developer 1`] = `null`;
-
-exports[`MenuBar: index renders public mode button execute logout 1`] = `
-<button
-  className="pt-button pt-minimal pt-small"
-  onClick={[Function]}
->
-  Logout
-</button>
-`;
-
-exports[`MenuBar: index renders public mode button execute strato api 1`] = `
-<button
-  className="pt-button pt-minimal pt-small"
-  onClick={[Function]}
->
-  STRATO API
-</button>
-`;
 
 exports[`MenuBar: index renders public mode component with values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
@@ -247,8 +182,8 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
           </Field>
         </div>
       </small>
+      <span className=\\"pt-navbar-divider\\" />
     </span>
-    <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
       STRATO 
       N/A
@@ -258,16 +193,6 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
       <a href=\\"/prometheus\\" target=\\"_black\\" rel=\\"noopener noreferrer\\">
         <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
           Prometheus Graphs
-        </button>
-      </a>
-      <a href=\\"http://localhost/docs/?url=/bloc/v2.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\" id=\\"tour-bloc-api-button\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          Bloc API
-        </button>
-      </a>
-      <a href=\\"http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
-        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-          STRATO API
         </button>
       </a>
       <span>
