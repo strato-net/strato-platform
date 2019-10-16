@@ -33,7 +33,7 @@ contract StringArray {
 }
 `;
 
-/*  it("can index string arrays", async () => {
+  it("can index string arrays", async () => {
     const [user, contract] = await upload("StringArray", stringArray);
     const index = await co.wrap(rest.waitQuery)(
       `${contract.name}?address=eq.${contract.address}`, 1);
@@ -88,7 +88,7 @@ contract Z {
     console.log(`Last index: ${JSON.stringify(indexZ, null, 2)}`);
   }).timeout(config.timeout);
 
-*/
+
 const eventsContract = `
 contract EventTest {
   event SlipstreamTest ( uint magic );
