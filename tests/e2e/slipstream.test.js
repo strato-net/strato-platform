@@ -104,7 +104,6 @@ contract EventTest {
 
     // multiple inserts with a single contract instance
     const [user,contract] = await upload("EventTest", eventsContract, options);
-  
     let magic = 97;
     let res = await co.wrap(rest.callMethod)(user, contract, "emitTest", {magic}, options);
     res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.97", 1);
