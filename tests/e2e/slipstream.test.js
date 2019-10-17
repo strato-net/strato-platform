@@ -20,7 +20,7 @@ async function upload(name, source, options={}) {
   console.log(`User ${user.name}@${user.address} uploading a ${name}`);
   console.log(`Source is ${source}`);
   options.doNotResolve = false;
-  const contract = await co.wrap(rest.uploadContractString)(user, name, source, {}, options);
+  const contract = await co.wrap(rest.uploadContractString)(user, name, source, {}, options=options);
   return [user, contract];
 }
 
@@ -92,16 +92,16 @@ contract Z {
 const eventsContract = `
 contract EventTest {
   event SlipstreamTest ( uint magic );
-
   function emitTest ( uint magic ) {
     emit SlipstreamTest ( magic );
+
   }
 }`;
 
   it("Will create and insert into tables for valid solidity events", async () => {
     // USING SolidVM (no EVM event support yet)
-    const options = {'VM' : 'SolidVM'};
-    
+    let options = {'VM' : 'SolidVM', 'doNotResolve' : false};
+
     // multiple inserts with a single contract instance
     const [user,contract] = await upload("EventTest", eventsContract, options);
   
@@ -111,15 +111,18 @@ contract EventTest {
     magic = 98;
     res = await co.wrap(rest.callMethod)(user, contract, "emitTest", {magic}, options);
     res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.98", 1);
+    magic = 99;
+    res = await co.wrap(rest.callMethod)(user, contract, "emitTest", {magic}, options);
+    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.99", 1);
    
     // insert with a different instance of the same contract (same table)
     const [user2,contract2] = await upload("EventTest", eventsContract, options);
     magic = 97;
-    
     res = await co.wrap(rest.callMethod)(user2, contract2, "emitTest", {magic}, options);
     res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.97", 2);
-
-
+    magic = 900;
+    res = await co.wrap(rest.callMethod)(user2, contract2, "emitTest", {magic}, options);
+    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.900", 1);
   }).timeout(config.timeout);
 
 
