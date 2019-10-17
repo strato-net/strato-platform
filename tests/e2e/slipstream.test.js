@@ -94,7 +94,6 @@ contract EventTest {
   event SlipstreamTest ( uint magic );
   function emitTest ( uint magic ) {
     emit SlipstreamTest ( magic );
-
   }
 }`;
 
