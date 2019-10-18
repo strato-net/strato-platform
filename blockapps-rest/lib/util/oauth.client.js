@@ -98,12 +98,12 @@ commander
   )
   .option(
     "-u, --username [username]",
-    `Username to use for the ${flows.resourceOwnerPasswordCredential} (can also be provided as serviceUsername in config)`,
+    `Username or client-id depending on the flow (optional)`,
     null
   )
   .option(
     "-p, --password [password]",
-    `Password to use for the ${flows.resourceOwnerPasswordCredential} (can also be provided as servicePassword in config)`,
+    `Password or client-secret depending on the flow (optional)`,
     null
   )
   .parse(process.argv);
@@ -294,7 +294,12 @@ const run = async function() {
       }
 
       try {
-        const ccToken = await oauth.getAccessTokenByClientSecret();
+        let ccToken;
+        if (commander.username && commander.password) {
+          ccToken = oauth.getAccessTokenByClientSecret(username, password);
+        } else {
+          ccToken = await oauth.getAccessTokenByClientSecret();
+        }
         if (commander.env) {
           envConfig[commander.env] = ccToken.token.access_token;
           const envContent = envfile.stringifySync(envConfig);
