@@ -27,8 +27,9 @@ class OAuthUtil {
       : "access_token"; //could use id_token
     this.serviceUsername = oauthConfig.serviceUsername;
     this.servicePassword = oauthConfig.servicePassword;
+    const url_split = o.openIdDiscoveryUrl.split("/");
+    this.tokenHost = url_split[0] + "//" + url_split[2];
   }
-
   /**
    * This function calls openIdConfigUrl to get openIdConfig and it also fetches
    * any public keys that maybe used to sign tokens
@@ -64,16 +65,13 @@ class OAuthUtil {
       o.getOpenIdConfig();
       // get tokenHost
 
-      const url_split = o.openIdDiscoveryUrl.split("/");
-      const tokenHost = url_split[0] + "//" + url_split[2];
-
       const credentials = {
         client: {
           id: o.clientId,
           secret: o.clientSecret
         },
         auth: {
-          tokenHost: tokenHost,
+          tokenHost: o.tokenHost,
           tokenPath: o.openIdConfig.token_endpoint,
           authorizePath: o.openIdConfig.authorization_endpoint
         }
@@ -124,12 +122,34 @@ class OAuthUtil {
   /**
    * This function gets the access token using the client secret
    * @method{getAccessTokenByClientSecret}
+   * @param {String} clientId
+   * @param {String} clientSecret
    * @returns AccessTokenResponse
    */
-  async getAccessTokenByClientSecret() {
+  async getAccessTokenByClientSecret(clientId, clientSecret) {
     const tokenConfig = {
       scope: this.scope
     };
+
+    let result;
+    if (clientId && clientSecret) {
+      const credential = {
+        client: {
+          id: clientId,
+          secret: clientSecret
+        },
+        auth: {
+          tokenHost: this.tokenHost,
+          tokenPath: this.openIdConfig.token_endpoint,
+          authorizePath: this.openIdConfig.authorization_endpoint
+        }
+      };
+
+      const altOAuth = simpleOauth.create(credentials);
+      const altResult = await altOAuth.clientCredentials.getToken(tokenConfig);
+      const altAccessTokenResponse = await altOAuth.accessToken.create(result);
+      return altAccessTokenResponse;
+    }
 
     const result = await this.oauth2.clientCredentials.getToken(tokenConfig);
     const accessTokenResponse = this.oauth2.accessToken.create(result);
@@ -140,6 +160,9 @@ class OAuthUtil {
   /**
    * This function gets the access token using a resource owner credential
    * @method{getAccessTokenByResourceOwnerCredential}
+   * @param {String} username
+   * @param {String} password
+   * @param {String} scope
    * @returns AccessTokenResponse
    */
   async getAccessTokenByResourceOwnerCredential(username, password, scope) {
