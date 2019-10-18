@@ -404,8 +404,7 @@ processTheMessages env conn g messages = do
               oldState <- readPreviousEVMState g addr chainId cont
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              eventTables <- createEvents details
-              pure . Right $ BatchedInserts indexContract hs fhs eventTables
+              pure . Right $ BatchedInserts indexContract hs fhs []
         BS.ActionSolidVMDiff{} -> do
           mName <- getCachedSolidVMDetails g row
           case mName of
