@@ -98,7 +98,7 @@ contract EventTest {
 }`;
 
   it("Will create and insert into tables for valid solidity events", async () => {
-    // USING SolidVM (no EVM event support yet)
+    // MUST USE SOLIDVM - EVM does not know about events
     let options = {'VM' : 'SolidVM', 'doNotResolve' : false};
 
     // multiple inserts with a single contract instance
