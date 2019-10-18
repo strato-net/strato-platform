@@ -27,7 +27,7 @@ class OAuthUtil {
       : "access_token"; //could use id_token
     this.serviceUsername = oauthConfig.serviceUsername;
     this.servicePassword = oauthConfig.servicePassword;
-    const url_split = o.openIdDiscoveryUrl.split("/");
+    const url_split = this.openIdDiscoveryUrl.split("/");
     this.tokenHost = url_split[0] + "//" + url_split[2];
   }
   /**
@@ -124,16 +124,16 @@ class OAuthUtil {
    * @method{getAccessTokenByClientSecret}
    * @param {String} clientId
    * @param {String} clientSecret
+   * @param {String} scope
    * @returns AccessTokenResponse
    */
-  async getAccessTokenByClientSecret(clientId, clientSecret) {
+  async getAccessTokenByClientSecret(clientId, clientSecret, scope) {
     const tokenConfig = {
-      scope: this.scope
+      scope: scope || this.scope
     };
 
-    let result;
     if (clientId && clientSecret) {
-      const credential = {
+      const credentials = {
         client: {
           id: clientId,
           secret: clientSecret
@@ -147,7 +147,9 @@ class OAuthUtil {
 
       const altOAuth = simpleOauth.create(credentials);
       const altResult = await altOAuth.clientCredentials.getToken(tokenConfig);
-      const altAccessTokenResponse = await altOAuth.accessToken.create(result);
+      const altAccessTokenResponse = await altOAuth.accessToken.create(
+        altResult
+      );
       return altAccessTokenResponse;
     }
 

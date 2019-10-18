@@ -296,7 +296,10 @@ const run = async function() {
       try {
         let ccToken;
         if (commander.username && commander.password) {
-          ccToken = oauth.getAccessTokenByClientSecret(username, password);
+          ccToken = await oauth.getAccessTokenByClientSecret(
+            commander.username,
+            commander.password
+          );
         } else {
           ccToken = await oauth.getAccessTokenByClientSecret();
         }
