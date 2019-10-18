@@ -127,11 +127,16 @@ class OAuthUtil {
    * @param {String} scope
    * @returns AccessTokenResponse
    */
-  async getAccessTokenByClientSecret(clientId, clientSecret, scope) {
+  async getAccessTokenByClientSecret(
+    clientId = undefined,
+    clientSecret = undefined,
+    scope = undefined
+  ) {
     const tokenConfig = {
       scope: scope || this.scope
     };
 
+    let accessTokenResponse;
     if (clientId && clientSecret) {
       const credentials = {
         client: {
@@ -147,15 +152,11 @@ class OAuthUtil {
 
       const altOAuth = simpleOauth.create(credentials);
       const altResult = await altOAuth.clientCredentials.getToken(tokenConfig);
-      const altAccessTokenResponse = await altOAuth.accessToken.create(
-        altResult
-      );
-      return altAccessTokenResponse;
+      accessTokenResponse = await altOAuth.accessToken.create(altResult);
+    } else {
+      const result = await this.oauth2.clientCredentials.getToken(tokenConfig);
+      accessTokenResponse = this.oauth2.accessToken.create(result);
     }
-
-    const result = await this.oauth2.clientCredentials.getToken(tokenConfig);
-    const accessTokenResponse = this.oauth2.accessToken.create(result);
-
     return accessTokenResponse;
   }
 
