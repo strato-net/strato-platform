@@ -40,7 +40,7 @@ describe('CreateContract: index', () => {
   describe('render component (public mode)', () => {
 
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     });
 
     test('render contracts without values', () => {
@@ -141,7 +141,7 @@ describe('CreateContract: index', () => {
   describe('render component (enterprise mode)', () => {
 
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     });
 
     test('render contracts without values', () => {
@@ -537,10 +537,10 @@ describe('CreateContract: index', () => {
         accounts: indexAccountsMock
       },
       user: {
-        "currentUser": {
-          "id": 6,
-          "username": "tanuj41",
-          "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+        oauthUser: {
+          id: 6,
+          username: "tanuj41",
+          address: "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
         },
       },
       chains: {

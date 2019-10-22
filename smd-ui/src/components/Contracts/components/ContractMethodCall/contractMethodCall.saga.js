@@ -14,16 +14,19 @@ import {
 import { fetchState } from '../ContractCard/contractCard.actions';
 import { env } from '../../../../env.js'
 import { handleErrors } from '../../../../lib/handleErrors';
+import { createUrl } from '../../../../lib/url';
+import { isOauthEnabled } from '../../../../lib/checkMode';
 
-const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress?:chainid";
-const methodUrl = env.BLOC_URL + "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve&:chainid";
+const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress";
+const blocMethodUrl = env.BLOC_URL + "/users/:username/:userAddress/contract/:contractName/:contractAddress/call";
+const transactionUrl = env.STRATO_URL_V23 + "/transaction"
 
-export function getArgs(contractName, contractAddress, symbol, chainId) {
-    const localContractUrl = contractsUrl
-              .replace(':contractName', contractName)
-              .replace(':contractAddress', contractAddress);
+export function getArgs(contractName, contractAddress, symbol, chainid) {
+  const options = { params: { contractName, contractAddress }, query: { chainid } };
+  const url = createUrl(contractsUrl, options);
+
   return fetch(
-      chainId ? localContractUrl.replace(":chainid", `chainid=${chainId}`) : localContractUrl.replace("?:chainid", ''),
+    url,
     {
       method: 'GET',
       credentials: "include",
@@ -41,14 +44,46 @@ export function getArgs(contractName, contractAddress, symbol, chainId) {
 }
 
 export function postMethodCall(payload) {
-  const localMethodUrl = methodUrl
-    .replace(':username', payload.username)
-    .replace(':userAddress', payload.userAddress)
-    .replace(":contractName", payload.contractName)
-    .replace(":contractAddress", payload.contractAddress);
+  const isModeOauth = isOauthEnabled();
+  const options = isModeOauth ? { query: { resolve: true, chainid: payload.chainid } } :
+    {
+      params: {
+        username: payload.username,
+        userAddress: payload.userAddress,
+        contractName: payload.contractName,
+        contractAddress: payload.contractAddress
+      }, query: { resolve: true, chainid: payload.chainid }
+    };
+
+  const url = createUrl(isModeOauth ? transactionUrl : blocMethodUrl, options);
+
+  const blocBody = {
+    password: payload.password,
+    method: payload.methodName,
+    value: payload.value && !isNaN(parseFloat(payload.value)) ? parseFloat(payload.value) : 0,
+    args: payload.args
+  };
+
+  const oauthBody = {
+    "txs": [
+      {
+        "payload": {
+          "contractName": payload.contractName,
+          "contractAddress": payload.contractAddress,
+          "value": payload.value,
+          "method": payload.methodName,
+          "args": payload.args,
+          "metadata": {}
+        },
+        "type": "FUNCTION"
+      }
+    ]
+  }
+
+  const body = isModeOauth ? oauthBody : blocBody;
 
   return fetch(
-    payload.chainId ? localMethodUrl.replace(":chainid", `chainid=${payload.chainId}`) : localMethodUrl.replace("&:chainid", ''),
+    url,
     {
       method: 'POST',
       credentials: "include",
@@ -56,12 +91,7 @@ export function postMethodCall(payload) {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        password: payload.password,
-        method: payload.methodName,
-        value: payload.value && !isNaN(parseFloat(payload.value)) ? parseFloat(payload.value) : 0,
-        args: payload.args
-      })
+      body: JSON.stringify(body)
     })
     .then(handleErrors)
     .then(function (response) {
@@ -85,7 +115,7 @@ export function* methodCall(action) {
 
 export function* fetchArgs(action) {
   try {
-      const response = yield call(getArgs, action.name, action.address, action.symbol, action.chainId);
+    const response = yield call(getArgs, action.name, action.address, action.symbol, action.chainId);
     const args = response.xabi.funcs[action.symbol].args;
     yield put(methodCallFetchArgsSuccess(action.key, args));
   }

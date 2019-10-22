@@ -122,6 +122,91 @@ Object {
 }
 `;
 
+exports[`Accounts: reducer fetch Oauth accounts on failure 1`] = `
+Object {
+  "accounts": Object {
+    "123456789012345678901234567890123": Object {},
+    "Admin_1085_64667": Object {},
+    "Admin_1177_31203": Object {},
+    "Admin_1177_39206": Object {},
+    "Admin_1177_49507": Object {},
+    "Admin_1301_62816": Object {},
+    "Admin_1301_86023": Object {},
+    "Buyer1": Object {},
+    "Buyer1177_18955": Object {},
+    "Buyer2": Object {},
+    "Supplier0_1301_46441": Object {},
+    "Supplier1": Object {},
+    "Supplier1177_62701": Object {},
+    "Supplier1_1301_46441": Object {},
+    "Supplier2": Object {},
+    "Supplier2_1301_46441": Object {},
+    "User_1177_14462": Object {},
+    "User_1177_26292": Object {},
+    "User_1177_37717": Object {},
+    "User_1177_42489": Object {},
+    "User_1177_52307": Object {},
+    "User_1177_59359": Object {},
+    "User_1177_59578": Object {},
+    "User_1177_69645 ?#%!@*": Object {},
+    "User_1177_79118": Object {},
+    "tanuj": Object {},
+  },
+  "currentAccountDetail": Object {
+    "balance": "3000000000000000000000",
+  },
+  "error": undefined,
+  "filter": "",
+  "oauthAccounts": Array [],
+}
+`;
+
+exports[`Accounts: reducer fetch Oauth accounts on success 1`] = `
+Object {
+  "accounts": Object {
+    "123456789012345678901234567890123": Object {},
+    "Admin_1085_64667": Object {},
+    "Admin_1177_31203": Object {},
+    "Admin_1177_39206": Object {},
+    "Admin_1177_49507": Object {},
+    "Admin_1301_62816": Object {},
+    "Admin_1301_86023": Object {},
+    "Buyer1": Object {},
+    "Buyer1177_18955": Object {},
+    "Buyer2": Object {},
+    "Supplier0_1301_46441": Object {},
+    "Supplier1": Object {},
+    "Supplier1177_62701": Object {},
+    "Supplier1_1301_46441": Object {},
+    "Supplier2": Object {},
+    "Supplier2_1301_46441": Object {},
+    "User_1177_14462": Object {},
+    "User_1177_26292": Object {},
+    "User_1177_37717": Object {},
+    "User_1177_42489": Object {},
+    "User_1177_52307": Object {},
+    "User_1177_59359": Object {},
+    "User_1177_59578": Object {},
+    "User_1177_69645 ?#%!@*": Object {},
+    "User_1177_79118": Object {},
+    "tanuj": Object {},
+  },
+  "currentAccountDetail": null,
+  "error": null,
+  "filter": "",
+  "oauthAccounts": Array [
+    Object {
+      "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+      "username": "clinicaladmin",
+    },
+    Object {
+      "address": "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547",
+      "username": "clinicalops",
+    },
+  ],
+}
+`;
+
 exports[`Accounts: reducer fetch account details on failure 1`] = `
 Object {
   "accounts": Object {
@@ -631,6 +716,7 @@ Object {
     "status": false,
   },
   "filter": "",
+  "oauthAccounts": Array [],
 }
 `;
 

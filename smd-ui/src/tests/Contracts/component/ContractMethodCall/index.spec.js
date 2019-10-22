@@ -20,7 +20,7 @@ describe('ContractMethodCall: index', () => {
       modal: {},
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
-      currentUser: {
+      oAuthUser: {
         "id": '',
         "username": '',
         "address": ''
@@ -37,7 +37,7 @@ describe('ContractMethodCall: index', () => {
       store: store
     }
 
-    checkMode.isModePublic = jest.fn().mockReturnValue(false);
+    checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
 
     const wrapper = shallow(
       <ContractMethodCall.WrappedComponent {...props} />
@@ -53,7 +53,7 @@ describe('ContractMethodCall: index', () => {
       modalUsername: 'Buyer1',
       chainLabel: chain,
       chainLabelIds: chain["airline cartel 9"],
-      currentUser: {
+      oAuthUser: {
         "id": '',
         "username": 'Supplier1',
         "address": '370adf114257cb0e0025eedf0a96261b51af23e3'
@@ -68,7 +68,7 @@ describe('ContractMethodCall: index', () => {
       store: store
     }
 
-    checkMode.isModePublic = jest.fn().mockReturnValue(true);
+    checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
 
     const wrapper = shallow(
       <ContractMethodCall.WrappedComponent {...props} />
@@ -88,10 +88,9 @@ describe('ContractMethodCall: index', () => {
       },
       user: {
         "username": null,
-        "currentUser": {
-          "id": 6,
+        "oAuthUser": {
           "username": "tanuj41",
-          "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+          "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
         },
         "isLoggedIn": true,
         "error": null,
@@ -108,7 +107,7 @@ describe('ContractMethodCall: index', () => {
       modal: modals,
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
-      currentUser: {
+      oAuthUser: {
         "id": 6,
         "username": "tanuj41",
         "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
@@ -137,7 +136,7 @@ describe('ContractMethodCall: index', () => {
       modal: modals,
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
-      currentUser: {
+      oAuthUser: {
         "id": 6,
         "username": "tanuj41",
         "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
@@ -167,7 +166,7 @@ describe('ContractMethodCall: index', () => {
       modal: modals,
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
-      currentUser: {
+      oAuthUser: {
         "id": 6,
         "username": "tanuj41",
         "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"

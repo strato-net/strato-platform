@@ -7,3 +7,7 @@ export function isModePublic() {
 export function isModeOauth() {
   return env.SMD_MODE === 'oauth'
 }
+
+export function isOauthEnabled() {
+  return env.OAUTH_ENABLED
+}

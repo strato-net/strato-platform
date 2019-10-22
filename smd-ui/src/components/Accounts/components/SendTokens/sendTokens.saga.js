@@ -11,20 +11,44 @@ import {
 
 import { env } from '../../../../env';
 import { handleErrors } from '../../../../lib/handleErrors';
+import { isOauthEnabled } from '../../../../lib/checkMode';
+import { createUrl } from '../../../../lib/url';
 
-const url = env.BLOC_URL + "/users/:user/:address/send?resolve&:chainid"
+const blocSendUrl = env.BLOC_URL + "/users/:user/:address/send";
+const transactionUrl = env.STRATO_URL_V23 + "/transaction";
 
-export function sendTokensAPICall(from, fromAddress, toAddress, value, password, chainId) {
-  const sendUrl = url.replace(":user", from).replace(":address", fromAddress);
+export function sendTokensAPICall(from, fromAddress, toAddress, value, password, chainid) {
+
+  const options = isOauthEnabled() ? { query: { resolve: true, chainid } } : { params: { user: from, address: fromAddress }, query: { resolve: true, chainid } };
+  const url = createUrl(isOauthEnabled() ? transactionUrl : blocSendUrl, options);
+
+  const blocBody = { value, password, toAddress };
+  const oauthBody = {
+    "txs": [
+      {
+        "payload": {
+          "toAddress": toAddress,
+          "value": value,
+          "metadata": {
+
+          }
+        },
+        "type": "TRANSFER"
+      }
+    ]
+  }
+
+  const body = isOauthEnabled() ? oauthBody : blocBody;
+
   return fetch(
-    chainId ? sendUrl.replace(":chainid", `chainid=${chainId}`) : sendUrl.replace("&:chainid", ''),
+    url,
     {
       method: 'POST',
       credentials: "include",
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ value, password, toAddress })
+      body: JSON.stringify(body)
     }
   )
     .then(handleErrors)
@@ -47,7 +71,8 @@ export function* sendTokens(action) {
       action.password,
       action.chainId
     );
-    yield put(sendTokensSuccess(response));
+    const data = isOauthEnabled() ? response[0] : response;
+    yield put(sendTokensSuccess(data));
   }
   catch (err) {
     yield put(sendTokensFailure(err.message));

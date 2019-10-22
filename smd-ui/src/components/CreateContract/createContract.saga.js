@@ -15,21 +15,45 @@ import { fetchCirrusInstances } from '../Contracts/components/ContractCard/contr
 import { env } from '../../env';
 import { COMPILE_CHAIN_CONTRACT_REQUEST, compileChainContractSuccess, compileChainContractFailure } from '../CreateChain/createChain.actions';
 import { handleErrors } from '../../lib/handleErrors';
+import { isOauthEnabled } from '../../lib/checkMode';
+import { createUrl } from '../../lib/url';
 
-const url = env.BLOC_URL + "/users/:user/:address/contract?resolve&:chainid"
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
+const userContractUrl = env.BLOC_URL + "/users/:username/:address/contract";
+const transactionUrl = env.STRATO_URL_V23 + "/transaction"
 
-export function createContractApiCall(contract, src, username, address, password, args, chainId, metadata) {
-  const contractUrl = url.replace(":user", username).replace(":address", address);
+export function createContractApiCall(contract, src, username, address, password, args, chainid, metadata) {
+
+  const options = isOauthEnabled() ? { query: { resolve: true, chainid } } : { params: { username, address }, query: { resolve: true, chainid } };
+  const url = createUrl(isOauthEnabled() ? transactionUrl : userContractUrl, options);
+
+  const blocBody = { contract, value: 0, password, src, args, metadata };
+  const oauthBody = {
+    "txs": [
+      {
+        "payload": {
+          contract,
+          src,
+          args,
+          metadata
+        },
+        "type": "CONTRACT"
+      }
+    ]
+  }
+
+  const body = isOauthEnabled() ? oauthBody : blocBody;
+
   return fetch(
-    chainId ? contractUrl.replace(":chainid", `chainid=${chainId}`) : contractUrl.replace("&:chainid", ''), {
+    url,
+    {
       method: 'POST',
       credentials: "include",
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ contract, value: 0, password, src, args, metadata })
+      body: JSON.stringify(body)
     })
     .then(handleErrors)
     .then(function (response) {
@@ -57,6 +81,28 @@ export function compileContractApiCall(contractName, source, s) {
         }
       ])
     })
+      .then(handleErrors)
+      .then(function (res) {
+        if (res.ok) {
+          return res.json();
+        } else {
+          return res.text().then(function (value) {
+            throw value;
+          });
+        }
+      }).catch(function (error) {
+        throw error;
+      });
+  }
+
+  return fetch(compileUrl, {
+    method: 'POST',
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: "src=" + encodeURIComponent(source)
+  })
     .then(handleErrors)
     .then(function (res) {
       if (res.ok) {
@@ -69,34 +115,12 @@ export function compileContractApiCall(contractName, source, s) {
     }).catch(function (error) {
       throw error;
     });
-  }
-
-  return fetch(compileUrl, {
-    method: 'POST',
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: "src=" + encodeURIComponent(source)
-  })
-  .then(handleErrors)
-  .then(function (res) {
-    if (res.ok) {
-      return res.json();
-    } else {
-      return res.text().then(function (value) {
-        throw value;
-      });
-    }
-  }).catch(function (error) {
-    throw error;
-  });
 }
 
 export function* createContract(action) {
   try {
     let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments, action.payload.chainId, action.payload.metadata);
-    yield put(createContractSuccess(response));
+    yield put(createContractSuccess(response[0]));
     yield put(updateToast());
     yield put(fetchContracts());
     yield put(fetchCirrusInstances(action.payload.contract));

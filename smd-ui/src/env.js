@@ -7,6 +7,7 @@ const bloc_doc_uri = '/docs/?url=/bloc/v2.2/swagger.json';
 const cirrus_uri = '/cirrus/search';
 const strato_uri = '/strato-api/eth/v1.2';
 const strato_doc_uri = '/docs/?url=/strato-api/eth/v1.2/swagger.json';
+const strato_v23_uri = '/strato/v2.3'
 
 const node_host = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? window.NODE_HOST : (process.env.REACT_APP_NODE_HOST ? process.env.REACT_APP_NODE_HOST : 'localhost');
 const oauth_enabled = window.OAUTH_ENABLED && window.OAUTH_ENABLED !== '__OAUTH_ENABLED__' ? window.OAUTH_ENABLED==='true' : process.env.REACT_APP_OAUTH_ENABLED==='true';
@@ -24,6 +25,7 @@ export const env = {
   NODE_HOST: node_host,
   OAUTH_ENABLED: oauth_enabled,
   STRATO_URL: `${http_protocol}://${node_host}${strato_uri}`,
+  STRATO_URL_V23: `${http_protocol}://${node_host}${strato_v23_uri}`,
   STRATO_DOC_URL: `${http_protocol}://${node_host}${strato_doc_uri}`,
   SOCKET_SERVER: `${ws_protocol}://${node_host}/`,
   POLLING_FREQUENCY: window.POLLING_FREQUENCY && window.POLLING_FREQUENCY !== '__POLLING_FREQUENCY__' ? window.POLLING_FREQUENCY : 5 * 1000,

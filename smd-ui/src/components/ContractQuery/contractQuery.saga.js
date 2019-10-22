@@ -13,6 +13,7 @@ import {
 } from './contractQuery.actions';
 import { env } from '../../env.js'
 import { handleErrors } from '../../lib/handleErrors';
+import { createUrl } from '../../lib/url';
 
 const cirrusUrl = env.CIRRUS_URL + '/:contractName?:queryString:chainid';
 const contractUrl = env.BLOC_URL + '/contracts/:contractName/Latest';
@@ -20,10 +21,11 @@ const contractUrl = env.BLOC_URL + '/contracts/:contractName/Latest';
 export function queryCirrusRequest(name, queryString, chainId) {
   let chain;
   if (queryString === '') {
-    chain =  chainId ? `chainId=eq.${chainId}` : ``;
+    chain = chainId ? `chainId=eq.${chainId}` : ``;
   } else {
-    chain =  chainId ? `&chainId=eq.${chainId}` : ``;
+    chain = chainId ? `&chainId=eq.${chainId}` : ``;
   }
+
   return fetch(
     cirrusUrl.replace(":contractName", name).replace(':queryString', queryString).replace(':chainid', chain),
     {
@@ -43,8 +45,11 @@ export function queryCirrusRequest(name, queryString, chainId) {
 }
 
 export function queryCirrusVarsRequest(contractName) {
+  const options = { params: { contractName } };
+  const url = createUrl(contractUrl, options);
+
   return fetch(
-    contractUrl.replace(":contractName", contractName),
+    url,
     {
       method: 'GET',
       credentials: "include",

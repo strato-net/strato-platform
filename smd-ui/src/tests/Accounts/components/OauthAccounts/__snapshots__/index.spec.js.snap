@@ -1,0 +1,117 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`OauthAccounts: index mapStateToProps with default values 1`] = `
+Object {
+  "filter": "Search accounts",
+  "oauthAccount": Object {
+    "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+    "username": "clinicaladmin",
+  },
+  "oauthAccounts": Array [
+    Object {
+      "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+      "username": "clinicaladmin",
+    },
+    Object {
+      "address": "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547",
+      "username": "clinicalops",
+    },
+  ],
+  "selectedChain": "airline cartel 1",
+}
+`;
+
+exports[`OauthAccounts: index render with empty values 1`] = `
+"<div>
+  <div className=\\"row\\">
+    <div className=\\"col-sm-4 text-left\\">
+      <h3>
+        Accounts
+      </h3>
+    </div>
+    <div className=\\"col-sm-8 text-right\\">
+      <div className=\\"pt-button-group\\">
+        <withRouter(Connect(ReduxForm)) />
+      </div>
+    </div>
+  </div>
+  <div className=\\"row\\">
+    <div className=\\"col-sm-4\\">
+      <div className=\\"pt-input-group pt-dark pt-large\\">
+        <span className=\\"pt-icon pt-icon-search\\" />
+        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search accounts\\" onChange={[Function: onChange]} dir=\\"auto\\" />
+      </div>
+    </div>
+  </div>
+  <div className=\\"container-fluid pt-dark\\">
+    <div className=\\"row\\">
+      <div className=\\"col-sm-4 main-div\\">
+        <div className=\\"accounts-margin-top\\">
+          <table>
+            <tbody>
+              <tr>
+                <td colSpan={3}>
+                  No Accounts
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className=\\"col-sm-8 account-details\\">
+        <div />
+      </div>
+    </div>
+  </div>
+</div>"
+`;
+
+exports[`OauthAccounts: index render with mocked values 1`] = `
+"<div>
+  <div className=\\"row\\">
+    <div className=\\"col-sm-4 text-left\\">
+      <h3>
+        Accounts
+      </h3>
+    </div>
+    <div className=\\"col-sm-8 text-right\\">
+      <div className=\\"pt-button-group\\">
+        <withRouter(Connect(ReduxForm)) />
+      </div>
+    </div>
+  </div>
+  <div className=\\"row\\">
+    <div className=\\"col-sm-4\\">
+      <div className=\\"pt-input-group pt-dark pt-large\\">
+        <span className=\\"pt-icon pt-icon-search\\" />
+        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search accounts\\" onChange={[Function: onChange]} dir=\\"auto\\" />
+      </div>
+    </div>
+  </div>
+  <div className=\\"container-fluid pt-dark\\">
+    <div className=\\"row\\">
+      <div className=\\"col-sm-4 main-div\\">
+        <div className=\\"accounts-margin-top\\">
+          <div className=\\"smd-margin-8\\">
+            <div className=\\"row\\">
+              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
+                clinicaladmin
+              </div>
+            </div>
+          </div>
+          <div className=\\"smd-margin-8\\">
+            <div className=\\"row\\">
+              <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
+                clinicalops
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className=\\"col-sm-8 account-details\\">
+        <div />
+      </div>
+    </div>
+  </div>
+</div>"
+`;

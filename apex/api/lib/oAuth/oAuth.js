@@ -106,5 +106,5 @@ async function waitFaucet(address) { //fixme - function duplicated in multiple t
 module.exports = {
   createKey,
   getKey,
-  getOrCreateKey,
+  getOrCreateKey
 };

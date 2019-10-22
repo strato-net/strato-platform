@@ -19,7 +19,7 @@ import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
-import { isModePublic } from '../../lib/checkMode';
+import { isOauthEnabled } from '../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
 import './createContract.css';
 
@@ -112,7 +112,7 @@ class CreateContract extends Component {
 
   submit = (values) => {
     const args = {};
-    const contractname = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName
+    const contractname = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName;
     const abi = this.props.sourceFromEditor ? this.props.sourceFromEditor : this.props.abi.src;
     Object.values(abi).forEach(val => {
       if (val.constr && val.constr.args !== undefined) {
@@ -126,7 +126,7 @@ class CreateContract extends Component {
 
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
     const metadata = {};
-    contracts.forEach(function(contract) {
+    contracts.forEach(function (contract) {
       if (values[`history@${contract}`]) {
         if (metadata['history']) {
           const curHistory = metadata['history'];
@@ -169,7 +169,7 @@ class CreateContract extends Component {
       contract: contractname,
       username: values.username,
       address: values.address,
-      password: values.password,
+      password: isOauthEnabled() ? null : values.password,
       searchable: values.searchable,
       fileText: fileText,
       arguments: args,
@@ -182,9 +182,9 @@ class CreateContract extends Component {
     this.props.reset();
   };
 
-  renderUsername = (isPublicMode) => {
+  renderUsername = (isModeOauth) => {
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    return (<div className={isPublicMode ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
@@ -192,10 +192,10 @@ class CreateContract extends Component {
         onChange={this.handleUsernameChange}
         validate={required}
         required
-        disabled={isPublicMode}
+        disabled={isModeOauth}
       >
-        <option value={isPublicMode ? this.props.initialValues.username : null}>
-          {isPublicMode && this.props.initialValues.username}
+        <option value={isModeOauth ? this.props.initialValues.username : null}>
+          {isModeOauth && this.props.initialValues.username}
         </option>
         {
           users.map((user, i) => {
@@ -208,21 +208,21 @@ class CreateContract extends Component {
     </div>)
   };
 
-  renderAddress = (isPublicMode) => {
+  renderAddress = (isModeOauth) => {
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
       : [];
-    return (<div className={isPublicMode ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="address"
         validate={required}
         required
-        disabled={isPublicMode}
+        disabled={isModeOauth}
       >
-        <option value={isPublicMode ? this.props.initialValues.address : null}>
-          {isPublicMode && this.props.initialValues.address}
+        <option value={isModeOauth ? this.props.initialValues.address : null}>
+          {isModeOauth && this.props.initialValues.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -238,7 +238,7 @@ class CreateContract extends Component {
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
-    !isModePublic() && this.props.fetchAccounts(true, false);
+    !isOauthEnabled() && this.props.fetchAccounts(true, false);
   }
 
   compilation() {
@@ -352,7 +352,7 @@ class CreateContract extends Component {
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-    const isPublicMode = isModePublic();
+    const isModeOauth = isOauthEnabled();
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
@@ -383,7 +383,7 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderUsername(isPublicMode)}
+                  {this.renderUsername(isModeOauth)}
                 </div>
               </div>
               <div className="row">
@@ -393,10 +393,10 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  {this.renderAddress(isPublicMode)}
+                  {this.renderAddress(isModeOauth)}
                 </div>
               </div>
-              <div className="row">
+              {!isModeOauth && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
                     Password
@@ -416,7 +416,7 @@ class CreateContract extends Component {
                     required
                   />
                 </div>
-              </div>
+              </div>}
               <div className="row">
                 <div className="col-sm-3">
                 </div>
@@ -491,23 +491,23 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                    { contracts.map((value, index) => {
-                      return (
-                        <label className="pt-control pt-checkbox">
-                          <Field
-                            id={value}
-                            className="form-width"
-                            name={"history@" + value}
-                            type="checkbox"
-                            component="input"
-                            dir="auto"
-                            title="History"
-                          />
-                          <span className="pt-control-indicator"></span>
-                          {value}
-                        </label>
-                      )
-                    })
+                  {contracts.map((value, index) => {
+                    return (
+                      <label className="pt-control pt-checkbox">
+                        <Field
+                          id={value}
+                          className="form-width"
+                          name={"history@" + value}
+                          type="checkbox"
+                          component="input"
+                          dir="auto"
+                          title="History"
+                        />
+                        <span className="pt-control-indicator"></span>
+                        {value}
+                      </label>
+                    )
+                  })
                   }
                 </div>
               </div>}
@@ -518,23 +518,23 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                    { contracts.map((value, index) => {
-                      return (
-                        <label className="pt-control pt-checkbox">
-                          <Field
-                            id={value}
-                            className="form-width"
-                            name={"noindex@" + value}
-                            type="checkbox"
-                            component="input"
-                            dir="auto"
-                            title="NoIndex"
-                          />
-                          <span className="pt-control-indicator"></span>
-                          {value}
-                        </label>
-                      )
-                    })
+                  {contracts.map((value, index) => {
+                    return (
+                      <label className="pt-control pt-checkbox">
+                        <Field
+                          id={value}
+                          className="form-width"
+                          name={"noindex@" + value}
+                          type="checkbox"
+                          component="input"
+                          dir="auto"
+                          title="NoIndex"
+                        />
+                        <span className="pt-control-indicator"></span>
+                        {value}
+                      </label>
+                    )
+                  })
                   }
                 </div>
               </div>}
@@ -621,11 +621,10 @@ export function mapStateToProps(state) {
     username: state.createContract.username,
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
-    currentUser: state.user.currentUser,
     searchable: selector(state, 'searchable'),
     initialValues: {
-      username: state.user.currentUser.username,
-      address: state.user.currentUser.accountAddress
+      username: state.user.oauthUser ? state.user.oauthUser.username : '',
+      address: state.user.oauthUser ? state.user.oauthUser.address : ''
     },
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds

@@ -54,7 +54,7 @@ describe('CreateContract: saga', () => {
     test('inspection', () => {
       const gen = createContract({ type: CREATE_CONTRACT_REQUEST, payload });
       expect(gen.next().value).toEqual(call(createContractApiCall, payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments, payload.chainId, payload.metadata));
-      expect(gen.next(createContractResponse).value).toEqual(put(createContractSuccess(createContractResponse)));
+      expect(gen.next([createContractResponse]).value).toEqual(put(createContractSuccess(createContractResponse)));
       expect(gen.next().value).toEqual(put(updateToast()));
       expect(gen.next().value).toEqual(put(fetchContracts()));
       expect(gen.next().value).toEqual(put(fetchCirrusInstances('GreeterC')));

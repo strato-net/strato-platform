@@ -15,12 +15,16 @@ import {
 
 import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
+import { createUrl } from '../../lib/url';
 
-const url = env.BLOC_URL + "/users/:user"
+const blocUrl = env.BLOC_URL + "/users/:username"
 
 export function createBlocUserApiCall(username, password) {
+  const options = { params: { username } };
+  const url = createUrl(blocUrl, options);
+
   return fetch(
-    url.replace(":user", username),
+    url,
     {
       method: 'POST',
       credentials: "include",

@@ -7,6 +7,34 @@ Object {
 }
 `;
 
+exports[`Accounts: action fetch Oauth accounts failure 1`] = `
+Object {
+  "type": "FETCH_OAUTH_ACCOUNTS_FAILURE",
+}
+`;
+
+exports[`Accounts: action fetch Oauth accounts request 1`] = `
+Object {
+  "type": "FETCH_OAUTH_ACCOUNTS_REQUEST",
+}
+`;
+
+exports[`Accounts: action fetch Oauth accounts success 1`] = `
+Object {
+  "data": Array [
+    Object {
+      "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+      "username": "clinicaladmin",
+    },
+    Object {
+      "address": "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547",
+      "username": "clinicalops",
+    },
+  ],
+  "type": "FETCH_OAUTH_ACCOUNTS_SUCCESS",
+}
+`;
+
 exports[`Accounts: action fetch account detail failure 1`] = `
 Object {
   "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",

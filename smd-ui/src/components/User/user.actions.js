@@ -11,6 +11,9 @@ export const FIRST_TIME_LOGIN_REQUEST = 'FIRST_TIME_LOGIN_REQUEST';
 export const FIRST_TIME_LOGIN_REQUEST_SUCCESS = 'FIRST_TIME_LOGIN_REQUEST_SUCCESS';
 export const FIRST_TIME_LOGIN_REQUEST_FAILURE = 'FIRST_TIME_LOGIN_REQUEST_FAILURE';
 export const RESET_FIRST_TIME_USER = 'RESET_FIRST_TIME_USER';
+export const GET_OR_CREATE_OAUTH_USER_REQUEST = 'GET_OR_CREATE_OAUTH_USER_REQUEST';
+export const GET_OR_CREATE_OAUTH_USER_SUCCESS = 'GET_OR_CREATE_OAUTH_USER_SUCCESS';
+export const GET_OR_CREATE_OAUTH_USER_FAILURE = 'GET_OR_CREATE_OAUTH_USER_FAILURE';
 
 export const login = function (payload) {
   return {
@@ -99,5 +102,25 @@ export const firstTimeLoginFailure = function (email, error) {
 export const resetFirstTimeUser = function () {
   return {
     type: RESET_FIRST_TIME_USER
+  }
+}
+
+export const getOrCreateOauthUserRequest = function () {
+  return {
+    type: GET_OR_CREATE_OAUTH_USER_REQUEST
+  }
+}
+
+export const getOrCreateOauthUserSuccess = function (data) {
+  return {
+    type: GET_OR_CREATE_OAUTH_USER_SUCCESS,
+    data
+  }
+}
+
+export const getOrCreateOauthUserFailure = function (error) {
+  return {
+    type: GET_OR_CREATE_OAUTH_USER_FAILURE,
+    error
   }
 }

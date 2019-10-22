@@ -219,3 +219,14 @@ export const getBalanceMock = [
     "nonce":0
  }
 ];
+
+export const oauthAccounts = [
+  { 
+    username: "clinicaladmin",
+    address: "57f2ed9058d2e868d7bbae9db03af12d27675117"
+  },
+  { 
+    username: "clinicalops",
+    address: "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547"
+  },
+]
