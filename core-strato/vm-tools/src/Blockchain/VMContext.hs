@@ -118,9 +118,6 @@ data Context = Context { contextStateDB                :: MP.MPDB
                        , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
                        , contextStorageTxMap           :: M.Map (Address, B.ByteString) B.ByteString
                        , contextStorageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
-                       , contextBlockHashRoot          :: BlockHashRoot
-                       , contextGenesisRoot            :: GenesisRoot
-                       , contextBestBlockRoot          :: BestBlockRoot
                        , contextBaggerState            :: !BaggerState
                        , contextKafkaState             :: K.KafkaState
                        , contextBestBlockInfo          :: ContextBestBlockInfo
@@ -311,9 +308,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                      M.empty
                      M.empty
                      M.empty
-                     (BlockHashRoot MP.emptyTriePtr)
-                     (GenesisRoot MP.emptyTriePtr)
-                     (BestBlockRoot MP.emptyTriePtr)
                      defaultBaggerState
                      initialKafkaState
                      Unspecified
@@ -357,9 +351,6 @@ runContextM f = do
                        M.empty
                        M.empty
                        M.empty
-                       (BlockHashRoot MP.emptyTriePtr)
-                       (GenesisRoot MP.emptyTriePtr)
-                       (BestBlockRoot MP.emptyTriePtr)
                        defaultBaggerState
                        initialKafkaState
                        Unspecified
