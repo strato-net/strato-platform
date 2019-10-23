@@ -331,7 +331,7 @@ describe("auth user", function() {
   });
 });
 
-describe.only("history", function() {
+describe("history", function() {
   this.timeout(config.timeout);
   let admin;
   const options = { config, logger };
