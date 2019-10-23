@@ -79,12 +79,14 @@ function constructMetadata(options, contractName) {
   if (options.hasOwnProperty("history")) {
     if (Array.isArray(options.history)) {
       metadata.history =
-        metadata.history.length === 0
+        metadata.history.length === 0 ||
+        options.history.indexOf(metadata.history) >= 0
           ? options.history.join(",")
           : `${metadata.history},${options.history.join(",")}`;
     } else if (typeof options.history === String) {
       metadata.history =
-        metadata.history.length === 0
+        metadata.history.length === 0 ||
+        options.history.indexOf(metadata.history) >= 0
           ? options.history
           : `${metadata.history},${options.history}`;
     }
