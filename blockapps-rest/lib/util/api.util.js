@@ -84,7 +84,8 @@ function constructMetadata(options, contractName) {
           : `${metadata.history},${options.history.join(",")}`;
     } else if (typeof options.history === String) {
       metadata.history =
-        metadata.history.length === 0
+        metadata.history.length === 0 ||
+        options.history.indexOf(metadata.history) >= 0
           ? options.history
           : `${metadata.history},${options.history}`;
     }
