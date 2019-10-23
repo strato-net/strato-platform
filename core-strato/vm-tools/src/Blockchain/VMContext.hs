@@ -45,6 +45,7 @@ import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
+import           Data.Default                       (def)
 import           Data.Foldable                      (toList)
 import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
@@ -183,17 +184,38 @@ instance Mod.Modifiable MP.StateRoot ContextM where
   get _    = gets (MP.stateRoot . contextStateDB)
   put _ sr = modify $ \c -> c{contextStateDB = (contextStateDB c){MP.stateRoot = sr}}
 
+vmBlockHashRootKey :: B.ByteString
+vmBlockHashRootKey = "block_hash_root"
+
+vmGenesisRootKey :: B.ByteString
+vmGenesisRootKey = "genesis_root"
+
+vmBestBlockRootKey :: B.ByteString
+vmBestBlockRootKey = "best_block_root"
+
 instance Mod.Modifiable BlockHashRoot ContextM where
-  get _     = gets contextBlockHashRoot
-  put _ bhr = modify $ \c -> c{contextBlockHashRoot = bhr}
+  get _ = do
+    db <- gets (MP.ldb . contextStateDB)
+    BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
+  put _ (BlockHashRoot (MP.StateRoot sr)) = do
+    db <- gets (MP.ldb . contextStateDB)
+    DB.put db def vmBlockHashRootKey sr
 
 instance Mod.Modifiable GenesisRoot ContextM where
-  get _    = gets contextGenesisRoot
-  put _ gr = modify $ \c -> c{contextGenesisRoot = gr}
+  get _ = do
+    db <- gets (MP.ldb . contextStateDB)
+    GenesisRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmGenesisRootKey
+  put _ (GenesisRoot (MP.StateRoot sr)) = do
+    db <- gets (MP.ldb . contextStateDB)
+    DB.put db def vmGenesisRootKey sr
 
 instance Mod.Modifiable BestBlockRoot ContextM where
-  get _     = gets contextBestBlockRoot
-  put _ bbr = modify $ \c -> c{contextBestBlockRoot = bbr}
+  get _ = do
+    db <- gets (MP.ldb . contextStateDB)
+    BestBlockRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBestBlockRootKey
+  put _ (BestBlockRoot (MP.StateRoot sr)) = do
+    db <- gets (MP.ldb . contextStateDB)
+    DB.put db def vmBestBlockRootKey sr
 
 instance Mod.Modifiable K.KafkaState ContextM where
   get _    = gets contextKafkaState
