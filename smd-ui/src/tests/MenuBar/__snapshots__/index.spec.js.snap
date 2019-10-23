@@ -22,6 +22,10 @@ Object {
     "username": "tanuj41",
   },
   "isLoggedIn": true,
+  "oauthUser": Object {
+    "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+    "username": "clinicaladmin",
+  },
 }
 `;
 
