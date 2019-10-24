@@ -558,10 +558,11 @@ runStatement st@(Xabi.EmitStatement eventName exptups) = do
   let evs = _events curCnct
       mEv = M.lookup (T.pack eventName) evs
   case mEv of
-    Nothing -> do 
+    Nothing -> do
       liftIO $ putStrLn $ "runStatement" ++ ": ignoring emit statement: " ++ 
           (unparseStatement st) ++ ": NO corresponding event declaration exists" 
-      return Nothing
+      typeError "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
+      -- return Nothing
     Just ev -> do
       if (length exptups) /= (length $ Xabi.eventLogs ev) then do
         liftIO $ putStrLn $ "runStatement" ++ ": ignoring emit statement: " ++ 
