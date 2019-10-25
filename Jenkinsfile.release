@@ -311,16 +311,14 @@ pipeline {
 
   post {
     always {
-      sh'''#!/bin/bash -le
-        set -x
-        cd strato-getting-started
-        rm -rf strato_logs*
-        ./fetchlogs --as-dir
-        mv strato_logs strato_logs_oauth
-        mv strato_logs_oauth strato_pipeline_logs/
-      '''
-          archiveArtifacts artifacts: 'strato_pipeline_logs/**', fingerprint: true
+      dir ('strato-getting-started') {
+        sh 'rm -rf strato_logs*'
+        sh './fetchlogs --as-dir'
+        sh 'mv strato_logs strato_logs_oauth'
+        sh 'mv strato_logs_oauth strato_pipeline_logs/'
+        archiveArtifacts artifacts: 'strato_pipeline_logs/**', fingerprint: true
       }
+    }
 
     success {
       slackSend (
