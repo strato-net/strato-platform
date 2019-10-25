@@ -172,7 +172,22 @@ pipeline {
             dir ('strato-worktree/tests') {
               sh 'rm -rf node_modules'
               sh 'npm install'
-              sh 'npm run test'
+              sh 'npm run test:blockhash'
+              sh 'npm run test:truchainz'
+              sh 'npm run test:multicontract'
+              sh 'npm run test:slipstream'
+              sh 'npm run test:solidvm'
+              // -- additional tests:
+              sh 'npm run test:uploadOrder'
+              sh 'npm run test:e2e'
+              sh 'npm run test:dataTypes'
+              sh 'npm run test:load'
+              sh 'npm run test:load10k'
+              sh 'npm run test:loadecho'
+              sh 'npm run test:upload'
+              sh 'npm run test:upload10k'
+              sh 'npm run test:loadFF'
+              sh 'npm run test:uploadOrder'
             }
             dir ('strato-worktree/core-strato/strato-init') {
               sh './check_genesis_ingestion.sh'
