@@ -23,12 +23,14 @@ import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Char8           as Char8
 import           Data.ByteString.Lazy            (fromStrict, toStrict)
+import           Data.Either                     (fromRight)
 import           Data.Int                        (Int32)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
 import           Data.Profunctor
 import           Data.Profunctor.Product.Default
+import           Data.RLP
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
@@ -214,7 +216,7 @@ contractByCodeHash
     )
 contractByCodeHash codeHash = proc () -> do
   contract@(_,_,ch,_,_,_,_,_,_) <- contractDetailsJoinTable -< ()
-  restrict -< ch .== constant (rlpEncode codeHash)
+  restrict -< ch .== constant codeHash
   returnA -< contract
 
 contractByMetadataId
@@ -242,7 +244,7 @@ contractInstancesByCodeHash
   -> Query (Column PGInt4)
 contractInstancesByCodeHash codeHash address chainId = proc () -> do
   (cmId,_,_,addr,_,_,_,ch,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< ch .== constant (rlpEncode codeHash)
+  restrict -< ch .== constant codeHash
   restrict -< addr .== constant address
   restrict -< cid .== constant chainId
   returnA -< cmId
@@ -724,7 +726,7 @@ insertContractMetaDataQuery
   :: Int32
   -> Text
   -> Text
-  -> Keccak256
+  -> CodePtr
   -> Keccak256
   -> Keccak256
   -> Xabi
@@ -736,7 +738,7 @@ insertContractMetaDataQuery
       , constant contractId
       , constant (Text.encodeUtf8 bin)
       , constant (Text.encodeUtf8 binRuntime)
-      , constant (rlpEncode codeHash)
+      , constant codeHash
       , constant xcodeHash
       , constant srcHash
       , constant (serializeXabi xabi)
@@ -753,7 +755,7 @@ insertContractMetaDataBatchQuery srcHash details = blocModify $ \ conn ->
         , constant contractId
         , constant (Text.encodeUtf8 contractdetailsBin)
         , constant (Text.encodeUtf8 contractdetailsBinRuntime)
-        , constant (rlpEncode contractdetailsCodeHash)
+        , constant contractdetailsCodeHash
         , constant $ keccak256 (Text.encodeUtf8 contractdetailsBin)
         , constant srcHash
         , constant (serializeXabi contractdetailsXabi)
@@ -810,6 +812,18 @@ instance Default Constant Keccak256 (Column PGBytea) where
     where
       fromKecc :: Keccak256 -> ByteString
       fromKecc (Keccak256 digest) = ByteArray.convert digest
+
+instance QueryRunnerColumnDefault PGBytea CodePtr where
+  queryRunnerColumnDefault =
+    queryRunnerColumn id toCodePtr queryRunnerColumnDefault
+    where
+      toCodePtr :: ByteString -> CodePtr
+      toCodePtr
+        = fromRight (error "could not decode CodePtr")
+        . rlpDeserialize
+
+instance Default Constant CodePtr (Column PGBytea) where
+  def = lmap rlpSerialize def
 
 instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
   queryRunnerColumnDefault =
@@ -890,7 +904,7 @@ compileContract source = do
         { contractdetailsBin = bin
         , contractdetailsAddress = Just (Named "Latest")
         , contractdetailsBinRuntime = binRuntime
-        , contractdetailsCodeHash =  binRuntimeToCodeHash binRuntime
+        , contractdetailsCodeHash =  EVMCode . keccak256SHA $ binRuntimeToCodeHash binRuntime
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi

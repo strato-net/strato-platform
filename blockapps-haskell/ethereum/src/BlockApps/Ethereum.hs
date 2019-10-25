@@ -71,6 +71,7 @@ import           ClassyPrelude ((<>), Hashable(hashWithSalt))
 import           Control.Lens.Operators
 import           Control.DeepSeq (NFData)
 import           Crypto.Hash
+import           Control.Monad          ((<=<))
 import           Crypto.Random.Entropy
 import           Crypto.HaskoinShim
 import           Data.Aeson             hiding (Array, String)
@@ -90,6 +91,7 @@ import qualified Data.Map.Strict        as M
 import           Data.Maybe
 import           Data.Proxy
 import           Data.RLP
+import qualified Data.RLP               as RLP (RLPObject(..))
 import           Data.Swagger
 import           Data.Text              (Text)
 import qualified Data.Text              as Text
@@ -200,14 +202,6 @@ instance RLPEncodable (Maybe Address) where
   rlpEncode = maybe rlp0 rlpEncode
   rlpDecode x = if x == rlp0 then return Nothing else Just <$> rlpDecode x
 
--- still needs most of the work
-instance RLPEncodable CodePtr where
-  rlpEncode (EVMCode codeHash) = String $ Char8.pack $ unSHA codeHash
-  rlpEncode (SolidVMCode n ch) = Array [String $ Char8.pack "SolidVM", rlpEncode n, rlpEncode ch]
-
-  rlpDecode (RLPArray [RLPString "SolidVM", n, ch]) = SolidVMCode (rlpDecode n) (rlpDecode ch)
-  rlpDecode ch = EVMCode $ rlpDecode ch
-
 instance ToCapture (Capture "userAddress" Address) where
   toCapture _ = DocCapture "userAddress" "an Ethereum address"
 
@@ -228,6 +222,20 @@ instance ToSchema Address where
 
 deriveAddress :: PubKey -> Address
 deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
+
+instance RLPEncodable Keccak256 where
+  rlpEncode = rlpEncode . keccak256ByteString
+  rlpDecode = maybe (Left "RLPEncodable.Keccak256: Could not decode") Right . byteStringKeccak256 <=< rlpDecode
+
+instance RLPEncodable CodePtr where
+  rlpEncode (EVMCode codeHash) = rlpEncode $ shaKeccak256 codeHash
+  rlpEncode (SolidVMCode n ch) = RLP.Array [RLP.String $ Char8.pack "SolidVM"
+                                           , rlpEncode n
+                                           , rlpEncode $ shaKeccak256 ch
+                                           ]
+
+  rlpDecode (RLP.Array [RLP.String "SolidVM", n, ch]) = SolidVMCode <$> rlpDecode n <*> (keccak256SHA <$> rlpDecode ch)
+  rlpDecode ch = EVMCode . keccak256SHA <$> rlpDecode ch
 
 --------------------------------------------------------------------------------
 
