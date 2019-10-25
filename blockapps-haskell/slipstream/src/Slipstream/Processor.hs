@@ -265,9 +265,10 @@ getCachedSolidVMDetails g row = liftM2 (<|>)
   )
  where codePtr = actionCodeHash row
 
+-- Should now work for both EVM and SolidVM?
 detailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
-  (getContractDetailsByCodeHash . shaKeccak256 . codePtrToSHA $ actionCodeHash row)
+  (getContractDetailsByCodeHash $ actionCodeHash row)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
@@ -282,7 +283,7 @@ adjustGlobals gref row details = do
         let contracts = filter (not . T.null) $ T.splitOn "," v
         forM_ contracts $ \c -> do
           (_, details') <- lookupT c m
-          let codePtr = EVMCode . keccak256SHA . contractdetailsCodeHash $ details'
+          let codePtr = contractdetailsCodeHash $ details'
           lift $ f gref codePtr
 
   -- won't actually recompile the contract
@@ -300,7 +301,7 @@ ensureContractInstance cmId row = do
   let addr = actionAddress row
       chainId = actionTxChainId row
   (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
-    contractInstancesByCodeHash (shaKeccak256 . codePtrToSHA $ actionCodeHash row) addr chainId
+    contractInstancesByCodeHash (actionCodeHash row) addr chainId
   when (isNothing mInstance) . void $
     insertContractInstance cmId addr chainId
 
