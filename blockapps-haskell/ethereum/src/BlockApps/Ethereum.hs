@@ -113,7 +113,6 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.SHA (shaToHex, SHA(..))
 
-
 lastWord64 :: Word256 -> Word64
 lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
 
@@ -200,6 +199,14 @@ instance RLPEncodable Address where
 instance RLPEncodable (Maybe Address) where
   rlpEncode = maybe rlp0 rlpEncode
   rlpDecode x = if x == rlp0 then return Nothing else Just <$> rlpDecode x
+
+-- still needs most of the work
+instance RLPEncodable CodePtr where
+  rlpEncode (EVMCode codeHash) = String $ Char8.pack $ unSHA codeHash
+  rlpEncode (SolidVMCode n ch) = Array [String $ Char8.pack "SolidVM", rlpEncode n, rlpEncode ch]
+
+  rlpDecode (RLPArray [RLPString "SolidVM", n, ch]) = SolidVMCode (rlpDecode n) (rlpDecode ch)
+  rlpDecode ch = EVMCode $ rlpDecode ch
 
 instance ToCapture (Capture "userAddress" Address) where
   toCapture _ = DocCapture "userAddress" "an Ethereum address"

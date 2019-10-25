@@ -31,6 +31,7 @@ import           BlockApps.Ethereum
 import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 
+
 data XabiKind = ContractKind
               | InterfaceKind
               | LibraryKind deriving (Eq, Show, Generic)
@@ -325,7 +326,7 @@ data ContractDetails = ContractDetails
   { contractdetailsBin        :: Text
   , contractdetailsAddress    :: Maybe (MaybeNamed Address)
   , contractdetailsBinRuntime :: Text
-  , contractdetailsCodeHash   :: Keccak256
+  , contractdetailsCodeHash   :: CodePtr
   , contractdetailsName       :: Text
   , contractdetailsSrc        :: Text
   , contractdetailsXabi       :: Xabi
@@ -372,7 +373,7 @@ instance ToSchema ContractDetails where
         { contractdetailsBin = "ContractBin"
         , contractdetailsAddress = Just (Unnamed (Address 0xdeadbeef))
         , contractdetailsBinRuntime = "ContractRuntime"
-        , contractdetailsCodeHash = keccak256 "digest"
+        , contractdetailsCodeHash = EVMCode $ SHA 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
         , contractdetailsName = "DetailsName"
         , contractdetailsSrc = "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi

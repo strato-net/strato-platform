@@ -50,6 +50,7 @@ import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
+
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 {- |
@@ -199,7 +200,7 @@ contractByAddress contractName contractAddress chainId = proc () -> do
   returnA -< contract
 
 contractByCodeHash
-  :: Keccak256
+  :: CodePtr
   -> Query
     ( Column PGBytea
     , Column PGBytea
@@ -213,7 +214,7 @@ contractByCodeHash
     )
 contractByCodeHash codeHash = proc () -> do
   contract@(_,_,ch,_,_,_,_,_,_) <- contractDetailsJoinTable -< ()
-  restrict -< ch .== constant codeHash
+  restrict -< ch .== constant (rlpEncode codeHash)
   returnA -< contract
 
 contractByMetadataId
@@ -235,13 +236,13 @@ contractByMetadataId metadataId = proc () -> do
   returnA -< contract
 
 contractInstancesByCodeHash
-  :: Keccak256
+  :: CodePtr
   -> Address
   -> Maybe ChainId
   -> Query (Column PGInt4)
 contractInstancesByCodeHash codeHash address chainId = proc () -> do
   (cmId,_,_,addr,_,_,_,ch,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< ch .== constant codeHash
+  restrict -< ch .== constant (rlpEncode codeHash)
   restrict -< addr .== constant address
   restrict -< cid .== constant chainId
   returnA -< cmId
@@ -466,7 +467,7 @@ getContractsContractByAddressQuery contractName contractAddress chainId =
     returnA -< (bin,binRuntime,codeHash,xcodeHash,name,src,cmId,xabi)
 
 getContractsContractByCodeHashQuery
-  :: Keccak256
+  :: CodePtr
   -> Query
     ( Column PGBytea
     , Column PGBytea
@@ -651,7 +652,7 @@ getContractDetailsAndMetadataId (ContractName contractName) contractId chainId =
             getContractsContractByNameQuery contractName name
           for tuple $ detailsWith (Just (Named name)) chainId
 
-getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe (Int32, ContractDetails))
+getContractDetailsByCodeHash :: CodePtr -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeHash codeHash = do
     mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
     for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
@@ -735,7 +736,7 @@ insertContractMetaDataQuery
       , constant contractId
       , constant (Text.encodeUtf8 bin)
       , constant (Text.encodeUtf8 binRuntime)
-      , constant codeHash
+      , constant (rlpEncode codeHash)
       , constant xcodeHash
       , constant srcHash
       , constant (serializeXabi xabi)
@@ -752,7 +753,7 @@ insertContractMetaDataBatchQuery srcHash details = blocModify $ \ conn ->
         , constant contractId
         , constant (Text.encodeUtf8 contractdetailsBin)
         , constant (Text.encodeUtf8 contractdetailsBinRuntime)
-        , constant contractdetailsCodeHash
+        , constant (rlpEncode contractdetailsCodeHash)
         , constant $ keccak256 (Text.encodeUtf8 contractdetailsBin)
         , constant srcHash
         , constant (serializeXabi contractdetailsXabi)
@@ -903,6 +904,7 @@ compileContract source = do
   let cmIdDetails = Map.elems . Map.intersectionWith (,) mdIdMap $ Map.fromList idDetails
   return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
 
+-- SolidVM only
 createMetadataNoCompile :: Text -> Bloc (Map Text (Int32, ContractDetails))
 createMetadataNoCompile source = do
   let eVerXabis = parseXabi "-" $ Text.unpack source
@@ -915,7 +917,7 @@ createMetadataNoCompile source = do
         { contractdetailsBin = source
         , contractdetailsAddress = Just (Named "Latest")
         , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash =  keccak256 $ Char8.pack $ Text.unpack $ contrName `Text.append` source
+        , contractdetailsCodeHash = SolidVMCode contrName $ keccak256SHA $ keccak256 source
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi

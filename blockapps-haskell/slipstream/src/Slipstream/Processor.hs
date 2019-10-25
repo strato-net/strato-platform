@@ -28,6 +28,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Short as SB
+-- import qualified Data.ByteString.Char8 as C8
 import Data.Either (lefts, rights)
 import Data.Int (Int32)
 import Data.IORef
@@ -228,6 +229,25 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
 
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
+
+
+-- Will also check BlocDB for details, if they are not in the cache 
+--   i.e. on node restart
+{- getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Text))
+getSolidVMDetails g row = do
+  mDetails <- getCachedSolidVMDetails g row
+  case mDetails of
+    Just (name, abi) -> return mDetails
+    Nothing -> do 
+      -- use the codeHash version?
+      blocDetails <- getContractDetailsByAddressOnly (actionAddress row) (actionTxChainId row)
+      case blocDetails of
+        Nothing -> return Nothing
+        Just deets -> do
+          detailsMap <- lift $ sourceToContractDetails $ False (contractdetailsSrc blocDetails)
+          setSolidVMABIs g (actionCodeHash row) detailsMap
+          return (getSolidVMABIs g (actionCodeHash codeptr))
+   -}       
 
 -- Note: This could be reshaped to remove the bloch dependency, as
 -- we only care about the ABI from `sourceToContractDetails` and
