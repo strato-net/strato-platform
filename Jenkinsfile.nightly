@@ -168,7 +168,7 @@ pipeline {
             '''
           },
 
-          '(Long) Integration tests' : {
+          'Integration tests' : {
             dir ('strato-worktree/tests') {
               sh 'rm -rf node_modules'
               sh 'npm install'
@@ -179,15 +179,15 @@ pipeline {
               sh 'npm run test:solidvm'
               sh 'npm run test:uploadOrder'
               // -- additional tests:
-              sh 'npm run test:e2e'
-              sh 'npm run test:dataTypes'
-              sh 'npm run test:load'
-              sh 'npm run test:load10k'
-              sh 'npm run test:loadecho'
-              sh 'npm run test:upload'
-              sh 'npm run test:upload10k'
-              sh 'npm run test:loadFF'
-              sh 'npm run test:uploadOrder'
+              //sh 'npm run test:e2e'
+              //sh 'npm run test:dataTypes'
+              //sh 'npm run test:load'
+              //sh 'npm run test:load10k'
+              //sh 'npm run test:loadecho'
+              //sh 'npm run test:upload'
+              //sh 'npm run test:upload10k'
+              //sh 'npm run test:loadFF' // SolidVM only
+              //sh 'npm run test:uploadOrder'
             }
             dir ('strato-worktree/core-strato/strato-init') {
               sh './check_genesis_ingestion.sh'
