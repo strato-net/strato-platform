@@ -286,7 +286,7 @@ postContractsCompile :: [PostCompileRequest] -> Bloc [PostCompileResponse]
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
-      idsAndDetails <- sourceToContractDetails True postcompilerequestSource
+      idsAndDetails <- sourceToContractDetails (Do Compile) postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of

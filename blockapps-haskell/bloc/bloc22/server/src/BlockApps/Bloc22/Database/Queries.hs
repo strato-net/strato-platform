@@ -55,6 +55,9 @@ import           BlockApps.Strato.Types
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
+data Should a = Don't a | Do a
+data Compile = Compile
+
 {- |
 SELECT address from key_store;
 -}
@@ -860,12 +863,12 @@ insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertMa
   ]
   (\ (contractInstanceId,_,_,_,_) -> contractInstanceId)
 
-sourceToContractDetails :: Bool -> Text -> Bloc (Map Text (Int32, ContractDetails))
+sourceToContractDetails :: Should Compile -> Text -> Bloc (Map Text (Int32, ContractDetails))
 sourceToContractDetails shouldCompile source = do
   let createContractDetails =
-        if shouldCompile
-        then compileContract
-        else createMetadataNoCompile
+        case shouldCompile of
+          Do Compile -> compileContract
+          Don't Compile -> createMetadataNoCompile
   details <- blocQuery . contractBySourceHash . keccak256 $ Text.encodeUtf8 source
   if null details
     then createContractDetails source
