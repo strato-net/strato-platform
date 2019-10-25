@@ -21,6 +21,10 @@ superSecretVaultWrapperMessage :: ByteString
 superSecretVaultWrapperMessage =
   "A monad is just a monoid in the category of endofunctors, what's the problem?"
 
+verifyPassword :: Connection -> IO Bool
+verifyPassword conn = do 
+  -- TODO: code to verify password exists or not
+
 setPassword :: Password -> Connection -> IO Bool
 setPassword pw conn = do
   (salt, nonce) <- newSaltAndNonce
