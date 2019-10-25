@@ -177,8 +177,8 @@ pipeline {
               sh 'npm run test:multicontract'
               sh 'npm run test:slipstream'
               sh 'npm run test:solidvm'
-              // -- additional tests:
               sh 'npm run test:uploadOrder'
+              // -- additional tests:
               sh 'npm run test:e2e'
               sh 'npm run test:dataTypes'
               sh 'npm run test:load'
