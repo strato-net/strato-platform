@@ -41,8 +41,15 @@ pipeline {
             git clone https://github.com/blockapps/strato-getting-started
             cp strato-worktree/docker-compose.yml strato-getting-started/
             cd strato-getting-started
+            export NODE_HOST=$(</host)
             export genesis=smokeTest
-            export NODE_HOST=localhost
+            export BLOC_DEBUG=true
+            export SLIPSTREAM_OPTIONAL=false
+            export OAUTH_JWT_VALIDATION_ENABLED=true
+            export OAUTH_JWT_USERNAME_PROPERTY=email
+            export OAUTH_JWT_VALIDATION_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration
+            export OAUTH_STRATO42_FALLBACK=true
+            export OAUTH_TEMPORARY_MIXED_AUTH=true
             export PASSWORD=123
             export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
             export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
