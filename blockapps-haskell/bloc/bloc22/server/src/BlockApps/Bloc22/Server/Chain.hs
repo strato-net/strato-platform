@@ -12,7 +12,6 @@ module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Monad.Except
 import           Crypto.Random.Entropy
-import qualified Data.ByteString.Char8             as BC
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe, isJust)
@@ -26,7 +25,6 @@ import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
-import           Blockchain.Strato.Model.SHA
 import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
@@ -91,9 +89,9 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
               
           (contractHash, b, s) <-
             case theVM of
-              "EVM" -> return (EVMCode $ keccak256SHA contractdetailsCodeHash, contractdetailsBinRuntime, src)
+              "EVM" -> return (contractdetailsCodeHash, contractdetailsBinRuntime, src)
               "SolidVM" -> do
-                return (SolidVMCode (Text.unpack contractdetailsName) $ hash (BC.pack $ Text.unpack src), "", src)
+                return (contractdetailsCodeHash, "", src)
               _ -> throwError . UserError . Text.pack $ "Unknown VM: " ++ show theVM
               
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage

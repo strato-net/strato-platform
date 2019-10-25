@@ -292,9 +292,11 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
         case eBlockappsjsXabi of
           Left msg -> throwError $
             AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
-          Right _ ->
-            return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
-        --return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
+          Right _ -> do
+            let ptr = contractdetailsCodeHash details
+            case ptr of
+              EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) (shaKeccak256 hsh)
+              _ -> throwError $ AnError (Text.pack "Somebody called contracts/compile on SolidVM Code, but it only works on EVM Code")
 
 postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =
