@@ -233,21 +233,20 @@ lookupT k = MaybeT . return . Map.lookup k
 
 -- Will also check BlocDB for details, if they are not in the cache 
 --   i.e. on node restart
-{- getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Text))
+getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Text))
 getSolidVMDetails g row = do
   mDetails <- getCachedSolidVMDetails g row
   case mDetails of
-    Just (name, abi) -> return mDetails
+    Just _ -> return mDetails
     Nothing -> do 
-      -- use the codeHash version?
-      blocDetails <- getContractDetailsByAddressOnly (actionAddress row) (actionTxChainId row)
+      blocDetails <- getContractDetailsByCodeHash $ actionCodeHash row
       case blocDetails of
         Nothing -> return Nothing
-        Just deets -> do
-          detailsMap <- lift $ sourceToContractDetails $ False (contractdetailsSrc blocDetails)
+        Just (_, deets) -> do
+          detailsMap <- sourceToContractDetails False (contractdetailsSrc deets)
           setSolidVMABIs g (actionCodeHash row) detailsMap
-          return (getSolidVMABIs g (actionCodeHash codeptr))
-   -}       
+          getSolidVMABIs g (actionCodeHash row)
+         
 
 -- Note: This could be reshaped to remove the bloch dependency, as
 -- we only care about the ABI from `sourceToContractDetails` and
@@ -402,7 +401,7 @@ processTheMessages env conn g messages = do
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs
         BS.ActionSolidVMDiff{} -> do
-          mName <- getCachedSolidVMDetails g row
+          mName <- getSolidVMDetails g row
           case mName of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
