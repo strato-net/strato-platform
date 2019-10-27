@@ -237,13 +237,19 @@ getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Text
 getSolidVMDetails g row = do
   mDetails <- getCachedSolidVMDetails g row
   case mDetails of
-    Just _ -> return mDetails
+    Just _ -> do 
+      $logInfoS "DEETS" . T.pack $ "found cached details"
+      return mDetails
     Nothing -> do 
+      $logInfoS "DEETS" . T.pack $ "did not find cached details, checking bloc"
       blocDetails <- getContractDetailsByCodeHash $ actionCodeHash row
       case blocDetails of
-        Nothing -> return Nothing
+        Nothing -> do
+          $logInfoS "DEETS" . T.pack $ "no details in bloc????"
+          return Nothing
         Just (_, deets) -> do
           detailsMap <- sourceToContractDetails False (contractdetailsSrc deets)
+          $logInfoS "DEETS" . T.pack $ "found details in bloc, caching.."
           setSolidVMABIs g (actionCodeHash row) detailsMap
           getSolidVMABIs g (actionCodeHash row)
          
