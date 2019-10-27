@@ -41,7 +41,6 @@ import Data.Maybe
 import Data.Ord (Down(..))
 import qualified Data.Text as T
 import Data.Text (Text)
-import Data.Text.Encoding (decodeUtf8)
 import Database.PostgreSQL.Typed (PGConnection)
 
 import Blockapps.Crossmon
@@ -231,9 +230,9 @@ lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
 
--- Will also check BlocDB for details, if they are not in the cache 
+-- Will also check BlocDB for details, if they are not in the cache
 --   i.e. on node restart
-getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Text))
+getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, ContractDetails))
 getSolidVMDetails g row = do
   mDetails <- getCachedSolidVMDetails g row
   case mDetails of
@@ -248,24 +247,24 @@ getSolidVMDetails g row = do
           $logInfoS "DEETS" . T.pack $ "no details in bloc????"
           return Nothing
         Just (_, deets) -> do
-          detailsMap <- sourceToContractDetails False (contractdetailsSrc deets)
           $logInfoS "DEETS" . T.pack $ "found details in bloc, caching.."
+          detailsMap <- Map.map snd <$> sourceToContractDetails (Don't Compile) (contractdetailsSrc deets)
           setSolidVMABIs g (actionCodeHash row) detailsMap
           getSolidVMABIs g (actionCodeHash row)
-         
+
 
 -- Note: This could be reshaped to remove the bloch dependency, as
 -- we only care about the ABI from `sourceToContractDetails` and
 -- not the metadata id. Additionally, at some point this must
 -- offload to disk.
-getCachedSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Text))
+getCachedSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, ContractDetails))
 getCachedSolidVMDetails g row = liftM2 (<|>)
   (getSolidVMABIs g codePtr)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
-    detailsMap <- lift $ sourceToContractDetails False src
-    setSolidVMABIs g codePtr detailsMap
+    detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
+    setSolidVMABIs g codePtr (Map.map snd detailsMap)
     MaybeT $ getSolidVMABIs g codePtr
   )
  where codePtr = actionCodeHash row
@@ -278,21 +277,27 @@ detailsForRow row = liftM2 (<|>)
     let md = actionMetadata row
     src <- lookupT "src" md
     name <- lookupT "name" md
-    detailsMap <- lift $ sourceToContractDetails True src
+    detailsMap <- lift $ sourceToContractDetails (Do Compile) src
     lookupT name detailsMap)
 
-adjustGlobals :: IORef Globals -> AggregateAction -> ContractDetails -> Bloc ()
-adjustGlobals gref row details = do
+adjustGlobals :: IORef Globals
+              -> Should Compile
+              -> AggregateAction
+              -> ContractDetails
+              -> Bloc ()
+adjustGlobals gref shouldCompile row details = do
   let go m (k,f) = runMaybeT $ do
         v <- lookupT k $ actionMetadata row
         let contracts = filter (not . T.null) $ T.splitOn "," v
         forM_ contracts $ \c -> do
           (_, details') <- lookupT c m
-          let codePtr = contractdetailsCodeHash $ details'
+          let codePtr = contractdetailsCodeHash details'
+          $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
           lift $ f gref codePtr
 
   -- won't actually recompile the contract
-  detailsMap <- sourceToContractDetails True $ contractdetailsSrc details
+  detailsMap <- sourceToContractDetails shouldCompile $ contractdetailsSrc details
+  $logInfoS "adjustGlobals" . T.pack $ "Details Map: " ++ show detailsMap
   mapM_ (go detailsMap) $ [("history", addToHistoryList)
                           ,("nohistory", removeFromHistoryList)
                           ,("noindex", addToNoIndexList)
@@ -392,13 +397,12 @@ processTheMessages env conn g messages = do
                             <> " and no 'src' field found in actionMetadata"
             Just (cmId, details) -> do
               let abiid = ABIID
-                    { aiAbi = T.replace "\'" "\'\'" . decodeUtf8 . BL.toStrict
-                            . JSON.encode $ contractdetailsXabi details
-                    , aiName = T.replace "\"" "" $ contractdetailsName details
+                    { aiAbi = xabiToText $ contractdetailsXabi details
+                    , aiName = T.filter (/= '"') $ contractdetailsName details
                     , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
                     }
                   cont = either error id . xAbiToContract $ contractdetailsXabi details
-              adjustGlobals g row details
+              adjustGlobals g (Do Compile) row details
 
               ensureContractInstance cmId row
 
@@ -412,10 +416,11 @@ processTheMessages env conn g messages = do
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in metadata"
-            Just (name, abi) -> do
-              let abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
+            Just (name, details) -> do
+              let abi = xabiToText $ contractdetailsXabi details
+                  abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
                   cont = error "internal error: contract should be unused for solidvm"
-                  details = error "internal error: details should be unused for solidvm"
+              adjustGlobals g (Don't Compile) row details
               oldState <- readPreviousSolidVMState g addr chainId
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState

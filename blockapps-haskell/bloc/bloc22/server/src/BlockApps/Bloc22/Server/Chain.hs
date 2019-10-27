@@ -60,9 +60,10 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
   
   when (null members) $ throwError $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
+  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
   idsAndDetails <- if (Text.null src)
                      then return Map.empty
-                     else sourceToContractDetails (theVM == "EVM") src
+                     else sourceToContractDetails shouldCompile src
   mContract <- case Map.toList idsAndDetails of
             [] -> return Nothing
             [(_, x)] -> return $ Just x

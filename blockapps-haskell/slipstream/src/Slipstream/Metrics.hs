@@ -80,7 +80,6 @@ recordGlobals g = liftIO $ do
   rec "no_index_list" (S.size . noIndexList)
   rec "solidvm_details_codehashes" (HM.size . solidVMABIs)
   rec "solidvm_details_contracts" (sum . map M.size . HM.elems . solidVMABIs)
-  rec "solidvm_details_bytes" (sum . concatMap (map T.length . M.elems) . HM.elems . solidVMABIs)
   rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()

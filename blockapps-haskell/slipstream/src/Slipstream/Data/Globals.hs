@@ -10,6 +10,7 @@ import Data.Text
 import GHC.Generics
 
 import BlockApps.Solidity.Value
+import BlockApps.Solidity.Xabi     (ContractDetails(..))
 import BlockApps.Ethereum
 import Slipstream.Data.GlobalsColdStorage (Handle)
 
@@ -21,7 +22,7 @@ data Globals = Globals { createdContracts :: S.Set CodePtr -- list of contacts w
                        , historyList :: S.Set CodePtr
                        , noIndexList :: S.Set CodePtr
                        , functionHistoryList :: S.Set CodePtr
-                       , solidVMABIs :: HM.HashMap SHA (M.Map Text Text)
+                       , solidVMABIs :: HM.HashMap SHA (M.Map Text ContractDetails)
                        , contractStates :: LRU (Address, Maybe ChainId) [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)
