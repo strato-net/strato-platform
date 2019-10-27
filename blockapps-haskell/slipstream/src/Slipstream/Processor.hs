@@ -236,18 +236,12 @@ getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Cont
 getSolidVMDetails g row = do
   mDetails <- getCachedSolidVMDetails g row
   case mDetails of
-    Just _ -> do 
-      $logInfoS "DEETS" . T.pack $ "found cached details"
-      return mDetails
+    Just _ -> return mDetails
     Nothing -> do 
-      $logInfoS "DEETS" . T.pack $ "did not find cached details, checking bloc"
       blocDetails <- getContractDetailsByCodeHash $ actionCodeHash row
       case blocDetails of
-        Nothing -> do
-          $logInfoS "DEETS" . T.pack $ "no details in bloc????"
-          return Nothing
+        Nothing -> return Nothing
         Just (_, deets) -> do
-          $logInfoS "DEETS" . T.pack $ "found details in bloc, caching.."
           detailsMap <- Map.map snd <$> sourceToContractDetails (Don't Compile) (contractdetailsSrc deets)
           setSolidVMABIs g (actionCodeHash row) detailsMap
           getSolidVMABIs g (actionCodeHash row)
@@ -255,8 +249,7 @@ getSolidVMDetails g row = do
 
 -- Note: This could be reshaped to remove the bloch dependency, as
 -- we only care about the ABI from `sourceToContractDetails` and
--- not the metadata id. Additionally, at some point this must
--- offload to disk.
+-- not the metadata id. 
 getCachedSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, ContractDetails))
 getCachedSolidVMDetails g row = liftM2 (<|>)
   (getSolidVMABIs g codePtr)
@@ -269,7 +262,8 @@ getCachedSolidVMDetails g row = liftM2 (<|>)
   )
  where codePtr = actionCodeHash row
 
--- Should now work for both EVM and SolidVM?
+-- TODO: This should now work for both EVM and SolidVM, so we should have
+--   a generic caching/bloc-lookup routine
 detailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 detailsForRow row = liftM2 (<|>)
   (getContractDetailsByCodeHash $ actionCodeHash row)
