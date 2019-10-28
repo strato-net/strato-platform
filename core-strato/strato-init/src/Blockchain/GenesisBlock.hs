@@ -24,6 +24,7 @@ import           Data.Maybe
 import qualified Data.JsonStream.Parser                       as JS
 import           Data.Text                                    (Text)
 import qualified Data.Text                                    as T
+import qualified Data.Sequence                                as S
 import           System.Directory
 
 import qualified Blockchain.Strato.Model.Action               as A
@@ -201,6 +202,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                                     SolidVMDiff _ -> error "TODO(tim): SolidVMDiff genesis block support")
                                   [A.emptyCallData]
             , A._actionMetadata = getMetadata ch
+            , A._actionEvents = S.empty
             }
             where ch =
                     case codeHash d of

@@ -12,14 +12,15 @@ const util = ba.common.util;
 
 config.apiDebug = true;
 
-async function upload(name, source) {
+async function upload(name, source, options={}) {
   const username = `SlipstreamTester_${util.uid()}`;
   const password = "2345";
   const user = await co.wrap(rest.createUser)(username, password);
   await co.wrap(rest.fill)(user, true);
   console.log(`User ${user.name}@${user.address} uploading a ${name}`);
   console.log(`Source is ${source}`);
-  const contract = await co.wrap(rest.uploadContractString)(user, name, source);
+  options.doNotResolve = false;
+  const contract = await co.wrap(rest.uploadContractString)(user, name, source, {}, options=options);
   return [user, contract];
 }
 
@@ -86,5 +87,42 @@ contract Z {
     indexZ = await co.wrap(rest.waitQuery)("Z?count=eq.2", 1);
     console.log(`Last index: ${JSON.stringify(indexZ, null, 2)}`);
   }).timeout(config.timeout);
+
+
+const eventsContract = `
+contract EventTest {
+  event SlipstreamTest ( uint magic );
+  function emitTest ( uint magic ) {
+    emit SlipstreamTest ( magic );
+  }
+}`;
+
+  it("Will create and insert into tables for valid solidity events", async () => {
+    // MUST USE SOLIDVM - EVM does not know about events
+    let options = {'VM' : 'SolidVM', 'doNotResolve' : false};
+
+    // multiple inserts with a single contract instance
+    const [user,contract] = await upload("EventTest", eventsContract, options);
+    let magic = 97;
+    let res = await co.wrap(rest.callMethod)(user, contract, "emitTest", {magic}, options);
+    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.97", 1);
+    magic = 98;
+    res = await co.wrap(rest.callMethod)(user, contract, "emitTest", {magic}, options);
+    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.98", 1);
+    magic = 99;
+    res = await co.wrap(rest.callMethod)(user, contract, "emitTest", {magic}, options);
+    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.99", 1);
+   
+    // insert with a different instance of the same contract (same table)
+    const [user2,contract2] = await upload("EventTest", eventsContract, options);
+    magic = 97;
+    res = await co.wrap(rest.callMethod)(user2, contract2, "emitTest", {magic}, options);
+    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.97", 2);
+    magic = 900;
+    res = await co.wrap(rest.callMethod)(user2, contract2, "emitTest", {magic}, options);
+    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.900", 1);
+  }).timeout(config.timeout);
+
+
 
 });

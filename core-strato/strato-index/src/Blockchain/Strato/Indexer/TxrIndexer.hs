@@ -26,7 +26,7 @@ import           Blockchain.Data.ChainInfoDB        (addMember, removeMember, te
 import           Blockchain.Data.DataDefs           (LogDB (..), EventDB (..), TransactionResult (..))
 import           Blockchain.Data.Enode
 import qualified Blockchain.Data.LogDB              as LogDB
-import qualified Blockchain.Data.EventDB            as EventDB
+-- import qualified Blockchain.Data.EventDB            as EventDB
 import           Blockchain.Data.TransactionDef     (formatChainId)
 import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
@@ -134,8 +134,11 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
                     Nothing -> $logErrorS "txrIndexer" . T.pack $ "failed to parse address for MemberRemoved event: " ++ addressStr
                     Just address -> doRemoveMember chainId address
                   _ -> return ()
-                void . lift $ EventDB.putEventDB ev
+                -- void . lift $ EventDB.putEventDB ev
+                -- ^^^ NOTE: not actually putting events into eth database, but still need
+                --       them so we can process governance changes
             TxResult r -> do
+
                 logF [ "Inserting TXResult for tx "
                      , format $ transactionResultTransactionHash r
                      , " at block "

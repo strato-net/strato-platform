@@ -59,7 +59,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import           Blockchain.Data.LogDB
-import           Blockchain.Data.Event
 import           Blockchain.Data.EventDB
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionDef          (formatChainId)
@@ -93,6 +92,7 @@ import           Blockchain.VMOptions
 import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
 import           Blockchain.SHA                          (formatSHAWithoutColor)
+import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.StateDiff             hiding (StateDiff (blockHash))

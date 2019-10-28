@@ -28,11 +28,12 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Short as SB
+--import Data.Conduit
 -- import qualified Data.ByteString.Char8 as C8
 import Data.Either (lefts, rights)
+import Data.Function
 import Data.Int (Int32)
 import Data.IORef
-import Data.Function
 import Data.List (foldl', sortOn)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
@@ -84,6 +85,7 @@ data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
   , functionInserts :: [ProcessedContract]
+  , eventCreations  :: [EventTable]
   } deriving (Show)
 
 toAction :: BL.ByteString -> Action
@@ -262,6 +264,7 @@ getCachedSolidVMDetails g row = liftM2 (<|>)
   )
  where codePtr = actionCodeHash row
 
+
 -- TODO: This should now work for both EVM and SolidVM, so we should have
 --   a generic caching/bloc-lookup routine
 detailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
@@ -350,6 +353,23 @@ rowToHistories gref abiid row actions cont details oldState = do
                                   hRow
       pure (hInsert, fInserts)
 
+
+-- Parses xabi event declarations to create a table,
+-- ignoring indexes and anonymous flag
+createEvents :: ContractDetails -> Bloc [EventTable]
+createEvents details = do
+  let events = xabiEvents $ contractdetailsXabi details
+  return $ map makeEvent $ Map.toList events
+  where
+    makeEvent :: (Text, Event) -> EventTable 
+    makeEvent (name, event) = 
+      EventTable
+      { eventContractName = contractdetailsName details
+      , eventName = name
+      , eventFields = map fst $ eventLogs event
+      }
+      
+
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
@@ -361,14 +381,20 @@ parseActions = sortOn withSourceFirst
              . filter matters
              . concatMap (flatten . toAction . BL.fromStrict)
 
+parseEvents :: [B.ByteString] -> [AggregateEvent]
+parseEvents = concatMap (squash . toAction . BL.fromStrict)
+
 processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> LoggingT IO ()
 processTheMessages env conn g messages = do
 
   let changes = parseActions messages
+      events = parseEvents messages
+      -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
+      
 
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
-
+  
   case length messages of
    0 -> return ()
    1 -> $logInfoS "processTheMessages" "1 message has arrived"
@@ -403,7 +429,7 @@ processTheMessages env conn g messages = do
               oldState <- readPreviousEVMState g addr chainId cont
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              pure . Right $ BatchedInserts indexContract hs fhs
+              pure . Right $ BatchedInserts indexContract hs fhs []
         BS.ActionSolidVMDiff{} -> do
           mName <- getSolidVMDetails g row
           case mName of
@@ -416,12 +442,14 @@ processTheMessages env conn g messages = do
                   cont = error "internal error: contract should be unused for solidvm"
 
               ensureContractInstance cmId row
-
+          
               adjustGlobals g (Don't Compile) row details
               oldState <- readPreviousSolidVMState g addr chainId
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              pure . Right $ BatchedInserts indexContract hs fhs
+              eventTables <- createEvents details
+              pure . Right $ BatchedInserts indexContract hs fhs eventTables
+
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -435,4 +463,10 @@ processTheMessages env conn g messages = do
     outputData conn . createInsertIndexTable g $ map indexInsert ins
     outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
     outputData conn . createInsertFunctionHistoryTable g $ concatMap functionInserts ins
+    when (length (concatMap eventCreations ins) > 0) $
+      outputData conn . createEventTables g $ concatMap eventCreations ins
+  
+  when (length events > 0) $ 
+    outputData conn $ insertEventTables g events
   flushPendingWrites g
+  

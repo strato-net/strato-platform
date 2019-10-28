@@ -23,6 +23,7 @@ import qualified Data.Map.Strict              as M
 import qualified Data.Set                     as S
 import qualified Data.Vector.Storable.Mutable as V
 import           Data.Word
+import qualified Data.Sequence                as Seq
 import           GHC.Generics
 
 import           Blockchain.Strato.Model.Action
@@ -117,6 +118,7 @@ startingAction Environment{..} = Action
   , _actionTransactionSender  = envSender
   , _actionData               = M.empty
   , _actionMetadata           = envMetadata
+  , _actionEvents             = Seq.empty
   }
 
 startingState :: Bool -> Bool -> Environment -> Config -> Context -> IO VMState

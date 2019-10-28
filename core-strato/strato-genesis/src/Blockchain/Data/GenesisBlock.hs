@@ -28,6 +28,7 @@ import           Data.Maybe                           (catMaybes)
 import           Data.List.Split                      (chunksOf)
 import qualified Data.Text                            as T
 import           Data.Time.Clock.POSIX
+import qualified Data.Sequence                        as S
 import           Numeric
 
 import           Blockchain.Database.MerklePatricia
@@ -296,6 +297,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
                                 SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map fromDiff m)
                              [A.emptyCallData]
         , A._actionMetadata = getMetadata ch
+        , A._actionEvents = S.empty
         }
         where
              ch =
