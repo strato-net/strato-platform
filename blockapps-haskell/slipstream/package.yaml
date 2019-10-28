@@ -32,7 +32,6 @@ dependencies:
   - bytestring
   - classy-prelude
   - common-log
-  - comonad
   - conduit
   - conduit-combinators
   - containers
