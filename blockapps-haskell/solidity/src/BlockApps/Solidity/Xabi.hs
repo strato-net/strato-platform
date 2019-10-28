@@ -7,6 +7,7 @@
 module BlockApps.Solidity.Xabi where
 
 import           Control.Applicative
+import           Control.DeepSeq
 import           Control.Lens                 (mapped, (&), (?~), (.~))
 import           Data.Aeson
 import           Data.Aeson.Casing
@@ -31,9 +32,10 @@ import           BlockApps.Ethereum
 import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 
+
 data XabiKind = ContractKind
               | InterfaceKind
-              | LibraryKind deriving (Eq, Show, Generic)
+              | LibraryKind deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where
@@ -55,7 +57,7 @@ data Xabi = Xabi
   , xabiEvents    :: Map Text Event
   , xabiKind      :: XabiKind
   , xabiUsing     :: Map Text Using
-  } deriving (Eq,Show,Generic)
+  } deriving (Eq,Show,Generic,NFData)
 
 instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -118,7 +120,7 @@ funcMapToConstructor = fmap snd . listToMaybe . Map.toList
 
 --------------------------------------------------------------------------------
 
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic, NFData)
 
 tShow :: StateMutability -> Text
 tShow Pure = "pure"
@@ -162,7 +164,7 @@ data Func = Func
   , funcContents :: Maybe Text
   , funcVisibility :: Maybe Visibility
   , funcModifiers :: Maybe [String]
-  } deriving (Eq,Show,Generic)
+  } deriving (Eq,Show,Generic,NFData)
 
 funcPayable :: Func -> Bool
 funcPayable Func{funcStateMutability = Just Payable} = True
@@ -223,7 +225,7 @@ data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Generic)
+  deriving (Eq,Show,Generic,NFData)
 
 instance ToJSON Visibility
 instance FromJSON Visibility
@@ -242,7 +244,7 @@ data Modifier = Modifier
   , modifierSelector :: Text
   , modifierVals     :: Map Text Xabi.IndexedType
   , modifierContents :: Maybe Text
-  } deriving (Eq,Show,Generic)
+  } deriving (Eq,Show,Generic,NFData)
 
 instance ToJSON Modifier where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -269,7 +271,7 @@ instance ToSchema Modifier where
 data Event = Event { eventAnonymous :: Bool
                    , eventLogs :: [(Text, Xabi.IndexedType)]
                    }
-              deriving (Eq,Show,Generic)
+              deriving (Eq,Show,Generic,NFData)
 
 instance ToJSON Event where
   toJSON e = object [
@@ -300,7 +302,7 @@ instance ToSchema Event where
           ]
         }
 
-newtype Using = Using String deriving (Eq,Show,Generic)
+newtype Using = Using String deriving (Eq,Show,Generic,NFData)
 
 instance ToJSON Using where
   toJSON (Using dec) = String . Text.pack $ dec
@@ -325,12 +327,12 @@ data ContractDetails = ContractDetails
   { contractdetailsBin        :: Text
   , contractdetailsAddress    :: Maybe (MaybeNamed Address)
   , contractdetailsBinRuntime :: Text
-  , contractdetailsCodeHash   :: Keccak256
+  , contractdetailsCodeHash   :: CodePtr
   , contractdetailsName       :: Text
   , contractdetailsSrc        :: Text
   , contractdetailsXabi       :: Xabi
   , contractdetailsChainId    :: Maybe ChainId
-  } deriving (Show,Eq,Generic)
+  } deriving (Show,Eq,Generic,NFData)
 
 instance ToJSON ContractDetails where
   toJSON ContractDetails{..} = object
@@ -372,7 +374,7 @@ instance ToSchema ContractDetails where
         { contractdetailsBin = "ContractBin"
         , contractdetailsAddress = Just (Unnamed (Address 0xdeadbeef))
         , contractdetailsBinRuntime = "ContractRuntime"
-        , contractdetailsCodeHash = keccak256 "digest"
+        , contractdetailsCodeHash = EVMCode $ SHA 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
         , contractdetailsName = "DetailsName"
         , contractdetailsSrc = "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi
@@ -381,7 +383,7 @@ instance ToSchema ContractDetails where
 
 --------------------------------------------------------------------------------
 
-data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
+data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic,NFData)
 
 instance ToJSON a => ToJSON (MaybeNamed a) where
   toJSON (Named _name) = toJSON _name

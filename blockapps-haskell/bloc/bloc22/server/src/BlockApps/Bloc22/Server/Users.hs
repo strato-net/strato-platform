@@ -243,7 +243,7 @@ postUsersContractEVM' :: ContractParameters -> Signer -> Bloc BlocTransactionRes
 postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
   --TODO: check what happens with mismatching args
-  idsAndDetails <- sourceToContractDetails True src
+  idsAndDetails <- sourceToContractDetails (Do Compile) src
   $logInfoLS "postUsersContractEVM'/args" args
   (cName,(cmId,ContractDetails{..})) <-
     case contract of
@@ -282,7 +282,7 @@ postUsersContractSolidVM' :: ContractParameters -> Signer -> Bloc BlocTransactio
 postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
-  idsAndDetails <- sourceToContractDetails False src
+  idsAndDetails <- sourceToContractDetails (Don't Compile) src
   (cName,(cmId,ContractDetails{..})) <-
     case contract of
      Nothing ->
