@@ -558,21 +558,14 @@ runStatement st@(Xabi.EmitStatement eventName exptups) = do
   let evs = _events curCnct
       mEv = M.lookup (T.pack eventName) evs
   case mEv of
-    Nothing -> do
-      liftIO $ putStrLn $ "runStatement" ++ ": ignoring emit statement: " ++ 
-          (unparseStatement st) ++ ": NO corresponding event declaration exists" 
-      typeError "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
-      -- return Nothing
+    Nothing -> 
+      missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
     Just ev -> do
-      if (length exptups) /= (length $ Xabi.eventLogs ev) then do
-        liftIO $ putStrLn $ "runStatement" ++ ": ignoring emit statement: " ++ 
-            (unparseStatement st) ++ ": arguments are inconsistent with those" ++
-            " in the event's declaration" 
-        return Nothing
+      if (length exptups) /= (length $ Xabi.eventLogs ev) then 
+        invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
         addEvent $ Event (_contractName curCnct) (currentAddress curInfo) eventName expStrs
         return Nothing
-
 
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
