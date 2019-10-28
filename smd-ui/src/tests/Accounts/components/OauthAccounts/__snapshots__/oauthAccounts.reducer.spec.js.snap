@@ -1,0 +1,121 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`OauthAccounts: reducer faucet account on failure 1`] = `
+Object {
+  "account": null,
+  "error": null,
+  "faucet": Object {
+    "accountAddress": null,
+    "status": false,
+  },
+  "filter": "",
+  "name": null,
+}
+`;
+
+exports[`OauthAccounts: reducer faucet account on request 1`] = `
+Object {
+  "account": null,
+  "error": null,
+  "faucet": Object {
+    "accountAddress": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+    "status": true,
+  },
+  "filter": "",
+  "name": null,
+}
+`;
+
+exports[`OauthAccounts: reducer faucet account on success 1`] = `
+Object {
+  "account": null,
+  "error": null,
+  "faucet": Object {
+    "accountAddress": null,
+    "status": false,
+  },
+  "filter": "",
+  "name": null,
+}
+`;
+
+exports[`OauthAccounts: reducer fetch Oauth account details on failure 1`] = `
+Object {
+  "account": null,
+  "error": "ERROR",
+  "faucet": Object {
+    "accountAddress": null,
+    "status": false,
+  },
+  "filter": "",
+  "name": null,
+}
+`;
+
+exports[`OauthAccounts: reducer fetch Oauth account details on request 1`] = `
+Object {
+  "account": null,
+  "error": null,
+  "faucet": Object {
+    "accountAddress": null,
+    "status": false,
+  },
+  "filter": "",
+  "name": "clinicaladmin",
+}
+`;
+
+exports[`OauthAccounts: reducer fetch Oauth account details on success 1`] = `
+Object {
+  "account": Object {
+    "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+    "username": "clinicaladmin",
+  },
+  "error": null,
+  "faucet": Object {
+    "accountAddress": null,
+    "status": false,
+  },
+  "filter": "",
+  "name": null,
+}
+`;
+
+exports[`OauthAccounts: reducer oauthAccountsFilter 1`] = `
+Object {
+  "account": null,
+  "error": null,
+  "faucet": Object {
+    "accountAddress": null,
+    "status": false,
+  },
+  "filter": "Search accounts",
+  "name": null,
+}
+`;
+
+exports[`OauthAccounts: reducer resetOauthUserAccount 1`] = `
+Object {
+  "account": null,
+  "error": null,
+  "faucet": Object {
+    "accountAddress": null,
+    "status": false,
+  },
+  "filter": "",
+  "name": null,
+}
+`;
+
+exports[`OauthAccounts: reducer set initial state 1`] = `
+Object {
+  "account": null,
+  "error": null,
+  "faucet": Object {
+    "accountAddress": null,
+    "status": false,
+  },
+  "filter": "",
+  "name": null,
+}
+`;

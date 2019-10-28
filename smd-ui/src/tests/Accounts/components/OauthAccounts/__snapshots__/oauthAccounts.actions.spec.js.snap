@@ -1,0 +1,62 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`OauthAccounts: action faucet failure 1`] = `
+Object {
+  "err": "ERROR",
+  "type": "OAUTH_FAUCET_FAILURE",
+}
+`;
+
+exports[`OauthAccounts: action faucet request 1`] = `
+Object {
+  "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+  "chainId": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
+  "name": "clinicaladmin",
+  "type": "OAUTH_FAUCET_REQUEST",
+}
+`;
+
+exports[`OauthAccounts: action faucet success 1`] = `
+Object {
+  "type": "OAUTH_FAUCET_SUCCESS",
+}
+`;
+
+exports[`OauthAccounts: action fetch Oauth account detail failure 1`] = `
+Object {
+  "error": "ERROR",
+  "type": "FETCH_OAUTH_ACCOUNT_DETAIL_FAILURE",
+}
+`;
+
+exports[`OauthAccounts: action fetch Oauth account detail request 1`] = `
+Object {
+  "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+  "chainId": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
+  "name": "clinicaladmin",
+  "type": "FETCH_OAUTH_ACCOUNT_DETAIL_REQUEST",
+}
+`;
+
+exports[`OauthAccounts: action fetch Oauth account detail success 1`] = `
+Object {
+  "account": Object {
+    "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
+    "username": "clinicaladmin",
+  },
+  "type": "FETCH_OAUTH_ACCOUNT_DETAIL_SUCCESS",
+}
+`;
+
+exports[`OauthAccounts: action oauthAccountsFilter 1`] = `
+Object {
+  "filter": "Search accounts",
+  "type": "OAUTH_ACCOUNTS_FILTER",
+}
+`;
+
+exports[`OauthAccounts: action resetOauthUserAccount 1`] = `
+Object {
+  "type": "RESET_OAUTH_USER_ACCOUNT",
+}
+`;

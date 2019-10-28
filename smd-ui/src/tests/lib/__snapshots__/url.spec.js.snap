@@ -1,0 +1,11 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Lib: url Empty options 1`] = `"http://localhost/user"`;
+
+exports[`Lib: url create url (null values should not be append) 1`] = `"http://localhost/user/clinicalops/0X22255555"`;
+
+exports[`Lib: url create url (params only) 1`] = `"http://localhost/user/clinicalops/0X22255555"`;
+
+exports[`Lib: url create url (query only) 1`] = `"http://localhost/user?chainid=54216454215454&resolve=true"`;
+
+exports[`Lib: url create url 1`] = `"http://localhost/user/clinicalops/0X22255555?chainid=54216454215454&resolve=true"`;

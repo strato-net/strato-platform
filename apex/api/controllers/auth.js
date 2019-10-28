@@ -9,7 +9,6 @@ const appConfig = require('../config/app.config');
 const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
 
-
 const sendLoginResponse = function (res, user) {
   let tokenData;
   try {

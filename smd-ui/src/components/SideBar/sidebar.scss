@@ -13,10 +13,6 @@ aside {
   box-shadow: inset 0 0 2px 1px rgba(16, 22, 26, 0.2), 0 1px 2px rgba(16, 22, 26, 0.4);
 }
 
-.menu {
-  padding: 0px 20px;
-}
-
 .menu-item{
   font-size: 1.25em;
   color: $pt-dark-text-color;
@@ -48,4 +44,34 @@ aside {
   bottom: 60px;
   width: 100%;
   text-align: center;
+}
+
+.menu {
+  padding: 0px 20px;
+  min-height: 35vh;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.menu::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+  border-radius: 4px;
+  background: #2F424D; 
+}
+ 
+::-webkit-scrollbar-thumb {
+  border-radius: 4px; 
+  background: #F4F8FA; 
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #BBCBD4; 
+}
+
+.send-tokens-dialog .chain-field {
+  width: 100%;
 }

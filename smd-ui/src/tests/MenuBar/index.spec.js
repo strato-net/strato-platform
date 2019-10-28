@@ -5,6 +5,7 @@ import { reducer as formReducer } from 'redux-form';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import * as checkMode from '../../lib/checkMode';
+import { oauthAccounts } from '../Accounts/accountsMock';
 
 // FIXME: get rid of static offsets (spans are rendered dynamically based on strato configuration)
 const PROMETHEUS_OFFSET = 0;
@@ -222,7 +223,8 @@ describe('MenuBar: index', () => {
         "isLoggedIn": true,
         "error": null,
         "isOpen": false,
-        "spinning": false
+        "spinning": false,
+        "oauthUser": oauthAccounts[0]
       },
       chains: {
         chainIds: [

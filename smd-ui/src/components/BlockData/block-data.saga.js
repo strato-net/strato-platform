@@ -10,14 +10,17 @@ import {
 } from './block-data.actions';
 import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
+import { createUrl } from '../../lib/url';
 
 
-const url = env.STRATO_URL + "/block/last/15"
+const blocUrl = env.STRATO_URL + "/block/last/15"
 
-export function getBlockData(chainId) {
-  const localUrl = chainId ? url + `?chainid=${chainId}` : url;
+export function getBlockData(chainid) {
+  const options = { query: { chainid } };
+  const url = createUrl(blocUrl, options);
+
   return fetch(
-    localUrl,
+    url,
     {
       method: 'GET',
       credentials: "include",

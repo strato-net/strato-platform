@@ -15,10 +15,11 @@ import {
   fetchCurrentAccountDetailFailure,
   faucetSuccess,
   faucetRequest,
-  faucetFailure
+  faucetFailure,
+  fetchOauthAccountsFailure,
+  fetchOauthAccountsSuccess
 } from '../../components/Accounts/accounts.actions';
-import { deepClone } from '../helper/testHelper';
-import { accountsMock, reducerAccounts, filter, error, accountDetail, indexAccountsMock } from "./accountsMock";
+import { accountsMock, reducerAccounts, filter, error, accountDetail, indexAccountsMock, oauthAccounts } from "./accountsMock";
 
 describe('Accounts: reducer', () => {
 
@@ -274,6 +275,36 @@ describe('Accounts: reducer', () => {
           status: false,
           accountAddress: null
         }
+      };
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+  });
+
+  describe('fetch Oauth accounts', () => {
+
+    // FETCH_OAUTH_ACCOUNTS_SUCCESS
+    test('on success', () => {
+      const action = fetchOauthAccountsSuccess(oauthAccounts);
+      const initialState = {
+        accounts: reducerAccounts,
+        currentAccountDetail: null,
+        filter: '',
+        error: null,
+        oauthAccounts: []
+      };
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+    // FETCH_OAUTH_ACCOUNTS_FAILURE
+    test('on failure', () => {
+      const action = fetchOauthAccountsFailure();
+      const initialState = {
+        accounts: reducerAccounts,
+        currentAccountDetail: { balance: "3000000000000000000000" },
+        filter: '',
+        error: null,
+        oauthAccounts: []
       };
       expect(reducer(initialState, action)).toMatchSnapshot();
     });

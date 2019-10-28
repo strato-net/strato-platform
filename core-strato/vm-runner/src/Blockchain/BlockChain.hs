@@ -293,17 +293,21 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
       ++ "TXs)."
     when flags_debug $ do
       bhr <- Mod.get (Proxy @BlockHashRoot)
-      cr <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
       $logDebugS "addBlock" $ T.pack $ "Old blockhash root: " ++ format bhr
-      $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
+      mcr <- getChainRoot $ blockHash b
+      case mcr of
+        Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate old chain root. Using emptyTriePtr"
+        Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
     putBlockHeaderInChainDB bd
 
     when flags_debug $ do
       bhr' <- Mod.get (Proxy @BlockHashRoot)
-      cr' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
       $logDebugS "addBlock" $ T.pack $ "New blockhash root after inserting header: " ++ format bhr'
-      $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr'
+      mcr' <- getChainRoot $ blockHash b
+      case mcr' of
+        Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after inserting header. Using emptyTriePtr"
+        Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr
 
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
@@ -331,9 +335,11 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 
     when flags_debug $ do
       bhr'' <- Mod.get (Proxy @BlockHashRoot)
-      cr'' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
       $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
-      $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr''
+      mcr'' <- getChainRoot $ blockHash b
+      case mcr'' of
+        Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
+        Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
 
     P.incCounter vmBlocksMined
     P.incCounter vmBlocksProcessed

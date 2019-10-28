@@ -14,7 +14,9 @@ import {
   FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE,
   FAUCET_REQUEST,
   FAUCET_SUCCESS,
-  FAUCET_FAILURE
+  FAUCET_FAILURE,
+  FETCH_OAUTH_ACCOUNTS_SUCCESS,
+  FETCH_OAUTH_ACCOUNTS_FAILURE
 } from './accounts.actions';
 
 const initialState = {
@@ -25,7 +27,8 @@ const initialState = {
   faucet: {
     status: false,
     accountAddress: null
-  }
+  },
+  oauthAccounts: []
 };
 
 const reducer = function (state = initialState, action) {
@@ -181,6 +184,17 @@ const reducer = function (state = initialState, action) {
           status: false,
           accountAddress: null
         }
+      }
+    case FETCH_OAUTH_ACCOUNTS_SUCCESS:
+      return {
+        ...state,
+        oauthAccounts: action.data
+      }
+    case FETCH_OAUTH_ACCOUNTS_FAILURE:
+      return {
+        ...state,
+        oauthAccounts: [],
+        error: action.error
       }
     default:
       return state;

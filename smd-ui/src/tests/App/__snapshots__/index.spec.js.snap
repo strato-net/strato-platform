@@ -12,6 +12,28 @@ Object {
 }
 `;
 
+exports[`App: index render in Oauth mode componentDidMount 1`] = `
+"<div className=\\"App\\">
+  <Connect(LoadingBar) style={{...}} />
+  <withRouter(Connect(ReduxForm)) />
+  <SideBar />
+  <main id=\\"outer-container\\" style={{...}}>
+    ENTERPRISE
+  </main>
+</div>"
+`;
+
+exports[`App: index render in Oauth mode componentDidMount 2`] = `
+"<div className=\\"App\\">
+  <Connect(LoadingBar) style={{...}} />
+  <withRouter(Connect(ReduxForm)) />
+  <SideBar />
+  <main id=\\"outer-container\\" style={{...}}>
+    ENTERPRISE
+  </main>
+</div>"
+`;
+
 exports[`App: index render in enterprise mode 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />

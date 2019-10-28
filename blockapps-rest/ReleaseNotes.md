@@ -1,5 +1,18 @@
 ## RELEASE NOTES
 
+### Version 7.5.2
+
+-   Bug fix for history metadata helper in api.util.js
+
+### Version 7.5.1
+
+-   Add support for adding custom state in the authorization url
+
+### Version 7.5.0
+
+-   Add support for resource-owner-password-credential grant flow
+-   Support overriding config client id and client secret for getAccessTokenByClientSecret
+
 ### Version 7.4.4
 
 -   Make calls to solidity-parser library synchronous

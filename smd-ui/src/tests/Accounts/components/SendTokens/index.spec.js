@@ -18,7 +18,7 @@ describe('SendTokens: index', () => {
   describe('render enterprise mode', () => {
 
     beforeEach(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     })
 
     test('without values', () => {
@@ -179,7 +179,7 @@ describe('SendTokens: index', () => {
   describe('render public mode', () => {
 
     beforeEach(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     })
 
     test('without values', () => {
@@ -325,7 +325,6 @@ describe('SendTokens: index', () => {
     dialog.find('Field').at(1).simulate('change', { target: { value: '75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86' } });
     expect(dialog.find('Field').at(2).props().disabled).toBe(true);
     expect(dialog.find('Field').at(3).props().disabled).toBe(true);
-    dialog.find('Field').at(6).simulate('change', { target: { value: '044eda43ba9c76fc36b9183c96f7a8fad8d21fe6' } });
     dialog.find('Button').last().simulate('click');
     expect(props.handleSubmit).toHaveBeenCalled();
     wrapper.dive().dive().dive().instance().submit(values);
@@ -347,9 +346,9 @@ describe('SendTokens: index', () => {
         listLabelIds: ['79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae']
       },
       user: {
-        currentUser: {
+        oauthUser: {
           username: 'Admin_1177_49507',
-          accountAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+          address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
         }
       }
     };

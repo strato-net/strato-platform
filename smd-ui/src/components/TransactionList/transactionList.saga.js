@@ -10,13 +10,16 @@ import {
 } from './transactionList.actions';
 import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
+import { createUrl } from '../../lib/url';
 
-const url = env.STRATO_URL + "/transaction/last/15";
+const urlLastFifteen = env.STRATO_URL + "/transaction/last/15";
 
-export function getTx(last, chainId) {
-  const localUrl = chainId ? url + `?chainid=${chainId}` : url;
+export function getTx(last, chainid) {
+  const options = { query: { chainid } };
+  const url = createUrl(urlLastFifteen, options);
+
   return fetch(
-    localUrl,
+    url,
     {
       method: 'GET',
       credentials: "include",

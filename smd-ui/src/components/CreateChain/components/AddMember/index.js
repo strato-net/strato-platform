@@ -7,8 +7,8 @@ import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm } from 'redux-form';
 import { fetchAccounts, fetchUserAddresses } from '../../../Accounts/accounts.actions';
 import { openAddMemberModal, closeAddMemberModal } from '../../createChain.actions';
-import { isModePublic } from '../../../../lib/checkMode';
 import { validate } from './validate';
+import { isOauthEnabled } from '../../../../lib/checkMode';
 
 class AddMember extends Component {
 
@@ -59,7 +59,7 @@ class AddMember extends Component {
     });
   }
 
-  userNameField = (users, isPublicMode) => {
+  userNameField = (users, isModeOauth) => {
     return (
       <Field
         className="pt-input"
@@ -73,12 +73,12 @@ class AddMember extends Component {
           }
         }
         required
-        disabled={isPublicMode}
+        disabled={isModeOauth}
       >
-        {isPublicMode && <option value={isPublicMode ? this.props.initialValues.from : null}>{this.props.initialValues.from}</option>}
-        {!isPublicMode && <option />}
+        {isModeOauth && <option value={isModeOauth ? this.props.initialValues.from : null}>{this.props.initialValues.from}</option>}
+        {!isModeOauth && <option />}
         {
-          !isPublicMode && users.map((user, i) => {
+          !isModeOauth && users.map((user, i) => {
             return (
               <option key={'user' + i} value={user}>{user}</option>
             )
@@ -88,7 +88,7 @@ class AddMember extends Component {
     )
   }
 
-  addressField = (isPublicMode) => {
+  addressField = (isModeOauth) => {
     const fromUserAddresses = Object.keys(this.props.accounts).length && this.state.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.state.username])
       : [];
@@ -101,11 +101,11 @@ class AddMember extends Component {
         value={this.state.address}
         onChange={(e) => this.handleAddressChange(e)}
         required
-        disabled={isPublicMode}
+        disabled={isModeOauth}
       >
-        <option value={isPublicMode ? this.props.initialValues.fromAddress : null}>{this.props.initialValues.fromAddress}</option>
+        <option value={isModeOauth ? this.props.initialValues.fromAddress : null}>{this.props.initialValues.fromAddress}</option>
         {
-          (!isPublicMode && fromUserAddresses.length) ?
+          (!isModeOauth && fromUserAddresses.length) ?
             fromUserAddresses.map((address, i) => {
               return (
                 <option key={address} value={address}>{address}</option>
@@ -126,8 +126,8 @@ class AddMember extends Component {
 
   submit = () => {
     let data = {
-      username: isModePublic() ? this.props.initialValues.from : this.state.username,
-      address: isModePublic() ? this.props.initialValues.fromAddress : this.state.address,
+      username: isOauthEnabled() ? this.props.initialValues.from : this.state.username,
+      address: isOauthEnabled() ? this.props.initialValues.fromAddress : this.state.address,
       enode: this.state.enode,
       balance: this.state.balance
     }
@@ -145,7 +145,7 @@ class AddMember extends Component {
 
   render() {
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    const isPublicMode = isModePublic();
+    const isModeOauth = isOauthEnabled();
 
     return (
       <div >
@@ -168,7 +168,7 @@ class AddMember extends Component {
             <div className="pt-dialog-body">
 
               {
-                !isPublicMode &&
+                !isModeOauth &&
                 <div className="row">
                   <div className="col-sm-3 text-right" />
                   <div className="col-sm-9 smd-pad-4">
@@ -182,14 +182,14 @@ class AddMember extends Component {
                       onClick={
                         () => {
                           this.setState((prevState) => {
-                            return { 
-                              form: { userSelected: !prevState.form.userSelected }, 
-                              username: null, 
-                              address: null, 
-                              balance: 0, 
+                            return {
+                              form: { userSelected: !prevState.form.userSelected },
+                              username: null,
+                              address: null,
+                              balance: 0,
                               enode: null,
                               errors: null
-                             };
+                            };
                           });
                         }
                       }
@@ -205,14 +205,14 @@ class AddMember extends Component {
                       onClick={
                         () => {
                           this.setState((prevState) => {
-                            return { 
-                              form: { userSelected: !prevState.form.userSelected }, 
-                              username: null, 
-                              address: null, 
-                              balance: 0, 
+                            return {
+                              form: { userSelected: !prevState.form.userSelected },
+                              username: null,
+                              address: null,
+                              balance: 0,
                               enode: null,
                               errors: null
-                             };
+                            };
                           });
                         }
                       }
@@ -232,7 +232,7 @@ class AddMember extends Component {
                     </div>
                     <div className="col-sm-9 smd-pad-4">
                       <div className="pt-select">
-                        {this.userNameField(users, isPublicMode)}
+                        {this.userNameField(users, isModeOauth)}
                         <br /><span className="error-text">{this.errorMessageFor('username')}</span>
                       </div>
                     </div>
@@ -246,7 +246,7 @@ class AddMember extends Component {
                     </div>
                     <div className="col-sm-9 smd-pad-4">
                       <div className="pt-select">
-                        {this.addressField(isPublicMode)}
+                        {this.addressField(isModeOauth)}
                         <br /><span className="error-text">{this.errorMessageFor('address')}</span>
                       </div>
                     </div>
@@ -352,8 +352,8 @@ export function mapStateToProps(state) {
     isOpen: state.createChain.isAddMemberModalOpen,
     accounts: state.accounts.accounts,
     initialValues: {
-      from: state.user.currentUser.username,
-      fromAddress: state.user.currentUser.accountAddress
+      from: state.user.oauthUser ? state.user.oauthUser.username : '',
+      fromAddress: state.user.oauthUser ? state.user.oauthUser.address : ''
     }
   };
 }

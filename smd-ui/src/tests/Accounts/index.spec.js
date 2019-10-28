@@ -1,10 +1,16 @@
 import React from 'react';
 import Accounts, { mapStateToProps } from '../../components/Accounts';
 import { filter, indexAccountsMock } from './accountsMock';
+import * as checkMode from '../../lib/checkMode';
 
 describe('Accounts: index', () => {
 
-  describe('render with', () => {
+  describe('render (Oauth enabled)', () => {
+
+    beforeAll(() => {
+      checkMode.isModeOauth = jest.fn().mockReturnValue(true);
+    })
+
     test('empty values', () => {
       const props = {
         accounts: [],
@@ -43,65 +49,48 @@ describe('Accounts: index', () => {
 
   });
 
-  test('hide account on click', () => {
-    const props = {
-      accounts: indexAccountsMock,
-      filter: '',
-      history: {},
-      fetchAccounts: jest.fn(),
-      changeAccountFilter: jest.fn(),
-      faucetRequest: jest.fn(),
-      resetUserAddress: jest.fn(),
-      fetchUserAddresses: jest.fn()
-    };
+  describe('render (Non-Oauth)', () => {
 
-    const wrapper = shallow(
-      <Accounts.WrappedComponent {...props} />
-    );
+    beforeAll(() => {
+      checkMode.isModeOauth = jest.fn().mockReturnValue(false);
+    })
 
-    wrapper.find('div').at(14).simulate('click');
-    expect(props.resetUserAddress).toHaveBeenCalled();
-    expect(props.resetUserAddress).toHaveBeenCalledTimes(1);
-    expect(props.fetchUserAddresses).not.toHaveBeenCalled();
-  });
+    test('empty values', () => {
+      const props = {
+        accounts: [],
+        filter: '',
+        history: {},
+        fetchAccounts: jest.fn(),
+        changeAccountFilter: jest.fn(),
+        faucetRequest: jest.fn(),
+        resetUserAddress: jest.fn(),
+        fetchUserAddresses: jest.fn()
+      }
+      const wrapper = shallow(
+        <Accounts.WrappedComponent {...props} />
+      );
 
-  test('open account on click', () => {
-    const props = {
-      accounts: indexAccountsMock,
-      filter: '',
-      history: { push: jest.fn() },
-      fetchAccounts: jest.fn(),
-      changeAccountFilter: jest.fn(),
-      faucetRequest: jest.fn(),
-      resetUserAddress: jest.fn(),
-      fetchUserAddresses: jest.fn()
-    }
-    const wrapper = shallow(
-      <Accounts.WrappedComponent {...props} />
-    );
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
 
-    wrapper.find('div').at(59).simulate('click');
-    expect(props.fetchUserAddresses).toHaveBeenCalled();
-    expect(props.fetchUserAddresses).toHaveBeenCalledTimes(1);
-    expect(props.resetUserAddress).not.toHaveBeenCalled();
-  });
+    test('mocked values', () => {
+      const props = {
+        accounts: indexAccountsMock,
+        filter: '',
+        history: {},
+        fetchAccounts: jest.fn(),
+        changeAccountFilter: jest.fn(),
+        faucetRequest: jest.fn(),
+        resetUserAddress: jest.fn(),
+        fetchUserAddresses: jest.fn()
+      }
+      const wrapper = shallow(
+        <Accounts.WrappedComponent {...props} />
+      );
 
-  test('invoke onchange on input and trigger changeAccountFilter', () => {
-    const props = {
-      accounts: indexAccountsMock,
-      filter: '',
-      history: { push: jest.fn() },
-      fetchAccounts: jest.fn(),
-      changeAccountFilter: jest.fn(),
-      faucetRequest: jest.fn(),
-      resetUserAddress: jest.fn(),
-      fetchUserAddresses: jest.fn()
-    }
-    const wrapper = shallow(
-      <Accounts.WrappedComponent {...props} />
-    );
-    wrapper.find('input').simulate('change', { target: { name: "pollName", value: "spam" } });
-    expect(props.changeAccountFilter).toHaveBeenCalled();
+      expect(wrapper.debug()).toMatchSnapshot();
+    });
+
   });
 
   test('componentDidMount', () => {
@@ -116,23 +105,40 @@ describe('Accounts: index', () => {
       resetUserAddress: jest.fn(),
       fetchUserAddresses: jest.fn()
     }
-    const wrapper = shallow(
+
+    shallow(
       <Accounts.WrappedComponent {...props} />
     );
+
     expect(props.fetchAccounts).toHaveBeenCalled();
     expect(props.fetchAccounts.mock.calls).toEqual([[true, true, props.selectedChain]]);
   });
 
-  test('mapStateToProps with default values', () => {
-    const state = {
-      accounts: {
-        accounts: indexAccountsMock,
-        filter: filter,
-      },
-      chains: {
-        selectedChain: 'airline cartel 1'
-      }
+  test('componentDidMount OauthEnabled', () => {
+    checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
+    const props = {
+      accounts: indexAccountsMock,
+      filter: filter,
+      history: {},
+      selectedChain: 'airline cartel 1',
+      fetchAccounts: jest.fn(),
+      changeAccountFilter: jest.fn(),
+      faucetRequest: jest.fn(),
+      resetUserAddress: jest.fn(),
+      fetchUserAddresses: jest.fn(),
+      fetchOauthAccounts: jest.fn()
     }
+
+    shallow(
+      <Accounts.WrappedComponent {...props} />
+    );
+
+    expect(props.fetchOauthAccounts).toHaveBeenCalled();
+    expect(props.fetchOauthAccounts.mock.calls).toEqual([[]]);
+  });
+
+  test('mapStateToProps with default values', () => {
+    const state = {}
     expect(mapStateToProps(state)).toMatchSnapshot();
   });
 
