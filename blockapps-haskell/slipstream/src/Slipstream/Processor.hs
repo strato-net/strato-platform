@@ -232,7 +232,7 @@ lookupT k = MaybeT . return . Map.lookup k
 
 -- Will also check BlocDB for details, if they are not in the cache
 --   i.e. on node restart
-getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, ContractDetails))
+getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Int32, ContractDetails))
 getSolidVMDetails g row = do
   mDetails <- getCachedSolidVMDetails g row
   case mDetails of
@@ -242,7 +242,7 @@ getSolidVMDetails g row = do
       case blocDetails of
         Nothing -> return Nothing
         Just (_, deets) -> do
-          detailsMap <- Map.map snd <$> sourceToContractDetails (Don't Compile) (contractdetailsSrc deets)
+          detailsMap <- sourceToContractDetails (Don't Compile) (contractdetailsSrc deets)
           setSolidVMABIs g (actionCodeHash row) detailsMap
           getSolidVMABIs g (actionCodeHash row)
 
@@ -250,14 +250,14 @@ getSolidVMDetails g row = do
 -- Note: This could be reshaped to remove the bloch dependency, as
 -- we only care about the ABI from `sourceToContractDetails` and
 -- not the metadata id. 
-getCachedSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, ContractDetails))
+getCachedSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Int32, ContractDetails))
 getCachedSolidVMDetails g row = liftM2 (<|>)
   (getSolidVMABIs g codePtr)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
     detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
-    setSolidVMABIs g codePtr (Map.map snd detailsMap)
+    setSolidVMABIs g codePtr detailsMap
     MaybeT $ getSolidVMABIs g codePtr
   )
  where codePtr = actionCodeHash row
@@ -410,10 +410,13 @@ processTheMessages env conn g messages = do
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in metadata"
-            Just (name, details) -> do
+            Just (name, cmId, details) -> do
               let abi = xabiToText $ contractdetailsXabi details
                   abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
                   cont = error "internal error: contract should be unused for solidvm"
+
+              ensureContractInstance cmId row
+
               adjustGlobals g (Don't Compile) row details
               oldState <- readPreviousSolidVMState g addr chainId
               indexContract <- rowToInsert g abiid row cont oldState
