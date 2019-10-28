@@ -39,6 +39,7 @@ import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
+
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
@@ -109,7 +110,7 @@ instance ToSample BlocTransactionData where
         contractdetailsBin        = "Contract Bin"
       , contractdetailsAddress    = Just (Named "Latest")
       , contractdetailsBinRuntime = "Contract Bin Runtime"
-      , contractdetailsCodeHash   = keccak256 "Contract Code Hash"
+      , contractdetailsCodeHash   = EVMCode $ keccak256SHA $ keccak256 "Contract Code Hash"
       , contractdetailsName       = "Example"
       , contractdetailsSrc        = "contract Example { }"
       , contractdetailsXabi       = sampleXabi

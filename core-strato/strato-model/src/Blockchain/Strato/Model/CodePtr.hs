@@ -15,6 +15,8 @@ import              Data.Binary
 import              Data.Data
 import              Data.DeriveTH
 import              Data.Hashable                        (Hashable)
+import qualified    Data.Swagger                         as S 
+import              Data.Swagger.Internal.Schema (named)
 import              Database.Persist.TH
 import              GHC.Generics
 import              Test.QuickCheck
@@ -27,6 +29,12 @@ import              Text.Format
 
 data CodePtr = EVMCode SHA | SolidVMCode String SHA
              deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable, Data)
+
+
+  
+instance S.ToSchema CodePtr where
+  declareNamedSchema _ = return $ named "Code Pointer"  S.binarySchema
+
 
 instance RLPSerializable CodePtr where
   rlpEncode (EVMCode codeHash) = rlpEncode codeHash
