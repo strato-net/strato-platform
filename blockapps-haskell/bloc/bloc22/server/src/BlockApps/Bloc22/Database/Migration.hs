@@ -131,7 +131,7 @@ dropXabiTables = [sql| DROP TABLE IF EXISTS contracts_lookup;
 
 migrateCodeHashToCodePtr :: Bloc ()
 migrateCodeHashToCodePtr = do
-  let idQuery = [sql| SELECT (id, code_hash) FROM contracts_metadata; |]
+  let idQuery = [sql| SELECT id,code_hash FROM contracts_metadata; |]
       xabiQuery = [sql| UPDATE contracts_metadata
                            SET code_hash = tup.x
                           FROM (VALUES (?,?::bytea)) as tup(i,x)
@@ -139,8 +139,13 @@ migrateCodeHashToCodePtr = do
                       |]
   idsAndCodeHashes <- blocModify $ flip query_ idQuery
   $logInfoS "migrateCodeHashToCodePtr" "Migrating code hashes to CodePtrs"
-  forM_ idsAndCodeHashes $ \((i :: Integer), bs) ->
+  forM_ idsAndCodeHashes $ \(i :: Integer, bs) ->
     for_ (byteStringKeccak256 bs) $ \kecc -> do
-      let codePtrBS = rlpSerialize . EVMCode $ keccak256SHA kecc
-      $logInfoS "migrateCodeHashToCodePtr" . T.pack $ "Processing ID " ++ show i ++ ": " ++ show bs
+      let codePtrBS = Binary . rlpSerialize . EVMCode $ keccak256SHA kecc
+      $logInfoS "migrateCodeHashToCodePtr" . T.pack $ concat
+        [ "Processing ID "
+        , show i
+        , ": "
+        , show codePtrBS
+        ]
       void . blocModify $ \conn -> execute conn xabiQuery (i, codePtrBS)
