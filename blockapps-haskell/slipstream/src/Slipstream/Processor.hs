@@ -231,6 +231,31 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
+-- TODO: this generic caching/lookup routine...
+--    abi setter/getter needs to know that maps are not a thing anymore...
+--     and, need to map calls to it for the metadata lookups, since they 
+--     return the maps
+getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Int32, ContractDetails))
+getDetailsForRow g row = checkCache <|> checkBloc <|> checkMetadata
+  where checkCache = MaybeT $ getCachedDetails g codePtr
+        checkBloc = runMaybeT $ do
+          detailsFromBloc <- getContractDetailsByCodeHash codePtr
+          setContractABIs g codePtr detailsFromBloc
+          getContractABIs g codePtr
+        checkMetadata = case codePtr of
+          EVMCode hsh -> runMaybeT $ do
+            let md = actionMetadata row
+            src <- lookupT "src" md
+            name <- lookupT "name" md
+            detailsMap <- lift $ sourceToContractDetails (Do Compile) src
+            lookupT name detailsMap
+          SolidVMCode _ hsh -> runMaybeT $ do
+            let md = actionMetadata row
+            src <- lookupT "src" md
+            detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
+            setSolidVMABIs g codePtr detailsMap
+            MaybeT $ getSolidVMABIs g codePtr
+        codePtr = actionCodeHash row 
 
 -- Will also check BlocDB for details, if they are not in the cache
 --   i.e. on node restart
