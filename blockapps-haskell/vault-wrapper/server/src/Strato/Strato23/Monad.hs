@@ -76,6 +76,10 @@ dbErrorToUserError = flip catchError $ \case
 toUserError :: MonadError VaultWrapperError m => Text -> m a -> m a
 toUserError msg = flip catchError (\_ -> throwError $ UserError msg)
 
+toCouldNotFind :: MonadError VaultWrapperError m => Text -> m a -> m a
+toCouldNotFind msg = flip catchError (\_ -> throwError $ CouldNotFind msg)
+ 
+
 --prettyCallStack' is the same idea as prettyCallStack, but with formatting more suitable for out project.  In particular, package names a very mangled by stack, making prettyCallStack unreadable.
 prettyCallStack'::CallStack->String
 prettyCallStack' cs =
