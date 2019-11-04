@@ -642,7 +642,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
           Right r  -> case erException r of
                         Nothing -> (Success, "Success!", erRemainingTxGas r)
-                        Just ex -> let fmt = (show $ erTrace r) in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
+                        Just ex -> let fmt = either show show ex
+                                    in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
