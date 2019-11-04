@@ -101,9 +101,9 @@ module.exports = {
             healthInfo: {
               uptime: uptime / 1000,
               isHealthy: healthStatus,
-              isLastPending: isPending,
               isNotStalled: stallStatus,
               isValidBlocksInc: isInc ,
+              isLastPending: isPending
             }
           }
       )
