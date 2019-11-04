@@ -291,7 +291,6 @@ adjustGlobals gref shouldCompile row details = do
 
   -- won't actually recompile the contract
   detailsMap <- sourceToContractDetails shouldCompile $ contractdetailsSrc details
-  $logInfoS "adjustGlobals" . T.pack $ "Details Map: " ++ show detailsMap
   mapM_ (go detailsMap) $ [("history", addToHistoryList)
                           ,("nohistory", removeFromHistoryList)
                           ,("noindex", addToNoIndexList)
