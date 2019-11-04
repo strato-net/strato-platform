@@ -14,7 +14,7 @@ import           Strato.Strato23.Database.Queries
 getKey :: Text -> Maybe Text -> VaultM StatusAndAddress
 getKey headerUserName queryParamUserName = withPassword $ \pw -> do
   let userName = fromMaybe headerUserName queryParamUserName
-  (salt, nonce, encKey, addr) <- toUserError ("User " <> userName <> " doesn't exist")
+  (salt, nonce, encKey, addr) <- toCouldNotFind ("User " <> userName <> " doesn't exist")
                                . vaultQuery1 $ getUserKeyQuery userName
   if isJust queryParamUserName          -- decrypt and derive the address if query param
     then return $ StatusAndAddress addr -- not specified, to guarantee correctness
