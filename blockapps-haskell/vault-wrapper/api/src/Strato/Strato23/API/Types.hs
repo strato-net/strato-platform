@@ -61,3 +61,4 @@ data User = User
   { username :: Text
   , address :: Address
   } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
+  

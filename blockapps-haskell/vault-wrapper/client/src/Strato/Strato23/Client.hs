@@ -33,5 +33,5 @@ postSignature = client (Proxy @ PostSignature)
 postPassword :: Text -> ClientM ()
 postPassword = client (Proxy @ PostPassword)
 
-verifyPassword :: ClientM ()
+verifyPassword :: ClientM Bool
 verifyPassword = client (Proxy @ VerifyPassword)
