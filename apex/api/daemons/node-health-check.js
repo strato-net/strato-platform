@@ -43,11 +43,13 @@ function queryHealthStatus() {
     try {
       // Check wheather global password exists or not
       const isGlobalPasswordExist = await isGlobalPasswordExists();
+      const isOauthEnabled = process.env['OAUTH_ENABLED'];
+
       const metricsResult = await getHealthPrometheus();
-      await checkLatest();
+      await checkLatest(isGlobalPasswordExist);
       const healthStatus = await compareTimeStamp(metricsResult);
-      const overallStatus = await updateHealthStat(healthStatus, isGlobalPasswordExist);
-      await updateCurrentHealth(overallStatus, isGlobalPasswordExist);
+      const overallStatus = await updateHealthStat(healthStatus, isGlobalPasswordExist, isOauthEnabled);
+      await updateCurrentHealth(overallStatus, isGlobalPasswordExist, isOauthEnabled);
       return resolve();
     } catch (error) {
       winston.error(`Error occurred while querying some of the health info: "${error.message ? error.message : 'no message'}"`);
@@ -122,7 +124,7 @@ async function compareTimeStamp(obj) {
   return ret;
 }
 
-async function updateHealthStat(healthStatus, isGlobalPasswordExist) {
+async function updateHealthStat(healthStatus, isGlobalPasswordExist, isOauthEnabled) {
   let overallStat = true;
   let currentTime = Date.now();
   let failedTask = [];
@@ -139,16 +141,16 @@ async function updateHealthStat(healthStatus, isGlobalPasswordExist) {
     });
   });
 
-  if (!isGlobalPasswordExist) {
+  if (isOauthEnabled && !isGlobalPasswordExist) {
     overallStat = false;
   }
 
   return [overallStat, failedTask];
 }
 
-async function updateCurrentHealth(overallStat, isGlobalPasswordExist) {
+async function updateCurrentHealth(overallStat, isGlobalPasswordExist, isOauthEnabled) {
   let currentTime = Date.now();
-  let [systemInfoStatus, systemInfo] = await checkSystemInfo(isGlobalPasswordExist);
+  let [systemInfoStatus, systemInfo] = await checkSystemInfo(isGlobalPasswordExist, isOauthEnabled);
 
   let [stat, created] = await models.CurrentHealth.findOrCreate({
     where: { processName: 'HealthStat' }, defaults: {
@@ -198,7 +200,7 @@ function formatPromethusTimestamp(timestamp) {
   return (timestamp.toString().split('.')[0])
 }
 
-async function checkLatest() {
+async function checkLatest(isGlobalPasswordExist, isOauthEnabled) {
   try {
     const healthInfo = await models.CurrentHealth.findOne({
       where: {
@@ -218,18 +220,18 @@ async function checkLatest() {
       const nodeUp = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy);
       if (!nodeUp) {
         const currentStatus = [false, 'Last Check Not Recent'];
-        await updateCurrentHealth(currentStatus);
+        await updateCurrentHealth(currentStatus, isGlobalPasswordExist, isOauthEnabled);
       }
     }
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking and comparing the latest health`)
     const currentStatus = [false, 'Could not calculate the health status'];
-    await updateCurrentHealth(currentStatus);
+    await updateCurrentHealth(currentStatus, isGlobalPasswordExist, isOauthEnabled);
   }
 }
 
 
-async function checkSystemInfo(isGlobalPasswordExist) {
+async function checkSystemInfo(isGlobalPasswordExist, isOauthEnabled) {
   try {
     let additional_info = [];
     let sysInfoCollected = {}
@@ -294,7 +296,7 @@ async function checkSystemInfo(isGlobalPasswordExist) {
     })
     sysInfoCollected.networkStats = nwStats;
 
-    if (!isGlobalPasswordExist) {
+    if (isOauthEnabled && !isGlobalPasswordExist) {
       isHealthy = false;
       additional_info.push("Global password is not set")
     }
