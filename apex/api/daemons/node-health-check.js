@@ -294,9 +294,6 @@ async function checkSystemInfo(isGlobalPasswordExist) {
     })
     sysInfoCollected.networkStats = nwStats;
 
-    // Check wheather global password exists or not
-    const isGlobalPasswordExist = await isGlobalPasswordExists();
-
     if (!isGlobalPasswordExist) {
       isHealthy = false;
       additional_info.push("Global password is not set")
