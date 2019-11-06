@@ -41,11 +41,13 @@ async function singleCheck() {
 function queryHealthStatus() {
   return new Promise(async (resolve, _void) => {
     try {
+      // Check wheather global password exists or not
+      const isGlobalPasswordExist = await isGlobalPasswordExists();
       const metricsResult = await getHealthPrometheus();
       await checkLatest();
       const healthStatus = await compareTimeStamp(metricsResult);
-      const overallStatus = await updateHealthStat(healthStatus);
-      await updateCurrentHealth(overallStatus);
+      const overallStatus = await updateHealthStat(healthStatus, isGlobalPasswordExist);
+      await updateCurrentHealth(overallStatus, isGlobalPasswordExist);
       return resolve();
     } catch (error) {
       winston.error(`Error occurred while querying some of the health info: "${error.message ? error.message : 'no message'}"`);
@@ -120,7 +122,7 @@ async function compareTimeStamp(obj) {
   return ret;
 }
 
-async function updateHealthStat(healthStatus) {
+async function updateHealthStat(healthStatus, isGlobalPasswordExist) {
   let overallStat = true;
   let currentTime = Date.now();
   let failedTask = [];
@@ -137,9 +139,6 @@ async function updateHealthStat(healthStatus) {
     });
   });
 
-  // Check wheather global password exists or not
-  const isGlobalPasswordExist = await isGlobalPasswordExists();
-
   if (!isGlobalPasswordExist) {
     overallStat = false;
   }
@@ -147,9 +146,9 @@ async function updateHealthStat(healthStatus) {
   return [overallStat, failedTask];
 }
 
-async function updateCurrentHealth(overallStat) {
+async function updateCurrentHealth(overallStat, isGlobalPasswordExist) {
   let currentTime = Date.now();
-  let [systemInfoStatus, systemInfo] = await checkSystemInfo();
+  let [systemInfoStatus, systemInfo] = await checkSystemInfo(isGlobalPasswordExist);
 
   let [stat, created] = await models.CurrentHealth.findOrCreate({
     where: { processName: 'HealthStat' }, defaults: {
@@ -230,7 +229,7 @@ async function checkLatest() {
 }
 
 
-async function checkSystemInfo() {
+async function checkSystemInfo(isGlobalPasswordExist) {
   try {
     let additional_info = [];
     let sysInfoCollected = {}
