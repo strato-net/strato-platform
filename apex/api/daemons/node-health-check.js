@@ -45,7 +45,6 @@ function queryHealthStatus() {
       await checkLatest();
       const healthStatus = await compareTimeStamp(metricsResult);
       const overallStatus = await updateHealthStat(healthStatus);
-      console.log("----------------------------------", overallStatus);
       await updateCurrentHealth(overallStatus);
       return resolve();
     } catch (error) {
@@ -69,7 +68,7 @@ function getHealthPrometheus() {
   return rp(options);
 }
 
-async function isPasswordExist() {
+async function isGlobalPasswordExists() {
   const options = {
     method: 'GET',
     url: `http://${process.env['vaultWrapperHost']}/strato/v2.3/verify-password`,
@@ -77,8 +76,8 @@ async function isPasswordExist() {
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,
   };
-  const data = await rp(options);
-  return data;
+
+  return await rp(options);
 }
 
 async function compareTimeStamp(obj) {
@@ -137,17 +136,24 @@ async function updateHealthStat(healthStatus) {
       timestamp: currentTime
     });
   });
+
+  // Check wheather global password exists or not
+  const isGlobalPasswordExist = await isGlobalPasswordExists();
+
+  if (!isGlobalPasswordExist) {
+    overallStat = false;
+  }
+
   return [overallStat, failedTask];
 }
 
 async function updateCurrentHealth(overallStat) {
   let currentTime = Date.now();
   let [systemInfoStatus, systemInfo] = await checkSystemInfo();
-  const isPasswordExists = await isPasswordExist();
 
   let [stat, created] = await models.CurrentHealth.findOrCreate({
     where: { processName: 'HealthStat' }, defaults: {
-      latestHealthStatus: isPasswordExists ? overallStat[0] : false,
+      latestHealthStatus: overallStat[0],
       latestCheckTimestamp: currentTime,
       additionalInfo: overallStat[1].toString(),
       lastFailureTimestamp: currentTime  // default first time marked as failure
@@ -157,7 +163,7 @@ async function updateCurrentHealth(overallStat) {
     await stat.update(
       {
         latestCheckTimestamp: currentTime,
-        latestHealthStatus: isPasswordExists ? overallStat[0] : false,
+        latestHealthStatus: overallStat[0],
         additionalInfo: overallStat[1].toString(),
         lastFailureTimestamp: overallStat[0] ? stat.lastFailureTimestamp : currentTime
       },
@@ -168,7 +174,7 @@ async function updateCurrentHealth(overallStat) {
   }
   let [statSys, createdSys] = await models.CurrentHealth.findOrCreate({
     where: { processName: 'SystemInfoStat' }, defaults: {
-      latestHealthStatus: isPasswordExists ? systemInfoStatus : false,
+      latestHealthStatus: systemInfoStatus,
       latestCheckTimestamp: currentTime,
       additionalInfo: JSON.stringify(systemInfo),
       lastFailureTimestamp: currentTime  // default first time marked as failure
@@ -178,7 +184,7 @@ async function updateCurrentHealth(overallStat) {
     await statSys.update(
       {
         latestCheckTimestamp: currentTime,
-        latestHealthStatus: isPasswordExists ? systemInfoStatus : false,
+        latestHealthStatus: systemInfoStatus,
         additionalInfo: JSON.stringify(systemInfo),
         lastFailureTimestamp: systemInfoStatus ? statSys.lastFailureTimestamp : currentTime
       },
@@ -289,9 +295,18 @@ async function checkSystemInfo() {
     })
     sysInfoCollected.networkStats = nwStats;
 
+    // Check wheather global password exists or not
+    const isGlobalPasswordExist = await isGlobalPasswordExists();
+
+    if (!isGlobalPasswordExist) {
+      isHealthy = false;
+      additional_info.push("Global password is not set")
+    }
+
     if (additional_info) {
       sysInfoCollected.Alerts = additional_info
     }
+
     winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)
     return [isHealthy, sysInfoCollected];
   } catch (e) {
