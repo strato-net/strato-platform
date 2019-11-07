@@ -55,6 +55,4 @@ verifyPassword :: VaultM Bool
 verifyPassword = do 
   existingPassword <- asks superSecretPassword
   doIAlreadyHaveAPassword <- liftIO $ readIORef existingPassword
-  case doIAlreadyHaveAPassword of 
-    Just _ -> return True
-    Nothing -> return False
+  return $ maybe False (const True) doIAlreadyHaveAPassword
