@@ -235,30 +235,33 @@ lookupT k = MaybeT . return . Map.lookup k
 --    abi setter/getter needs to know that maps are not a thing anymore...
 --     and, need to map calls to it for the metadata lookups, since they 
 --     return the maps
-getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Int32, ContractDetails))
-getDetailsForRow g row = checkCache <|> checkBloc <|> checkMetadata
-  where checkCache = MaybeT $ getCachedDetails g codePtr
-        checkBloc = runMaybeT $ do
-          detailsFromBloc <- getContractDetailsByCodeHash codePtr
-          setContractABIs g codePtr detailsFromBloc
+getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
+getDetailsForRow g row = liftM3 (\a b c -> a <|> b <|> c) checkCache checkBloc checkMetadata
+  where checkCache = do
+          $logInfoS "DEETS" . T.pack $ "checking cache for details"
           getContractABIs g codePtr
-        checkMetadata = case codePtr of
-          EVMCode hsh -> runMaybeT $ do
-            let md = actionMetadata row
-            src <- lookupT "src" md
-            name <- lookupT "name" md
-            detailsMap <- lift $ sourceToContractDetails (Do Compile) src
-            lookupT name detailsMap
-          SolidVMCode _ hsh -> runMaybeT $ do
-            let md = actionMetadata row
-            src <- lookupT "src" md
-            detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
-            setSolidVMABIs g codePtr detailsMap
-            MaybeT $ getSolidVMABIs g codePtr
+        checkBloc = runMaybeT $ do
+          $logInfoS "DEETS" . T.pack $ "checking bloc for details"
+          detailsFromBloc <- lift $ getContractDetailsByCodeHash codePtr
+          setContractABIs g codePtr $ fromJust detailsFromBloc
+          MaybeT $ getContractABIs g codePtr
+        checkMetadata = runMaybeT $ do
+          $logInfoS "DEETS" . T.pack $ "checking metadata for details"
+          let md = actionMetadata row
+          src <- lookupT "src" md
+          detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
+          name <- case codePtr of
+            EVMCode _ -> lookupT "name" md
+            SolidVMCode cname _ -> return $ T.pack cname
+          detailsTup <- lookupT name detailsMap
+          setContractABIs g codePtr detailsTup
+          MaybeT $ getContractABIs g codePtr 
         codePtr = actionCodeHash row 
 
 -- Will also check BlocDB for details, if they are not in the cache
 --   i.e. on node restart
+
+{- 
 getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Int32, ContractDetails))
 getSolidVMDetails g row = do
   mDetails <- getCachedSolidVMDetails g row
@@ -301,7 +304,7 @@ detailsForRow row = liftM2 (<|>)
     name <- lookupT "name" md
     detailsMap <- lift $ sourceToContractDetails (Do Compile) src
     lookupT name detailsMap)
-
+-}
 adjustGlobals :: IORef Globals
               -> Should Compile
               -> AggregateAction
@@ -434,7 +437,7 @@ processTheMessages env conn g messages = do
 
       case actionStorage row of
         BS.ActionEVMDiff{} -> do
-          mDetails <- detailsForRow row
+          mDetails <- getDetailsForRow g row
           case mDetails of
             Nothing -> pure . Left $ "No details found for code hash "
                             <> (T.pack . show $ actionCodeHash row)
@@ -455,13 +458,14 @@ processTheMessages env conn g messages = do
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs []
         BS.ActionSolidVMDiff{} -> do
-          mName <- getSolidVMDetails g row
+          mName <- getDetailsForRow g row
           case mName of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in metadata"
-            Just (name, cmId, details) -> do
+            Just (cmId, details) -> do
               let abi = xabiToText $ contractdetailsXabi details
+                  name = T.filter (/= '"') $ contractdetailsName details
                   abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
                   cont = error "internal error: contract should be unused for solidvm"
 

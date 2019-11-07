@@ -23,7 +23,6 @@ import qualified Data.Cache.LRU              as LRU
 import           Data.Either.Extra
 import qualified Data.HashMap.Strict         as HM
 import           Data.Int                    (Int32)
-import qualified Data.Map                    as M
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
@@ -51,23 +50,15 @@ xabiToText = T.replace "\'" "\'\'"
            . decodeUtf8 . BL.toStrict
            . JSON.encode
 
-setSolidVMABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text (Int32, ContractDetails) -> m ()
-setSolidVMABIs gref (SolidVMCode _ !codeHash) detailsMap = do
+setContractABIs :: MonadIO m => IORef Globals -> CodePtr -> (Int32, ContractDetails) -> m ()
+setContractABIs gref codePtr detailsTup = do
   globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{solidVMABIs=HM.insert codeHash detailsMap solidVMABIs}
-setSolidVMABIs _ EVMCode{} _ = error "internal error: setSolidVMDetails for EVMCode"
+  updateGlobals gref globals{contractABIs=HM.insert codePtr detailsTup contractABIs}
 
-getSolidVMABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (Text, Int32, ContractDetails))
-getSolidVMABIs gref (SolidVMCode name' codeHash) = do
-  abis <- solidVMABIs <$> readIORef gref
-  case HM.lookup codeHash abis of
-    Nothing -> return Nothing
-    Just details -> do
-      let name = T.pack name'
-      case M.lookup name details of
-        Nothing -> return Nothing
-        Just (cmId, deets) -> return $ Just (name, cmId, deets)
-getSolidVMABIs _ EVMCode{} = error "internal error: getSolidVMDetails for EVMCode"
+getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (Int32, ContractDetails))
+getContractABIs gref codePtr = do
+  abis <- contractABIs <$> readIORef gref
+  return $ HM.lookup codePtr abis 
 
 setContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
 setContractCreated globalsIORef codeHash = do
