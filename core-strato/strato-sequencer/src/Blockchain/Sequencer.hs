@@ -220,23 +220,23 @@ blockstanbulSend' msg = do
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   return vmevs
 
+privateWitnessableHash :: Word256 -> Word256 -> SHA
+privateWitnessableHash tHash cHash =
+  superProprietaryStratoSHAHash
+  . RL.rlpSerialize
+  $ RL.RLPArray [RL.rlpEncode tHash, RL.rlpEncode cHash]
+
 transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
   motx <- wrapTransaction lookupChainIdFromChainHash t
   for_ motx $ \otx -> do
-    let witnessHash = witnessableHash otx
-    witnessed <- wasTransactionHashWitnessed witnessHash
-    unless witnessed $ do
-      let privateWitnessHash =
-            superProprietaryStratoSHAHash
-            . RL.rlpSerialize
-            $ RL.RLPArray [RL.rlpEncode th', RL.rlpEncode ch']
-      pwitnessed <- wasTransactionHashWitnessed privateWitnessHash
-      unless pwitnessed $ do
-        witnessTransactionHash privateWitnessHash
-        runPrivateHashTX (SHA th') (SHA ch')
-        markForP2P $ P2pTx otx
-        markForVM  $ VmTx ts otx
+    let privateWitnessHash = privateWitnessableHash th' ch'
+    pwitnessed <- wasTransactionHashWitnessed privateWitnessHash
+    unless pwitnessed $ do
+      witnessTransactionHash privateWitnessHash
+      runPrivateHashTX (SHA th') (SHA ch')
+      markForP2P $ P2pTx otx
+      markForVM  $ VmTx ts otx
 
 transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
 transformFullTransactions pairs = do
@@ -310,6 +310,8 @@ transformFullTransactions pairs = do
                     SHA th' = txHash ptx
                     SHA ch' = cHash
                     phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
+                    privateWitnessHash = privateWitnessableHash th' ch'
+                witnessTransactionHash privateWitnessHash
                 logF . concat $
                   [ "Created chain hash "
                   , format cHash
