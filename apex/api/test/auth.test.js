@@ -46,7 +46,7 @@ chai.use(chaiHttp);
 const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
 
 describe('non-OAuth/public Auth tests', function () {
-  this.timeout(10000);
+  this.timeout(60000);
 
     //need to add skip check to each describe block because of mocha bug.
     // technically beforeEach would work, but other beforeEach's still run
@@ -147,7 +147,7 @@ describe('non-OAuth/public Auth tests', function () {
           });
       });
       it('creates accounts', async function () {
-        this.timeout(20000);
+        this.timeout(60000);
         await models.TempUser.create({
           email: 'you@test.com',
           password: bcrypt.hashSync('hunter2', appConfig.passwordSaltRounds),
@@ -242,7 +242,7 @@ describe('non-OAuth/public Auth tests', function () {
       });
 
       it("can upload init contracts", async function () {
-        this.timeout(30000);
+        this.timeout(60000);
         console.log("about to create user");
         await models.TempUser.create({
           email: 'john_wayne@test.com',
