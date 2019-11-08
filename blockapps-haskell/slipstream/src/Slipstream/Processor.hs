@@ -236,16 +236,16 @@ lookupT k = MaybeT . return . Map.lookup k
 --     and, need to map calls to it for the metadata lookups, since they 
 --     return the maps
 getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
-getDetailsForRow g row = liftM3 (\a b c -> a <|> b <|> c) checkCache checkBloc checkMetadata
+getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
   where checkCache = do
           $logInfoS "DEETS" . T.pack $ "checking cache for details"
-          getContractABIs g codePtr
-        checkBloc = runMaybeT $ do
+          MaybeT $ getContractABIs g codePtr
+        checkBloc = do
           $logInfoS "DEETS" . T.pack $ "checking bloc for details"
           detailsFromBloc <- lift $ getContractDetailsByCodeHash codePtr
           setContractABIs g codePtr $ fromJust detailsFromBloc
           MaybeT $ getContractABIs g codePtr
-        checkMetadata = runMaybeT $ do
+        checkMetadata = do
           $logInfoS "DEETS" . T.pack $ "checking metadata for details"
           let md = actionMetadata row
           src <- lookupT "src" md
