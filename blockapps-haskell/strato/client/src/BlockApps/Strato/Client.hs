@@ -93,12 +93,12 @@ data AccountsFilterParams = AccountsFilterParams
   , qaNonce      :: Maybe Natural
   , qaMinNonce   :: Maybe Natural
   , qaMaxNonce   :: Maybe Natural
-  , qaChainId    :: Maybe ChainId
+  , qaChainId    :: [ChainId]
   } deriving (Eq, Show, Generic)
 
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
-  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing []
 
 data StorageFilterParams = StorageFilterParams
   { qsAddress  :: Maybe Address
@@ -108,12 +108,12 @@ data StorageFilterParams = StorageFilterParams
   , qsValue    :: Maybe Natural
   , qsMinValue :: Maybe Natural
   , qsMaxValue :: Maybe Natural
-  , qsChainId  :: Maybe ChainId
+  , qsChainId  :: [ChainId]
   }
 
 storageFilterParams :: StorageFilterParams
 storageFilterParams = StorageFilterParams
-  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing []
 
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> Maybe ChainId -> ClientM [WithNext Transaction]

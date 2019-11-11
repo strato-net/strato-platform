@@ -128,7 +128,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   storage' <- case mName of
     Nothing -> blocStrato $ getStorage
       storageFilterParams{ qsAddress = Just address
-                         , qsChainId = chainId
+                         , qsChainId = maybeToList chainId
                          }
     Just name ->
       let ranges = decodeStorageKey
@@ -173,7 +173,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
         storageFilterParams{ qsAddress = Just a
                            , qsMinKey = Just . fromInteger $ toInteger o
                            , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
-                           , qsChainId = chainId
+                           , qsChainId = maybeToList chainId
                            }
 
 getContractsDetails :: Address -> Maybe ChainId -> Bloc ContractDetails

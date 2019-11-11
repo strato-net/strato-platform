@@ -900,7 +900,7 @@ getAccountTxParams addr chainId mTxParams = do
 
 getAccountNonce :: Address -> Maybe ChainId -> Bloc Nonce
 getAccountNonce addr chainId = do
-  let params = accountsFilterParams{qaAddress = Just addr, qaChainId = chainId}
+  let params = accountsFilterParams{qaAddress = Just addr, qaChainId = maybeToList chainId}
   accts <- blocStrato $ getAccountsFilter params
   $logInfoLS "getAccountNonce/req" params
   $logInfoLS "getAccountNonce/resp" accts

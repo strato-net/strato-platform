@@ -80,7 +80,7 @@ type API =
     :> QueryParam "nonce" Natural
     :> QueryParam "minnonce" Natural
     :> QueryParam "maxnonce" Natural
-    :> QueryParam "chainid" ChainId
+    :> QueryParams "chainid" ChainId
     :> Get '[JSON] [Account]
   :<|> "stats"
     :> "difficulty"
@@ -96,7 +96,7 @@ type API =
     :> QueryParam "value" Natural
     :> QueryParam "minvalue" Natural
     :> QueryParam "maxvalue" Natural
-    :> QueryParam "chainid" ChainId
+    :> QueryParams "chainid" ChainId
     :> Get '[JSON] [Storage]
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
