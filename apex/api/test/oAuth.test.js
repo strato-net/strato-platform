@@ -41,7 +41,7 @@ const waitFaucet = async function(address) {
 chai.use(chaiHttp);
 
 describe('OAuth tests', function () {
-  this.timeout(60000);
+  this.timeout(appConfig.timeout);
 
   const userData = testFactory.getUserData();
 
