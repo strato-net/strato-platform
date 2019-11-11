@@ -236,10 +236,15 @@ lookupT k = MaybeT . return . Map.lookup k
 --  If they're not in the cache but they are in the action metadata or bloc database,
 --  it adds them to cache
 getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
-getDetailsForRow g row = runMaybeT $ checkCache <|> checkMetadata <|> checkBloc
+getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
   where checkCache = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking contractABIs cache for contract details"
           MaybeT $ getContractABIs g codePtr
+        checkBloc = MaybeT $ do
+          $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
+          mDetails <- getContractDetailsByCodeHash codePtr
+          for_ mDetails $ setContractABIs g codePtr
+          return mDetails
         checkMetadata = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
           let md = actionMetadata row
@@ -254,11 +259,6 @@ getDetailsForRow g row = runMaybeT $ checkCache <|> checkMetadata <|> checkBloc
               lookupT (T.pack name) detailsMap
           setContractABIs g codePtr detailsTup
           MaybeT $ return $ Just detailsTup
-        checkBloc = MaybeT $ do
-          $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
-          mDetails <- getContractDetailsByCodeHash codePtr
-          for_ mDetails $ setContractABIs g codePtr
-          return mDetails
         codePtr = actionCodeHash row 
 
 adjustGlobals :: IORef Globals
