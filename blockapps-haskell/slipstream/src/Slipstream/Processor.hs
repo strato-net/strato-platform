@@ -233,29 +233,32 @@ lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
 -- Tries to get contract metadata ID and contract details for a given codehash.
---  If they're not in the cache but they are in blocDB or action metadata,
+--  If they're not in the cache but they are in the action metadata or bloc database,
 --  it adds them to cache
 getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
-getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
+getDetailsForRow g row = runMaybeT $ checkCache <|> checkMetadata <|> checkBloc
   where checkCache = do
-          $logInfoS "DEETS" . T.pack $ "checking cache"
+          $logInfoS "getDetailsForRow" . T.pack $ "checking contractABIs cache for contract details"
           MaybeT $ getContractABIs g codePtr
+        checkMetadata = do
+          $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
+          let md = actionMetadata row
+          src <- lookupT "src" md
+          detailsTup <- case codePtr of
+            EVMCode _ -> do
+              detailsMap <- lift $ sourceToContractDetails (Do Compile) src
+              name <- lookupT "name" md
+              lookupT name detailsMap
+            SolidVMCode name _ -> do
+              detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
+              lookupT (T.pack name) detailsMap
+          setContractABIs g codePtr detailsTup
+          MaybeT $ return $ Just detailsTup
         checkBloc = MaybeT $ do
-          $logInfoS "DEETS" . T.pack $ "checking bloc"
+          $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
           mDetails <- getContractDetailsByCodeHash codePtr
           for_ mDetails $ setContractABIs g codePtr
           return mDetails
-        checkMetadata = do
-          $logInfoS "DEETS" . T.pack $ "checking metadata"
-          let md = actionMetadata row
-          src <- lookupT "src" md
-          detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
-          name <- case codePtr of
-            EVMCode _ -> lookupT "name" md
-            SolidVMCode cname _ -> return $ T.pack cname
-          detailsTup <- lookupT name detailsMap
-          setContractABIs g codePtr detailsTup
-          MaybeT $ return $ Just detailsTup
         codePtr = actionCodeHash row 
 
 adjustGlobals :: IORef Globals
