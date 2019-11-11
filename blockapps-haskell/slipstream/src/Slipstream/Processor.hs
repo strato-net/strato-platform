@@ -233,7 +233,7 @@ lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
 -- Tries to get contract metadata ID and contract details for a given codehash.
---  If they're not in the cache but they are in the action metadata or bloc database,
+--  If they're not in the cache but they are in bloc database or action metadata,
 --  it adds them to cache
 getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
