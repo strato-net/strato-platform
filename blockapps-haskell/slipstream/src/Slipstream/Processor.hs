@@ -231,24 +231,19 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
--- TODO: this generic caching/lookup routine...
---    abi setter/getter needs to know that maps are not a thing anymore...
---     and, need to map calls to it for the metadata lookups, since they 
---     return the maps
+-- Tries to get contract metadata ID and contract details for a given codehash.
+--  If they're not in the cache but they are in blocDB or action metadata,
+--  it adds them to cache
 getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
-  where checkCache = do
-          $logInfoS "DEETS" . T.pack $ "checking cache for details for " ++ (show codePtr)
-          MaybeT $ getContractABIs g codePtr
+  where checkCache = MaybeT $ getContractABIs g codePtr
         checkBloc = MaybeT $ do
           _ <- (getContractDetailsByCodeHash codePtr) >>= (traverse (setContractABIs g codePtr))
           getContractABIs g codePtr
         checkMetadata = do
-          $logInfoS "DEETS" . T.pack $ "checking metadata for details for " ++ (show codePtr)
           let md = actionMetadata row
           src <- lookupT "src" md
           detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
-          $logInfoS "DEETS" . T.pack $ "got metadata details for " ++ (show detailsMap)
           name <- case codePtr of
             EVMCode _ -> lookupT "name" md
             SolidVMCode cname _ -> return $ T.pack cname
@@ -257,53 +252,6 @@ getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
           MaybeT $ getContractABIs g codePtr 
         codePtr = actionCodeHash row 
 
--- Will also check BlocDB for details, if they are not in the cache
---   i.e. on node restart
-
-{- 
-getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Int32, ContractDetails))
-getSolidVMDetails g row = do
-  mDetails <- getCachedSolidVMDetails g row
-  case mDetails of
-    Just _ -> return mDetails
-    Nothing -> do 
-      blocDetails <- getContractDetailsByCodeHash $ actionCodeHash row
-      case blocDetails of
-        Nothing -> return Nothing
-        Just (_, deets) -> do
-          detailsMap <- sourceToContractDetails (Don't Compile) (contractdetailsSrc deets)
-          setSolidVMABIs g (actionCodeHash row) detailsMap
-          getSolidVMABIs g (actionCodeHash row)
-
-
--- Note: This could be reshaped to remove the bloch dependency, as
--- we only care about the ABI from `sourceToContractDetails` and
--- not the metadata id. 
-getCachedSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Int32, ContractDetails))
-getCachedSolidVMDetails g row = liftM2 (<|>)
-  (getSolidVMABIs g codePtr)
-  (runMaybeT $ do
-    let md = actionMetadata row
-    src <- lookupT "src" md
-    detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
-    setSolidVMABIs g codePtr detailsMap
-    MaybeT $ getSolidVMABIs g codePtr
-  )
- where codePtr = actionCodeHash row
-
-
--- TODO: This should now work for both EVM and SolidVM, so we should have
---   a generic caching/bloc-lookup routine
-detailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
-detailsForRow row = liftM2 (<|>)
-  (getContractDetailsByCodeHash $ actionCodeHash row)
-  (runMaybeT $ do
-    let md = actionMetadata row
-    src <- lookupT "src" md
-    name <- lookupT "name" md
-    detailsMap <- lift $ sourceToContractDetails (Do Compile) src
-    lookupT name detailsMap)
--}
 adjustGlobals :: IORef Globals
               -> Should Compile
               -> AggregateAction
