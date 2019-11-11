@@ -32,6 +32,7 @@ import qualified Data.ByteString.Short as SB
 -- import qualified Data.ByteString.Char8 as C8
 import Data.Either (lefts, rights)
 import Data.Function
+import Data.Foldable
 import Data.Int (Int32)
 import Data.IORef
 import Data.List (foldl', sortOn)
@@ -236,11 +237,16 @@ lookupT k = MaybeT . return . Map.lookup k
 --  it adds them to cache
 getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
-  where checkCache = MaybeT $ getContractABIs g codePtr
+  where checkCache = do
+          $logInfoS "DEETS" . T.pack $ "checking cache"
+          MaybeT $ getContractABIs g codePtr
         checkBloc = MaybeT $ do
-          _ <- (getContractDetailsByCodeHash codePtr) >>= (traverse (setContractABIs g codePtr))
-          getContractABIs g codePtr
+          $logInfoS "DEETS" . T.pack $ "checking bloc"
+          mDetails <- getContractDetailsByCodeHash codePtr
+          for_ mDetails $ setContractABIs g codePtr
+          return mDetails
         checkMetadata = do
+          $logInfoS "DEETS" . T.pack $ "checking metadata"
           let md = actionMetadata row
           src <- lookupT "src" md
           detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
@@ -249,7 +255,7 @@ getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
             SolidVMCode cname _ -> return $ T.pack cname
           detailsTup <- lookupT name detailsMap
           setContractABIs g codePtr detailsTup
-          MaybeT $ getContractABIs g codePtr 
+          MaybeT $ return $ Just detailsTup
         codePtr = actionCodeHash row 
 
 adjustGlobals :: IORef Globals
