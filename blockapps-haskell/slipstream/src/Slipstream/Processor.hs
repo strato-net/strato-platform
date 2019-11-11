@@ -238,18 +238,17 @@ lookupT k = MaybeT . return . Map.lookup k
 getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
   where checkCache = do
-          $logInfoS "DEETS" . T.pack $ "checking cache for details"
+          $logInfoS "DEETS" . T.pack $ "checking cache for details for " ++ (show codePtr)
           MaybeT $ getContractABIs g codePtr
-        checkBloc = do
-          $logInfoS "DEETS" . T.pack $ "checking bloc for details"
-          detailsFromBloc <- lift $ getContractDetailsByCodeHash codePtr
-          setContractABIs g codePtr $ fromJust detailsFromBloc
-          MaybeT $ getContractABIs g codePtr
+        checkBloc = MaybeT $ do
+          _ <- (getContractDetailsByCodeHash codePtr) >>= (traverse (setContractABIs g codePtr))
+          getContractABIs g codePtr
         checkMetadata = do
-          $logInfoS "DEETS" . T.pack $ "checking metadata for details"
+          $logInfoS "DEETS" . T.pack $ "checking metadata for details for " ++ (show codePtr)
           let md = actionMetadata row
           src <- lookupT "src" md
           detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
+          $logInfoS "DEETS" . T.pack $ "got metadata details for " ++ (show detailsMap)
           name <- case codePtr of
             EVMCode _ -> lookupT "name" md
             SolidVMCode cname _ -> return $ T.pack cname
