@@ -8,6 +8,9 @@ module BlockApps.Bloc22.Server.Utils
   ( getBatchBlocTxStatus
   , partitionWith
   , indexedPartitionWith
+  , mergePartitions
+  , mergeSortedLists
+  , mergeSortedListsWith
   , binRuntimeToCodeHash
   , emptyTxParams
   , waitFor
@@ -62,6 +65,22 @@ partitionWith f = map (fmap (map snd)) . indexedPartitionWith f
 indexedPartitionWith :: Ord k => (a -> k) -> [a] -> [(k, [(Int, a)])]
 indexedPartitionWith f = M.toList . foldr (uncurry builder) M.empty . zip [0..]
   where builder i a = M.alter (Just . ((i,a):) . fromMaybe []) (f a)
+
+mergePartitions :: Ord k => [(b, [(k, a)])] -> [a]
+mergePartitions = map snd . mergeSortedListsWith fst . map snd
+
+mergeSortedLists :: Ord a => [[a]] -> [a]
+mergeSortedLists = mergeSortedListsWith id
+
+mergeSortedListsWith :: Ord k => (a -> k) -> [[a]] -> [a]
+mergeSortedListsWith _ []         = []
+mergeSortedListsWith _ [as]       = as
+mergeSortedListsWith f (a1:a2:as) = mergeSortedListsWith f ((merge a1 a2):as)
+  where merge [] ys = ys
+        merge xs [] = xs
+        merge (x:xs) (y:ys) = if f x <= f y
+                                then x:merge xs (y:ys)
+                                else y:merge (x:xs) ys
 
 waitFor :: Text.Text -> Bloc Bool -> Bloc ()
 waitFor msg action = go 20
