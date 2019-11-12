@@ -55,9 +55,9 @@ emptyTxParams = TxParams Nothing Nothing Nothing Nothing
 binRuntimeToCodeHash :: Text.Text -> Keccak256
 binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
 
-partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
-partitionWith f = M.toList . foldr g M.empty
-  where g a = M.alter (Just . (a:) . fromMaybe []) (f a)
+partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
+partitionWith f = M.toList . foldr builder M.empty
+  where builder a = M.alter (Just . (a:) . fromMaybe []) (f a)
 
 waitFor :: Text.Text -> Bloc Bool -> Bloc ()
 waitFor msg action = go 20
