@@ -13,13 +13,19 @@ import App from './App';
 import Applications from './components/Applications/';
 import LaunchPad from './components/LaunchPad/';
 import CodeEditor from './components/CodeEditor';
-import SideBar from './components/SideBar';
-import AccountDetail from './components/AccountDetail';
 import ExternalStorage from './components/ExternalStorage';
 import Chains from './components/Chains'
 
-const CommonRoute = (props) => {
-  return (<div>
+export const routes =
+  <Switch>
+    <Route exact path="/" component={App}>
+      <Redirect to="/home" />
+    </Route>
+    <Route exact path="/home" component={Dashboard} />
+    {/* TODO: remove app section */}
+    {/* <Route exact path="/apps" component={Applications} /> */}
+    <Route exact path="/accounts" component={Accounts} />
+    <Route exact path="/external_storage" component={ExternalStorage} />
     <Route exact path="/nodes" component={Nodes} />
     <Route exact path="/blocks" component={Blocks} />
     <Route exact path="/blocks/:block" component={BlockView} />
@@ -30,19 +36,4 @@ const CommonRoute = (props) => {
     <Route exact path="/contracts/:name/query" component={ContractQuery} />
     <Route exact path="/code_editor" component={CodeEditor} />
     <Route exact path="/launchpad" component={LaunchPad} />
-  </div>)
-};
-
-export const routes =
-  <Switch>
-    <Route exact path="/" component={App}>
-      <Redirect to="/home" />
-    </Route>
-    <Route exact path="/home" component={Dashboard} />
-    {/* TODO: remove app section */}
-    <Route exact path="/apps" component={Applications} />
-    <Route exact path="/accounts" component={Accounts} />
-    <Route exact path="/external_storage" component={ExternalStorage} />
-    <CommonRoute />
-    {/* <Route component={SideBar} /> */}
   </Switch>

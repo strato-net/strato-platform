@@ -12,7 +12,7 @@ import { env } from '../env';
 import LoadingBar from 'react-redux-loading-bar'
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { isModePublic, isOauthEnabled } from '../lib/checkMode';
+import { isOauthEnabled } from '../lib/checkMode';
 import { getOrCreateOauthUserRequest } from '../components/User/user.actions';
 import { getUserFromLocal } from '../lib/localStorage';
 
@@ -27,17 +27,13 @@ class App extends Component {
     }
   }
 
-  sideBar() {
-    return (this.props.isLoggedIn || !isModePublic()) ? <SideBar /> : null
-  }
-
   render() {
     return (
       <div className="App" >
         <LoadingBar style={{ top: '0px', backgroundColor: '#62d96b', zIndex: 999, height: '4px' }} />
         <MenuBar />
-        {this.sideBar()}
-        <main id="outer-container" style={{ marginLeft: (this.props.isLoggedIn || !isModePublic()) ? '320px' : '0' }} >
+        <SideBar />
+        <main id="outer-container">
           {scenes}
         </main>
       </div>
@@ -45,12 +41,6 @@ class App extends Component {
   }
 }
 
-export function mapStateToProps(state) {
-  return {
-    isLoggedIn: state.user.isLoggedIn
-  };
-}
-
-export default withRouter(connect(mapStateToProps, {
+export default withRouter(connect({}, {
   getOrCreateOauthUserRequest
 })(App));
