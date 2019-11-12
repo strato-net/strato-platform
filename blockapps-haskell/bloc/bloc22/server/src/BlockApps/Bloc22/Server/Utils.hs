@@ -7,6 +7,7 @@
 module BlockApps.Bloc22.Server.Utils
   ( getBatchBlocTxStatus
   , partitionWith
+  , indexedPartitionWith
   , binRuntimeToCodeHash
   , emptyTxParams
   , waitFor
@@ -56,8 +57,11 @@ binRuntimeToCodeHash :: Text.Text -> Keccak256
 binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
-partitionWith f = M.toList . foldr builder M.empty
-  where builder a = M.alter (Just . (a:) . fromMaybe []) (f a)
+partitionWith f = map (fmap (map snd)) . indexedPartitionWith f
+
+indexedPartitionWith :: Ord k => (a -> k) -> [a] -> [(k, [(Int, a)])]
+indexedPartitionWith f = M.toList . foldr (uncurry builder) M.empty . zip [0..]
+  where builder i a = M.alter (Just . ((i,a):) . fromMaybe []) (f a)
 
 waitFor :: Text.Text -> Bloc Bool -> Bloc ()
 waitFor msg action = go 20
