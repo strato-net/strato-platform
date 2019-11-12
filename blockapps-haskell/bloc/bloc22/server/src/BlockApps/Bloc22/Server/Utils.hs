@@ -5,7 +5,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 module BlockApps.Bloc22.Server.Utils
-  ( getBatchBlocTxStatus
+  ( toMaybe
+  , getBatchBlocTxStatus
   , partitionWith
   , indexedPartitionWith
   , mergePartitions
@@ -32,6 +33,9 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Ethereum         hiding (Transaction (..))
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
+
+toMaybe :: Eq a => a -> a -> Maybe a
+toMaybe a b = if a == b then Nothing else Just b
 
 maybeTxBatchResult :: Maybe ChainId -> [Keccak256] -> Bloc [Maybe TransactionResult]
 maybeTxBatchResult chainId hashes = maybeHeads <$> (blocStrato (postTxResultBatch chainId hashes))

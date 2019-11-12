@@ -332,7 +332,7 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
 
 postUsersUploadListSolidVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListSolidVM' ContractListParameters{..} sign = do
-  txsWithParams <- genNonces (getAccountNonce fromAddr chainId) uploadlistcontractTxParams contracts
+  txsWithParams <- genNonces (getAccountNonce fromAddr) chainId uploadlistcontractTxParams contracts
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name args params value md) -> do
       mtuple <- use $ at name
@@ -382,10 +382,10 @@ postUsersUploadListSolidVM' ContractListParameters{..} sign = do
     ]
   getBatchBlocTransactionResult' chainId hashes resolve
 
-              
+
 postUsersUploadListEVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListEVM' ContractListParameters{..} sign = do
-  txsWithParams <- genNonces (getAccountNonce fromAddr chainId) uploadlistcontractTxParams contracts
+  txsWithParams <- genNonces (getAccountNonce fromAddr) chainId uploadlistcontractTxParams contracts
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name args params value md) -> do
       mtuple <- use $ at name
@@ -446,7 +446,7 @@ postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve'
 
 postUsersSendList' :: TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersSendList' TransferListParameters{..} sign = do
-  txsWithParams <- genNonces (getAccountNonce fromAddr chainId) sendtransactionTxParams txs
+  txsWithParams <- genNonces (getAccountNonce fromAddr) chainId sendtransactionTxParams txs
   txs' <- mapM
     (\(SendTransaction toAddr (Strung value) params md) -> do
         let header = TransactionHeader
@@ -498,30 +498,40 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
                (resolve || postmethodlistrequestResolve)
   postUsersContractMethodList' bflp (return . signTransaction sk)
 
-genNonces :: (Show a, Monad m) => m Nonce -> Lens' a (Maybe TxParams) -> [a] -> m [a]
-genNonces n l as = do
-  let noncesInUse = S.fromList $ mapMaybe (txparamsNonce <=< view l) as
-  nonce <- if S.size noncesInUse == length as
-            then return . Nonce . error $ "internal error: unused nonce when already specified " ++ show as
-            else n
-  return . forState nonce as $ \a -> do
-    let params' = fromMaybe emptyTxParams (a ^. l)
-    newNonce <- case txparamsNonce params' of
-      Just v -> return v
-      Nothing -> do
-        whileM $ do
-          inUse <- gets (`S.member` noncesInUse)
-          when inUse $ id += 1
-          return inUse
-        id <<+= 1
-    return $ (l .~ Just params'{txparamsNonce = Just newNonce }) a
+genNonces :: (Show a, Monad m) => (S.Set (Maybe ChainId) -> m (Map (Maybe ChainId) Nonce))
+                               -> Maybe ChainId
+                               -> Lens' a (Maybe TxParams)
+                               -> [a]
+                               -> m [a]
+genNonces retrieveNoncesForChains mChainId l unindexedAs = do
+  let getChainId = maybe mChainId Just . (txparamsChainId <=< view l)
+  let chainIds = S.fromList $ map getChainId unindexedAs
+  nonceMap <- retrieveNoncesForChains chainIds
+  let indexedByChainId = indexedPartitionWith getChainId unindexedAs
+  fmap mergePartitions . forM indexedByChainId $ \(chainId, indexedAs) -> do
+    let noncesInUse = S.fromList $ mapMaybe ((txparamsNonce <=< view l) . snd) indexedAs
+        nonce = if S.size noncesInUse == length indexedAs
+                  then Nonce . error $
+                         "internal error: unused nonce when already specified " ++ show indexedAs
+                  else fromMaybe 0 $ Map.lookup chainId nonceMap
+    return . (chainId,) . fst . runIdentity . forStateT nonce indexedAs $ \(i,a) -> do
+      let params' = fromMaybe emptyTxParams (a ^. l)
+      newNonce <- case txparamsNonce params' of
+        Just v -> return v
+        Nothing -> do
+          whileM $ do
+            inUse <- gets (`S.member` noncesInUse)
+            when inUse $ id += 1
+            return inUse
+          id <<+= 1
+      return (i, (l .~ Just params'{txparamsNonce = Just newNonce}) a)
 
 postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersContractMethodList' FunctionListParameters{..} sign = do
   if null txs
     then return []
     else do
-      txsWithParams <- genNonces (getAccountNonce fromAddr chainId) methodcallTxParams txs
+      txsWithParams <- genNonces (getAccountNonce fromAddr) chainId methodcallTxParams txs
       txsCmIdsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall{..}) -> do
           mtuple <- use $ at methodcallContractName
@@ -894,19 +904,20 @@ getAccountTxParams addr chainId mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
   case txparamsNonce params of
     Nothing -> do
-      n <- getAccountNonce addr chainId
-      return params{txparamsNonce = Just n}
+      mNonce <- Map.lookup chainId <$> getAccountNonce addr (S.singleton chainId)
+      return params{txparamsNonce = Just (fromMaybe 0 mNonce)}
     Just{} -> return params
 
-getAccountNonce :: Address -> Maybe ChainId -> Bloc Nonce
-getAccountNonce addr chainId = do
-  let params = accountsFilterParams{qaAddress = Just addr, qaChainId = maybeToList chainId}
-  accts <- blocStrato $ getAccountsFilter params
+getAccountNonce :: Address -> S.Set (Maybe ChainId) -> Bloc (Map (Maybe ChainId) Nonce)
+getAccountNonce addr chainIds = do
+  let chainIds' = map (fromMaybe (ChainId 0)) $ S.toList chainIds
+  let params = accountsFilterParams{qaAddress = Just addr, qaChainId = chainIds'}
+  mAccts <- blocStrato $ getAccountsFilter params
   $logInfoLS "getAccountNonce/req" params
-  $logInfoLS "getAccountNonce/resp" accts
-  case listToMaybe accts of
-    Nothing   -> throwError . UserError $ "User does not have a balance"
-    Just acct -> return $ accountNonce acct
+  $logInfoLS "getAccountNonce/resp" mAccts
+  case mAccts of
+    [] -> throwError . UserError $ "User does not have a balance"
+    accts -> return . Map.fromList $ map (accountChainId &&& accountNonce) accts
 
 getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
 getAccountSecKey userName password addr = do
