@@ -32,6 +32,7 @@ import qualified Data.ByteString.Short as SB
 -- import qualified Data.ByteString.Char8 as C8
 import Data.Either (lefts, rights)
 import Data.Function
+import Data.Foldable
 import Data.Int (Int32)
 import Data.IORef
 import Data.List (foldl', sortOn)
@@ -231,51 +232,34 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
-
--- Will also check BlocDB for details, if they are not in the cache
---   i.e. on node restart
-getSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Int32, ContractDetails))
-getSolidVMDetails g row = do
-  mDetails <- getCachedSolidVMDetails g row
-  case mDetails of
-    Just _ -> return mDetails
-    Nothing -> do 
-      blocDetails <- getContractDetailsByCodeHash $ actionCodeHash row
-      case blocDetails of
-        Nothing -> return Nothing
-        Just (_, deets) -> do
-          detailsMap <- sourceToContractDetails (Don't Compile) (contractdetailsSrc deets)
-          setSolidVMABIs g (actionCodeHash row) detailsMap
-          getSolidVMABIs g (actionCodeHash row)
-
-
--- Note: This could be reshaped to remove the bloch dependency, as
--- we only care about the ABI from `sourceToContractDetails` and
--- not the metadata id. 
-getCachedSolidVMDetails :: IORef Globals -> AggregateAction -> Bloc (Maybe (Text, Int32, ContractDetails))
-getCachedSolidVMDetails g row = liftM2 (<|>)
-  (getSolidVMABIs g codePtr)
-  (runMaybeT $ do
-    let md = actionMetadata row
-    src <- lookupT "src" md
-    detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
-    setSolidVMABIs g codePtr detailsMap
-    MaybeT $ getSolidVMABIs g codePtr
-  )
- where codePtr = actionCodeHash row
-
-
--- TODO: This should now work for both EVM and SolidVM, so we should have
---   a generic caching/bloc-lookup routine
-detailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
-detailsForRow row = liftM2 (<|>)
-  (getContractDetailsByCodeHash $ actionCodeHash row)
-  (runMaybeT $ do
-    let md = actionMetadata row
-    src <- lookupT "src" md
-    name <- lookupT "name" md
-    detailsMap <- lift $ sourceToContractDetails (Do Compile) src
-    lookupT name detailsMap)
+-- Tries to get contract metadata ID and contract details for a given codehash.
+--  If they're not in the cache but they are in bloc database or action metadata,
+--  it adds them to cache
+getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
+getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
+  where checkCache = do
+          $logInfoS "getDetailsForRow" . T.pack $ "checking contractABIs cache for contract details"
+          MaybeT $ getContractABIs g codePtr
+        checkBloc = MaybeT $ do
+          $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
+          mDetails <- getContractDetailsByCodeHash codePtr
+          for_ mDetails $ setContractABIs g codePtr
+          return mDetails
+        checkMetadata = do
+          $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
+          let md = actionMetadata row
+          src <- lookupT "src" md
+          detailsTup <- case codePtr of
+            EVMCode _ -> do
+              detailsMap <- lift $ sourceToContractDetails (Do Compile) src
+              name <- lookupT "name" md
+              lookupT name detailsMap
+            SolidVMCode name _ -> do
+              detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
+              lookupT (T.pack name) detailsMap
+          setContractABIs g codePtr detailsTup
+          MaybeT $ return $ Just detailsTup
+        codePtr = actionCodeHash row 
 
 adjustGlobals :: IORef Globals
               -> Should Compile
@@ -409,7 +393,7 @@ processTheMessages env conn g messages = do
 
       case actionStorage row of
         BS.ActionEVMDiff{} -> do
-          mDetails <- detailsForRow row
+          mDetails <- getDetailsForRow g row
           case mDetails of
             Nothing -> pure . Left $ "No details found for code hash "
                             <> (T.pack . show $ actionCodeHash row)
@@ -430,13 +414,14 @@ processTheMessages env conn g messages = do
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs []
         BS.ActionSolidVMDiff{} -> do
-          mName <- getSolidVMDetails g row
+          mName <- getDetailsForRow g row
           case mName of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in metadata"
-            Just (name, cmId, details) -> do
+            Just (cmId, details) -> do
               let abi = xabiToText $ contractdetailsXabi details
+                  name = T.filter (/= '"') $ contractdetailsName details
                   abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
                   cont = error "internal error: contract should be unused for solidvm"
 

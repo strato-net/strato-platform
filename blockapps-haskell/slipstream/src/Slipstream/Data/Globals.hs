@@ -4,7 +4,6 @@ module Slipstream.Data.Globals where
 import Control.DeepSeq
 import Data.Cache.LRU
 import qualified Data.HashMap.Strict as HM
-import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Text
 import Data.Int (Int32)
@@ -24,7 +23,7 @@ data Globals = Globals { createdEvents :: S.Set (Text, Text) -- (contractName, e
                        , historyList :: S.Set CodePtr
                        , noIndexList :: S.Set CodePtr
                        , functionHistoryList :: S.Set CodePtr
-                       , solidVMABIs :: HM.HashMap SHA (M.Map Text (Int32, ContractDetails))
+                       , contractABIs :: HM.HashMap CodePtr (Int32, ContractDetails)
                        , contractStates :: LRU (Address, Maybe ChainId) [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)
