@@ -77,7 +77,7 @@ instance ToSample PostBlocTransactionRequest where
         (Strung 600)
         (Just $ Map.fromList [("purpose","groceries")])
       ]
-      (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
+      (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0) Nothing))
 
 instance ToSchema PostBlocTransactionRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -93,7 +93,7 @@ instance ToSchema PostBlocTransactionRequest where
                    (Strung 600)
                    (Just $ Map.fromList [("purpose","groceries")])
                  ]
-                 (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
+                 (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0) Nothing))
 
 data BlocTransactionPayload = BlocTransfer TransferPayload
                             | BlocContract ContractPayload

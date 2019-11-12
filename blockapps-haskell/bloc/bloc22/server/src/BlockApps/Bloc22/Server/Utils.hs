@@ -50,7 +50,7 @@ getBatchBlocTxStatus chainId hashes = do
           _          -> return (Failure, mtxr)
 
 emptyTxParams :: TxParams
-emptyTxParams = TxParams Nothing Nothing Nothing
+emptyTxParams = TxParams Nothing Nothing Nothing Nothing
 
 binRuntimeToCodeHash :: Text.Text -> Keccak256
 binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
