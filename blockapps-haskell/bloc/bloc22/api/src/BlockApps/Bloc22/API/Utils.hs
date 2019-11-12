@@ -78,7 +78,7 @@ instance FromJSON UserName where
 
 instance ToSample UserName where
   toSamples _ = samples
-    [ UserName uname | uname <- ["samrit", "eitan", "ilya", "ilir"]]
+    [ UserName uname | uname <- ["samrit", "dustin", "yunfan", "daniel"]]
 
 instance ToCapture (Capture "user" UserName) where
   toCapture _ = DocCapture "user" "a user name"
@@ -92,7 +92,7 @@ instance ToSchema UserName where
   declareNamedSchema _ = return $ NamedSchema (Just "User Name")
       ( mempty
         & type_ .~ SwaggerString
-        & example ?~ toJSON (UserName "Martin")
+        & example ?~ toJSON (UserName "Nikita")
         & description ?~ "User Name" )
 
 --------------------------------------------------------------------------------
