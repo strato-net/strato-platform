@@ -168,13 +168,11 @@ instance ToSchema BlocTransactionResult where
 type GetBlocTransactionResult = "transactions"
   :> Capture "hash" Keccak256
   :> "result"
-  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> Get '[JSON] BlocTransactionResult
 
 type PostBlocTransactionResults = "transactions"
   :> "results"
-  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] [Keccak256]
   :> Post '[JSON] [BlocTransactionResult]

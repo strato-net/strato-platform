@@ -41,11 +41,9 @@ type API =
       :> Post '[JSON] [Keccak256]
   :<|> "transactionResult"
     :> Capture "hash" Keccak256
-    :> QueryParam "chainid" ChainId
     :> Get '[JSON] [TransactionResult]
   :<|> "transactionResult"
     :> "batch"
-    :> QueryParam "chainid" ChainId
     :> ReqBody '[PlainText] [Keccak256]
     :> Post '[JSON] BatchTransactionResult
   :<|> "block"

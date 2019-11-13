@@ -171,10 +171,10 @@ postUsersContractMethodList
   -> ClientM [BlocTransactionResult]
 postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 
-getBlocTransactionResult :: Keccak256 -> Maybe ChainId -> Bool -> ClientM BlocTransactionResult
+getBlocTransactionResult :: Keccak256 -> Bool -> ClientM BlocTransactionResult
 getBlocTransactionResult = client (Proxy @ GetBlocTransactionResult)
 
-postBlocTransactionResults :: Maybe ChainId -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResults :: Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @ PostBlocTransactionResults)
 
 postChainInfo :: ChainInput -> ClientM ChainId

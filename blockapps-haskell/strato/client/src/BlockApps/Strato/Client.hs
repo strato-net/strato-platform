@@ -119,8 +119,8 @@ getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> Maybe ChainId -> ClientM [WithNext Transaction]
 postTx :: PostTransaction -> ClientM Keccak256
 postTxList :: [PostTransaction] -> ClientM [Keccak256]
-getTxResult :: Keccak256 -> Maybe ChainId -> ClientM [TransactionResult]
-postTxResultBatch :: Maybe ChainId -> [Keccak256] -> ClientM BatchTransactionResult
+getTxResult :: Keccak256 -> ClientM [TransactionResult]
+postTxResultBatch :: [Keccak256] -> ClientM BatchTransactionResult
 getBlocksFilter :: BlocksFilterParams -> ClientM [WithNext Block]
 getBlocksLast :: Natural -> Maybe ChainId -> ClientM [WithNext Block]
 getAccountsFilter :: AccountsFilterParams -> ClientM [Account]

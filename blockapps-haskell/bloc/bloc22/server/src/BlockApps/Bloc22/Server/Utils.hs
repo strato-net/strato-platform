@@ -37,8 +37,8 @@ import           BlockApps.Strato.Types
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
 
-maybeTxBatchResult :: Maybe ChainId -> [Keccak256] -> Bloc [Maybe TransactionResult]
-maybeTxBatchResult chainId hashes = maybeHeads <$> (blocStrato (postTxResultBatch chainId hashes))
+maybeTxBatchResult :: [Keccak256] -> Bloc [Maybe TransactionResult]
+maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (postTxResultBatch hashes))
   where maybeHeads btxr =
           let list = map (flip M.lookup $ unBatchTransactionResult btxr) hashes
           in flip map list $ \mtrs -> case mtrs of
@@ -46,9 +46,9 @@ maybeTxBatchResult chainId hashes = maybeHeads <$> (blocStrato (postTxResultBatc
             Just trs -> listToMaybe trs
 
 
-getBatchBlocTxStatus :: Maybe ChainId -> [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe TransactionResult)]
-getBatchBlocTxStatus chainId hashes = do
-  mtxrs <- maybeTxBatchResult chainId hashes
+getBatchBlocTxStatus :: [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe TransactionResult)]
+getBatchBlocTxStatus hashes = do
+  mtxrs <- maybeTxBatchResult hashes
   forM mtxrs $ \mtxr ->
     case mtxr of
       Nothing -> return (Pending, mtxr)

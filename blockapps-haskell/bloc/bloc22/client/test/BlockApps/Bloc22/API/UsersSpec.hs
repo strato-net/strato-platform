@@ -60,7 +60,7 @@ spec = do
       let
         Right result1 = postUsersFillEither1
         Right result2 = postUsersFillEither2
-      eResult1 <- runClientM (getBlocTransactionResult (blocTransactionHash result1) Nothing True) (ClientEnv mgr blocUrl Nothing)
+      eResult1 <- runClientM (getBlocTransactionResult (blocTransactionHash result1) True) (ClientEnv mgr blocUrl Nothing)
       eResult1 `shouldSatisfy` isRight
       let
         Right resolved1 = eResult1
