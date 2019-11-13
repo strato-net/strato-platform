@@ -36,40 +36,62 @@ emitKafkaTransactions gs = do
         Right resps -> $logDebug $ "writeUnseqEventsEnd Kafka commit: " Import.++ (T.pack $ show resps)
     return ()
 
-
 postChainR :: HandlerFor App Value
 postChainR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
   ci <- parseJsonBody :: HandlerFor App (Result ChainInfo)
   case ci of
-    Success gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ mmd) _) -> do
-    -- add more checks?
-      when (length acin == 0) $ invalidArgs ["account info is empty"]
-      when (M.size mb == 0) $ invalidArgs ["member list is empty"]
+    Success gen -> case processChainInfos [gen] of
+      Left (_, err) -> invalidArgs [T.pack err]
+      Right [] -> error "postChainR: The impossible happened. processChainInfos succeeded, but returned an empty list"
+      Right (cid:_) -> do
+        let hexCid = T.pack $ showHex cid ""
+        $logDebugS "postChainR" . T.pack $ show gen
+        $logInfoS "postChainR" hexCid
+        emitKafkaTransactions $ [(cid,gen)]
+        return $ String hexCid
+    Error err -> invalidArgs [T.pack $ "could not parse the args: " ++ err]
 
-      let theVM = fromMaybe "EVM" $ M.lookup "VM" mmd
-      
-      let accountCodeHashes = S.fromList . flip mapMaybe acin $ \case
-            NonContract _ _ -> Nothing
-            ContractNoStorage _ _ (EVMCode c) -> Just c
-            ContractNoStorage _ _ (SolidVMCode _ c) -> Just c
-            ContractWithStorage _ _ (EVMCode c) _ -> Just c
-            ContractWithStorage _ _ (SolidVMCode _ c) _ -> Just c
-          getCode CodeInfo{..} =
-            case theVM of --For SolidVM, the source is the code
-              "SolidVM" -> BC.pack $ T.unpack codeInfoSource
-              _ -> codeInfoCode
-          codeCodeHashes = S.fromList . flip map cdin $ hash . getCode
-                                           
-      case accountCodeHashes S.\\ codeCodeHashes of
-        s | s /= S.empty -> invalidArgs ["Each contract code hash in accountInfo must match a corresponding code hash in codeInfo."]
-          | otherwise -> do
-            $logDebugS "postChainR" . T.pack $ show gen
-            let SHA cid = rlpHash gen
-            emitKafkaTransactions [(cid, gen)]
-            return . String . T.pack $ showHex cid ""
-    _ -> invalidArgs ["could not parse the args"]
+postChainsR :: HandlerFor App Value
+postChainsR = do
+  addHeader "Access-Control-Allow-Origin" "*"
+
+  ci <- parseJsonBody :: HandlerFor App (Result [ChainInfo])
+  case ci of
+    Success gens -> case processChainInfos gens of
+      Left (i, err) -> invalidArgs [T.pack $ "At index " ++ show i ++ ": " ++ err]
+      Right cids -> do
+        let hexCids = map (T.pack . flip showHex "") cids
+        $logDebugS "postChainsR" . T.pack $ show gens
+        $logInfoS "postChainsR" $ T.intercalate ", " hexCids
+        emitKafkaTransactions $ zip cids gens
+        returnJson hexCids
+    Error err -> invalidArgs [T.pack $ "could not parse the args" ++ err]
+
+processChainInfos :: [ChainInfo] -> Either (Int, String) [Word256]
+processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Use post-incrementing state
+  \(i, gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ mmd) _)) -> do
+    -- add more checks?
+    when (length acin == 0) $ Left (i,"account info is empty")
+    when (M.size mb == 0) $ Left (i, "member list is empty")
+    let theVM = fromMaybe "EVM" $ M.lookup "VM" mmd
+        accountCodeHashes = S.fromList . flip mapMaybe acin $ \case
+          NonContract _ _ -> Nothing
+          ContractNoStorage _ _ (EVMCode c) -> Just c
+          ContractNoStorage _ _ (SolidVMCode _ c) -> Just c
+          ContractWithStorage _ _ (EVMCode c) _ -> Just c
+          ContractWithStorage _ _ (SolidVMCode _ c) _ -> Just c
+        getCode CodeInfo{..} =
+          case theVM of --For SolidVM, the source is the code
+            "SolidVM" -> BC.pack $ T.unpack codeInfoSource
+            _ -> codeInfoCode
+        codeCodeHashes = S.fromList . flip map cdin $ hash . getCode
+    case accountCodeHashes S.\\ codeCodeHashes of
+      s | s /= S.empty -> Left (i, "Each contract code hash in accountInfo must match a corresponding code hash in codeInfo.")
+        | otherwise -> do
+          let SHA cid = rlpHash gen
+          return cid
 
 getChainR :: HandlerFor App Value
 getChainR = do
