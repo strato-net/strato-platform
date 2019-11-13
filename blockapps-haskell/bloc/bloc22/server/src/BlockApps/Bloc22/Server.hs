@@ -55,6 +55,7 @@ bloc = return gitInfo
   :<|> postBlocTransactionResults
   :<|> postChainInfo
   :<|> getChainInfo
+  :<|> postChainInfos
   :<|> postBlocTransaction
 
 serveBloc :: BlocEnv -> Server BlocAPI

@@ -7,6 +7,7 @@ module BlockApps.Bloc22.Client
   , getAddresses
   , postChainInfo
   , getChainInfo
+  , postChainInfos
   , getContracts
   , getContractsData
   , getContractsContract
@@ -182,6 +183,9 @@ postChainInfo = client (Proxy @ PostChainInfo)
 
 getChainInfo :: [ChainId] -> ClientM [ChainIdChainOutput]
 getChainInfo = client (Proxy @ GetChainInfo)
+
+postChainInfos :: [ChainInput] -> ClientM [ChainId]
+postChainInfos = client (Proxy @ PostChainInfos)
 
 postBlocTransaction
   :: Maybe Text

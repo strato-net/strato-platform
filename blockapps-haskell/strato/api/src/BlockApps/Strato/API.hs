@@ -105,3 +105,6 @@ type API =
   :<|> "chain"
     :> QueryParams "chainid" ChainId
     :> Get '[JSON] [ChainIdChainInfo]
+  :<|> "chains"
+    :> ReqBody '[JSON] [ChainInfo]
+    :> Post '[JSON] [ChainId]

@@ -121,6 +121,9 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
     void $ insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
+postChainInfos :: [ChainInput] -> Bloc [ChainId]
+postChainInfos = traverse postChainInfo
+
 waitForChainInfo :: ChainId -> Bloc ()
 waitForChainInfo chainId = waitFor "failed to retrieve chain info" go
   where go :: Bloc Bool
