@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS hash_name(
   hash bytea NOT NULL,
   contract_metadata_id int NOT NULL,
   transaction_type int NOT NULL,
-  data_string varchar(512) NOT NULL
+  data_string text NOT NULL
 );
 |]
 
