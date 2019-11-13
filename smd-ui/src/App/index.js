@@ -41,6 +41,10 @@ class App extends Component {
   }
 }
 
-export default withRouter(connect({}, {
+export function mapStateToProps() {
+  return ({})
+}
+
+export default withRouter(connect(mapStateToProps, {
   getOrCreateOauthUserRequest
 })(App));

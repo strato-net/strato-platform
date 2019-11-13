@@ -8,14 +8,12 @@ import { createStore, applyMiddleware, combineReducers, compose } from 'redux';
 import createSagaMiddleware from 'redux-saga';
 import { fork, all } from 'redux-saga/effects';
 import { routerReducer } from 'react-router-redux';
-import { reducer as formReducer } from 'redux-form';
 import { loadingBarReducer, loadingBarMiddleware } from 'react-redux-loading-bar'
 import App from "./App/";
 
 import dashboardReducer from './components/Dashboard/dashboard.reducer';
 import accountsReducer from './components/Accounts/accounts.reducer';
 import blockDataReducer from './components/BlockData/block-data.reducer'
-import createUserReducer from './components/CreateUser/createUser.reducer';
 import createContractReducer from './components/CreateContract/createContract.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
 import contractQueryReducer from './components/ContractQuery/contractQuery.reducer';
@@ -29,10 +27,7 @@ import userReducer from './components/User/user.reducer';
 import codeEditorReducer from './components/CodeEditor/codeEditor.reducer';
 import applicationsReducer from './components/Applications/applications.reducer';
 import launchPadReducer from './components/LaunchPad/launchPad.reducer';
-import cliReducer from './components/CLI/cli.reducer';
-import walkThroughReducer from './components/WalkThrough/walkThrough.reducer';
 import tokenRequestReducer from './components/TokenRequest/tokenRequest.reducer';
-import verifyAccountReducer from './components/VerifyAccount/verifyAccount.reducer';
 import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.reducer';
 import externalStorageReducer from './components/ExternalStorage/externalStorage.reducer';
 import uploadFileReducer from './components/ExternalStorage/UploadFile/uploadFile.reducer';
@@ -45,8 +40,7 @@ import oauthAccountsReducer from './components/Accounts/components/OauthAccounts
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
-import watchFetchTx from './components/TransactionList/transactionList.saga'
-import watchCreateUser from './components/CreateUser/createUser.saga';
+import watchFetchTx from './components/TransactionList/transactionList.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
 import { watchCompileSourceFromEditor } from './components/CodeEditor/codeEditor.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';
@@ -67,7 +61,6 @@ import { watchQueryCirrus, watchQueryCirrusVars } from './components/ContractQue
 import watchSendTokens from './components/Accounts/components/SendTokens/sendTokens.saga';
 import watchFetchApplications from './components/Applications/applications.saga';
 import watchAppUpload from './components/LaunchPad/launchPad.saga';
-import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';
 import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.saga';
@@ -75,19 +68,7 @@ import watchFetchChains from './components/Chains/chains.saga';
 import watchCreateChain from './components/CreateChain/createChain.saga';
 import watchOauthAccountActions from './components/Accounts/components/OauthAccounts/oauthAccounts.saga';
 
-import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
-
 const rootReducer = combineReducers({
-  form: formReducer.plugin({
-    'create-user': (state, action) => {
-      switch (action.type) {
-        case CREATE_USER_SUCCESS:
-          return undefined;
-        default:
-          return state;
-      }
-    }
-  }),
   routing: routerReducer,
   // YOUR REDUCERS HERE
   accounts: accountsReducer,
@@ -96,7 +77,6 @@ const rootReducer = combineReducers({
   contracts: contractsReducer,
   contractQuery: contractQueryReducer,
   createContract: createContractReducer,
-  createUser: createUserReducer,
   methodCall: methodCallReducer,
   node: nodeCardReducer,
   transactions: transactionsReducer,
@@ -109,10 +89,7 @@ const rootReducer = combineReducers({
   applications: applicationsReducer,
   launchPad: launchPadReducer,
   dashboard: dashboardReducer,
-  cli: cliReducer,
-  walkThrough: walkThroughReducer,
   tokenRequest: tokenRequestReducer,
-  verifyAccount: verifyAccountReducer,
   createBlocUser: createBlocUserReducer,
   uploadFile: uploadFileReducer,
   externalStorage: externalStorageReducer,
@@ -127,7 +104,6 @@ const rootSaga = function* startForeman() {
   yield all([// YOUR SAGAS HERE
     fork(watchFetchBlockData),
     fork(watchFetchTx),
-    fork(watchCreateUser),
     fork(watchFetchAccounts),
     fork(watchCompileSourceFromEditor),
     fork(watchCreateContract),
@@ -146,7 +122,6 @@ const rootSaga = function* startForeman() {
     fork(watchAppUpload),
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
-    fork(watchVerifyAccount),
     fork(watchCreateBlocUser),
     fork(watchUploadFile),
     fork(watchFetchUpload),

@@ -5,7 +5,6 @@ import { withRouter } from 'react-router-dom';
 import { launchApp, selectApp } from '../Applications/applications.actions';
 import { Menu, MenuItem, Popover, Position, Button } from '@blueprintjs/core';
 import ReactLoading from 'react-loading';
-import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 import { isModePublic } from '../../lib/checkMode';
 
 class ApplicationCard extends Component {
@@ -37,8 +36,7 @@ class ApplicationCard extends Component {
   renderLogin(app) {
     return (
       <Button onClick={() => {
-        this.props.selectApp(app)
-        this.props.openWalkThroughOverlay();
+        this.props.selectApp(app);
       }} className="pt-intent-primary"
         id="Login-button"
         text={'Launch'} />
@@ -129,7 +127,6 @@ export default withRouter(
   connect(mapStateToProps,
     {
       launchApp,
-      openWalkThroughOverlay,
       selectApp
     }
   )(ApplicationCard)

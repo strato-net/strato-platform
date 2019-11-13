@@ -3,11 +3,9 @@ import { connect } from 'react-redux';
 import { withRouter, Link } from 'react-router-dom';
 import { Field, reduxForm } from 'redux-form';
 import Dropzone from 'react-dropzone';
-import { Button, Dialog } from '@blueprintjs/core';
+import { Button } from '@blueprintjs/core';
 import { required } from '../../lib/reduxFormsValidations'
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import CLI from '../CLI';
-import { openCLIOverlay, closeCLIOverlay } from '../CLI/cli.actions';
 
 import {
   loadLaunchPad,
@@ -270,12 +268,6 @@ class LaunchPad extends Component {
             </div>}
           </div>
         </div>
-        <Dialog
-          isOpen={this.props.isOpen}
-          onClose={this.props.closeCLIOverlay}
-          title="Additional Instructions"
-          className="pt-dark cli-dialog"
-        ><CLI /></Dialog>
       </div>
     );
   }
@@ -326,8 +318,6 @@ export default withRouter(
       appUploadRequest,
       appSetError,
       appReset,
-      openCLIOverlay,
-      closeCLIOverlay,
     }
   )(formed)
 );

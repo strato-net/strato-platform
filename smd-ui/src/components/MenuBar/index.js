@@ -5,11 +5,7 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
 import logo from './blockapps-cube-color-430x500.png';
 import { env } from '../../env';
-import { logout, openLoginOverlay } from '../User/user.actions';
-import Login from '../Login';
-import WalkThrough from '../WalkThrough';
-import { Button } from '@blueprintjs/core';
-import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
+import { logout } from '../User/user.actions';
 import qs from 'query-string';
 import { isModePublic, isModeOauth } from '../../lib/checkMode';
 import { Field, reduxForm } from 'redux-form';
@@ -57,17 +53,6 @@ class MenuBar extends Component {
             </a></span>}
         </div>
       );
-    }
-  }
-
-  renderDeveloperButton() {
-    if (!this.props.isLoggedIn && isModePublic()) {
-      return (
-        <Button onClick={() => {
-          mixpanelWrapper.track('create_user_open_click');
-          this.props.openWalkThroughOverlay(false);
-        }} text="Developer Sign In" className="pt-button pt-small pt-intent-primary" />
-      )
     }
   }
 
@@ -126,13 +111,10 @@ class MenuBar extends Component {
           <div className="pt-navbar-heading">STRATO Management Dashboard</div>
         </div>
         <div className="pt-navbar-group pt-align-right">
-          {this.renderDeveloperButton()}
           {this.renderChainDropDown()}
           <small className="pt-text-muted">STRATO {env.STRATO_VERSION}</small>
           {this.afterLoggedIn()}
         </div>
-        {isModePublic() && <div><Login />
-          <WalkThrough /></div>}
       </nav>
     );
   }
@@ -150,8 +132,6 @@ export function mapStateToProps(state) {
 const formed = reduxForm({ form: 'menu-bar' })(MenuBar);
 const connected = connect(mapStateToProps, {
   logout,
-  openLoginOverlay,
-  openWalkThroughOverlay,
   selectChain,
   fetchChainIds
 })(formed);

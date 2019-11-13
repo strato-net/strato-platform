@@ -10,7 +10,8 @@ import TransactionView from './components/Transactions/components/TransactionVie
 import BlockView from './components/Blocks/components/BlockView';
 import ContractQuery from './components/ContractQuery';
 import App from './App';
-import Applications from './components/Applications/';
+// TODO: remove this
+// import Applications from './components/Applications/';
 import LaunchPad from './components/LaunchPad/';
 import CodeEditor from './components/CodeEditor';
 import ExternalStorage from './components/ExternalStorage';
