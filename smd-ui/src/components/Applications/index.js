@@ -11,22 +11,12 @@ import ApplicationCard from '../ApplicationCard';
 import { canDeployApps } from '../../lib/envChecks';
 import { env } from '../../env';
 import TokenRequest from '../TokenRequest';
-import qs from 'query-string';
-import { isModePublic } from '../../lib/checkMode';
 
 import './application.css'
 
 class Applications extends Component {
 
   componentDidMount() {
-    // I am really sorry for this. But time.
-    if (isModePublic()) {
-      const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
-      if (!this.props.isLoggedIn && !developerSignIn) {
-        window.location.href = `${window.location.protocol}//${window.location.hostname}/dappstore/`;
-      }
-    }
-
     mixpanelWrapper.track('launchpad_load');
     this.props.fetchApplications();
     this.startPoll();

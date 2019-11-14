@@ -6,7 +6,7 @@ import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
-import { isModePublic, isModeOauth } from '../../../lib/checkMode';
+import { isOauthEnabled } from '../../../lib/checkMode';
 import { toasts } from '../../Toasts';
 import { fetchUserAddresses } from '../../Accounts/accounts.actions';
 
@@ -49,19 +49,19 @@ class Attest extends Component {
     this.props.fetchUserAddresses(e.target.value, true);
   };
 
-  renderUsername = (isPublicMode) => {
+  renderUsername = (isModeOauth) => {
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    return (<div className={isPublicMode ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="username"
         onChange={this.handleUsernameChange}
         required
-        disabled={isPublicMode}
+        disabled={isModeOauth}
       >
-        <option value={isPublicMode ? this.props.initialValues.username : null}>
-          {isPublicMode && this.props.initialValues.username}
+        <option value={isModeOauth ? this.props.initialValues.username : null}>
+          {isModeOauth && this.props.initialValues.username}
         </option>
         {
           users.map((user, i) => {
@@ -75,9 +75,7 @@ class Attest extends Component {
   };
 
   renderAuth = () => {
-    if (isModeOauth()) return null;
-
-    const isPublicMode = isModePublic();
+    const isModeOauth = isOauthEnabled();
 
     return <div>
       <div className="row">
@@ -87,7 +85,7 @@ class Attest extends Component {
           </label>
         </div>
         <div className="col-sm-9 smd-pad-4">
-          {this.renderUsername(isPublicMode)}
+          {this.renderUsername(isModeOauth)}
           <br /><span className="error-text">{this.errorMessageFor('username')}</span>
         </div>
       </div>
@@ -98,7 +96,7 @@ class Attest extends Component {
           </label>
         </div>
         <div className="col-sm-9 smd-pad-4">
-          {this.renderAddress(isPublicMode)}
+          {this.renderAddress(isModeOauth)}
           <br /> <span className="error-text">{this.errorMessageFor('address')}</span>
         </div>
       </div>
@@ -110,34 +108,34 @@ class Attest extends Component {
         </div>
         <div className="col-sm-9 smd-pad-4">
           <Field
-              name="password"
-              component="input"
-              type="password"
-              placeholder="Password"
-              className="pt-input form-width"
-              tabIndex="3"
-              required
-          /> <br/>
+            name="password"
+            component="input"
+            type="password"
+            placeholder="Password"
+            className="pt-input form-width"
+            tabIndex="3"
+            required
+          /> <br />
           <span className="error-text">{this.errorMessageFor('password')}</span>
         </div>
       </div>
     </div>
   }
 
-  renderAddress = (isPublicMode) => {
+  renderAddress = (isModeOauth) => {
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
       : [];
-    return (<div className={isPublicMode ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="address"
         required
-        disabled={isPublicMode}
+        disabled={isModeOauth}
       >
-        <option value={isPublicMode ? this.props.initialValues.address : null}>
-          {isPublicMode && this.props.initialValues.address}
+        <option value={isModeOauth ? this.props.initialValues.address : null}>
+          {isModeOauth && this.props.initialValues.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -154,7 +152,7 @@ class Attest extends Component {
     return (
       <div className="pt-dialog-body upload-form">
 
-        { this.renderAuth() }
+        {this.renderAuth()}
 
         <div className="row">
           <div className="col-sm-3 text-right">
@@ -263,8 +261,8 @@ export function mapStateToProps(state) {
     isLoading: state.attest.isLoading,
     accounts: state.accounts.accounts,
     initialValues: {
-      username: state.user.currentUser.username,
-      address: state.user.currentUser.accountAddress
+      username: state.user.oauthUser ? state.user.oauthUser.username : '',
+      address: state.user.oauthUser ? state.user.oauthUser.address : ''
     }
   };
 }

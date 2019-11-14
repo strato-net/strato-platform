@@ -6,7 +6,6 @@ import logo from './blockapps-logo-horizontal-white.png';
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { isModePublic } from '../../lib/checkMode';
 import { isS3Available } from '../../lib/checkS3Credentials';
 
 class SideBar extends Component {
@@ -14,15 +13,15 @@ class SideBar extends Component {
   // noOverlay
   // TODO: customCrossIcon={<div><div className="pt-icon-standard pt-icon-chevron-left"/></div>}
   render() {
-    let route = isModePublic() ?
-      [{ path: '/apps', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" }, { path: '/home', label: 'Network', id: 'network', icon: "fa-dashboard" }]
-      : [{ path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" }];
+    // let route = isModePublic() ?
+    //   [{ path: '/apps', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" }, { path: '/home', label: 'Network', id: 'network', icon: "fa-dashboard" }]
+    //   : [];
 
     const navLinksData = (
       [
-        ...route,
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
-        { path: '/chains', label: 'Chains', id: 'chains', icon: "fa-user-secret"},
+        { path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" },
+        { path: '/chains', label: 'Chains', id: 'chains', icon: "fa-user-secret" },
         { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link" },
         { path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange" },
         { path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users" },
@@ -49,7 +48,7 @@ class SideBar extends Component {
               </NavLink>
             )
           }
-          {isS3Available() && !isModePublic() &&
+          {isS3Available() &&
             <NavLink
               id={'external_storage'}
               to={'/external_storage'}
@@ -62,7 +61,7 @@ class SideBar extends Component {
             </NavLink>}
         </div>
         <hr />
-        {!isModePublic() && <div className="menu">
+        <div className="menu">
           <NavLink
             id={'apps'}
             to={'/apps'}
@@ -73,7 +72,7 @@ class SideBar extends Component {
             <i className='fa fa-rocket'> </i>
             <span className="menu-text">Apps</span>
           </NavLink>
-        </div>}
+        </div>
         <div>
         </div>
         <div className="smd-sidebar-logo">

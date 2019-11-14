@@ -6,61 +6,43 @@ import './menubar.css';
 import logo from './blockapps-cube-color-430x500.png';
 import { env } from '../../env';
 import { logout } from '../User/user.actions';
-import qs from 'query-string';
-import { isModePublic, isModeOauth } from '../../lib/checkMode';
+import { isOauthEnabled } from '../../lib/checkMode';
 import { Field, reduxForm } from 'redux-form';
 import { selectChain, fetchChainIds } from '../Chains/chains.actions';
 
 class MenuBar extends Component {
 
   componentDidMount() {
-    const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
-    if (developerSignIn && isModePublic()) {
-      this.props.openWalkThroughOverlay(false);
-    }
     this.props.fetchChainIds();
   }
 
+  logout() {
+    localStorage.removeItem('user');
+    window.location.href = '/auth/logout';
+  }
+
   afterLoggedIn() {
-    if (this.props.isLoggedIn || !isModePublic()) {
-      return (
-        <div>
+    return (
+      <div>
+        <span className="pt-navbar-divider" />
+        <a href='/prometheus' target="_black" rel="noopener noreferrer">
+          <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("prometheus_graphs_click") }}>Prometheus Graphs</button>
+        </a>
+        {isOauthEnabled() && <span><span className="pt-navbar-divider" />
+          <small className="pt-text-muted welcome-user"> {this.props.oauthUser ? this.props.oauthUser.username : ''} </small>
           <span className="pt-navbar-divider" />
-          <a href='/prometheus' target="_black" rel="noopener noreferrer">
-            <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("prometheus_graphs_click") }}>Prometheus Graphs</button>
-          </a>
-          {/*<a href={env.BLOC_DOC_URL} target="_blank" rel="noopener noreferrer" id="tour-bloc-api-button">*/}
-            {/*<button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("bloc_docs_click") }}>Bloc API</button>*/}
-          {/*</a>*/}
-          {/*<a href={env.STRATO_DOC_URL} target="_blank" rel="noopener noreferrer">*/}
-            {/*<button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("strato_docs_click") }}>STRATO API</button>*/}
-          {/*</a>*/}
-          {/* TODO: remove public mode and remove logout (unused code) */}
-          {this.props.isLoggedIn && <span><span className="pt-navbar-divider" />
-            <small className="pt-text-muted welcome-user"> Welcome, {this.props.currentUser.username} </small>
-            <span className="pt-navbar-divider" />
-            <a target="_blank" rel="noopener noreferrer">
-              <button className="pt-button pt-minimal pt-small" onClick={() => { this.props.logout() }}>Logout</button>
-            </a></span>}
-          {isModeOauth() && <span><span className="pt-navbar-divider" />
-            <small className="pt-text-muted welcome-user"> {this.props.oauthUser ? this.props.oauthUser.username : ''} </small>
-            <span className="pt-navbar-divider" />
-            <a target="_blank" rel="noopener noreferrer">
-              <button className="pt-button pt-minimal pt-small" onClick={() => { 
-                localStorage.removeItem('user');
-                window.location.href = '/auth/logout' 
-              }}>Logout</button>
-            </a></span>}
-        </div>
-      );
-    }
+          <a target="_blank" rel="noopener noreferrer">
+            <button className="pt-button pt-minimal pt-small" onClick={this.logout}>Logout</button>
+          </a></span>}
+      </div>
+    );
   }
 
   renderChainDropDown() {
-    if ( this.props.chainIds.length && (this.props.isLoggedIn || !isModePublic())) {
+    if (this.props.chainIds.length) {
       return (
         <span>
-          <span className="pt-navbar-divider"/>
+          <span className="pt-navbar-divider" />
           <small className="pt-text-muted">
             <div className="pt-select">
               <Field
@@ -122,8 +104,6 @@ class MenuBar extends Component {
 
 export function mapStateToProps(state) {
   return {
-    isLoggedIn: state.user.isLoggedIn,
-    currentUser: state.user.currentUser,
     chainIds: state.chains.chainIds,
     oauthUser: state.user.oauthUser
   };

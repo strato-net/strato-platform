@@ -16,7 +16,7 @@ import {
 } from './launchPad.actions';
 import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { canDeployApps } from '../../lib/envChecks';
-import { isModePublic } from '../../lib/checkMode';
+import { isOauthEnabled } from '../../lib/checkMode';
 
 class LaunchPad extends Component {
 
@@ -26,7 +26,7 @@ class LaunchPad extends Component {
 
   componentWillMount() {
     if (this.props.launchPad.firstLoad) {
-      if (Object.getOwnPropertyNames(this.props.accounts).length === 0 && !isModePublic()) {
+      if (Object.getOwnPropertyNames(this.props.accounts).length === 0 && !isOauthEnabled()) {
         this.props.fetchAccounts(true, false);
       }
       this.props.loadLaunchPad();
@@ -93,20 +93,20 @@ class LaunchPad extends Component {
     mixpanelWrapper.track('launchpad_upload_app');
   }
 
-  renderUsername = (isPublicMode) => {
+  renderUsername = (isModeOauth) => {
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    return (<div className={isPublicMode ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="appUsername"
         onChange={this.handleUsernameChange}
         validate={required}
-        disabled={isPublicMode}
+        disabled={isModeOauth}
         required
       >
-        <option value={isPublicMode ? this.props.currentUser.username : null}>
-          {isPublicMode && this.props.currentUser.username}
+        <option value={isModeOauth ? this.props.currentUser.username : null}>
+          {isModeOauth && this.props.currentUser.username}
         </option>
         {users.map((user, i) => {
           return (
@@ -118,21 +118,21 @@ class LaunchPad extends Component {
     </div>)
   }
 
-  renderAddress = (isPublicMode) => {
+  renderAddress = (isModeOauth) => {
     const userAddresses = this.props.accounts && this.props.launchPad.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.launchPad.username])
       : [];
-    return (<div className={isPublicMode ? "" : "pt-select"}>
+    return (<div className={isModeOauth ? "" : "pt-select"}>
       <Field
         className="pt-input"
         component="select"
         name="appUserAddress"
         validate={required}
         required
-        disabled={isPublicMode}
+        disabled={isModeOauth}
       >
-        <option value={isPublicMode ? this.props.currentUser.accountAddress : null}>
-          {isPublicMode && this.props.currentUser.accountAddress}
+        <option value={isModeOauth ? this.props.currentUser.accountAddress : null}>
+          {isModeOauth && this.props.currentUser.accountAddress}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -146,7 +146,7 @@ class LaunchPad extends Component {
   }
 
   render() {
-    const isPublicMode = isModePublic();
+    const isModeOauth = isOauthEnabled();
     const { handleSubmit, pristine, submitting, valid } = this.props;
 
     return (
@@ -172,100 +172,100 @@ class LaunchPad extends Component {
             {!canDeployApps
               ? <div className="pt-card"><span>Unable to deploy apps when running multinode on localhost</span></div>
               :
-            <div className="pt-card">
-              <div className="row">
-                <div className="col-sm-6">
-                  <h4>Enter application details</h4>
-                </div>
-                <div className="col-sm-6 text-right">
-                  <Button onClick={this.props.openCLIOverlay} className="pt-button pt-minimal">
-                    <i className='fa fa-info-circle smd-margin-right-8'> </i>
-                    Instructions
+              <div className="pt-card">
+                <div className="row">
+                  <div className="col-sm-6">
+                    <h4>Enter application details</h4>
+                  </div>
+                  <div className="col-sm-6 text-right">
+                    <Button onClick={this.props.openCLIOverlay} className="pt-button pt-minimal">
+                      <i className='fa fa-info-circle smd-margin-right-8'> </i>
+                      Instructions
                     </Button>
-                  <a href="https://developers.blockapps.net/advanced/launch-dapp/" target="_blank" rel="noopener noreferrer">
-                    <button className="pt-button pt-minimal pt-intent-primary">
-                      <i className='fa fa-book smd-margin-right-8'> </i>
-                      Read the docs
+                    <a href="https://developers.blockapps.net/advanced/launch-dapp/" target="_blank" rel="noopener noreferrer">
+                      <button className="pt-button pt-minimal pt-intent-primary">
+                        <i className='fa fa-book smd-margin-right-8'> </i>
+                        Read the docs
                     </button>
-                  </a>
+                    </a>
+                  </div>
                 </div>
-              </div>
-              <hr />
-              <form>
-                <div className="row smd-pad-top-12">
-                  <div className="col-sm-2 text-right">
-                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                      Username
+                <hr />
+                <form>
+                  <div className="row smd-pad-top-12">
+                    <div className="col-sm-2 text-right">
+                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                        Username
                     </label>
-                  </div>
-                  <div className="col-sm-10">
-                    {this.renderUsername(isPublicMode)}
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-sm-2 text-right">
-                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                      User Address
-                    </label>
-                  </div>
-                  <div className="col-sm-10">
-                    {this.renderAddress(isPublicMode)}
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-sm-2 text-right">
-                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                      Password
-                    </label>
-                  </div>
-                  <div className="col-sm-10">
-                    <Field
-                      name="appPassword"
-                      className="pt-input smd-input-width"
-                      component="input"
-                      type="password"
-                      placeholder="User Password"
-                      dir="auto"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-sm-2 text-right">
-                    <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
-                      Package
-                    </label>
-                  </div>
-                  <div className="col-sm-10">
-                    <Field
-                      className="pt-input"
-                      name="appPackage"
-                      component={this.renderDropzoneInput}
-                      dir="auto"
-                      title="Package"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-sm-offset-2 col-sm-1">
-                    <button
-                      type="submit"
-                      onClick={handleSubmit(this.submit)}
-                      className="pt-button pt-intent-primary"
-                      disabled={pristine || submitting || !valid}
-                    >
-                      Upload
-                    </button>
-                  </div>
-                  <div className="col-sm-9">
-                    <div className="smd-pad-4 smd-text-warning">
-                      {this.props.launchPad.error}
+                    </div>
+                    <div className="col-sm-10">
+                      {this.renderUsername(isModeOauth)}
                     </div>
                   </div>
-                </div>
-              </form>
-            </div>}
+                  <div className="row">
+                    <div className="col-sm-2 text-right">
+                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                        User Address
+                    </label>
+                    </div>
+                    <div className="col-sm-10">
+                      {this.renderAddress(isModeOauth)}
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-sm-2 text-right">
+                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                        Password
+                    </label>
+                    </div>
+                    <div className="col-sm-10">
+                      <Field
+                        name="appPassword"
+                        className="pt-input smd-input-width"
+                        component="input"
+                        type="password"
+                        placeholder="User Password"
+                        dir="auto"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-sm-2 text-right">
+                      <label className="pt-label smd-pad-vertical-4" htmlFor="appName">
+                        Package
+                    </label>
+                    </div>
+                    <div className="col-sm-10">
+                      <Field
+                        className="pt-input"
+                        name="appPackage"
+                        component={this.renderDropzoneInput}
+                        dir="auto"
+                        title="Package"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-sm-offset-2 col-sm-1">
+                      <button
+                        type="submit"
+                        onClick={handleSubmit(this.submit)}
+                        className="pt-button pt-intent-primary"
+                        disabled={pristine || submitting || !valid}
+                      >
+                        Upload
+                    </button>
+                    </div>
+                    <div className="col-sm-9">
+                      <div className="smd-pad-4 smd-text-warning">
+                        {this.props.launchPad.error}
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>}
           </div>
         </div>
       </div>

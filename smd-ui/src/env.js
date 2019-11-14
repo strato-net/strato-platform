@@ -11,7 +11,7 @@ const strato_v23_uri = '/strato/v2.3'
 
 const node_host = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? window.NODE_HOST : (process.env.REACT_APP_NODE_HOST ? process.env.REACT_APP_NODE_HOST : 'localhost');
 const oauth_enabled = window.OAUTH_ENABLED && window.OAUTH_ENABLED !== '__OAUTH_ENABLED__' ? window.OAUTH_ENABLED==='true' : process.env.REACT_APP_OAUTH_ENABLED==='true';
-const smd_mode = window.SMD_MODE && window.SMD_MODE === 'public' ? 'public' : (oauth_enabled ? 'oauth' : 'enterprise');
+// const smd_mode = window.SMD_MODE && window.SMD_MODE === 'public' ? 'public' : (oauth_enabled ? 'oauth' : 'enterprise');
 
 
 window.EXT_STORAGE_S3_BUCKET = process.env.REACT_APP_EXT_STORAGE_S3_BUCKET ? process.env.REACT_APP_EXT_STORAGE_S3_BUCKET : window.EXT_STORAGE_S3_BUCKET
@@ -31,7 +31,6 @@ export const env = {
   POLLING_FREQUENCY: window.POLLING_FREQUENCY && window.POLLING_FREQUENCY !== '__POLLING_FREQUENCY__' ? window.POLLING_FREQUENCY : 5 * 1000,
   STRATO_GS_MODE: window.STRATO_GS_MODE && window.STRATO_GS_MODE !== '__STRATO_GS_MODE__' ? window.STRATO_GS_MODE : '0',
   SINGLE_NODE: window.SINGLE_NODE && window.SINGLE_NODE !== '__SINGLE_NODE__' ? window.SINGLE_NODE : 'false',
-  SMD_MODE: smd_mode,
   EXT_STORAGE_ENABLED: window.EXT_STORAGE_S3_BUCKET && window.EXT_STORAGE_S3_BUCKET !== '__EXT_STORAGE_S3_BUCKET__' ? 'true' : (process.env.REACT_APP_EXT_STORAGE_ENABLED ? process.env.REACT_APP_EXT_STORAGE_ENABLED : 'false'),
   STRATO_VERSION: window.STRATO_VERSION && window.STRATO_VERSION !== '__STRATO_VERSION__' ? window.STRATO_VERSION : 'N/A',
 };

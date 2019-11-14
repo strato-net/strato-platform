@@ -10,6 +10,7 @@ import { fork, all } from 'redux-saga/effects';
 import { routerReducer } from 'react-router-redux';
 import { loadingBarReducer, loadingBarMiddleware } from 'react-redux-loading-bar'
 import App from "./App/";
+import { reducer as formReducer } from 'redux-form';
 
 import dashboardReducer from './components/Dashboard/dashboard.reducer';
 import accountsReducer from './components/Accounts/accounts.reducer';
@@ -67,8 +68,19 @@ import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.
 import watchFetchChains from './components/Chains/chains.saga';
 import watchCreateChain from './components/CreateChain/createChain.saga';
 import watchOauthAccountActions from './components/Accounts/components/OauthAccounts/oauthAccounts.saga';
+import { CREATE_BLOC_USER_SUCCESS } from './components/CreateBlocUser/createBlocUser.actions';
 
 const rootReducer = combineReducers({
+  form: formReducer.plugin({
+    'create-user': (state, action) => {
+      switch (action.type) {
+        case CREATE_BLOC_USER_SUCCESS:
+          return undefined;
+        default:
+          return state;
+      }
+    }
+  }),
   routing: routerReducer,
   // YOUR REDUCERS HERE
   accounts: accountsReducer,

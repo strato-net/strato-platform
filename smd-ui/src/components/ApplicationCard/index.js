@@ -5,7 +5,6 @@ import { withRouter } from 'react-router-dom';
 import { launchApp, selectApp } from '../Applications/applications.actions';
 import { Menu, MenuItem, Popover, Position, Button } from '@blueprintjs/core';
 import ReactLoading from 'react-loading';
-import { isModePublic } from '../../lib/checkMode';
 
 class ApplicationCard extends Component {
 
@@ -89,7 +88,9 @@ class ApplicationCard extends Component {
                     Share
                   </button>
                 </Popover>
-                {(!this.props.isLoggedIn && isModePublic()) ? this.renderLogin(app) : (app.isLoading ?
+                {/* TODO: remove this when everything is ready */}
+                {/* {(!this.props.isLoggedIn && isModePublic()) ? this.renderLogin(app) : (app.isLoading ? */}
+                {(app.isLoading ?
                   <span className="launch-loader"> <ReactLoading type="bars" color="#f5f8fa" className="pull-right" height={0} width={30} /> </span> :
                   <button
                     className="pt-button pt-intent-primary pull-right"
@@ -118,7 +119,6 @@ class ApplicationCard extends Component {
 export function mapStateToProps(state) {
   return {
     isLoading: state.applications.isLoading,
-    isLoggedIn: state.user.isLoggedIn,
     url: state.applications.url
   };
 }
