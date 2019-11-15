@@ -120,6 +120,7 @@ spec = do
             , uploadlistcontractArgs = Map.empty
             , _uploadlistcontractTxParams = testTxParams
             , uploadlistcontractValue = Nothing
+            , _uploadlistcontractChainid = Nothing
             , uploadlistcontractMetadata = Nothing
             }
           ]
@@ -164,6 +165,7 @@ spec = do
               { sendtransactionToAddress = toUserAddress
               , sendtransactionValue = Strung 100
               , _sendtransactionTxParams = testTxParams
+              , _sendtransactionChainid = Nothing
               , sendtransactionMetadata = Nothing
               }
           }
@@ -190,6 +192,7 @@ spec = do
               , methodcallArgs = Map.empty
               , methodcallValue = Strung 0
               , _methodcallTxParams = testTxParams
+              , _methodcallChainid = Nothing
               , methodcallMetadata = Nothing
               }
           }

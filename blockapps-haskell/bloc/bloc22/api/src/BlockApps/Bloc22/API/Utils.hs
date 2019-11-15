@@ -101,7 +101,6 @@ data TxParams = TxParams
   { txparamsGasLimit :: Maybe Gas
   , txparamsGasPrice :: Maybe Wei
   , txparamsNonce    :: Maybe Nonce
-  , txparamsChainId  :: Maybe ChainId
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary TxParams where arbitrary = GR.genericArbitrary GR.uniform
@@ -119,13 +118,12 @@ instance ToSchema TxParams where
       ( mempty
         & type_ .~ SwaggerObject
         & example ?~ toJSON
-          (TxParams (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876)) Nothing)
+          (TxParams (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876)))
         & description ?~ "Transaction Parameters"
         & properties .~
             [ ("gasLimit", wordSchema)
             , ("gasPrice", wordSchema)
             , ("nonce", wordSchema)
-            , ("chainid", wordSchema)
             ]
         & required .~ []
       )

@@ -850,7 +850,7 @@ spec =
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
-        txParamsComplex = Just $ TxParams (Just (Gas 100000000000000)) (Just (Wei 1)) Nothing Nothing
+        txParamsComplex = Just $ TxParams (Just (Gas 100000000000000)) (Just (Wei 1)) Nothing
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest

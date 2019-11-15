@@ -431,6 +431,7 @@ instance ToSchema UploadListRequest where
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , _uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
+        , _uploadlistcontractChainid = Nothing
         , uploadlistcontractMetadata = Nothing
         }
       ex :: UploadListRequest
@@ -441,6 +442,7 @@ data UploadListContract = UploadListContract
   , uploadlistcontractArgs         :: Map Text ArgValue
   , _uploadlistcontractTxParams    :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
+  , _uploadlistcontractChainid     :: Maybe ChainId
   , uploadlistcontractMetadata     :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 makeLenses ''UploadListContract
@@ -462,8 +464,9 @@ instance ToSchema UploadListContract where
       ex = UploadListContract
         { uploadlistcontractContractName = "SampleContract"
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
-        , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing Nothing
+        , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing
+        , _uploadlistcontractChainid = Nothing
         , uploadlistcontractMetadata = Nothing
         }
 
@@ -644,7 +647,8 @@ instance ToSchema PostSendListRequest where
         { sendtransactionToAddress = Address 0xdeadbeef
         , sendtransactionValue = Strung 1000000000000000
         , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
-            (Just $ Nonce 9876) Nothing)
+            (Just $ Nonce 9876))
+        , _sendtransactionChainid = Nothing
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
 
@@ -652,6 +656,7 @@ data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue     :: Strung Natural
   , _sendtransactionTxParams :: Maybe TxParams
+  , _sendtransactionChainid  :: Maybe ChainId
   , sendtransactionMetadata  :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 makeLenses ''SendTransaction
@@ -703,7 +708,8 @@ instance ToSchema SendTransaction where
         { sendtransactionToAddress = Address 0xdeadbeef
         , sendtransactionValue = Strung 100000000000000
         , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
-            (Just $ Nonce 9876) Nothing)
+            (Just $ Nonce 9876))
+        , _sendtransactionChainid = Nothing
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
 
@@ -813,6 +819,7 @@ methodErroredExample =
        , methodcallMethodName = "getHoroscope"
        , methodcallContractAddress = Address 0xdeadbeef
        , methodcallContractName = "HoroscopeApp"
+       , _methodcallChainid = Nothing
        , methodcallMetadata = Nothing
        }
 
@@ -863,6 +870,7 @@ instance ToSchema PostMethodListRequest where
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"
+        , _methodcallChainid = Nothing
         , methodcallMetadata = Nothing
         }
 
@@ -873,6 +881,7 @@ data MethodCall = MethodCall
   , methodcallArgs            :: Map Text ArgValue
   , methodcallValue           :: Strung Natural
   , _methodcallTxParams       :: Maybe TxParams
+  , _methodcallChainid        :: Maybe ChainId
   , methodcallMetadata        :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 makeLenses ''MethodCall
@@ -899,6 +908,7 @@ instance ToSchema MethodCall where
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"
+        , _methodcallChainid = Nothing
         , methodcallMetadata = Nothing
         }
 
