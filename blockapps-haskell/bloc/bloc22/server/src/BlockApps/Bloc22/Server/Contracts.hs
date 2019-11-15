@@ -176,6 +176,18 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
                            , qsChainId = maybeToList chainId
                            }
 
+getContractsBatchStates :: [GetContractsBatchStatesRequest]
+                        -> Bloc [GetContractsStateResponses]
+getContractsBatchStates = traverse flattenRequest
+  where flattenRequest GetContractsBatchStatesRequest{..} =
+          getContractsState getcontractsbatchstatesrequestContractName
+                            getcontractsbatchstatesrequestAddress
+                            getcontractsbatchstatesrequestChainid
+                            getcontractsbatchstatesrequestVarName
+                            getcontractsbatchstatesrequestCount
+                            getcontractsbatchstatesrequestOffset
+                            (fromMaybe False getcontractsbatchstatesrequestLength)
+
 getContractsDetails :: Address -> Maybe ChainId -> Bloc ContractDetails
 getContractsDetails contractAddress chainId = do
   let err = UserError $ Text.concat
