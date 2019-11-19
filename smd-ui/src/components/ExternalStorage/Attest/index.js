@@ -100,7 +100,7 @@ class Attest extends Component {
           <br /> <span className="error-text">{this.errorMessageFor('address')}</span>
         </div>
       </div>
-      <div className="row">
+      {!isModeOauth && <div className="row">
         <div className="col-sm-3 text-right">
           <label className="pt-label smd-pad-4">
             Password
@@ -118,7 +118,7 @@ class Attest extends Component {
           /> <br />
           <span className="error-text">{this.errorMessageFor('password')}</span>
         </div>
-      </div>
+      </div>}
     </div>
   }
 
