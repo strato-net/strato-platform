@@ -26,9 +26,6 @@ import queryEngineReducer from './components/QueryEngine/queryEngine.reducer';
 import sendTokensReducer from './components/Accounts/components/SendTokens/sendTokens.reducer';
 import userReducer from './components/User/user.reducer';
 import codeEditorReducer from './components/CodeEditor/codeEditor.reducer';
-import applicationsReducer from './components/Applications/applications.reducer';
-import launchPadReducer from './components/LaunchPad/launchPad.reducer';
-import tokenRequestReducer from './components/TokenRequest/tokenRequest.reducer';
 import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.reducer';
 import externalStorageReducer from './components/ExternalStorage/externalStorage.reducer';
 import uploadFileReducer from './components/ExternalStorage/UploadFile/uploadFile.reducer';
@@ -60,8 +57,6 @@ import {
 import watchExecuteQuery from './components/QueryEngine/queryEngine.saga';
 import { watchQueryCirrus, watchQueryCirrusVars } from './components/ContractQuery/contractQuery.saga';
 import watchSendTokens from './components/Accounts/components/SendTokens/sendTokens.saga';
-import watchFetchApplications from './components/Applications/applications.saga';
-import watchAppUpload from './components/LaunchPad/launchPad.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';
 import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.saga';
@@ -98,10 +93,7 @@ const rootReducer = combineReducers({
   loadingBar: loadingBarReducer,
   tour: tourReducer,
   user: userReducer,
-  applications: applicationsReducer,
-  launchPad: launchPadReducer,
   dashboard: dashboardReducer,
-  tokenRequest: tokenRequestReducer,
   createBlocUser: createBlocUserReducer,
   uploadFile: uploadFileReducer,
   externalStorage: externalStorageReducer,
@@ -130,8 +122,6 @@ const rootSaga = function* startForeman() {
     fork(watchQueryCirrusVars),
     fork(watchSendTokens),
     fork(watchAccount),
-    fork(watchFetchApplications),
-    fork(watchAppUpload),
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
     fork(watchCreateBlocUser),

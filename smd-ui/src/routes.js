@@ -10,9 +10,6 @@ import TransactionView from './components/Transactions/components/TransactionVie
 import BlockView from './components/Blocks/components/BlockView';
 import ContractQuery from './components/ContractQuery';
 import App from './App';
-// TODO: remove this
-// import Applications from './components/Applications/';
-import LaunchPad from './components/LaunchPad/';
 import CodeEditor from './components/CodeEditor';
 import ExternalStorage from './components/ExternalStorage';
 import Chains from './components/Chains'
@@ -23,8 +20,6 @@ export const routes =
       <Redirect to="/home" />
     </Route>
     <Route exact path="/home" component={Dashboard} />
-    {/* TODO: remove app section */}
-    {/* <Route exact path="/apps" component={Applications} /> */}
     <Route exact path="/accounts" component={Accounts} />
     <Route exact path="/external_storage" component={ExternalStorage} />
     <Route exact path="/nodes" component={Nodes} />
@@ -36,5 +31,4 @@ export const routes =
     <Route exact path="/contracts" component={Contracts} />
     <Route exact path="/contracts/:name/query" component={ContractQuery} />
     <Route exact path="/code_editor" component={CodeEditor} />
-    <Route exact path="/launchpad" component={LaunchPad} />
   </Switch>
