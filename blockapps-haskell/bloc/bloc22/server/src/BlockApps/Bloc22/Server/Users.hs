@@ -94,12 +94,11 @@ data BatchState = BatchState
   }
 makeLenses ''BatchState
 
-forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m ([b],s)
-forStateT s [] _ = return ([],s)
-forStateT s (a:as) run = do
-  (b,s') <- runStateT (run a) s
-  (bs,s'') <- forStateT s' as run
-  return (b:bs,s'')
+forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
+forStateT s as f = flip evalStateT s $ mapM f as
+
+forState :: s -> [a] -> (a -> State s b) -> [b]
+forState s as = runIdentity . forStateT s as
 
 getUsers :: Bloc [UserName]
 getUsers = do
@@ -334,7 +333,7 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
 postUsersUploadListSolidVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListSolidVM' ContractListParameters{..} sign = do
   txsWithParams <- genNonces (getAccountNonce fromAddr chainId) uploadlistcontractTxParams contracts
-  namesCmIdsTxs <- fmap fst . forStateT Map.empty txsWithParams $
+  namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name args params value md) -> do
       mtuple <- use $ at name
       (_, src, cmId, xabi) <- case mtuple of
@@ -387,7 +386,7 @@ postUsersUploadListSolidVM' ContractListParameters{..} sign = do
 postUsersUploadListEVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListEVM' ContractListParameters{..} sign = do
   txsWithParams <- genNonces (getAccountNonce fromAddr chainId) uploadlistcontractTxParams contracts
-  namesCmIdsTxs <- fmap fst . forStateT Map.empty txsWithParams $
+  namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name args params value md) -> do
       mtuple <- use $ at name
       (bin, src, cmId, xabi) <- case mtuple of
@@ -505,7 +504,7 @@ genNonces n l as = do
   nonce <- if S.size noncesInUse == length as
             then return . Nonce . error $ "internal error: unused nonce when already specified " ++ show as
             else n
-  return . fst . runIdentity . forStateT nonce as $ \a -> do
+  return . forState nonce as $ \a -> do
     let params' = fromMaybe emptyTxParams (a ^. l)
     newNonce <- case txparamsNonce params' of
       Just v -> return v
@@ -523,7 +522,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
     then return []
     else do
       txsWithParams <- genNonces (getAccountNonce fromAddr chainId) methodcallTxParams txs
-      txsCmIdsFuncNames <- fmap fst . forStateT Map.empty txsWithParams $
+      txsCmIdsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall{..}) -> do
           mtuple <- use $ at methodcallContractName
           (mapKey, xabi) <- case mtuple of
@@ -728,7 +727,7 @@ recurseTRDs chainId resolve hashes = go 0 (toPending hashes)
         else (p : merge (d:ds) ps c)
 
 evalAndReturn :: [TRD] -> Bloc [BlocTransactionResult]
-evalAndReturn list = fmap fst . forStateT emptyBatchState list $
+evalAndReturn list = forStateT emptyBatchState list $
     \(TRD status hash _ mtxr) -> case status of
         Pending -> return $ BlocTransactionResult Pending hash Nothing Nothing
         Failure -> return $ BlocTransactionResult Failure hash mtxr Nothing

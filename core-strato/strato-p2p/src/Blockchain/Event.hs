@@ -22,6 +22,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import           Data.Foldable                         (for_)
+import qualified Data.DList                            as DL
 import           Data.List
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
@@ -259,15 +260,15 @@ handleEvents peer = awaitForever $ \case
       stampActionTimestamp
       mrh <- gets maxReturnedHeaders
       let shas = take mrh shas'
-      getUntilMissing shas [] [] >>= \(bodies, pshas) -> do
-          yieldR . BlockBodies . Prelude.reverse $ map toBody bodies
+      getUntilMissing shas DL.empty DL.empty >>= \(bodies, pshas) -> do
+          yieldR . BlockBodies $ map toBody bodies
           ptxs <- fmap (map snd . catMaybes) . RBDB.withRedisBlockDB $ mapM RBDB.getPrivateTransactions pshas
           unless (null ptxs) . yieldR . Transactions $ morphTx <$> ptxs
         where getUntilMissing :: (Accessible RBDB.RedisConnection m, MonadIO m)
-                              => [SHA] -> [OutputBlock] -> [SHA] -> m ([OutputBlock],[SHA])
-              getUntilMissing []     bodies pshas = return (bodies, pshas)
+                              => [SHA] -> DL.DList OutputBlock -> DL.DList SHA -> m ([OutputBlock],[SHA])
+              getUntilMissing []     bodies pshas = return (DL.toList bodies, DL.toList pshas)
               getUntilMissing (h:hs) bodies pshas = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
-                  Nothing   -> return (bodies, pshas)
+                  Nothing   -> return (DL.toList bodies, DL.toList pshas)
                   Just body -> do
                     cIdTxsMap <- RBDB.withRedisBlockDB $ RBDB.getChainTxsInBlock h
                     let kvs = M.assocs cIdTxsMap
@@ -275,7 +276,7 @@ handleEvents peer = awaitForever $ \case
                     let trMems = zip kvs mems
                         pshas' = concat . map (snd . fst) $
                                   filter ((checkPeerIsMember peer) . snd) trMems
-                    getUntilMissing hs (body:bodies) (pshas ++ pshas')
+                    getUntilMissing hs (bodies `DL.snoc` body) (pshas `DL.append` DL.fromList pshas')
 
               toBody :: OutputBlock -> ([Transaction], [BlockHeader])
               toBody = ((map otBaseTx . obReceiptTransactions) &&& fmap morphBlockHeader . obBlockUncles)

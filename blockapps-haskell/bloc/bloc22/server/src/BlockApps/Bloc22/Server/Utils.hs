@@ -6,7 +6,6 @@
 {-# LANGUAGE RecordWildCards   #-}
 module BlockApps.Bloc22.Server.Utils
   ( getBatchBlocTxStatus
-  , accumStateT
   , partitionWith
   , binRuntimeToCodeHash
   , emptyTxParams
@@ -17,10 +16,8 @@ import           Control.Concurrent               (threadDelay)
 import           Control.Monad                    (forM, unless, when)
 import           Control.Monad.Except             (throwError)
 import           Control.Monad.IO.Class           (liftIO)
-import           Control.Monad.Trans.State.Strict
 import qualified Data.ByteString.Base16           as BS16
-import           Data.Functor.Identity
-import qualified Data.Map.Strict                  as Map
+import qualified Data.Map.Strict                  as M
 import           Data.Maybe
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -35,7 +32,7 @@ import           BlockApps.Strato.Types
 maybeTxBatchResult :: Maybe ChainId -> [Keccak256] -> Bloc [Maybe TransactionResult]
 maybeTxBatchResult chainId hashes = maybeHeads <$> (blocStrato (postTxResultBatch chainId hashes))
   where maybeHeads btxr =
-          let list = map (flip Map.lookup $ unBatchTransactionResult btxr) hashes
+          let list = map (flip M.lookup $ unBatchTransactionResult btxr) hashes
           in flip map list $ \mtrs -> case mtrs of
             Nothing -> Nothing
             Just trs -> listToMaybe trs
@@ -58,15 +55,9 @@ emptyTxParams = TxParams Nothing Nothing Nothing
 binRuntimeToCodeHash :: Text.Text -> Keccak256
 binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
 
-accumStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
-accumStateT s as f = evalStateT (mapM f as) s
-
-buildStateT :: Monad m => s -> [a] -> (a -> StateT s m ()) -> m s
-buildStateT s as f = execStateT (mapM_ f as) s
-
-partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
-partitionWith f as = Map.toList . fmap reverse . runIdentity . buildStateT Map.empty as $ \a ->
-  modify $ Map.alter (Just . (a:) . fromMaybe []) (f a)
+partitionWith :: Ord k => (a -> k) -> [a] -> [(k,[a])]
+partitionWith f = M.toList . foldr g M.empty
+  where g a = M.alter (Just . (a:) . fromMaybe []) (f a)
 
 waitFor :: Text.Text -> Bloc Bool -> Bloc ()
 waitFor msg action = go 20

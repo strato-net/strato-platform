@@ -16,10 +16,10 @@ import qualified Blockchain.Database.MerklePatricia      as MP
 import           Blockchain.Output
 import           Control.Monad.Trans.State.Lazy        (gets)
 import qualified Data.ByteString                       as BS
+import qualified Data.DList                            as DL
 import           Data.List
 import           Data.Proxy
 import qualified Data.Text                             as T
-import qualified Data.Map.Ordered                      as O
 import qualified Data.Map                              as M
 import           Data.Maybe                            (isNothing, fromMaybe)
 import qualified Data.Set                              as S
@@ -149,8 +149,8 @@ ethereumVM = void . execContextM $ do
         pbft <- gets contextHasBlockstanbul
         reqd <- use contextBlockRequested
         let pending = B.pending state
-            priv = B.privateHashes $ B.miningCache state
-            hasTxs = not (null poolableNewTxs) || not (M.null pending) || not (O.null priv)
+            priv = DL.toList . B.privateHashes $ B.miningCache state
+            hasTxs = not (null poolableNewTxs) || not (M.null pending) || not (null priv)
             shouldOutputBlocks = isCaughtUp && (
               if pbft
                 then reqd && hasTxs

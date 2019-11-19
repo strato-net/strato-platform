@@ -22,6 +22,7 @@ dependencies:
   - data-default
   - deepseq
   - directory
+  - dlist
   - ethereum-rlp
   - exceptions
   - extra
@@ -35,7 +36,6 @@ dependencies:
   - monad-alter
   - mtl
   - nibblestring
-  - ordered-containers
   - persistent-postgresql
   - persistent-sqlite
   - prometheus-client

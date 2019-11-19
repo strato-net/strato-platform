@@ -1,14 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Bagger.BaggerState where
 
 import           Control.Applicative                (Alternative, empty)
 import           Control.DeepSeq
 
-import           Data.Map.Ordered                   (OMap)
-import qualified Data.Map.Ordered                   as OMap
+import qualified Data.DList                         as DL
 import qualified Data.Map.Strict                    as M
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
@@ -30,9 +28,6 @@ import           Blockchain.SHA
 
 type ATL = M.Map Address TransactionList
 
-instance (NFData a, NFData b) => NFData (OMap a b) where
-  rnf m = OMap.assocs m `deepseq` ()
-
 data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , bestBlockHeader       :: DD.BlockData
                                , bestBlockTxHashes     :: [SHA]
@@ -40,7 +35,7 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , remainingGas          :: Integer
                                , lastExecutedTxs       :: [TxRunResult]
                                , promotedTransactions  :: [OutputTx]
-                               , privateHashes         :: OMap SHA OutputTx
+                               , privateHashes         :: DL.DList OutputTx
                                , startTimestamp        :: UTCTime
                                } deriving (Show, Generic)
 
@@ -87,7 +82,7 @@ defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []
-                                  , privateHashes         = OMap.empty
+                                  , privateHashes         = DL.empty
                                   , startTimestamp        = posixSecondsToUTCTime 0
                                   }
 
