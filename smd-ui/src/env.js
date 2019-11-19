@@ -11,8 +11,6 @@ const strato_v23_uri = '/strato/v2.3'
 
 const node_host = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? window.NODE_HOST : (process.env.REACT_APP_NODE_HOST ? process.env.REACT_APP_NODE_HOST : 'localhost');
 const oauth_enabled = window.OAUTH_ENABLED && window.OAUTH_ENABLED !== '__OAUTH_ENABLED__' ? window.OAUTH_ENABLED==='true' : process.env.REACT_APP_OAUTH_ENABLED==='true';
-// const smd_mode = window.SMD_MODE && window.SMD_MODE === 'public' ? 'public' : (oauth_enabled ? 'oauth' : 'enterprise');
-
 
 window.EXT_STORAGE_S3_BUCKET = process.env.REACT_APP_EXT_STORAGE_S3_BUCKET ? process.env.REACT_APP_EXT_STORAGE_S3_BUCKET : window.EXT_STORAGE_S3_BUCKET
 

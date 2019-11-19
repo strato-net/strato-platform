@@ -9,7 +9,7 @@ describe('Account: index', () => {
   describe('renders correctly', () => {
 
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     })
 
     test('with empty values', () => {
@@ -66,7 +66,7 @@ describe('Account: index', () => {
       stopPropagation: jest.fn()
     };
 
-    checkMode.isModePublic = jest.fn().mockReturnValue(false);
+    checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     const wrapper = shallow(
       <Account.WrappedComponent {...props} />
     );
