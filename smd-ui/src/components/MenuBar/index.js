@@ -5,7 +5,6 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
 import logo from './blockapps-cube-color-430x500.png';
 import { env } from '../../env';
-import { logout } from '../User/user.actions';
 import { isOauthEnabled } from '../../lib/checkMode';
 import { Field, reduxForm } from 'redux-form';
 import { selectChain, fetchChainIds } from '../Chains/chains.actions';
@@ -111,7 +110,6 @@ export function mapStateToProps(state) {
 
 const formed = reduxForm({ form: 'menu-bar' })(MenuBar);
 const connected = connect(mapStateToProps, {
-  logout,
   selectChain,
   fetchChainIds
 })(formed);

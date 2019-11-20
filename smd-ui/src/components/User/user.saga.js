@@ -7,34 +7,10 @@ import {
   getOrCreateOauthUserSuccess,
   getOrCreateOauthUserFailure,
   GET_OR_CREATE_OAUTH_USER_REQUEST,
-  LOGOUT_REQUEST,
-  logoutSuccess,
 } from './user.actions';
 import { env } from '../../env';
-import { handleErrors } from '../../lib/handleErrors';
 
 const oauthUserUrl = env.APEX_URL + "/user";
-const logoutUrl = env.APEX_URL + "/logout";
-
-function logoutAccount() {
-  return fetch(
-    logoutUrl,
-    {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-    })
-    .then(handleErrors)
-    .then(function (response) {
-      return response.json();
-    })
-    .catch(function (error) {
-      throw error;
-    })
-}
 
 function getOrCreateOauthUserApi() {
   return fetch(
@@ -56,16 +32,6 @@ function getOrCreateOauthUserApi() {
     });
 }
 
-function* logout() {
-  try {
-    yield call(logoutAccount);
-    localStorage.removeItem('token');
-    yield put(logoutSuccess());
-  } catch (err) {
-    // Handle when you have error on logout
-  }
-}
-
 function* getOrCreateOauthUser() {
   try {
     const user = yield call(getOrCreateOauthUserApi);
@@ -82,7 +48,6 @@ function* getOrCreateOauthUser() {
 
 export default function* watchFetchUser() {
   yield [
-    takeEvery(LOGOUT_REQUEST, logout),
     takeEvery(GET_OR_CREATE_OAUTH_USER_REQUEST, getOrCreateOauthUser)
   ];
 }
