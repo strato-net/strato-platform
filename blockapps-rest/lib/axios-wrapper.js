@@ -88,6 +88,18 @@ function responseFormatter(response) {
     response.data[0].data.contents.src = 'source removed.'
   } catch (e) {
   }
+  try {
+    response.data[0].data.contents.bin = 'bin removed.'
+  } catch (e) {
+  }
+  try {
+    response.data[0].data.contents['bin-runtime'] = 'bin-runtime removed.'
+  } catch (e) {
+  }
+  try {
+    response.data[0].data.contents.xabi = 'xabi removed.'
+  } catch (e) {
+  }
   if (response.data) {
     return JSON.stringify(response.data, null, 2)
   }
