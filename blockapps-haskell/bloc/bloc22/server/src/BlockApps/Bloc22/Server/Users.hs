@@ -520,7 +520,7 @@ genNonces retrieveNoncesForChains chainLens l unindexedAs = do
                   then Nonce . error $
                          "internal error: unused nonce when already specified " ++ show indexedAs
                   else fromMaybe 0 $ Map.lookup chainId nonceMap
-    return . (chainId,) . fst . runIdentity . forStateT nonce indexedAs $ \(i,a) -> do
+    return . (chainId,) . runIdentity . forStateT nonce indexedAs $ \(i,a) -> do
       let params' = fromMaybe emptyTxParams (a ^. l)
       newNonce <- case txparamsNonce params' of
         Just v -> return v

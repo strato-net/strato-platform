@@ -12,7 +12,6 @@ import qualified Data.ByteString          as B
 import           Data.ByteString.Internal
 import           Data.Char
 import           Data.Data
-import           Data.List                (foldl')
 import qualified Data.Map.Strict          as M
 import           Data.Maybe
 import           Data.Word
