@@ -79,6 +79,10 @@ function requestFormatter(_request) {
     request.data.txs[0].payload.src = 'source removed.'
   } catch (e) {
   }
+  try {
+    request.data.src = 'source removed.'
+  } catch (e) {
+  }
   return JSON.stringify(request, null, 2)
 }
 
@@ -98,6 +102,10 @@ function responseFormatter(response) {
   }
   try {
     response.data[0].data.contents.xabi = 'xabi removed.'
+  } catch (e) {
+  }
+  try {
+    response.data[0].data.src = 'source removed.'
   } catch (e) {
   }
   if (response.data) {
