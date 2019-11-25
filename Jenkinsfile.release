@@ -69,7 +69,7 @@ pipeline {
             export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
             export EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
             export PASSWORD=123
-            // old-style strato 4.2 semi-oauth mode for old t&t
+            # old-style strato 4.2 semi-oauth mode for old t&t
             export OAUTH_JWT_VALIDATION_ENABLED=true
             export OAUTH_JWT_USERNAME_PROPERTY=email
             export OAUTH_JWT_VALIDATION_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration
