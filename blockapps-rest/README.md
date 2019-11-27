@@ -98,7 +98,7 @@ The above configuration defines the following settings:
 
 1. `apiDebug`: This flag controls if blockapps-rest will output the backend calls its making to the various STRATO APIs to the console. This is useful during development, but should be set to false for productions environments.
 2. `timeout`: This is the query wait timeout used by blockapps-rest internally. Some operations in blockapps-rest wait on a transactions to be final. The time it takes for finality on a STRATO network depends on it configuration, so this value may need to be tweaked based on your environment. But for most situations, the default value of 60000 milli-seconds should be good enough.
-3. The nodes collection defines a set of nodes that this process can connect to and the OAuth details for the connection. These details are:
+3. `nodes`: The nodes collection defines a set of nodes that this process can connect to and the OAuth details for the connection. These details are:
     - `id`: This id is used by the blockapps-rest calls to identify which node to connect to. This id should be a unique integer.
     - `url`: This is the base url at which the STRATO apis are available for the given node.
     - `publickey`: This is the public key of the STRATO node.
