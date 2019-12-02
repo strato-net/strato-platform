@@ -176,17 +176,17 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
                            , qsChainId = maybeToList chainId
                            }
 
-getContractsBatchStates :: [GetContractsBatchStatesRequest]
+postContractsBatchStates :: [PostContractsBatchStatesRequest]
                         -> Bloc [GetContractsStateResponses]
-getContractsBatchStates = traverse flattenRequest
-  where flattenRequest GetContractsBatchStatesRequest{..} =
-          getContractsState getcontractsbatchstatesrequestContractName
-                            getcontractsbatchstatesrequestAddress
-                            getcontractsbatchstatesrequestChainid
-                            getcontractsbatchstatesrequestVarName
-                            getcontractsbatchstatesrequestCount
-                            getcontractsbatchstatesrequestOffset
-                            (fromMaybe False getcontractsbatchstatesrequestLength)
+postContractsBatchStates = traverse flattenRequest
+  where flattenRequest PostContractsBatchStatesRequest{..} =
+          getContractsState postcontractsbatchstatesrequestContractName
+                            postcontractsbatchstatesrequestAddress
+                            postcontractsbatchstatesrequestChainid
+                            postcontractsbatchstatesrequestVarName
+                            postcontractsbatchstatesrequestCount
+                            postcontractsbatchstatesrequestOffset
+                            (fromMaybe False postcontractsbatchstatesrequestLength)
 
 getContractsDetails :: Address -> Maybe ChainId -> Bloc ContractDetails
 getContractsDetails contractAddress chainId = do

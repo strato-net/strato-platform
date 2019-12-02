@@ -52,7 +52,7 @@ type BlocAPI =
   :<|> GetAddresses
   -- /contracts endpoints
   :<|> GetContracts
-  :<|> GetContractsBatchStates
+  :<|> PostContractsBatchStates
   :<|> GetContractsData
   :<|> GetContractsContract
   :<|> GetContractsState

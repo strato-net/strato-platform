@@ -39,7 +39,7 @@ bloc = return gitInfo
   :<|> postUsersContractMethodList
   :<|> getAddresses
   :<|> getContracts
-  :<|> getContractsBatchStates
+  :<|> postContractsBatchStates
   :<|> getContractsData
   :<|> getContractsContract
   :<|> getContractsState

@@ -142,47 +142,47 @@ type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity v
 
 instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 
-data GetContractsBatchStatesRequest = GetContractsBatchStatesRequest
-  { getcontractsbatchstatesrequestContractName :: ContractName
-  , getcontractsbatchstatesrequestAddress      :: MaybeNamed Address
-  , getcontractsbatchstatesrequestChainid      :: Maybe ChainId -- lowercase `i` for camelCase JSON instances
-  , getcontractsbatchstatesrequestVarName      :: Maybe Text
-  , getcontractsbatchstatesrequestCount        :: Maybe Integer
-  , getcontractsbatchstatesrequestOffset       :: Maybe Integer
-  , getcontractsbatchstatesrequestLength       :: Maybe Bool
+data PostContractsBatchStatesRequest = PostContractsBatchStatesRequest
+  { postcontractsbatchstatesrequestContractName :: ContractName
+  , postcontractsbatchstatesrequestAddress      :: MaybeNamed Address
+  , postcontractsbatchstatesrequestChainid      :: Maybe ChainId -- lowercase `i` for camelCase JSON instances
+  , postcontractsbatchstatesrequestVarName      :: Maybe Text
+  , postcontractsbatchstatesrequestCount        :: Maybe Integer
+  , postcontractsbatchstatesrequestOffset       :: Maybe Integer
+  , postcontractsbatchstatesrequestLength       :: Maybe Bool
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary GetContractsBatchStatesRequest where arbitrary = GR.genericArbitrary GR.uniform
+instance Arbitrary PostContractsBatchStatesRequest where arbitrary = GR.genericArbitrary GR.uniform
 
-instance ToJSON GetContractsBatchStatesRequest where
+instance ToJSON PostContractsBatchStatesRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
-instance FromJSON GetContractsBatchStatesRequest where
+instance FromJSON PostContractsBatchStatesRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
-instance ToSample GetContractsBatchStatesRequest where
+instance ToSample PostContractsBatchStatesRequest where
   toSamples _ = noSamples
 
-instance ToSchema GetContractsBatchStatesRequest where
+instance ToSchema PostContractsBatchStatesRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.name ?~ "Get Contracts States"
     & mapped.schema.example ?~ toJSON ex
     where
-      ex :: GetContractsBatchStatesRequest
-      ex = GetContractsBatchStatesRequest
-        { getcontractsbatchstatesrequestContractName = ContractName "MySampleContract"
-        , getcontractsbatchstatesrequestAddress = Unnamed 0xdeadbeef
-        , getcontractsbatchstatesrequestChainid = Nothing
-        , getcontractsbatchstatesrequestVarName = Nothing
-        , getcontractsbatchstatesrequestCount   = Nothing
-        , getcontractsbatchstatesrequestOffset  = Nothing
-        , getcontractsbatchstatesrequestLength  = Nothing
+      ex :: PostContractsBatchStatesRequest
+      ex = PostContractsBatchStatesRequest
+        { postcontractsbatchstatesrequestContractName = ContractName "MySampleContract"
+        , postcontractsbatchstatesrequestAddress = Unnamed 0xdeadbeef
+        , postcontractsbatchstatesrequestChainid = Nothing
+        , postcontractsbatchstatesrequestVarName = Nothing
+        , postcontractsbatchstatesrequestCount   = Nothing
+        , postcontractsbatchstatesrequestOffset  = Nothing
+        , postcontractsbatchstatesrequestLength  = Nothing
         }
 
-type GetContractsBatchStates = "contracts"
+type PostContractsBatchStates = "contracts"
   :> "states"
-  :> ReqBody '[JSON] [GetContractsBatchStatesRequest]
-  :> Get '[JSON] [GetContractsStateResponses]
+  :> ReqBody '[JSON] [PostContractsBatchStatesRequest]
+  :> Post '[JSON] [GetContractsStateResponses]
 
 type GetContractsDetails = "contracts"
   :> "contract"
