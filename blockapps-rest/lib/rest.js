@@ -352,43 +352,46 @@ async function createChain(user, chain, contract, options) {
 // =====================================================================
 
 async function uploadExtStorage(user, args, options) {
-    const result = await api.uploadExtStorage(
-      args,
-      setAuthHeaders(user, options)
-    );
-    return result;
+  const result = await api.uploadExtStorage(
+    args,
+    setAuthHeaders(user, options)
+  );
+  return result;
 }
 
 async function attestExtStorage(user, args, options) {
-    const result = await api.attestExtStorage(
-        args,
-        setAuthHeaders(user, options)
-    );
-    return result;
+  const result = await api.attestExtStorage(
+    args,
+    setAuthHeaders(user, options)
+  );
+  return result;
 }
 
-async function verifyExtStorage(user, args, options) {
-    const result = await api.verifyExtStorage(
-        args,
-        setAuthHeaders(user, options)
-    );
-    return result;
+async function verifyExtStorage(user, contract, options) {
+  const result = await api.verifyExtStorage(
+    user,
+    contract,
+    options
+  );
+  return result;
 }
 
-async function downloadExtStorage(user, args, options) {
-    const result = await api.downloadExtStorage(
-        args,
-        setAuthHeaders(user, options)
-    );
-    return result;
+async function downloadExtStorage(user, contract, options) {
+  const result = await api.downloadExtStorage(
+    user,
+    contract,
+    options
+  );
+  return result;
 }
 
 async function listExtStorage(user, args, options) {
-    const result = await api.listExtStorage(
-        args,
-        setAuthHeaders(user, options)
-    );
-    return result;
+  const result = await api.listExtStorage(
+    user,
+    args,
+    options
+  );
+  return result;
 }
 
 // =====================================================================
