@@ -348,6 +348,50 @@ async function createChain(user, chain, contract, options) {
 }
 
 // =====================================================================
+//   External Storage
+// =====================================================================
+
+async function uploadExtStorage(user, args, options) {
+    const result = await api.uploadExtStorage(
+      args,
+      setAuthHeaders(user, options)
+    );
+    return result;
+}
+
+async function attestExtStorage(user, args, options) {
+    const result = await api.attestExtStorage(
+        args,
+        setAuthHeaders(user, options)
+    );
+    return result;
+}
+
+async function verifyExtStorage(user, args, options) {
+    const result = await api.verifyExtStorage(
+        args,
+        setAuthHeaders(user, options)
+    );
+    return result;
+}
+
+async function downloadExtStorage(user, args, options) {
+    const result = await api.downloadExtStorage(
+        args,
+        setAuthHeaders(user, options)
+    );
+    return result;
+}
+
+async function listExtStorage(user, args, options) {
+    const result = await api.listExtStorage(
+        args,
+        setAuthHeaders(user, options)
+    );
+    return result;
+}
+
+// =====================================================================
 //   OAuth
 // =====================================================================
 
@@ -410,6 +454,12 @@ export default {
   createChain,
   getChain,
   getChains,
+  //
+  uploadExtStorage,
+  attestExtStorage,
+  verifyExtStorage,
+  downloadExtStorage,
+  listExtStorage,
   //
   pingOauth,
   //

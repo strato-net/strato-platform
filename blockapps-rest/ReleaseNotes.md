@@ -1,5 +1,9 @@
 ## RELEASE NOTES
 
+### Version 7.5.6
+
+-   Added external storage endpoints
+
 ### Version 7.5.4
 
 -   Generate source maps in build

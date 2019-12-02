@@ -7,6 +7,7 @@ const blocUrl = "/bloc/v2.2";
 const strato12Url = "/strato-api/eth/v1.2";
 const strato23Url = "/strato/v2.3";
 const cirrusUrl = "/cirrus/search";
+const externalStorageUrl = "/apex-api/bloc/file";
 
 const Endpoint = {
   ACCOUNT: `${strato12Url}/account`,
@@ -18,7 +19,12 @@ const Endpoint = {
   SEND: `${strato23Url}/transaction`,
   KEY: `${strato23Url}/key`,
   SEARCH: `${cirrusUrl}/:name`,
-  CHAIN: `${blocUrl}/chain`
+  CHAIN: `${blocUrl}/chain`,
+  EXT_UPLOAD: `${externalStorageUrl}/upload`,
+  EXT_ATTEST: `${externalStorageUrl}/attest`,
+  EXT_VERIFY: `${externalStorageUrl}/verify`,
+  EXT_DOWNLOAD: `${externalStorageUrl}/download`,
+  EXT_LIST: `${externalStorageUrl}/list`,
 };
 
 function constructEndpoint(endpointTemplate, options = {}, params = {}) {

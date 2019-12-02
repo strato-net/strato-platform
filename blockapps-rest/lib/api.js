@@ -236,6 +236,36 @@ async function createChain(body, options) {
   return await post(url, endpoint, body, options);
 }
 
+async function uploadExtStorage(body, options) {
+    const url = getNodeUrl(options);
+    const endpoint = constructEndpoint(Endpoint.EXT_UPLOAD, options);
+    return await post(url, endpoint, body, options);
+}
+
+async function attestExtStorage(body, options) {
+    const url = getNodeUrl(options);
+    const endpoint = constructEndpoint(Endpoint.EXT_ATTEST, options);
+    return await post(url, endpoint, body, options);
+}
+
+async function verifyExtStorage(user, options) {
+    const url = getNodeUrl(options);
+    const endpoint = constructEndpoint(Endpoint.EXT_VERIFY, options);
+    return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function downloadExtStorage(user, options) {
+    const url = getNodeUrl(options);
+    const endpoint = constructEndpoint(Endpoint.EXT_DOWNLOAD, options);
+    return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function listExtStorage(user, options) {
+    const url = getNodeUrl(options);
+    const endpoint = constructEndpoint(Endpoint.EXT_LIST, options);
+    return get(url, endpoint, setAuthHeaders(user, options));
+}
+
 async function pingOauth(user, options){
   const url = getNodeUrl(options)
   const endpoint = constructEndpoint(Endpoint.KEY, options)
@@ -263,5 +293,10 @@ export default {
   search,
   getChains,
   createChain,
+  uploadExtStorage,
+  attestExtStorage,
+  verifyExtStorage,
+  downloadExtStorage,
+  listExtStorage,
   pingOauth
 }
