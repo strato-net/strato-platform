@@ -99,6 +99,7 @@ setup = do
       , uploadlistcontractArgs = Map.empty
       , _uploadlistcontractTxParams = testTxParams testConfig
       , uploadlistcontractValue = Nothing
+      , _uploadlistcontractChainid = Nothing
       , uploadlistcontractMetadata = Nothing
       }
     uploadListRequest = UploadListRequest

@@ -54,7 +54,7 @@ getStorageInfoR = do
                                               [cid] -> if (T.unpack cid == "main")
                                                            then  [(addrStRef E.^. AddressStateRefChainId) E.==. E.val 0]
                                                            else if (T.unpack cid == "all")
-                                                                    then []
+                                                                    then [E.val True]
                                                                     else [matchChainId cid]
                                               cids -> P.map matchChainId cids
 
