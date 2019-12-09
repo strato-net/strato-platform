@@ -24,6 +24,7 @@ module Blockchain.SolidVM.SetGet (
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
+import           Data.Foldable (for_)
 import           Data.IORef
 import           Data.List
 import qualified Data.Map as M
@@ -216,9 +217,19 @@ getBool p = do
     _ -> typeError "getBool" (p, v)
 
 deleteVar :: Variable -> SM ()
-deleteVar (Constant (SReference (AddressedPath addr path))) = do
-  markDiffForAction addr path $ MS.BDefault
-  putSolidStorageKeyVal' addr path $ MS.BDefault
+deleteVar (Constant (SReference a@(AddressedPath addr path))) = do
+  xType <- getXabiValueType a
+  case xType of
+    Xabi.Array{} -> do
+      let lengthVar = Constant . SReference $ a `apSnoc` MS.Field "length"
+      len <- fromInteger <$> getInt lengthVar
+      deleteVar lengthVar
+      unless (len <= 0) . for_ [0..(len - 1)] $ \i -> do
+        let elemPath = a `apSnoc` MS.ArrayIndex i
+        deleteVar . Constant $ SReference elemPath
+    _ -> do -- TODO: handle other types
+      markDiffForAction addr path $ MS.BDefault
+      putSolidStorageKeyVal' addr path $ MS.BDefault
 
 
 deleteVar _ = error "deleteVar not yet supported for local variables"
