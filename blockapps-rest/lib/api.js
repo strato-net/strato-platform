@@ -73,7 +73,7 @@ async function createContract(user, contract, options) {
 }
 
 async function createContractList(user, contracts, options) {
-  const txs = contracts.map(contract => getCreateArgs(contract, options);
+  const txs = contracts.map(contract => getCreateArgs(contract, options));
   const body = {
     txs
   };
@@ -160,7 +160,7 @@ async function call(user, callMethodArgs, options) {
 }
 
 async function callList(user, callListArgs, options) {
-  const txs = callListArgs.map(callArgs => getCallArgs(callArgs, options))
+  const txs = callListArgs.map(callArgs => getCallArgs(callArgs, options));
   const body = {
     txs
   };
