@@ -142,6 +142,48 @@ type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity v
 
 instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 
+data PostContractsBatchStatesRequest = PostContractsBatchStatesRequest
+  { postcontractsbatchstatesrequestContractName :: ContractName
+  , postcontractsbatchstatesrequestAddress      :: MaybeNamed Address
+  , postcontractsbatchstatesrequestChainid      :: Maybe ChainId -- lowercase `i` for camelCase JSON instances
+  , postcontractsbatchstatesrequestVarName      :: Maybe Text
+  , postcontractsbatchstatesrequestCount        :: Maybe Integer
+  , postcontractsbatchstatesrequestOffset       :: Maybe Integer
+  , postcontractsbatchstatesrequestLength       :: Maybe Bool
+  } deriving (Eq,Show,Generic)
+
+instance Arbitrary PostContractsBatchStatesRequest where arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToJSON PostContractsBatchStatesRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON PostContractsBatchStatesRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToSample PostContractsBatchStatesRequest where
+  toSamples _ = noSamples
+
+instance ToSchema PostContractsBatchStatesRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Get Contracts States"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostContractsBatchStatesRequest
+      ex = PostContractsBatchStatesRequest
+        { postcontractsbatchstatesrequestContractName = ContractName "MySampleContract"
+        , postcontractsbatchstatesrequestAddress = Unnamed 0xdeadbeef
+        , postcontractsbatchstatesrequestChainid = Nothing
+        , postcontractsbatchstatesrequestVarName = Nothing
+        , postcontractsbatchstatesrequestCount   = Nothing
+        , postcontractsbatchstatesrequestOffset  = Nothing
+        , postcontractsbatchstatesrequestLength  = Nothing
+        }
+
+type PostContractsBatchStates = "contracts"
+  :> "states"
+  :> ReqBody '[JSON] [PostContractsBatchStatesRequest]
+  :> Post '[JSON] [GetContractsStateResponses]
+
 type GetContractsDetails = "contracts"
   :> "contract"
   :> Capture "contractAddress" Address

@@ -338,6 +338,15 @@ spec = do
       runFile "testdata/Delete.sol"
       getFields ["x"] `shouldReturn` [BDefault]
 
+    it "can delete arrays" . runTest $ do
+      runFile "testdata/DeleteArray.sol"
+      getAll
+        [ [Field "x", Field "length"]
+        , [Field "x", ArrayIndex 0]
+        , [Field "x", ArrayIndex 1]
+        , [Field "x", ArrayIndex 2]
+        ] `shouldReturn` replicate 4 BDefault
+
     it "can run complicated constructors" . runTest $ do
       runFile "testdata/Constructor.sol"
 

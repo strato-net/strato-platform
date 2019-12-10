@@ -60,7 +60,7 @@ spec = do
       let
         Right result1 = postUsersFillEither1
         Right result2 = postUsersFillEither2
-      eResult1 <- runClientM (getBlocTransactionResult (blocTransactionHash result1) Nothing True) (ClientEnv mgr blocUrl Nothing)
+      eResult1 <- runClientM (getBlocTransactionResult (blocTransactionHash result1) True) (ClientEnv mgr blocUrl Nothing)
       eResult1 `shouldSatisfy` isRight
       let
         Right resolved1 = eResult1
@@ -120,6 +120,7 @@ spec = do
             , uploadlistcontractArgs = Map.empty
             , _uploadlistcontractTxParams = testTxParams
             , uploadlistcontractValue = Nothing
+            , _uploadlistcontractChainid = Nothing
             , uploadlistcontractMetadata = Nothing
             }
           ]
@@ -164,6 +165,7 @@ spec = do
               { sendtransactionToAddress = toUserAddress
               , sendtransactionValue = Strung 100
               , _sendtransactionTxParams = testTxParams
+              , _sendtransactionChainid = Nothing
               , sendtransactionMetadata = Nothing
               }
           }
@@ -190,6 +192,7 @@ spec = do
               , methodcallArgs = Map.empty
               , methodcallValue = Strung 0
               , _methodcallTxParams = testTxParams
+              , _methodcallChainid = Nothing
               , methodcallMetadata = Nothing
               }
           }
