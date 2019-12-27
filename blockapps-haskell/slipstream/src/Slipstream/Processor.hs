@@ -248,7 +248,7 @@ getSolidVMDetailsForRow g row = runMaybeT
         checkCache = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking contractABIs cache for contract details"
 
-          mDetails <- getContractABIs g codePtr
+          mDetails <- runMaybeT $ getContractABIs g codePtr
           case mDetails of 
             Nothing -> return Nothing
             Just detailsMap -> return $ Map.lookup (T.pack name) detailsMap
@@ -303,11 +303,8 @@ adjustGlobals gref shouldCompile row details = do
   
   -- if we pass Don't Compile, we assume it's SolidVMCode, and use details from cache
   detailsMap <- case shouldCompile of
-    Do Compile -> do 
-      $logInfoS "adjustGlobals" . T.pack $ "compiling from source"
-      sourceToContractDetails shouldCompile $ contractdetailsSrc details
+    Do Compile -> sourceToContractDetails shouldCompile $ contractdetailsSrc details
     Don't Compile -> do 
-      $logInfoS "adjustGlobals" . T.pack $ "reading from svmABIs"
       mMap <- getContractABIs gref (actionCodeHash row)
       case mMap of
         Nothing -> error "solidVMABIs should be in the cache, but adjustGlobals didn't find them"
