@@ -32,7 +32,8 @@ import qualified Data.ByteString.Short as SB
 -- import qualified Data.ByteString.Char8 as C8
 import Data.Either (lefts, rights)
 import Data.Function
-import Data.Foldable
+--import Data.Foldable
+--import Data.Traversable
 import Data.Int (Int32)
 import Data.IORef
 import Data.List (foldl', sortOn)
@@ -232,34 +233,57 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
+
+
 -- Tries to get contract metadata ID and contract details for a given codehash.
 --  If they're not in the cache but they are in bloc database or action metadata,
 --  it adds them to cache
-getDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
-getDetailsForRow g row = runMaybeT $ checkCache <|> checkBloc <|> checkMetadata
-  where checkCache = do
+-- TODO: (Dan)...this could be monadically prettier...when time allows, come back. 
+getSolidVMDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
+getSolidVMDetailsForRow g row = runMaybeT  
+   $  MaybeT checkCache 
+  <|> MaybeT checkBloc 
+  <|> MaybeT checkMetadata
+  where checkCache :: Bloc (Maybe (Int32, ContractDetails))
+        checkCache = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking contractABIs cache for contract details"
-          MaybeT $ getContractABIs g codePtr
-        checkBloc = MaybeT $ do
+
+          mDetails <- getContractABIs g codePtr
+          case mDetails of 
+            Nothing -> return Nothing
+            Just detailsMap -> return $ Map.lookup (T.pack name) detailsMap
+        checkBloc :: Bloc (Maybe (Int32, ContractDetails)) 
+        checkBloc = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
           mDetails <- getContractDetailsByCodeHash codePtr
-          for_ mDetails $ setContractABIs g codePtr
-          return mDetails
-        checkMetadata = do
+          case mDetails of 
+            Nothing -> return Nothing
+            Just (_,details) -> do
+              detailsMap <- sourceToContractDetails (Don't Compile) (contractdetailsSrc details)
+              setContractABIs g codePtr detailsMap
+              return $ Map.lookup (T.pack name) detailsMap 
+        checkMetadata :: Bloc (Maybe (Int32, ContractDetails))
+        checkMetadata = runMaybeT $ do
           $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
           let md = actionMetadata row
           src <- lookupT "src" md
-          detailsTup <- case codePtr of
-            EVMCode _ -> do
-              detailsMap <- lift $ sourceToContractDetails (Do Compile) src
-              name <- lookupT "name" md
-              lookupT name detailsMap
-            SolidVMCode name _ -> do
-              detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
-              lookupT (T.pack name) detailsMap
-          setContractABIs g codePtr detailsTup
-          MaybeT $ return $ Just detailsTup
-        codePtr = actionCodeHash row 
+          detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
+          setContractABIs g codePtr detailsMap
+          lookupT (T.pack name) detailsMap
+        codePtr@(SolidVMCode name _) = actionCodeHash row
+
+
+-- Yes, I hate that we aren't caching for EVM...we briefly did, but because we want adjustGlobals to use cache and not recompile where possible, we need the cache to link all contracts that share a source, and at the moment, we can only do this with SolidVMCode pointers. Too bad. EVM is "softly deprecated", so we are optimizing for SolidVM 
+getEVMDetailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
+getEVMDetailsForRow row = liftM2 (<|>)
+  (getContractDetailsByCodeHash $ actionCodeHash row)
+  (runMaybeT $ do
+    let md = actionMetadata row
+    src <- lookupT "src" md
+    name <- lookupT "name" md
+    detailsMap <- lift $ sourceToContractDetails (Do Compile) src
+    lookupT name detailsMap)
+
 
 adjustGlobals :: IORef Globals
               -> Should Compile
@@ -276,8 +300,19 @@ adjustGlobals gref shouldCompile row details = do
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
           lift $ f gref codePtr
 
-  -- won't actually recompile the contract
-  detailsMap <- sourceToContractDetails shouldCompile $ contractdetailsSrc details
+  
+  -- if we pass Don't Compile, we assume it's SolidVMCode, and use details from cache
+  detailsMap <- case shouldCompile of
+    Do Compile -> do 
+      $logInfoS "adjustGlobals" . T.pack $ "compiling from source"
+      sourceToContractDetails shouldCompile $ contractdetailsSrc details
+    Don't Compile -> do 
+      $logInfoS "adjustGlobals" . T.pack $ "reading from svmABIs"
+      mMap <- getContractABIs gref (actionCodeHash row)
+      case mMap of
+        Nothing -> error "solidVMABIs should be in the cache, but adjustGlobals didn't find them"
+        Just dMap -> return dMap
+  
   mapM_ (go detailsMap) $ [("history", addToHistoryList)
                           ,("nohistory", removeFromHistoryList)
                           ,("noindex", addToNoIndexList)
@@ -286,14 +321,16 @@ adjustGlobals gref shouldCompile row details = do
                           ,("nofunctionhistory", removeFromFunctionHistoryList)
                           ]
 
-ensureContractInstance :: Int32 -> AggregateAction -> Bloc ()
-ensureContractInstance cmId row = do
+ensureContractInstance :: IORef Globals -> Int32 -> AggregateAction -> Bloc ()
+ensureContractInstance g cmId row = do
   let addr = actionAddress row
       chainId = actionTxChainId row
-  (mInstance :: Maybe Int32) <- fmap listToMaybe . blocQuery $
-    contractInstancesByCodeHash (actionCodeHash row) addr chainId
-  when (isNothing mInstance) . void $
-    insertContractInstance cmId addr chainId
+      codePtr = actionCodeHash row
+  instExists <- isInstanceCreated g codePtr
+  if instExists then
+    return ()
+  else
+    insertContractInstance cmId addr chainId >> setInstanceCreated g codePtr
 
 readPreviousEVMState :: IORef Globals -> Address -> Maybe ChainId -> Contract -> Bloc [(Text, Value)]
 readPreviousEVMState gref addr chainId cont = do
@@ -393,7 +430,7 @@ processTheMessages env conn g messages = do
 
       case actionStorage row of
         BS.ActionEVMDiff{} -> do
-          mDetails <- getDetailsForRow g row
+          mDetails <- getEVMDetailsForRow row
           case mDetails of
             Nothing -> pure . Left $ "No details found for code hash "
                             <> (T.pack . show $ actionCodeHash row)
@@ -407,14 +444,14 @@ processTheMessages env conn g messages = do
                   cont = either error id . xAbiToContract $ contractdetailsXabi details
               adjustGlobals g (Do Compile) row details
 
-              ensureContractInstance cmId row
+              ensureContractInstance g cmId row
 
               oldState <- readPreviousEVMState g addr chainId cont
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs []
         BS.ActionSolidVMDiff{} -> do
-          mName <- getDetailsForRow g row
+          mName <- getSolidVMDetailsForRow g row
           case mName of
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
@@ -425,7 +462,7 @@ processTheMessages env conn g messages = do
                   abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
                   cont = error "internal error: contract should be unused for solidvm"
 
-              ensureContractInstance cmId row
+              ensureContractInstance g cmId row
           
               adjustGlobals g (Don't Compile) row details
               oldState <- readPreviousSolidVMState g addr chainId

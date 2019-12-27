@@ -22,6 +22,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Cache.LRU              as LRU
 import           Data.Either.Extra
 import qualified Data.HashMap.Strict         as HM
+import qualified Data.Map.Strict              as M
 import           Data.Int                    (Int32)
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
@@ -37,7 +38,7 @@ import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
 newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
+newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -50,15 +51,18 @@ xabiToText = T.replace "\'" "\'\'"
            . decodeUtf8 . BL.toStrict
            . JSON.encode
 
-setContractABIs :: MonadIO m => IORef Globals -> CodePtr -> (Int32, ContractDetails) -> m ()
-setContractABIs gref codePtr detailsTup = do
+setContractABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text (Int32, ContractDetails) -> m ()
+setContractABIs gref (SolidVMCode _ !codeHash) detailsMap = do 
   globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{contractABIs=HM.insert codePtr detailsTup contractABIs}
+  updateGlobals gref globals{contractABIs=HM.insert codeHash detailsMap contractABIs}
+setContractABIs _ (EVMCode _) _ = error "cannot use the contractABIs cache for EVM contracts"
 
-getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (Int32, ContractDetails))
-getContractABIs gref codePtr = do
+
+getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text (Int32, ContractDetails)))
+getContractABIs gref (SolidVMCode _ !codeHash) = do
   abis <- contractABIs <$> readIORef gref
-  return $ HM.lookup codePtr abis 
+  return $ HM.lookup codeHash abis
+getContractABIs _ (EVMCode _) = error "cannot use the contractABIs cache for EVM contracts"
 
 setContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
 setContractCreated globalsIORef codeHash = do
@@ -69,6 +73,18 @@ isContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m Bool
 isContractCreated globalsIORef codeHash = do
   Globals{..} <- readIORef globalsIORef
   return $ codeHash `Set.member` createdContracts
+
+-- Hopefully temporary, just to remove extra calls to bloc in ensureContractInstance
+setInstanceCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
+setInstanceCreated globalsIORef codeHash = do
+  globals@Globals{..} <- readIORef globalsIORef
+  updateGlobals globalsIORef globals{createdInstances=Set.insert codeHash createdInstances}
+
+isInstanceCreated :: MonadIO m => IORef Globals -> CodePtr -> m Bool
+isInstanceCreated globalsIORef codeHash = do
+  Globals{..} <- readIORef globalsIORef
+  return $ codeHash `Set.member` createdInstances
+
 
 setEventCreated :: MonadIO m => IORef Globals -> (Text, Text) -> m ()
 setEventCreated globalsIORef evTup = do
