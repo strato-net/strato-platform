@@ -58,7 +58,7 @@ getContracts chainId = blocTransaction $ do
       Map.empty
   contractsAddresses <- blocQuery $ getContractsAddressesQuery chainId
   contractsNamesAsAddresses <- blocQuery $ getContractsNamesAsAddressesQuery chainId
-  return . GetContractsResponse $
+  return . GetContractsResponse $ Map.take 50 $
     addressesToMap contractsAddresses
     `Map.union`
     namesToMap contractsNamesAsAddresses
