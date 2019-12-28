@@ -84,7 +84,7 @@ module.exports = {
 
       const currentTime = Date.now();
 
-      const [healthInfo, stallInfo] = await getLatestHealth();
+      const [healthInfo, stallInfo, _ignored_systemInfo] = await getLatestHealth();
 
       if (healthInfo && stallInfo) {
         healthStatus = healthInfo.latestHealthStatus;
@@ -115,49 +115,51 @@ module.exports = {
 };
 
 async function getLatestHealth() {
+  const [healthInfo, stallInfo, systemInfo] = await Promise.all([
+      
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "HealthStat"
+      },
+      attributes: [
+        'latestHealthStatus',
+        'latestCheckTimestamp',
+        'lastFailureTimestamp',
+        'additionalInfo'
+      ],
+      raw:true,
+    }),
 
-  const healthInfo = await models.CurrentHealth.findOne({
-    where: {
-      processName: "HealthStat"
-    },
-    attributes: [
-      'latestHealthStatus',
-      'latestCheckTimestamp',
-      'lastFailureTimestamp',
-      'additionalInfo'
-    ],
-    raw:true,
-  }).catch(err => next(err));
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "StallStat"
+      },
+      attributes: [
+        'latestHealthStatus',
+        'latestCheckTimestamp',
+        'lastFailureTimestamp',
+        'isBlocksValidInc',
+        'isLastPending'
+      ],
+      raw: true,
+    }),
 
-  const stallInfo = await models.CurrentHealth.findOne({
-    where: {
-      processName: "StallStat"
-    },
-    attributes: [
-      'latestHealthStatus',
-      'latestCheckTimestamp',
-      'lastFailureTimestamp',
-      'isBlocksValidInc',
-      'isLastPending'
-    ],
-
-    raw: true,
-  }).catch(err => next(err));
-
-  const systemInfo = await models.CurrentHealth.findOne({
-    where: {
-      processName: "SystemInfoStat"
-    },
-    attributes: [
-      'latestHealthStatus',
-      'latestCheckTimestamp',
-      'lastFailureTimestamp',
-      'isBlocksValidInc',
-      'isLastPending',
-      'additionalInfo'
-    ],
-    raw:true,
-  }).catch(err => next(err));
-
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "SystemInfoStat"
+      },
+      attributes: [
+        'latestHealthStatus',
+        'latestCheckTimestamp',
+        'lastFailureTimestamp',
+        'isBlocksValidInc',
+        'isLastPending',
+        'additionalInfo'
+      ],
+      raw:true,
+    }),
+    
+  ])
+  
   return [healthInfo, stallInfo, systemInfo]
 }
