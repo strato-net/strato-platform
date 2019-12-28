@@ -235,45 +235,40 @@ lookupT k = MaybeT . return . Map.lookup k
 
 
 
--- Tries to get contract metadata ID and contract details for a given codehash.
+-- Tries to get contract metadata ID and contract details for a given contract.
 --  If they're not in the cache but they are in bloc database or action metadata,
---  it adds them to cache
--- TODO: (Dan)...this could be monadically prettier...when time allows, come back. 
+--  it reparses the whole source blob, and caches them for every contract
 getSolidVMDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 getSolidVMDetailsForRow g row = runMaybeT  
-   $  MaybeT checkCache 
-  <|> MaybeT checkBloc 
-  <|> MaybeT checkMetadata
-  where checkCache :: Bloc (Maybe (Int32, ContractDetails))
-        checkCache = do
-          $logInfoS "getDetailsForRow" . T.pack $ "checking contractABIs cache for contract details"
-
-          mDetails <- runMaybeT $ getContractABIs g codePtr
-          case mDetails of 
-            Nothing -> return Nothing
-            Just detailsMap -> return $ Map.lookup (T.pack name) detailsMap
-        checkBloc :: Bloc (Maybe (Int32, ContractDetails)) 
+   $  checkCache 
+  <|> checkBloc 
+  <|> checkMetadata
+  
+  where checkCache = do
+          $logInfoS "getDetailsForRow" . T.pack $ "checking cache for contract details"
+          (MaybeT $ getContractABIs g codePtr) >>= (lookupT $ T.pack name)
+        
         checkBloc = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
-          mDetails <- getContractDetailsByCodeHash codePtr
-          case mDetails of 
-            Nothing -> return Nothing
-            Just (_,details) -> do
-              detailsMap <- sourceToContractDetails (Don't Compile) (contractdetailsSrc details)
-              setContractABIs g codePtr detailsMap
-              return $ Map.lookup (T.pack name) detailsMap 
-        checkMetadata :: Bloc (Maybe (Int32, ContractDetails))
-        checkMetadata = runMaybeT $ do
+          (MaybeT $ getContractDetailsByCodeHash codePtr) >>= (parseAndSet . contractdetailsSrc . snd)
+        
+        checkMetadata = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
-          let md = actionMetadata row
-          src <- lookupT "src" md
+          (lookupT "src" $ actionMetadata row) >>= parseAndSet
+        
+
+        -- parse source code, add all of the contract's details to cache, return the one we need
+        parseAndSet :: Text -> MaybeT Bloc (Int32, ContractDetails)
+        parseAndSet src = do
           detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
           setContractABIs g codePtr detailsMap
           lookupT (T.pack name) detailsMap
+          
         codePtr@(SolidVMCode name _) = actionCodeHash row
 
 
--- Yes, I hate that we aren't caching for EVM...we briefly did, but because we want adjustGlobals to use cache and not recompile where possible, we need the cache to link all contracts that share a source, and at the moment, we can only do this with SolidVMCode pointers. Too bad. EVM is "softly deprecated", so we are optimizing for SolidVM 
+
+-- For now, EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
 getEVMDetailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 getEVMDetailsForRow row = liftM2 (<|>)
   (getContractDetailsByCodeHash $ actionCodeHash row)
@@ -285,6 +280,8 @@ getEVMDetailsForRow row = liftM2 (<|>)
     lookupT name detailsMap)
 
 
+
+-- we want adjustGlobals to use cache and not recompile where possible, so we need the cache to link all contracts that share a source, and at the moment, we can only do this with SolidVMCode pointers
 adjustGlobals :: IORef Globals
               -> Should Compile
               -> AggregateAction
