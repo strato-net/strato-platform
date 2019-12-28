@@ -237,7 +237,7 @@ lookupT k = MaybeT . return . Map.lookup k
 
 -- Tries to get contract metadata ID and contract details for a given contract.
 --  If they're not in the cache but they are in bloc database or action metadata,
---  it reparses the whole source blob, and caches them for every contract
+--  it reparses the whole source blob, and caches the details for every contract
 getSolidVMDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 getSolidVMDetailsForRow g row = runMaybeT  
    $  checkCache 
@@ -257,7 +257,7 @@ getSolidVMDetailsForRow g row = runMaybeT
           (lookupT "src" $ actionMetadata row) >>= parseAndSet
         
 
-        -- parse source code, add all of the contract's details to cache, return the one we need
+        -- parse source code, add all of details to cache, return the one we need
         parseAndSet :: Text -> MaybeT Bloc (Int32, ContractDetails)
         parseAndSet src = do
           detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
