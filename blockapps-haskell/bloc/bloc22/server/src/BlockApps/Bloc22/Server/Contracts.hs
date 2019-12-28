@@ -128,7 +128,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   storage' <- case mName of
     Nothing -> blocStrato $ getStorage
       storageFilterParams{ qsAddress = Just address
-                         , qsChainId = chainId
+                         , qsChainId = maybeToList chainId
                          }
     Just name ->
       let ranges = decodeStorageKey
@@ -173,8 +173,20 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
         storageFilterParams{ qsAddress = Just a
                            , qsMinKey = Just . fromInteger $ toInteger o
                            , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
-                           , qsChainId = chainId
+                           , qsChainId = maybeToList chainId
                            }
+
+postContractsBatchStates :: [PostContractsBatchStatesRequest]
+                        -> Bloc [GetContractsStateResponses]
+postContractsBatchStates = traverse flattenRequest
+  where flattenRequest PostContractsBatchStatesRequest{..} =
+          getContractsState postcontractsbatchstatesrequestContractName
+                            postcontractsbatchstatesrequestAddress
+                            postcontractsbatchstatesrequestChainid
+                            postcontractsbatchstatesrequestVarName
+                            postcontractsbatchstatesrequestCount
+                            postcontractsbatchstatesrequestOffset
+                            (fromMaybe False postcontractsbatchstatesrequestLength)
 
 getContractsDetails :: Address -> Maybe ChainId -> Bloc ContractDetails
 getContractsDetails contractAddress chainId = do
@@ -286,15 +298,17 @@ postContractsCompile :: [PostCompileRequest] -> Bloc [PostCompileResponse]
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
-      idsAndDetails <- sourceToContractDetails True postcompilerequestSource
+      idsAndDetails <- sourceToContractDetails (Do Compile) postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of
           Left msg -> throwError $
             AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
-          Right _ ->
-            return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
-        --return $ PostCompileResponse (contractdetailsName details) (contractdetailsCodeHash details)
+          Right _ -> do
+            let ptr = contractdetailsCodeHash details
+            case ptr of
+              EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) (shaKeccak256 hsh)
+              _ -> throwError $ AnError (Text.pack "Somebody called contracts/compile on SolidVM Code, but it only works on EVM Code")
 
 postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =

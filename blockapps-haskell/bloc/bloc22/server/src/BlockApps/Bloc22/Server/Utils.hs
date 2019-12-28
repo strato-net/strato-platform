@@ -5,9 +5,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 module BlockApps.Bloc22.Server.Utils
-  ( getBatchBlocTxStatus
-  , accumStateT
+  ( toMaybe
+  , getBatchBlocTxStatus
   , partitionWith
+  , indexedPartitionWith
+  , mergePartitions
+  , mergeSortedLists
+  , mergeSortedListsWith
   , binRuntimeToCodeHash
   , emptyTxParams
   , waitFor
@@ -17,10 +21,8 @@ import           Control.Concurrent               (threadDelay)
 import           Control.Monad                    (forM, unless, when)
 import           Control.Monad.Except             (throwError)
 import           Control.Monad.IO.Class           (liftIO)
-import           Control.Monad.Trans.State.Strict
 import qualified Data.ByteString.Base16           as BS16
-import           Data.Functor.Identity
-import qualified Data.Map.Strict                  as Map
+import qualified Data.Map.Strict                  as M
 import           Data.Maybe
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -32,18 +34,21 @@ import           BlockApps.Ethereum         hiding (Transaction (..))
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
-maybeTxBatchResult :: Maybe ChainId -> [Keccak256] -> Bloc [Maybe TransactionResult]
-maybeTxBatchResult chainId hashes = maybeHeads <$> (blocStrato (postTxResultBatch chainId hashes))
+toMaybe :: Eq a => a -> a -> Maybe a
+toMaybe a b = if a == b then Nothing else Just b
+
+maybeTxBatchResult :: [Keccak256] -> Bloc [Maybe TransactionResult]
+maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (postTxResultBatch hashes))
   where maybeHeads btxr =
-          let list = map (flip Map.lookup $ unBatchTransactionResult btxr) hashes
+          let list = map (flip M.lookup $ unBatchTransactionResult btxr) hashes
           in flip map list $ \mtrs -> case mtrs of
             Nothing -> Nothing
             Just trs -> listToMaybe trs
 
 
-getBatchBlocTxStatus :: Maybe ChainId -> [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe TransactionResult)]
-getBatchBlocTxStatus chainId hashes = do
-  mtxrs <- maybeTxBatchResult chainId hashes
+getBatchBlocTxStatus :: [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe TransactionResult)]
+getBatchBlocTxStatus hashes = do
+  mtxrs <- maybeTxBatchResult hashes
   forM mtxrs $ \mtxr ->
     case mtxr of
       Nothing -> return (Pending, mtxr)
@@ -58,15 +63,28 @@ emptyTxParams = TxParams Nothing Nothing Nothing
 binRuntimeToCodeHash :: Text.Text -> Keccak256
 binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
 
-accumStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
-accumStateT s as f = evalStateT (mapM f as) s
-
-buildStateT :: Monad m => s -> [a] -> (a -> StateT s m ()) -> m s
-buildStateT s as f = execStateT (mapM_ f as) s
-
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
-partitionWith f as = Map.toList . fmap reverse . runIdentity . buildStateT Map.empty as $ \a ->
-  modify $ Map.alter (Just . (a:) . fromMaybe []) (f a)
+partitionWith f = map (fmap (map snd)) . indexedPartitionWith f
+
+indexedPartitionWith :: Ord k => (a -> k) -> [a] -> [(k, [(Int, a)])]
+indexedPartitionWith f = M.toList . foldr (uncurry builder) M.empty . zip [0..]
+  where builder i a = M.alter (Just . ((i,a):) . fromMaybe []) (f a)
+
+mergePartitions :: Ord k => [(b, [(k, a)])] -> [a]
+mergePartitions = map snd . mergeSortedListsWith fst . map snd
+
+mergeSortedLists :: Ord a => [[a]] -> [a]
+mergeSortedLists = mergeSortedListsWith id
+
+mergeSortedListsWith :: Ord k => (a -> k) -> [[a]] -> [a]
+mergeSortedListsWith _ []         = []
+mergeSortedListsWith _ [as]       = as
+mergeSortedListsWith f (a1:a2:as) = mergeSortedListsWith f ((merge a1 a2):as)
+  where merge [] ys = ys
+        merge xs [] = xs
+        merge (x:xs) (y:ys) = if f x <= f y
+                                then x:merge xs (y:ys)
+                                else y:merge (x:xs) ys
 
 waitFor :: Text.Text -> Bloc Bool -> Bloc ()
 waitFor msg action = go 20

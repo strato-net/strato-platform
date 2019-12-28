@@ -1,6 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module BlockApps.Bloc22.Database.Migration
   ( runBlocMigrations
@@ -8,7 +10,10 @@ module BlockApps.Bloc22.Database.Migration
 
 import           Control.Exception                            (catch)
 import           Control.Monad
+import           Data.Foldable                                (for_)
 import           Data.Maybe
+import           Data.RLP
+import qualified Data.Text                                    as T
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Simple.SqlQQ
 
@@ -16,6 +21,8 @@ import           BlockApps.Bloc22.Database.Create
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Queries.Deprecated
 import           BlockApps.Bloc22.Monad
+import           BlockApps.Ethereum
+import           BlockApps.Logging
 
 data Migration = MigrationAction (Bloc ())
                | MigrationQuery (MigrationErrorBehavior, Query)
@@ -28,34 +35,41 @@ runBlocMigrations = do
     (query_ conn getSchemaVersion :: IO [Only Int])
     ((return . const []) :: (SqlError -> IO [Only Int]))
   let dbSchemaVersion = maybe 0 fromOnly $ listToMaybe dbsvs
-  forM_ (drop dbSchemaVersion migrations) $ \case
-    MigrationAction action -> action
-    MigrationQuery (meb,q) -> void . blocModify $ \conn -> do
-      case meb of
-        Catch -> catch
-          (execute_ conn q)
-          (\e@SqlError{..} -> putStrLn "Error suppressed: " >> print e >> return 0)
-        Throw -> execute_ conn q
+  $logInfoS "runBlocMigrations" . T.pack $ "dbSchemaVersion: " ++ show dbSchemaVersion
+  forM_ (drop dbSchemaVersion migrations) $ \(name, migration) -> case migration of
+    MigrationAction action -> do
+      $logInfoS "runBlocMigrations" . T.pack $ "Running MigrationAction: " ++ name
+      action
+    MigrationQuery (meb,q) -> do
+      $logInfoS "runBlocMigrations" . T.pack $ "Running MigrationQuery: " ++ name
+      void . blocModify $ \conn -> do
+        case meb of
+          Catch -> catch
+            (execute_ conn q)
+            (\e@SqlError{..} -> putStrLn "Error suppressed: " >> print e >> return 0)
+          Throw -> execute_ conn q
   updateMigrationNumber
 
 updateMigrationNumber :: Bloc ()
 updateMigrationNumber = void . blocModify $ \conn -> execute conn updateSchemaVersion (Only $ length migrations)
 
-migrations :: [Migration]
-migrations = [ MigrationQuery (Throw, createTables)
-             , MigrationQuery (Throw, insertSchemaVersion)
-             , MigrationQuery (Throw, dropHashNameTable)
-             , MigrationQuery (Throw, hashNameTable)
-             , MigrationQuery (Throw, addConstantColumn)
-             , MigrationQuery (Throw, addValueColumn)
-             , MigrationQuery (Throw, addMutabilityColumn)
-             , MigrationQuery (Throw, addChainIdColumn)
-             , MigrationQuery (Throw, contractsSourceTable)
-             , MigrationQuery (Throw, addSrcHashColumn)
-             , MigrationQuery (Throw, alterValueColumn)
-             , MigrationQuery (Throw, addXabiColumn)
-             , MigrationAction migrateXabi
-             , MigrationQuery (Throw, dropXabiTables)
+migrations :: [(String, Migration)]
+migrations = [ ("Create tables"               , MigrationQuery (Throw, createTables))
+             , ("Insert schema version"       , MigrationQuery (Throw, insertSchemaVersion))
+             , ("Drop hash name table"        , MigrationQuery (Throw, dropHashNameTable))
+             , ("Hash name table"             , MigrationQuery (Throw, hashNameTable))
+             , ("Add constant column"         , MigrationQuery (Throw, addConstantColumn))
+             , ("Add value column"            , MigrationQuery (Throw, addValueColumn))
+             , ("Add mutability column"       , MigrationQuery (Throw, addMutabilityColumn))
+             , ("Add Chain ID column"         , MigrationQuery (Throw, addChainIdColumn))
+             , ("Contracts source table"      , MigrationQuery (Throw, contractsSourceTable))
+             , ("Add source hash column"      , MigrationQuery (Throw, addSrcHashColumn))
+             , ("Alter value column"          , MigrationQuery (Throw, alterValueColumn))
+             , ("Add Xabi column"             , MigrationQuery (Throw, addXabiColumn))
+             , ("Migrate Xabi"                , MigrationAction migrateXabi)
+             , ("Drop Xabi Tables"            , MigrationQuery (Throw, dropXabiTables))
+             , ("Migrate code hash to CodePtr", MigrationAction migrateCodeHashToCodePtr)
+             , ("Alter hash name data column" , MigrationQuery (Throw, alterDataColumn))
              ]
 
 getSchemaVersion :: Query
@@ -115,3 +129,27 @@ dropXabiTables = [sql| DROP TABLE IF EXISTS contracts_lookup;
                        DROP TABLE IF EXISTS xabi_types;
                        DROP TABLE IF EXISTS xabi_type_defs;
                      |]
+
+migrateCodeHashToCodePtr :: Bloc ()
+migrateCodeHashToCodePtr = do
+  let idQuery = [sql| SELECT id,code_hash FROM contracts_metadata; |]
+      xabiQuery = [sql| UPDATE contracts_metadata
+                           SET code_hash = tup.x
+                          FROM (VALUES (?,?::bytea)) as tup(i,x)
+                         WHERE id = tup.i;
+                      |]
+  idsAndCodeHashes <- blocModify $ flip query_ idQuery
+  $logInfoS "migrateCodeHashToCodePtr" "Migrating code hashes to CodePtrs"
+  forM_ idsAndCodeHashes $ \(i :: Integer, bs) ->
+    for_ (byteStringKeccak256 bs) $ \kecc -> do
+      let codePtrBS = Binary . rlpSerialize . EVMCode $ keccak256SHA kecc
+      $logInfoS "migrateCodeHashToCodePtr" . T.pack $ concat
+        [ "Processing ID "
+        , show i
+        , ": "
+        , show codePtrBS
+        ]
+      void . blocModify $ \conn -> execute conn xabiQuery (i, codePtrBS)
+
+alterDataColumn :: Query
+alterDataColumn = [sql| ALTER TABLE IF EXISTS hash_name ALTER COLUMN data_string TYPE text; |]

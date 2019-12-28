@@ -39,6 +39,7 @@ import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
+
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
@@ -109,7 +110,7 @@ instance ToSample BlocTransactionData where
         contractdetailsBin        = "Contract Bin"
       , contractdetailsAddress    = Just (Named "Latest")
       , contractdetailsBinRuntime = "Contract Bin Runtime"
-      , contractdetailsCodeHash   = keccak256 "Contract Code Hash"
+      , contractdetailsCodeHash   = EVMCode $ keccak256SHA $ keccak256 "Contract Code Hash"
       , contractdetailsName       = "Example"
       , contractdetailsSrc        = "contract Example { }"
       , contractdetailsXabi       = sampleXabi
@@ -167,13 +168,11 @@ instance ToSchema BlocTransactionResult where
 type GetBlocTransactionResult = "transactions"
   :> Capture "hash" Keccak256
   :> "result"
-  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> Get '[JSON] BlocTransactionResult
 
 type PostBlocTransactionResults = "transactions"
   :> "results"
-  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] [Keccak256]
   :> Post '[JSON] [BlocTransactionResult]
@@ -432,6 +431,7 @@ instance ToSchema UploadListRequest where
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , _uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
+        , _uploadlistcontractChainid = Nothing
         , uploadlistcontractMetadata = Nothing
         }
       ex :: UploadListRequest
@@ -442,6 +442,7 @@ data UploadListContract = UploadListContract
   , uploadlistcontractArgs         :: Map Text ArgValue
   , _uploadlistcontractTxParams    :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
+  , _uploadlistcontractChainid     :: Maybe ChainId
   , uploadlistcontractMetadata     :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 makeLenses ''UploadListContract
@@ -465,6 +466,7 @@ instance ToSchema UploadListContract where
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
         , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing
+        , _uploadlistcontractChainid = Nothing
         , uploadlistcontractMetadata = Nothing
         }
 
@@ -646,6 +648,7 @@ instance ToSchema PostSendListRequest where
         , sendtransactionValue = Strung 1000000000000000
         , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
+        , _sendtransactionChainid = Nothing
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
 
@@ -653,6 +656,7 @@ data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue     :: Strung Natural
   , _sendtransactionTxParams :: Maybe TxParams
+  , _sendtransactionChainid  :: Maybe ChainId
   , sendtransactionMetadata  :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 makeLenses ''SendTransaction
@@ -705,6 +709,7 @@ instance ToSchema SendTransaction where
         , sendtransactionValue = Strung 100000000000000
         , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
+        , _sendtransactionChainid = Nothing
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
 
@@ -814,6 +819,7 @@ methodErroredExample =
        , methodcallMethodName = "getHoroscope"
        , methodcallContractAddress = Address 0xdeadbeef
        , methodcallContractName = "HoroscopeApp"
+       , _methodcallChainid = Nothing
        , methodcallMetadata = Nothing
        }
 
@@ -864,6 +870,7 @@ instance ToSchema PostMethodListRequest where
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"
+        , _methodcallChainid = Nothing
         , methodcallMetadata = Nothing
         }
 
@@ -874,6 +881,7 @@ data MethodCall = MethodCall
   , methodcallArgs            :: Map Text ArgValue
   , methodcallValue           :: Strung Natural
   , _methodcallTxParams       :: Maybe TxParams
+  , _methodcallChainid        :: Maybe ChainId
   , methodcallMetadata        :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 makeLenses ''MethodCall
@@ -900,6 +908,7 @@ instance ToSchema MethodCall where
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"
+        , _methodcallChainid = Nothing
         , methodcallMetadata = Nothing
         }
 

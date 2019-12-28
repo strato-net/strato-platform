@@ -20,6 +20,7 @@ import           Control.DeepSeq
 import           Data.Map.Strict         (Map)
 import qualified Data.Map.Strict         as M
 import           Data.Maybe              (fromMaybe,listToMaybe)
+import           Data.Foldable           (toList)
 import           Data.Text               (Text)
 import qualified Data.Text               as T
 import           Data.Time
@@ -27,7 +28,7 @@ import           GHC.Generics
 
 import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
                                                 , CallType(..), CallData(..))
-
+import           Blockchain.Strato.Model.Event
 
 data AggregateAction = AggregateAction
   { actionBlockHash      :: SHA
@@ -43,6 +44,7 @@ data AggregateAction = AggregateAction
   , actionCallData       :: [CallData]
   , actionMetadata       :: Map Text Text
   } deriving (Show, Generic, NFData)
+
 
 flatten :: Action -> [AggregateAction]
 flatten Action{..} = flip map (M.toList _actionData) $
@@ -90,3 +92,23 @@ formatAction AggregateAction{..} = T.concat
   ]
   where tshow :: Show a => a -> Text
         tshow = T.pack . show
+
+
+data AggregateEvent = AggregateEvent
+  { agContractName         :: Text
+  , agContractAddress      :: Address
+  , agEventName            :: Text
+  , agEventArgs            :: [Text]
+  } deriving (Show, Generic, NFData)
+
+
+squash :: Action -> [AggregateEvent]
+squash Action{..} = flip map (toList _actionEvents)
+  (\ev -> AggregateEvent
+    { agContractName          = T.pack $ evContractName ev
+    , agContractAddress       = evContractAddress ev
+    , agEventName             = T.pack $ evName ev
+    , agEventArgs             = map T.pack (evArgs ev)
+    }
+  )
+ 

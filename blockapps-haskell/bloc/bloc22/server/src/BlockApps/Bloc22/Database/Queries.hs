@@ -23,12 +23,14 @@ import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Char8           as Char8
 import           Data.ByteString.Lazy            (fromStrict, toStrict)
+import           Data.Either                     (fromRight)
 import           Data.Int                        (Int32)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
 import           Data.Profunctor
 import           Data.Profunctor.Product.Default
+import           Data.RLP
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
@@ -50,7 +52,11 @@ import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
+
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
+
+data Should a = Don't a | Do a
+data Compile = Compile
 
 {- |
 SELECT address from key_store;
@@ -199,7 +205,7 @@ contractByAddress contractName contractAddress chainId = proc () -> do
   returnA -< contract
 
 contractByCodeHash
-  :: Keccak256
+  :: CodePtr
   -> Query
     ( Column PGBytea
     , Column PGBytea
@@ -235,7 +241,7 @@ contractByMetadataId metadataId = proc () -> do
   returnA -< contract
 
 contractInstancesByCodeHash
-  :: Keccak256
+  :: CodePtr
   -> Address
   -> Maybe ChainId
   -> Query (Column PGInt4)
@@ -466,7 +472,7 @@ getContractsContractByAddressQuery contractName contractAddress chainId =
     returnA -< (bin,binRuntime,codeHash,xcodeHash,name,src,cmId,xabi)
 
 getContractsContractByCodeHashQuery
-  :: Keccak256
+  :: CodePtr
   -> Query
     ( Column PGBytea
     , Column PGBytea
@@ -651,7 +657,7 @@ getContractDetailsAndMetadataId (ContractName contractName) contractId chainId =
             getContractsContractByNameQuery contractName name
           for tuple $ detailsWith (Just (Named name)) chainId
 
-getContractDetailsByCodeHash :: Keccak256 -> Bloc (Maybe (Int32, ContractDetails))
+getContractDetailsByCodeHash :: CodePtr -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeHash codeHash = do
     mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
     for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
@@ -723,7 +729,7 @@ insertContractMetaDataQuery
   :: Int32
   -> Text
   -> Text
-  -> Keccak256
+  -> CodePtr
   -> Keccak256
   -> Keccak256
   -> Xabi
@@ -810,6 +816,18 @@ instance Default Constant Keccak256 (Column PGBytea) where
       fromKecc :: Keccak256 -> ByteString
       fromKecc (Keccak256 digest) = ByteArray.convert digest
 
+instance QueryRunnerColumnDefault PGBytea CodePtr where
+  queryRunnerColumnDefault =
+    queryRunnerColumn id toCodePtr queryRunnerColumnDefault
+    where
+      toCodePtr :: ByteString -> CodePtr
+      toCodePtr
+        = fromRight (error "could not decode CodePtr")
+        . rlpDeserialize
+
+instance Default Constant CodePtr (Column PGBytea) where
+  def = lmap rlpSerialize def
+
 instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
   queryRunnerColumnDefault =
     queryRunnerColumn id toChainId queryRunnerColumnDefault
@@ -845,12 +863,12 @@ insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertMa
   ]
   (\ (contractInstanceId,_,_,_,_) -> contractInstanceId)
 
-sourceToContractDetails :: Bool -> Text -> Bloc (Map Text (Int32, ContractDetails))
+sourceToContractDetails :: Should Compile -> Text -> Bloc (Map Text (Int32, ContractDetails))
 sourceToContractDetails shouldCompile source = do
   let createContractDetails =
-        if shouldCompile
-        then compileContract
-        else createMetadataNoCompile
+        case shouldCompile of
+          Do Compile -> compileContract
+          Don't Compile -> createMetadataNoCompile
   details <- blocQuery . contractBySourceHash . keccak256 $ Text.encodeUtf8 source
   if null details
     then createContractDetails source
@@ -889,7 +907,7 @@ compileContract source = do
         { contractdetailsBin = bin
         , contractdetailsAddress = Just (Named "Latest")
         , contractdetailsBinRuntime = binRuntime
-        , contractdetailsCodeHash =  binRuntimeToCodeHash binRuntime
+        , contractdetailsCodeHash =  EVMCode . keccak256SHA $ binRuntimeToCodeHash binRuntime
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi
@@ -903,6 +921,7 @@ compileContract source = do
   let cmIdDetails = Map.elems . Map.intersectionWith (,) mdIdMap $ Map.fromList idDetails
   return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
 
+-- SolidVM only
 createMetadataNoCompile :: Text -> Bloc (Map Text (Int32, ContractDetails))
 createMetadataNoCompile source = do
   let eVerXabis = parseXabi "-" $ Text.unpack source
@@ -915,7 +934,7 @@ createMetadataNoCompile source = do
         { contractdetailsBin = source
         , contractdetailsAddress = Just (Named "Latest")
         , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash =  keccak256 $ Char8.pack $ Text.unpack $ contrName `Text.append` source
+        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ keccak256SHA $ keccak256 (Char8.pack $ Text.unpack source)
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi

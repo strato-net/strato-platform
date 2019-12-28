@@ -1,5 +1,29 @@
 ## RELEASE NOTES
 
+### Version 7.6.0
+
+-   Add external storage endpoints
+
+### Version 7.5.6
+
+-   Add batch contract state and chain creation functions, as well as expose get{Send,Create,Call}Args functions for generating transaction payloads
+
+### Version 7.5.5
+    
+-   Better debug logs formatting
+
+### Version 7.5.4
+
+-   Generate source maps in build
+
+### Version 7.5.3
+
+-   Bug fix for chain ID helper for Cirrus queries in api.util.js
+
+### Version 7.5.2
+
+-   Bug fix for history metadata helper in api.util.js
+
 ### Version 7.5.1
 
 -   Add support for adding custom state in the authorization url

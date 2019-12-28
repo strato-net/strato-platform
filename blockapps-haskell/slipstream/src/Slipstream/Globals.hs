@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 module Slipstream.Globals
@@ -9,6 +11,7 @@ module Slipstream.Globals
   ) where
 
 
+import           BlockApps.Logging
 import           BlockApps.Solidity.Value
 import           Control.DeepSeq
 
@@ -19,8 +22,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Cache.LRU              as LRU
 import           Data.Either.Extra
 import qualified Data.HashMap.Strict         as HM
-import           Data.Int
-import qualified Data.Map                    as M
+import           Data.Int                    (Int32)
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
@@ -35,7 +37,7 @@ import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
 newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
+newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -48,22 +50,15 @@ xabiToText = T.replace "\'" "\'\'"
            . decodeUtf8 . BL.toStrict
            . JSON.encode
 
-setSolidVMABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text (Int32, ContractDetails) -> m ()
-setSolidVMABIs gref (SolidVMCode _ !codeHash) detailsMap = do
+setContractABIs :: MonadIO m => IORef Globals -> CodePtr -> (Int32, ContractDetails) -> m ()
+setContractABIs gref codePtr detailsTup = do
   globals@Globals{..} <- readIORef gref
-  let !abis = force $ M.map (xabiToText . contractdetailsXabi . snd) detailsMap
-  updateGlobals gref globals{solidVMABIs=HM.insert codeHash abis solidVMABIs}
-setSolidVMABIs _ EVMCode{} _ = error "internal error: setSolidVMDetails for EVMCode"
+  updateGlobals gref globals{contractABIs=HM.insert codePtr detailsTup contractABIs}
 
-getSolidVMABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (Text, Text))
-getSolidVMABIs gref (SolidVMCode name' codeHash) = do
-  abis <- solidVMABIs <$> readIORef gref
-  case HM.lookup codeHash abis of
-    Nothing -> return Nothing
-    Just details -> do
-      let name = T.pack name'
-      return $ (name,) <$> M.lookup name details
-getSolidVMABIs _ EVMCode{} = error "internal error: getSolidVMDetails for EVMCode"
+getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (Int32, ContractDetails))
+getContractABIs gref codePtr = do
+  abis <- contractABIs <$> readIORef gref
+  return $ HM.lookup codePtr abis 
 
 setContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
 setContractCreated globalsIORef codeHash = do
@@ -75,9 +70,16 @@ isContractCreated globalsIORef codeHash = do
   Globals{..} <- readIORef globalsIORef
   return $ codeHash `Set.member` createdContracts
 
-isHistoric :: MonadIO m => IORef Globals -> CodePtr -> m Bool
+setEventCreated :: MonadIO m => IORef Globals -> (Text, Text) -> m ()
+setEventCreated globalsIORef evTup = do
+  globals@Globals{..} <- readIORef globalsIORef
+  updateGlobals globalsIORef globals{createdEvents=Set.insert evTup createdEvents}
+
+isHistoric :: (MonadLogger m, MonadIO m) => IORef Globals -> CodePtr -> m Bool
 isHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
+  $logInfoS "isHistoric" . T.pack $ "Checking history status of " ++ show name
+  $logInfoS "isHistoric" . T.pack $ "History list: " ++ show historyList
   return $ name `Set.member` historyList
 
 isFunctionHistoric :: MonadIO m => IORef Globals -> CodePtr -> m Bool

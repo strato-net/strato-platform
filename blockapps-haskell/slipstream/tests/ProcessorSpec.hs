@@ -68,7 +68,14 @@ messageToSplit = [r|
   "metadata": {
     "name": "Y",
     "src": "\ncontract X {\n  uint public z = 7624;\n}\n\ncontract Y {\n  X x;\n  constructor() public {\n    x = new X();\n  }\n}\n"
-  }
+  },
+  "events" : 
+         [ { "eventContractName" : "Vehicle",
+             "eventContractAddress" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
+             "eventName" : "Vehicle Event",
+             "eventArgs" : ["x", "y"]
+           }
+         ]
 }
 |]
 

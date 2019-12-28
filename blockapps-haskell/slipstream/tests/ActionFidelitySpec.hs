@@ -7,8 +7,10 @@ import Data.Aeson.QQ
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import Data.Either
+import Data.Maybe (fromJust)
 import qualified Data.Map.Strict as M
 import Data.Time.Clock.POSIX
+import qualified Data.Sequence as S
 import Test.QuickCheck
 import Test.Hspec
 
@@ -16,6 +18,8 @@ import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Event
+import Blockchain.Strato.Model.Address
 import Blockchain.SolidVM.Model
 import qualified Slipstream.Data.Action as SS
 
@@ -29,7 +33,7 @@ emptySolidVMData :: BS.ActionData
 emptySolidVMData = BS.ActionData (SolidVMCode "ContractName" $ SHA 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
 
 emptyAction :: BS.Action
-emptyAction = BS.Action (SHA 0) (posixSecondsToUTCTime 0) 0 (SHA 0) Nothing 0x0 M.empty Nothing
+emptyAction = BS.Action (SHA 0) (posixSecondsToUTCTime 0) 0 (SHA 0) Nothing 0x0 M.empty Nothing S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -102,7 +106,14 @@ spec = describe "Action conversions" $ do
          "metadata": {
            "name": "Vehicle",
            "src": "contract Vehicle {}"
-         }
+         },
+         "events" : 
+         [ { "eventContractName" : "Vehicle",
+             "eventContractAddress" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
+             "eventName" : "Vehicle Event",
+             "eventArgs" : ["x", "y"]
+           }
+         ]
        }|]
 
      eitherDecode (encode oldStyle) `shouldBe` Right (SS.Action
@@ -134,4 +145,5 @@ spec = describe "Action conversions" $ do
             }]
           }
         , SS._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
+        , SS._actionEvents = S.singleton $ Event "Vehicle" (fromJust $ stringAddress "2e385b6a3aea46d4172df98617b5385c13b7100d") "Vehicle Event" ["x", "y"]
       })

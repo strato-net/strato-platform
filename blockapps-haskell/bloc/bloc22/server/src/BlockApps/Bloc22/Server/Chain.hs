@@ -10,12 +10,14 @@
 
 module BlockApps.Bloc22.Server.Chain where
 
+import           Control.Applicative               (liftA2)
 import           Control.Monad.Except
 import           Crypto.Random.Entropy
-import qualified Data.ByteString.Char8             as BC
+import           Data.Foldable                     (for_)
+import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromMaybe, isJust)
+import           Data.Maybe                        (catMaybes, fromMaybe)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 
@@ -26,7 +28,6 @@ import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
-import           Blockchain.Strato.Model.SHA
 import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
@@ -56,15 +57,16 @@ replaceMembers Struct{..} addrs m =
           TypeArrayDynamic (SimpleType TypeAddress) -> m'
           _ -> m
 
-postChainInfo :: ChainInput -> Bloc ChainId
-postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = do
-  let theVM = fromMaybe "EVM" $ join $ fmap (Map.lookup "VM") mmd
-  
+createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
+createChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = do
+  let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
+
   when (null members) $ throwError $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
+  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
   idsAndDetails <- if (Text.null src)
                      then return Map.empty
-                     else sourceToContractDetails (theVM == "EVM") src
+                     else sourceToContractDetails shouldCompile src
   mContract <- case Map.toList idsAndDetails of
             [] -> return Nothing
             [(_, x)] -> return $ Just x
@@ -88,14 +90,14 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
                           (Map.toList argsText')
               balMap = Map.fromList $ map toTuple balances
               govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
-              
+
           (contractHash, b, s) <-
             case theVM of
-              "EVM" -> return (EVMCode $ keccak256SHA contractdetailsCodeHash, contractdetailsBinRuntime, src)
+              "EVM" -> return (contractdetailsCodeHash, contractdetailsBinRuntime, src)
               "SolidVM" -> do
-                return (SolidVMCode (Text.unpack contractdetailsName) $ hash (BC.pack $ Text.unpack src), "", src)
+                return (contractdetailsCodeHash, "", src)
               _ -> throwError . UserError . Text.pack $ "Unknown VM: " ++ show theVM
-              
+
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               codeInfo' = CodeInfo b s contractdetailsName
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
@@ -115,21 +117,36 @@ postChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = d
                            (fromMaybe Map.empty mmd)
         )
         Nothing
+  return (fst <$> mContract, chainInfo)
+
+postChainInfo :: ChainInput -> Bloc ChainId
+postChainInfo chainInput = do
+  (mCmId, chainInfo) <- createChainInfo chainInput
   chainId <- blocStrato $ Strato.postChain chainInfo
   waitForChainInfo chainId
-  when (isJust mContract) $ do
-    let Just (cmId, _) = mContract
-    void $ insertContractInstance cmId governanceAddress (Just chainId)
+  for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
+postChainInfos :: [ChainInput] -> Bloc [ChainId]
+postChainInfos chainInputs = do
+  chainInfos <- traverse createChainInfo chainInputs
+  chainIds <- blocStrato . Strato.postChains $ map snd chainInfos
+  waitForChainInfos chainIds
+  let cmIdChains = catMaybes $ zipWith (liftA2 (,)) (map fst chainInfos) (map Just chainIds)
+  for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId governanceAddress (Just chainId)
+  return chainIds
+
 waitForChainInfo :: ChainId -> Bloc ()
-waitForChainInfo chainId = waitFor "failed to retrieve chain info" go
+waitForChainInfo chainId = waitForChainInfos [chainId]
+
+waitForChainInfos :: [ChainId] -> Bloc ()
+waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
   where go :: Bloc Bool
         go = do
-          infos <- getChainInfo [chainId]
-          $logInfoLS "waitForChainInfo/req" chainId
-          $logInfoLS "waitForChainInfo/resp" infos
-          return . not $ null infos
+          infos <- getChainInfo chainIds
+          $logInfoLS "waitForChainInfo/req" chainIds
+          $logDebugLS "waitForChainInfo/resp" infos
+          return $ length infos == length chainIds
 
 
 getChainInfo :: [ChainId] -> Bloc [ChainIdChainOutput]

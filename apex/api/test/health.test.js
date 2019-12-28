@@ -18,7 +18,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const timeout = config.healthCheck.pollFrequency;
 
 describe('Tests - Node-level Health Check', function () {
-  this.timeout(timeout);
+  this.timeout(config.timeout);
   before(async function () {
     const currentTime = Date.now();
     sampleResponse2.data.result.forEach((elem) => {

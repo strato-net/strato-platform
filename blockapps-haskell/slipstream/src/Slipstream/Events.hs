@@ -38,3 +38,9 @@ data ProcessedContract = ProcessedContract
   , functionCallData  :: Maybe FunctionCallData
   , contractData      :: Map Text V.Value
   } deriving (Show)
+
+data EventTable = EventTable
+  { eventContractName :: Text
+  , eventName         :: Text
+  , eventFields       :: [Text]
+  } deriving (Show)

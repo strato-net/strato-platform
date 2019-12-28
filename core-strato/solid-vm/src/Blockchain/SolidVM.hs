@@ -29,7 +29,7 @@ import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
-import qualified Data.List                            as List
+--import qualified Data.List                            as List
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
@@ -42,7 +42,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
-import           Blockchain.Data.Event
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.ExtWord
@@ -57,6 +56,7 @@ import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
 import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Event
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
@@ -152,7 +152,7 @@ create' creator newAddress ch cc contractName' argExps = do
     erReturnVal = Just BSS.empty,
     erTrace = [],
     erLogs = [],
-    erEvents = toList $ events sstate,
+    erEvents = toList $ ssEvents sstate,
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
     erAction = Just $ sstate ^. action,
@@ -227,7 +227,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       erReturnVal = BSS.toShort <$> returnVal,
       erTrace = [],
       erLogs = [],
-      erEvents = toList $ events sstate,
+      erEvents = toList $ ssEvents sstate,
       erNewContractAddress = Nothing,
       erSuicideList = S.empty,
       erAction = Just $ finalAct,
@@ -546,15 +546,27 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   setVar dstVar =<< getString srcVar
   return Nothing
 
-runStatement (Xabi.EmitStatement eventName exptups) = do
+runStatement st@(Xabi.EmitStatement eventName exptups) = do
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
-  addEvent $ Event eventName expStrs
 
-  onTraced $ liftIO $ putStrLn $ "Event Emission Parsed: " ++ eventName ++ " (" ++ List.intercalate "," expStrs ++ ")"
+  -- checks that the event is declared and that the number of args match
+  --   DOES NOT check consistency of arg types
+  curInfo <- getCurrentCallInfo
+  curCnct <- getCurrentContract
+  let evs = _events curCnct
+      mEv = M.lookup (T.pack eventName) evs
+  case mEv of
+    Nothing -> 
+      missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
+    Just ev -> do
+      if (length exptups) /= (length $ Xabi.eventLogs ev) then 
+        invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
+      else do
+        addEvent $ Event (_contractName curCnct) (currentAddress curInfo) eventName expStrs
+        return Nothing
 
-  return Nothing
 
 runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
 

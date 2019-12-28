@@ -157,6 +157,5 @@ do
 done
 echo 'vault-wrapper is available'
 
-openresty
 echo  'nginx is now running. See the logs below...'
-tail -n0 -F /usr/local/openresty/nginx/logs/*.log
+openresty -g "daemon off;"

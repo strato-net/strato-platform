@@ -20,6 +20,7 @@ import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Text                    (Text)
 import           Data.Time
+import qualified Data.Sequence                as S
 import           GHC.Generics
 import           Test.QuickCheck
 
@@ -28,6 +29,7 @@ import           Blockchain.MiscJSON()
 import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord (Word256, bytesToWord256)
+import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.SHA
 
@@ -156,6 +158,7 @@ data Action = Action
   , _actionTransactionSender  :: Address
   , _actionData               :: Map Address ActionData
   , _actionMetadata           :: Maybe (Map Text Text)
+  , _actionEvents             :: S.Seq Event
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''Action
 
@@ -169,6 +172,7 @@ instance ToJSON Action where
     , "sender"          .= _actionTransactionSender
     , "data"            .= _actionData
     , "metadata"        .= _actionMetadata
+    , "events"          .= _actionEvents
     ]
 
 instance FromJSON Action where
@@ -181,6 +185,7 @@ instance FromJSON Action where
     <*> (o .: "sender")
     <*> (o .: "data")
     <*> (o .: "metadata")
+    <*> (o .: "events")
   parseJSON o = error $ "parseJSON Action: Expected object, got: " ++ show o
 
 derive makeArbitrary ''CallType

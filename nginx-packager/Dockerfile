@@ -13,7 +13,7 @@ RUN apt-get update && \
     opm get zmartzone/lua-resty-openidc=1.7.1
 
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
-  CMD curl  --silent --output /dev/null --fail localhost:80/ || \
+  CMD curl  --silent --output /dev/null --fail localhost:80/_ping || \
         exit 1
 
 COPY nginx.tpl.conf auth.htpasswd openid.tpl.lua /tmp/

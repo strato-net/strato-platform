@@ -7,6 +7,7 @@ const blocUrl = "/bloc/v2.2";
 const strato12Url = "/strato-api/eth/v1.2";
 const strato23Url = "/strato/v2.3";
 const cirrusUrl = "/cirrus/search";
+const externalStorageUrl = "/apex-api/bloc/file";
 
 const Endpoint = {
   ACCOUNT: `${strato12Url}/account`,
@@ -14,11 +15,18 @@ const Endpoint = {
   USER: `${blocUrl}/users/:username`,
   FILL: `${blocUrl}/users/:username/:address/fill`,
   STATE: `${blocUrl}/contracts/:name/:address/state`,
+  STATES: `${blocUrl}/contracts/states`,
   TXRESULTS: `${blocUrl}/transactions/results`,
   SEND: `${strato23Url}/transaction`,
   KEY: `${strato23Url}/key`,
   SEARCH: `${cirrusUrl}/:name`,
-  CHAIN: `${blocUrl}/chain`
+  CHAIN: `${blocUrl}/chain`,
+  CHAINS: `${blocUrl}/chains`,
+  EXT_UPLOAD: `${externalStorageUrl}/upload`,
+  EXT_ATTEST: `${externalStorageUrl}/attest`,
+  EXT_VERIFY: `${externalStorageUrl}/verify`,
+  EXT_DOWNLOAD: `${externalStorageUrl}/download`,
+  EXT_LIST: `${externalStorageUrl}/list`,
 };
 
 function constructEndpoint(endpointTemplate, options = {}, params = {}) {
@@ -38,12 +46,30 @@ function constructQuerySearch(options) {
   if (options === undefined) {
     return "";
   }
-  const queryObject = Object.assign(
-    { chainid: options.chainIds },
-    options.query
-  );
-  const query = `?${queryString.stringify(queryObject)}`;
-  return query;
+
+  const chainIds = options.chainIds;
+  if (chainIds !== undefined && chainIds.length !== undefined && chainIds.length > 0) {
+    if (chainIds.length == 1) {
+      const queryObject = Object.assign(
+        { chainId: `eq.${chainIds[0]}` },
+        options.query
+      );
+      const query = `?${queryString.stringify(queryObject)}`;
+      return query;
+    } else {
+      const joinedChainIds = chainIds.join();
+      const queryObject = Object.assign(
+        { chainId: `in.${joinedChainIds}` },
+        options.query
+      );
+      const query = `?${queryString.stringify(queryObject)}`;
+      return query;
+
+    }
+  } else {
+    const query = `?${queryString.stringify(options.query)}`;
+    return query;
+  }
 }
 
 function constructQuery(options) {
@@ -72,14 +98,24 @@ function constructMetadata(options, contractName) {
   if (options === {}) return metadata;
 
   // history flag (default: off)
+  metadata.history = "";
   if (options.enableHistory) {
     metadata.history = contractName;
   }
   if (options.hasOwnProperty("history")) {
-    const newContracts = options.history
-      .filter(contract => contract !== contractName)
-      .join();
-    metadata.history = `${options.history},${newContracts}`;
+    if (Array.isArray(options.history)) {
+      metadata.history =
+        metadata.history.length === 0 ||
+        options.history.indexOf(metadata.history) >= 0
+          ? options.history.join(",")
+          : `${metadata.history},${options.history.join(",")}`;
+    } else if (typeof options.history === String) {
+      metadata.history =
+        metadata.history.length === 0 ||
+        options.history.indexOf(metadata.history) >= 0
+          ? options.history
+          : `${metadata.history},${options.history}`;
+    }
   }
 
   // index flag (default: on)

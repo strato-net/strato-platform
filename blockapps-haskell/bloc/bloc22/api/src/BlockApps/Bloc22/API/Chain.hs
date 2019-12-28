@@ -169,3 +169,9 @@ type PostChainInfo = "chain"
 type GetChainInfo = "chain"
   :> QueryParams "chainid" ChainId
   :> Get '[JSON] [ChainIdChainOutput]
+
+-- POST /chains
+
+type PostChainInfos = "chains"
+  :> ReqBody '[JSON] [ChainInput]
+  :> Post '[JSON] [ChainId]

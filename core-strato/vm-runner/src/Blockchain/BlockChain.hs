@@ -33,6 +33,7 @@ import           Control.Monad.Trans.Except
 import           Data.Bifunctor                          (bimap)
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Short                   as BSS
+import qualified Data.DList                              as DL
 import           Data.Either.Extra
 import           Data.List
 import qualified Data.Map                                as M
@@ -59,7 +60,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import           Blockchain.Data.LogDB
-import           Blockchain.Data.Event
 import           Blockchain.Data.EventDB
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionDef          (formatChainId)
@@ -93,6 +93,7 @@ import           Blockchain.VMOptions
 import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
 import           Blockchain.SHA                          (formatSHAWithoutColor)
+import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.StateDiff             hiding (StateDiff (blockHash))
@@ -124,7 +125,7 @@ instance Bagger.MonadBagger ContextM where
         setStateDBStateRoot sr
         (TxMiningResult res ranTxs unranTxs newGas) <-
           timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
-          $ mineTransactions' theBlockHeader remainingGas [] txs
+          $ mineTransactions' theBlockHeader remainingGas DL.empty txs
         timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
         timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
         newStateRoot <- Mod.get (Proxy @MP.StateRoot)
@@ -244,7 +245,7 @@ addBlocks unfiltered = do
       didReplaceBest   <- liftIO (newIORef False)
       ranPrivateTxs    <- liftIO (newIORef M.empty)
       replacedBest     <- liftIO (newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!"))
-      (actions, srLog') <- flip State.runStateT [] $ forM filtered $ \block ->
+      (actions, srLog') <- flip State.runStateT DL.empty $ forM filtered $ \block ->
           let blockNo = blockDataNumber $! obBlockData block
               txCount = length $! obReceiptTransactions block
           in timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
@@ -257,12 +258,12 @@ addBlocks unfiltered = do
           -- and the intermediate ones increase the granularity at which we can compute a sequence
           -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
           -- the diff between them, which is estimated by the number of transactions.
-          id %= ((blockDataStateRoot $ obBlockData block, hsh, num, txCount):)
+          id %= (`DL.snoc` (blockDataStateRoot $ obBlockData block, hsh, num, txCount))
         unless (M.null ranPriv) . liftIO $
           modifyIORef' ranPrivateTxs $ flip M.unionWith ranPriv $
             \(n1,s1) (n2,s2) -> if n1 > n2 then (n1,s1) else (n2,s2)
         return actions
-      let srLog = reverse srLog'
+      let srLog = DL.toList srLog'
       $logDebugLS "addBlocks/srLog" srLog
       didReplaceBest' <- liftIO (readIORef didReplaceBest)
       ranPrivateTxs' <- liftIO (readIORef ranPrivateTxs)
@@ -293,17 +294,21 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
       ++ "TXs)."
     when flags_debug $ do
       bhr <- Mod.get (Proxy @BlockHashRoot)
-      cr <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
       $logDebugS "addBlock" $ T.pack $ "Old blockhash root: " ++ format bhr
-      $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
+      mcr <- getChainRoot $ blockHash b
+      case mcr of
+        Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate old chain root. Using emptyTriePtr"
+        Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
     putBlockHeaderInChainDB bd
 
     when flags_debug $ do
       bhr' <- Mod.get (Proxy @BlockHashRoot)
-      cr' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
       $logDebugS "addBlock" $ T.pack $ "New blockhash root after inserting header: " ++ format bhr'
-      $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr'
+      mcr' <- getChainRoot $ blockHash b
+      case mcr' of
+        Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after inserting header. Using emptyTriePtr"
+        Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr
 
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
@@ -331,9 +336,11 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 
     when flags_debug $ do
       bhr'' <- Mod.get (Proxy @BlockHashRoot)
-      cr'' <- fmap (fromMaybe MP.emptyTriePtr) . getChainRoot $ blockHash b
       $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
-      $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr''
+      mcr'' <- getChainRoot $ blockHash b
+      case mcr'' of
+        Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
+        Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
 
     P.incCounter vmBlocksMined
     P.incCounter vmBlocksProcessed
@@ -382,7 +389,7 @@ addTransactions chainId canCache blockData blockGas0 txs =
             then Bagger.getCachedRunResults blockData
             else return Nothing
   trrs <- case mtrrs of
-    Nothing -> go blockGas0 txs []
+    Nothing -> go blockGas0 txs DL.empty
     Just (cachedSR, _, cachedTRRs) -> do
       let cachedTXs = map trrTransaction cachedTRRs
       when (flags_debug && txs /= cachedTXs) $ do
@@ -397,7 +404,7 @@ addTransactions chainId canCache blockData blockGas0 txs =
   return (catMaybes otrs, asms)
 
   where
-    go _ [] trrs = return $ reverse trrs
+    go _ [] trrs = return $ DL.toList trrs
     go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs = do
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
@@ -415,7 +422,7 @@ addTransactions chainId canCache blockData blockGas0 txs =
             Left _           -> blockGas
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
-      go remainingBlockGas rest (trr : trrs)
+      go remainingBlockGas rest (trrs `DL.snoc` trr)
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
                                      , tmrRanTxs   :: [TxRunResult]
@@ -423,8 +430,8 @@ data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCa
                                      , tmrRemGas   :: Integer
                                      } deriving (Show)
 
-mineTransactions' :: BlockData -> Integer -> [TxRunResult] -> [OutputTx] -> ContextM TxMiningResult
-mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
+mineTransactions' :: BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> ContextM TxMiningResult
+mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     flushMemAddressStateTxToBlockDB
     flushMemStorageTxDBToBlockDB
@@ -437,8 +444,8 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     case result of
         Right execResult -> do
           let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
-          mineTransactions' header nextRemGas (trr:ran) txs
-        Left  failure    -> return $ TxMiningResult (Just failure) (reverse ran) unran remGas
+          mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+        Left  failure    -> return $ TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
 
 blockIsHomestead :: Integer -> Bool
@@ -636,7 +643,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
           Right r  -> case erException r of
                         Nothing -> (Success, "Success!", erRemainingTxGas r)
-                        Just ex -> let fmt = (show $ erTrace r) in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
+                        Just ex -> let fmt = either show show ex
+                                    in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 

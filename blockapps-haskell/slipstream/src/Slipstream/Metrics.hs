@@ -20,7 +20,6 @@ import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.Cache.LRU as LRU
 import qualified Data.HashMap.Strict as HM
-import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Network.Kafka.Protocol (Offset)
@@ -78,9 +77,7 @@ recordGlobals g = liftIO $ do
   rec "history_list" (S.size . historyList)
   rec "function_history_list" (S.size . functionHistoryList)
   rec "no_index_list" (S.size . noIndexList)
-  rec "solidvm_details_codehashes" (HM.size . solidVMABIs)
-  rec "solidvm_details_contracts" (sum . map M.size . HM.elems . solidVMABIs)
-  rec "solidvm_details_bytes" (sum . concatMap (map T.length . M.elems) . HM.elems . solidVMABIs)
+  rec "contract_abis" (HM.size . contractABIs)
   rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()
