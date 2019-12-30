@@ -297,7 +297,8 @@ adjustGlobals gref shouldCompile row details = do
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
           lift $ f gref codePtr
 
-  
+ 
+
   -- if we pass Don't Compile, we assume it's SolidVMCode, and use details from cache
   detailsMap <- case shouldCompile of
     Do Compile -> sourceToContractDetails shouldCompile $ contractdetailsSrc details
@@ -307,6 +308,7 @@ adjustGlobals gref shouldCompile row details = do
         Nothing -> error "solidVMABIs should be in the cache, but adjustGlobals didn't find them"
         Just dMap -> return dMap
   
+  -- TODO: ideally we check if these flags are in the metadata BEFORE we get the detailsMap
   mapM_ (go detailsMap) $ [("history", addToHistoryList)
                           ,("nohistory", removeFromHistoryList)
                           ,("noindex", addToNoIndexList)
