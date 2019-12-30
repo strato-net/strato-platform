@@ -58,10 +58,11 @@ getContracts chainId = blocTransaction $ do
       Map.empty
   contractsAddresses <- blocQuery $ getContractsAddressesQuery chainId
   contractsNamesAsAddresses <- blocQuery $ getContractsNamesAsAddressesQuery chainId
-  return . GetContractsResponse $ Map.take 50 $
-    addressesToMap contractsAddresses
-    `Map.union`
-    namesToMap contractsNamesAsAddresses
+  -- Take only 100 entries as a short-term solution to prevent from crashing.
+  -- See also: https://blockapps.atlassian.net/browse/STRATO-1714
+  let reducedResponseMap = (addressesToMap $ take 100 contractsAddresses) `Map.union`
+                           (namesToMap $ take 100 contractsNamesAsAddresses)
+  return . GetContractsResponse $ reducedResponseMap
 
 getContractsData :: ContractName -> Bloc [MaybeNamed Address]
 getContractsData (ContractName contractName) = blocTransaction $ do
