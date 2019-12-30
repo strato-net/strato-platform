@@ -56,12 +56,12 @@ getContracts chainId = blocTransaction $ do
     namesToMap = foldr'
       (\ (key,name,utc,cid) -> Map.insertWith (++) key [nameToVal name utc cid])
       Map.empty
-  contractsAddresses <- blocQuery $ getContractsAddressesQuery chainId
-  contractsNamesAsAddresses <- blocQuery $ getContractsNamesAsAddressesQuery chainId
   -- Take only 100 entries as a short-term solution to prevent from crashing.
   -- See also: https://blockapps.atlassian.net/browse/STRATO-1714
-  let reducedResponseMap = (addressesToMap $ take 100 contractsAddresses) `Map.union`
-                           (namesToMap $ take 100 contractsNamesAsAddresses)
+  contractsAddresses <- blocQuery $ getContractsAddressesQuery chainId
+  contractsNamesAsAddresses <- blocQuery $ getContractsNamesAsAddressesQuery chainId
+  let reducedResponseMap = (addressesToMap $ contractsAddresses) `Map.union`
+                           (namesToMap $ contractsNamesAsAddresses)
   return . GetContractsResponse $ reducedResponseMap
 
 getContractsData :: ContractName -> Bloc [MaybeNamed Address]
