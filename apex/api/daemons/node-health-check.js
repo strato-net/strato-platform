@@ -130,7 +130,7 @@ function reformatPrometheusMetrics(obj) {
 }
 
 //TODO: refactor - make a batch db insert for all stats at once, divide node health calc and db insert (ridiculous function name)
-async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics, isGlobalPasswordExist) {
+async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics, isGlobalPasswordSet) {
   let isNodeHealthy = true;
   let currentTime = Date.now();
   let failedChecks = [];
@@ -147,7 +147,8 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics, isGlobal
     });
   });
 
-  if (isOauthEnabled && !isGlobalPasswordExist) {
+  // TODO: move out from here (into checkSystemInfo?)
+  if (isOauthEnabled && !isGlobalPasswordSet) {
     isNodeHealthy = false;
     failedChecks.push('stratoPassword')
   }
@@ -155,11 +156,11 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics, isGlobal
   return [isNodeHealthy, failedChecks];
 }
 
-async function updateNodeHealthStatus(nodeHealthData, isGlobalPasswordExist) {
+async function updateNodeHealthStatus(nodeHealthData, isGlobalPasswordSet) {
   let currentTime = Date.now();
   
   // TODO: move checkSystemInfo out of here!
-  let [systemInfoStatus, systemInfo] = await checkSystemInfo(isGlobalPasswordExist);
+  let [systemInfoStatus, systemInfo] = await checkSystemInfo(isGlobalPasswordSet);
 
   // TODO: Should the unhealthy 'SystemInfoStat' make the HealthStat false??? Or add the status as a separate value in /health output
   let [stat, created] = await models.CurrentHealth.findOrCreate({
@@ -206,7 +207,7 @@ async function updateNodeHealthStatus(nodeHealthData, isGlobalPasswordExist) {
   return
 }
 
-async function checkHealthIsFresh(isGlobalPasswordExist) {
+async function checkHealthIsFresh(isGlobalPasswordSet) {
   try {
     const healthInfo = await models.CurrentHealth.findOne({
       where: {
@@ -226,18 +227,18 @@ async function checkHealthIsFresh(isGlobalPasswordExist) {
       const isHealthcheckUptodate = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy);
       if (!isHealthcheckUptodate) {
         const currentStatus = [false, 'Latest health check is outdated'];
-        await updateNodeHealthStatus(currentStatus, isGlobalPasswordExist);
+        await updateNodeHealthStatus(currentStatus, isGlobalPasswordSet);
       }
     }
   } catch (err) {
     winston.warn(`Error occurred while checking and comparing the latest health: ${err.message ? err.message : err} `);
     const currentStatus = [false, 'Server error: could not calculate the health status'];
-    await updateNodeHealthStatus(currentStatus, isGlobalPasswordExist);
+    await updateNodeHealthStatus(currentStatus, isGlobalPasswordSet);
   }
 }
 
 
-async function checkSystemInfo(isGlobalPasswordExist) {
+async function checkSystemInfo(isGlobalPasswordSet) {
   try {
     let additional_info = [];
     let sysInfoCollected = {}
@@ -305,7 +306,7 @@ async function checkSystemInfo(isGlobalPasswordExist) {
     })
     sysInfoCollected.networkStats = nwStats;
 
-    if (isOauthEnabled && !isGlobalPasswordExist) {
+    if (isOauthEnabled && !isGlobalPasswordSet) {
       isHealthy = false;
       additional_info.push("STRATO password is not set")
     }
@@ -319,7 +320,7 @@ async function checkSystemInfo(isGlobalPasswordExist) {
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
     const currentStatus = [false, ['Error when checking System Information']];
-    await updateNodeHealthStatus(currentStatus, isGlobalPasswordExist);
+    await updateNodeHealthStatus(currentStatus, isGlobalPasswordSet);
   }
 }
 

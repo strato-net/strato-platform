@@ -17,6 +17,10 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 const timeout = config.healthCheck.pollFrequency;
 
+// TODO: remove global password from here after the node-health-check.js is refactored, change tests accordingly
+const isGlobalPasswordSet = true;
+
+
 describe('Tests - Node-level Health Check', function () {
   this.timeout(config.timeout);
   before(async function () {
@@ -30,7 +34,7 @@ describe('Tests - Node-level Health Check', function () {
   it('HealthStat update - FAILURE', async function () {
     let testObj = sampleResponse;
     const res = nodeHealthCheckJs.reformatPrometheusMetrics(testObj);
-    const stat = await nodeHealthCheckJs.calcNodeHealthAndSaveVitalStats(res);
+    const stat = await nodeHealthCheckJs.calcNodeHealthAndSaveVitalStats(res, isGlobalPasswordSet);
     await nodeHealthCheckJs.updateNodeHealthStatus(stat);
     assert.equal(stat[0], false, "Unhealthy");
     assert.equal(stat[1].sort().toString(), Object.values(nodeHealthCheckJs.neededJobs).sort().toString(), 'Errored Processes')
@@ -63,7 +67,7 @@ describe('Tests - Node-level Health Check', function () {
       elem.value[0] = (currentTime - config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy)/1000;
     })
     const res = nodeHealthCheckJs.reformatPrometheusMetrics(testObj);
-    const stat = await nodeHealthCheckJs.calcNodeHealthAndSaveVitalStats(res);
+    const stat = await nodeHealthCheckJs.calcNodeHealthAndSaveVitalStats(res, isGlobalPasswordSet);
     await nodeHealthCheckJs.updateNodeHealthStatus(stat);
     assert.equal(stat[0], false, "Unhealthy");
     assert.equal(stat[1].sort().toString(), Object.values(nodeHealthCheckJs.neededJobs).sort().toString(), 'Errored Processes')
@@ -84,7 +88,7 @@ describe('Tests - Node-level Health Check', function () {
       elem.value[0] = currentTime/1000;
     })
     const res = nodeHealthCheckJs.reformatPrometheusMetrics(testObj);
-    const stat = await nodeHealthCheckJs.calcNodeHealthAndSaveVitalStats(res);
+    const stat = await nodeHealthCheckJs.calcNodeHealthAndSaveVitalStats(res, isGlobalPasswordSet);
     await nodeHealthCheckJs.updateNodeHealthStatus(stat);
     assert.equal(stat[0], true, "Healthy");
     assert.equal(stat[1].concat().toString(), [].toString(), "Errored Processes")
