@@ -105,12 +105,7 @@ class Dashboard extends Component {
     const health = this.props.dashboard.healthStatus;
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
-    let connection = true;
-
-
-    socket.on('disconnect', e => {
-      connection = false;
-    });
+    
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
@@ -125,8 +120,8 @@ class Dashboard extends Component {
                onMouseLeave={this.handleMouseHover}
           >
             <NumberCard
-              number={connection ? (health ? 'HEALTHY':'UNHEALTHY') : "No Connection"}
-              description= {connection ? (sec2Date(uptime)):"No Connection"}
+              number={health ? 'HEALTHY' : 'UNHEALTHY'}
+              description= {uptime ? sec2Date(uptime) : ''}
               mode={(health && systemHealth) ? 'success':'warning' }
               iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />
