@@ -40,7 +40,7 @@ const waitFaucet = async function (address) {
 chai.use(chaiHttp);
 
 describe('File - ExternalStorage - non-OAuth/Public', function () {
-  this.timeout(appConfig.timeout);
+  this.timeout(60000);
   let _contractAddress, accountAddress, app;
 
   before(async function () {

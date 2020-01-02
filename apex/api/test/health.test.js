@@ -21,7 +21,7 @@ const isGlobalPasswordSet = true;
 
 
 describe('Tests - Node-level Health Check', function () {
-  this.timeout(config.timeout);
+  this.timeout(60000);
   before(async function () {
     const currentTime = Date.now();
     prometheusCorrectResponse.data.result.forEach((elem) => {
