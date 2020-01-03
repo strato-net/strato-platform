@@ -2,16 +2,15 @@
 require('co-mocha')
 const env = process.env.NODE_ENV || 'development';
 const models = require('../models');
-const nodeHealthCheckJs = require('../daemons/node-health-check')
-const stallCheckJs = require('../daemons/stall-check')
-const sampleResponse = require('./testdata/prometheusFailResponse')
-const sampleResp2FileName = './testdata/prometheusCorrectResponse'
-const sampleResponse2 = require(sampleResp2FileName)
+const nodeHealthCheckJs = require('../daemons/node-health-check-utils')
+const stallCheckJs = require('../daemons/stall-check-utils')
+const prometheusFailResponse = require('./testdata/prometheusFailResponse')
+const prometheusCorrectResponse = require('./testdata/prometheusCorrectResponse')
 const config = require('../config/app.config');
 const ba = require('blockapps-rest');
-const fs = require('fs')
 
 const {assert} = ba.common
+
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -22,17 +21,17 @@ const isGlobalPasswordSet = true;
 
 
 describe('Tests - Node-level Health Check', function () {
-  this.timeout(config.timeout);
+  this.timeout(timeout);
   before(async function () {
     const currentTime = Date.now();
-    sampleResponse2.data.result.forEach((elem) => {
+    prometheusCorrectResponse.data.result.forEach((elem) => {
       elem.value[0] = currentTime / 1000;
     })
 
   })
 
   it('HealthStat update - FAILURE', async function () {
-    let testObj = sampleResponse;
+    let testObj = prometheusFailResponse;
     const res = nodeHealthCheckJs.reformatPrometheusMetrics(testObj);
     const stat = await nodeHealthCheckJs.calcNodeHealthAndSaveVitalStats(res, isGlobalPasswordSet);
     await nodeHealthCheckJs.updateNodeHealthStatus(stat);
@@ -61,7 +60,7 @@ describe('Tests - Node-level Health Check', function () {
   })
 
   it('HealthStat update - FAILURE - Data not recent', async function () {
-    let testObj = sampleResponse2;
+    let testObj = prometheusCorrectResponse;
     const currentTime = Date.now();
     testObj.data.result.forEach((elem) => {
       elem.value[0] = (currentTime - config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy)/1000;
@@ -82,7 +81,7 @@ describe('Tests - Node-level Health Check', function () {
   })
 
   it('HealthStat update - SUCCESS', async function () {
-    let testObj = sampleResponse2;
+    let testObj = prometheusCorrectResponse;
     const currentTime = Date.now();
     testObj.data.result.forEach((elem) => {
       elem.value[0] = currentTime/1000;

@@ -12,13 +12,6 @@ const config = require('../config/app.config');
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 
-(async() => {
-    await singleCheck()
-    setInterval(async () => {
-        await singleCheck()
-    }, config.healthCheck.stallCheckProgressWindow);
-})();
-
 async function singleCheck() {
     try {
         await queryHealthStatus();
@@ -186,6 +179,7 @@ async function initialCreate(){
 }
 
 module.exports = {
+    singleCheck,
     getCurrentHealth,
     updateNodeStallStatus
 }

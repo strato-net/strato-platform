@@ -23,16 +23,6 @@ const isOauthEnabled = (process.env['OAUTH_ENABLED'] === config.oAuthEnabledTrue
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-// DAEMON - query node-health-check every N sec
-winston.info('Starting node-health-check with a delay of', config.healthCheck.pollFrequency);
-
-(async () => {
-  await singleCheck()
-  setInterval(async () => {
-    await singleCheck()
-  }, config.healthCheck.pollFrequency);
-})();
-
 async function singleCheck() {
   try {
     await queryHealthStatus();
@@ -325,6 +315,7 @@ async function checkSystemInfo(isGlobalPasswordSet) {
 }
 
 module.exports = {
+  singleCheck,
   updateNodeHealthStatus,
   calcNodeHealthAndSaveVitalStats,
   reformatPrometheusMetrics,

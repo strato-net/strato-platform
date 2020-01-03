@@ -1,5 +1,4 @@
 module.exports = {
-  timeout: 60000,
   apps: {
       directory: 'apps'
   },
