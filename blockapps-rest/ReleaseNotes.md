@@ -1,12 +1,13 @@
 ## RELEASE NOTES
 
-### Version 7.6.0
+### Version 7.5.7
 
--   Add external storage endpoints
+-   Hotfix for regeneratorRuntime error in oauth.util.js
 
 ### Version 7.5.6
 
 -   Add batch contract state and chain creation functions, as well as expose get{Send,Create,Call}Args functions for generating transaction payloads
+-   Add external storage endpoints
 
 ### Version 7.5.5
     
