@@ -10,7 +10,6 @@ const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
 const healthHandler = require('../controllers/health');
 const trackHandler = require('../controllers/track');
-const checkMode = require('../lib/checkMode').checkMode;
 const appConfig = require(`${process.cwd()}/config/app.config`);
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
@@ -64,12 +63,7 @@ router.post('/dapps', dappController.upload);
 
 // router.get('/dapps', dappController.list);
 
-router.post('/login', checkMode, authController.login);
-router.post('/user', checkMode, oAuthController.createUser);
-router.post('/users', checkMode, authController.create);
-router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
-router.post('/verify-email', checkMode, authController.verifyEmail);
-router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
+
 
 router.post('/bloc/file/upload', checkUID, multerMiddleware, fileController.upload);
 router.post('/bloc/file/attest', checkUID, fileController.attest);

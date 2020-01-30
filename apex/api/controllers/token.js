@@ -1,3 +1,4 @@
+// TODO: we don't need this. @nikita please have a look and confirm
 const randToken = require('rand-token');
 
 const models = require('../models');
