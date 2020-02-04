@@ -3,14 +3,16 @@
 module Main where
 
 import Blockchain.Strato.Model.Address
+import Crypto.HaskoinShim
 import Data.Aeson
 import Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy.Char8 as CL8
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import Data.List (sort)
 import Control.Monad
-import Network.Haskoin.Crypto hiding (Address)
+import Network.Haskoin.Crypto hiding (Address, derivePubKey)
 import System.Entropy
 import HFlags
 
@@ -20,8 +22,12 @@ $(return [])
 data KeyPair = KeyPair PrvKey
 
 instance ToJSON KeyPair where
-  toJSON (KeyPair prvkey) = object [ "private_key" .= pkString, "address" .= prvKey2Address prvkey]
+  toJSON (KeyPair prvkey) = object [ "private_key" .= pkString
+                                   , "public_key" .= pubkey
+                                   , "address" .= prvKey2Address prvkey
+                                   ]
       where pkString = C8.unpack . B64.encode . encodePrvKey $ prvkey
+            pubkey = drop 2 . C8.unpack . B16.encode . exportPubKey False . derivePubKey $ SecKey prvkey
 
 data KeyList = KeyList [KeyPair] [Address]
 
