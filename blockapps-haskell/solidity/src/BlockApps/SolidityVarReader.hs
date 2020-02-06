@@ -44,6 +44,7 @@ import           Text.Printf
 import           Text.Read
 
 import           BlockApps.Ethereum
+import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Struct
@@ -491,15 +492,16 @@ encodeValues
   :: TypeDefs
   -> Struct
   -> Word256
-  -> [(Text,Text)]
-  -> Map Word256 Word256
+  -> [(Text,ArgValue)]
+  -> Either Text (Map Word256 Word256)
 encodeValues typeDefs' struct'@Struct{..} offset vars =
   zipMapMaybe (uncurry $ encodeValue typeDefs' offset struct') vars Map.empty
   where
-    zipMapMaybe _ [] m = m
+    zipMapMaybe _ [] m = Right m
     zipMapMaybe f (a:as) m = case (f a) of
-      Nothing -> zipMapMaybe f as m
-      Just b -> zipMapMaybe f as $ foldl' (apply (.|.)) m b
+      Left t -> Left t
+      Right Nothing -> zipMapMaybe f as m
+      Right (Just b) -> zipMapMaybe f as $ foldl' (apply (.|.)) m b
     apply f m (a,b) = case Map.lookup a m of
       Nothing -> Map.insert a b m
       Just c -> Map.insert a (f c b) m
@@ -509,14 +511,15 @@ encodeValue
   -> Word256
   -> Struct
   -> Text
-  -> Text
-  -> Maybe [(Word256,Word256)]
-encodeValue typeDefs' offset Struct{..} varName val = case OMap.lookup varName fields of
-   Nothing -> Nothing
-   Just (Right position, theType) -> case (textToValue (Just typeDefs') val theType) of
-     Left err -> error $ "encodeValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
-     Right v -> Just $ encodeValue' typeDefs' (position `Storage.addOffset` fromIntegral offset) theType v
-   Just (Left _, _) -> error "decodeValue: cannot convert constant variable to storage"
+  -> ArgValue
+  -> Either Text (Maybe [(Word256,Word256)])
+encodeValue typeDefs' offset Struct{..} varName argVal = case OMap.lookup varName fields of
+   Nothing -> Right Nothing
+   Just (Right position, theType) -> do
+     val <- argValueToValue (Just typeDefs') theType argVal
+     return . Just $
+       encodeValue' typeDefs' (position `Storage.addOffset` fromIntegral offset) theType val
+   Just (Left _, _) -> Left "encodeValue: cannot convert constant variable to storage"
 
 encodeValue'
   :: TypeDefs
