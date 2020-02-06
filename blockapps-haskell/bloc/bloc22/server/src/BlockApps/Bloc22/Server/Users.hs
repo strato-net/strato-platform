@@ -258,7 +258,7 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
     metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
   unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
-  argsBin <- constructArgValues (fmap (fmap argValueToText) args) xabiArgs
+  argsBin <- constructArgValues args xabiArgs
   tx <- signAndPrepare sign fromAddr metadata' $
     TransactionHeader
       Nothing
@@ -295,7 +295,7 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   $logInfoLS "postUsersContractSolidVM'/args" args
 
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
-  (_, argsAsSource) <- constructArgValuesAndSource (fmap (fmap argValueToText) args) xabiArgs
+  (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
 
   let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource)]
 
@@ -360,7 +360,7 @@ postUsersUploadListSolidVM' ContractListParameters{..} sign = do
               x <- lift $ deserializeXabi x'
               at name <?= (b, src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
-      (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just (fmap argValueToText args)) xabiArgs
+      (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
       tx <- lift . signAndPrepare sign fromAddr metadata' $
@@ -414,7 +414,7 @@ postUsersUploadListEVM' ContractListParameters{..} sign = do
               x <- lift $ deserializeXabi x'
               at name <?= (b, src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
-      argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
+      argsBin <- lift $ constructArgValues (Just args) xabiArgs
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
       tx <- lift . signAndPrepare sign fromAddr metadata' $
           TransactionHeader
@@ -561,7 +561,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
              _ -> lift $ throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
           let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
           (argsBin, argsAsSource) <-
-            lift $ constructArgValuesAndSource (Just (fmap argValueToText methodcallArgs)) xabiArgs
+            lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
           let methodcallMetadataWithCallInfo = Just $
                 Map.insert "funcName" methodcallMethodName
                 $ Map.insert "args" argsAsSource
@@ -649,7 +649,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
        Just (_, TypeFunction selector _ _) -> return selector
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
-    (argsBin, argsAsSource) <- constructArgValuesAndSource (Just (fmap argValueToText args)) xabiArgs
+    (argsBin, argsAsSource) <- constructArgValuesAndSource (Just args) xabiArgs
     let metadataWithCallInfo =
           Map.insert "funcName" funcName
           $ Map.insert "args" argsAsSource
@@ -830,11 +830,11 @@ convertResultResToVals txResp responseTypes =
   let byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
   in map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
-getArgValues :: Map Text Text -> Map Text Xabi.IndexedType -> Bloc [Value]
+getArgValues :: Map Text ArgValue -> Map Text Xabi.IndexedType -> Bloc [Value]
 getArgValues argsMap argNamesTypes = do
     let
-      determineValue :: Text -> Xabi.IndexedType -> Bloc (Int32, Value)
-      determineValue valStr (Xabi.IndexedType ix xabiType) =
+      determineValue :: ArgValue -> Xabi.IndexedType -> Bloc (Int32, Value)
+      determineValue argVal (Xabi.IndexedType ix xabiType) =
         let
           typeM = case xabiType of
             Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
@@ -868,7 +868,7 @@ getArgValues argsMap argNamesTypes = do
             Xabi.Label _                 -> Right $ SimpleType typeUInt -- since Enums are converted to Ints
         in do
           ty <- either (blocError . UserError) return typeM
-          either (blocError . UserError) (return . (ix,)) (textToValue Nothing valStr ty)
+          either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)
     argsVals <-
       if not (Map.keysSet argNamesTypes `isSubsetOf` Map.keysSet argsMap)
       then do
@@ -879,7 +879,7 @@ getArgValues argsMap argNamesTypes = do
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
 
-constructArgValues :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc ByteString
+constructArgValues :: Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> Bloc ByteString
 constructArgValues args argNamesTypes = do
     case args of
       Nothing ->
@@ -890,7 +890,7 @@ constructArgValues args argNamesTypes = do
         vals <- getArgValues argsMap argNamesTypes
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
-constructArgValuesAndSource :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc (ByteString, Text)
+constructArgValuesAndSource :: Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> Bloc (ByteString, Text)
 constructArgValuesAndSource args argNamesTypes = do
     case args of
       Nothing ->
