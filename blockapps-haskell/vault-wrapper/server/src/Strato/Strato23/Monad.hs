@@ -172,11 +172,12 @@ enterVaultWrapper env x
                      "You are using a feature that has not yet been implemented.",
                      Text.unpack err
                    ]}
-          RuntimeError _ -> err500{errBody = fromString $ unlines
+          RuntimeError err -> err500{errBody = fromString $ unlines
                    [
                      "Runtime Error!",
                      "Something wrong has happened inside of STRATO.",
-                     "Please contact your network administrator to have this problem fixed."
+                     "Please contact your network administrator to have this problem fixed.",
+                     "The error was: " ++ (show err)
                    ]}
 
 withPassword :: (Password -> VaultM a) -> VaultM a
