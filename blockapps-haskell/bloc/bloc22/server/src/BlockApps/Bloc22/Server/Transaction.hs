@@ -7,6 +7,7 @@
 
 module BlockApps.Bloc22.Server.Transaction where
 
+import           Control.Applicative               ((<|>))
 import           Control.Monad
 import           Control.Monad.Except
 import qualified Data.Map.Strict                   as Map
