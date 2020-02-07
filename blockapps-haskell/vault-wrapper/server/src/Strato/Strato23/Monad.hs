@@ -136,7 +136,7 @@ enterVaultWrapper env x
           DBError _ ->
             err500{errBody = fromString $ unlines
                    [
-                     "Internal Error!",
+                     "DB Error!",
                      "Something is broken in the STRATO database.",
                      "Please contact your network administrator to have this problem fixed."
                    ]}
@@ -161,7 +161,7 @@ enterVaultWrapper env x
           AnError _ ->
             err500{errBody = fromString $ unlines
                    [
-                     "Internal Error!",
+                     "An Error!",
                      "Something is broken in STRATO.",
                      "Please contact your network administrator to have this problem fixed."
                    ]}
@@ -174,7 +174,7 @@ enterVaultWrapper env x
                    ]}
           RuntimeError _ -> err500{errBody = fromString $ unlines
                    [
-                     "Internal Error!",
+                     "Runtime Error!",
                      "Something wrong has happened inside of STRATO.",
                      "Please contact your network administrator to have this problem fixed."
                    ]}
