@@ -58,7 +58,6 @@ function logoutAccount() {
         'Content-Type': 'application/json'
       }
     })
-    .then(handleErrors)
     .then(function (response) {
       return response.json();
     })
@@ -99,6 +98,7 @@ function getOrCreateOauthUserApi() {
       },
       body: JSON.stringify({})
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })
@@ -142,7 +142,7 @@ function* logout() {
     yield put(resetFirstTimeUser());
     yield put(logoutSuccess());
   } catch (err) {
-    // Handle when you have error on logout
+    console.error('Failed to logout. Error:', err)
   }
 }
 
@@ -150,7 +150,9 @@ function* getOrCreateOauthUser() {
   try {
     const user = yield call(getOrCreateOauthUserApi);
     if (user.error) {
-      window.location.href = '/auth/logout'
+      // We only get the non-401 errors here (401 is handled inside of getOrCreateOauthUserApi)
+      console.error('Failed to create account for OAuth user. Error:', user.error)
+      // Admin: refer to strato nginx and apex logs for details
     } else {
       localStorage.setItem('user', JSON.stringify(user));
       yield put(getOrCreateOauthUserSuccess(user));
