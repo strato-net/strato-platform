@@ -46,7 +46,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (transferpayloadValue p)
                         txParams
                         (transferpayloadMetadata p)
-                        chainId
+                        (transferpayloadChainid p <|> chainId)
                         resolve
             fmap (:[]) $ postUsersSend' btp (callSignature userName)
           xs -> do
@@ -70,7 +70,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (contractpayloadValue p)
                         txParams
                         (contractpayloadMetadata p)
-                        chainId
+                        (contractpayloadChainid p <|> chainId)
                         resolve
                 poster = case Map.lookup "VM" =<< md of
                             Nothing -> postUsersContractEVM'
@@ -108,7 +108,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (functionpayloadValue p)
                         txParams
                         (functionpayloadMetadata p)
-                        chainId
+                        (functionpayloadChainid p <|> chainId)
                         resolve
             fmap (:[]) $ postUsersContractMethod' bfp (callSignature userName)
           xs -> do
