@@ -1,0 +1,31 @@
+{
+  "name": "vault-bug",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "blockapps-rest": "^7.6.1",
+    "body-parser": "^1.19.0",
+    "chai": "^4.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "express-winston": "^4.0.2",
+    "helmet": "^3.21.2",
+    "jwt-decode": "^2.2.0",
+    "mocha": "^7.0.1",
+    "moment": "^2.24.0",
+    "winston": "^3.2.1"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.8.4",
+    "@babel/core": "^7.8.4",
+    "@babel/node": "^7.8.4",
+    "@babel/preset-env": "^7.8.4",
+    "@babel/register": "^7.8.3"
+  },
+  "scripts": {
+    "start": "babel-node index"
+  }
+}
