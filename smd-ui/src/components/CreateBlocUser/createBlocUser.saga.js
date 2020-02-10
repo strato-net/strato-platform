@@ -17,11 +17,9 @@ import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
 import { createUrl } from '../../lib/url';
 
-const blocUrl = env.BLOC_URL + "/users/:username"
-
 export function createBlocUserApiCall(username, password) {
   const options = { params: { username } };
-  const url = createUrl(blocUrl, options);
+  const url = env.BLOC_URL + createUrl("/users/:username", options);
 
   return fetch(
     url,

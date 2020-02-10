@@ -16,7 +16,6 @@ import { handleErrors } from '../../lib/handleErrors';
 import { createUrl } from '../../lib/url';
 
 const cirrusUrl = env.CIRRUS_URL + '/:contractName?:queryString:chainid';
-const contractUrl = env.BLOC_URL + '/contracts/:contractName/Latest';
 
 export function queryCirrusRequest(name, queryString, chainId) {
   let chain;
@@ -46,7 +45,7 @@ export function queryCirrusRequest(name, queryString, chainId) {
 
 export function queryCirrusVarsRequest(contractName) {
   const options = { params: { contractName } };
-  const url = createUrl(contractUrl, options);
+  const url = env.BLOC_URL + createUrl('/contracts/:contractName/Latest', options);
 
   return fetch(
     url,

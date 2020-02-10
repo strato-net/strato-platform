@@ -12,11 +12,9 @@ import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
 import { createUrl } from '../../lib/url';
 
-const urlLastFifteen = env.STRATO_URL + "/transaction/last/15";
-
 export function getTx(last, chainid) {
   const options = { query: { chainid } };
-  const url = createUrl(urlLastFifteen, options);
+  const url = env.STRATO_URL + createUrl("/transaction/last/15", options);
 
   return fetch(
     url,
