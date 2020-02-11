@@ -214,13 +214,21 @@ async function search(user, contract, options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function searchWithFullResponse(user, contract, options) {
+async function searchWithContentRange(user, contract, options) {
   const url = getNodeUrl(options);
   const urlParams = {
-    name: contract.name
+      name: contract.name
   };
   const endpoint = constructEndpoint(Endpoint.SEARCH, options, urlParams);
-  return getWithFullResponse(url, endpoint, setAuthHeaders(user, options));
+  const headersWithCount = { ...options.headers, Prefer: 'count=exact' };
+  const optionsWithCount = { ...options, headers: headersWithCount, getFullResponse: true };
+  const { data, headers } = await get(url, endpoint, setAuthHeaders(user, optionsWithCount));
+  const contentRangeStr = headers['content-range'];
+  const [range, countStr] = contentRangeStr.split('/');
+  const [start, end] = range.split('-').map((s) => parseInt(s, 10));
+  const count = parseInt(countStr, 10);
+  const contentRange = { start, end, count }
+  return { data, contentRange };
 }
 
 // TODO: check options.params and options.headers in axoos wrapper.
@@ -315,7 +323,7 @@ export default {
   getKey,
   createKey,
   search,
-  searchWithFullResponse,
+  searchWithContentRange,
   getChains,
   createChain,
   createChains,

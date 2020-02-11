@@ -14,12 +14,11 @@ if (!process.env.USER_TOKEN) {
 
 const config = factory.getTestConfig();
 const fixtures = factory.getTestFixtures();
-const logger = console;
 
 describe("rest_7", function() {
   this.timeout(config.timeout);
   let admin;
-  const options = { config, logger };
+  const options = { config };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
@@ -310,7 +309,7 @@ function stringValue(uid, index) {
 
 describe("search until", function() {
   this.timeout(config.timeout);
-  const options = { config, logger };
+  const options = { config };
   let admin, contract;
 
   before(async () => {
@@ -380,7 +379,7 @@ describe("search until", function() {
 
 describe("search query", function() {
   this.timeout(config.timeout);
-  const options = { config, logger };
+  const options = { config };
   const count = 4;
   let admin;
 
@@ -413,6 +412,39 @@ describe("search query", function() {
     assert.lengthOf(results, count, `array has length of ${count}`);
     // check all
     results.forEach((result, index) => {
+      assert.equal(result.address, contracts[index].address, "address");
+      assert.equal(result.intValue, intValue(uid, index), "intValue");
+      assert.equal(result.stringValue, stringValue(uid, index), "stringValue");
+    });
+  });
+
+  it("search multiple with content range", async () => {
+    const uid = util.uid();
+    const contracts = [];
+
+    for (let i = 0; i < count; i++) {
+      const contract = await createSearchContract(admin, uid, i, options);
+      contracts.push(contract);
+    }
+
+    // wait for all contracts to be created
+    function predicate(response) {
+      return response.data.length >= count;
+    }
+
+    const contentRangeOptions = { ...options, getContentRange: true }
+    const results = await rest.searchWithContentRangeUntil(
+      admin,
+      contracts[0],
+      predicate,
+      contentRangeOptions
+    );
+    const { data, contentRange } = results
+    assert.isDefined(contentRange, "contentRange should be defined");
+    assert.isArray(data, "should be array");
+    assert.lengthOf(data, count, `array has length of ${count}`);
+    // check all
+    data.forEach((result, index) => {
       assert.equal(result.address, contracts[index].address, "address");
       assert.equal(result.intValue, intValue(uid, index), "intValue");
       assert.equal(result.stringValue, stringValue(uid, index), "stringValue");
