@@ -60,7 +60,7 @@ main = do
   void $ Strato23.runMigrations conn
   close conn
 
-  pool <- createPool (connect dbConnectInfo) close 5 3 5
+  pool <- createPool (connect dbConnectInfo) close 20 3 20
   mgr <- newManager defaultManagerSettings
   password <- newIORef Nothing
   let env = Strato23.VaultWrapperEnv mgr pool password
