@@ -440,6 +440,9 @@ describe("search query", function() {
     );
     const { data, contentRange } = results
     assert.isDefined(contentRange, "contentRange should be defined");
+    assert.equal(contentRange.count, count, "contentRange.count should be equal to count");
+    assert.equal(contentRange.start, 0, "contentRange.start should be equal to 0");
+    assert.equal(contentRange.end, count - 1, "contentRange.end should be equal to count - 1");
     assert.isArray(data, "should be array");
     assert.lengthOf(data, count, `array has length of ${count}`);
     // check all
@@ -448,6 +451,37 @@ describe("search query", function() {
       assert.equal(result.intValue, intValue(uid, index), "intValue");
       assert.equal(result.stringValue, stringValue(uid, index), "stringValue");
     });
+  });
+
+  it("search with content range - no results", async () => {
+    const uid = util.uid();
+    const contracts = [];
+
+    for (let i = 0; i < count; i++) {
+      const contract = await createSearchContract(admin, uid, i, options);
+      contracts.push(contract);
+    }
+
+    // wait for all contracts to be created
+    function predicate(response) {
+      return true;
+    }
+
+    const query = { stringValue: 'eq.ThIs Is NoT a ReAl VaLuE' }
+    const dummySearchOptions = { ...options, query }
+    const results = await rest.searchWithContentRangeUntil(
+      admin,
+      contracts[0],
+      predicate,
+      dummySearchOptions
+    );
+    const { data, contentRange } = results
+    assert.isDefined(contentRange, "contentRange should be defined");
+    assert.equal(contentRange.count, 0, "count should be 0");
+    assert.isUndefined(contentRange.start, "start should be undefined");
+    assert.isUndefined(contentRange.end, "end should be undefined");
+    assert.isArray(data, "should be array");
+    assert.lengthOf(data, 0, `array has length of ${count}`);
   });
 
   it("search by value", async () => {

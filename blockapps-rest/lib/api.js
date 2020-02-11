@@ -225,9 +225,13 @@ async function searchWithContentRange(user, contract, options) {
   const { data, headers } = await get(url, endpoint, setAuthHeaders(user, optionsWithCount));
   const contentRangeStr = headers['content-range'];
   const [range, countStr] = contentRangeStr.split('/');
-  const [start, end] = range.split('-').map((s) => parseInt(s, 10));
   const count = parseInt(countStr, 10);
-  const contentRange = { start, end, count }
+  if (range === "*") {
+    const contentRange = { count };
+    return { data, contentRange };
+  }
+  const [start, end] = range.split('-').map((s) => parseInt(s, 10));
+  const contentRange = { start, end, count };
   return { data, contentRange };
 }
 
