@@ -432,12 +432,11 @@ describe("search query", function() {
       return response.data.length >= count;
     }
 
-    const contentRangeOptions = { ...options, getContentRange: true }
     const results = await rest.searchWithContentRangeUntil(
       admin,
       contracts[0],
       predicate,
-      contentRangeOptions
+      options
     );
     const { data, contentRange } = results
     assert.isDefined(contentRange, "contentRange should be defined");
