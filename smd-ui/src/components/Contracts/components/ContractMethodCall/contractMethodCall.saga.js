@@ -17,13 +17,9 @@ import { handleErrors } from '../../../../lib/handleErrors';
 import { createUrl } from '../../../../lib/url';
 import { isOauthEnabled } from '../../../../lib/checkMode';
 
-const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress";
-const blocMethodUrl = env.BLOC_URL + "/users/:username/:userAddress/contract/:contractName/:contractAddress/call";
-const transactionUrl = env.STRATO_URL_V23 + "/transaction"
-
 export function getArgs(contractName, contractAddress, symbol, chainid) {
   const options = { params: { contractName, contractAddress }, query: { chainid } };
-  const url = createUrl(contractsUrl, options);
+  const url = env.BLOC_URL + createUrl("/contracts/:contractName/:contractAddress", options);
 
   return fetch(
     url,
@@ -55,7 +51,8 @@ export function postMethodCall(payload) {
       }, query: { resolve: true, chainid: payload.chainid }
     };
 
-  const url = createUrl(isModeOauth ? transactionUrl : blocMethodUrl, options);
+  const prefix = isModeOauth ? env.STRATO_URL_V23 : env.BLOC_URL;
+  const url = prefix + createUrl(isModeOauth ? '/transaction' : '/users/:username/:userAddress/contract/:contractName/:contractAddress/call', options);
 
   const blocBody = {
     password: payload.password,

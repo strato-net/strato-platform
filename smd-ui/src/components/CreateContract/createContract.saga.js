@@ -20,13 +20,12 @@ import { createUrl } from '../../lib/url';
 
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
-const userContractUrl = env.BLOC_URL + "/users/:username/:address/contract";
-const transactionUrl = env.STRATO_URL_V23 + "/transaction"
 
 export function createContractApiCall(contract, src, username, address, password, args, chainid, metadata) {
-
-  const options = isOauthEnabled() ? { query: { resolve: true, chainid } } : { params: { username, address }, query: { resolve: true, chainid } };
-  const url = createUrl(isOauthEnabled() ? transactionUrl : userContractUrl, options);
+  const isOauth = isOauthEnabled();
+  const options = isOauth ? { query: { resolve: true, chainid } } : { params: { username, address }, query: { resolve: true, chainid } };
+  const prefix = isOauth ? env.STRATO_URL_V23 : env.BLOC_URL;
+  const url = prefix + createUrl(isOauth ? "/transaction" : "/users/:username/:address/contract", options);
 
   const blocBody = { contract, value: 0, password, src, args, metadata };
   const oauthBody = {

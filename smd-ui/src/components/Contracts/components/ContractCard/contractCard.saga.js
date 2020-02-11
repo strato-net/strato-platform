@@ -18,13 +18,9 @@ import { env } from '../../../../env.js'
 import { handleErrors } from '../../../../lib/handleErrors';
 import { createUrl } from '../../../../lib/url';
 
-const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress/state";
-const cirrusUrl = env.CIRRUS_URL + '/:contractName'
-const accountUrl = env.STRATO_URL + '/account'
-
 export function getState(contractName, contractAddress, chainid) {
   const options = { params: { contractName, contractAddress }, query: { chainid } };
-  const url = createUrl(contractsUrl, options);
+  const url = env.BLOC_URL + createUrl("/contracts/:contractName/:contractAddress/state", options);
 
   return fetch(
     url,
@@ -46,7 +42,7 @@ export function getState(contractName, contractAddress, chainid) {
 
 export function getCirrusInstances(contractName) {
   const options = { params: { contractName } };
-  const url = createUrl(cirrusUrl, options);
+  const url = env.CIRRUS_URL + createUrl("/:contractName", options);
 
   return fetch(
     url,
@@ -71,7 +67,7 @@ export function getCirrusInstances(contractName) {
 
 export function getAccount(address) {
   const options = { query: { address } };
-  const url = createUrl(accountUrl, options);
+  const url = env.STRATO_URL + createUrl("/account", options);
 
   return fetch(
     url,
