@@ -65,6 +65,55 @@ async function post(host, endpoint, body, options) {
   }
 }
 
+async function getWithFullResponse(host, endpoint, options = {}) {
+  const logger = options.logger || (options.config.apiDebug? console : nullLogger)
+  const url = host + endpoint
+  const request = {
+    method: 'GET',
+    url,
+    headers: options.headers || null,
+    params: options.params || null,
+    transformResponse: [toJson],
+  }
+  try {
+    logger.debug('### axios GET')
+    logger.debug(requestFormatter(request))
+    const response = await axios(request)
+    logger.debug('### axios GET response')
+    logger.debug(responseFormatter(response))
+    return response
+  } catch (err) {
+    logger.error(errorFormatter(err))
+    logger.debug('### axios GET error')
+    logger.debug(errorFormatter(err))
+    throw err
+  }
+}
+
+async function postWithFullResponse(host, endpoint, body, options) {
+  const logger = options.logger || (options.config.apiDebug? console : nullLogger)
+  const url = host + endpoint
+  const request = {
+    url,
+    method: 'POST',
+    headers: options.headers || null,
+    data: body,
+    transformResponse: [toJson],
+  }
+  try {
+    logger.debug('### axios POST')
+    logger.debug(requestFormatter(request))
+    const response = await axios(request)
+    logger.debug('### axios POST response')
+    logger.debug(responseFormatter(response))
+    return response
+  } catch (err) {
+    logger.debug('### axios POST error')
+    logger.error(errorFormatter(err))
+    throw err
+  }
+}
+
 function requestFormatter(_request) {
   const request = JSON.parse(JSON.stringify(_request)) // deep copy
   if (request.headers && request.headers.Authorization) {
@@ -135,8 +184,17 @@ async function postue(host, endpoint, data, _options) {
   return post(host, endpoint, queryString.stringify(data), options)
 }
 
+async function postueWithFullResponse(host, endpoint, data, _options) {
+  const options = Object.assign({}, _options)
+  options.headers = Object.assign({}, options.headers, urlencodedHeaders)
+  return postWithFullResponse(host, endpoint, queryString.stringify(data), options)
+}
+
 export default {
   get,
   post,
+  getWithFullResponse,
+  postWithFullResponse,
   postue,
+  postueWithFullResponse,
 }

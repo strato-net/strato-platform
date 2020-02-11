@@ -214,6 +214,15 @@ async function search(user, contract, options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
+async function searchWithFullResponse(user, contract, options) {
+  const url = getNodeUrl(options);
+  const urlParams = {
+    name: contract.name
+  };
+  const endpoint = constructEndpoint(Endpoint.SEARCH, options, urlParams);
+  return getWithFullResponse(url, endpoint, setAuthHeaders(user, options));
+}
+
 // TODO: check options.params and options.headers in axoos wrapper.
 async function getChains(chainIds, options) {
   const url = getNodeUrl(options);
@@ -306,6 +315,7 @@ export default {
   getKey,
   createKey,
   search,
+  searchWithFullResponse,
   getChains,
   createChain,
   createChains,

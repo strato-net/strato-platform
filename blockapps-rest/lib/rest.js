@@ -320,6 +320,27 @@ async function searchUntil(user, contract, predicate, options) {
   return results;
 }
 
+async function searchWithFullResponse(user, contract, options) {
+  try {
+    const results = await api.searchWithFullResponse(user, contract, options);
+    return results;
+  } catch (err) {
+    if (err.response && err.response.status === RestStatus.NOT_FOUND) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function searchUntilWithFullResponse(user, contract, predicate, options) {
+  const action = async o => {
+    return searchWithFullResponse(user, contract, o);
+  };
+
+  const results = await util.until(predicate, action, options);
+  return results;
+}
+
 // =====================================================================
 //   Chains
 // =====================================================================
@@ -434,6 +455,29 @@ async function waitForAddress(user, contract, _options) {
   return results[0];
 }
 
+async function waitForAddressWithFullResponse(user, contract, _options) {
+  const options = Object.assign(
+    {
+      query: {
+        address: `eq.${contract.address}`
+      }
+    },
+    _options
+  );
+
+  function predicate(response) {
+    return (
+      response !== undefined &&
+        response.length != undefined &&
+        response.length > 0
+    );
+  }
+
+  const results = await searchUntilWithFullResponse(user, contract, predicate, options);
+  const result = { ...results, data: results.data[0]};
+  return result;
+}
+
 export default {
   getUsers,
   getUser,
@@ -458,6 +502,8 @@ export default {
   //
   search,
   searchUntil,
+  searchWithFullResponse,
+  searchUntilWithFullResponse,
   //
   createChain,
   createChains,
@@ -475,5 +521,6 @@ export default {
   RestError,
   response,
   //
-  waitForAddress
+  waitForAddress,
+  waitForAddressWithFullResponse
 };
