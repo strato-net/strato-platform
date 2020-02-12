@@ -33,7 +33,6 @@ module Blockchain.Context
 
 
 import           Conduit
-import           Control.Applicative
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Modify           as Mod
 import           Blockchain.Output
@@ -182,7 +181,10 @@ getPeerByIP ip = runWithSQL $ do
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
 setPeerAddrIfUnset :: MonadState Context m => Address -> m ()
-setPeerAddrIfUnset addr = blockstanbulPeerAddr %= (<|> Just addr)
+setPeerAddrIfUnset addr = blockstanbulPeerAddr %= alt
+  where alt = \case -- strict alternative
+          Just a -> Just a
+          Nothing -> Just addr
 
 shouldSendToPeer :: MonadState Context m => Address -> m Bool
 shouldSendToPeer addr = maybe True zeroOrArg <$> use blockstanbulPeerAddr
