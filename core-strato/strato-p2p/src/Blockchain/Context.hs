@@ -38,7 +38,7 @@ import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Modify           as Mod
 import           Blockchain.Output
 import           Control.Monad.Reader
-import           Control.Monad.State
+import           Control.Monad.State.Strict
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 
