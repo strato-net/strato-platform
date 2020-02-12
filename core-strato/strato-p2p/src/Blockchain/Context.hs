@@ -16,6 +16,7 @@ module Blockchain.Context
     , ContextM
     , initContext
     , runContextM
+    , blockstanbulPeerAddr
     , getDebugMsg
     , addDebugMsg
     , getBlockHeaders
