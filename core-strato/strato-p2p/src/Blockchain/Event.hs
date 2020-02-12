@@ -18,7 +18,7 @@ import           Control.Monad
 import           Control.Monad.Change.Modify           hiding (get, put, yield, awaitForever)
 import           Control.Monad.IO.Class
 import           Blockchain.Output
-import           Control.Monad.State
+import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import           Data.Foldable                         (for_)
