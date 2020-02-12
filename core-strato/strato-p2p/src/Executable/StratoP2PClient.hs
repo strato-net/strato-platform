@@ -16,7 +16,7 @@ import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.State
+import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Resource
 import           Crypto.PubKey.ECC.DH
 import qualified Data.ByteString.Char8                 as BC
@@ -76,7 +76,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
 
         !eventSource <- mkEthP2PEventSource app inCtx (contextKafkaState initState)
         !eventSink <- mkEthP2PEventConduit (show $ appSockAddr app) outCtx
-        attempt :: Either SomeException () <- try . runConduit . evalStateLC initState $
+        attempt :: Either SomeException () <- try . runConduit . evalStateC initState $
                   transPipe lift eventSource
                .| handleMsgClientConduit myPublic peer
                .| transPipe lift eventSink

@@ -16,7 +16,7 @@ import           Conduit
 import           Control.Monad
 import           Control.Monad.Trans.Identity
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.State
+import           Control.Monad.Trans.State.Strict
 import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
 import           Data.Streaming.Network                (appCloseConnection)
@@ -62,7 +62,7 @@ runEthServer myPriv listenPort = do
               (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` appSink app
               !eventSource <- mkEthP2PEventSource app inCtx (contextKafkaState initState)
               !eventSink <- mkEthP2PEventConduit (show $ appSockAddr app) outCtx
-              (attempt :: Either SomeException ()) <- try . runConduit . evalStateLC initState $
+              (attempt :: Either SomeException ()) <- try . runConduit . evalStateC initState $
                      transPipe lift eventSource
                   .| handleMsgServerConduit myPubkey p
                   .| transPipe lift eventSink

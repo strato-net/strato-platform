@@ -5,7 +5,7 @@ module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
 import Conduit
 import Control.Monad
-import Control.Monad.Trans.State
+import Control.Monad.Trans.State.Strict
 import qualified Data.Text as T
 import Prometheus
 
