@@ -14,6 +14,7 @@ module Blockchain.Event (
   ) where
 
 import           Control.Arrow                         ((&&&), first)
+import           Control.Lens                          (use)
 import           Control.Monad
 import           Control.Monad.Change.Modify           hiding (get, put, yield, awaitForever)
 import           Control.Monad.IO.Class
@@ -309,6 +310,8 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (Blockstanbul wm) -> do
       stampActionTimestamp
       setPeerAddrIfUnset $ blockstanbulSender wm
+      peerAddr <- use blockstanbulPeerAddr
+      $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
       lift $ SK.emitBlockstanbulMsg wm
 
     -- private chains
