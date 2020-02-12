@@ -12,7 +12,7 @@ module Blockchain.CommunicationConduit
 
 import           Control.Monad.Change.Modify           (Accessible)
 import           Control.Monad.IO.Unlift
-import           Control.Monad.State
+import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Resource
 import           Crypto.Types.PubKey.ECC
 import           Data.Bits                             (shiftL)
