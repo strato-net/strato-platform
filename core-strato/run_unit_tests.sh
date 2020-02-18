@@ -32,7 +32,7 @@ BENCHES=(
 )
 # There's a good chance that strato-getting-started is also running, so
 # we change redis's port to avoid a conflict.
-POSTGRES=$(docker run -d -p 2345:5432 postgres:9.6)
+POSTGRES=$(docker run -d -p 2345:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:9.6)
 trap "docker rm -f ${POSTGRES}" EXIT
 REDIS=$(docker run -d -p 2023:6379 redis:3.2 redis-server --appendonly yes)
 trap "docker rm -f ${POSTGRES} ${REDIS}" EXIT
