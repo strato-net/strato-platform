@@ -5,10 +5,10 @@ module EventSpec where
 
 import ClassyPrelude (atomically)
 import Conduit
+import Control.Monad.State
 import Control.Monad.Trans.Reader
 import Data.Conduit.TMChan
 import Database.Persist.Sql
-import Database.Persist.Postgresql
 import qualified Data.Map                              as M
 import qualified Database.Redis                        as Redis
 import Text.Printf
@@ -38,8 +38,8 @@ import Test.QuickCheck
 -- Kafka, postgres, or ethconf. It does need redis, but targets
 -- a test instance.
 testContext :: (MonadIO m, MonadUnliftIO m)
-            => ConnectionPool -> m (TMChan [IngestEvent], Config, Context)
-testContext pool = do
+            => m (TMChan [IngestEvent], Context)
+testContext = do
   redisBDBPool <- liftIO . Redis.checkedConnect $ Redis.defaultConnectInfo {
         Redis.connectHost           = "localhost",
         Redis.connectPort           = Redis.PortNumber 2023,
@@ -47,7 +47,6 @@ testContext pool = do
     }
   ch <- atomically newTMChan
   return ( ch
-         , Config pool
          , Context { actionTimestamp = Nothing
                    , contextRedisBlockDB = RBDB.RedisConnection redisBDBPool
                    , contextKafkaState = error "no kafka state available"
@@ -76,18 +75,13 @@ migrateAll = do
 
 runTestPeer :: (TMChan [IngestEvent] -> ContextM a) -> IO ()
 runTestPeer mv = do
-  runNoLoggingT $ withPostgresqlPool "host=localhost port=2345 user=postgres" 4 $ \pool -> do
-    (ch, cfg, ctx) <- testContext pool
-    liftSqlPersistMPool migrateAll pool
-    runContextM (cfg, ctx) (mv ch)
+  runNoLoggingT $ do
+    (ch, ctx) <- testContext
+    runContextM (error "runTestPeer: no SQL database setup") . flip runStateT ctx $ mv ch
 
 spec :: Spec
 spec = do
   describe "environment sanity checks" $ do
-    it "has a PPeer table" $ do
-      runTestPeer . const $ do
-        pool <- lift $ asks configSQLDB
-        liftSqlPersistMPool (count ([] :: [Filter DataPeer.PPeer])) pool `L.shouldReturn` 0
     it "can pretend to write to kafka" $ do
       quickCheck . once $ \ori txs -> runTestPeer . const $ emitKafkaTransactions ori txs
       quickCheck . once $ \ori blk -> runTestPeer . const $ emitKafkaBlock ori blk

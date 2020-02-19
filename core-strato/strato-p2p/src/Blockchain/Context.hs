@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -10,12 +11,14 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS -fno-warn-orphans      #-}
+{-# OPTIONS -fno-warn-missing-methods #-}
 module Blockchain.Context
     ( Context(..)
     , Config(..)
     , ContextM
     , GenesisBlockHash(..)
     , BestBlockNumber(..)
+    , WithPPeerByIP(..)
     , initContext
     , runContextM
     , blockstanbulPeerAddr
@@ -201,6 +204,19 @@ instance (MonadIO m, MonadState Context m, Mod.Modifiable K.KafkaState m) => Mod
 instance (MonadState Context m, MonadIO m, Mod.Modifiable K.KafkaState m) => HasVMEventsSink m where
   getVMEventsSink = gets vmEventsSink
 
+-- dummy newtype wrapper to avoid overlapping instance
+newtype WithPPeerByIP m a = WithPPeerByIP { unPPeerByIp :: m a }
+  deriving (Functor, Applicative, Monad)
+
+instance HasSQLDB m => A.Selectable String PPeer (WithPPeerByIP m) where
+  select _ ip = WithPPeerByIP $ do
+    db <- Mod.access (Mod.Proxy @SQLDB)
+    SQL.runSqlPool actions db >>= \case
+        [] -> return Nothing
+        lst -> return . Just . SQL.entityVal $ head lst
+
+    where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
+
 getDebugMsg :: MonadState Context m => m String
 getDebugMsg = concat . reverse . vmTrace <$> get
 
@@ -245,10 +261,10 @@ clearActionTimestamp = do
     put cxt{actionTimestamp=Nothing}
 
 runContextM :: MonadUnliftIO m
-            => (r, s)
-            -> StateT s (ReaderT r (ResourceT m)) a
+            => r
+            -> ReaderT r (ResourceT m) a
             -> m ()
-runContextM (r, s) = void . runResourceT . flip runReaderT r . flip runStateT s
+runContextM r = void . runResourceT . flip runReaderT r
 
 initContext :: ( MonadLogger m
                , MonadUnliftIO m
@@ -272,16 +288,10 @@ initContext maxHeaders = do
                  })
 
 
-getPeerByIP :: WrapsSQLDB t m
+getPeerByIP :: A.Selectable String PPeer m
             => String
-            -> (t m) (Maybe (SQL.Entity PPeer))
-getPeerByIP ip = runWithSQL $ do
-    db <- Mod.access (Mod.Proxy @SQLDB)
-    SQL.runSqlPool actions db >>= \case
-        [] -> return Nothing
-        lst -> return . Just $ head lst
-
-    where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
+            -> m (Maybe PPeer)
+getPeerByIP = A.select (A.Proxy @PPeer)
 
 setPeerAddrIfUnset :: MonadState Context m => Address -> m ()
 setPeerAddrIfUnset addr = blockstanbulPeerAddr %= (<|> Just addr)
