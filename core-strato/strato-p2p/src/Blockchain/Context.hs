@@ -16,19 +16,22 @@ module Blockchain.Context
     ( Context(..)
     , Config(..)
     , ContextM
+    , ActionTimestamp(..)
+    , emptyActionTimestamp
+    , RemainingBlockHeaders(..)
+    , MaxReturnedHeaders(..)
+    , ConnectionTimeout(..)
+    , PeerAddress(..)
     , GenesisBlockHash(..)
     , BestBlockNumber(..)
     , WithPPeerByIP(..)
     , initContext
     , runContextM
     , blockstanbulPeerAddr
-    , getDebugMsg
-    , addDebugMsg
     , getBlockHeaders
     , putBlockHeaders
     , getRemainingBHeaders
     , putRemainingBHeaders
-    , clearDebugMsg
     , stampActionTimestamp
     , getActionTimestamp
     , clearActionTimestamp
@@ -84,6 +87,19 @@ import           Blockchain.Util                       (toMaybe)
 
 newtype Config = Config { configSQLDB :: SQLDB }
 
+newtype ActionTimestamp = ActionTimestamp { unActionTimestamp :: Maybe UTCTime }
+
+emptyActionTimestamp :: ActionTimestamp
+emptyActionTimestamp = ActionTimestamp Nothing
+
+newtype RemainingBlockHeaders = RemainingBlockHeaders { unRemainingBlockHeaders :: [BlockData] }
+newtype MaxReturnedHeaders = MaxReturnedHeaders { unMaxReturnedHeaders :: Int }
+newtype ConnectionTimeout = ConnectionTimeout { unConnectionTimeout :: Int }
+newtype PeerAddress = PeerAddress { unPeerAddress :: Maybe Address }
+
+withPeerAddress :: (Maybe Address -> Maybe Address) -> PeerAddress -> PeerAddress
+withPeerAddress f = PeerAddress . f . unPeerAddress
+
 data Context = Context
   { contextRedisBlockDB   :: RBDB.RedisConnection
   , contextKafkaState     :: K.KafkaState
@@ -91,11 +107,11 @@ data Context = Context
   , unseqSink             :: forall m . (MonadIO m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
   , vmEventsSink          :: forall m . (MonadIO m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
   , blockHeaders          :: [BlockData]
-  , remainingBlockHeaders :: [BlockData]
-  , actionTimestamp       :: Maybe UTCTime
-  , connectionTimeout     :: Int
-  , maxReturnedHeaders    :: Int
-  , _blockstanbulPeerAddr :: Maybe Address
+  , remainingBlockHeaders :: RemainingBlockHeaders
+  , actionTimestamp       :: ActionTimestamp
+  , connectionTimeout     :: ConnectionTimeout
+  , maxReturnedHeaders    :: MaxReturnedHeaders
+  , _blockstanbulPeerAddr :: PeerAddress
   }
 
 makeLenses ''Context
@@ -189,6 +205,40 @@ instance Monad m => Mod.Modifiable K.KafkaState (StateT Context m) where
   get _   = gets contextKafkaState
   put _ k = modify $ \c -> c{contextKafkaState = k}
 
+instance Monad m => Mod.Modifiable ActionTimestamp (StateT Context m) where
+  get _   = gets actionTimestamp
+  put _ k = modify $ \c -> c{actionTimestamp = k}
+
+instance Monad m => Mod.Accessible ActionTimestamp (StateT Context m) where
+  access _ = Mod.get (Mod.Proxy @ActionTimestamp)
+
+instance Monad m => Mod.Modifiable [BlockData] (StateT Context m) where
+  get _   = gets blockHeaders
+  put _ k = modify $ \c -> c{blockHeaders = k}
+
+instance Monad m => Mod.Accessible [BlockData] (StateT Context m) where
+  access _ = Mod.get (Mod.Proxy @[BlockData])
+
+instance Monad m => Mod.Modifiable RemainingBlockHeaders (StateT Context m) where
+  get _   = gets remainingBlockHeaders
+  put _ k = modify $ \c -> c{remainingBlockHeaders = k}
+
+instance Monad m => Mod.Accessible RemainingBlockHeaders (StateT Context m) where
+  access _ = Mod.get (Mod.Proxy @RemainingBlockHeaders)
+
+instance Monad m => Mod.Accessible MaxReturnedHeaders (StateT Context m) where
+  access _ = gets maxReturnedHeaders
+
+instance Monad m => Mod.Modifiable PeerAddress (StateT Context m) where
+  get _   = use blockstanbulPeerAddr
+  put _ k = blockstanbulPeerAddr .= k
+
+instance Monad m => Mod.Accessible PeerAddress (StateT Context m) where
+  access _ = Mod.get (Mod.Proxy @PeerAddress)
+
+instance Monad m => Mod.Accessible ConnectionTimeout (StateT Context m) where
+  access _ = gets connectionTimeout
+
 instance MonadIO m => Mod.Accessible RBDB.RedisConnection (StateT Context m) where
   access _ = gets contextRedisBlockDB
 
@@ -217,48 +267,28 @@ instance HasSQLDB m => A.Selectable String PPeer (WithPPeerByIP m) where
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
-getDebugMsg :: MonadState Context m => m String
-getDebugMsg = concat . reverse . vmTrace <$> get
+getBlockHeaders :: Mod.Accessible [BlockData] m => m [BlockData]
+getBlockHeaders = Mod.access (Mod.Proxy @[BlockData])
 
-getBlockHeaders :: MonadState Context m => m [BlockData]
-getBlockHeaders = blockHeaders <$> get
+putBlockHeaders :: Mod.Modifiable [BlockData] m => [BlockData]-> m ()
+putBlockHeaders = Mod.put (Mod.Proxy @[BlockData])
 
-putBlockHeaders :: MonadState Context m => [BlockData]->m ()
-putBlockHeaders headers = do
-    cxt <- get
-    put cxt{blockHeaders=headers}
+getRemainingBHeaders :: (Functor m, Mod.Accessible RemainingBlockHeaders m) => m [BlockData]
+getRemainingBHeaders = unRemainingBlockHeaders <$> Mod.access (Mod.Proxy @RemainingBlockHeaders)
 
-getRemainingBHeaders :: MonadState Context m => m [BlockData]
-getRemainingBHeaders = remainingBlockHeaders <$> get
+putRemainingBHeaders :: Mod.Modifiable RemainingBlockHeaders m => [BlockData]-> m ()
+putRemainingBHeaders = Mod.put (Mod.Proxy @RemainingBlockHeaders) . RemainingBlockHeaders
 
-putRemainingBHeaders :: MonadState Context m => [BlockData]->m ()
-putRemainingBHeaders headers = do
-    cxt <- get
-    put cxt{remainingBlockHeaders=headers}
-
-addDebugMsg :: MonadState Context m => String->m ()
-addDebugMsg msg = do
-    cxt <- get
-    put cxt{vmTrace=msg:vmTrace cxt}
-
-clearDebugMsg :: MonadState Context m => m ()
-clearDebugMsg = do
-    cxt <- get
-    put cxt{vmTrace=[]}
-
-stampActionTimestamp :: (MonadIO m, MonadState Context m) => m ()
+stampActionTimestamp :: (MonadIO m, Mod.Modifiable ActionTimestamp m) => m ()
 stampActionTimestamp = do
-    cxt <- get
-    ts <- liftIO getCurrentTime
-    put cxt{actionTimestamp=Just ts}
+  ts <- liftIO getCurrentTime
+  Mod.put (Mod.Proxy @ActionTimestamp) . ActionTimestamp $ Just ts
 
-getActionTimestamp :: MonadState Context m => m (Maybe UTCTime)
-getActionTimestamp = actionTimestamp <$> get
+getActionTimestamp :: Mod.Accessible ActionTimestamp m => m ActionTimestamp
+getActionTimestamp = Mod.access (Mod.Proxy @ActionTimestamp)
 
-clearActionTimestamp :: MonadState Context m => m ()
-clearActionTimestamp = do
-    cxt <- get
-    put cxt{actionTimestamp=Nothing}
+clearActionTimestamp :: Mod.Modifiable ActionTimestamp m => m ()
+clearActionTimestamp = Mod.put (Mod.Proxy @ActionTimestamp) emptyActionTimestamp
 
 runContextM :: MonadUnliftIO m
             => r
@@ -274,17 +304,17 @@ initContext maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   return (Config (sqlDB' dbs),
-         Context { actionTimestamp = Nothing
+         Context { actionTimestamp = emptyActionTimestamp
                  , contextRedisBlockDB = RBDB.RedisConnection redisBDBPool
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-                 , blockHeaders=[]
-                 , remainingBlockHeaders=[]
+                 , blockHeaders = []
+                 , remainingBlockHeaders = RemainingBlockHeaders []
                  , unseqSink=void . K.withKafkaViolently . writeUnseqEvents
                  , vmEventsSink=void . produceVMEventsM
                  , vmTrace=[]
-                 , connectionTimeout=flags_connectionTimeout
-                 , maxReturnedHeaders = maxHeaders
-                 , _blockstanbulPeerAddr = Nothing
+                 , connectionTimeout = ConnectionTimeout flags_connectionTimeout
+                 , maxReturnedHeaders = MaxReturnedHeaders maxHeaders
+                 , _blockstanbulPeerAddr = PeerAddress Nothing
                  })
 
 
@@ -293,10 +323,10 @@ getPeerByIP :: A.Selectable String PPeer m
             -> m (Maybe PPeer)
 getPeerByIP = A.select (A.Proxy @PPeer)
 
-setPeerAddrIfUnset :: MonadState Context m => Address -> m ()
-setPeerAddrIfUnset addr = blockstanbulPeerAddr %= (<|> Just addr)
+setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
+setPeerAddrIfUnset addr = Mod.modify_ (Mod.Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)
 
-shouldSendToPeer :: MonadState Context m => Address -> m Bool
-shouldSendToPeer addr = maybe True zeroOrArg <$> use blockstanbulPeerAddr
+shouldSendToPeer :: (Functor m, Mod.Accessible PeerAddress m) => Address -> m Bool
+shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Mod.Proxy @PeerAddress)
         -- 0x0 is for a broadcast sync message.
   where zeroOrArg addr' = addr' == 0x0 || addr' == addr

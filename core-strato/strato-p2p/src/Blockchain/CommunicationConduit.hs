@@ -149,6 +149,16 @@ handleMsgClientConduit :: ( MonadIO m
                           , Mod.Modifiable K.KafkaState m
                           , Mod.Modifiable BestBlock m
                           , Mod.Modifiable WorldBestBlock m
+                          , Mod.Modifiable ActionTimestamp m
+                          , Mod.Accessible ActionTimestamp m
+                          , Mod.Modifiable [BlockData] m
+                          , Mod.Accessible [BlockData] m
+                          , Mod.Modifiable RemainingBlockHeaders m
+                          , Mod.Accessible RemainingBlockHeaders m
+                          , Mod.Modifiable PeerAddress m
+                          , Mod.Accessible PeerAddress m
+                          , Mod.Accessible MaxReturnedHeaders m
+                          , Mod.Accessible ConnectionTimeout m
                           , (Integer `A.Selectable` Canonical BlockData) m
                           , (SHA `A.Alters` BlockData) m
                           , (IPAddress `A.Selectable` IPChains) m
@@ -195,11 +205,11 @@ handleMsgClientConduit myId peer = do
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
                 Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
-                mrh <- gets maxReturnedHeaders
+                mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
                 yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
                 yield . Right $ GetChainDetails []
                 handleGetChainDetails peer S.empty
-                stampActionTimestamp
+                lift stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
@@ -211,6 +221,16 @@ handleMsgServerConduit :: ( MonadIO m
                           , Mod.Modifiable K.KafkaState m
                           , Mod.Modifiable BestBlock m
                           , Mod.Modifiable WorldBestBlock m
+                          , Mod.Modifiable ActionTimestamp m
+                          , Mod.Accessible ActionTimestamp m
+                          , Mod.Modifiable [BlockData] m
+                          , Mod.Accessible [BlockData] m
+                          , Mod.Modifiable RemainingBlockHeaders m
+                          , Mod.Accessible RemainingBlockHeaders m
+                          , Mod.Modifiable PeerAddress m
+                          , Mod.Accessible PeerAddress m
+                          , Mod.Accessible MaxReturnedHeaders m
+                          , Mod.Accessible ConnectionTimeout m
                           , (Integer `A.Selectable` Canonical BlockData) m
                           , (SHA `A.Alters` BlockData) m
                           , (IPAddress `A.Selectable` IPChains) m

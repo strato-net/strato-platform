@@ -47,17 +47,17 @@ testContext = do
     }
   ch <- atomically newTMChan
   return ( ch
-         , Context { actionTimestamp = Nothing
+         , Context { actionTimestamp = emptyActionTimestamp
                    , contextRedisBlockDB = RBDB.RedisConnection redisBDBPool
                    , contextKafkaState = error "no kafka state available"
                    , blockHeaders=[]
-                   , remainingBlockHeaders=[]
+                   , remainingBlockHeaders = RemainingBlockHeaders []
                    , unseqSink=atomically . writeTMChan ch
                    , vmEventsSink=const (return ())
                    , vmTrace=[]
-                   , connectionTimeout=60
-                   , maxReturnedHeaders=1000
-                   , _blockstanbulPeerAddr=Nothing
+                   , connectionTimeout = ConnectionTimeout 60
+                   , maxReturnedHeaders = MaxReturnedHeaders 1000
+                   , _blockstanbulPeerAddr = PeerAddress Nothing
                    })
 
 testPeer :: DataPeer.PPeer

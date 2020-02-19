@@ -15,7 +15,6 @@ module Blockchain.Event (
   ) where
 
 import           Control.Arrow                         ((&&&), second)
-import           Control.Lens                          (use)
 import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify           hiding (get, put, yield, awaitForever)
@@ -40,7 +39,6 @@ import qualified Data.Text                             as T
 import           Data.These
 import           Data.Time.Clock
 import           MonadUtils
-import qualified Network.Kafka                         as K
 import           Prelude                               hiding (lookup)
 import           System.Random
 import           Text.Printf
@@ -122,11 +120,20 @@ yieldL = yield . Left
 handleEvents :: ( MonadIO m
                 , MonadResource m
                 , Accessible (SK.UnseqSink m) m
-                , MonadState Context m
                 , MonadLogger m
-                , Modifiable K.KafkaState m
+                , HasVMEventsSink m
                 , Modifiable BestBlock m
                 , Modifiable WorldBestBlock m
+                , Modifiable ActionTimestamp m
+                , Accessible ActionTimestamp m
+                , Modifiable [BlockData] m
+                , Accessible [BlockData] m
+                , Modifiable RemainingBlockHeaders m
+                , Accessible RemainingBlockHeaders m
+                , Modifiable PeerAddress m
+                , Accessible PeerAddress m
+                , Accessible MaxReturnedHeaders m
+                , Accessible ConnectionTimeout m
                 , (Integer `Selectable` Canonical BlockData) m
                 , (SHA `Alters` BlockData) m
                 , (IPAddress `Selectable` IPChains) m
@@ -143,12 +150,12 @@ handleEvents peer = awaitForever $ \case
     MsgEvt Ping     -> yieldR Pong
 
     MsgEvt (Transactions txs) -> do
-        stampActionTimestamp
+        lift stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
         lift $ SK.emitKafkaTransactions txo txs
 
     MsgEvt (NewBlock block' tdiff) -> do
-        stampActionTimestamp
+        lift stampActionTimestamp
         $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock with tdiff " ++ show tdiff
         let sha         = blockHash block'
         let header      = blockHeader block'
@@ -170,7 +177,7 @@ handleEvents peer = awaitForever $ \case
             void . lift $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
-        stampActionTimestamp
+        lift stampActionTimestamp
         bestBlock <- lift $ Mod.get (Proxy @BestBlock)
         let bestBlockNum = numberFromBestBlock bestBlock
         let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
@@ -178,11 +185,11 @@ handleEvents peer = awaitForever $ \case
         syncFetch Forward fetchNumber
 
     MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
-      stampActionTimestamp
+      lift stampActionTimestamp
       start' <- case dir of
         Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
         Forward -> return start
-      mrh <- gets maxReturnedHeaders
+      mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
       -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
       -- 3/4s of the blocks will be dropped when creating the blockheaders
       -- so we overcompensate here.
@@ -198,7 +205,7 @@ handleEvents peer = awaitForever $ \case
       yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
-      stampActionTimestamp
+      lift stampActionTimestamp
       maybeHeader <- lift $ lookup (Proxy @BlockData) start
       case maybeHeader of
         Nothing    -> yieldR (BlockBodies [])
@@ -209,14 +216,14 @@ handleEvents peer = awaitForever $ \case
                 Reverse -> if num > fromIntegral max'
                              then num - fromIntegral max'
                              else 1
-          mrh <- gets maxReturnedHeaders
+          mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
           let count = (1 + skip') * min mrh (fromIntegral num)
           chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start'..]
           yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
 
     MsgEvt (BlockHeaders bHeaders) -> do
         let headers = morphBlockHeader <$> bHeaders
-        stampActionTimestamp
+        lift stampActionTimestamp
         alreadyRequestedHeaders <- lift getBlockHeaders -- get already requested headers
         when (null alreadyRequestedHeaders) $ do        -- proceed if we are not already requesting headers
             -- let headerHashes = S.fromList $ map headerHash headers
@@ -255,7 +262,7 @@ handleEvents peer = awaitForever $ \case
             lift $ putRemainingBHeaders remainingHeaders
             $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
             yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
-            stampActionTimestamp
+            lift stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
     -- todo: e.g. if they have bodies for SHAs [1, 2, 4, 7, 8, 9] and you request [1..10] you'll get
@@ -268,11 +275,11 @@ handleEvents peer = awaitForever $ \case
     -- todo: instead, we'd just return [1, 2] in this case, and hope the peer re-requests the missing blocks from
     -- todo: someone else or us at a later time
     MsgEvt (GetBlockBodies [])   -> do
-      stampActionTimestamp
+      lift stampActionTimestamp
       yieldR (BlockBodies []) -- todo parity bans peers when they do this. should we?
     MsgEvt (GetBlockBodies shas') -> do
-      stampActionTimestamp
-      mrh <- gets maxReturnedHeaders
+      lift stampActionTimestamp
+      mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
       let shas = take mrh shas'
       lift (getUntilMissing shas DL.empty DL.empty) >>= \(bodies, pshas) -> do
           yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
@@ -307,7 +314,7 @@ handleEvents peer = awaitForever $ \case
     -- todo:
     MsgEvt (BlockBodies []) -> return () --clearActionTimestamp
     MsgEvt (BlockBodies bodies) -> do
-        stampActionTimestamp
+        lift stampActionTimestamp
         headers <- lift getBlockHeaders
         let verified = and $ zipWith (\h b -> blockDataTransactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
         unless verified $ error "headers don't match bodies"
@@ -322,29 +329,29 @@ handleEvents peer = awaitForever $ \case
         lift $ putRemainingBHeaders remainingHeaders
         if null neededHeaders
             then when (newCount > 0) $ do
-                mrh <- gets maxReturnedHeaders
+                mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
                 yieldR $ GetBlockHeaders (BlockHash $ blockHeaderHash $ last headers) mrh 0 Forward
-                stampActionTimestamp
+                lift stampActionTimestamp
             else do
                 yieldR $ GetBlockBodies (map blockHeaderHash neededHeaders)
-                stampActionTimestamp
-    MsgEvt (Blockstanbul wm) -> do
+                lift stampActionTimestamp
+    MsgEvt (Blockstanbul wm) -> lift $ do
       stampActionTimestamp
       setPeerAddrIfUnset $ blockstanbulSender wm
-      peerAddr <- use blockstanbulPeerAddr
+      peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
       $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-      lift $ SK.emitBlockstanbulMsg wm
+      SK.emitBlockstanbulMsg wm
 
     -- private chains
     MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'
 
     MsgEvt (ChainDetails chpairs) -> do
-      stampActionTimestamp
+      lift stampActionTimestamp
       lift $ mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
     MsgEvt (GetTransactions trHashes) -> do
-      stampActionTimestamp
+      lift stampActionTimestamp
       $logInfoS "handleEvents/GetTransactions" $ T.pack $ "requesting info for txHashes: "
         ++ (intercalate "\n" (format <$> trHashes))
       ptrs <- fmap (map unPrivate . M.elems) . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) trHashes
@@ -406,14 +413,14 @@ handleEvents peer = awaitForever $ \case
         $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
         yieldR outbound
       P2pAskForBlocks start _ p -> do
-        ss <- shouldSendToPeer p
+        ss <- lift $ shouldSendToPeer p
         when ss $ do
           $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
           syncFetch Forward start
       P2pPushBlocks start end p -> do
-        ss <- shouldSendToPeer p
+        ss <- lift $ shouldSendToPeer p
         when ss $ do
-          mrh <- gets maxReturnedHeaders
+          mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
           let count = min mrh . fromIntegral $ end - start + 1
           chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start..]
           when (null chain) $
@@ -424,12 +431,12 @@ handleEvents peer = awaitForever $ \case
           yieldR outbound
 
     TimerEvt -> do
-        maybeOldTS <- getActionTimestamp
+        maybeOldTS <- unActionTimestamp <$> lift getActionTimestamp
         case maybeOldTS of
             Just oldTS -> do
                 ts <- liftIO getCurrentTime
                 let diffTime = ts `diffUTCTime` oldTS
-                maxTime <- gets (fromIntegral . connectionTimeout)
+                maxTime <- fromIntegral . unConnectionTimeout <$> lift (access (Proxy @ConnectionTimeout))
                 liftIO $ setTitle $ "timer: " ++ show (maxTime - diffTime)
                 when (diffTime > maxTime) $ do
                     yieldR $ Disconnect UselessPeer
@@ -447,12 +454,12 @@ handleEvents peer = awaitForever $ \case
 
 handleGetChainDetails :: ( MonadIO m
                          , MonadResource m
-                         , MonadState Context m
                          , MonadLogger m
                          , (IPAddress `Selectable` IPChains) m
                          , (OrgId `Selectable` OrgIdChains) m
                          , (Word256 `Selectable` ChainMembers) m
                          , (Word256 `Selectable` ChainInfo) m
+                         , Modifiable ActionTimestamp m
                          )
                       => PPeer
                       -> S.Set Word256
@@ -466,7 +473,7 @@ handleGetChainDetails peer cids' = do
                            $ pPeerPubkey peer
               return $ S.union (unIPChains ipChains) (unOrgIdChains orgIdChains)
             else return cids'
-  stampActionTimestamp
+  lift stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ formatChainId . Just <$> cids)
   mems <- lift $ selectMany (Proxy @ChainMembers) cids
   let filteredPairs = M.keys $ M.filter (checkPeerIsMember peer) mems
@@ -474,7 +481,7 @@ handleGetChainDetails peer cids' = do
   unless (null filteredPairs) $ do
     cInfos <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) cids
     yieldR $ ChainDetails cInfos
-    stampActionTimestamp
+    lift stampActionTimestamp
     $logInfoS "handleGetChainDetails" $ T.pack $ "the following ChainIds were returned " ++
       (intercalate "\n" $ formatChainId . Just . fst <$> cInfos)
 
@@ -483,14 +490,18 @@ numberFromBestBlock (BestBlock _ n _) = n
 
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
-syncFetch :: (MonadIO m, MonadState Context m)
+syncFetch :: ( MonadIO m
+             , Modifiable ActionTimestamp m
+             , Accessible [BlockData] m
+             , Accessible MaxReturnedHeaders m
+             )
           => Direction -> Integer -> ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
-        mrh <- gets maxReturnedHeaders
+        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
         yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
-        stampActionTimestamp
+        lift stampActionTimestamp
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer txo = case txo of
