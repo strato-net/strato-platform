@@ -1,5 +1,7 @@
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE PolyKinds            #-}
 {-# LANGUAGE RankNTypes           #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TypeApplications     #-}
@@ -141,34 +143,40 @@ debounceTxSends = do
       recordEmptyQueue
       yieldMany . map W.Transactions $ chunksOf 100 txs
 
-handleMsgClientConduit :: ( MonadIO m
+handleMsgClientConduit :: ( HasVMEventsSink m
+                          , MonadIO m
                           , MonadResource m
                           , MonadLogger m
-                          , Mod.Accessible (SK.UnseqSink m) m
-                          , Mod.Modifiable BestBlock m
-                          , Mod.Modifiable WorldBestBlock m
-                          , Mod.Modifiable ActionTimestamp m
-                          , Mod.Accessible ActionTimestamp m
-                          , Mod.Modifiable [BlockData] m
-                          , Mod.Accessible [BlockData] m
-                          , Mod.Modifiable RemainingBlockHeaders m
-                          , Mod.Accessible RemainingBlockHeaders m
-                          , Mod.Modifiable PeerAddress m
-                          , Mod.Accessible PeerAddress m
-                          , Mod.Accessible MaxReturnedHeaders m
-                          , Mod.Accessible ConnectionTimeout m
-                          , (Integer `A.Selectable` Canonical BlockData) m
-                          , (SHA `A.Alters` BlockData) m
-                          , (IPAddress `A.Selectable` IPChains) m
-                          , (OrgId `A.Selectable` OrgIdChains) m
-                          , (SHA `A.Selectable` ChainTxsInBlock) m
-                          , (Word256 `A.Selectable` ChainMembers) m
-                          , (Word256 `A.Selectable` ChainInfo) m
-                          , (SHA `A.Selectable` Private (Word256, OutputTx)) m
-                          , (SHA `A.Alters` OutputBlock) m
-                          , Mod.Accessible GenesisBlockHash m
-                          , Mod.Accessible BestBlockNumber m
-                          , HasVMEventsSink m
+                          , All '[Mod.Accessible, Mod.Modifiable]
+                              '[ ActionTimestamp
+                               , [BlockData]
+                               , RemainingBlockHeaders
+                               , PeerAddress
+                               ] m
+                          , All '[Mod.Accessible]
+                              '[ (SK.UnseqSink m)
+                               , MaxReturnedHeaders
+                               , ConnectionTimeout
+                               , GenesisBlockHash
+                               , BestBlockNumber
+                               ] m
+                          , All '[Mod.Modifiable]
+                              '[ BestBlock
+                               , WorldBestBlock
+                               ] m
+                          , All2 '[A.Selectable]
+                              '[ '(Integer, Canonical BlockData)
+                               , '(IPAddress, IPChains)
+                               , '(OrgId, OrgIdChains)
+                               , '(SHA, ChainTxsInBlock)
+                               , '(Word256, ChainMembers)
+                               , '(Word256, ChainInfo)
+                               , '(SHA, Private (Word256, OutputTx))
+                               ] m
+                          , All2 '[A.Alters]
+                              '[ '(SHA, BlockData)
+                               , '(SHA, OutputBlock)
+                               ] m
                           )
                        => Point
                        -> PPeer
@@ -212,33 +220,40 @@ handleMsgClientConduit myId peer = do
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
-handleMsgServerConduit :: ( MonadIO m
+handleMsgServerConduit :: ( HasVMEventsSink m
+                          , MonadIO m
                           , MonadResource m
                           , MonadLogger m
-                          , Mod.Accessible (SK.UnseqSink m) m
-                          , Mod.Modifiable BestBlock m
-                          , Mod.Modifiable WorldBestBlock m
-                          , Mod.Modifiable ActionTimestamp m
-                          , Mod.Accessible ActionTimestamp m
-                          , Mod.Modifiable [BlockData] m
-                          , Mod.Accessible [BlockData] m
-                          , Mod.Modifiable RemainingBlockHeaders m
-                          , Mod.Accessible RemainingBlockHeaders m
-                          , Mod.Modifiable PeerAddress m
-                          , Mod.Accessible PeerAddress m
-                          , Mod.Accessible MaxReturnedHeaders m
-                          , Mod.Accessible ConnectionTimeout m
-                          , (Integer `A.Selectable` Canonical BlockData) m
-                          , (SHA `A.Alters` BlockData) m
-                          , (IPAddress `A.Selectable` IPChains) m
-                          , (OrgId `A.Selectable` OrgIdChains) m
-                          , (SHA `A.Selectable` ChainTxsInBlock) m
-                          , (Word256 `A.Selectable` ChainMembers) m
-                          , (Word256 `A.Selectable` ChainInfo) m
-                          , (SHA `A.Selectable` Private (Word256, OutputTx)) m
-                          , (SHA `A.Alters` OutputBlock) m
-                          , Mod.Accessible GenesisBlockHash m
-                          , HasVMEventsSink m
+                          , All '[Mod.Accessible, Mod.Modifiable]
+                              '[ ActionTimestamp
+                               , [BlockData]
+                               , RemainingBlockHeaders
+                               , PeerAddress
+                               ] m
+                          , All '[Mod.Accessible]
+                              '[ (SK.UnseqSink m)
+                               , MaxReturnedHeaders
+                               , ConnectionTimeout
+                               , GenesisBlockHash
+                               , BestBlockNumber
+                               ] m
+                          , All '[Mod.Modifiable]
+                              '[ BestBlock
+                               , WorldBestBlock
+                               ] m
+                          , All2 '[A.Selectable]
+                              '[ '(Integer, Canonical BlockData)
+                               , '(IPAddress, IPChains)
+                               , '(OrgId, OrgIdChains)
+                               , '(SHA, ChainTxsInBlock)
+                               , '(Word256, ChainMembers)
+                               , '(Word256, ChainInfo)
+                               , '(SHA, Private (Word256, OutputTx))
+                               ] m
+                          , All2 '[A.Alters]
+                              '[ '(SHA, BlockData)
+                               , '(SHA, OutputBlock)
+                               ] m
                           )
                  => Point
                  -> PPeer
