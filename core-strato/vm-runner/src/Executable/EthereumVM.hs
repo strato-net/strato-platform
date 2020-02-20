@@ -30,10 +30,11 @@ import           Util                                  hiding (intercalate)
 
 import           Blockapps.Crossmon
 import           Blockchain.BlockChain
-import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber, BlockData(..))
+import           Blockchain.Data.Block                 (BestBlock(..), WorldBestBlock(..))
 import           Blockchain.Data.BlockHeader           (extraData2TxsLen)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.DataDefs              (blockDataExtraData, blockDataNumber, BlockData(..))
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.EventDB
@@ -65,8 +66,6 @@ import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
-import qualified Blockchain.Strato.RedisBlockDB        as RBDB
-import           Blockchain.Strato.RedisBlockDB.Models
 import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
 import           Blockchain.Timing
 import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
@@ -375,12 +374,12 @@ getUnprocessedKafkaEvents offset = do
 shouldProcessNewTransactions :: ContextM Bool -- todo: probably shouldn't do it by number, but tdiff.
 shouldProcessNewTransactions =
     if flags_useSyncMode then do
-        worldBestBlock <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
+        worldBestBlock <- fmap unWorldBestBlock <$> Mod.access (Mod.Proxy @(Maybe WorldBestBlock))
         case worldBestBlock of
             Nothing -> do
                 $logInfoS "shouldProcessNewTransactions" "got Nothing from worldBestBlockInfo, playing it safe and not mining Txs"
                 return False -- we either had no peers or some other error, lets play it safe
-            Just (RedisBestBlock worldBestSha _ _) -> do
+            Just (BestBlock worldBestSha _ _) -> do
                 didRunBest <- hasBSum worldBestSha
                 let msg =
                       if didRunBest

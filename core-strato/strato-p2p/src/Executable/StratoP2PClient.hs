@@ -56,8 +56,8 @@ runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
 runPeer peer myPriv _ _ = runResourceT $ do
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
-  ctx <- initContext flags_maxReturnedHeaders
-  runContextM ctx $ do
+  (cfg, initState) <- initContext flags_maxReturnedHeaders
+  runContextM cfg $ do
     let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
         myPublic    = calculatePublic theCurve myPriv
 
@@ -68,8 +68,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
     $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
     let peerPort    = pPeerTcpPort peer
         peerAddress = BC.pack . T.unpack $ pPeerIp peer
-    initState <- get
-    lift $ runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
+    runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
         void . liftIO $ setPeerActiveState (pPeerIp peer) peerPort Active
 
         (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
