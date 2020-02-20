@@ -145,8 +145,6 @@ handleMsgClientConduit :: ( MonadIO m
                           , MonadResource m
                           , MonadLogger m
                           , Mod.Accessible (SK.UnseqSink m) m
-                          , MonadState Context m
-                          , Mod.Modifiable K.KafkaState m
                           , Mod.Modifiable BestBlock m
                           , Mod.Modifiable WorldBestBlock m
                           , Mod.Modifiable ActionTimestamp m
@@ -170,6 +168,7 @@ handleMsgClientConduit :: ( MonadIO m
                           , (SHA `A.Alters` OutputBlock) m
                           , Mod.Accessible GenesisBlockHash m
                           , Mod.Accessible BestBlockNumber m
+                          , HasVMEventsSink m
                           )
                        => Point
                        -> PPeer
@@ -217,8 +216,6 @@ handleMsgServerConduit :: ( MonadIO m
                           , MonadResource m
                           , MonadLogger m
                           , Mod.Accessible (SK.UnseqSink m) m
-                          , MonadState Context m
-                          , Mod.Modifiable K.KafkaState m
                           , Mod.Modifiable BestBlock m
                           , Mod.Modifiable WorldBestBlock m
                           , Mod.Modifiable ActionTimestamp m
@@ -241,6 +238,7 @@ handleMsgServerConduit :: ( MonadIO m
                           , (SHA `A.Selectable` Private (Word256, OutputTx)) m
                           , (SHA `A.Alters` OutputBlock) m
                           , Mod.Accessible GenesisBlockHash m
+                          , HasVMEventsSink m
                           )
                  => Point
                  -> PPeer

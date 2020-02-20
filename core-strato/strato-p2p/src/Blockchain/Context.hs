@@ -248,10 +248,10 @@ instance MonadReader Config m => Mod.Accessible SQLDB m where
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
 
-instance (MonadIO m, MonadState Context m, Mod.Modifiable K.KafkaState m) => Mod.Accessible (UnseqSink m) m where
+instance MonadIO m => Mod.Accessible (UnseqSink (StateT Context m)) (StateT Context m) where
   access _ = gets unseqSink
 
-instance (MonadState Context m, MonadIO m, Mod.Modifiable K.KafkaState m) => HasVMEventsSink m where
+instance MonadIO m => HasVMEventsSink (StateT Context m) where
   getVMEventsSink = gets vmEventsSink
 
 -- dummy newtype wrapper to avoid overlapping instance
