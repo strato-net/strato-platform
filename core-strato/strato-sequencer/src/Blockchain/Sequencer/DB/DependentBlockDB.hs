@@ -106,7 +106,9 @@ buildEmissionChain :: (SHA `Alters` DependentBlockEntry) m
                    -> Integer
                    -> m [OutputBlock]
 buildEmissionChain b lastTotalDifficulty = lookup Proxy (sbHash b) >>= \case
-  Nothing -> return [theBlock]
+  Nothing -> do
+    insert Proxy (sbHash b) $ Emitted totalDifficulty'
+    return [theBlock]
   Just (Emitted _) -> return []
   Just (DependentBlocks blocks') -> do
     insert Proxy (sbHash b) $ Emitted totalDifficulty'
