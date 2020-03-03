@@ -69,6 +69,7 @@ bootstrapSequencer Block{blockBlockData = bd,
             }
       runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty
+        flushLdbBatchOps
   initKafka :: CablePackage -> IO ()
   initKafka pkg = do
       let clientId = KP.KString $ C8.pack defaultKafkaClientId'
