@@ -193,7 +193,7 @@ blockstanbulSend' msg = do
                         . blockToIngestBlock TO.Blockstanbul
       creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
   rBlocks <- catMaybes <$> traverse getSequencedBlock blocks
-  vmBlocks <- join <$> traverse expandBlock rBlocks
+  vmBlocks <- catMaybes <$> traverse insertEmitted rBlocks
   let vmevs = creates
            ++ (VmBlock <$> vmBlocks)
            ++ [VmVoteToMake r d s| PendingVote r d s <- resp]
@@ -374,12 +374,12 @@ runConsensus = awaitForever $ \sb -> do
       yieldMany $ VmBlock <$> obs
     else do
       let blk = sequencedBlockToBlock sb
-      mRouted <- if isHistoricBlock blk
-                   then lift $ fmap PreviousBlock <$> checkBlockReadiness sb
-                   else pure . Just $ UnannouncedBlock blk
+      routed <- if isHistoricBlock blk
+                   then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
+                   else pure [UnannouncedBlock blk]
       -- Blockstanbul will check that the seals and validators match up before
       -- announcing it to the network or forwarding to the EVM.
-      traverse_ (yieldMany <=< lift . blockstanbulSend') mRouted
+      traverse_ (yieldMany <=< lift . blockstanbulSend') routed
 
 hydrateAndEmit :: Maybe Word256 -> ConduitM VmEvent VmEvent SequencerM ()
 hydrateAndEmit chainId = awaitForever $ \case

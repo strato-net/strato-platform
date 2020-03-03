@@ -21,6 +21,7 @@ import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
+import           Control.Monad.IO.Class              (liftIO)
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
@@ -366,19 +367,19 @@ spec = do
 
       it "should sequence blocks out of order in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
-        let mkBlk parent = let blk0 = makeBlock 2 1
-                               blk1 = Block (blockBlockData blk0){blockDataParentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
-                               blk2 = addValidators (_validators ctx) blk1{
-                                         blockBlockData = (blockBlockData blk1){blockDataNumber = 1}}
-                               pseal = proposerSeal blk2 (_prvkey ctx)
-                               blk3 = addProposerSeal pseal blk2
-                               cseal = commitmentSeal (blockHash blk3) (_prvkey ctx)
-                            in addCommitmentSeals [cseal] blk3
+        let mkBlk parent num = let blk0 = makeBlock 2 1
+                                   blk1 = Block (blockBlockData blk0){blockDataParentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
+                                   blk2 = addValidators (_validators ctx) blk1{
+                                             blockBlockData = (blockBlockData blk1){blockDataNumber = num}}
+                                   pseal = proposerSeal blk2 (_prvkey ctx)
+                                   blk3 = addProposerSeal pseal blk2
+                                   cseal = commitmentSeal (blockHash blk3) (_prvkey ctx)
+                                in addCommitmentSeals [cseal] blk3
             ieBlk = IEBlock . blockToIngestBlock TO.Morphism
-            mkBlkChn 0 _ = []
-            mkBlkChn n p = let b = mkBlk p
-                            in b : mkBlkChn (n - 1) (blockHash b)
-            blkChn = mkBlkChn (5 :: Int) h
+            mkBlkChn 0 _ _ = []
+            mkBlkChn n p i = let b = mkBlk p i
+                              in b : mkBlkChn (n - 1) (blockHash b) (i + 1)
+            blkChn = mkBlkChn (5 :: Int) h 1
         putBlockstanbulContext ctx
         checkForUnseq $ ieBlk <$> reverse blkChn
         drainP2P `shouldReturn` []
@@ -386,7 +387,7 @@ spec = do
         vmevs `shouldContain` [VmCreateBlockCommand]
         map outputBlockToBlock [oblk | VmBlock oblk <- vmevs] `shouldMatchList` blkChn
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
-        _view ctx' `shouldBe` View 0 1
+        _view ctx' `shouldBe` View 0 5
 
       it "should be able to fetch if the write is after the read begins" . runTestM $ do
         src <- sealConduitT <$> fuseChannels

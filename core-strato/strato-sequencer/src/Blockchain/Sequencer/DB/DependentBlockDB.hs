@@ -101,6 +101,15 @@ enqueueIfParentNotEmitted b = existingParent b >>= \case
     insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks [b]
     return NotReadyToEmit
 
+insertEmitted :: (SHA `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe OutputBlock)
+insertEmitted b = existingParent b >>= \case
+  Just (Emitted t) -> do
+    insert Proxy (sbHash b) . Emitted $ totalDifficulty' t
+    return . Just $ theBlock t
+  _ -> return Nothing
+  where totalDifficulty' t = t + sequencedBlockDifficulty b
+        theBlock t = sequencedBlockToOutputBlock b $ totalDifficulty' t
+
 buildEmissionChain :: (SHA `Alters` DependentBlockEntry) m
                    => SequencedBlock
                    -> Integer
