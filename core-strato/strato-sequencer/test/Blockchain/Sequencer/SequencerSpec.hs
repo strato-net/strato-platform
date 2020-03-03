@@ -364,6 +364,30 @@ spec = do
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
 
+      it "should sequence blocks out of order in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
+        ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
+        let mkBlk parent = let blk0 = makeBlock 2 1
+                               blk1 = Block (blockBlockData blk0){blockDataParentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
+                               blk2 = addValidators (_validators ctx) blk1{
+                                         blockBlockData = (blockBlockData blk1){blockDataNumber = 1}}
+                               pseal = proposerSeal blk2 (_prvkey ctx)
+                               blk3 = addProposerSeal pseal blk2
+                               cseal = commitmentSeal (blockHash blk3) (_prvkey ctx)
+                            in addCommitmentSeals [cseal] blk3
+            ieBlk = IEBlock . blockToIngestBlock TO.Morphism
+            mkBlkChn 0 _ = []
+            mkBlkChn n p = let b = mkBlk p
+                            in b : mkBlkChn (n - 1) (blockHash b)
+            blkChn = mkBlkChn (5 :: Int) h
+        putBlockstanbulContext ctx
+        checkForUnseq $ ieBlk <$> reverse blkChn
+        drainP2P `shouldReturn` []
+        vmevs <- drainVM
+        vmevs `shouldContain` [VmCreateBlockCommand]
+        map outputBlockToBlock [oblk | VmBlock oblk <- vmevs] `shouldMatchList` blkChn
+        ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
+        _view ctx' `shouldBe` View 0 1
+
       it "should be able to fetch if the write is after the read begins" . runTestM $ do
         src <- sealConduitT <$> fuseChannels
         uch <- asks blockstanbulTimeouts

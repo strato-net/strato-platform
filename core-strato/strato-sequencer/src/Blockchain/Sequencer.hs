@@ -170,12 +170,11 @@ blockstanbulSend = mapM_ $ \ie -> do
   oes <- blockstanbulSend' ie
   mapM_ markForVM =<< runConduit
     ( yieldMany oes
-   .| expandBlock
    .| hydrateAndEmit Nothing
    .| sinkList
     )
 
-blockstanbulSend' :: InEvent -> SequencerM [Either SequencedBlock VmEvent]
+blockstanbulSend' :: InEvent -> SequencerM [VmEvent]
 blockstanbulSend' msg = do
   resp' <- sendAllMessages [msg]
   let blocks = [b | ToCommit b <- resp']
@@ -193,8 +192,10 @@ blockstanbulSend' msg = do
   let getSequencedBlock = ingestBlockToSequencedBlock lookupChainIdFromChainHash
                         . blockToIngestBlock TO.Blockstanbul
       creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
-  rBlocks <- fmap catMaybes $ traverse getSequencedBlock blocks
+  rBlocks <- catMaybes <$> traverse getSequencedBlock blocks
+  vmBlocks <- join <$> traverse expandBlock rBlocks
   let vmevs = creates
+           ++ (VmBlock <$> vmBlocks)
            ++ [VmVoteToMake r d s| PendingVote r d s <- resp]
       p2pevs = [P2pBlockstanbul (WireMessage a m) | OMsg a m <- resp]
             ++ [P2pAskForBlocks (h+1) l p | GapFound h l p <- resp]
@@ -214,7 +215,7 @@ blockstanbulSend' msg = do
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
   mapM_ markForP2P p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
-  return $ map Right vmevs ++ map Left rBlocks
+  return vmevs
 
 privateWitnessableHash :: Word256 -> Word256 -> SHA
 privateWitnessableHash tHash cHash =
@@ -329,44 +330,56 @@ runBlockWithConsensus sb =
   mapM_ markForVM =<< runConduit
     ( yield sb
    .| runConsensus
-   .| expandBlock
    .| hydrateAndEmit Nothing
    .| sinkList
     )
 
-expandBlock :: ConduitM (Either SequencedBlock VmEvent) VmEvent SequencerM ()
-expandBlock = awaitForever $ \case
-  Right vmEv -> yield vmEv
-  Left sb -> do
-    readiness <- lift $ enqueueIfParentNotEmitted sb
-    case readiness of
-      NotReadyToEmit -> do
-        $logWarnS "expandBlock" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
-        lift $ P.incCounter seqBlocksEnqueued
-      (ReadyToEmit totalPastDifficulty) -> do
-        -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
-        dryChain <- lift $ buildEmissionChain sb totalPastDifficulty
-        if dryChain /= []
-          then do
-            $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."
-            lift . mapM_ markForP2P $ P2pBlock <$> dryChain
-            yieldMany $ map VmBlock dryChain
-          else do
-            $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
+expandBlock :: SequencedBlock -> SequencerM [OutputBlock]
+expandBlock sb = do
+  readiness <- enqueueIfParentNotEmitted sb
+  case readiness of
+    NotReadyToEmit -> do
+      $logWarnS "expandBlock" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
+      P.incCounter seqBlocksEnqueued
+      return []
+    (ReadyToEmit totalPastDifficulty) -> do
+      -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
+      dryChain <- buildEmissionChain sb totalPastDifficulty
+      if dryChain /= []
+        then do
+          $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."
+          return dryChain
+        else do
+          $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
+          return []
 
-runConsensus :: ConduitM SequencedBlock (Either SequencedBlock VmEvent) SequencerM ()
+checkBlockReadiness :: SequencedBlock -> SequencerM (Maybe BDB.Block)
+checkBlockReadiness sb = do
+  readiness <- enqueueIfParentNotEmitted sb
+  case readiness of
+    NotReadyToEmit -> do
+      $logInfoS "checkBlockReadiness" . T.pack $ prettyBlock sb ++ " is not yet ready to be run by Blockstanbul."
+      return Nothing
+    (ReadyToEmit _) -> do
+      $logInfoS "checkBlockReadiness" . T.pack $ prettyBlock sb ++ " is ready to be run by Blockstanbul."
+      return . Just $ sequencedBlockToBlock sb
+
+runConsensus :: ConduitM SequencedBlock VmEvent SequencerM ()
 runConsensus = awaitForever $ \sb -> do
   hasPBFT <- lift $ blockstanbulRunning
   if not hasPBFT
-    then yield $ Left sb
+    then do
+      obs <- lift $ expandBlock sb
+      lift $ traverse_ (markForP2P . P2pBlock) obs
+      yieldMany $ VmBlock <$> obs
     else do
       let blk = sequencedBlockToBlock sb
-          routed = if isHistoricBlock blk
-                     then PreviousBlock blk
-                     else UnannouncedBlock blk
-          -- Blockstanbul will check that the seals and validators match up before
-          -- announcing it to the network or forwarding to the EVM.
-      yieldMany =<< lift (blockstanbulSend' routed)
+      mRouted <- if isHistoricBlock blk
+                   then lift $ fmap PreviousBlock <$> checkBlockReadiness sb
+                   else pure . Just $ UnannouncedBlock blk
+      -- Blockstanbul will check that the seals and validators match up before
+      -- announcing it to the network or forwarding to the EVM.
+      traverse_ (yieldMany <=< lift . blockstanbulSend') mRouted
 
 hydrateAndEmit :: Maybe Word256 -> ConduitM VmEvent VmEvent SequencerM ()
 hydrateAndEmit chainId = awaitForever $ \case
