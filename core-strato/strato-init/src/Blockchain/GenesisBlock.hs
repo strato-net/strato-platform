@@ -30,7 +30,6 @@ import           System.Directory
 import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
@@ -72,7 +71,6 @@ import qualified Blockchain.Strato.Indexer.Model      as IdxModel
 import qualified Blockchain.Strato.Model.Address      as Ad
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
-import qualified Database.Persist.Postgresql          as SQL
 
 import           Text.Format
 
@@ -139,7 +137,7 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
     obGB <- liftIO $ bootstrapSequencer genesisBlock
     putGenesisHash $ blockHash genesisBlock
     $logInfoS "initgen" "Initial merkle patricia tries successfully created"
-    [genBId] <- putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
+    void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
     $logInfoS "initgen" "Genesis Block put"
     $logInfoS "initgen" "State diff has been generated"
 
@@ -150,7 +148,7 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
         (blockDataNumber . blockBlockData $ genesisBlock)
         (blockDataDifficulty . blockBlockData $ genesisBlock)
     $logInfoS "initgen" "best block info inserted"
-    liftIO (bootstrapIndexer genBId obGB)
+    liftIO $ bootstrapIndexer obGB
     $logInfoS "initgen" "indexer has been bootstrapped"
     let rewrite (_, CodeInfo bin src name) = (superProprietaryStratoSHAHash bin, Map.fromList [("src", src),("name",name)])
         metadatas = Map.fromList . map rewrite $ srcInfo
@@ -234,15 +232,14 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
        Right errs -> error . show $ errs
        Left err -> error . show $ err
 
-bootstrapIndexer :: SQL.Key BlockDataRef -> OutputBlock -> IO ()
-bootstrapIndexer key obGB =
+bootstrapIndexer :: OutputBlock -> IO ()
+bootstrapIndexer obGB =
     let clientId = fst ApiIndexer.kafkaClientIds
         consumer = snd ApiIndexer.kafkaClientIds
         topic    = IContext.targetTopicName
-        ibbi     = IContext.IndexerBestBlockInfo key
-        mkMeta   = KP.Metadata . KP.KString . C8.pack . show $ IContext.unIBBI ibbi
+        mkMeta   = KP.Metadata . KP.KString $ C8.empty
         commit   = do
-            putStrLn $ "Bootstrapping indexer with " ++ show ibbi
+            putStrLn $ "Bootstrapping indexer"
             runKafkaConfigured clientId $
                 commitSingleOffset consumer topic 0 0 mkMeta
         runner = commit >>= \case
