@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Strato.Indexer.ApiIndexer
     ( apiIndexer
+    , indexAPI
     , kafkaClientIds
     ) where
 
@@ -34,12 +35,12 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
     $logInfoS "apiIndexer" "About to fetch blocks"
     (offset, idxEvents) <- getUnprocessedIndexEvents
     $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    index idxEvents
+    indexAPI idxEvents
     let nextOffset' = offset + fromIntegral (length idxEvents)
     setKafkaCheckpoint nextOffset'
 
-index :: [IndexEvent] -> IContextM ()
-index idxEvents = do
+indexAPI :: [IndexEvent] -> IContextM ()
+indexAPI idxEvents = do
   let txs = [tx | IndexTransaction _ tx <- idxEvents]
   lift $ forM_ txs $ \OutputTx{..} -> insertTX Log otOrigin Nothing [otBaseTx]
   let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]

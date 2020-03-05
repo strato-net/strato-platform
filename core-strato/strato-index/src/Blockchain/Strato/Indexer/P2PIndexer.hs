@@ -30,12 +30,12 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
     $logInfoS "p2pIndexer" "About to fetch IndexEvents"
     (offset, idxEvents) <- getUnprocessedIndexEvents
     $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    index idxEvents
+    indexP2P idxEvents
     let nextOffset' = offset + fromIntegral (length idxEvents)
     setKafkaCheckpoint nextOffset'
 
-index :: [IndexEvent] -> IContextM ()
-index idxEvents = do
+indexP2P :: [IndexEvent] -> IContextM ()
+indexP2P idxEvents = do
   let ptxs = [t | IndexPrivateTx t <- idxEvents]
   unless (null ptxs)
     . void

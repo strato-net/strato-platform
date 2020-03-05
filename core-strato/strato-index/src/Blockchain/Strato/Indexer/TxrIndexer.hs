@@ -84,12 +84,12 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
     $logInfoS "txrIndexer" "About to fetch IndexEvents"
     (offset, idxEvents) <- getUnprocessedIndexEvents
     $logInfoS "txrIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    index idxEvents
+    indexTXR idxEvents
     let nextOffset' = offset + fromIntegral (length idxEvents)
     setKafkaCheckpoint nextOffset'
 
-index :: [IndexEvent] -> IContextM ()
-index = traverse_ $ \case
+indexTXR :: [IndexEvent] -> IContextM ()
+indexTXR = traverse_ $ \case
   LogDBEntry l -> for_ (logDBChainId l) $ \chainId -> do
     logF [ "Inserting LogDB entry for tx: "
          , format $ logDBTransactionHash l
