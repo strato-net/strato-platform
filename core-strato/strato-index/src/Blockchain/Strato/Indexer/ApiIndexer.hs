@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeOperators     #-}
 module Blockchain.Strato.Indexer.ApiIndexer
     ( apiIndexer
     , indexAPI
@@ -10,22 +12,23 @@ module Blockchain.Strato.Indexer.ApiIndexer
 
 import           Control.Arrow                      ((&&&))
 import           Control.Monad
-import           Control.Monad.Trans.Class          (lift)
+import qualified Control.Monad.Change.Alter         as A
 import           Blockchain.Output
 import qualified Data.ByteString.Char8              as S8
+import qualified Data.Map.Strict                    as M
 import qualified Data.Text                          as T
 import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.ChainInfoDB        (putChainInfo)
-import           Blockchain.Data.Transaction         (insertTX)
-import           Blockchain.DBM
+import           Blockchain.Data.ChainInfo
 import           Blockchain.EthConf                 (lookupConsumerGroup)
+import           Blockchain.ExtWord
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Sequencer.Event
 
@@ -39,18 +42,25 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
     let nextOffset' = offset + fromIntegral (length idxEvents)
     setKafkaCheckpoint nextOffset'
 
-indexAPI :: [IndexEvent] -> IContextM ()
+indexAPI :: ( MonadLogger m
+            , (SHA `A.Alters` API OutputTx) m
+            , (Word256 `A.Alters` API ChainInfo) m
+            , (SHA `A.Alters` API OutputBlock) m
+            )
+         => [IndexEvent] -> m ()
 indexAPI idxEvents = do
   let txs = [tx | IndexTransaction _ tx <- idxEvents]
-  lift $ forM_ txs $ \OutputTx{..} -> insertTX Log otOrigin Nothing [otBaseTx]
-  let chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
-  lift $ forM_ chainInfos . uncurry $ putChainInfo
-  let blocks = [b | RanBlock b <- idxEvents]
+      chainInfos = [(cId, cInfo) | NewChainInfo cId cInfo <- idxEvents]
+      blocks = [b | RanBlock b <- idxEvents]
       insertCount = length blocks
+
+  A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
+  A.insertMany (A.Proxy @(API ChainInfo)) . M.fromList $ fmap API <$> chainInfos
+
   $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
   when (insertCount > 0) $ do
     $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
-    void . lift $ putBlocks ((outputBlockToBlock &&& obTotalDifficulty) <$> blocks) False
+    A.insertMany (A.Proxy @(API OutputBlock)) . M.fromList $ (blockHash &&& API) <$> blocks
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")
@@ -73,9 +83,7 @@ indexerMetadata :: Metadata
 indexerMetadata = Metadata $ KString S8.empty
 
 setKafkaCheckpoint' :: Kafka k => Offset -> k (Either KafkaError ())
-setKafkaCheckpoint' ofs =
-    let group     = snd kafkaClientIds
-    in commitSingleOffset group targetTopicName 0 ofs indexerMetadata
+setKafkaCheckpoint' = commitSingleOffset (snd kafkaClientIds) targetTopicName 0 `flip` indexerMetadata
 
 getUnprocessedIndexEvents :: IContextM (Offset, [IndexEvent])
 getUnprocessedIndexEvents = do
