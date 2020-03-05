@@ -4,18 +4,18 @@
 {-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Strato.Indexer.TxrIndexer where
 
+import           Conduit
 import           Control.DeepSeq
 import           Control.Exception
 import           Control.Monad
-import           Control.Monad.IO.Class             (liftIO)
 import           Control.Monad.Trans.Class          (lift)
 import           Control.Exception                  (SomeException)
 import           Data.Binary
 import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Lazy               as BL
-import           Data.Foldable                      (for_, traverse_)
 import qualified Data.List                          as List
+import           Data.Maybe                         (maybeToList)
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8)
 import           Network.Kafka
@@ -44,6 +44,7 @@ import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Util                    (byteString2Integer)
 
+import           System.IO.Unsafe                   (unsafePerformIO)
 import           Text.Format
 
 addTopic :: SHA
@@ -83,39 +84,76 @@ txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
     $logInfoS "txrIndexer" "About to fetch IndexEvents"
     (offset, idxEvents) <- getUnprocessedIndexEvents
-    $logInfoS "txrIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    indexTXR idxEvents
+    logF ["Fetched ", show (length idxEvents), " events starting from ", show offset]
+    runConduit $ yieldMany idxEvents .| process .| output
     let nextOffset' = offset + fromIntegral (length idxEvents)
     setKafkaCheckpoint nextOffset'
+  where process = awaitForever $ yieldMany . indexEventToTxrResults
+        output = awaitForever $ lift . txrResultHandler
 
-indexTXR :: [IndexEvent] -> IContextM ()
-indexTXR = traverse_ $ \case
-  LogDBEntry l -> for_ (logDBChainId l) $ \chainId -> do
-    logF [ "Inserting LogDB entry for tx: "
-         , format $ logDBTransactionHash l
-         , " on chain "
-         , formatChainId $ Just chainId
-         , " at block "
-         , format $ logDBBlockHash l
-         ]
+data TxrResult = AddMember (Either String (Word256, Address, Enode))
+               | RemoveMember (Either String (Word256, Address))
+               | TerminateChain (Either String Word256)
+               | PutLogDB LogDB
+               | PutEventDB EventDB
+               | PutTxResult TransactionResult
+
+indexEventToTxrResults :: IndexEvent -> [TxrResult]
+indexEventToTxrResults = \case
+  LogDBEntry l -> (:) (PutLogDB l) . maybeToList $ logDBChainId l >>= \chainId ->
     case logDBTopic1 l of
-      Just x | SHA x == addTopic -> do
+      Just x | SHA x == addTopic ->
         let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l --TODO: unhack
             enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
             enode' = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
-        eEnode :: Either SomeException Enode <- liftIO . try . evaluate . force $ readEnode enode' --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
-        case eEnode of
-          Left err -> $logErrorS "txrIndexer" . T.pack $ "failed to parse enode: " ++ show err
-          Right enode -> doAddMember chainId address enode
-      Just x | SHA x == removeTopic -> do
+            --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
+            eEnode :: Either SomeException Enode = unsafePerformIO $ try . evaluate . force $ readEnode enode'
+         in case eEnode of
+          Left err -> Just . AddMember . Left $ "failed to parse enode: " ++ show err
+          Right enode -> Just . AddMember $ Right (chainId, address, enode)
+      Just x | SHA x == removeTopic ->
         let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
-        doRemoveMember chainId address
-      Just x | SHA x == terminateTopic -> do
-        logF ["Terminating chain ", formatChainId $ Just chainId]
-        lift $ terminateChain chainId
-      _ -> return ()
+         in Just . RemoveMember $ Right (chainId, address)
+      Just x | SHA x == terminateTopic -> Just . TerminateChain $ Right chainId
+      _ -> Nothing
+  EventDBEntry ev -> (:) (PutEventDB ev) . maybeToList $ eventDBChainId ev >>= \chainId ->
+     case (eventDBName ev, eventDBArgs ev) of
+      ("MemberAdded", [addressStr, enodeStr]) -> case stringAddress addressStr of
+        Nothing -> Just . AddMember . Left $ "failed to parse address for MemberAdded event: " ++ addressStr
+        Just address ->
+          --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
+          let eNode :: Either SomeException Enode = unsafePerformIO $ try . evaluate . force $ readEnode enodeStr
+           in case eNode of
+            Left err -> Just . AddMember . Left $ "failed to parse enode" ++ show err
+            Right enode -> Just . AddMember $ Right (chainId, address, enode)
+      ("MemberRemoved", [addressStr]) -> case stringAddress addressStr of
+        Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
+        Just address -> Just . RemoveMember $ Right (chainId, address)
+      _ -> Nothing
+  TxResult r -> [PutTxResult r]
+  _ -> []
+
+txrResultHandler :: TxrResult -> IContextM ()
+txrResultHandler = \case
+  AddMember e -> case e of
+    Right (chainId, address, enode) -> doAddMember chainId address enode
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  RemoveMember e -> case e of
+    Right (chainId, address) -> doRemoveMember chainId address
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  TerminateChain e -> case e of
+    Right chainId -> lift $ terminateChain chainId
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  PutLogDB l -> do
+    logF [ "Inserting LogDB entry for tx: "
+         , format $ logDBTransactionHash l
+         , " on chain "
+         , formatChainId $ logDBChainId l
+         , " at block "
+         , format $ logDBBlockHash l
+         ]
     void . lift $ LogDB.putLogDB l
-  EventDBEntry ev -> for_ (eventDBChainId ev) $ \chainId -> do
+  PutEventDB ev -> do
     let evName = eventDBName ev
         evArgs = eventDBArgs ev
     logF [ "Inserting EventDB entry for Event: "
@@ -123,31 +161,15 @@ indexTXR = traverse_ $ \case
          , " with args: "
          , List.intercalate "," evArgs
          , " for chainID: "
-         , formatChainId $ Just chainId
+         , formatChainId $ eventDBChainId ev
          ]
-    case (evName, evArgs) of
-      ("MemberAdded", [addressStr, enodeStr]) -> case stringAddress addressStr of
-        Nothing -> $logErrorS "txrIndexer" . T.pack $ "failed to parse address for MemberAdded event: " ++ addressStr
-        Just address -> do
-          eNode :: Either SomeException Enode <- liftIO . try . evaluate . force $ readEnode enodeStr --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
-          case eNode of
-            Left err -> $logErrorS "txrIndexer" . T.pack $ "failed to parse enode" ++ show err
-            Right enode -> doAddMember chainId address enode
-      ("MemberRemoved", [addressStr]) -> case stringAddress addressStr of
-        Nothing -> $logErrorS "txrIndexer" . T.pack $ "failed to parse address for MemberRemoved event: " ++ addressStr
-        Just address -> doRemoveMember chainId address
-      _ -> return ()
-    -- void . lift $ EventDB.putEventDB ev
-    -- ^^^ NOTE: not actually putting events into eth database, but still need
-    --       them so we can process governance changes
-  TxResult r -> do
+  PutTxResult r -> do
     logF [ "Inserting TXResult for tx "
          , format $ transactionResultTransactionHash r
          , " at block "
          , format $ transactionResultBlockHash r
          ]
     void . lift $ TxrDB.putTransactionResult r
-  _ -> return ()
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-txr-indexer", lookupConsumerGroup "strato-txr-indexer")
