@@ -33,9 +33,11 @@ import qualified Data.Map.Strict                 as M
 import qualified Data.Text                       as T
 import qualified Database.Persist.Postgresql     as SQL
 
+import           Blockchain.Data.Block           (BestBlock(..), Private(..))
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB     (putChainInfo)
+import           Blockchain.Data.Enode           (ChainMembers(..))
 import           Blockchain.Data.Transaction     (insertTX)
 import           Blockchain.DBM
 import           Blockchain.DB.SQLDB
@@ -85,15 +87,58 @@ instance (SHA `A.Alters` API OutputTx) IContextM where
   insert _ _ (API OutputTx{..}) = void . lift $ insertTX Log otOrigin Nothing [otBaseTx]
 
 instance (Word256 `A.Alters` API ChainInfo) IContextM where
-  lookup _ _               = liftIO . throwIO $ Lookup "API" "SHA" "ChainInfo"
-  delete _ _               = liftIO . throwIO $ Delete "API" "SHA" "ChainInfo"
+  lookup _ _               = liftIO . throwIO $ Lookup "API" "Word256" "ChainInfo"
+  delete _ _               = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
   insert _ cId (API cInfo) = void . lift $ putChainInfo cId cInfo
 
 instance (SHA `A.Alters` API OutputBlock) IContextM where
-  lookup _ _          = liftIO . throwIO $ Lookup "API" "SHA" "OutputBlock"
-  delete _ _          = liftIO . throwIO $ Delete "API" "SHA" "OutputBlock"
-  insert _ _ (API ob) = void . lift $ putBlocks [(outputBlockToBlock ob, obTotalDifficulty ob)] False
-  insertMany _        = void . lift . flip putBlocks False . map ((outputBlockToBlock &&& obTotalDifficulty) . unAPI) . M.elems
+  lookup     _ _          = liftIO . throwIO $ Lookup "API" "SHA" "OutputBlock"
+  delete     _ _          = liftIO . throwIO $ Delete "API" "SHA" "OutputBlock"
+  insert     _ _ (API ob) = void . lift $ putBlocks [(outputBlockToBlock ob, obTotalDifficulty ob)] False
+  insertMany _            = void
+                          . lift
+                          . flip putBlocks False
+                          . map ((outputBlockToBlock &&& obTotalDifficulty) . unAPI)
+                          . M.elems
+
+instance (SHA `A.Alters` P2P (Private (Word256, OutputTx))) IContextM where
+  lookup     _ _ = liftIO . throwIO $ Lookup "P2P" "SHA" "Private (Word256, OutputTx)"
+  delete     _ _ = liftIO . throwIO $ Delete "P2P" "SHA" "Private (Word256, OutputTx)"
+  insert   p k v = A.insertMany p $ M.fromList [(k,v)]
+  insertMany _   = void
+                 . RBDB.withRedisBlockDB
+                 . RBDB.addPrivateTransactions
+                 . map (fmap $ unPrivate . unP2P)
+                 . M.toList
+
+instance (SHA `A.Alters` P2P OutputBlock) IContextM where
+  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "SHA" "OutputBlock"
+  delete _ _ = liftIO . throwIO $ Delete "P2P" "SHA" "OutputBlock"
+  insert _ _ = void
+             . RBDB.withRedisBlockDB
+             . RBDB.putBlock
+             . unP2P
+
+instance Mod.Modifiable (P2P BestBlock) IContextM where
+  get _                         = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
+  put _ (P2P (BestBlock s n d)) = void . RBDB.withRedisBlockDB $ RBDB.putBestBlockInfo s n d
+
+instance (Word256 `A.Alters` P2P ChainInfo) IContextM where
+  lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainInfo"
+  delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainInfo"
+  insert _ cId = void
+               . RBDB.withRedisBlockDB
+               . RBDB.putChainInfo cId
+               . unP2P
+
+instance (Word256 `A.Alters` P2P ChainMembers) IContextM where
+  lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
+  delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
+  insert _ cId = void
+               . RBDB.withRedisBlockDB
+               . RBDB.putChainMembers cId
+               . unChainMembers
+               . unP2P
 
 pgPoolSize :: Int
 pgPoolSize = 20
