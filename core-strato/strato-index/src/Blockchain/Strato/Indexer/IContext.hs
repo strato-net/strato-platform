@@ -63,10 +63,10 @@ runIContextM cid f = do
     $logInfoS "runIContextM" . T.pack $ "Creating PG connection pool of size " ++ show pgPoolSize
     sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr pgPoolSize
     redis <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-    (ret, _) <- runResourceT
-              . flip runReaderT (IConfig sqldb)
-              . flip runStateT (IContext (mkConfiguredKafkaState cid)
-                                         (RBDB.RedisConnection redis))
-              $ f
+    ret <- fmap fst
+         . runResourceT
+         . flip runReaderT (IConfig sqldb)
+         . flip runStateT (IContext (mkConfiguredKafkaState cid) (RBDB.RedisConnection redis))
+         $ f
     $logInfoS "runIContextM" "runIContextM complete, returning"
     return ret

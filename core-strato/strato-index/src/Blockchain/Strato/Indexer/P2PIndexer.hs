@@ -30,30 +30,33 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
     $logInfoS "p2pIndexer" "About to fetch IndexEvents"
     (offset, idxEvents) <- getUnprocessedIndexEvents
     $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    let zipIdxEvents = zip [offset+1..] idxEvents
-        ptxs = [t | (_,IndexPrivateTx t) <- zipIdxEvents]
-    unless (null ptxs)
-      . void
-      . RBDB.withRedisBlockDB
-      . RBDB.addPrivateTransactions
-      $ map (txHash &&& (fromJust . txChainId &&& id)) ptxs
-    forM_ zipIdxEvents $ \(nextIdx, e) -> do
-        case e of
-            RanBlock b -> do
-                $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
-                void $ RBDB.withRedisBlockDB (RBDB.putBlock b)
-            NewBestBlock (sha, num, tdiff) -> do
-                $logInfoS "p2pIndexer" . T.pack $
-                    "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ", " ++ show tdiff ++ ")"
-                void $ RBDB.withRedisBlockDB (RBDB.putBestBlockInfo sha num tdiff)
-            NewChainInfo cId cInfo -> do
-                $logInfoS "p2pIndexer" . T.pack $
-                    "Inserting ChainInfo for chain " ++ format cId ++ ": " ++ show cInfo
-                void . RBDB.withRedisBlockDB $ RBDB.putChainInfo cId cInfo
-                let cMembers = members $ chainInfo cInfo
-                void . RBDB.withRedisBlockDB $ RBDB.putChainMembers cId cMembers
-            _ -> return ()
-        setKafkaCheckpoint nextIdx
+    index idxEvents
+    let nextOffset' = offset + fromIntegral (length idxEvents)
+    setKafkaCheckpoint nextOffset'
+
+index :: [IndexEvent] -> IContextM ()
+index idxEvents = do
+  let ptxs = [t | IndexPrivateTx t <- idxEvents]
+  unless (null ptxs)
+    . void
+    . RBDB.withRedisBlockDB
+    . RBDB.addPrivateTransactions
+    $ map (txHash &&& (fromJust . txChainId &&& id)) ptxs
+  forM_ idxEvents $ \case
+    RanBlock b -> do
+      $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
+      void $ RBDB.withRedisBlockDB (RBDB.putBlock b)
+    NewBestBlock (sha, num, tdiff) -> do
+      $logInfoS "p2pIndexer" . T.pack $
+        "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ", " ++ show tdiff ++ ")"
+      void $ RBDB.withRedisBlockDB (RBDB.putBestBlockInfo sha num tdiff)
+    NewChainInfo cId cInfo -> do
+      $logInfoS "p2pIndexer" . T.pack $
+        "Inserting ChainInfo for chain " ++ format cId ++ ": " ++ show cInfo
+      void . RBDB.withRedisBlockDB $ RBDB.putChainInfo cId cInfo
+      let cMembers = members $ chainInfo cInfo
+      void . RBDB.withRedisBlockDB $ RBDB.putChainMembers cId cMembers
+    _ -> return ()
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-p2p-indexer", lookupConsumerGroup "strato-p2p-indexer")
