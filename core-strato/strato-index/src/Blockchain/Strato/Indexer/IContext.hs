@@ -9,13 +9,8 @@
 module Blockchain.Strato.Indexer.IContext
     ( IContext(..)
     , IContextM
-    , IndexerBestBlockInfo(..)
     , runIContextM
-    , getIndexerBestBlockInfo
-    , putIndexerBestBlockInfo
     , targetTopicName
-    , unIBBI
-    , reIBBI
     ) where
 
 import qualified Control.Monad.Change.Modify     as Mod
@@ -24,11 +19,9 @@ import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State
-import           Data.Int                        (Int64)
 import qualified Data.Text                       as T
 import qualified Database.Persist.Postgresql     as SQL
 
-import           Blockchain.Data.DataDefs        (BlockDataRef, Key (BlockDataRefKey))
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
 import qualified Blockchain.Strato.RedisBlockDB  as RBDB
@@ -41,17 +34,13 @@ import           Blockchain.Strato.Indexer.Kafka
 
 newtype IConfig = IConfig { contextSQLDB :: SQLDB }
 
-data IContext = IContext {
-    contextKafkaState   :: KafkaState,
-    contextRedisBlockDB :: RBDB.RedisConnection,
-    contextBestBlock    :: IndexerBestBlockInfo
-}
+data IContext = IContext
+  { contextKafkaState   :: KafkaState
+  , contextRedisBlockDB :: RBDB.RedisConnection
+  }
 
 type IConfigM = ReaderT IConfig (ResourceT (LoggingT IO))
 type IContextM = StateT IContext IConfigM
-
-newtype IndexerBestBlockInfo = IndexerBestBlockInfo (SQL.Key BlockDataRef)
-    deriving (Eq, Ord, Read, Show)
 
 instance Mod.Accessible SQLDB IConfigM where
   access _ = asks contextSQLDB
@@ -63,26 +52,11 @@ instance Mod.Modifiable KafkaState IContextM where
 instance Mod.Accessible RBDB.RedisConnection IContextM where
   access _ = contextRedisBlockDB <$> get
 
-getIndexerBestBlockInfo :: IContextM IndexerBestBlockInfo
-getIndexerBestBlockInfo = contextBestBlock <$> get
-
-putIndexerBestBlockInfo :: IndexerBestBlockInfo -> IContextM ()
-putIndexerBestBlockInfo new = do
-    ctx <- get
-    put ctx { contextBestBlock = new }
-
 pgPoolSize :: Int
 pgPoolSize = 20
 
 targetTopicName :: TopicName
 targetTopicName = indexEventsTopicName
-
--- todo: Database.Persist.Postgresql.SqlBackendKey appears to be an Int64 under the hood. Need to verify.
-unIBBI :: IndexerBestBlockInfo -> Int64
-unIBBI (IndexerBestBlockInfo (BlockDataRefKey k)) = fromIntegral k
-
-reIBBI :: Int64 -> IndexerBestBlockInfo
-reIBBI = IndexerBestBlockInfo . BlockDataRefKey . fromIntegral
 
 runIContextM :: KafkaClientId -> IContextM a -> LoggingT IO a
 runIContextM cid f = do
@@ -92,8 +66,7 @@ runIContextM cid f = do
     (ret, _) <- runResourceT
               . flip runReaderT (IConfig sqldb)
               . flip runStateT (IContext (mkConfiguredKafkaState cid)
-                                         (RBDB.RedisConnection redis)
-                                         (reIBBI 0))
+                                         (RBDB.RedisConnection redis))
               $ f
     $logInfoS "runIContextM" "runIContextM complete, returning"
     return ret
