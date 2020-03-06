@@ -29,6 +29,7 @@ import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
+import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
 --import qualified Data.List                            as List
@@ -147,7 +148,8 @@ create' creator newAddress ch cc contractName' argExps = do
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
-  action' <- Mod.get (Mod.Proxy @Action)
+  finalAct <- Mod.get (Mod.Proxy @Action)
+  finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -155,10 +157,10 @@ create' creator newAddress ch cc contractName' argExps = do
     erReturnVal = Just BSS.empty,
     erTrace = [],
     erLogs = [],
-    erEvents = toList $ ssEvents sstate,
+    erEvents = toList finalEvs,
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
-    erAction = Just action',
+    erAction = Just finalAct,
     erException = Nothing,
     erKind = SolidVM
     }
@@ -219,18 +221,19 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
-    
+
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
-  
-    finalAct <- use action
-    sstate <- get
+
+    finalAct <- Mod.get (Mod.Proxy @Action)
+    finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
       erRefund = 0,
       erReturnVal = BSS.toShort <$> returnVal,
       erTrace = [],
       erLogs = [],
-      erEvents = toList $ ssEvents sstate,
+      erEvents = toList finalEvs,
       erNewContractAddress = Nothing,
       erSuicideList = S.empty,
       erAction = Just $ finalAct,

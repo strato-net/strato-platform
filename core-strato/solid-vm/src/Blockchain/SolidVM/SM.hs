@@ -55,7 +55,7 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.NibbleString as N
-import qualified Data.Sequence as S
+import qualified Data.Sequence as Q
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
@@ -129,7 +129,7 @@ data SState =
     codeDB                 :: CodeDB,
     hashDB                 :: HashDB,
     stateDB                :: MP.MPDB,
-    ssEvents               :: S.Seq Event,
+    ssEvents               :: Q.Seq Event,
     addressStateTxDBMap    :: M.Map Address AddressStateModification,
     addressStateBlockDBMap :: M.Map Address AddressStateModification,
     storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
@@ -148,6 +148,7 @@ type MonadSM m = ( (Address `A.Alters` AddressState) m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
                  , Mod.Modifiable Action m
+                 , Mod.Modifiable (Q.Seq Event) m
                  , MonadIO m --todo: remove
                  )
 
@@ -222,7 +223,7 @@ instance Mod.Modifiable Action SM where
   get _ = use action
   put _ = assign action
 
-instance Mod.Modifiable (S.Seq Event) SM where
+instance Mod.Modifiable (Q.Seq Event) SM where
   -- adding events to the action so that slipstream gets them,
   --   and also to the events field of the sstate, so that they get sent to
   --    TxrIndexer for governance updates
@@ -231,7 +232,7 @@ instance Mod.Modifiable (S.Seq Event) SM where
     action . actionEvents .= q
     modify $ \sstate -> sstate { ssEvents = q }
   modify _ f = do
-    aEvents <- use action . actionEvents
+    aEvents <- use $ action . actionEvents
     aEvents' <- f aEvents
     assign (action . actionEvents) aEvents'
 
@@ -251,7 +252,7 @@ runSM maybeCode env f = do
         codeDB = contextCodeDB vmcontext,
         hashDB = contextHashDB vmcontext,
         stateDB = contextStateDB vmcontext,
-        ssEvents = S.empty,
+        ssEvents = Q.empty,
         addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
         addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
         storageTxMap = contextStorageTxMap vmcontext,
@@ -311,7 +312,7 @@ startingAction maybeCode env' = Action
         Just theCode ->
           Just $ M.insert "src" (T.pack $ BC.unpack theCode) $ fromMaybe M.empty $ Env.metadata env'
         Nothing -> Env.metadata env'
-  , _actionEvents             = S.empty
+  , _actionEvents             = Q.empty
   }
 
 
@@ -611,5 +612,5 @@ markDiffForAction owner key' val' = do
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData . at owner . mapped . actionDataStorageDiffs %= ins
 
-addEvent :: Mod.Modifiable (S.Seq Event) m => Event -> m ()
-addEvent newEvent = Mod.modify_ (Mod.Proxy @(S.Seq Event)) $ pure . (S.|> newEvent)
+addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
+addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
