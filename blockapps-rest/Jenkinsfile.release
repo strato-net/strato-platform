@@ -78,7 +78,7 @@ pipeline {
       }
     }
       
-    stage('Release') {
+    stage('Release to github repo') {
       steps {
         withEnv(["REFSPEC=${env.REFSPEC}"]) {
           withCredentials([
@@ -109,7 +109,28 @@ pipeline {
               git -c "user.name=cd-blockapps" -c "user.email=support@blockapps.net" tag "v${BA_REST_VERSION}"
               git push --tags
             '''
-            //TODO: release from blockapps/blockapps-rest to npm here
+          }
+        }
+      }
+    }
+    stage('Publish to npm') {
+      steps {
+        withEnv(["REFSPEC=${env.REFSPEC}"]) {
+          sh "rm -rf blockapps-rest"
+          withCredentials([
+            usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+          ]) {
+            sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/blockapps-rest"
+          }
+          dir ("blockapps-rest") {
+            sh "yarn"
+            sh "yarn build"
+            sh "cp ~/.npmrc ~/.npmrc.BAK"
+            withCredentials([string(credentialsId: 'npm-admin-token', variable: 'NPMTOKEN')]) {
+              sh "npm set //registry.npmjs.org/:_authToken=${NPMTOKEN}"
+            }
+            sh "npm publish"
+            sh "cp ~/.npmrc.BAK ~/.npmrc"
           }
         }
       }
@@ -117,6 +138,11 @@ pipeline {
   }
 
   post {
+    always {
+      steps {
+        sh "mv ~/.npmrc.BAK ~/.npmrc || true"
+      }
+    }
     success {
       slackSend (
         color: 'good',
