@@ -129,9 +129,7 @@ pipeline {
                 git submodule update --init --recursive
                 cd server
                 sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
-                # symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
-                cp -r ../../strato-worktree/blockapps-rest blockapps-rest
-                sed -i 's|.*blockapps-rest.*|"blockapps-rest": "file:./blockapps-rest",|' package.json
+                # oauth42style uses the old hardcoded ba-rest version
                 touch .env
                 yarn build
                 yarn install
