@@ -127,7 +127,7 @@ pipeline {
             sh "yarn build"
             sh "cp ~/.npmrc ~/.npmrc.BAK"
             withCredentials([string(credentialsId: 'npm-admin-token', variable: 'NPMTOKEN')]) {
-              sh "npm set //registry.npmjs.org/:_authToken=${NPMTOKEN}"
+              sh "npm set //registry.npmjs.org/:_authToken ${NPMTOKEN}"
             }
             sh "npm publish"
             sh "cp ~/.npmrc.BAK ~/.npmrc"
