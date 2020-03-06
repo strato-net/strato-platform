@@ -2,6 +2,7 @@
 -- {-# OPTIONS -fno-warn-unused-top-binds  #-}
 
 module Blockchain.SolidVM.Environment (
+  Sender(..),
   Environment(..)
   ) where
 
@@ -13,7 +14,7 @@ import           Blockchain.Data.DataDefs (BlockData(..))
 import           Blockchain.ExtWord
 import           Blockchain.SHA
 
-
+newtype Sender = Sender { unSender :: Address }
 
 data Environment =
   Environment {
