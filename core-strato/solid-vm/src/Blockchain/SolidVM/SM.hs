@@ -231,15 +231,6 @@ instance Mod.Modifiable (Q.Seq Event) SM where
   put    _ q = do
     action . actionEvents .= q
     modify $ \sstate -> sstate { ssEvents = q }
-  modify _ f = do
-    aEvents <- use $ action . actionEvents
-    aEvents' <- f aEvents
-    assign (action . actionEvents) aEvents'
-
-    sstate <- get
-    ssEvents' <- f (ssEvents sstate)
-    put sstate { ssEvents = ssEvents' }
-    pure ssEvents'
 
 runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
 runSM maybeCode env f = do
