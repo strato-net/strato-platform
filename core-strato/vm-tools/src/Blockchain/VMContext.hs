@@ -180,6 +180,10 @@ instance HasMemEventDB ContextM where
     _ <- K.withKafkaRetry1s $ IK.writeIndexEvents (IM.EventDBEntry <$> toWrite)
     put $ ctx { contextEventDBQueue = [] }
 
+instance Mod.Modifiable Context ContextM where
+  get _ = get
+  put _ = put
+
 instance Mod.Modifiable MP.StateRoot ContextM where
   get _    = gets (MP.stateRoot . contextStateDB)
   put _ sr = modify $ \c -> c{contextStateDB = (contextStateDB c){MP.stateRoot = sr}}

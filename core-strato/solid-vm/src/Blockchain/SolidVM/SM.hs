@@ -41,7 +41,7 @@ module Blockchain.SolidVM.SM (
 
 import           Control.Applicative ((<|>))
 import           Control.Exception
-import           Control.Lens
+import           Control.Lens hiding (Context)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
@@ -232,9 +232,17 @@ instance Mod.Modifiable (Q.Seq Event) SM where
     action . actionEvents .= q
     modify $ \sstate -> sstate { ssEvents = q }
 
-runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
+runSM :: ( MonadIO m
+         , MonadLogger m
+         , Mod.Modifiable Context m
+         , HasStateDB m
+         )
+      => (Maybe ByteString)
+      -> Env.Environment
+      -> SM a
+      -> m (Either SolidException a)
 runSM maybeCode env f = do
-  vmcontext <- get
+  vmcontext <- Mod.get (Mod.Proxy @Context)
 
   let startingState =
         SState {
@@ -263,11 +271,11 @@ runSM maybeCode env f = do
       if flags_svmDev
         then do
           $logErrorLS "runSM/error_code" maybeCode
-          throw se
+          liftIO $ throwIO se
         else return $ Left se
     Right (value, sstateAfter) -> do
-      vmcontext' <- get
-      put vmcontext'{
+      vmcontext' <- Mod.get (Mod.Proxy @Context)
+      Mod.put (Mod.Proxy @Context) vmcontext'{
         contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
         contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
         contextStorageTxMap = storageTxMap sstateAfter,

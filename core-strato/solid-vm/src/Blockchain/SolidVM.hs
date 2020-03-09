@@ -13,7 +13,7 @@ module Blockchain.SolidVM
     , create
     ) where
 
-import           Control.Lens hiding (assign, from, to)
+import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
@@ -47,7 +47,9 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.ModifyStateDB          (pay)
+import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
+import           Blockchain.Output
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
@@ -84,7 +86,12 @@ onTraced :: Monad m => m () -> m ()
 onTraced = when flags_svmTrace
 
 
-create :: Bool
+create :: ( MonadIO m
+          , MonadLogger m
+          , Mod.Modifiable Context m
+          , HasStateDB m
+          )
+       => Bool
        -> Bool
        -> S.Set Address
        -> BlockData
@@ -99,7 +106,7 @@ create :: Bool
        -> SHA
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
-       -> ContextM ExecResults
+       -> m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash' chainId' metadata = do
@@ -181,7 +188,12 @@ initializeStorage root value = do
      x -> setVar root x
 -}
 
-call :: Bool
+call :: ( MonadIO m
+        , MonadLogger m
+        , Mod.Modifiable Context m
+        , HasStateDB m
+        )
+     => Bool
      -> Bool
      -> Bool
      -> S.Set Address
@@ -198,7 +210,7 @@ call :: Bool
      -> SHA
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
-     -> ContextM ExecResults
+     -> m ExecResults
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
