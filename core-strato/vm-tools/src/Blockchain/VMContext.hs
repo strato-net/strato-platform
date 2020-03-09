@@ -32,7 +32,6 @@ module Blockchain.VMContext
     , compactContextM
     ) where
 
-import           Control.Arrow                      ((&&&))
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch
@@ -252,9 +251,9 @@ instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   delete _ = genericDeleteHashDB $ gets contextHashDB
 
 instance HasMemRawStorageDB ContextM where
-  getMemRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
+  getMemRawStorageTxDB = gets contextStorageTxMap
   putMemRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
-  getMemRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
+  getMemRawStorageBlockDB = gets contextStorageBlockMap
   putMemRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
 
 instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
@@ -397,7 +396,7 @@ getNewAddress address = do
 
 purgeStorageMap :: HasMemStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  storageMap <- snd <$> getMemRawStorageTxDB
+  storageMap <- getMemRawStorageTxDB
   putMemRawStorageTxMap $ M.filterWithKey (const . (/= address) . fst) storageMap
 
 getContextBestBlockInfo :: ContextM ContextBestBlockInfo

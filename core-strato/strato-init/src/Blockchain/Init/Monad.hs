@@ -77,17 +77,11 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
   delete _ = MP.genericDeleteDB $ asks stateDB
 
 instance HasMemRawStorageDB SetupDBM where
-  getMemRawStorageTxDB = do
-    cxt <- ask
-    lst <- liftIO . readIORef .localStorageTx $ cxt
-    return (stateDB cxt, lst)
+  getMemRawStorageTxDB = liftIO . readIORef .localStorageTx =<< ask
   putMemRawStorageTxMap theMap = do
     lstref <- asks localStorageTx
     liftIO $ atomicWriteIORef lstref theMap
-  getMemRawStorageBlockDB = do
-    cxt <- ask
-    lsb <- liftIO . readIORef . localStorageBlock $ cxt
-    return (stateDB cxt, lsb)
+  getMemRawStorageBlockDB = liftIO . readIORef . localStorageBlock =<< ask
   putMemRawStorageBlockMap theMap = do
     lsbref <- asks localStorageBlock
     liftIO $ atomicWriteIORef lsbref theMap

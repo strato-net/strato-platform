@@ -113,20 +113,10 @@ instance Mod.Modifiable MP.StateRoot VMM where
   put _ sr = lift $ get >>= \c -> put c{dbs=(dbs c){contextStateDB=(contextStateDB $ dbs c){MP.stateRoot=sr}}}
 
 instance HasMemRawStorageDB VMM where
-    getMemRawStorageTxDB = do
-      cxt <- lift get
-      return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
-              contextStorageTxMap $ dbs cxt)
-    putMemRawStorageTxMap theMap = do
-      cxt <- lift get
-      lift $ put cxt{dbs=(dbs cxt){contextStorageTxMap=theMap}}
-    getMemRawStorageBlockDB = do
-      cxt <- lift get
-      return (MP.ldb $ contextStateDB $ dbs cxt, --storage uses the state db also
-              contextStorageBlockMap $ dbs cxt)
-    putMemRawStorageBlockMap theMap = do
-      cxt <- lift get
-      lift $ put cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
+    getMemRawStorageTxDB = lift . gets $ contextStorageTxMap . dbs
+    putMemRawStorageTxMap theMap = lift . modify $ \cxt -> cxt{dbs=(dbs cxt){contextStorageTxMap=theMap}}
+    getMemRawStorageBlockDB = lift . gets $ contextStorageBlockMap . dbs
+    putMemRawStorageBlockMap theMap = lift . modify $ \cxt -> cxt{dbs=(dbs cxt){contextStorageBlockMap=theMap}}
 
 instance (RawStorageKey `A.Alters` RawStorageValue) VMM where
   lookup _ = genericLookupRawStorageDB

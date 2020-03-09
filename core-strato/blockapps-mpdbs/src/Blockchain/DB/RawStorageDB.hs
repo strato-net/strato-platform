@@ -34,7 +34,6 @@ import           Data.List
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as M
 import           Data.Traversable                            (for)
-import qualified Database.LevelDB                            as DB
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Data.AddressStateDB
@@ -57,9 +56,9 @@ type RawStorageValue = ByteString
 type HasRawStorageDB m = (RawStorageKey `A.Alters` RawStorageValue) m
 
 class Monad m => HasMemRawStorageDB m where
-  getMemRawStorageTxDB     :: m (DB.DB, M.Map RawStorageKey RawStorageValue)
+  getMemRawStorageTxDB     :: m (M.Map RawStorageKey RawStorageValue)
   putMemRawStorageTxMap    :: M.Map RawStorageKey RawStorageValue -> m ()
-  getMemRawStorageBlockDB  :: m (DB.DB, M.Map RawStorageKey RawStorageValue)
+  getMemRawStorageBlockDB  :: m (M.Map RawStorageKey RawStorageValue)
   putMemRawStorageBlockMap :: M.Map RawStorageKey RawStorageValue -> m ()
 
 type FullRawStorage m = ( HasMemAddressStateDB m
@@ -94,11 +93,11 @@ genericLookupRawStorageDB :: ( HasMemRawStorageDB m
                           => RawStorageKey
                           -> m (Maybe RawStorageValue)
 genericLookupRawStorageDB key = do
-  theMap <- snd <$> getMemRawStorageTxDB
+  theMap <- getMemRawStorageTxDB
   case M.lookup key theMap of
    Just val -> return $ Just val
    Nothing  -> do
-     theBMap <- snd <$> getMemRawStorageBlockDB
+     theBMap <- getMemRawStorageBlockDB
      case M.lookup key theBMap of
        Just val' -> return $ Just val'
        Nothing -> do
@@ -115,11 +114,11 @@ genericLookupWithDefaultRawStorageDB
   => RawStorageKey
   -> m RawStorageValue
 genericLookupWithDefaultRawStorageDB key = do
-  theMap <- snd <$> getMemRawStorageTxDB
+  theMap <- getMemRawStorageTxDB
   case M.lookup key theMap of
    Just val -> return val
    Nothing  -> do
-     theBMap <- snd <$> getMemRawStorageBlockDB
+     theBMap <- getMemRawStorageBlockDB
      case M.lookup key theBMap of
        Just val' -> return val'
        Nothing -> do
@@ -133,14 +132,14 @@ genericInsertRawStorageDB :: HasMemRawStorageDB m
                           -> RawStorageValue
                           -> m ()
 genericInsertRawStorageDB key val = do
-  theMap <- snd <$> getMemRawStorageTxDB
+  theMap <- getMemRawStorageTxDB
   putMemRawStorageTxMap $ M.insert key val theMap
 
 genericDeleteRawStorageDB :: HasMemRawStorageDB m
                           => RawStorageKey
                           -> m ()
 genericDeleteRawStorageDB key = do
-  theMap <- snd <$> getMemRawStorageTxDB
+  theMap <- getMemRawStorageTxDB
   putMemRawStorageTxMap $ M.insert key blankVal theMap
 
 getAllRawStorageKeyValsMC :: FullRawStorage m  => Address -> m [(MP.Key, RawStorageValue)]
@@ -148,15 +147,15 @@ getAllRawStorageKeyValsMC = getAllRawStorageKeyValsDB
 
 flushMemRawStorageTxDBToBlockDB :: HasMemRawStorageDB m => m ()
 flushMemRawStorageTxDBToBlockDB = do
-  txMap <- snd <$> getMemRawStorageTxDB
-  blkMap <- snd <$> getMemRawStorageBlockDB
+  txMap <- getMemRawStorageTxDB
+  blkMap <- getMemRawStorageBlockDB
   putMemRawStorageBlockMap $ txMap `M.union` blkMap
   putMemRawStorageTxMap M.empty
 
 flushMemRawStorageDB :: (MonadLogger m, FullRawStorage m) => m ()
 flushMemRawStorageDB = do
   flushMemRawStorageTxDBToBlockDB
-  theMap <- fmap snd getMemRawStorageBlockDB
+  theMap <- getMemRawStorageBlockDB
 
   let changesByAddress :: Map Address [(ByteString, RawStorageValue)]
       changesByAddress = M.fromListWith (++)  $ map (\((a, k), v) -> (a, [(k, v)])) $ M.toList theMap
