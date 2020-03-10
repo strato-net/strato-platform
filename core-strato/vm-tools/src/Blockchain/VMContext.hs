@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
@@ -226,6 +227,9 @@ instance Mod.Modifiable Context ContextM where
   get _ = get
   put _ = put
 
+instance Mod.Accessible Context ContextM where
+  access _ = get
+
 instance Mod.Modifiable MP.StateRoot ContextM where
   get _    = gets (MP.stateRoot . contextStateDB)
   put _ sr = modify $ \c -> c{contextStateDB = (contextStateDB c){MP.stateRoot = sr}}
@@ -446,29 +450,32 @@ purgeStorageMap address = do
   storageMap <- getMemRawStorageTxDB
   putMemRawStorageTxMap $ M.filterWithKey (const . (/= address) . fst) storageMap
 
-getContextBestBlockInfo :: ContextM ContextBestBlockInfo
-getContextBestBlockInfo = contextBestBlockInfo <$> get
+getContextBestBlockInfo :: (Functor m, Mod.Accessible Context m) => m ContextBestBlockInfo
+getContextBestBlockInfo = contextBestBlockInfo <$> Mod.access Mod.Proxy
 
-putContextBestBlockInfo :: ContextBestBlockInfo -> ContextM ()
-putContextBestBlockInfo new = do
-    ctx <- get
-    put ctx { contextBestBlockInfo = new }
+putContextBestBlockInfo :: Mod.Modifiable Context m => ContextBestBlockInfo -> m ()
+putContextBestBlockInfo new = Mod.modify_ Mod.Proxy $ \ctx -> pure $ ctx{ contextBestBlockInfo = new }
 
-queuePendingVote :: Address -> Bool -> Address -> ContextM ()
-queuePendingVote a r s= do
+queuePendingVote :: ( MonadLogger m
+                    , Mod.Modifiable Context m
+                    )
+                 => Address -> Bool -> Address -> m ()
+queuePendingVote a r s = do
   let nonce = case r of
         True -> maxBound
         False -> 0
-  let newVote = ((a, nonce), s)
+      newVote = ((a, nonce), s)
   $logInfoLS "queuePendingVote" newVote
-  ctx <- get
-  put ctx { contextCoinbaseQueue = newVote Q.<| (contextCoinbaseQueue ctx)}
+  Mod.modify_ (Mod.Proxy @Context) $ \ctx -> pure $ ctx { contextCoinbaseQueue = newVote Q.<| (contextCoinbaseQueue ctx)}
 
 -- (Coinbase, Nonce) to be applied on a constructed block
 -- When no pending votes are available, supplies the default coinbase (0x0)
-peekPendingVote :: ContextM (Address, Word64)
+peekPendingVote :: ( MonadLogger m
+                   , Mod.Accessible Context m
+                   )
+                => m (Address, Word64)
 peekPendingVote = do
-  ctx <- get
+  ctx <- Mod.access (Mod.Proxy @Context)
   case Q.viewl $ contextCoinbaseQueue ctx of
     Q.EmptyL -> return (0,0)
     ( v Q.:< _) -> do
@@ -477,18 +484,20 @@ peekPendingVote = do
 
 -- If the Block was sent out by us and contains our vote,
 -- mark the vote as committed and remove it from the queue.
-clearPendingVote :: Block -> ContextM ()
-clearPendingVote b = do
+clearPendingVote :: ( MonadLogger m
+                    , Mod.Modifiable Context m
+                    )
+                 => Block -> m ()
+clearPendingVote b = Mod.modify_ (Mod.Proxy @Context) $ \ctx -> do
   let bd = blockBlockData b
       currentBlockData = (blockDataCoinbase bd, blockDataNonce bd)
-  $logInfoLS "clearPendingVote" currentBlockData
-  ctx <- get
-  let sender = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
-  let ctxCoinbaseQ = contextCoinbaseQueue ctx
-  let newCoinbaseQ = case Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ of
+      sender = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
+      ctxCoinbaseQ = contextCoinbaseQueue ctx
+      newCoinbaseQ = case Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ of
         Just i -> Q.deleteAt i ctxCoinbaseQ
         Nothing -> ctxCoinbaseQ
-  put ctx { contextCoinbaseQueue = newCoinbaseQ}
+  $logInfoLS "clearPendingVote" currentBlockData
+  pure $ ctx { contextCoinbaseQueue = newCoinbaseQ }
 
 compactContextM :: ContextM ()
 compactContextM = modify' force
