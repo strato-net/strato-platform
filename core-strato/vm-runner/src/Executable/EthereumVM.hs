@@ -120,7 +120,7 @@ handleVmEvents makeLazyBlocks events = do
   numPoolable <- processTransactions txPairs
   actions <- processBlocks blocks
 
-  contextModify $ \ctx -> ctx{ _contextBlockRequested = VmCreateBlockCommand `elem` events }
+  contextModify $ \ctx -> ctx{ _contextBlockRequested = _contextBlockRequested ctx || VmCreateBlockCommand `elem` events }
   -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
   -- todo: which may fail
   isCaughtUp <- shouldProcessNewTransactions
