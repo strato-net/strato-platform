@@ -44,7 +44,7 @@ import qualified Data.Text                          as T
 import           Data.Time.Clock.POSIX
 import           Numeric
 import           Text.Printf
-import           UnliftIO.Exception (throwIO)
+import           UnliftIO
 
 
 
@@ -1010,11 +1010,11 @@ runPrecompiled precompiled = do
 
 runVMM :: Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM a -> ContextM ExecResults
 runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availableGas f = force <$> do
-  dbs' <- get
-  sqldbs' <- ask
+  (sqldbs', dbsIORef) <- ask
+  dbs' <- readIORef dbsIORef
   vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
   gasref <- liftIO $ newCounter availableGas
-  (res, vmState') <- lift . lift $
+  (res, vmState') <- lift $
       flip runStateT vmState{
                          callDepth=callDepth,
                          vmGasRemaining=gasref,
@@ -1026,7 +1026,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
 
   case res of
       Left e -> do
-          lift . lift $ $logInfoS "runVMM/Left" . T.pack $ CL.red $ "Exception caught (" ++ show e ++ "), reverting state"
+          lift $ $logInfoS "runVMM/Left" . T.pack $ CL.red $ "Exception caught (" ++ show e ++ "), reverting state"
           when flags_debug $ $logDebugS "runVMM/Left" "VM has finished running"
           return execResults{
                    erLogs=[],
@@ -1043,7 +1043,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
           putMemRawStorageTxMap $ contextStorageTxMap $ dbs vmState'
           putAddressStateTxDBMap $ contextAddressStateTxDBMap $ dbs vmState'
 
-          when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
+          when flags_debug . lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return execResults
 
 create :: Bool
@@ -1080,8 +1080,8 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
           envMetadata = metadata
           }
 
-  dbs' <- get
-  sqldbs' <- ask
+  (sqldbs', dbsIORef) <- ask
+  dbs' <- readIORef dbsIORef
   vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
 
   success <-
@@ -1316,9 +1316,13 @@ create_debugWrapper block owner value initCodeBytes = do
       sqldb' <- lift $ gets sqldb
 
       currentVMState <- lift get
+      dbsIORef <- newIORef dbs'
 
       let runEm :: ContextM a -> VMM (a, Context)
-          runEm f = lift . lift . flip runReaderT sqldb' . runStateT f $ dbs'
+          runEm f = lift . lift $ do
+            a <- runReaderT f (sqldb', dbsIORef)
+            dbs'' <- readIORef dbsIORef
+            return (a, dbs'')
           callEm :: ContextM ExecResults
           callEm = create (isRunningTests currentVMState)
                           (vmIsHomestead currentVMState)
@@ -1367,9 +1371,13 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
   sqldb' <- lift $ gets sqldb
 
   currentVMState <- lift get
+  dbsIORef <- newIORef dbs'
 
   let runEm :: ContextM a -> VMM (a, Context)
-      runEm = lift . lift . flip runReaderT sqldb' . flip runStateT dbs'
+      runEm f = lift . lift $ do
+        a <- runReaderT f (sqldb', dbsIORef)
+        dbs'' <- readIORef dbsIORef
+        return (a, dbs'')
       callEm :: ContextM ExecResults
       callEm = call (isRunningTests currentVMState)
                     (vmIsHomestead currentVMState)

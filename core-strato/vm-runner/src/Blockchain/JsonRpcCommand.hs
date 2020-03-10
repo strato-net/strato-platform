@@ -47,17 +47,16 @@ produceResponse id theData = do
         Right _ -> return ()
 
 
-runJsonRpcCommand :: ( MonadLogger (t m)
-                     , WrapsSQLDB t m
-                     , HasStateDB (t m)
-                     , HasCodeDB (t m)
-                     , HasStorageDB (t m)
-                     , (Address `A.Alters` AddressState) (t m)
-                     , MonadIO (t m)
+runJsonRpcCommand :: ( MonadLogger m
+                     , HasSQLDB m
+                     , HasStateDB m
+                     , HasCodeDB m
+                     , HasStorageDB m
+                     , (Address `A.Alters` AddressState) m
                      )
-                  => JsonRpcCommand -> t m ()
+                  => JsonRpcCommand -> m ()
 runJsonRpcCommand = liftIO . uncurry produceResponse
-                <=< runJsonRpcCommand' (runWithSQL getBestBlock)
+                <=< runJsonRpcCommand' getBestBlock
 
 runJsonRpcCommand' :: ( MonadLogger m
                       , HasStateDB m

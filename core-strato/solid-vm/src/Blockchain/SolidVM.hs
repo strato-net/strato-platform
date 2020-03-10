@@ -24,11 +24,11 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
-import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
+import           Data.NibbleString                    (NibbleString(..))
 import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
@@ -46,6 +46,7 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
+import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
@@ -55,7 +56,6 @@ import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Metrics
-import           Blockchain.SolidVM.Model
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
@@ -79,6 +79,8 @@ import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
+import           UnliftIO
+
 import           CodeCollection
 
 
@@ -87,8 +89,11 @@ onTraced = when flags_svmTrace
 
 
 create :: ( MonadIO m
+          , MonadUnliftIO m
           , MonadLogger m
           , Mod.Modifiable Context m
+          , (NibbleString `A.Alters` NibbleString) m
+          , (SHA `A.Alters` DBCode) m
           , HasStateDB m
           )
        => Bool
@@ -189,8 +194,11 @@ initializeStorage root value = do
 -}
 
 call :: ( MonadIO m
+        , MonadUnliftIO m
         , MonadLogger m
         , Mod.Modifiable Context m
+        , (NibbleString `A.Alters` NibbleString) m
+        , (SHA `A.Alters` DBCode) m
         , HasStateDB m
         )
      => Bool

@@ -16,6 +16,11 @@ module Blockchain.VMContext
     , Config(..)
     , ContextBestBlockInfo(..)
     , ContextM
+    , contextGet
+    , contextGets
+    , contextPut
+    , contextModify
+    , contextModify'
     , runTestContextM
     , runContextM
     , evalContextM
@@ -34,14 +39,11 @@ module Blockchain.VMContext
 
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
-import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
 import           Blockchain.Output
 import           Control.Monad.Reader
-import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
 import           Data.Default                       (def)
@@ -63,7 +65,6 @@ import qualified Network.Kafka                      as K
 import qualified Network.Kafka.Protocol             as K
 import qualified Blockchain.MilenaTools             as K
 import           System.Directory
-import           System.IO.Temp
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 import           Prometheus
 
@@ -101,6 +102,8 @@ import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 
+import           UnliftIO
+
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
@@ -135,7 +138,47 @@ data Context = Context { contextStateDB                :: MP.MPDB
 makeLenses ''Context
 
 
-type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
+type ContextM = ReaderT (Config, IORef Context) (ResourceT (LoggingT IO))
+
+get :: ContextM Context
+get = readIORef =<< asks snd
+{-# INLINE get #-}
+
+gets :: (Context -> a) -> ContextM a
+gets f = fmap f $ readIORef =<< asks snd
+{-# INLINE gets #-}
+
+put :: Context -> ContextM ()
+put c = asks snd >>= \i -> atomicWriteIORef i c
+{-# INLINE put #-}
+
+modify :: (Context -> Context) -> ContextM ()
+modify f = asks snd >>= \i -> atomicModifyIORef i (\a -> (f a, ()))
+{-# INLINE modify #-}
+
+modify' :: (Context -> Context) -> ContextM ()
+modify' f = asks snd >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
+{-# INLINE modify' #-}
+
+contextGet :: ContextM Context
+contextGet = get
+{-# INLINE contextGet #-}
+
+contextGets :: (Context -> a) -> ContextM a
+contextGets = gets
+{-# INLINE contextGets #-}
+
+contextPut :: Context -> ContextM ()
+contextPut = put
+{-# INLINE contextPut #-}
+
+contextModify :: (Context -> Context) -> ContextM ()
+contextModify = modify
+{-# INLINE contextModify #-}
+
+contextModify' :: (Context -> Context) -> ContextM ()
+contextModify' = modify'
+{-# INLINE contextModify' #-}
 
 instance Show Context where
   show = const "<context>"
@@ -267,11 +310,8 @@ instance (SHA `A.Alters` BlockSummary) ContextM where
   insert _ = genericInsertBlockSummaryDB $ gets contextBlockSummaryDB
   delete _ = genericDeleteBlockSummaryDB $ gets contextBlockSummaryDB
 
-instance MonadReader Config m => Mod.Accessible SQLDB m where
-  access _ = asks configSQLDB
-
-instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
-  runWithSQL = lift
+instance MonadReader (Config, a) m => Mod.Accessible SQLDB m where
+  access _ = asks $ configSQLDB . fst
 
 instance Mod.Accessible RBDB.RedisConnection ContextM where
   access _ = gets contextRedisPool
@@ -285,101 +325,108 @@ instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
-runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadMask m,
-                    HasStateDB (StateT Context (ReaderT Config (ResourceT m)))) =>
-                   StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
+runTestContextM :: ( MonadIO m
+                   , MonadUnliftIO m
+                   , HasStateDB (ReaderT (Config, IORef Context) (ResourceT m))
+                   )
+                => ReaderT (Config, IORef Context) (ResourceT m) a
+                -> m (a, Context)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
   withTempFile tmpdir "evm.sqlite" $ \filepath _ ->
     runResourceT $ do
       conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack filepath) 20
-      flip runReaderT (Config conn) $ do
-        let ldbOptions = DB.defaultOptions {
-          DB.createIfMissing = True,
-          DB.cacheSize = flags_ldbCacheSize,
-          DB.blockSize = flags_ldbBlockSize
-        }
-        let openDB base = DB.open (tmpdir ++ base) ldbOptions
-        sdb <- openDB stateDBPath
-        hdb <- openDB hashDBPath
-        cdb <- openDB codeDBPath
-        blksumdb <- openDB blockSummaryCacheDBPath
-        redisPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
-          Redis.connectHost = "localhost",
-          Redis.connectPort = Redis.PortNumber 2023,
-          Redis.connectDatabase = 0
-        }
-        let initialKafkaState = K.mkKafkaState (K.KString "fake_client")
-                                               (K.Host (K.KString "localhost"), K.Port 1234132)
-        cache <- liftIO $ TRC.new 64
-        flip runStateT (Context
-                     MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "must set stateroot for test context"}
-                     (HashDB hdb)
-                     (CodeDB cdb)
-                     (BlockSummaryDB blksumdb)
-                     M.empty
-                     M.empty
-                     M.empty
-                     M.empty
-                     defaultBaggerState
-                     initialKafkaState
-                     Unspecified
-                     (RBDB.RedisConnection redisPool)
-                     Q.empty 
-                     []
-                     []
-                     False
-                     False
-                     Q.empty
-                     cache) $ do
-          MP.initializeBlank
-          setStateDBStateRoot MP.emptyTriePtr
-          f
+      let ldbOptions = DB.defaultOptions {
+        DB.createIfMissing = True,
+        DB.cacheSize = flags_ldbCacheSize,
+        DB.blockSize = flags_ldbBlockSize
+      }
+      let openDB base = DB.open (tmpdir ++ base) ldbOptions
+      sdb <- openDB stateDBPath
+      hdb <- openDB hashDBPath
+      cdb <- openDB codeDBPath
+      blksumdb <- openDB blockSummaryCacheDBPath
+      redisPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
+        Redis.connectHost = "localhost",
+        Redis.connectPort = Redis.PortNumber 2023,
+        Redis.connectDatabase = 0
+      }
+      let initialKafkaState = K.mkKafkaState (K.KString "fake_client")
+                                             (K.Host (K.KString "localhost"), K.Port 1234132)
+      cache <- liftIO $ TRC.new 64
+      ctx <- newIORef (Context
+                         MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "must set stateroot for test context"}
+                         (HashDB hdb)
+                         (CodeDB cdb)
+                         (BlockSummaryDB blksumdb)
+                         M.empty
+                         M.empty
+                         M.empty
+                         M.empty
+                         defaultBaggerState
+                         initialKafkaState
+                         Unspecified
+                         (RBDB.RedisConnection redisPool)
+                         Q.empty
+                         []
+                         []
+                         False
+                         False
+                         Q.empty
+                         cache)
+      a <- flip runReaderT (Config conn, ctx) $ do
+        MP.initializeBlank
+        setStateDBStateRoot MP.emptyTriePtr
+        f
+      ctx' <- readIORef ctx
+      return (a, ctx')
 
 runContextM :: (MonadIO m, MonadUnliftIO m) =>
-                StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
+                ReaderT (Config, IORef Context) (ResourceT m) a -> m (a, Context)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
         conn <- liftIO $ runNoLoggingT  $ PSQL.createPostgresqlPool connStr 20
-        flip runReaderT (Config conn) $ do
-          let ldbOptions = DB.defaultOptions {
-              DB.createIfMissing = True,
-              DB.cacheSize       = flags_ldbCacheSize,
-              DB.blockSize       = flags_ldbBlockSize
-          }
-          sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
-          hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
-          cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-          blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
-          redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-          let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
-          cache <- liftIO $ TRC.new 64
-          runStateT f (Context
-                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
-                       (HashDB hdb)
-                       (CodeDB cdb)
-                       (BlockSummaryDB blksumdb)
-                       M.empty
-                       M.empty
-                       M.empty
-                       M.empty
-                       defaultBaggerState
-                       initialKafkaState
-                       Unspecified
-                       (RBDB.RedisConnection redisPool)
-                       Q.empty
-                       []
-                       []
-                       flags_blockstanbul
-                       False
-                       Q.empty
-                       cache)
+        let ldbOptions = DB.defaultOptions {
+            DB.createIfMissing = True,
+            DB.cacheSize       = flags_ldbCacheSize,
+            DB.blockSize       = flags_ldbBlockSize
+        }
+        sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
+        hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
+        cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
+        blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
+        redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
+        let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
+        cache <- liftIO $ TRC.new 64
+        ctx <- newIORef (Context
+                           MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
+                           (HashDB hdb)
+                           (CodeDB cdb)
+                           (BlockSummaryDB blksumdb)
+                           M.empty
+                           M.empty
+                           M.empty
+                           M.empty
+                           defaultBaggerState
+                           initialKafkaState
+                           Unspecified
+                           (RBDB.RedisConnection redisPool)
+                           Q.empty
+                           []
+                           []
+                           flags_blockstanbul
+                           False
+                           Q.empty
+                           cache)
+        a <- runReaderT f (Config conn, ctx)
+        ctx' <- readIORef ctx
+        return (a, ctx')
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
+evalContextM :: (MonadIO m, MonadUnliftIO m) => ReaderT (Config, IORef Context) (ResourceT m) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
+execContextM :: (MonadIO m, MonadUnliftIO m) => ReaderT (Config, IORef Context) (ResourceT m) a -> m Context
 execContextM f = snd <$> runContextM f
 
 incrementNonce :: (Address `A.Alters` AddressState) f => Address -> f ()

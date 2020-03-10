@@ -51,7 +51,7 @@ dependencies:
   - temporary
   - time
   - transformers
-  - unliftio-core
+  - unliftio
 
 library:
   source-dirs: src/

@@ -50,6 +50,7 @@ dependencies:
   - time
   - transformers
   - transformers-base
+  - unliftio
   - unordered-containers
   - vector
   - vm-tools

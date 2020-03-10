@@ -211,11 +211,11 @@ runTest test = do
                 envMetadata = Nothing
                 }
 
-        cxt <- get
-        cfg <- ask
+        cxt <- contextGet
+        cfg <- asks fst
         vmState0 <- liftIO $ startingState True False env' cfg cxt
 
-        (result, vmState1) <- lift . lift $ do
+        (result, vmState1) <- lift $ do
           gasref <- liftIO . newCounter . fromIntegral . getNumber . gas' $ exec
           flip runStateT vmState0{vmGasRemaining=gasref, debugCallCreates=Just []} . runExceptT $ do
             runCodeFromStart
@@ -230,7 +230,7 @@ runTest test = do
           liftIO . putStrLn . ("runCodeFromStart: " ++) . show $ result
           liftIO . putStrLn . ("runCodeFromStart: " ++) . show $ vmState1
 
-        put $ dbs vmState1
+        contextPut $ dbs vmState1
 
         flushMemStorageDB
         flushMemAddressStateDB

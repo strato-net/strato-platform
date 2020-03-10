@@ -8,13 +8,11 @@ module Executable.EthereumVM (
   ethereumVM
 ) where
 
-import           Control.Lens                          ((.=), (||=), use)
 import           Control.Monad
 import qualified Control.Monad.Change.Modify             as Mod
 import           Control.Monad.IO.Class
 import qualified Blockchain.Database.MerklePatricia      as MP
 import           Blockchain.Output
-import           Control.Monad.Trans.State.Lazy        (gets)
 import qualified Data.ByteString                       as BS
 import qualified Data.DList                            as DL
 import           Data.List
@@ -90,7 +88,7 @@ ethereumVM = void . execContextM $ do
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
     forever $ loopTimeit "one full loop" $ do
-        recordBaggerMetrics =<< gets contextBaggerState
+        recordBaggerMetrics =<< contextGets contextBaggerState
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- loopTimeit "======>>>> waiting for new events <<<<======" $ getUnprocessedKafkaEvents cpOffset
@@ -122,13 +120,13 @@ handleVmEvents makeLazyBlocks events = do
   numPoolable <- processTransactions txPairs
   actions <- processBlocks blocks
 
-  contextBlockRequested ||= (VmCreateBlockCommand `elem` events)
+  contextModify $ \ctx -> ctx{ _contextBlockRequested = VmCreateBlockCommand `elem` events }
   -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
   -- todo: which may fail
   isCaughtUp <- shouldProcessNewTransactions
   state <- Bagger.getBaggerState
-  pbft <- gets contextHasBlockstanbul
-  reqd <- use contextBlockRequested
+  pbft <- contextGets contextHasBlockstanbul
+  reqd <- contextGets _contextBlockRequested
   let pending = B.pending state
       priv = DL.toList . B.privateHashes $ B.miningCache state
       hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
@@ -142,7 +140,7 @@ handleVmEvents makeLazyBlocks events = do
       "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
        (isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks)
   when (pbft && shouldOutputBlocks) $
-    contextBlockRequested .= False
+    contextModify $ \ctx -> ctx{ _contextBlockRequested = False }
   $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
   $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
   when shouldOutputBlocks $ do
