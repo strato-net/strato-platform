@@ -107,20 +107,42 @@ microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 {-# NOINLINE microtimeCutoff #-}
 
+data BatchVmEvent = Batch
+  { newChains :: [OutputGenesis]
+  , votesToMake :: [(Address, Bool, Address)]
+  , rpcCommands :: [JsonRpcCommand]
+  , txPairs     :: [(Timestamp, OutputTx)]
+  , tLen        :: {-# UNPACK #-} !Int
+  , blocks      :: [OutputBlock]
+  , bLen        :: {-# UNPACK #-} !Int
+  , createBlock :: !Bool
+  }
+
+newBatch :: BatchVmEvent
+newBatch = Batch [] [] [] [] 0 [] 0 False
+
+insertBatch :: VmEvent -> BatchVmEvent -> BatchVmEvent
+insertBatch e b = case e of
+  VmGenesis og -> b{ newChains = og:newChains b}
+  VmVoteToMake r d s -> b{ votesToMake = (r,d,s):votesToMake b}
+  VmJsonRpcCommand j -> b{ rpcCommands = j:rpcCommands b}
+  VmTx ts t -> b{ txPairs = (ts,t):txPairs b, tLen = tLen b + 1}
+  VmBlock ob -> b{ blocks = ob:blocks b, bLen = bLen b + 1}
+  VmCreateBlockCommand -> b{ createBlock = True }
+  _ -> b
+
 handleVmEvents :: Bool -> [VmEvent] -> ContextM ()
 handleVmEvents makeLazyBlocks events = do
-  outputNewChains =<< insertNewChains [og | VmGenesis og <- events]
-  mapM_ (uncurry3 queuePendingVote) [(r, d, s) | VmVoteToMake r d s <- events]
-  mapM_ runJsonRpcCommand [c | VmJsonRpcCommand c <- events]
+  let Batch{..} = foldr insertBatch newBatch events
+  outputNewChains =<< insertNewChains newChains
+  mapM_ (uncurry3 queuePendingVote) votesToMake
+  mapM_ runJsonRpcCommand rpcCommands
 
-  let txPairs = [(ts,t) | VmTx ts t <- events]
-      blocks = [b | VmBlock b <- events]
-      (bLen, tLen) = (length blocks, length txPairs)
   recordSeqEventCount bLen tLen
   numPoolable <- processTransactions txPairs
   actions <- processBlocks blocks
 
-  contextModify $ \ctx -> ctx{ _contextBlockRequested = _contextBlockRequested ctx || VmCreateBlockCommand `elem` events }
+  contextModify $ \ctx -> ctx{ _contextBlockRequested = _contextBlockRequested ctx || createBlock }
   -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
   -- todo: which may fail
   isCaughtUp <- shouldProcessNewTransactions
