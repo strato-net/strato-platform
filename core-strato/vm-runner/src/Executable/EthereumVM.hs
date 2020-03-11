@@ -11,7 +11,6 @@ module Executable.EthereumVM (
 ) where
 
 import           Conduit
-import           Control.Applicative
 import           Control.Arrow                         ((&&&), (***))
 import           Control.Monad
 import qualified Control.Monad.Change.Alter            as A
@@ -280,7 +279,7 @@ processBlockSummaries = mapM_ $ \b -> do
   writeBlockSummary b
 
 processTransactions :: [(Timestamp, OutputTx)] -> ContextM ([VmOutEvent], Int)
-processTransactions = uncurry (liftA2 (,)) . (pure . outputTransactions &&& getNumPoolable)
+processTransactions = uncurry (fmap . (,)) . (outputTransactions &&& getNumPoolable)
 
 getNumPoolable :: ( MonadLogger m
                   , Bagger.MonadBagger m
