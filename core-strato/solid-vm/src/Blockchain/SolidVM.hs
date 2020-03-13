@@ -621,7 +621,7 @@ expToPath (Xabi.Variable x) = do
       val <- weakGetVar var
       case val of
         SReference apt -> return apt
-        _ -> error "expToPath should never be called for a local variable"
+        _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
     Nothing -> return $ AddressedPath (currentAddress callInfo) path
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
@@ -792,7 +792,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
-      _ -> typeError "unhandled case in expToVar' for MemberAccess: " (show val)
+      _ -> typeError "SolidVM: Illegal member access" ((show val) ++ "." ++ name)
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref
@@ -840,7 +840,7 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
         (SArray _ theVector, SInteger i) -> do
           return $ theVector V.! fromIntegral i
         (SReference _, _) -> Constant . SReference <$> expToPath x
-        _ -> error $ "expToVar' called for IndexAccess with unsupported types:\nval = " ++ show val ++ "\ntheIndex = " ++ show theIndex
+        _ -> typeError "expToVar' called for IndexAccess with unsupported types: " ("\nval = " ++ show val ++ "\ntheIndex = " ++ show theIndex)
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 
