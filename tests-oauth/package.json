@@ -1,6 +1,7 @@
 {
   "name": "tests-oauth",
   "version": "0.0.1",
+  "private": true,
   "scripts": {
     "mocha-babel": "node_modules/.bin/mocha --require @babel/register",
     "test:load:beanstalk": "yarn mocha-babel load/stratoLoadBeanstalk.test.js"
