@@ -97,4 +97,4 @@ unknownVariable :: (Show v) => String -> v -> a
 unknownVariable = toThrower UnknownVariable
 
 unknownStatement :: (Show v) => String -> v -> a
-unknownStatement = toThrower UnknownVariable
+unknownStatement = toThrower UnknownStatement
