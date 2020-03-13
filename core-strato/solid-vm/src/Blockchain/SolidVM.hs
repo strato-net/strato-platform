@@ -604,7 +604,7 @@ getIndexType (AddressedPath addr p) = do
          Xabi.Mapping{Xabi.key=Xabi.Address{}} -> MapAddressIndex
          Xabi.Mapping{Xabi.key=Xabi.Bool{}} -> MapBoolIndex
          Xabi.Array{} -> ArrayIndex
-         _ -> todo "unanticipated index type" t
+         _ -> typeError "unanticipated index type" t
        loop n t = case t of
          Xabi.Mapping{Xabi.value=t'} -> loop (n - 1) t'
          Xabi.Array{Xabi.entry=t'} -> loop (n - 1) t'

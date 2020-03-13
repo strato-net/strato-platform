@@ -2200,4 +2200,4 @@ contract qq {
 contract qq {
   uint x = 0;
   uint y = x[1];
-}|])) `shouldThrow` anyTODO
+}|])) `shouldThrow` anyTypeError
