@@ -65,6 +65,10 @@ anyUnknownFunc :: Selector HandledException
 anyUnknownFunc (HE UnknownFunction{}) = True
 anyUnknownFunc _ = False
 
+anyTypeError :: Selector HandledException
+anyTypeError (HE Blockchain.SolidVM.Exception.TypeError{}) = True
+anyTypeError _ = False
+
 sender :: Address
 sender = 0xdeadbeef
 
@@ -2185,3 +2189,15 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 833]
+
+  it "rejects member access on primitives" $ (runTest (runBS [r|
+contract qq {
+  uint x = 0;
+  uint y = x.mem;
+}|])) `shouldThrow` anyTypeError
+
+  it "rejects index access on primitives" $ (runTest (runBS [r|
+contract qq {
+  uint x = 0;
+  uint y = x[1];
+}|])) `shouldThrow` anyTODO
