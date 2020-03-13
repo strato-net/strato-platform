@@ -13,6 +13,7 @@ module Blockchain.VM.SolidException
   , unknownFunction
   , unknownConstant
   , unknownVariable
+  , unknownStatement
   ) where
 
 import Control.DeepSeq
@@ -34,6 +35,7 @@ data SolidException = TypeError String String
                     | UnknownFunction String String
                     | UnknownConstant String String
                     | UnknownVariable String String
+                    | UnknownStatement String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -50,6 +52,7 @@ instance Show SolidException where
   show (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
   show (UnknownFunction a b) = printf "unknown function: %s: %s" a b
   show (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
+  show (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -92,3 +95,6 @@ unknownConstant = toThrower UnknownConstant
 
 unknownVariable :: (Show v) => String -> v -> a
 unknownVariable = toThrower UnknownVariable
+
+unknownStatement :: (Show v) => String -> v -> a
+unknownStatement = toThrower UnknownVariable

@@ -574,7 +574,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups) = do
         return Nothing
 
 
-runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
+runStatement x = unknownStatement "unknown statement in call to runStatement: " (show x)
 
 while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
@@ -792,7 +792,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
-      _ -> error $ "unhandled case in expToVar' for MemberAccess: " ++ show val
+      _ -> typeError "unhandled case in expToVar' for MemberAccess: " (show val)
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref
