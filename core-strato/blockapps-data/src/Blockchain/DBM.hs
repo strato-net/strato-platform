@@ -12,7 +12,6 @@ module Blockchain.DBM (
 import           Control.Monad.IO.Unlift
 
 import           Blockchain.Output            (runNoLoggingT)
-import qualified Database.Persist.Postgresql  as SQL
 
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
@@ -25,4 +24,4 @@ newtype DBs =
     }
 
 openDBs:: MonadUnliftIO m => m DBs
-openDBs = fmap DBs . runNoLoggingT . SQL.createPostgresqlPool connStr $ 20
+openDBs = fmap DBs . runNoLoggingT $ createPostgresqlPool connStr 20

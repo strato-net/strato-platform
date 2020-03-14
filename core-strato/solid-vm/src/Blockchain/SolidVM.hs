@@ -1,6 +1,7 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
@@ -8,10 +9,10 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.SolidVM
-    (
-      call
-    , create
-    ) where
+  ( SolidVMBase
+  , call
+  , create
+  ) where
 
 import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Monad
@@ -28,7 +29,6 @@ import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
-import           Data.NibbleString                    (NibbleString(..))
 import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
@@ -48,9 +48,7 @@ import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
-import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
-import           Blockchain.Output
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
@@ -83,19 +81,13 @@ import           UnliftIO
 
 import           CodeCollection
 
+type SolidVMBase m = VMBase m
 
 onTraced :: Monad m => m () -> m ()
 onTraced = when flags_svmTrace
 
 
-create :: ( MonadIO m
-          , MonadUnliftIO m
-          , MonadLogger m
-          , Mod.Modifiable Context m
-          , (NibbleString `A.Alters` NibbleString) m
-          , (SHA `A.Alters` DBCode) m
-          , HasStateDB m
-          )
+create :: SolidVMBase m
        => Bool
        -> Bool
        -> S.Set Address
@@ -193,14 +185,7 @@ initializeStorage root value = do
      x -> setVar root x
 -}
 
-call :: ( MonadIO m
-        , MonadUnliftIO m
-        , MonadLogger m
-        , Mod.Modifiable Context m
-        , (NibbleString `A.Alters` NibbleString) m
-        , (SHA `A.Alters` DBCode) m
-        , HasStateDB m
-        )
+call :: SolidVMBase m
      => Bool
      -> Bool
      -> Bool
@@ -279,13 +264,13 @@ getCodeAndCollection address' = do
     return (c', hsh, cc')
     else do
     codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
-    
+
     (contractName', ch, cc) <-
       case codeHash of
         SolidVMCode cn ch' -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')
-        ch -> internalError "SolidVM for non-solidvm code" ch
+        ch -> internalError "SolidVM for non-solidvm code" (format ch)
 
 
     let contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
@@ -299,11 +284,11 @@ logFunctionCall args address contract functionName f = do
       case args of
         OrderedVals argList -> fmap (intercalate ", ") $ forM argList showSM
         NamedVals argMap ->
-          fmap (intercalate ", ") $ 
+          fmap (intercalate ", ") $
           forM argMap $ \(n, v) -> do
             valString <- showSM v
             return $ n ++ ": " ++ valString
-        
+
     let shownFunc = functionName ++ "(" ++ argStrings ++ ")"
     liftIO $ putStrLn $ box $ concat $ map (wrap 150)
       ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ shownFunc]

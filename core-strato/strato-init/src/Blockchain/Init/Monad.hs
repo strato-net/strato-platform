@@ -17,7 +17,6 @@ import qualified Data.Map                           as M
 import qualified Data.NibbleString                  as N
 import qualified Database.Redis                     as Redis
 import qualified Database.LevelDB                   as DB
-import           Database.Persist.Postgresql        (createPostgresqlPool)
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB

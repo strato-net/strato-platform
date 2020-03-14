@@ -7,8 +7,6 @@ module Blockchain.Data.LogDB
     , putLogDBs
     ) where
 
-import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
-import           Control.Monad.Trans.Resource
 import           Database.Persist             hiding (get)
 import qualified Database.Persist.Postgresql  as SQL
 
@@ -26,4 +24,4 @@ putLogDB :: HasSQLDB m => LogDB -> m (Key LogDB)
 putLogDB = fmap head . putLogDBs . pure
 
 putLogDBs :: HasSQLDB m => [LogDB] -> m [Key LogDB]
-putLogDBs ls = access (Proxy @SQLDB) >>= runResourceT . SQL.runSqlPool (SQL.insertMany ls)
+putLogDBs = sqlQuery . SQL.insertMany

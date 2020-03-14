@@ -27,7 +27,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 import           Blockchain.Verification
-import           Blockchain.VMContext
 import           Blockchain.VMOptions
 
 {-
@@ -90,7 +89,7 @@ verifyTransactionRoot OutputBlock{obBlockData=bd,obReceiptTransactions=txs} = do
 verifyOmmersRoot::HasStateDB m=>OutputBlock->m Bool
 verifyOmmersRoot OutputBlock{obBlockData=bd, obBlockUncles=bu} = return $ blockDataUnclesHash bd == hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
 
-checkValidity :: Monad m => Bool -> BlockSummary -> OutputBlock -> ContextM (m ())
+checkValidity :: HasStateDB m => Bool -> BlockSummary -> OutputBlock -> m (Maybe String)
 checkValidity isHomestead parentBSum b = do
   when (flags_transactionRootVerification) $ do
            trVerified <- verifyTransactionRoot b
@@ -103,14 +102,20 @@ checkValidity isHomestead parentBSum b = do
   ommersVerified <- verifyOmmersRoot b
   when (not ommersVerified) $ error "ommersRoot doesn't match uncles"
   checkParentChildValidity isHomestead b parentBSum
-  when flags_miningVerification $ do
-    let miningVerified = (verify verifier) (outputBlockToBlock b) -- todo: dont wanna rewrite adit just yet
-    unless miningVerified $ fail "block falsely mined, verification failed"
+  mErr <- if flags_miningVerification
+    then do
+      let miningVerified = (verify verifier) (outputBlockToBlock b) -- todo: dont wanna rewrite adit just yet
+      if miningVerified
+        then pure Nothing
+        else pure $ Just "block falsely mined, verification failed"
+    else pure Nothing
   --nIsValid <- nonceIsValid' b
   --unless nIsValid $ fail $ "Block nonce is wrong: " ++ format b
-  unless (checkUnclesHash b) $ fail "Block unclesHash is wrong"
-  return $ return ()
-
+  case mErr of
+    Just err -> pure $ Just err
+    Nothing -> if checkUnclesHash b
+                 then pure Nothing
+                 else pure $ Just "Block unclesHash is wrong"
 
 {-
                     coinbase=prvKey2Address prvKey,

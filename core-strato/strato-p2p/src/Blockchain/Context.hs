@@ -196,7 +196,7 @@ instance ( MonadIO m
          , MonadUnliftIO m
          , MonadReader Config m
          ) => Mod.Accessible GenesisBlockHash (StateT Context m) where
-  access _ = GenesisBlockHash <$> runWithSQL getGenesisBlockHash
+  access _ = GenesisBlockHash <$> lift getGenesisBlockHash
 
 instance MonadIO m => Mod.Accessible BestBlockNumber (StateT Context m) where
   access _ = BestBlockNumber <$> liftIO getBestKafkaBlockNumber
@@ -245,9 +245,6 @@ instance MonadIO m => Mod.Accessible RBDB.RedisConnection (StateT Context m) whe
 instance MonadReader Config m => Mod.Accessible SQLDB m where
   access _ = asks configSQLDB
 
-instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
-  runWithSQL = lift
-
 instance MonadIO m => Mod.Accessible (UnseqSink (StateT Context m)) (StateT Context m) where
   access _ = gets unseqSink
 
@@ -260,8 +257,7 @@ newtype WithPPeerByIP m a = WithPPeerByIP { unPPeerByIp :: m a }
 
 instance HasSQLDB m => A.Selectable String PPeer (WithPPeerByIP m) where
   select _ ip = WithPPeerByIP $ do
-    db <- Mod.access (Mod.Proxy @SQLDB)
-    SQL.runSqlPool actions db >>= \case
+    sqlQuery actions >>= \case
         [] -> return Nothing
         lst -> return . Just . SQL.entityVal $ head lst
 

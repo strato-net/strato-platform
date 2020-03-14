@@ -26,7 +26,6 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.SolidVM.Model
 
 import           Control.Monad
-import           Control.Monad.Change.Modify                 (Accessible(..), Proxy(..))
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (for_)
@@ -45,8 +44,7 @@ sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
 
 commitSqlDiffs :: HasSQLDB m => StateDiff -> m ()
 commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
-  pool <- access (Proxy @SQLDB)
-  flip SQL.runSqlPool pool $ do
+  sqlQuery $ do
     createAccount chainId blockNumber $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount chainId) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount chainId blockNumber) updatedAccounts

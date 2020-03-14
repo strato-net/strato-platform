@@ -55,6 +55,7 @@ dependencies:
   - time
   - transformers
   - unboxed-ref
+  - unliftio
   - unordered-containers
   - vm-runner
   - vm-tools

@@ -18,7 +18,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
-import           Blockchain.Database.MerklePatricia hiding (stateRoot)
+import           Blockchain.Database.MerklePatricia
 import           Blockchain.MiscArbitrary()
 import           Blockchain.Util
 

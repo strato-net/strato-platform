@@ -1,7 +1,8 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
 
 module Blockchain.VM.TestEthereum
     ( runAllTests
@@ -16,7 +17,6 @@ import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.State
 import           Data.Aeson
 import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Lazy                        as BL
@@ -59,12 +59,15 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 import           Blockchain.VMContext
+import           Blockchain.VM.VMException
 
 import           Blockchain.VM.TestDescriptions
 import           Blockchain.VM.TestFiles
 
 import qualified Text.Colors                                 as C
 import           Text.Format
+
+import           UnliftIO
 
 defineFlag "debugEnabled" False "enable debugging"
 defineFlag "debugEnabled2" False "enable debugging"
@@ -151,7 +154,7 @@ addressStates = do
 txToOutputTx :: Transaction -> OutputTx
 txToOutputTx = fromJust . wrapTransactionUnanchored . IngestTx TO.Direct
 
-runTest::Test-> ContextM ()
+runTest :: Test-> ContextM ()
 runTest test = do
   when flags_debugEnabled $
     liftIO . print $ test
@@ -211,26 +214,26 @@ runTest test = do
                 envMetadata = Nothing
                 }
 
-        cxt <- contextGet
-        cfg <- asks fst
-        vmState0 <- liftIO $ startingState True False env' cfg cxt
+        mdbs <- contextGets _memDBs
+        vmState0 <- liftIO $ startingState True False env' mdbs
+        gasref <- liftIO . newCounter . fromIntegral . getNumber . gas' $ exec
+        vmStateRef <- newIORef $ vmState0{vmGasRemaining=gasref, debugCallCreates=Just []}
 
-        (result, vmState1) <- lift $ do
-          gasref <- liftIO . newCounter . fromIntegral . getNumber . gas' $ exec
-          flip runStateT vmState0{vmGasRemaining=gasref, debugCallCreates=Just []} . runExceptT $ do
-            runCodeFromStart
+        result <- try . flip runReaderT vmStateRef $ do
+          runCodeFromStart
 
-            vmState2 <- lift get
-            when flags_debugEnabled $
-              liftIO $ putStrLn $ "Removing accounts in suicideList: " ++
-                                intercalate ", " (show . pretty <$> S.toList (suicideList vmState2))
+          vmState2 <- readIORef vmStateRef
+          when flags_debugEnabled $
+            liftIO $ putStrLn $ "Removing accounts in suicideList: " ++
+                              intercalate ", " (show . pretty <$> S.toList (suicideList vmState2))
 
-            forM_ (suicideList vmState2) deleteAddressState
+          forM_ (suicideList vmState2) deleteAddressState
+        vmState1 <- readIORef vmStateRef
         when flags_debugEnabled $ do
           liftIO . putStrLn . ("runCodeFromStart: " ++) . show $ result
           liftIO . putStrLn . ("runCodeFromStart: " ++) . show $ vmState1
 
-        contextPut $ dbs vmState1
+        contextModify $ \st -> st{_memDBs = vmMemDBs vmState1}
 
         flushMemStorageDB
         flushMemAddressStateDB
@@ -239,7 +242,7 @@ runTest test = do
          Right _ -> do
           gr <- readGasRemaining vmState1
           return (result, returnVal vmState1, gr, logs vmState1, debugCallCreates vmState1, Just vmState1)
-         Left _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
+         Left (_ :: VMException) -> return (Right (), Nothing, 0, [], Just [], Nothing)
 
       ITransaction transaction -> do
         let t = case tTo' transaction of

@@ -19,8 +19,8 @@ instance NFData StateDB where
 
 type HasStateDB m = ((MP.StateRoot `Alters` MP.NodeData) m, Modifiable MP.StateRoot m)
 
-getStateDB :: HasStateDB m => m MP.StateRoot
-getStateDB = get (Proxy @MP.StateRoot)
+getStateRoot :: HasStateDB m => m MP.StateRoot
+getStateRoot = get (Proxy @MP.StateRoot)
 
 setStateDBStateRoot :: HasStateDB m => MP.StateRoot -> m ()
 setStateDBStateRoot = put (Proxy @MP.StateRoot)

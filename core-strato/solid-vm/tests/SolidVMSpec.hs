@@ -205,11 +205,15 @@ runCall funcName callArgs bs = do
       theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   newAddress <- getNewAddress sender
+  $logErrorS "runCall" "Beginning create"
   er1 <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
     value gasPrice availableGas newAddress code txHash chainId createMetadata
+  $logErrorS "runCall" "Returned from create"
   rethrowEx er1
+  $logErrorS "runCall" "Beginning call"
   er2 <- SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
     newAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+  $logErrorS "runCall" "Returned from call"
   rethrowEx er2
   return $ erReturnVal er2
 

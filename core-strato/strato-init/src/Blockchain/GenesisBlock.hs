@@ -161,7 +161,7 @@ populateStorageDBs::(MonadLogger m, HasSQLDB m, HasCodeDB m, HasStateDB m, HasHa
                     (SHA -> Maybe (Map Text Text)) -> Block -> Maybe Word256 -> m ()
 populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
-    accountDB <- getStateDB
+    sr <- getStateRoot
     res <- liftIO . runKafkaConfigured "strato-init" $ do
       assertTopicCreation
 
@@ -169,7 +169,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
      Right () -> return ()
      Left err -> error . show $ err
 
-    MP.forEach accountDB $ \keyHash value -> do
+    MP.forEach sr $ \keyHash value -> do
       address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ C8.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
 
       $logInfoS "initgen" $ T.pack $ "##################### writing to DBs: " ++ format address

@@ -41,9 +41,7 @@ import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 
 
 import           Control.Lens
-import           Control.Monad.Change.Modify        (Accessible(..), Proxy(..))
 import           Control.Monad.State
-import           Control.Monad.Trans.Resource
 
 import           Blockchain.Constants
 import           Blockchain.Data.BlockHeader
@@ -98,9 +96,7 @@ getBlock :: HasSQLDB m
          => SHA
          -> m (Maybe BlockDataRef)
 getBlock h = do
-  db <- access (Proxy @SQLDB)
-  entBlkL <- runResourceT $
-    SQL.runSqlPool actions db
+  entBlkL <- sqlQuery actions
 
   case entBlkL of
     []  -> return Nothing
@@ -145,9 +141,7 @@ putBlocks :: HasSQLDB m
           -> m [Key BlockDataRef]
 putBlocks blocksAndDifficulties makeHashOne = do
   let blocksHashesAndDifficulties = (\(b,d) -> (b, blockHash b, d)) <$> blocksAndDifficulties
-  db <- access (Proxy @SQLDB)
-  runResourceT $
-    flip SQL.runSqlPool db $
+  sqlQuery $
     forM blocksHashesAndDifficulties $ \(b, hash', diff) -> do
       insertTXIfNew' (BlockHash $ blockHash b) (Just $ blockDataNumber $ blockBlockData b) (blockReceiptTransactions b)
 

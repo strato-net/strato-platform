@@ -46,7 +46,6 @@ dependencies:
   - strato-model
   - strato-redis-blockdb
   - seqevents
-  - split
   - text
   - temporary
   - time

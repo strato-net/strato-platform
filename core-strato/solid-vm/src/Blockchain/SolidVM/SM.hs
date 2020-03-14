@@ -87,23 +87,15 @@ import           UnliftIO
 
 import CodeCollection
 
-
-
-
-
-
 data CallInfo = CallInfo
-  { currentFunctionName            :: String
-  , currentAddress                 :: Address
-  , currentContract                :: Contract
-  , codeCollection                 :: CodeCollection
-  , collectionHash                 :: SHA
-  , localVariables                 :: Map String (Xabi.Type, Variable)
-  , callInfoAddressStateTxDBMap    :: M.Map Address AddressStateModification
-  , callInfoAddressStateBlockDBMap :: M.Map Address AddressStateModification
-  , callInfoStorageTxMap           :: M.Map (Address, B.ByteString) B.ByteString
-  , callInfoStorageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
+  { currentFunctionName :: String
+  , currentAddress      :: Address
+  , currentContract     :: Contract
+  , codeCollection      :: CodeCollection
+  , collectionHash      :: SHA
+  , localVariables      :: Map String (Xabi.Type, Variable)
   } deriving (Show)
+makeLenses ''CallInfo
 
 {-
 BlockData
@@ -126,16 +118,12 @@ BlockData
 -}
 
 data SState = SState
-  { env                    :: Env.Environment
-  , callStack              :: [CallInfo]
-  , ssEvents               :: Q.Seq Event
-  , addressStateTxDBMap    :: M.Map Address AddressStateModification
-  , addressStateBlockDBMap :: M.Map Address AddressStateModification
-  , storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString
-  , storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
-  , _action                :: Action
+  { env             :: Env.Environment
+  , callStack       :: [CallInfo]
+  , ssEvents        :: Q.Seq Event
+  , _ssMemDBs       :: MemDBs
+  , _action         :: Action
   }
-
 makeLenses ''SState
 
 type SM m = StateT SState m
@@ -146,6 +134,7 @@ type MonadSM m = ( (Address `A.Alters` AddressState) m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
                  , Mod.Accessible Env.Environment m
+                 , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
                  , Mod.Modifiable Action m
@@ -154,44 +143,16 @@ type MonadSM m = ( (Address `A.Alters` AddressState) m
                  )
 
 instance Monad m => HasMemAddressStateDB (SM m) where
-  getAddressStateTxDBMap = do
-    SState{..} <- get
-    case callStack of
-      CallInfo{..}:_ -> pure callInfoAddressStateTxDBMap
-      [] -> pure addressStateTxDBMap
-  putAddressStateTxDBMap theMap = modify $ \ss@SState{..} -> do
-    case callStack of
-      ci : cis -> ss{callStack = ci{callInfoAddressStateTxDBMap=theMap} : cis}
-      [] -> ss{addressStateTxDBMap=theMap}
-  getAddressStateBlockDBMap = do
-    SState{..} <- get
-    case callStack of
-      CallInfo{..}:_ -> pure callInfoAddressStateBlockDBMap
-      [] -> pure addressStateBlockDBMap
-  putAddressStateBlockDBMap theMap = modify $ \ss@SState{..} -> do
-    case callStack of
-      ci : cis -> ss{callStack = ci{callInfoAddressStateBlockDBMap=theMap} : cis}
-      [] -> ss{addressStateBlockDBMap=theMap}
+  getAddressStateTxDBMap      = gets $ _stateTxMap . _ssMemDBs
+  putAddressStateTxDBMap    m = modify $ ssMemDBs . stateTxMap .~ m
+  getAddressStateBlockDBMap   = gets $ _stateBlockMap . _ssMemDBs
+  putAddressStateBlockDBMap m = modify $ ssMemDBs . stateBlockMap .~ m
 
 instance Monad m => HasMemRawStorageDB (SM m) where
-  getMemRawStorageTxDB = do
-    SState{..} <- get
-    case callStack of
-      CallInfo{..}:_ -> pure callInfoStorageTxMap
-      [] -> pure storageTxMap
-  putMemRawStorageTxMap theMap =  modify $ \ss@SState{..} -> do
-    case callStack of
-      ci : cis -> ss{callStack = ci{callInfoStorageTxMap=theMap} : cis}
-      [] -> ss{storageTxMap=theMap}
-  getMemRawStorageBlockDB = do
-    SState{..} <- get
-    case callStack of
-      CallInfo{..}:_ -> pure callInfoStorageBlockMap
-      [] -> pure storageBlockMap
-  putMemRawStorageBlockMap theMap =  modify $ \ss@SState{..} -> do
-    case callStack of
-      ci : cis -> ss{callStack = ci{callInfoStorageBlockMap=theMap} : cis}
-      [] -> ss{storageBlockMap=theMap}
+  getMemRawStorageTxDB       = gets $ _storageTxMap . _ssMemDBs
+  putMemRawStorageTxMap    m = modify $ ssMemDBs . storageTxMap .~ m
+  getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
+  putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
 instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
@@ -202,9 +163,9 @@ instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance Mod.Modifiable MP.StateRoot m => Mod.Modifiable MP.StateRoot (SM m) where
-  get   = lift . Mod.get
-  put p = lift . Mod.put p
+instance Monad m => Mod.Modifiable MP.StateRoot (SM m) where
+  get _    = gets $ _stateRoot . _ssMemDBs
+  put _ sr = modify $ ssMemDBs . stateRoot .~ sr
 
 instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
@@ -240,6 +201,10 @@ instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
   get _ = gets callStack
   put _ cs = modify $ \ss -> ss{callStack = cs}
 
+instance Monad m => Mod.Modifiable MemDBs (SM m) where
+  get _    = gets $ _ssMemDBs
+  put _ md = modify $ ssMemDBs .~ md
+
 instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
   put _ = assign action
@@ -256,24 +221,21 @@ instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
 runSM :: ( MonadIO m
          , MonadUnliftIO m
          , MonadLogger m
-         , Mod.Modifiable Context m
+         , Mod.Modifiable ContextState m
          )
       => (Maybe ByteString)
       -> Env.Environment
       -> SM m a
       -> m (Either SolidException a)
 runSM maybeCode env f = do
-  vmcontext <- Mod.get (Mod.Proxy @Context)
+  csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
 
   let startingState =
         SState {
         env = env,
         callStack = [],
         ssEvents = Q.empty,
-        addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
-        addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
-        storageTxMap = contextStorageTxMap vmcontext,
-        storageBlockMap = contextStorageBlockMap vmcontext,
+        _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env
         }
 
@@ -292,13 +254,7 @@ runSM maybeCode env f = do
           throwIO se
         else return $ Left se
     Right (value, sstateAfter) -> do
-      vmcontext' <- Mod.get (Mod.Proxy @Context)
-      Mod.put (Mod.Proxy @Context) vmcontext'{
-        contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
-        contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
-        contextStorageTxMap = storageTxMap sstateAfter,
-        contextStorageBlockMap = storageBlockMap sstateAfter
-        }
+      Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
       return $ Right value
 
 
@@ -456,11 +412,6 @@ addCallInfo :: MonadSM m
             -> Map String (Xabi.Type, Variable)
             -> m ()
 addCallInfo a c fn hsh cc initialLocalVariables = do
-  atx <- getAddressStateTxDBMap
-  ab  <- getAddressStateBlockDBMap
-  stx <- getMemRawStorageTxDB
-  sb  <- getMemRawStorageBlockDB
-
   let newCallInfo =
         CallInfo {
           currentFunctionName=fn,
@@ -468,29 +419,15 @@ addCallInfo a c fn hsh cc initialLocalVariables = do
           currentContract=c,
           codeCollection=cc,
           collectionHash=hsh,
-          localVariables=initialLocalVariables,
-          callInfoAddressStateTxDBMap = atx,
-          callInfoAddressStateBlockDBMap = ab,
-          callInfoStorageTxMap = stx,
-          callInfoStorageBlockMap = sb
+          localVariables=initialLocalVariables
         }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
 
 popCallInfo :: MonadSM m => m ()
-popCallInfo = do
-  atx <- getAddressStateTxDBMap
-  ab  <- getAddressStateBlockDBMap
-  stx <- getMemRawStorageTxDB
-  sb  <- getMemRawStorageBlockDB
-  Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-    [] -> internalError "popCallInfo was called on an already empty stack" ()
-    (_:rest) -> pure rest
-  putAddressStateTxDBMap atx
-  putAddressStateBlockDBMap ab
-  putMemRawStorageTxMap stx
-  putMemRawStorageBlockMap sb
-
+popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> internalError "popCallInfo was called on an already empty stack" ()
+  (_:rest) -> pure rest
 
 getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do

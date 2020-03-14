@@ -16,7 +16,7 @@ module Blockchain.Strato.StateDiff
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff     as Diff
-import           Blockchain.Database.MerklePatricia.Internal hiding (stateRoot)
+import           Blockchain.Database.MerklePatricia.Internal
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.ChainDB

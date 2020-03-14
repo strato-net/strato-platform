@@ -17,10 +17,9 @@ module Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Control.Monad.Change.Modify           (Accessible(..), Proxy(..))
+import           Control.Monad.Change.Modify           (Accessible(..))
 import           Control.Monad.Reader
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Trans.Resource
 import qualified Data.Text                             as T
 import qualified Database.Persist.Postgresql           as SQL
 
@@ -37,10 +36,8 @@ initContextLite = do
 
 addPeer :: HasSQLDB m =>PPeer->m (SQL.Key PPeer)
 addPeer peer = do
-  db <- access (Proxy @SQLDB)
   maybePeer <- getPeerByIP (T.unpack $ pPeerIp peer)
-  runResourceT $
-    SQL.runSqlPool (actions maybePeer) db
+  sqlQuery $ actions maybePeer
   where actions mp = case mp of
             Nothing -> SQL.insert peer
             Just peer'-> do
@@ -51,8 +48,7 @@ addPeer peer = do
 
 getPeerByIP :: HasSQLDB m =>String->m (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = do
-  db <- access (Proxy @SQLDB)
-  entPeer <- runResourceT $ SQL.runSqlPool actions db
+  entPeer <- sqlQuery actions
 
   case entPeer of
     []  -> return Nothing

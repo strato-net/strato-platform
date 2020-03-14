@@ -19,8 +19,7 @@ import qualified Prelude                  as P
 import           Yesod.Core.Types         (Logger)
 
 import           Network.Haskoin.Crypto   as HK
-import           Blockchain.DB.SQLDB
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.DB.SQLDB      hiding (runSqlPool, )
 
 timeFormat :: String
 timeFormat = "%Y-%m-%dT%T.%q"
@@ -112,7 +111,7 @@ instance Yesod App where
     makeLogger = return . appLogger
 
 instance Accessible SQLDB (HandlerFor App) where
-  access _ = appConnPool <$> getYesod
+  access _ = SQLDB . appConnPool <$> getYesod
 
 instance YesodPersist App where
     type YesodPersistBackend App = SqlBackend

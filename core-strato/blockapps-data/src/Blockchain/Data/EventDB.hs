@@ -7,8 +7,6 @@ module Blockchain.Data.EventDB
     , putEventDBs
     ) where
 
-import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
-import           Control.Monad.Trans.Resource
 import           Database.Persist             hiding (get)
 import qualified Database.Persist.Postgresql  as SQL
 
@@ -26,4 +24,4 @@ putEventDB :: HasSQLDB m => EventDB -> m (Key EventDB)
 putEventDB = fmap head . putEventDBs . pure
 
 putEventDBs :: HasSQLDB m => [EventDB] -> m [Key EventDB]
-putEventDBs ls = access (Proxy @SQLDB) >>= runResourceT . SQL.runSqlPool (SQL.insertMany ls)
+putEventDBs = sqlQuery . SQL.insertMany

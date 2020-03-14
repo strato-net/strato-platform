@@ -21,13 +21,10 @@ module Blockchain.EVM.Memory (
 import           Control.Monad
 import           Blockchain.Output
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.State    hiding (state)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Internal              as BI
 import qualified Data.ByteString.Base16       as B16
 import qualified Data.ByteString.Unsafe       as BU
-import           Data.IORef
 import qualified Data.Text                    as T
 import qualified Data.Vector                  as DV
 import qualified Data.Vector.Storable.Mutable as V
@@ -43,6 +40,8 @@ import           Blockchain.VM.VMException
 
 import qualified Text.Colors                  as CL
 
+import           UnliftIO
+
 safeReadRange :: V.IOVector Word8 -> Int -> Int -> IO B.ByteString
 safeReadRange v !offset !count = do
   let len = V.length v
@@ -54,17 +53,17 @@ safeReadRange v !offset !count = do
        BI.memcpy dst (plusPtr src offset) count
   return $! BI.PS dstFP 0 count
 
-getSizeInWords::VMM Word256
+getSizeInWords :: MonadIO m => VMM m Word256
 getSizeInWords = do
-  state <- lift get
+  state <- vmstateGet
   let (Memory _ size) = memory state
-  liftIO $ (ceiling . (/ (32::Double)) . fromIntegral) <$> readIORef size
+  (ceiling . (/ (32::Double)) . fromIntegral) <$> readIORef size
 
-getSizeInBytes::VMM Word256
+getSizeInBytes :: MonadIO m => VMM m Word256
 getSizeInBytes = do
-  state <- lift get
+  state <- vmstateGet
   let (Memory _ size) = memory state
-  liftIO $ fromIntegral <$> readIORef size
+  fromIntegral <$> readIORef size
 
 --In this function I use the words "size" and "length" to mean 2 different things....
 --"size" is the highest memory location used (as described in the yellowpaper).
@@ -72,16 +71,16 @@ getSizeInBytes = do
 --Basically, to avoid resizing the vector constantly (which could be expensive),
 --I keep something larger around until it fills up, then reallocate (something even
 --larger).
-setNewMaxSize::Integer->VMM ()
+setNewMaxSize :: (MonadLogger m, MonadIO m) => Integer -> VMM m ()
 setNewMaxSize newSize' = do
   --TODO- I should just store the number of words....  memory size can only be a multiple of words.
   --For now I will just use this hack to allocate to the nearest higher number of words.
   when (newSize' > 0x7fffffffffffffff) $ do
     $logErrorS "setNewMaxSize" . T.pack $ "unable to cast to int: " ++ show newSize'
-    throwE OutOfGasException
+    throwIO OutOfGasException
   let !newSize = 32 * ceiling (fromIntegral newSize'/(32::Double))::Int
-  state <- lift get
-  oldSize <- liftIO $ readIORef (mSize $ memory state)
+  state <- vmstateGet
+  oldSize <- readIORef (mSize $ memory state)
   when (oldSize < newSize) $ do
     let gasCharge = fromIntegral $
           let newWordSize = ceiling $ fromIntegral newSize/(32::Double)
@@ -92,17 +91,17 @@ setNewMaxSize newSize' = do
     gr <- readGasRemaining $ state
     when (gr < gasCharge) $ do
       setGasRemaining 0
-      throwE OutOfGasException
-    liftIO $ writeIORef (mSize $ memory state) newSize
+      throwIO OutOfGasException
+    writeIORef (mSize $ memory state) newSize
     when (newSize > oldLength) $ do
-      state' <- lift get
+      state' <- vmstateGet
       let newLength = 2 * newSize
       when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red ("Warning, memory needs to grow to a huge value: " ++ show (fromIntegral newSize/(1000000::Double)) ++ "MB")
       arr' <- liftIO $ V.grow (mVector $ memory state') $ fromIntegral $ newLength
       when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red $ "clearing out memory"
       liftIO $ V.set (V.unsafeSlice (fromIntegral oldLength) newLength arr') 0
       when (newSize > 100000000) $ liftIO $ putStrLn $ CL.red $ "Finished growing memory"
-      lift $ put $ state'{memory=(memory state'){mVector = arr'}}
+      vmstatePut $ state'{memory=(memory state'){mVector = arr'}}
     useGas gasCharge
 
 getShow::Memory->IO String
@@ -116,34 +115,34 @@ getMemAsByteString (Memory arr sizeRef) = do
   msize <- readIORef sizeRef
   safeReadRange arr 0 msize
 
-mLoad::Word256->VMM B.ByteString
+mLoad :: (MonadIO m, MonadLogger m) => Word256 -> VMM m B.ByteString
 mLoad p = do
   setNewMaxSize (fromIntegral p+32)
-  state <- lift get
+  state <- vmstateGet
   liftIO $ safeReadRange (mVector $ memory state) (fromIntegral p) 32
 
-mLoadByteString::Word256->Word256->VMM B.ByteString
+mLoadByteString :: (MonadIO m, MonadLogger m) => Word256 -> Word256 -> VMM m B.ByteString
 mLoadByteString _ 0 = return B.empty --no need to charge gas for mem change if nothing returned
 mLoadByteString p size = do
   setNewMaxSize (fromIntegral p+fromIntegral size)
-  state <- lift get
+  state <- vmstateGet
   val <- liftIO $ safeReadRange (mVector $ memory state) (fromIntegral p) (fromIntegral size)
   return val
 
-unsafeSliceByteString::Word256->Word256->VMM B.ByteString
+unsafeSliceByteString :: (MonadIO m, MonadLogger m) => Word256 -> Word256 -> VMM m B.ByteString
 unsafeSliceByteString _ 0 = return $ B.empty
 unsafeSliceByteString p size = do
   setNewMaxSize (fromIntegral p+fromIntegral size)
-  state <- lift get
+  state <- vmstateGet
   let (fptr, len) = V.unsafeToForeignPtr0 (V.slice (fromIntegral p) (fromIntegral size) $ mVector $ memory state)
   liftIO $ withForeignPtr fptr $ \ptr ->
     B.packCStringLen (castPtr ptr, len * sizeOf (undefined :: Word8))
 
 
-mStore::Word256->Word256->VMM ()
+mStore :: (MonadIO m, MonadLogger m) => Word256 -> Word256 -> VMM m ()
 mStore p val = do
   setNewMaxSize (fromIntegral p+32)
-  state <- lift get
+  state <- vmstateGet
   let bytes = word256ToBytes val
       mem = mVector $! memory state
   liftIO $ V.unsafeWith mem $ \dst ->
@@ -152,17 +151,17 @@ mStore p val = do
              BU.unsafeUseAsCString bytes $ \src ->
                copyBytes (plusPtr dst (fromIntegral p)) src 32
 
-mStore8::Word256->Word8->VMM ()
+mStore8 :: (MonadIO m, MonadLogger m) => Word256 -> Word8 -> VMM m ()
 mStore8 p val = do
   setNewMaxSize (fromIntegral p+1)
-  state <- lift get
+  state <- vmstateGet
   liftIO $ V.write (mVector $ memory state) (fromIntegral p) val
 
-mStoreByteString::Word256->B.ByteString->VMM ()
+mStoreByteString :: (MonadIO m, MonadLogger m) => Word256 -> B.ByteString -> VMM m ()
 mStoreByteString _ theData | B.null theData = return () --no need to charge gas for mem change if nothing set
 mStoreByteString p theData = do
   setNewMaxSize (fromIntegral p + fromIntegral (B.length theData))
-  state <- lift get
+  state <- vmstateGet
   let sr = DV.enumFromN (fromIntegral p) (B.length theData) -- fromIntegral <$> sr'
       up = DV.fromList $ B.unpack theData
   liftIO $ DV.zipWithM_ (\i d -> V.unsafeWrite (mVector $ memory state) i d) sr up

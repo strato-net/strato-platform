@@ -71,8 +71,7 @@ data DebugCallCreate =
 data VMState =
   VMState {
     vmIsHomestead    :: Bool,
-    dbs              :: Context,
-    sqldb            :: Config,
+    vmMemDBs         :: MemDBs,
     vmGasRemaining   :: Counter,
     pc               :: Counter,
     memory           :: Memory,
@@ -102,11 +101,11 @@ makeLenses ''VMState
 
 
 instance Format VMState where
-  format state =
-    "pc: " ++ show (pc state) ++ "\n" ++
-    "done: " ++ show (done state) ++ "\n" ++
-    "gasRemaining: " ++ show (vmGasRemaining state) ++ "\n" ++
-    "stack: " ++ show (stack state) ++ "\n"
+  format VMState{..} =
+    "pc: " ++ show pc ++ "\n" ++
+    "done: " ++ show done ++ "\n" ++
+    "gasRemaining: " ++ show vmGasRemaining ++ "\n" ++
+    "stack: " ++ show stack ++ "\n"
 
 startingAction :: Environment -> Action
 startingAction Environment{..} = Action
@@ -121,8 +120,8 @@ startingAction Environment{..} = Action
   , _actionEvents             = Seq.empty
   }
 
-startingState :: Bool -> Bool -> Environment -> Config -> Context -> IO VMState
-startingState isRunningTests' isHomestead env sqldb' dbs' = do
+startingState :: Bool -> Bool -> Environment -> MemDBs -> IO VMState
+startingState isRunningTests' isHomestead env dbs' = do
   m <- newMemory
   pcref <- newCounter 0
   gasref <- newCounter 0
@@ -131,8 +130,7 @@ startingState isRunningTests' isHomestead env sqldb' dbs' = do
   return VMState
              {
                vmIsHomestead=isHomestead,
-               dbs = dbs',
-               sqldb = sqldb',
+               vmMemDBs = dbs',
                pc = pcref,
                done=False,
                returnVal=Nothing,
