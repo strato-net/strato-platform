@@ -1,0 +1,45 @@
+name: x509-certs
+version: 0.0.1
+build-type: Simple
+author: dpmesko
+maintainer:   daniel@blockapps.net
+synopsis: A Haskell x509 certificate generator
+category:      Data Structures
+license: Apache-2.0
+description:
+    A Haskell x509 certificate generator
+
+dependencies:
+  - base >= 4 && < 5
+  - x509
+#   - x509-util
+#  - x509-store
+#  - x509-validation
+  - asn1-encoding
+  - asn1-types
+  - cryptonite
+  - cereal
+  - hourglass
+  - time
+  - ecdsa
+  - bytestring
+  - pem
+  - random
+  - transformers
+  - containers
+
+ghc-options: -Wall -Werror
+
+
+library:
+  source-dirs: src
+  ghc-options: -Wall -O2
+
+
+executables:
+  x509certs:
+    source-dirs: exec_src/
+    main: x509CertsMain.hs
+    dependencies:
+      - hflags
+      - x509-certs
