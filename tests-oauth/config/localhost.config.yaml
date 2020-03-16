@@ -1,5 +1,6 @@
-apiDebug: false
+apiDebug: true
 password: "1234"
+VM: SolidVM
 timeout: 600000
 
 nodes:
