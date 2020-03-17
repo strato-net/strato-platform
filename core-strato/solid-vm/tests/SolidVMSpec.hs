@@ -69,6 +69,18 @@ anyTypeError :: Selector HandledException
 anyTypeError (HE Blockchain.SolidVM.Exception.TypeError{}) = True
 anyTypeError _ = False
 
+failedRequirementMsg :: String -> Selector HandledException
+failedRequirementMsg str (HE (Require (Just msg))) = str == msg
+failedRequirementMsg _   _                         = False
+
+failedRequirementNoMsg :: Selector HandledException
+failedRequirementNoMsg (HE (Require Nothing)) = True
+failedRequirementNoMsg _                      = False
+
+failedAssertion :: Selector HandledException
+failedAssertion (HE Assert) = True
+failedAssertion _           = False
+
 sender :: Address
 sender = 0xdeadbeef
 
@@ -509,6 +521,22 @@ contract qq {
   }
 }|]
 
+    it "can handle failed requirement with message" $ runTest (do
+      runBS [r|
+contract qq {
+  constructor() {
+    require(3 == 4, "Who is John Galt?");
+  }
+}|]) `shouldThrow` failedRequirementMsg "SString \"Who is John Galt?\""
+
+    it "can handle failed requirement without message" $ runTest (do
+      runBS [r|
+contract qq {
+  constructor() {
+    require(3 == 4);
+  }
+}|]) `shouldThrow` failedRequirementNoMsg
+
     it "can multiline require" . runTest $ do
       runBS [r|
 contract qq {
@@ -516,6 +544,32 @@ contract qq {
     require(
       3 == 3,
       "Who is John Galt????"
+    );
+  }
+}|]
+
+    it "can assert" . runTest $ do
+      runBS [r|
+contract qq {
+  constructor() {
+    assert(3 == 3);
+  }
+}|]
+
+    it "can handle failed assertion" $ runTest (do
+      runBS [r|
+contract qq {
+  constructor() {
+    assert(3 == 4);
+  }
+}|]) `shouldThrow` failedAssertion
+
+    it "can multiline assert" . runTest $ do
+      runBS [r|
+contract qq {
+  constructor() public {
+    assert(
+      3 == 3
     );
   }
 }|]
@@ -2201,3 +2255,24 @@ contract qq {
   uint x = 0;
   uint y = x[1];
 }|])) `shouldThrow` anyTypeError
+
+  it "can emit events" . runTest $ do
+    runBS [r|
+contract qq {
+  event x(uint v);
+  constructor() {
+    emit x(5);
+  }
+}|]
+
+  it "can emit inherited events" . runTest $ do
+    runBS [r|
+contract parent {
+  event x(uint v);
+}
+
+contract qq is parent {
+  constructor() {
+    emit x(6);
+  }
+}|]

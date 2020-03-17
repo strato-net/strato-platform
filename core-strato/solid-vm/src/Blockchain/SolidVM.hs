@@ -1128,6 +1128,7 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
     [] -> require cond Nothing
     (m:_) -> require cond (Just $ show m)
   return SNULL
+callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 
