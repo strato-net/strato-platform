@@ -168,6 +168,7 @@ valEquals :: Contract -> Value -> Value -> Bool
 valEquals ct lhs rhs = case (lhs, rhs) of
   (SInteger i, _) -> coerceFromInt ct rhs i == rhs
   (_, SInteger i) -> coerceFromInt ct lhs i == lhs
+  (SBool s1, SBool s2) -> s1 == s2
   (SString s1, SString s2) -> s1 == s2
   (SAddress v1, SAddress v2) -> v1 == v2
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2

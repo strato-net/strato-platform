@@ -791,6 +791,26 @@ contract qq {
 }|]
     getFields ["found"] `shouldReturn` [BBool False]
 
+  it "supports boolean equality" . runTest $ do
+    runBS [r|
+contract qq {
+  bool x = true;
+  bool y = true;
+  constructor() {
+    assert(x == y);
+  }
+}|]
+
+  it "supports boolean inequality" . runTest $ do
+    runBS [r|
+contract qq {
+  bool x = true;
+  bool y = false;
+  constructor() {
+    assert(x != y);
+  }
+}|]
+
   it "compares equal againts default" . runTest $ do
     liftIO $ pendingWith "add static typing" --TODO- Jim
     runBS [r|
