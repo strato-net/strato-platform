@@ -24,7 +24,6 @@ function getOrCreateOauthUserApi() {
       },
       body: JSON.stringify({})
     })
-    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })
