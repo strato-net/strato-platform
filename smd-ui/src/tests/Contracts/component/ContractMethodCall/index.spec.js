@@ -15,7 +15,7 @@ describe('ContractMethodCall: index', () => {
     store = createStore(combineReducers({ form: formReducer }))
   })
 
-  test('renders contracts card (enterprise mode)', () => {
+  test('renders contracts card (non Oauth mode)', () => {
     const props = {
       modal: {},
       accounts: indexAccountsMock,
@@ -46,7 +46,7 @@ describe('ContractMethodCall: index', () => {
     expect(wrapper.debug()).toMatchSnapshot();
   });
 
-  test('renders contracts card (public mode)', () => {
+  test('renders contracts card (Oauth mode)', () => {
     const props = {
       modal: {},
       accounts: {},

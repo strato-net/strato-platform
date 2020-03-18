@@ -16,12 +16,6 @@ Object {
       "label": "airline cartel 3",
     },
   ],
-  "currentUser": Object {
-    "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
-    "id": 6,
-    "username": "tanuj41",
-  },
-  "isLoggedIn": true,
   "oauthUser": Object {
     "address": "57f2ed9058d2e868d7bbae9db03af12d27675117",
     "username": "clinicaladmin",
@@ -29,7 +23,7 @@ Object {
 }
 `;
 
-exports[`MenuBar: index renders enterprise mode component with values 1`] = `
+exports[`MenuBar: index renders Oauth mode component with values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
@@ -80,13 +74,12 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
       <span>
         <span className=\\"pt-navbar-divider\\" />
         <small className=\\"pt-text-muted welcome-user\\">
-           Welcome, 
-          tanuj44
+           
            
         </small>
         <span className=\\"pt-navbar-divider\\" />
         <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
-          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: logout]}>
             Logout
           </button>
         </a>
@@ -96,7 +89,9 @@ exports[`MenuBar: index renders enterprise mode component with values 1`] = `
 </nav>"
 `;
 
-exports[`MenuBar: index renders enterprise mode component without values 1`] = `
+exports[`MenuBar: index renders Oauth mode component without values 1`] = `"<Connect(Form(MenuBar)) isLoggedIn={false} currentUser={{...}} chainIds={{...}} openWalkThroughOverlay={[Function: mockConstructor]} location={{...}} initialValues={[undefined]} touchOnBlur={true} touchOnChange={false} persistentSubmitErrors={false} destroyOnUnmount={true} shouldAsyncValidate={[Function: defaultShouldAsyncValidate]} shouldValidate={[Function: defaultShouldValidate]} enableReinitialize={false} keepDirtyOnReinitialize={false} getFormState={[Function: getFormState]} pure={true} forceUnregisterOnUnmount={false} form=\\"menu-bar\\" />"`;
+
+exports[`MenuBar: index renders non Oauth mode component with values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
@@ -149,9 +144,7 @@ exports[`MenuBar: index renders enterprise mode component without values 1`] = `
 </nav>"
 `;
 
-exports[`MenuBar: index renders public mode button execute for developer 1`] = `null`;
-
-exports[`MenuBar: index renders public mode component with values 1`] = `
+exports[`MenuBar: index renders non Oauth mode component without values 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
   <div className=\\"pt-navbar-group pt-align-left\\">
     <div>
@@ -199,27 +192,7 @@ exports[`MenuBar: index renders public mode component with values 1`] = `
           Prometheus Graphs
         </button>
       </a>
-      <span>
-        <span className=\\"pt-navbar-divider\\" />
-        <small className=\\"pt-text-muted welcome-user\\">
-           Welcome, 
-          tanuj44
-           
-        </small>
-        <span className=\\"pt-navbar-divider\\" />
-        <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
-          <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
-            Logout
-          </button>
-        </a>
-      </span>
     </div>
-  </div>
-  <div>
-    <withRouter(Connect(Login)) />
-    <withRouter(Connect(WalkThrough)) />
   </div>
 </nav>"
 `;
-
-exports[`MenuBar: index renders public mode component without values 1`] = `"<Connect(Form(MenuBar)) isLoggedIn={false} currentUser={{...}} chainIds={{...}} openWalkThroughOverlay={[Function: mockConstructor]} location={{...}} initialValues={[undefined]} touchOnBlur={true} touchOnChange={false} persistentSubmitErrors={false} destroyOnUnmount={true} shouldAsyncValidate={[Function: defaultShouldAsyncValidate]} shouldValidate={[Function: defaultShouldValidate]} enableReinitialize={false} keepDirtyOnReinitialize={false} getFormState={[Function: getFormState]} pure={true} forceUnregisterOnUnmount={false} form=\\"menu-bar\\" />"`;

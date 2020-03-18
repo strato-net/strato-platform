@@ -11,9 +11,9 @@ describe('UploadFile: index', () => {
     store = createStore(combineReducers({ form: formReducer }));
   });
 
-  describe('render component (enterprise mode)', () => {
+  describe('render component (non Oauth mode)', () => {
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     })
 
     test('without values', () => {
@@ -56,9 +56,9 @@ describe('UploadFile: index', () => {
 
   });
 
-  describe('render component (public mode)', () => {
+  describe('render component (Oauth mode)', () => {
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     })
 
     test('without values', () => {
@@ -101,29 +101,11 @@ describe('UploadFile: index', () => {
 
   });
 
-  describe('Public Mode', () => {
+  describe('Oauth Mode', () => {
 
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     })
-
-    test('componentDidMount', () => {
-      const props = {
-        isOpen: true,
-        uploadError: 'error',
-        result: {},
-        closeUploadModal: jest.fn(),
-        resetError: jest.fn(),
-        fetchAccounts: jest.fn()
-      }
-
-      const wrapper = shallow(
-        <UplaodFile.WrappedComponent {...props} />
-      );
-
-      expect(props.fetchAccounts).toHaveBeenCalledTimes(0);
-      expect(props.fetchAccounts).not.toHaveBeenCalled();
-    });
 
     test('componentWillReceiveProps', () => {
       const props = {
@@ -147,10 +129,10 @@ describe('UploadFile: index', () => {
 
   });
 
-  describe('Enterprise Mode', () => {
+  describe('Non Oauth Mode', () => {
 
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     })
 
     test('componentDidMount', () => {

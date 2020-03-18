@@ -53,7 +53,358 @@ Object {
 }
 `;
 
-exports[`UploadFile: index render component (enterprise mode) with values 1`] = `
+exports[`UploadFile: index render component (Non Oauth mode) with values 1`] = `
+"<div>
+  <form>
+    <div className=\\"pt-dialog-body upload-form\\">
+      <div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Username
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={true}>
+                <option value=\\"User_1177_79118\\">
+                  User_1177_79118
+                </option>
+                <option value=\\"Admin_1085_64667\\">
+                  Admin_1085_64667
+                </option>
+                <option value=\\"Supplier1\\">
+                  Supplier1
+                </option>
+                <option value=\\"Supplier2\\">
+                  Supplier2
+                </option>
+                <option value=\\"Buyer1\\">
+                  Buyer1
+                </option>
+                <option value=\\"Buyer2\\">
+                  Buyer2
+                </option>
+                <option value=\\"Admin_1177_49507\\">
+                  Admin_1177_49507
+                </option>
+                <option value=\\"Admin_1177_39206\\">
+                  Admin_1177_39206
+                </option>
+                <option value=\\"Admin_1177_31203\\">
+                  Admin_1177_31203
+                </option>
+                <option value=\\"User_1177_14462\\">
+                  User_1177_14462
+                </option>
+                <option value=\\"123456789012345678901234567890123\\">
+                  123456789012345678901234567890123
+                </option>
+                <option value=\\"User_1177_26292\\">
+                  User_1177_26292
+                </option>
+                <option value=\\"User_1177_69645 ?#%!@*\\">
+                  User_1177_69645 ?#%!@*
+                </option>
+                <option value=\\"User_1177_59578\\">
+                  User_1177_59578
+                </option>
+                <option value=\\"User_1177_79118\\">
+                  User_1177_79118
+                </option>
+                <option value=\\"User_1177_59359\\">
+                  User_1177_59359
+                </option>
+                <option value=\\"User_1177_42489\\">
+                  User_1177_42489
+                </option>
+                <option value=\\"User_1177_37717\\">
+                  User_1177_37717
+                </option>
+                <option value=\\"User_1177_52307\\">
+                  User_1177_52307
+                </option>
+                <option value=\\"Buyer1177_18955\\">
+                  Buyer1177_18955
+                </option>
+                <option value=\\"Supplier1177_62701\\">
+                  Supplier1177_62701
+                </option>
+                <option value=\\"Admin_1301_86023\\">
+                  Admin_1301_86023
+                </option>
+                <option value=\\"Admin_1301_62816\\">
+                  Admin_1301_62816
+                </option>
+                <option value=\\"Supplier0_1301_46441\\">
+                  Supplier0_1301_46441
+                </option>
+                <option value=\\"Supplier1_1301_46441\\">
+                  Supplier1_1301_46441
+                </option>
+                <option value=\\"Supplier2_1301_46441\\">
+                  Supplier2_1301_46441
+                </option>
+              </Field>
+            </div>
+            <br />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Address
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"address\\" required={true} disabled={true}>
+                <option value=\\"33c02a81e677ea493aace735f0a6b44cfa18f44e\\">
+                  33c02a81e677ea493aace735f0a6b44cfa18f44e
+                </option>
+                <option value=\\"33c02a81e677ea493aace735f0a6b44cfa18f44e\\">
+                  33c02a81e677ea493aace735f0a6b44cfa18f44e
+                </option>
+              </Field>
+            </div>
+            <br />
+             
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+      </div>
+      <div className=\\"row\\">
+        <div className=\\"col-sm-3 text-right\\">
+          <label className=\\"pt-label smd-pad-4\\">
+            File
+          </label>
+        </div>
+        <div className=\\"col-sm-9 smd-pad-4\\">
+          <Field id=\\"input-b\\" component={[Function]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
+           
+          <br />
+          <span className=\\"error-text\\" />
+        </div>
+      </div>
+      <div className=\\"row\\">
+        <div className=\\"col-sm-3 text-right\\">
+          <label className=\\"pt-label smd-pad-4\\">
+            Provider
+          </label>
+        </div>
+        <div className=\\"col-sm-9 smd-pad-4\\">
+          <div className=\\"pt-select\\">
+            <Field className=\\"pt-input\\" component=\\"select\\" name=\\"provider\\" tabIndex=\\"5\\" required={true}>
+              <option value=\\"s3\\">
+                 s3 
+              </option>
+            </Field>
+             
+            <br />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+      </div>
+      <div className=\\"row\\">
+        <div className=\\"col-sm-3 text-right\\">
+          <label className=\\"pt-label smd-pad-4\\">
+            Description
+          </label>
+        </div>
+        <div className=\\"col-sm-9 smd-pad-4\\">
+          <Field name=\\"description\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Description\\" className=\\"pt-input form-width\\" tabIndex=\\"6\\" required={true} />
+           
+          <br />
+          <span className=\\"error-text\\" />
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer upload-button\\">
+        <div className=\\"pt-dialog-footer-actions button-center upload\\">
+          <Blueprint.Button intent={0} onClick={[undefined]} disabled={false} text=\\"Upload\\" />
+        </div>
+      </div>
+    </div>
+  </form>
+</div>"
+`;
+
+exports[`UploadFile: index render component (Non Oauth mode) without values 1`] = `
+"<div>
+  <form>
+    <div className=\\"pt-dialog-body upload-form\\">
+      <div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Username
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={true}>
+                <option value={{...}} />
+                <option value=\\"0\\">
+                  0
+                </option>
+                <option value=\\"1\\">
+                  1
+                </option>
+                <option value=\\"2\\">
+                  2
+                </option>
+                <option value=\\"3\\">
+                  3
+                </option>
+                <option value=\\"4\\">
+                  4
+                </option>
+                <option value=\\"5\\">
+                  5
+                </option>
+                <option value=\\"6\\">
+                  6
+                </option>
+                <option value=\\"7\\">
+                  7
+                </option>
+                <option value=\\"8\\">
+                  8
+                </option>
+                <option value=\\"9\\">
+                  9
+                </option>
+                <option value=\\"10\\">
+                  10
+                </option>
+                <option value=\\"11\\">
+                  11
+                </option>
+                <option value=\\"12\\">
+                  12
+                </option>
+                <option value=\\"13\\">
+                  13
+                </option>
+                <option value=\\"14\\">
+                  14
+                </option>
+                <option value=\\"15\\">
+                  15
+                </option>
+                <option value=\\"16\\">
+                  16
+                </option>
+                <option value=\\"17\\">
+                  17
+                </option>
+                <option value=\\"18\\">
+                  18
+                </option>
+                <option value=\\"19\\">
+                  19
+                </option>
+                <option value=\\"20\\">
+                  20
+                </option>
+                <option value=\\"21\\">
+                  21
+                </option>
+                <option value=\\"22\\">
+                  22
+                </option>
+                <option value=\\"23\\">
+                  23
+                </option>
+                <option value=\\"24\\">
+                  24
+                </option>
+                <option value=\\"25\\">
+                  25
+                </option>
+                <option value=\\"length\\">
+                  length
+                </option>
+              </Field>
+            </div>
+            <br />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Address
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"address\\" required={true} disabled={true}>
+                <option value={{...}} />
+              </Field>
+            </div>
+            <br />
+             
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+      </div>
+      <div className=\\"row\\">
+        <div className=\\"col-sm-3 text-right\\">
+          <label className=\\"pt-label smd-pad-4\\">
+            File
+          </label>
+        </div>
+        <div className=\\"col-sm-9 smd-pad-4\\">
+          <Field id=\\"input-b\\" component={[Function]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
+           
+          <br />
+          <span className=\\"error-text\\" />
+        </div>
+      </div>
+      <div className=\\"row\\">
+        <div className=\\"col-sm-3 text-right\\">
+          <label className=\\"pt-label smd-pad-4\\">
+            Provider
+          </label>
+        </div>
+        <div className=\\"col-sm-9 smd-pad-4\\">
+          <div className=\\"pt-select\\">
+            <Field className=\\"pt-input\\" component=\\"select\\" name=\\"provider\\" tabIndex=\\"5\\" required={true}>
+              <option value=\\"s3\\">
+                 s3 
+              </option>
+            </Field>
+             
+            <br />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+      </div>
+      <div className=\\"row\\">
+        <div className=\\"col-sm-3 text-right\\">
+          <label className=\\"pt-label smd-pad-4\\">
+            Description
+          </label>
+        </div>
+        <div className=\\"col-sm-9 smd-pad-4\\">
+          <Field name=\\"description\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Description\\" className=\\"pt-input form-width\\" tabIndex=\\"6\\" required={true} />
+           
+          <br />
+          <span className=\\"error-text\\" />
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer upload-button\\">
+        <div className=\\"pt-dialog-footer-actions button-center upload\\">
+          <Blueprint.Button intent={0} onClick={[undefined]} disabled={false} text=\\"Upload\\" />
+        </div>
+      </div>
+    </div>
+  </form>
+</div>"
+`;
+
+exports[`UploadFile: index render component (Oauth mode) with values 1`] = `
 "<div>
   <form>
     <div className=\\"pt-dialog-body upload-form\\">
@@ -238,7 +589,7 @@ exports[`UploadFile: index render component (enterprise mode) with values 1`] = 
 </div>"
 `;
 
-exports[`UploadFile: index render component (enterprise mode) without values 1`] = `
+exports[`UploadFile: index render component (Oauth mode) without values 1`] = `
 "<div>
   <form>
     <div className=\\"pt-dialog-body upload-form\\">
@@ -349,383 +700,6 @@ exports[`UploadFile: index render component (enterprise mode) without values 1`]
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"pt-select\\">
               <Field className=\\"pt-input\\" component=\\"select\\" name=\\"address\\" required={true} disabled={false}>
-                <option value={{...}} />
-              </Field>
-            </div>
-            <br />
-             
-            <span className=\\"error-text\\" />
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Password
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field name=\\"password\\" component=\\"input\\" type=\\"password\\" placeholder=\\"Password\\" className=\\"pt-input form-width\\" tabIndex=\\"3\\" required={true} />
-             
-            <br />
-            <span className=\\"error-text\\" />
-          </div>
-        </div>
-      </div>
-      <div className=\\"row\\">
-        <div className=\\"col-sm-3 text-right\\">
-          <label className=\\"pt-label smd-pad-4\\">
-            File
-          </label>
-        </div>
-        <div className=\\"col-sm-9 smd-pad-4\\">
-          <Field id=\\"input-b\\" component={[Function]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
-           
-          <br />
-          <span className=\\"error-text\\" />
-        </div>
-      </div>
-      <div className=\\"row\\">
-        <div className=\\"col-sm-3 text-right\\">
-          <label className=\\"pt-label smd-pad-4\\">
-            Provider
-          </label>
-        </div>
-        <div className=\\"col-sm-9 smd-pad-4\\">
-          <div className=\\"pt-select\\">
-            <Field className=\\"pt-input\\" component=\\"select\\" name=\\"provider\\" tabIndex=\\"5\\" required={true}>
-              <option value=\\"s3\\">
-                 s3 
-              </option>
-            </Field>
-             
-            <br />
-            <span className=\\"error-text\\" />
-          </div>
-        </div>
-      </div>
-      <div className=\\"row\\">
-        <div className=\\"col-sm-3 text-right\\">
-          <label className=\\"pt-label smd-pad-4\\">
-            Description
-          </label>
-        </div>
-        <div className=\\"col-sm-9 smd-pad-4\\">
-          <Field name=\\"description\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Description\\" className=\\"pt-input form-width\\" tabIndex=\\"6\\" required={true} />
-           
-          <br />
-          <span className=\\"error-text\\" />
-        </div>
-      </div>
-      <div className=\\"pt-dialog-footer upload-button\\">
-        <div className=\\"pt-dialog-footer-actions button-center upload\\">
-          <Blueprint.Button intent={0} onClick={[undefined]} disabled={false} text=\\"Upload\\" />
-        </div>
-      </div>
-    </div>
-  </form>
-</div>"
-`;
-
-exports[`UploadFile: index render component (public mode) with values 1`] = `
-"<div>
-  <form>
-    <div className=\\"pt-dialog-body upload-form\\">
-      <div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Username
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={true}>
-                <option value=\\"User_1177_79118\\">
-                  User_1177_79118
-                </option>
-                <option value=\\"Admin_1085_64667\\">
-                  Admin_1085_64667
-                </option>
-                <option value=\\"Supplier1\\">
-                  Supplier1
-                </option>
-                <option value=\\"Supplier2\\">
-                  Supplier2
-                </option>
-                <option value=\\"Buyer1\\">
-                  Buyer1
-                </option>
-                <option value=\\"Buyer2\\">
-                  Buyer2
-                </option>
-                <option value=\\"Admin_1177_49507\\">
-                  Admin_1177_49507
-                </option>
-                <option value=\\"Admin_1177_39206\\">
-                  Admin_1177_39206
-                </option>
-                <option value=\\"Admin_1177_31203\\">
-                  Admin_1177_31203
-                </option>
-                <option value=\\"User_1177_14462\\">
-                  User_1177_14462
-                </option>
-                <option value=\\"123456789012345678901234567890123\\">
-                  123456789012345678901234567890123
-                </option>
-                <option value=\\"User_1177_26292\\">
-                  User_1177_26292
-                </option>
-                <option value=\\"User_1177_69645 ?#%!@*\\">
-                  User_1177_69645 ?#%!@*
-                </option>
-                <option value=\\"User_1177_59578\\">
-                  User_1177_59578
-                </option>
-                <option value=\\"User_1177_79118\\">
-                  User_1177_79118
-                </option>
-                <option value=\\"User_1177_59359\\">
-                  User_1177_59359
-                </option>
-                <option value=\\"User_1177_42489\\">
-                  User_1177_42489
-                </option>
-                <option value=\\"User_1177_37717\\">
-                  User_1177_37717
-                </option>
-                <option value=\\"User_1177_52307\\">
-                  User_1177_52307
-                </option>
-                <option value=\\"Buyer1177_18955\\">
-                  Buyer1177_18955
-                </option>
-                <option value=\\"Supplier1177_62701\\">
-                  Supplier1177_62701
-                </option>
-                <option value=\\"Admin_1301_86023\\">
-                  Admin_1301_86023
-                </option>
-                <option value=\\"Admin_1301_62816\\">
-                  Admin_1301_62816
-                </option>
-                <option value=\\"Supplier0_1301_46441\\">
-                  Supplier0_1301_46441
-                </option>
-                <option value=\\"Supplier1_1301_46441\\">
-                  Supplier1_1301_46441
-                </option>
-                <option value=\\"Supplier2_1301_46441\\">
-                  Supplier2_1301_46441
-                </option>
-              </Field>
-            </div>
-            <br />
-            <span className=\\"error-text\\" />
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Address
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"address\\" required={true} disabled={true}>
-                <option value=\\"33c02a81e677ea493aace735f0a6b44cfa18f44e\\">
-                  33c02a81e677ea493aace735f0a6b44cfa18f44e
-                </option>
-                <option value=\\"33c02a81e677ea493aace735f0a6b44cfa18f44e\\">
-                  33c02a81e677ea493aace735f0a6b44cfa18f44e
-                </option>
-              </Field>
-            </div>
-            <br />
-             
-            <span className=\\"error-text\\" />
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Password
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field name=\\"password\\" component=\\"input\\" type=\\"password\\" placeholder=\\"Password\\" className=\\"pt-input form-width\\" tabIndex=\\"3\\" required={true} />
-             
-            <br />
-            <span className=\\"error-text\\" />
-          </div>
-        </div>
-      </div>
-      <div className=\\"row\\">
-        <div className=\\"col-sm-3 text-right\\">
-          <label className=\\"pt-label smd-pad-4\\">
-            File
-          </label>
-        </div>
-        <div className=\\"col-sm-9 smd-pad-4\\">
-          <Field id=\\"input-b\\" component={[Function]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
-           
-          <br />
-          <span className=\\"error-text\\" />
-        </div>
-      </div>
-      <div className=\\"row\\">
-        <div className=\\"col-sm-3 text-right\\">
-          <label className=\\"pt-label smd-pad-4\\">
-            Provider
-          </label>
-        </div>
-        <div className=\\"col-sm-9 smd-pad-4\\">
-          <div className=\\"pt-select\\">
-            <Field className=\\"pt-input\\" component=\\"select\\" name=\\"provider\\" tabIndex=\\"5\\" required={true}>
-              <option value=\\"s3\\">
-                 s3 
-              </option>
-            </Field>
-             
-            <br />
-            <span className=\\"error-text\\" />
-          </div>
-        </div>
-      </div>
-      <div className=\\"row\\">
-        <div className=\\"col-sm-3 text-right\\">
-          <label className=\\"pt-label smd-pad-4\\">
-            Description
-          </label>
-        </div>
-        <div className=\\"col-sm-9 smd-pad-4\\">
-          <Field name=\\"description\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Description\\" className=\\"pt-input form-width\\" tabIndex=\\"6\\" required={true} />
-           
-          <br />
-          <span className=\\"error-text\\" />
-        </div>
-      </div>
-      <div className=\\"pt-dialog-footer upload-button\\">
-        <div className=\\"pt-dialog-footer-actions button-center upload\\">
-          <Blueprint.Button intent={0} onClick={[undefined]} disabled={false} text=\\"Upload\\" />
-        </div>
-      </div>
-    </div>
-  </form>
-</div>"
-`;
-
-exports[`UploadFile: index render component (public mode) without values 1`] = `
-"<div>
-  <form>
-    <div className=\\"pt-dialog-body upload-form\\">
-      <div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Username
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={true}>
-                <option value={{...}} />
-                <option value=\\"0\\">
-                  0
-                </option>
-                <option value=\\"1\\">
-                  1
-                </option>
-                <option value=\\"2\\">
-                  2
-                </option>
-                <option value=\\"3\\">
-                  3
-                </option>
-                <option value=\\"4\\">
-                  4
-                </option>
-                <option value=\\"5\\">
-                  5
-                </option>
-                <option value=\\"6\\">
-                  6
-                </option>
-                <option value=\\"7\\">
-                  7
-                </option>
-                <option value=\\"8\\">
-                  8
-                </option>
-                <option value=\\"9\\">
-                  9
-                </option>
-                <option value=\\"10\\">
-                  10
-                </option>
-                <option value=\\"11\\">
-                  11
-                </option>
-                <option value=\\"12\\">
-                  12
-                </option>
-                <option value=\\"13\\">
-                  13
-                </option>
-                <option value=\\"14\\">
-                  14
-                </option>
-                <option value=\\"15\\">
-                  15
-                </option>
-                <option value=\\"16\\">
-                  16
-                </option>
-                <option value=\\"17\\">
-                  17
-                </option>
-                <option value=\\"18\\">
-                  18
-                </option>
-                <option value=\\"19\\">
-                  19
-                </option>
-                <option value=\\"20\\">
-                  20
-                </option>
-                <option value=\\"21\\">
-                  21
-                </option>
-                <option value=\\"22\\">
-                  22
-                </option>
-                <option value=\\"23\\">
-                  23
-                </option>
-                <option value=\\"24\\">
-                  24
-                </option>
-                <option value=\\"25\\">
-                  25
-                </option>
-                <option value=\\"length\\">
-                  length
-                </option>
-              </Field>
-            </div>
-            <br />
-            <span className=\\"error-text\\" />
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Address
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"address\\" required={true} disabled={true}>
                 <option value={{...}} />
               </Field>
             </div>
