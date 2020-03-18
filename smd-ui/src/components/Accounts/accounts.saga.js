@@ -38,9 +38,7 @@ import { createUrl } from '../../lib/url';
 
 const oauthAccountDataUrl = env.STRATO_URL_V23 + "/users";
 const accountDataUrl = env.STRATO_URL + "/account";
-const addressUrl = env.BLOC_URL + '/users/:user';
 const usernameUrl = env.BLOC_URL + "/users";
-const faucetUrl = env.BLOC_URL + "/users/:user/:address/fill"
 
 export function getAccountsApi() {
   return fetch(
@@ -63,7 +61,7 @@ export function getAccountsApi() {
 
 export function getUserAddressesApi(username) {
   const options = { params: { user: username } };
-  const url = createUrl(addressUrl, options);
+  const url = env.BLOC_URL + createUrl("/users/:user", options);
 
   return fetch(
     url,
@@ -109,7 +107,7 @@ export function getAccountDetailApi(address, chainid) {
 
 export function postFaucet(username, address) {
   const options = { params: { user: username, address }, query: { resolve: true } };
-  const url = createUrl(faucetUrl, options);
+  const url = env.BLOC_URL + createUrl("/users/:user/:address/fill", options);
 
   return fetch(
     url,

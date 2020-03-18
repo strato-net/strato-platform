@@ -12,13 +12,6 @@ const config = require('../config/app.config');
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 
-(async() => {
-    await singleCheck()
-    setInterval(async () => {
-        await singleCheck()
-    }, config.healthCheck.stallCheckProgressWindow);
-})();
-
 async function singleCheck() {
     try {
         await queryHealthStatus();
@@ -50,7 +43,7 @@ function queryHealthStatus() {
             await updateStallStat(blocksValid, blocksPending);
             const overallStat = await getCurrentHealth(lastP, lastV, blocksValid);
 
-            await updateCurrentHealth(overallStat);
+            await updateNodeStallStatus(overallStat);
 
             return resolve();
 
@@ -132,7 +125,7 @@ async function getCurrentHealth(lastP, lastV, thisV){
     return [overallStat, blocksValidInc, (lastP > 0)]
 }
 
-async function updateCurrentHealth(overallStat){
+async function updateNodeStallStatus(overallStat){
     let currentTime = Date.now();
     let [stat, created] = await models.CurrentHealth.findOrCreate({where: {processName: 'StallStat'}, defaults: {
         latestHealthStatus: overallStat[0],
@@ -159,6 +152,7 @@ async function updateCurrentHealth(overallStat){
 }
 
 async function updateStallStat(blocksValid, blocksPending){
+  // TODO: Promise.all() here
     let currentTime = Date.now();
     await models.StallStat.create({
         blockType: "Valid",
@@ -185,7 +179,7 @@ async function initialCreate(){
 }
 
 module.exports = {
+    singleCheck,
     getCurrentHealth,
-    updateStallStat,
-    updateCurrentHealth
+    updateNodeStallStatus
 }

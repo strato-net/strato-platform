@@ -7,6 +7,7 @@
 
 module BlockApps.Bloc22.Server.Transaction where
 
+import           Control.Applicative               ((<|>))
 import           Control.Monad
 import           Control.Monad.Except
 import qualified Data.Map.Strict                   as Map
@@ -46,14 +47,14 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (transferpayloadValue p)
                         txParams
                         (transferpayloadMetadata p)
-                        chainId
+                        (transferpayloadChainid p <|> chainId)
                         resolve
             fmap (:[]) $ postUsersSend' btp (callSignature userName)
           xs -> do
             p <- mapM fromTransfer xs
             let btlp = TransferListParameters
                         addr
-                        (map (\(TransferPayload t v m) -> SendTransaction t v txParams m) p)
+                        (map (\(TransferPayload t v c m) -> SendTransaction t v txParams c m) p)
                         chainId
                         resolve
             postUsersSendList' btlp (callSignature userName)
@@ -70,7 +71,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (contractpayloadValue p)
                         txParams
                         (contractpayloadMetadata p)
-                        chainId
+                        (contractpayloadChainid p <|> chainId)
                         resolve
                 poster = case Map.lookup "VM" =<< md of
                             Nothing -> postUsersContractEVM'
@@ -83,7 +84,8 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
             p <- mapM fromContract xs
             let bclp = ContractListParameters
                         addr
-                        (map (\(ContractPayload _ c a v m) -> UploadListContract (fromJust c) (fromMaybe Map.empty a) txParams v m) p)
+                        (map (\(ContractPayload _ c a v cid m) ->
+                                UploadListContract (fromJust c) (fromMaybe Map.empty a) txParams v cid m) p)
                         chainId
                         resolve
                 md = contractpayloadMetadata $ head p      --Determine VM option by the metadata of the first tx in list
@@ -107,14 +109,15 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (functionpayloadValue p)
                         txParams
                         (functionpayloadMetadata p)
-                        chainId
+                        (functionpayloadChainid p <|> chainId)
                         resolve
             fmap (:[]) $ postUsersContractMethod' bfp (callSignature userName)
           xs -> do
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
                         addr
-                        (map (\(FunctionPayload (ContractName n) a m r v md) -> MethodCall n a m r (fromMaybe (Strung 0) v) txParams md) p)
+                        (map (\(FunctionPayload (ContractName n) a m r v c md) ->
+                                MethodCall n a m r (fromMaybe (Strung 0) v) txParams c md) p)
                         chainId
                         resolve
             postUsersContractMethodList' bflp (callSignature userName)

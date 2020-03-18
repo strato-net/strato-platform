@@ -12,7 +12,7 @@ const dbConfig = {
     password: 'api',
     database: 'eth_' + nodeUUID,
     host: 'localhost',
-    port: '5432',
+    port: '15433',
     dialect: 'postgres',
   },
   test: {

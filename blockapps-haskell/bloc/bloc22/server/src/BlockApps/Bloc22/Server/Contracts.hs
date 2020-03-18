@@ -56,12 +56,13 @@ getContracts chainId = blocTransaction $ do
     namesToMap = foldr'
       (\ (key,name,utc,cid) -> Map.insertWith (++) key [nameToVal name utc cid])
       Map.empty
+  -- Take only 100 entries as a short-term solution to prevent from crashing.
+  -- See also: https://blockapps.atlassian.net/browse/STRATO-1714
   contractsAddresses <- blocQuery $ getContractsAddressesQuery chainId
   contractsNamesAsAddresses <- blocQuery $ getContractsNamesAsAddressesQuery chainId
-  return . GetContractsResponse $
-    addressesToMap contractsAddresses
-    `Map.union`
-    namesToMap contractsNamesAsAddresses
+  let reducedResponseMap = (addressesToMap $ contractsAddresses) `Map.union`
+                           (namesToMap $ contractsNamesAsAddresses)
+  return . GetContractsResponse $ reducedResponseMap
 
 getContractsData :: ContractName -> Bloc [MaybeNamed Address]
 getContractsData (ContractName contractName) = blocTransaction $ do
@@ -128,7 +129,7 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   storage' <- case mName of
     Nothing -> blocStrato $ getStorage
       storageFilterParams{ qsAddress = Just address
-                         , qsChainId = chainId
+                         , qsChainId = maybeToList chainId
                          }
     Just name ->
       let ranges = decodeStorageKey
@@ -173,8 +174,20 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
         storageFilterParams{ qsAddress = Just a
                            , qsMinKey = Just . fromInteger $ toInteger o
                            , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
-                           , qsChainId = chainId
+                           , qsChainId = maybeToList chainId
                            }
+
+postContractsBatchStates :: [PostContractsBatchStatesRequest]
+                        -> Bloc [GetContractsStateResponses]
+postContractsBatchStates = traverse flattenRequest
+  where flattenRequest PostContractsBatchStatesRequest{..} =
+          getContractsState postcontractsbatchstatesrequestContractName
+                            postcontractsbatchstatesrequestAddress
+                            postcontractsbatchstatesrequestChainid
+                            postcontractsbatchstatesrequestVarName
+                            postcontractsbatchstatesrequestCount
+                            postcontractsbatchstatesrequestOffset
+                            (fromMaybe False postcontractsbatchstatesrequestLength)
 
 getContractsDetails :: Address -> Maybe ChainId -> Bloc ContractDetails
 getContractsDetails contractAddress chainId = do

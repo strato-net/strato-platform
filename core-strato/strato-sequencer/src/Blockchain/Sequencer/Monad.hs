@@ -33,6 +33,7 @@ module Blockchain.Sequencer.Monad (
   , markForVM
   , markForP2P
   , clearLdbBatchOps
+  , flushLdbBatchOps
   , addLdbBatchOps
   , drainP2P
   , drainVM
@@ -405,6 +406,15 @@ drainVotes = atomically . flushTQueue =<< asks blockstanbulBeneficiary
 
 clearLdbBatchOps :: SequencerM ()
 clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
+
+flushLdbBatchOps :: SequencerM ()
+flushLdbBatchOps = do
+  pendingLDBWrites <- gets _ldbBatchOps
+  applyLDBBatchWrites $ toList pendingLDBWrites
+  incCounter seqLdbBatchWrites
+  setGauge seqLdbBatchSize . fromIntegral . length $ pendingLDBWrites
+  $logInfoS "flushLdbBatchOps" "Applied pending LDB writes"
+  clearLdbBatchOps
 
 addLdbBatchOps :: [LDB.BatchOp] -> SequencerM ()
 addLdbBatchOps ops = do

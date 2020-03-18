@@ -54,6 +54,7 @@ import qualified Data.NibbleString                  as N
 import qualified Data.Sequence                      as Q
 import           Data.Word
 import qualified Data.Text                          as T
+import           Data.Traversable                   (for)
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Postgresql        as PSQL
 import qualified Database.Persist.Sqlite            as Lite
@@ -72,6 +73,7 @@ import           Blockchain.Blockstanbul.Authentication as Auth
 import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs           (LogDB, EventDB, TransactionResult)
@@ -93,6 +95,7 @@ import qualified Blockchain.Strato.Indexer.Kafka    as IK
 import qualified Blockchain.Strato.Indexer.Model    as IM
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+import           Blockchain.Strato.RedisBlockDB.Models
 import qualified Blockchain.TxRunResultCache        as TRC
 import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
@@ -269,6 +272,12 @@ instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
 
 instance Mod.Accessible RBDB.RedisConnection ContextM where
   access _ = gets contextRedisPool
+
+instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
+  access _ = do
+    mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
+    for mRBB $ \(RedisBestBlock sha num diff) ->
+      return . WorldBestBlock $ BestBlock sha num diff
 
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO

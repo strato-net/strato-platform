@@ -24,6 +24,7 @@ function getOrCreateOauthUserApi() {
       },
       body: JSON.stringify({})
     })
+    .then(handleErrors)
     .then(function (response) {
       return response.json()
     })
@@ -36,7 +37,9 @@ function* getOrCreateOauthUser() {
   try {
     const user = yield call(getOrCreateOauthUserApi);
     if (user.error) {
-      window.location.href = '/auth/logout'
+      // We only get the non-401 errors here (401 is handled inside of getOrCreateOauthUserApi)
+      console.error('Failed to create account for OAuth user. Error:', user.error)
+      // Admin: refer to strato nginx and apex logs for details
     } else {
       localStorage.setItem('user', JSON.stringify(user));
       yield put(getOrCreateOauthUserSuccess(user));

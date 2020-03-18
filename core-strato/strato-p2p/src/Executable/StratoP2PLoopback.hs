@@ -5,7 +5,6 @@ module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
 import Conduit
 import Control.Monad
-import Control.Monad.Trans.State
 import qualified Data.Text as T
 import Prometheus
 
@@ -29,14 +28,14 @@ recordEvent lab = liftIO $ withLabel loopbackEvents lab incCounter
 stratoP2PLoopback :: LoggingT IO ()
 stratoP2PLoopback = do
   $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
-  ctx <- initContext flags_maxReturnedHeaders
-  void . runContextM ctx $ do
-    ks <- gets contextKafkaState
-    let toWireMessage = \case
+  (cfg, initState) <- initContext flags_maxReturnedHeaders
+  void . runContextM cfg $ do
+    let ks = contextKafkaState initState
+        toWireMessage = \case
           P2pBlockstanbul wm -> Just wm
           _ -> Nothing
 
-    runConduit $
+    runConduit . evalStateLC initState $
          seqEventNotificationSource ks
       .| iterMC (const $ recordEvent "in")
       .| concatMapC toWireMessage

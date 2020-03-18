@@ -9,7 +9,6 @@ import qualified Data.Map.Strict     as M
 import qualified Data.Text           as T
 import qualified Database.Esqueleto  as E
 import           Handler.Common
-import           Handler.Filters              (fromHexText)
 import           Import
 import           Numeric             (readHex)
 import qualified Prelude             as P
@@ -33,16 +32,12 @@ instance ToJSONKey StrungSHA where
 postBatchTransactionResultR :: HandlerFor App Value
 postBatchTransactionResultR = do
   addHeader "Access-Control-Allow-Origin" "*"
-  chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
   hashesR <- parseJsonBody :: HandlerFor App (Result [StrungSHA])
   case hashesR of
     Success hashes -> do
         txrs <- runDB . E.select . E.from $ \txr -> do
           let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList (unStrungSHA <$> hashes)
-              matchChainId = case chainId of
-                Nothing -> (E.isNothing $ txr E.^. TransactionResultChainId)
-                Just cid -> (txr E.^. TransactionResultChainId) E.==. (E.just $ E.val cid)
-          E.where_ (matchHashes E.&&. matchChainId)
+          E.where_ matchHashes
           return txr
         let mmUpsert k v m = case M.lookup k m of
                 Nothing -> M.insert k [v] m
@@ -52,6 +47,3 @@ postBatchTransactionResultR = do
             grouped = P.foldl theFold baseMap (E.entityVal <$> txrs)
         returnJson grouped
     x -> invalidArgs [T.pack $ "couldn't decode array of transaction hashes " ++ show x]
-
-
-

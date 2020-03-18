@@ -1,9 +1,11 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Blockchain.SolidVM
     (
@@ -14,8 +16,8 @@ module Blockchain.SolidVM
 import           Control.Lens hiding (assign, from, to)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
+import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.State
 import           Data.Bits
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
@@ -27,6 +29,7 @@ import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
+import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
 --import qualified Data.List                            as List
@@ -55,6 +58,7 @@ import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
 import           Blockchain.SHA
+import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.VMContext
@@ -120,7 +124,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash
     (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' newAddress hsh cc contractName' args
 
-create' :: Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> SM ExecResults
+create' :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
 create' creator newAddress ch cc contractName' argExps = do
   initializeAction newAddress contractName' ch
 
@@ -144,7 +148,8 @@ create' creator newAddress ch cc contractName' argExps = do
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
-  sstate <- get
+  finalAct <- Mod.get (Mod.Proxy @Action)
+  finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -152,10 +157,10 @@ create' creator newAddress ch cc contractName' argExps = do
     erReturnVal = Just BSS.empty,
     erTrace = [],
     erLogs = [],
-    erEvents = toList $ ssEvents sstate,
+    erEvents = toList finalEvs,
     erNewContractAddress = Just newAddress,
     erSuicideList = S.empty,
-    erAction = Just $ sstate ^. action,
+    erAction = Just finalAct,
     erException = Nothing,
     erKind = SolidVM
     }
@@ -216,18 +221,19 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
-    
+
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
-  
-    finalAct <- use action
-    sstate <- get
+
+    finalAct <- Mod.get (Mod.Proxy @Action)
+    finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
       erRefund = 0,
       erReturnVal = BSS.toShort <$> returnVal,
       erTrace = [],
       erLogs = [],
-      erEvents = toList $ ssEvents sstate,
+      erEvents = toList finalEvs,
       erNewContractAddress = Nothing,
       erSuicideList = S.empty,
       erAction = Just $ finalAct,
@@ -236,9 +242,9 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       }
 
 
-getCodeAndCollection :: Address -> SM (Contract, SHA, CodeCollection)
+getCodeAndCollection :: MonadSM m => Address -> m (Contract, SHA, CodeCollection)
 getCodeAndCollection address' = do
-  callStack' <- fmap callStack get
+  callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
         case callStack' of
           (current:_) -> Just $ currentAddress current
@@ -266,7 +272,7 @@ getCodeAndCollection address' = do
 
     return (contract', ch, cc)
 
-logFunctionCall :: ValList -> Address -> Contract -> String -> SM (Maybe Value) -> SM (Maybe Value)
+logFunctionCall :: MonadSM m => ValList -> Address -> Contract -> String -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
   onTraced $ do
     argStrings <-
@@ -292,7 +298,7 @@ logFunctionCall args address contract functionName f = do
   return result
 
 
-argsToVals :: Contract -> Xabi.Func -> Xabi.ArgList -> SM ValList
+argsToVals :: MonadSM m => Contract -> Xabi.Func -> Xabi.ArgList -> m ValList
 argsToVals ctract fn args =
   case args of
     Xabi.OrderedArgs xs -> do
@@ -310,7 +316,7 @@ argsToVals ctract fn args =
         orderedTypes = map Xabi.indexedTypeType
                      . map snd $ Xabi.funcArgs fn
 
-        eval :: Xabi.Type -> Xabi.Expression -> SM Value
+        eval :: MonadSM m => Xabi.Type -> Xabi.Expression -> m Value
         eval t x = case x of
            Xabi.NumberLiteral n Nothing -> return . coerceType ctract t $ SInteger n
            Xabi.NumberLiteral n (Just nu) -> todo "Number literal with units" (n, nu)
@@ -326,7 +332,7 @@ argsToVals ctract fn args =
            _ -> getVar =<< expToVar x
 
 
-callWrapper :: Address -> Address -> Maybe String -> String -> Xabi.ArgList -> SM (Maybe Value)
+callWrapper :: MonadSM m => Address -> Address -> Maybe String -> String -> Xabi.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName argExps = do
   (contract', hsh, cc) <- getCodeAndCollection to
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
@@ -356,7 +362,7 @@ callWrapper from to mContract functionName argExps = do
   logFunctionCall args to contract functionName f
 
 
-runStatements :: [Xabi.Statement] -> SM (Maybe Value)
+runStatements :: MonadSM m => [Xabi.Statement] -> m (Maybe Value)
 runStatements [] = return Nothing
 runStatements (s:rest) = do
   onTraced $ do
@@ -370,7 +376,7 @@ runStatements (s:rest) = do
     v -> return v
 
 
-runStatement :: Xabi.Statement -> SM (Maybe Value)
+runStatement :: MonadSM m => Xabi.Statement -> m (Maybe Value)
 --runStatement x | trace (C.green $ "statement> " ++ unparseStatement x) $ False = undefined
 --runStatement x | trace (C.green $ "statement> " ++ show x) $ False = undefined
 {-
@@ -568,9 +574,9 @@ runStatement st@(Xabi.EmitStatement eventName exptups) = do
         return Nothing
 
 
-runStatement x = error $ "unknown statement in call to runStatement: " ++ show x
+runStatement x = unknownStatement "unknown statement in call to runStatement: " (show x)
 
-while :: SM Bool -> SM (Maybe Value) -> SM (Maybe Value)
+while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
@@ -582,7 +588,7 @@ while condition code = do
         _ -> return result
     else return Nothing
 
-getIndexType :: AddressedPath -> SM IndexType
+getIndexType :: MonadSM m => AddressedPath -> m IndexType
 getIndexType (AddressedPath addr p) = do
   let field = MS.getField p
   mType <- getXabiType addr field
@@ -598,7 +604,7 @@ getIndexType (AddressedPath addr p) = do
          Xabi.Mapping{Xabi.key=Xabi.Address{}} -> MapAddressIndex
          Xabi.Mapping{Xabi.key=Xabi.Bool{}} -> MapBoolIndex
          Xabi.Array{} -> ArrayIndex
-         _ -> todo "unanticipated index type" t
+         _ -> typeError "unanticipated index type" t
        loop n t = case t of
          Xabi.Mapping{Xabi.value=t'} -> loop (n - 1) t'
          Xabi.Array{Xabi.entry=t'} -> loop (n - 1) t'
@@ -606,7 +612,7 @@ getIndexType (AddressedPath addr p) = do
 
 
 
-expToPath :: Xabi.Expression -> SM AddressedPath
+expToPath :: MonadSM m => Xabi.Expression -> m AddressedPath
 expToPath (Xabi.Variable x) = do
   callInfo <- getCurrentCallInfo
   let path = MS.singleton $ BC.pack x
@@ -615,7 +621,7 @@ expToPath (Xabi.Variable x) = do
       val <- weakGetVar var
       case val of
         SReference apt -> return apt
-        _ -> error "expToPath should never be called for a local variable"
+        _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
     Nothing -> return $ AddressedPath (currentAddress callInfo) path
 expToPath x@(Xabi.IndexAccess parent mIndex) = do
   parPath  <- do
@@ -656,12 +662,12 @@ expToPath (Xabi.MemberAccess parent field) = do
 
 expToPath x = todo "expToPath/unhandled" x
 
-expToVar :: Xabi.Expression -> SM Variable
+expToVar :: MonadSM m => Xabi.Expression -> m Variable
 expToVar x = do
   v <- expToVar' x
   return v
 
-expToVar' :: Xabi.Expression -> SM Variable
+expToVar' :: MonadSM m => Xabi.Expression -> m Variable
 expToVar' (Xabi.NumberLiteral v Nothing) = return . Constant $ SInteger v
 expToVar' (Xabi.StringLiteral s) = return $ Constant $ SString s
 expToVar' (Xabi.BoolLiteral b) = return $ Constant $ SBool b
@@ -786,7 +792,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
-      _ -> error $ "unhandled case in expToVar' for MemberAccess: " ++ show val
+      _ -> typeError "SolidVM: Illegal member access" ((show val) ++ "." ++ name)
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref
@@ -834,7 +840,7 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
         (SArray _ theVector, SInteger i) -> do
           return $ theVector V.! fromIntegral i
         (SReference _, _) -> Constant . SReference <$> expToPath x
-        _ -> error $ "expToVar' called for IndexAccess with unsupported types:\nval = " ++ show val ++ "\ntheIndex = " ++ show theIndex
+        _ -> typeError "expToVar' called for IndexAccess with unsupported types: " ("\nval = " ++ show val ++ "\ntheIndex = " ++ show theIndex)
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 
@@ -1076,14 +1082,14 @@ expToVar' x = todo "expToVar/unhandled" x
 
 --------------
 
-expToVarInteger :: Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -> (a->Value) -> SM Variable
+expToVarInteger :: MonadSM m => Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -> (a->Value) -> m Variable
 expToVarInteger expr1 o expr2 retType = do
   i1 <- getInt =<< expToVar expr1
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
 
 
-binopAssign :: (Integer -> Integer -> Integer) -> Xabi.Expression -> Xabi.Expression -> SM Variable
+binopAssign :: MonadSM m => (Integer -> Integer -> Integer) -> Xabi.Expression -> Xabi.Expression -> m Variable
 binopAssign oper lhs rhs = do
   let readInt e = getInt =<< expToVar e
   delta <- readInt rhs
@@ -1103,7 +1109,7 @@ intBuiltin [SString hex] =
     _ -> typeError "numeric cast - not a hex string" hex
 intBuiltin args = typeError "numeric cast - invalid args" args
 
-callBuiltin :: String -> [Value] -> Maybe Value -> SM Value
+callBuiltin :: MonadSM m => String -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s
 callBuiltin "string" vs _ = typeError "string cast" vs
 callBuiltin "address" [SInteger a] _ = return . SAddress $ fromIntegral a
@@ -1122,6 +1128,7 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
     [] -> require cond Nothing
     (m:_) -> require cond (Just $ show m)
   return SNULL
+callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 
@@ -1165,7 +1172,7 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> SM ()
+runTheConstructors :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
@@ -1252,19 +1259,31 @@ runTheConstructors from to hsh cc contractName' argExps = do
   return ()
 
 -- Note: this is intentionally nonstrict in `theType`
-addLocalVariable :: Xabi.Type -> String -> Value -> SM ()
+addLocalVariable :: MonadSM m => Xabi.Type -> String -> Value -> m ()
 addLocalVariable theType name value = do
 --  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack name) value
   newVariable <- liftIO $ fmap Variable $ newIORef value
-  sstate <- get
-  case callStack sstate of
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
     [] -> internalError "addLocalVariable called with an empty stack" (name, value)
     (currentSlice:rest) ->
-      put sstate
-          {callStack = currentSlice{localVariables=M.insert name (theType, newVariable) $ localVariables currentSlice}:rest}
+      Mod.put (Mod.Proxy @[CallInfo]) $
+        currentSlice
+          { localVariables = M.insert name (theType, newVariable) $
+              localVariables currentSlice
+          }
+        : rest
 
 
-runTheCall :: Address -> Contract -> String -> SHA -> CodeCollection -> Xabi.Func -> ValList -> SM (Maybe Value)
+runTheCall :: MonadSM m
+           => Address
+           -> Contract
+           -> String
+           -> SHA
+           -> CodeCollection
+           -> Xabi.Func
+           -> ValList
+           -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals = do
   let returns = [(T.unpack n, (t, defaultValue contract' t)) | (Just n, Xabi.IndexedType _ t) <- Xabi.funcVals theFunction]
       args = case argVals of
@@ -1328,18 +1347,18 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
 
 
 
-logAssigningVariable :: Value -> SM ()
+logAssigningVariable :: MonadSM m => Value -> m ()
 logAssigningVariable v = do
   valueString <- showSM v
   onTraced $ liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
 
-logVals :: (Show a, Show b) => a -> b -> SM ()
+logVals :: (Show a, Show b, MonadIO m) => a -> b -> m ()
 logVals val1 val2 = onTraced . liftIO $ printf
   "            %%%% val1 = %s\n\
   \            %%%% val2 = %s\n" (show val1) (show val2)
 
 --TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
-encodeForReturn :: Value -> SM ByteString
+encodeForReturn :: MonadSM m => Value -> m ByteString
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
 encodeForReturn (SEnumVal _ _ v) = return . word256ToBytes . fromIntegral $ v
 encodeForReturn (SAddress a) = return . word256ToBytes . fromIntegral $ a

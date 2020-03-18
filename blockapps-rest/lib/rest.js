@@ -187,6 +187,10 @@ async function getState(user, contract, options) {
   return api.getState(user, contract, options);
 }
 
+async function getBatchStates(user, contracts, options) {
+  return api.getBatchStates(user, contracts, options);
+}
+
 async function getArray(user, contract, name, options) {
   const MAX_SEGMENT_SIZE = 100;
   options.stateQuery = { name, length: true };
@@ -278,12 +282,7 @@ async function sendMany(user, sendTxs, options) {
   const pendingTxResults = await api.sendTransactions(
     user,
     {
-      txs: sendTxs.map(tx => {
-        return {
-          payload: tx,
-          type: "TRANSFER"
-        };
-      })
+        txs: sendTxs.map(tx => api.getSendArgs(tx, options)),
     },
     options
   );
@@ -321,6 +320,27 @@ async function searchUntil(user, contract, predicate, options) {
   return results;
 }
 
+async function searchWithContentRange(user, contract, options) {
+  try {
+    const results = await api.searchWithContentRange(user, contract, options);
+    return results;
+  } catch (err) {
+    if (err.response && err.response.status === RestStatus.NOT_FOUND) {
+      return {};
+    }
+    throw err;
+  }
+}
+
+async function searchWithContentRangeUntil(user, contract, predicate, options) {
+  const action = async o => {
+    return searchWithContentRange(user, contract, o);
+  };
+
+  const results = await util.until(predicate, action, options);
+  return results;
+}
+
 // =====================================================================
 //   Chains
 // =====================================================================
@@ -343,6 +363,58 @@ async function createChain(user, chain, contract, options) {
       metadata: constructMetadata(options, contract.name)
     },
     setAuthHeaders(user, options)
+  );
+  return result;
+}
+
+async function createChains(user, chains, options) {
+  const result = await api.createChains(chains, setAuthHeaders(user, options));
+  return result;
+}
+
+// =====================================================================
+//   External Storage
+// =====================================================================
+
+async function uploadExtStorage(user, args, options) {
+  const result = await api.uploadExtStorage(
+    args,
+    setAuthHeaders(user, options)
+  );
+  return result;
+}
+
+async function attestExtStorage(user, args, options) {
+  const result = await api.attestExtStorage(
+    args,
+    setAuthHeaders(user, options)
+  );
+  return result;
+}
+
+async function verifyExtStorage(user, contract, options) {
+  const result = await api.verifyExtStorage(
+    user,
+    contract,
+    options
+  );
+  return result;
+}
+
+async function downloadExtStorage(user, contract, options) {
+  const result = await api.downloadExtStorage(
+    user,
+    contract,
+    options
+  );
+  return result;
+}
+
+async function listExtStorage(user, args, options) {
+  const result = await api.listExtStorage(
+    user,
+    args,
+    options
   );
   return result;
 }
@@ -390,6 +462,7 @@ export default {
   createContract,
   createContractList,
   getState,
+  getBatchStates,
   getArray,
   call,
   callList,
@@ -406,10 +479,19 @@ export default {
   //
   search,
   searchUntil,
+  searchWithContentRange,
+  searchWithContentRangeUntil,
   //
   createChain,
+  createChains,
   getChain,
   getChains,
+  //
+  uploadExtStorage,
+  attestExtStorage,
+  verifyExtStorage,
+  downloadExtStorage,
+  listExtStorage,
   //
   pingOauth,
   //

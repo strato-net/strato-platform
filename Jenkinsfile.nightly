@@ -22,11 +22,13 @@ pipeline {
 
     stage('Build') {
       steps {
-        sh '''#!/bin/bash -le
-          set -x
-          cd strato-worktree
-          REPO=private make all
-        '''
+        dir ('strato-worktree') {
+          sh 'REPO=private make all'
+          dir ('blockapps-rest') {
+            sh 'yarn'
+            sh 'yarn build'
+          }
+        }
       }
     }
 
@@ -125,8 +127,9 @@ pipeline {
                 cd track-and-trace
                 git checkout oauth42style
                 git submodule update --init --recursive
-                sed -i "s/localhost:8080/localhost/g" server/config/localhost.config.yaml
                 cd server
+                sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
+                # oauth42style uses the old hardcoded ba-rest version
                 touch .env
                 yarn build
                 yarn install
@@ -283,8 +286,11 @@ pipeline {
                 git clone https://github.com/blockapps/track-and-trace.git
                 cd track-and-trace
                 git submodule update --init --recursive
-                sed -i "s/localhost:8080/localhost/g" server/config/localhost.config.yaml
                 cd server
+                sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
+                # symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
+                cp -r ../../strato-worktree/blockapps-rest blockapps-rest
+                sed -i 's|.*blockapps-rest.*|"blockapps-rest": "file:./blockapps-rest",|' package.json
                 touch .env
                 yarn build
                 yarn install

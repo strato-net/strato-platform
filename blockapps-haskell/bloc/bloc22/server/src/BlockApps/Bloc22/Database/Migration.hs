@@ -69,6 +69,7 @@ migrations = [ ("Create tables"               , MigrationQuery (Throw, createTab
              , ("Migrate Xabi"                , MigrationAction migrateXabi)
              , ("Drop Xabi Tables"            , MigrationQuery (Throw, dropXabiTables))
              , ("Migrate code hash to CodePtr", MigrationAction migrateCodeHashToCodePtr)
+             , ("Alter hash name data column" , MigrationQuery (Throw, alterDataColumn))
              ]
 
 getSchemaVersion :: Query
@@ -149,3 +150,6 @@ migrateCodeHashToCodePtr = do
         , show codePtrBS
         ]
       void . blocModify $ \conn -> execute conn xabiQuery (i, codePtrBS)
+
+alterDataColumn :: Query
+alterDataColumn = [sql| ALTER TABLE IF EXISTS hash_name ALTER COLUMN data_string TYPE text; |]

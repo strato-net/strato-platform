@@ -19,14 +19,14 @@ local function isEmpty(s)
 end
 
 -- Which property of access token payload to use as STRATO account name
-local username_property = "<OAUTH_JWT_USERNAME_PROPERTY>"
+local username_property = "<OAUTH_JWT_USERNAME_PROPERTY_PLACEHOLDER>"
 
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
 local unique_name = ''
 
 local verify_opts = {
-  discovery = "<OAUTH_DISCOVERY_URL>",
+  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   accept_none_alg = false,
   accept_unsupported_alg = false
@@ -34,10 +34,10 @@ local verify_opts = {
 
 local authenticate_opts = {
   redirect_uri = "/auth/openidc/return",
-  discovery = "<OAUTH_DISCOVERY_URL>",
+  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
   client_id = "<CLIENT_ID_PLACEHOLDER>",
   client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
-  scope = "openid email",
+  scope = "<OAUTH_SCOPE_PLACEHOLDER>",
   token_endpoint_auth_method = "client_secret_post",
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
@@ -106,7 +106,17 @@ else
   if not isEmpty(authenticate_res.id_token[username_property]) then
     unique_name = authenticate_res.id_token[username_property]
   else
-    unique_name = authenticate_res.id_token.appid
+    if not isEmpty(authenticate_res.id_token.appid) then
+      unique_name = authenticate_res.id_token.appid
+    else
+      -- None of the two expected properties found in id_token
+      ngx.status = 500
+      ngx.header['Set-Cookie'] = 'strato_user_name=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      user_err_msg = 'Could not authenticate the request. STRATO nginx is likely misconfigured.'
+      ngx.log(ngx.STDERR, user_err_msg .. ' Error details: Failed to find claims \''..username_property..'\' and \'appid\' in payload of id_token obtained with openidc.authenticate(). Possible reason: OAUTH_SCOPE does not have the required scope for \''..username_property..'\' claim (current scope value: \''..authenticate_opts.scope..'\')')
+      ngx.say(user_err_msg..' Please contact STRATO node administrator.')
+      ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+    end
   end
 
   -- set the username cookie on client

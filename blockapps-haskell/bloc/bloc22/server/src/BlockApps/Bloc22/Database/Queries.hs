@@ -335,7 +335,7 @@ getContractsAddressesQuery :: Maybe ChainId -> Query
   , Column PGBytea
   )
 getContractsAddressesQuery chainId = proc () -> do
-  (_,name,_,addr,timestamp,_,_,_,_,cid,_) <- contractsJoinTable -< ()
+  (_,name,_,addr,timestamp,_,_,_,_,cid,_) <- limit 100 $ contractsJoinTable -< ()
   restrict -< cid .== constant chainId
   returnA -< (name,addr,timestamp,cid)
 
@@ -363,7 +363,7 @@ getContractsNamesAsAddressesQuery :: Maybe ChainId -> Query
   , Column PGBytea
   )
 getContractsNamesAsAddressesQuery chainId = proc () -> do
-  (n1,n2,ts,cid) <- joinF
+  (n1,n2,ts,cid) <- limit 100 $ joinF
     (\ (_,_,_,timestamp,cid) (_,_,_,_,name,name2,_,_,_) -> (name,name2,timestamp,cid))
     (\ (_,contractmetadataId,_,_,_) (_,_,_,_,_,_,_,cm2Id,_) -> contractmetadataId .== cm2Id)
     (queryTable contractsInstanceTable)

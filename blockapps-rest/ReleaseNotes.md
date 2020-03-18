@@ -1,5 +1,47 @@
 ## RELEASE NOTES
 
+### Version 7.6.3
+
+- Fix for util.uid() to always return string value for compatibility with STRATO 5.2+
+
+### Version 7.6.2
+
+- Expose searchWithContentRange and searchWithContentRangeUntil
+
+### Version 7.6.1
+
+- Fix distributive
+
+### Version 7.6.0
+
+-   Token-getter updates: no separate config needed - fully mimics the app by following it's config
+-   Fix for @babel/polyfill dependency
+
+### Version 7.5.8
+
+-   Pass chainid parameter through getCallArgs and getCreateArgs
+
+### Version 7.5.7
+
+-   Hotfix for regeneratorRuntime error in oauth.util.js
+
+### Version 7.5.6
+
+-   Add batch contract state and chain creation functions, as well as expose get{Send,Create,Call}Args functions for generating transaction payloads
+-   Add external storage endpoints
+
+### Version 7.5.5
+    
+-   Better debug logs formatting
+
+### Version 7.5.4
+
+-   Generate source maps in build
+
+### Version 7.5.3
+
+-   Bug fix for chain ID helper for Cirrus queries in api.util.js
+
 ### Version 7.5.2
 
 -   Bug fix for history metadata helper in api.util.js

@@ -10,9 +10,11 @@ module Blockchain.VM.SolidException
   , missingType
   , parseError
   , require
+  , assert
   , unknownFunction
   , unknownConstant
   , unknownVariable
+  , unknownStatement
   ) where
 
 import Control.DeepSeq
@@ -31,9 +33,11 @@ data SolidException = TypeError String String
                     | ArityMismatch String Int Int
                     | ParseError String String
                     | Require (Maybe String)
+                    | Assert
                     | UnknownFunction String String
                     | UnknownConstant String String
                     | UnknownVariable String String
+                    | UnknownStatement String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -45,11 +49,13 @@ instance Show SolidException where
   show (ParseError m v) = printf "parse error: %s: %s" m v
   show (Require Nothing) = printf "solidity require failed"
   show (Require (Just m)) = printf "solidity require failed: %s" m
+  show Assert = printf "solidity assert failed"
   show (TODO m v) = printf "TODO: %s: %s" m v
   show (TypeError a b) = printf "type error: %s: %s" a b
   show (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
   show (UnknownFunction a b) = printf "unknown function: %s: %s" a b
   show (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
+  show (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -84,6 +90,9 @@ parseError = toThrower ParseError
 require :: MonadIO m => Bool -> Maybe String -> m ()
 require c = unless c . liftIO . throwIO . Require
 
+assert :: MonadIO m => Bool -> m ()
+assert c = unless c . liftIO $ throwIO Assert
+
 unknownFunction :: (Show v) => String -> v -> a
 unknownFunction = toThrower UnknownFunction
 
@@ -92,3 +101,6 @@ unknownConstant = toThrower UnknownConstant
 
 unknownVariable :: (Show v) => String -> v -> a
 unknownVariable = toThrower UnknownVariable
+
+unknownStatement :: (Show v) => String -> v -> a
+unknownStatement = toThrower UnknownStatement

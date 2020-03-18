@@ -89,6 +89,7 @@ addInheritedObjects cc c =
   _storageDefs=toUnionMaker _storageDefs cc c,
   _enums=toUnionMaker _enums cc c,
   _structs=toUnionMaker _structs cc c,
+  _events = toUnionMaker _events cc c,
   _constants=toUnionMaker _constants cc c
   }
 
