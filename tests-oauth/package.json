@@ -7,7 +7,7 @@
   },
   "scripts": {
     "mocha-babel": "node_modules/.bin/mocha --require @babel/register",
-    "test:load:beanstalk": "yarn mocha-babel load/stratoLoadBeanstalk.test.js"
+    "test:load:beanstalk": "yarn mocha-babel load/stratoLoadBeanstalk.test.js --batchCount 20 --batchSize 20"
   },
   "dependencies": {
     "blockapps-rest": "^7.6.3",
