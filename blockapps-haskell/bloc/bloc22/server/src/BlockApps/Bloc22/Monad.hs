@@ -182,7 +182,7 @@ enterBloc env x
           VaultWrapperError (FailureResponse Response{..}) | responseStatusCode == status503 ->
             err503{errBody = responseBody}
                                                            | statusIsClientError responseStatusCode ->
-            err400{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
+            err400{errBody = responseBody } 
           VaultWrapperError (ConnectionError _) ->
             err500{errBody = JSON.encode $ unlines
                    [
