@@ -2,7 +2,8 @@
 
 ### Version 7.6.4
 
-- add babel-preset-minify, remove gulp-uglify
+- Add source mappings for minified dist code
+- Add babel-preset-minify, remove gulp-uglify
 
 ### Version 7.6.3
 
