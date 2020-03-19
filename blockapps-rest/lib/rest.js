@@ -85,6 +85,14 @@ async function fill(user, options) {
 }
 
 // =====================================================================
+//   compile contracts
+// =====================================================================
+
+async function compileContracts(user, contract, options) {
+  return await api.compileContracts(user, contract, options);
+}
+
+// =====================================================================
 //   contract
 // =====================================================================
 
@@ -121,7 +129,8 @@ async function createContractList(user, contract, options) {
     contract,
     options
   );
-  return createContractListResolve(pendingTxResult, options);
+  const temp = createContractListResolve(pendingTxResult, options);
+  return temp;
 }
 
 async function createContractListResolve(pendingTxResultList, options) {
@@ -459,6 +468,7 @@ export default {
   getUsers,
   getUser,
   createUser,
+  compileContracts,
   createContract,
   createContractList,
   getState,
