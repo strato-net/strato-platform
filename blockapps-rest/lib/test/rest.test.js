@@ -15,7 +15,7 @@ if (!process.env.USER_TOKEN) {
 const config = factory.getTestConfig();
 const fixtures = factory.getTestFixtures();
 
-describe("rest_7", function() {
+describe("rest_7", function () {
   this.timeout(config.timeout);
   let admin;
   const options = { config };
@@ -25,14 +25,14 @@ describe("rest_7", function() {
     admin = await factory.createAdmin(userArgs, options);
   });
 
-  describe("oauthPing", function() {
+  describe("oauthPing", function () {
     it("ping - oauth authorized", async () => {
       const result = await rest.pingOauth(admin, options)
       assert.equal(result, "success")
     });
   });
 
-  describe("contract call", function() {
+  describe("contract call", function () {
     this.timeout(config.timeout);
     let contract;
     const var1 = 2;
@@ -146,9 +146,31 @@ describe("rest_7", function() {
       );
     });
 
+    it("compile contract - single contract", async () => {
+      const count = 1;
+      const contracts = factory.createCompileContractsArgs(count);
+      const results = await rest.compileContracts(admin, contracts, { config });
+      assert.isArray(results, "should be array");
+      assert.equal(results.length, contracts.length, `should be ${count}`);
+      results.forEach((contract, index) => {
+        assert.equal(contract.contractName, contracts[index]['contractName'])
+      })
+    });
+
+    it("compile contract - multiple contracts", async () => {
+      const count = 4;
+      const contracts = factory.createCompileContractsArgs(count);
+      const results = await rest.compileContracts(admin, contracts, { config });
+      assert.isArray(results, "should be array");
+      assert.equal(results.length, contracts.length, `should be ${count}`);
+      results.forEach((contract, index) => {
+        assert.equal(contract.contractName, contracts[index]['contractName'])
+      })
+    });
+
     // Skipped because of platform issue. https://blockapps.atlassian.net/browse/STRATO-1331
     it.skip("create contract list - async - SKIPPED - STRATO-1331", async () => {
-      const count = 5;
+      const count = 2;
       const contracts = factory.createContractListArgs(count);
       const pendingResults = await rest.createContractList(admin, contracts, {
         config,
@@ -221,7 +243,7 @@ describe("rest_7", function() {
     });
   });
 
-  describe("send", function() {
+  describe("send", function () {
     this.timeout(config.timeout);
     let user2;
 
@@ -307,7 +329,7 @@ function stringValue(uid, index) {
   return `_${intValue(uid, index)}_`;
 }
 
-describe("search until", function() {
+describe("search until", function () {
   this.timeout(config.timeout);
   const options = { config };
   let admin, contract;
@@ -345,7 +367,7 @@ describe("search until", function() {
 
   it("searchUntil - timeout error", async () => {
     // predicate is created: to wait until response is available otherwise throws the error
-    function predicate() {}
+    function predicate() { }
 
     try {
       await rest.searchUntil(admin, contract, predicate, options);
@@ -377,7 +399,7 @@ describe("search until", function() {
   });
 });
 
-describe("search query", function() {
+describe("search query", function () {
   this.timeout(config.timeout);
   const options = { config };
   const count = 4;
@@ -615,7 +637,7 @@ describe("search query", function() {
   });
 });
 
-describe("chain", function() {
+describe("chain", function () {
   this.timeout(config.timeout);
   let admin, chainId, chainArgs;
   const options = { config };
