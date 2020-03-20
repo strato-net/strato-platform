@@ -2,9 +2,12 @@
 
 ### Version 7.6.4
 
+- Add source mappings for minified dist code
+- Add babel-preset-minify, remove gulp-uglify
+
 #### Minor upgrades
 
--   Added Bloc /compile endpoint
+- Added Bloc /compile endpoint
 
 ### Version 7.6.3
 
