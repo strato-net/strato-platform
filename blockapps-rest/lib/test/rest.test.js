@@ -182,7 +182,7 @@ describe("rest_7", function () {
 
     // Skipped because of platform issue. https://blockapps.atlassian.net/browse/STRATO-1331
     it.skip("create contract list - async - SKIPPED - STRATO-1331", async () => {
-      const count = 2;
+      const count = 5;
       const contracts = factory.createContractListArgs(count);
       const pendingResults = await rest.createContractList(admin, contracts, {
         config,
