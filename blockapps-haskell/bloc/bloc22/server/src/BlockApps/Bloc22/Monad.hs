@@ -152,16 +152,19 @@ enterBloc env x
     reThrowError :: BlocError -> ServantErr
     reThrowError
       = \case
-          StratoError (FailureResponse (Response Status{statusCode=404} _ _ _)) ->
-            err404{errBody = JSON.encode $ unlines
+          StratoError (FailureResponse Response{..}) 
+            | responseStatusCode == status404 ->
+                err404{errBody = JSON.encode $ unlines
                    [
                      "Strato Error!",
                      "Bloc seems to be improperly configured: Strato page is missing.",
                      "Please contact your network administrator to have this problem fixed.",
-                     "(More information can be found in the Bloc logs.)"
+                     "(More information can be found in the Bloc logs.)",
+                     "Error Message:",
+                     compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody
                    ]}
-          StratoError (FailureResponse Response{..}) | statusIsClientError responseStatusCode ->
-            err400{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
+            | statusIsClientError responseStatusCode ->
+                err400{errBody= JSON.encode $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           StratoError (ConnectionError _) ->
             err500{errBody = JSON.encode $ unlines
                    [
