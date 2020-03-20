@@ -31,7 +31,7 @@ import           Strato.Strato23.API.Types
 postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
 postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   case mUserName of
-    Nothing -> error "Did not find X-USER-UNIQUE-NAME in the header"
+    Nothing -> throwError $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
     Just userName -> do
       addr <- case mAddr of
         Nothing -> fmap unStatusAndAddress . blocVaultWrapper $ getKey userName Nothing

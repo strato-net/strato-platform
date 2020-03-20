@@ -763,7 +763,7 @@ evalAndReturn list = forStateT emptyBatchState list $
             0 -> return $ BlocTransactionResult Success hash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata)
             1 -> contractResult hash mtxr cmId tdata
             2 -> functionResult hash mtxr cmId tdata
-            _ -> error $ "Unexpected transaction type: got" ++ show ttype
+            _ -> throwError $ InternalError $ Text.pack $ "Unexpected transaction type: got" ++ show ttype
 
 contractResult :: Keccak256
                -> Maybe TransactionResult
