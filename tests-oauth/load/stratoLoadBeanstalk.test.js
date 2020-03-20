@@ -1,32 +1,37 @@
 import '../loadEnv';
 import config from '../loadConfig';
 import { rest, importer, util } from 'blockapps-rest';
-const { createUser, createContractList } = rest;
+const { createUser, createContractList, compileContracts } = rest;
 
-const user1Credentials = { token: process.env.USER1 };
+const userArgs = { token: process.env.USER_TOKEN };
 let txs = [], txResults = [];
 
 describe('Strato Load Test (beanstalk)', function () {
   this.timeout(config.timeout);
 
   const options = { config };
-  let user1;
+  let user;
 
   const batchSize = util.getArgInt('--batchSize', 1);
   const batchCount = util.getArgInt('--batchCount', 1);
 
   before(async () => {
     console.log('creating user')
-    user1 = await createUser(user1Credentials, options);
+    user = await createUser(userArgs, options);
   })
 
   it('Upload contracts', async () => {
-    for (let i = 0; i < batchCount; i++) {
-      console.log(`Creating ${batchSize} transactions for count ${i}`);
-      await factory_createContractArgs(batchSize, i);
-      const contract = await createContract(user1, txs.slice(1), { isAsync: true, ...options })
-      console.log(`Received receipts`, contract);
-    }
+    await factory_createContractArgs(2, 1);
+    console.log("---------------------------------", txs)
+    const compile = await compileContracts(user, txs, options)
+    const contract = await createContractList(user, txs, { isAsync: true, ...options })
+    // for (let i = 0; i < batchCount; i++) {
+    //   console.log(`Creating ${batchSize} transactions for count ${i}`);
+    //   await factory_createContractArgs(batchSize, i);
+    //   const compile = await compileContracts(user, txs.slice(1), options)
+    //   const contract = await createContractList(user, txs.slice(1), { isAsync: true, ...options })
+    //   console.log(`Received receipts`, contract);
+    // }
 
   });
 
