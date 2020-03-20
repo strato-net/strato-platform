@@ -89,7 +89,15 @@ async function fill(user, options) {
 // =====================================================================
 
 async function compileContracts(user, contract, options) {
-  return await api.compileContracts(user, contract, options);
+  try {
+    return await api.compileContracts(user, contract, options);
+  } catch (err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText,
+      err.response.data
+    );
+  }
 }
 
 // =====================================================================
@@ -129,8 +137,7 @@ async function createContractList(user, contract, options) {
     contract,
     options
   );
-  const temp = createContractListResolve(pendingTxResult, options);
-  return temp;
+  return createContractListResolve(pendingTxResult, options);
 }
 
 async function createContractListResolve(pendingTxResultList, options) {
