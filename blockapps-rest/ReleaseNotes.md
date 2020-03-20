@@ -8,6 +8,7 @@
 #### Minor upgrades
 
 - Added Bloc /compile endpoint
+- Bug fix for createContractList
 
 ### Version 7.6.3
 
