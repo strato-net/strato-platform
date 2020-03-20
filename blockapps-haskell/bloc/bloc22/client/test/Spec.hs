@@ -96,6 +96,7 @@ setup = do
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
+      , uploadlistcontractSrc = Nothing
       , uploadlistcontractArgs = Map.empty
       , _uploadlistcontractTxParams = testTxParams testConfig
       , uploadlistcontractValue = Nothing
@@ -105,6 +106,7 @@ setup = do
     uploadListRequest = UploadListRequest
       { uploadlistPassword = pw testConfig
       , uploadlistContracts = [uploadListContract1]
+      , uploadlistSrcs = Nothing
       , uploadlistResolve = True
       }
     clients = do
