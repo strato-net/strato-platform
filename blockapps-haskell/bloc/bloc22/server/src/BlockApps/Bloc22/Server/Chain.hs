@@ -11,7 +11,7 @@
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Applicative               (liftA2)
-import           Control.Monad.Except
+import           Control.Monad                     (when)
 import           Crypto.Random.Entropy
 import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
@@ -39,6 +39,8 @@ import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
+import           UnliftIO
+
 governanceAddress :: Address
 governanceAddress = Address 0x100
 
@@ -62,8 +64,8 @@ createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
 createChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = do
   let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
 
-  when (null members) $ throwError $ UserError "Private chains must include at least one member"
-  when (sum (nmap2' balances) == 0) $ throwError $ UserError "At least one account must have a non-zero balance"
+  when (null members) $ throwIO $ UserError "Private chains must include at least one member"
+  when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
   let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
   idsAndDetails <- if (Text.null src)
                      then return Map.empty
@@ -72,18 +74,18 @@ createChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) =
             [] -> return Nothing
             [(_, x)] -> return $ Just x
             _ -> case cname of
-                   Nothing -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
+                   Nothing -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
                    Just name -> fmap Just $ blocMaybe "Could not find contract name in compilation details"
                                       $ Map.lookup name idsAndDetails
   (cAcctInfo, codeInfo) <- case mContract of
       Nothing -> return ([],[])
       Just (_, ContractDetails{..}) -> do
-          contract <- either (throwError . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
+          contract <- either (throwIO . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
           let argValues = replaceMembers
                             (mainStruct contract)
                             (nmap1' members)
                             chaininputArgs
-          storage <- either (throwError . UserError) return $ encodeValues
+          storage <- either (throwIO . UserError) return $ encodeValues
                        (typeDefs contract)
                        (mainStruct contract)
                        0
@@ -96,7 +98,7 @@ createChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) =
               "EVM" -> return (contractdetailsCodeHash, contractdetailsBinRuntime, src)
               "SolidVM" -> do
                 return (contractdetailsCodeHash, "", src)
-              _ -> throwError . UserError . Text.pack $ "Unknown VM: " ++ show theVM
+              _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               codeInfo' = CodeInfo b s contractdetailsName

@@ -9,7 +9,6 @@ module BlockApps.Bloc22.Server.Transaction where
 
 import           Control.Applicative               ((<|>), liftA2)
 import           Control.Monad
-import           Control.Monad.Except
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Text                         (Text)
@@ -28,6 +27,8 @@ import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 
+import           UnliftIO
+
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
 mergeTxParams (Just inner) (Just outer) = Just $
   TxParams (txparamsGasLimit inner <|> txparamsGasLimit outer)
@@ -38,7 +39,7 @@ mergeTxParams inner outer = inner <|> outer
 postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
 postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   case mUserName of
-    Nothing -> throwError $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+    Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
     Just userName -> do
       addr <- case mAddr of
         Nothing -> fmap unStatusAndAddress . blocVaultWrapper $ getKey userName Nothing
@@ -85,7 +86,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                             Nothing -> postUsersContractEVM'
                             Just "EVM" -> postUsersContractEVM'
                             Just "SolidVM" -> postUsersContractSolidVM'
-                            Just vm -> \_ _ -> throwError $ UserError $ Text.pack
+                            Just vm -> \_ _ -> throwIO $ UserError $ Text.pack
                                              $ "Invalid value for VM choice: " ++ show vm
             fmap (:[]) $ poster bcp (callSignature userName)
           xs -> do
@@ -105,7 +106,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                   Nothing -> postUsersUploadListEVM'
                   Just "EVM" -> postUsersUploadListEVM'
                   Just "SolidVM" -> postUsersUploadListSolidVM'
-                  Just vm -> \_ _ -> throwError $ UserError $ Text.pack
+                  Just vm -> \_ _ -> throwIO $ UserError $ Text.pack
                                    $ "Invalid value for VM choice: " ++ show vm
             poster bclp (callSignature userName)
         FUNCTION -> case txs of
@@ -135,13 +136,13 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
             postUsersContractMethodList' bflp (callSignature userName)
   where fromTransfer = \case
           BlocTransfer t -> return t
-          _ -> throwError $ UserError "Could not decode transfer arguments from body"
+          _ -> throwIO $ UserError "Could not decode transfer arguments from body"
         fromContract = \case
           BlocContract c -> return c
-          _ -> throwError $ UserError "Could not decode contract arguments from body"
+          _ -> throwIO $ UserError "Could not decode contract arguments from body"
         fromFunction = \case
           BlocFunction f -> return f
-          _ -> throwError $ UserError "Could not decode function arguments from body"
+          _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 callSignature :: Text -> UnsignedTransaction -> Bloc Transaction
 callSignature userName unsigned@UnsignedTransaction{..} = do

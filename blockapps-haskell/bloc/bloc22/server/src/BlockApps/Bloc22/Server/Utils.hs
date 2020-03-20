@@ -19,7 +19,6 @@ module BlockApps.Bloc22.Server.Utils
 
 import           Control.Concurrent               (threadDelay)
 import           Control.Monad                    (forM, unless, when)
-import           Control.Monad.Except             (throwError)
 import           Control.Monad.IO.Class           (liftIO)
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.Map.Strict                  as M
@@ -33,6 +32,8 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Ethereum         hiding (Transaction (..))
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
+
+import           UnliftIO
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
@@ -90,7 +91,7 @@ waitFor :: Text.Text -> Bloc Bool -> Bloc ()
 waitFor msg action = go 20
   where go :: Int -> Bloc ()
         go ms = do
-          when (ms > 30000) . throwError $ CouldNotFind msg
+          when (ms > 30000) . throwIO $ CouldNotFind msg
           b <- action
           unless b $ do
             liftIO . threadDelay $ ms * 1000
