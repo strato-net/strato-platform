@@ -123,6 +123,7 @@ data BlocError
   | AlreadyExists Text
   | RuntimeError SomeException
   | UnavailableError Text
+  | InternalError Text
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -152,9 +153,9 @@ enterBloc env x
     reThrowError
       = \case
           StratoError (FailureResponse (Response Status{statusCode=404} _ _ _)) ->
-            err500{errBody = JSON.encode $ unlines
+            err404{errBody = JSON.encode $ unlines
                    [
-                     "Error!",
+                     "Strato Error!",
                      "Bloc seems to be improperly configured: Strato page is missing.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
@@ -164,7 +165,7 @@ enterBloc env x
           StratoError (ConnectionError _) ->
             err500{errBody = JSON.encode $ unlines
                    [
-                     "Error!",
+                     "Strato Error!",
                      "Bloc can not connect to Strato.",
                      "This probably is a configuration error, but can also mean the Strato peer is down.",
                      "Please contact your network administrator to have this problem fixed.",
@@ -173,7 +174,7 @@ enterBloc env x
           StratoError _ ->
             err500{errBody = JSON.encode $ unlines
                    [
-                     "Error!",
+                     "Strato Error!",
                      "Bloc recieved a malformed response from Strato.",
                      "This is probably a backend configuration problem.",
                      "Please contact your network administrator to have this problem fixed.",
@@ -186,8 +187,8 @@ enterBloc env x
           VaultWrapperError (ConnectionError _) ->
             err500{errBody = JSON.encode $ unlines
                    [
-                     "Error!",
-                     "Bloc can not connect to Strato.",
+                     "Connection Error!",
+                     "Bloc can not connect to the Vault Wrapper.",
                      "This probably is a configuration error, but can also mean the Strato peer is down.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
@@ -195,8 +196,8 @@ enterBloc env x
           VaultWrapperError _ ->
             err500{errBody = JSON.encode $ unlines
                    [
-                     "Error!",
-                     "Bloc recieved a malformed response from Strato.",
+                     "Vault-Wrapper Error!",
+                     "Bloc recieved a malformed response from Vault-Wrapper.",
                      "This is probably a backend configuration problem.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
@@ -204,7 +205,7 @@ enterBloc env x
           DBError _ ->
             err500{errBody = JSON.encode $ unlines
                    [
-                     "Internal Error!",
+                     "Database Error!",
                      "Something is broken in the Bloc Server database.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
@@ -225,16 +226,23 @@ enterBloc env x
           Unimplemented err ->
             err501{errBody = JSON.encode $ unlines
                    [
-                     "Internal Error!",
+                     "Unimplemented Error",
                      "You are using a feature of the Bloc Server that has not yet been implemented.",
                      Text.unpack err
                    ]}
           RuntimeError _ -> err500{errBody = JSON.encode $ unlines
                    [
-                     "Internal Error!",
+                     "Runtime Error!",
                      "Something wrong has happened inside of bloc.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
+                   ]}
+          InternalError err -> err500{errBody = JSON.encode $ unlines
+                   [ "Internal Error!",
+                     "Bloc couldn't process that request.",
+                     "Please contact your network administrator.",
+                     "Error Message:",
+                     Text.unpack err
                    ]}
 
 
@@ -242,10 +250,9 @@ enterBloc env x
 compensateForTheOddStratoApiFormattingAndPullOutTheMessage::Lazy.Char8.ByteString->String
 compensateForTheOddStratoApiFormattingAndPullOutTheMessage x | "Invalid Arguments" `Lazy.Char8.isPrefixOf` x =
    case JSON.decode $ Lazy.Char8.drop 18 x of
-     Nothing -> error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
-     Just o -> fromMaybe errMsg (HashMap.lookup ("error" :: Text) o)
-                  where errMsg = error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
-compensateForTheOddStratoApiFormattingAndPullOutTheMessage x = error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
+     Nothing -> show x
+     Just o -> fromMaybe (show x) (HashMap.lookup ("error" :: Text) o)
+compensateForTheOddStratoApiFormattingAndPullOutTheMessage x = show x
 
 
 formatTopLocation::[(String, SrcLoc)]->String
