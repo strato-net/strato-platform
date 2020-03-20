@@ -1,5 +1,11 @@
 ## RELEASE NOTES
 
+### Version 7.6.4
+
+#### Minor upgrades
+
+-   Added Bloc /compile endpoint
+
 ### Version 7.6.3
 
 - Fix for util.uid() to always return string value for compatibility with STRATO 5.2+
