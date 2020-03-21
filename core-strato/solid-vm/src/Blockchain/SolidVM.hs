@@ -838,7 +838,10 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
       val <- getVar var
       case (val, theIndex) of
         (SArray _ theVector, SInteger i) -> do
-          return $ theVector V.! fromIntegral i
+          if (fromIntegral i) >= length theVector then
+            indexOutOfBounds (unparseExpression x) (", array length is " ++ (show i))
+          else
+            return $ theVector V.! fromIntegral i
         (SReference _, _) -> Constant . SReference <$> expToPath x
         _ -> typeError "expToVar' called for IndexAccess with unsupported types: " ("\nval = " ++ show val ++ "\ntheIndex = " ++ show theIndex)
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
