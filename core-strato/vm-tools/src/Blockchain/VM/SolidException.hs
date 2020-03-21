@@ -53,7 +53,7 @@ instance Show SolidException where
   show (Require Nothing) = printf "solidity require failed"
   show (Require (Just m)) = printf "solidity require failed: %s" m
   show Assert = printf "solidity assert failed"
-  show (TODO m v) = printf "TODO: %s: %s" m v
+  show (TODO m v) = printf "Unimplemented solidity construct in SolidVM: %s: %s" m v
   show (TypeError a b) = printf "type error: %s: %s" a b
   show (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
   show (UnknownFunction a b) = printf "unknown function: %s: %s" a b

@@ -139,15 +139,18 @@ setVal (STuple dstVector) (STuple srcVector) =
       srcItemVal <- getVar srcItemVar
       setVar dstItem srcItemVal
     
-
-
-
 setVal (SReference (AddressedPath addr path)) src = do
   markDiffForAction addr path $ toBasic src
   putSolidStorageKeyVal' addr path $ toBasic src
-setVal dst src = error $ "unknown case called in setVal:\nsrc = " ++ show src ++ "\ndst = " ++ show dst
 
 
+
+
+setVal dst src = typeError "unknown case called in setVal:" ("\nsrc = " ++ show src ++ "\ndst = " ++ show dst)
+
+
+  
+  
 {-
 
 
