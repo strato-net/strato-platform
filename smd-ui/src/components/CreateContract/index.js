@@ -84,7 +84,7 @@ class CreateContract extends Component {
       self.props.compileContract(
         contract.name.substring(0, contract.name.indexOf('.')),
         fileContents,
-        self.props.searchable
+        self.props.solidvm
       );
     };
     reader.readAsText(contract);
@@ -96,18 +96,6 @@ class CreateContract extends Component {
     const contractSource = files[0];
     if (!contractSource.name.includes('.sol'))
       return 'It should be an .sol extention file';
-  };
-
-  handleContractSearchabilityChange = (e) => {
-    const contractName = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName
-    const source = this.props.textFromEditor ? this.props.textFromEditor : this.props.contract
-    if (source.length) {
-      this.props.compileContract(
-        contractName,
-        source,
-        e.target.checked
-      );
-    }
   };
 
   submit = (values) => {
@@ -125,7 +113,7 @@ class CreateContract extends Component {
     const fileText = this.props.textFromEditor ? this.props.textFromEditor : this.props.contract
 
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-    const metadata = {};
+    const metadata = { VM: this.props.solidvm ? 'SolidVM' : 'EVM' };
     contracts.forEach(function (contract) {
       if (values[`history@${contract}`]) {
         if (metadata['history']) {
@@ -170,7 +158,7 @@ class CreateContract extends Component {
       username: values.username,
       address: values.address,
       password: isOauthEnabled() ? null : values.password,
-      searchable: values.searchable,
+      solidvm: values.solidvm,
       fileText: fileText,
       arguments: args,
       chainId: values.chainId,
@@ -417,27 +405,6 @@ class CreateContract extends Component {
                   />
                 </div>
               </div>}
-              <div className="row">
-                <div className="col-sm-3">
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  <label className="pt-control pt-checkbox">
-                    <Field
-                      id="input-b"
-                      className="form-width"
-                      name="searchable"
-                      type="checkbox"
-                      component="input"
-                      dir="auto"
-                      title="Searchable"
-                      onChange={this.handleContractSearchabilityChange}
-                      required
-                    />
-                    <span className="pt-control-indicator"></span>
-                    Searchable
-                </label>
-                </div>
-              </div>
               {!this.props.sourceFromEditor &&
                 <div className="row">
                   <div className="col-sm-3 text-right">
@@ -482,6 +449,27 @@ class CreateContract extends Component {
                       }
                     </Field>
                   </div>
+                </div>
+              </div>}
+              {contracts && <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    SolidVM
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <label className="pt-control pt-checkbox">
+                    <Field
+                      id="input-b"
+                      className="form-width"
+                      name="solidvm"
+                      type="checkbox"
+                      component="input"
+                      dir="auto"
+                      title="SolidVM"
+                    />
+                    <span className="pt-control-indicator"></span>
+                  </label>
                 </div>
               </div>}
               {contracts && <div className="row">
@@ -621,7 +609,7 @@ export function mapStateToProps(state) {
     username: state.createContract.username,
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
-    searchable: selector(state, 'searchable'),
+    solidvm: selector(state, 'solidvm'),
     initialValues: {
       username: state.user.oauthUser ? state.user.oauthUser.username : '',
       address: state.user.oauthUser ? state.user.oauthUser.address : ''
