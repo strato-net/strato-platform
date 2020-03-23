@@ -139,9 +139,7 @@ pipeline {
 
   post {
     always {
-      steps {
-        sh "mv ~/.npmrc.BAK ~/.npmrc || true"
-      }
+      sh "mv ~/.npmrc.BAK ~/.npmrc || true"
     }
     success {
       slackSend (

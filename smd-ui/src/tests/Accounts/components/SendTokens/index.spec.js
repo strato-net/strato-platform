@@ -15,7 +15,7 @@ describe('SendTokens: index', () => {
     store = createStore(combineReducers({ form: formReducer }))
   });
 
-  describe('render enterprise mode', () => {
+  describe('render non oauth mode', () => {
 
     beforeEach(() => {
       checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
@@ -176,7 +176,7 @@ describe('SendTokens: index', () => {
     });
   });
 
-  describe('render public mode', () => {
+  describe('render Oauth mode', () => {
 
     beforeEach(() => {
       checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);

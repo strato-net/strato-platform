@@ -217,7 +217,375 @@ Object {
 }
 `;
 
-exports[`SendTokens: index render enterprise mode with values 1`] = `
+exports[`SendTokens: index render Oauth mode with values 1`] = `
+"<div className=\\"smd-pad-16\\">
+  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
+  <form>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
+      <div className=\\"pt-dialog-body\\">
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Chain
+              </label>
+            </div>
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input chain-field\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+                  <option />
+                  <option value=\\"airline cartel 9\\">
+                    airline cartel 9
+                  </option>
+                  <option value=\\"airline cartel 1\\">
+                    airline cartel 1
+                  </option>
+                  <option value=\\"airline cartel 2\\">
+                    airline cartel 2
+                  </option>
+                  <option value=\\"airline cartel 3\\">
+                    airline cartel 3
+                  </option>
+                  <option value=\\"airline cartel 4\\">
+                    airline cartel 4
+                  </option>
+                  <option value=\\"airline cartel 5\\">
+                    airline cartel 5
+                  </option>
+                  <option value=\\"airline cartel 6\\">
+                    airline cartel 6
+                  </option>
+                  <option value=\\"airline cartel 7\\">
+                    airline cartel 7
+                  </option>
+                  <option value=\\"airline cartel 10\\">
+                    airline cartel 10
+                  </option>
+                  <option value=\\"airline cartel 11\\">
+                    airline cartel 11
+                  </option>
+                  <option value=\\"airline cartel 12\\">
+                    airline cartel 12
+                  </option>
+                  <option value=\\"airline cartel 13\\">
+                    airline cartel 13
+                  </option>
+                  <option value=\\"airline cartel 14\\">
+                    airline cartel 14
+                  </option>
+                  <option value=\\"airline cartel 89\\">
+                    airline cartel 89
+                  </option>
+                  <option value=\\"airline cartel 200\\">
+                    airline cartel 200
+                  </option>
+                  <option value=\\"airline cartel 822\\">
+                    airline cartel 822
+                  </option>
+                  <option value=\\"airline cartel 52\\">
+                    airline cartel 52
+                  </option>
+                  <option value=\\"airline cartel 900\\">
+                    airline cartel 900
+                  </option>
+                  <option value=\\"airline cartel 1000\\">
+                    airline cartel 1000
+                  </option>
+                  <option value=\\"airline cartel 9000\\">
+                    airline cartel 9000
+                  </option>
+                  <option value=\\"airline cartel 2000\\">
+                    airline cartel 2000
+                  </option>
+                </Field>
+              </div>
+            </div>
+          </div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Chain IDs
+              </label>
+            </div>
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <div className=\\"pt-select smd-max-width\\">
+                <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
+                  <option />
+                  <option value=\\"0\\">
+                    0
+                  </option>
+                  <option value=\\"1\\">
+                    1
+                  </option>
+                  <option value=\\"length\\">
+                    length
+                  </option>
+                </Field>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              From
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" onChange={[Function: onChange]} required={true} disabled={true}>
+                <option value=\\"Admin_1177_49507\\">
+                  Admin_1177_49507
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              From Address
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" required={true} disabled={true}>
+                <option value=\\"0bdd9ade6477ba753650cc5d9ce40a17c42246c1\\">
+                  0bdd9ade6477ba753650cc5d9ce40a17c42246c1
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Address
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <Field id=\\"address\\" className=\\"form-width pt-input\\" placeholder=\\"address\\" name=\\"address\\" component=\\"input\\" dir=\\"auto\\" title=\\"address\\" required={true} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Value
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <div className=\\"form-width\\">
+              <Field name=\\"value\\" balance={10000000000} component={[Function: ValueInput]} required={true} />
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12\\">
+            <hr />
+            <h5>
+              Results
+            </h5>
+            <pre className=\\"smd-scrollable\\">
+               
+              <br />
+            </pre>
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
+          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;
+
+exports[`SendTokens: index render Oauth mode without values 1`] = `
+"<div className=\\"smd-pad-16\\">
+  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
+  <form>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
+      <div className=\\"pt-dialog-body\\">
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Chain
+              </label>
+            </div>
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input chain-field\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
+                  <option />
+                  <option value=\\"airline cartel 9\\">
+                    airline cartel 9
+                  </option>
+                  <option value=\\"airline cartel 1\\">
+                    airline cartel 1
+                  </option>
+                  <option value=\\"airline cartel 2\\">
+                    airline cartel 2
+                  </option>
+                  <option value=\\"airline cartel 3\\">
+                    airline cartel 3
+                  </option>
+                  <option value=\\"airline cartel 4\\">
+                    airline cartel 4
+                  </option>
+                  <option value=\\"airline cartel 5\\">
+                    airline cartel 5
+                  </option>
+                  <option value=\\"airline cartel 6\\">
+                    airline cartel 6
+                  </option>
+                  <option value=\\"airline cartel 7\\">
+                    airline cartel 7
+                  </option>
+                  <option value=\\"airline cartel 10\\">
+                    airline cartel 10
+                  </option>
+                  <option value=\\"airline cartel 11\\">
+                    airline cartel 11
+                  </option>
+                  <option value=\\"airline cartel 12\\">
+                    airline cartel 12
+                  </option>
+                  <option value=\\"airline cartel 13\\">
+                    airline cartel 13
+                  </option>
+                  <option value=\\"airline cartel 14\\">
+                    airline cartel 14
+                  </option>
+                  <option value=\\"airline cartel 89\\">
+                    airline cartel 89
+                  </option>
+                  <option value=\\"airline cartel 200\\">
+                    airline cartel 200
+                  </option>
+                  <option value=\\"airline cartel 822\\">
+                    airline cartel 822
+                  </option>
+                  <option value=\\"airline cartel 52\\">
+                    airline cartel 52
+                  </option>
+                  <option value=\\"airline cartel 900\\">
+                    airline cartel 900
+                  </option>
+                  <option value=\\"airline cartel 1000\\">
+                    airline cartel 1000
+                  </option>
+                  <option value=\\"airline cartel 9000\\">
+                    airline cartel 9000
+                  </option>
+                  <option value=\\"airline cartel 2000\\">
+                    airline cartel 2000
+                  </option>
+                </Field>
+              </div>
+            </div>
+          </div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-4 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Chain IDs
+              </label>
+            </div>
+            <div className=\\"col-sm-8 smd-pad-4\\">
+              <div className=\\"pt-select smd-max-width\\">
+                <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
+                  <option />
+                  <option value=\\"0\\">
+                    0
+                  </option>
+                  <option value=\\"1\\">
+                    1
+                  </option>
+                  <option value=\\"length\\">
+                    length
+                  </option>
+                </Field>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              From
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" onChange={[Function: onChange]} required={true} disabled={true}>
+                <option value=\\"\\" />
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              From Address
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" required={true} disabled={true}>
+                <option value=\\"\\" />
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Address
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <Field id=\\"address\\" className=\\"form-width pt-input\\" placeholder=\\"address\\" name=\\"address\\" component=\\"input\\" dir=\\"auto\\" title=\\"address\\" required={true} />
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-4 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Value
+            </label>
+          </div>
+          <div className=\\"col-sm-8 smd-pad-4\\">
+            <div className=\\"form-width\\">
+              <Field name=\\"value\\" balance={[undefined]} component={[Function: ValueInput]} required={true} />
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-12\\">
+            <hr />
+            <h5>
+              Results
+            </h5>
+            <pre className=\\"smd-scrollable\\">
+               
+              <br />
+            </pre>
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
+          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;
+
+exports[`SendTokens: index render non oauth mode with values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
   <form>
@@ -596,7 +964,7 @@ exports[`SendTokens: index render enterprise mode with values 1`] = `
 </div>"
 `;
 
-exports[`SendTokens: index render enterprise mode without values 1`] = `
+exports[`SendTokens: index render non oauth mode without values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
   <form>
@@ -683,374 +1051,6 @@ exports[`SendTokens: index render enterprise mode without values 1`] = `
                 </Field>
               </div>
             </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Value
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"form-width\\">
-              <Field name=\\"value\\" balance={[undefined]} component={[Function: ValueInput]} required={true} />
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-12\\">
-            <hr />
-            <h5>
-              Results
-            </h5>
-            <pre className=\\"smd-scrollable\\">
-               
-              <br />
-            </pre>
-          </div>
-        </div>
-      </div>
-      <div className=\\"pt-dialog-footer\\">
-        <div className=\\"pt-dialog-footer-actions\\">
-          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
-        </div>
-      </div>
-    </Blueprint.Dialog>
-  </form>
-</div>"
-`;
-
-exports[`SendTokens: index render public mode with values 1`] = `
-"<div className=\\"smd-pad-16\\">
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
-  <form>
-    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
-      <div className=\\"pt-dialog-body\\">
-        <div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-4 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Chain
-              </label>
-            </div>
-            <div className=\\"col-sm-8 smd-pad-4\\">
-              <div className=\\"pt-select\\">
-                <Field className=\\"pt-input chain-field\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
-                  <option />
-                  <option value=\\"airline cartel 9\\">
-                    airline cartel 9
-                  </option>
-                  <option value=\\"airline cartel 1\\">
-                    airline cartel 1
-                  </option>
-                  <option value=\\"airline cartel 2\\">
-                    airline cartel 2
-                  </option>
-                  <option value=\\"airline cartel 3\\">
-                    airline cartel 3
-                  </option>
-                  <option value=\\"airline cartel 4\\">
-                    airline cartel 4
-                  </option>
-                  <option value=\\"airline cartel 5\\">
-                    airline cartel 5
-                  </option>
-                  <option value=\\"airline cartel 6\\">
-                    airline cartel 6
-                  </option>
-                  <option value=\\"airline cartel 7\\">
-                    airline cartel 7
-                  </option>
-                  <option value=\\"airline cartel 10\\">
-                    airline cartel 10
-                  </option>
-                  <option value=\\"airline cartel 11\\">
-                    airline cartel 11
-                  </option>
-                  <option value=\\"airline cartel 12\\">
-                    airline cartel 12
-                  </option>
-                  <option value=\\"airline cartel 13\\">
-                    airline cartel 13
-                  </option>
-                  <option value=\\"airline cartel 14\\">
-                    airline cartel 14
-                  </option>
-                  <option value=\\"airline cartel 89\\">
-                    airline cartel 89
-                  </option>
-                  <option value=\\"airline cartel 200\\">
-                    airline cartel 200
-                  </option>
-                  <option value=\\"airline cartel 822\\">
-                    airline cartel 822
-                  </option>
-                  <option value=\\"airline cartel 52\\">
-                    airline cartel 52
-                  </option>
-                  <option value=\\"airline cartel 900\\">
-                    airline cartel 900
-                  </option>
-                  <option value=\\"airline cartel 1000\\">
-                    airline cartel 1000
-                  </option>
-                  <option value=\\"airline cartel 9000\\">
-                    airline cartel 9000
-                  </option>
-                  <option value=\\"airline cartel 2000\\">
-                    airline cartel 2000
-                  </option>
-                </Field>
-              </div>
-            </div>
-          </div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-4 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Chain IDs
-              </label>
-            </div>
-            <div className=\\"col-sm-8 smd-pad-4\\">
-              <div className=\\"pt-select smd-max-width\\">
-                <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
-                  <option />
-                  <option value=\\"0\\">
-                    0
-                  </option>
-                  <option value=\\"1\\">
-                    1
-                  </option>
-                  <option value=\\"length\\">
-                    length
-                  </option>
-                </Field>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              From
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" onChange={[Function: onChange]} required={true} disabled={true}>
-                <option value=\\"Admin_1177_49507\\">
-                  Admin_1177_49507
-                </option>
-              </Field>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              From Address
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" required={true} disabled={true}>
-                <option value=\\"0bdd9ade6477ba753650cc5d9ce40a17c42246c1\\">
-                  0bdd9ade6477ba753650cc5d9ce40a17c42246c1
-                </option>
-              </Field>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Address
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <Field id=\\"address\\" className=\\"form-width pt-input\\" placeholder=\\"address\\" name=\\"address\\" component=\\"input\\" dir=\\"auto\\" title=\\"address\\" required={true} />
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Value
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"form-width\\">
-              <Field name=\\"value\\" balance={10000000000} component={[Function: ValueInput]} required={true} />
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-12\\">
-            <hr />
-            <h5>
-              Results
-            </h5>
-            <pre className=\\"smd-scrollable\\">
-               
-              <br />
-            </pre>
-          </div>
-        </div>
-      </div>
-      <div className=\\"pt-dialog-footer\\">
-        <div className=\\"pt-dialog-footer-actions\\">
-          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
-        </div>
-      </div>
-    </Blueprint.Dialog>
-  </form>
-</div>"
-`;
-
-exports[`SendTokens: index render public mode without values 1`] = `
-"<div className=\\"smd-pad-16\\">
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
-  <form>
-    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
-      <div className=\\"pt-dialog-body\\">
-        <div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-4 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Chain
-              </label>
-            </div>
-            <div className=\\"col-sm-8 smd-pad-4\\">
-              <div className=\\"pt-select\\">
-                <Field className=\\"pt-input chain-field\\" component=\\"select\\" name=\\"chainLabel\\" onChange={[Function: onChange]} required={true}>
-                  <option />
-                  <option value=\\"airline cartel 9\\">
-                    airline cartel 9
-                  </option>
-                  <option value=\\"airline cartel 1\\">
-                    airline cartel 1
-                  </option>
-                  <option value=\\"airline cartel 2\\">
-                    airline cartel 2
-                  </option>
-                  <option value=\\"airline cartel 3\\">
-                    airline cartel 3
-                  </option>
-                  <option value=\\"airline cartel 4\\">
-                    airline cartel 4
-                  </option>
-                  <option value=\\"airline cartel 5\\">
-                    airline cartel 5
-                  </option>
-                  <option value=\\"airline cartel 6\\">
-                    airline cartel 6
-                  </option>
-                  <option value=\\"airline cartel 7\\">
-                    airline cartel 7
-                  </option>
-                  <option value=\\"airline cartel 10\\">
-                    airline cartel 10
-                  </option>
-                  <option value=\\"airline cartel 11\\">
-                    airline cartel 11
-                  </option>
-                  <option value=\\"airline cartel 12\\">
-                    airline cartel 12
-                  </option>
-                  <option value=\\"airline cartel 13\\">
-                    airline cartel 13
-                  </option>
-                  <option value=\\"airline cartel 14\\">
-                    airline cartel 14
-                  </option>
-                  <option value=\\"airline cartel 89\\">
-                    airline cartel 89
-                  </option>
-                  <option value=\\"airline cartel 200\\">
-                    airline cartel 200
-                  </option>
-                  <option value=\\"airline cartel 822\\">
-                    airline cartel 822
-                  </option>
-                  <option value=\\"airline cartel 52\\">
-                    airline cartel 52
-                  </option>
-                  <option value=\\"airline cartel 900\\">
-                    airline cartel 900
-                  </option>
-                  <option value=\\"airline cartel 1000\\">
-                    airline cartel 1000
-                  </option>
-                  <option value=\\"airline cartel 9000\\">
-                    airline cartel 9000
-                  </option>
-                  <option value=\\"airline cartel 2000\\">
-                    airline cartel 2000
-                  </option>
-                </Field>
-              </div>
-            </div>
-          </div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-4 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Chain IDs
-              </label>
-            </div>
-            <div className=\\"col-sm-8 smd-pad-4\\">
-              <div className=\\"pt-select smd-max-width\\">
-                <Field className=\\"pt-input smd-max-width\\" component=\\"select\\" name=\\"chainId\\" required={true}>
-                  <option />
-                  <option value=\\"0\\">
-                    0
-                  </option>
-                  <option value=\\"1\\">
-                    1
-                  </option>
-                  <option value=\\"length\\">
-                    length
-                  </option>
-                </Field>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              From
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" onChange={[Function: onChange]} required={true} disabled={true}>
-                <option value=\\"\\" />
-              </Field>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              From Address
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" required={true} disabled={true}>
-                <option value=\\"\\" />
-              </Field>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-4 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Address
-            </label>
-          </div>
-          <div className=\\"col-sm-8 smd-pad-4\\">
-            <Field id=\\"address\\" className=\\"form-width pt-input\\" placeholder=\\"address\\" name=\\"address\\" component=\\"input\\" dir=\\"auto\\" title=\\"address\\" required={true} />
           </div>
         </div>
         <div className=\\"row\\">

@@ -7,73 +7,23 @@ describe('SideBar: index', () => {
   let wrapper;
 
   test('render component for public mode', () => {
-    checkMode.isModePublic = jest.fn().mockReturnValue(true);
+    checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     checkS3Credentials.isS3Available = jest.fn().mockReturnValue(false);
     wrapper = shallow(<SideBar />);
     expect(wrapper.debug()).toMatchSnapshot();
   });
 
-  describe('sequence of links for public mode', () => {
-
-    beforeEach(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
-      checkS3Credentials.isS3Available = jest.fn().mockReturnValue(false);
-      wrapper = shallow(<SideBar />);
-    });
-
-    test('first position /apps', () => {
-      wrapper.find('NavLink').at(0).simulate('click');
-      expect(wrapper.find('NavLink').get(0)).toMatchSnapshot();
-    });
-
-    test('secound position /home', () => {
-      wrapper.find('NavLink').at(1).simulate('click');
-      expect(wrapper.find('NavLink').get(1)).toMatchSnapshot();
-    });
-
-    test('third position /chains', () => {
-      wrapper.find('NavLink').at(2).simulate('click');
-      expect(wrapper.find('NavLink').get(2)).toMatchSnapshot();
-    });
-
-    test('fourth position /blocks', () => {
-      wrapper.find('NavLink').at(3).simulate('click');
-      expect(wrapper.find('NavLink').get(3)).toMatchSnapshot();
-    });
-
-    test('fifth position /transactions', () => {
-      wrapper.find('NavLink').at(4).simulate('click');
-      expect(wrapper.find('NavLink').get(4)).toMatchSnapshot();
-    });
-
-    test('sixth position /accounts', () => {
-      wrapper.find('NavLink').at(5).simulate('click');
-      expect(wrapper.find('NavLink').get(5)).toMatchSnapshot();
-    });
-
-    test('seventh position /contracts', () => {
-      wrapper.find('NavLink').at(6).simulate('click');
-      expect(wrapper.find('NavLink').get(6)).toMatchSnapshot();
-    });
-
-    test('eight position /code_editor', () => {
-      wrapper.find('NavLink').at(7).simulate('click');
-      expect(wrapper.find('NavLink').get(7)).toMatchSnapshot();
-    });
-
-  });
-
-  test('render component for enterprise mode', () => {
-    checkMode.isModePublic = jest.fn().mockReturnValue(false);
+  test('render component for non oauth mode', () => {
+    checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     checkS3Credentials.isS3Available = jest.fn().mockReturnValue(true);
     wrapper = shallow(<SideBar />);
     expect(wrapper.debug()).toMatchSnapshot();
   });
 
-  describe('sequence of links for enterprise mode', () => {
+  describe('sequence of links for oauth and non-oauth mode', () => {
 
     beforeEach(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
       checkS3Credentials.isS3Available = jest.fn().mockReturnValue(true);
       wrapper = shallow(<SideBar />);
     });
@@ -117,12 +67,6 @@ describe('SideBar: index', () => {
       wrapper.find('NavLink').at(7).simulate('click');
       expect(wrapper.find('NavLink').get(7)).toMatchSnapshot();
     });
-
-    test('ninth position /apps', () => {
-      wrapper.find('NavLink').at(8).simulate('click');
-      expect(wrapper.find('NavLink').get(8)).toMatchSnapshot();
-    });
-
 
   });
 

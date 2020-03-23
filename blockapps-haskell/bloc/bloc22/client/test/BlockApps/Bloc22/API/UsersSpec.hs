@@ -117,6 +117,7 @@ spec = do
         uploadListContracts =
           [ UploadListContract
             { uploadlistcontractContractName = simpleStorageContractName
+            , uploadlistcontractSrc = Nothing
             , uploadlistcontractArgs = Map.empty
             , _uploadlistcontractTxParams = testTxParams
             , uploadlistcontractValue = Nothing
@@ -127,6 +128,7 @@ spec = do
         uploadListRequest = UploadListRequest
           { uploadlistPassword = pw
           , uploadlistContracts = uploadListContracts
+          , uploadlistSrcs = Nothing
           , uploadlistResolve = False
           }
       eResults <- runClientM (postUsersUploadList userName userAddress Nothing False uploadListRequest) (ClientEnv mgr blocUrl Nothing)
