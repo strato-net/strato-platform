@@ -18,13 +18,13 @@ async function factoryCreateContractArgs(size) {
   const source = await importer.combine('./contracts/beanstalk/agreement/AgreementManager.sol');
 
   for (let i = 0; i < size; i++) {
-    /* 
+    /*
       constructor (
         address _dappAddress,
         address _permissionManager,
         address _userManager,
-        address _programManager 
-      ) public { 
+        address _programManager
+      ) public {
     */
     txs.push({
       name: 'AgreementManager',
