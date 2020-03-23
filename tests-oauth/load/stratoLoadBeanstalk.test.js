@@ -92,7 +92,10 @@ describe('Strato Load Test (beanstalk)', function () {
 
       const transactionStartTime = moment();
       const transactions = txs.slice(batchSize * i, batchSize * i + batchSize);
-      const contracts = await createContractList(user, transactions, { ...options });
+      const contracts = await createContractList(user, transactions, {
+        isAsync: true,
+        ...options,
+      });
       const endTime = moment();
       transactionsTime += endTime.diff(transactionStartTime, 'seconds');
 
