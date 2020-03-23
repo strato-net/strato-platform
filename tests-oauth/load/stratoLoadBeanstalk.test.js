@@ -69,7 +69,6 @@ async function waitResult(user, size, count) {
 }
 
 
-
 describe('Strato Load Test (beanstalk)', function () {
   this.timeout(config.timeout);
 
@@ -101,6 +100,8 @@ describe('Strato Load Test (beanstalk)', function () {
 
       console.log(`Received ${contracts.length} receipts`);
       txResults = txResults.concat(contracts);
+      // NOTE: if we don't sleep only half of the contracts uploaded. any other solution for this?
+      await util.sleep(1000);
     }
 
     console.log(`Waiting on address '${user.address}' to reach nonce ${batchSize * batchCount}`);
