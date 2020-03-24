@@ -406,6 +406,7 @@ type PostUsersUploadList = "users"
 data UploadListRequest = UploadListRequest
   { uploadlistPassword  :: Password
   , uploadlistContracts :: [UploadListContract]
+  , uploadlistSrcs      :: Maybe (Map Text Text)
   , uploadlistResolve   :: Bool
   } deriving (Eq,Show,Generic)
 
@@ -428,6 +429,7 @@ instance ToSchema UploadListRequest where
       exContract1 :: UploadListContract
       exContract1 = UploadListContract
         { uploadlistcontractContractName = "AccountsContract"
+        , uploadlistcontractSrc = Nothing
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , _uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
@@ -435,10 +437,11 @@ instance ToSchema UploadListRequest where
         , uploadlistcontractMetadata = Nothing
         }
       ex :: UploadListRequest
-      ex = UploadListRequest "SecretPassword" [exContract1] True
+      ex = UploadListRequest "SecretPassword" [exContract1] Nothing True
 
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
+  , uploadlistcontractSrc          :: Maybe Text
   , uploadlistcontractArgs         :: Map Text ArgValue
   , _uploadlistcontractTxParams    :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
@@ -463,6 +466,7 @@ instance ToSchema UploadListContract where
       ex :: UploadListContract
       ex = UploadListContract
         { uploadlistcontractContractName = "SampleContract"
+        , uploadlistcontractSrc = Nothing
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
         , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing

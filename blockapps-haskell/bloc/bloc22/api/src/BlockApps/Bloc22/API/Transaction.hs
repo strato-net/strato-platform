@@ -57,6 +57,7 @@ data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Maybe Address
   , postbloctransactionrequestTxs      :: [BlocTransactionPayload]
   , postbloctransactionrequestTxParams :: Maybe TxParams
+  , postbloctransactionrequestSrcs     :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary PostBlocTransactionRequest where
@@ -79,6 +80,7 @@ instance ToSample PostBlocTransactionRequest where
         (Just $ Map.fromList [("purpose","groceries")])
       ]
       (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
+      Nothing
 
 instance ToSchema PostBlocTransactionRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -96,6 +98,7 @@ instance ToSchema PostBlocTransactionRequest where
                    (Just $ Map.fromList [("purpose","groceries")])
                  ]
                  (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
+                 Nothing
 
 data BlocTransactionPayload = BlocTransfer TransferPayload
                             | BlocContract ContractPayload
@@ -121,7 +124,7 @@ instance FromJSON BlocTransactionPayload where
   parseJSON o = error $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload
-  { contractpayloadSrc      :: Text
+  { contractpayloadSrc      :: Maybe Text
   , contractpayloadContract :: Maybe Text
   , contractpayloadArgs     :: Maybe (Map Text ArgValue)
   , contractpayloadValue    :: Maybe (Strung Natural)
@@ -175,7 +178,7 @@ instance ToSchema BlocTransactionPayload where
     where
       ex :: BlocTransactionPayload
       ex = BlocContract $ ContractPayload
-        { contractpayloadSrc      = "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        { contractpayloadSrc      = Just "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
@@ -191,7 +194,7 @@ instance ToSchema ContractPayload where
     where
       ex :: ContractPayload
       ex = ContractPayload
-        { contractpayloadSrc      = "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        { contractpayloadSrc      = Just "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing

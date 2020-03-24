@@ -145,8 +145,15 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   let storage = translateStorageMap storage'
 
   ret <- case (storage', mName) of
-    (Storage{storageKind=SolidVM}:_, Nothing) -> return .
-        decodeSolidVMValues $ map (\Storage{storageKV=SolidVMEntry k v} -> (k, v)) storage'
+    (Storage{storageKind=SolidVM}:_, Nothing) -> do
+      $logInfoS "getContractsState/SolidVM" $ Text.unlines
+        [ "Storage:"
+        , Text.pack $ unlines $ map (("  " ++) . show . storageKV) $ storage'
+        , "End of storage"
+        ]
+      return $
+           (contractFunctions $ mainStruct contract')
+        ++ (decodeSolidVMValues $ map (\Storage{storageKV=SolidVMEntry k v} -> (k, v)) storage')
     (Storage{storageKind=SolidVM}:_, Just name) ->
        error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
     -- Treat this potentially empty storage as the EVM, even though it could be on SolidVM.
