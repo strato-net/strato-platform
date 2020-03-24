@@ -396,6 +396,31 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 -}
 
 
+
+-- Assignment to index of an array
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess arr (Just indExp)) src))) = do
+  indVal <- getVar =<< expToVar indExp
+
+  case indVal of
+    SInteger ind -> do
+      srcVar <- expToVar src
+      srcVal <- getVar srcVar
+
+      arrVar <- expToVar arr
+      arrVal <- getVar arrVar
+
+      -- Make a new vector and reset the array variable
+      case arrVal of
+        SArray typ fs -> do
+          let newVec = fs V.// [(fromIntegral ind, srcVar)]
+          setVar arrVar (SArray typ newVec)
+          return $ Just srcVal
+        _ -> typeError "illegal assignment to index of a non-array variable" (unparseStatement st)
+    _ -> typeError ("index value ( " ++ (show indVal) ++ ") is not an integer:") (unparseStatement st)
+
+
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _))) = typeError "IndexAccess: index value cannot be empty" (unparseStatement st)
+
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src))) = do
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
@@ -827,6 +852,8 @@ expToVar' (Xabi.MemberAccess expr name) = do
             _ -> todo "access member of storage item" (val', name, apt) -}
 
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
+expToVar' x@(Xabi.IndexAccess _ (Nothing)) = typeError "IndexAccess: index value cannot be empty" (unparseExpression x)
+
 expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
   var <- expToVar parent
 
@@ -839,7 +866,7 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
       case (val, theIndex) of
         (SArray _ theVector, SInteger i) -> do
           if (fromIntegral i) >= length theVector then
-            indexOutOfBounds (unparseExpression x) (", array length is " ++ (show i))
+            indexOutOfBounds (unparseExpression x) ("index = " ++ (show i) ++ ", array length = " ++ (show $ length theVector))
           else
             return $ theVector V.! fromIntegral i
         (SReference _, _) -> Constant . SReference <$> expToPath x
