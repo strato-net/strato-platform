@@ -252,9 +252,13 @@ describe("rest_7", function () {
       assert.isOk(verifyContracts, "contracts");
     });
 
-    xit("create contract list - BAD_REQUEST 400", async () => {
+    xit("create contract list - BAD_REQUEST 400 - EVM", async () => {
       const count = 5;
       const contracts = factory.createContractListArgs(count);
+
+      // compile contracts
+      await rest.compileContracts(admin, contracts, { config });
+
       await assert.restStatus(async () => {
         return rest.createContractList(admin, contracts, {
           config,
