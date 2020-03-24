@@ -179,9 +179,10 @@ describe("rest_7", function () {
         await rest.compileContracts(admin, contracts, { config });
       }, RestStatus.BAD_REQUEST);
     });
-
+    
     it("create contract list - async - VM: EVM", async () => {
       const count = 1;
+      const count = 5;
       const contracts = factory.createContractListArgs(count);
       // compile contracts
       await rest.compileContracts(admin, contracts, { config });
