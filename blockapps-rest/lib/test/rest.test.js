@@ -173,6 +173,40 @@ describe("rest_7", function () {
       );
     });
 
+    it("compile contract - single contract", async () => {
+      const count = 1;
+      const contracts = factory.createCompileContractsArgs(count);
+      const results = await rest.compileContracts(admin, contracts, { config });
+      assert.isArray(results, "should be array");
+      assert.equal(results.length, contracts.length, `should be ${count}`);
+      results.forEach((contract, index) => {
+        assert.equal(contract.contractName, contracts[index]['contractName'])
+      })
+    });
+
+    it("compile contract - multiple contracts", async () => {
+      const count = 4;
+      const contracts = factory.createCompileContractsArgs(count);
+      const results = await rest.compileContracts(admin, contracts, { config });
+      assert.isArray(results, "should be array");
+      assert.equal(results.length, contracts.length, `should be ${count}`);
+      results.forEach((contract, index) => {
+        assert.equal(contract.contractName, contracts[index]['contractName'])
+      })
+    });
+
+    it("compile contract - BAD_REQUEST 400", async () => {
+      const uid = util.uid();
+      const contractName = `TestContract_${uid}`;
+      // this contract does not have opening and closing brackets
+      const source = `contract ${contractName}`;
+
+      const contracts = [{ contractName, source }];
+      await assert.restStatus(async () => {
+        await rest.compileContracts(admin, contracts, { config });
+      }, RestStatus.BAD_REQUEST);
+    });
+
     // Skipped because of platform issue. https://blockapps.atlassian.net/browse/STRATO-1331
     it.skip("create contract list - async - SKIPPED - STRATO-1331", async () => {
       const count = 5;
