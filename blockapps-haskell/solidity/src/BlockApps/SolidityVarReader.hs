@@ -4,8 +4,10 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
 
 module BlockApps.SolidityVarReader (
+  contractFunctions,
   decodeStorageKey,
   decodeCacheValues,
   decodeValue,
@@ -35,7 +37,7 @@ import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
 import qualified Data.Map.Ordered                 as OMap
-import           Data.Maybe                       (fromJust, fromMaybe)
+import           Data.Maybe                       (fromJust, fromMaybe, mapMaybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -299,6 +301,14 @@ structSort (Struct om _)  = sortBy omOrder
   -- Struct sort should run in O(n * log n * log n) as each comparison takes log n
   where omOrder :: (Text, Value) -> (Text, Value) -> Ordering
         omOrder (k1, _) (k2, _) = OMap.findIndex k1 om `compare` OMap.findIndex k2 om
+
+contractFunctions
+  :: Struct
+  -> [(Text, SolidityValue)]
+contractFunctions = mapMaybe (uncurry getFunction) . map (fmap snd) . OMap.assocs . fields
+  where getFunction name = \case
+          TypeFunction sel args ret -> Just . (name,) . valueToSolidityValue $ ValueFunction sel args ret
+          _ -> Nothing
 
 decodeValues
   :: Integer
