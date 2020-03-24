@@ -7,7 +7,7 @@
 
 module BlockApps.Bloc22.Server.Transaction where
 
-import           Control.Applicative               ((<|>))
+import           Control.Applicative               ((<|>), liftA2)
 import           Control.Monad
 import           Control.Monad.Except
 import qualified Data.Map.Strict                   as Map
@@ -29,13 +29,14 @@ import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 
 postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
-postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams) = do
+postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   case mUserName of
-    Nothing -> error "Did not find X-USER-UNIQUE-NAME in the header"
+    Nothing -> throwError $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
     Just userName -> do
       addr <- case mAddr of
         Nothing -> fmap unStatusAndAddress . blocVaultWrapper $ getKey userName Nothing
         Just addr' -> return addr'
+      let getSrc p = contractpayloadSrc p <|> join (liftA2 Map.lookup (contractpayloadContract p) msrcs)
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
         TRANSFER -> case txs of
           [] -> return []
@@ -65,7 +66,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
             let md = contractpayloadMetadata p
                 bcp = ContractParameters
                         addr
-                        (contractpayloadSrc p)
+                        (fromMaybe "" $ getSrc p)
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
@@ -81,14 +82,14 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                                              $ "Invalid value for VM choice: " ++ show vm
             fmap (:[]) $ poster bcp (callSignature userName)
           xs -> do
-            p <- mapM fromContract xs
+            ps <- mapM fromContract xs
             let bclp = ContractListParameters
                         addr
-                        (map (\(ContractPayload _ c a v cid m) ->
-                                UploadListContract (fromJust c) (fromMaybe Map.empty a) txParams v cid m) p)
+                        (map (\p@(ContractPayload _ c a v cid m) ->
+                                UploadListContract (fromJust c) (getSrc p) (fromMaybe Map.empty a) txParams v cid m) ps)
                         chainId
                         resolve
-                md = contractpayloadMetadata $ head p      --Determine VM option by the metadata of the first tx in list
+                md = contractpayloadMetadata $ head ps --Determine VM option by the metadata of the first tx in list
                 poster = case Map.lookup "VM" =<< md of
                   Nothing -> postUsersUploadListEVM'
                   Just "EVM" -> postUsersUploadListEVM'
