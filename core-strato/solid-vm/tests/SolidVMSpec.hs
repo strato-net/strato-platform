@@ -2450,3 +2450,44 @@ contract qq {
 
 }|]
     getFields ["x"] `shouldReturn` [BInteger 0]
+
+  it "can handle all expr combinations for logical OR clause " . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic == 0 || x == 0) {
+      x++;
+    }
+    if (magic == 42 || x == 0) {
+      x++;
+    }
+    if (magic == 100 || x == 2) {
+      x++;
+    }
+    if (magic == 1000 || x == 0) {
+      x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 3]
+
+  it "RHS expr in an OR clause is not evaluated if the LHS expr evaluates to True" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic == 42 || ++x > 100)
+    {
+      return 0;
+    }
+    return 0;
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0]

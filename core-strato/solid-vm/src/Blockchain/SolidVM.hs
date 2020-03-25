@@ -966,9 +966,13 @@ expToVar' (Xabi.Binary "&&" expr1 expr2) = do
 expToVar' (Xabi.Binary "||" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
 
-  b2 <- getBool =<< expToVar expr2
-  logVals b1 b2
-  return $ Constant $ SBool $ b1 || b2
+  -- Only evaluate expr2 if b1 is False, otherwise return True
+  if b1 then
+    return $ Constant $ SBool True
+  else do
+    b2 <- getBool =<< expToVar expr2
+    logVals b1 b2
+    return $ Constant $ SBool b2
 
 expToVar' (Xabi.TupleExpression exps) = do
   -- Or should STuple be a Vector of Maybe?
