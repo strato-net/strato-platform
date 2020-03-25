@@ -32,6 +32,7 @@ import qualified SolidVM.Solidity.Xabi.Def          as Xabi
 import qualified SolidVM.Solidity.Xabi.Type         as Xabitype
 import qualified SolidVM.Solidity.Xabi.VarDef       as Xabitype
 
+import           Blockchain.VM.SolidException
 
 data SourceUnit = Pragma Identifier String
                 | NamedXabi Text.Text (Xabi, [Text.Text])
@@ -219,7 +220,7 @@ simpleVariableDeclaration = do
   semi
 
   if isConstant
-    then return (variableName, ConstantDeclaration $ Xabi.ConstantDecl variableType isPublic $ fromMaybe (error "error while parsing Solidity, constants must be initialized") value)
+    then return (variableName, ConstantDeclaration $ Xabi.ConstantDecl variableType isPublic $ fromMaybe (parseError "constants must be initialized" variableName) value)
     else return (variableName, VariableDeclaration $ Xabi.VariableDecl variableType isPublic value)
 
 {- Functions and function-like -}
