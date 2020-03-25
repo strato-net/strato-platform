@@ -69,6 +69,14 @@ anyTypeError :: Selector HandledException
 anyTypeError (HE Blockchain.SolidVM.Exception.TypeError{}) = True
 anyTypeError _ = False
 
+anyIndexOOBError :: Selector HandledException
+anyIndexOOBError (HE Blockchain.SolidVM.Exception.IndexOutOfBounds{}) = True
+anyIndexOOBError _ = False
+
+anyMissingFieldError :: Selector HandledException
+anyMissingFieldError (HE Blockchain.SolidVM.Exception.MissingField{}) = True
+anyMissingFieldError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
 failedRequirementMsg _   _                         = False
@@ -2296,3 +2304,108 @@ contract qq is parent {
     emit x(6);
   }
 }|]
+
+  it "can assign directly to index of an array" . runTest $ do
+    runBS [r|
+contract qq {
+  uint[] arr;
+  uint x;
+
+  constructor() {
+    arr[0] = 42;
+    x = arr[0];
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 42]
+
+  it "can assign directly to index of a mapping" . runTest $ do
+    runBS [r|
+contract qq {
+  mapping(bool => uint) bs;
+  uint x;
+
+  constructor() {
+    bs[true] = 42;
+    x = bs[true];
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 42]
+
+  it "throws array index out of bounds exception" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+    
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      x = arr[5];
+   }
+}|])) `shouldThrow` anyIndexOOBError
+
+  it "type checks the index value in array index access" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      x = arr[true];
+   }
+}|])) `shouldThrow` anyTypeError
+ 
+  it "type checks the index value in array index assignment" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      arr[true] = 2112;
+   }
+}|])) `shouldThrow` anyTypeError
+ 
+  it "rejects empty index value on array index access" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      x = arr[];
+   }
+}|])) `shouldThrow` anyMissingFieldError
+ 
+  it "rejects empty index value on mapping index access" $ (runTest (runBS [r|
+contract qq {
+   mapping(bool => uint) bs;
+   uint x;
+
+   constructor()
+   {
+      x = bs[];
+   }
+}|])) `shouldThrow` anyMissingFieldError
+ 
+  it "rejects empty index value on array index assignment" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      arr[] = 2112;
+   }
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "rejects empty index value on mapping index assignment" $ (runTest (runBS [r|
+contract qq {
+   mapping(bool => uint) bs;
+   uint x;
+
+   constructor()
+   {
+      bs[] = 42;
+   }
+}|])) `shouldThrow` anyMissingFieldError
