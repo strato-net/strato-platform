@@ -954,9 +954,14 @@ expToVar' (Xabi.Binary "<=" expr1 expr2) = do
 
 expToVar' (Xabi.Binary "&&" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
-  b2 <- getBool =<< expToVar expr2
-  logVals b1 b2
-  return $ Constant $ SBool $ b1 && b2
+
+  -- Only evaluate expr2 if b1 is True, otherwise return False
+  if b1 then do
+    b2 <- getBool =<< expToVar expr2
+    logVals b1 b2
+    return $ Constant $ SBool b2
+  else
+    return $ Constant $ SBool False
 
 expToVar' (Xabi.Binary "||" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1

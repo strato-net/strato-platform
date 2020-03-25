@@ -2409,3 +2409,44 @@ contract qq {
       bs[] = 42;
    }
 }|])) `shouldThrow` anyMissingFieldError
+
+  it "can handle all expr combinations for logical AND clause " . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic == 0 && x == 0) {
+      x++;
+    }
+    if (magic == 42 && x == 0) {
+      x++;
+    }
+    if (magic == 100 && x == 1) {
+      x++;
+    }
+    if (magic == 1000 && x == 0) {
+      x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 1]
+
+  it "RHS expr in an AND clause is not evaluated if the LHS expr evaluates to False" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic > 100 && ++x > 100)
+    {
+      return 0;
+    }
+    return 0;
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0]
