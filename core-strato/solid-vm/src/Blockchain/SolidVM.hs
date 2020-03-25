@@ -397,29 +397,38 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 
--- Assignment to index of an array
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess arr (Just indExp)) src))) = do
-  indVal <- getVar =<< expToVar indExp
+-- Assignment to an index into an array or mapping
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst@(Xabi.IndexAccess parent (Just indExp)) src))) = do
+  srcVar <- expToVar src
+  srcVal <- getVar srcVar
 
-  case indVal of
-    SInteger ind -> do
-      srcVar <- expToVar src
-      srcVal <- getVar srcVar
+  onTraced $ do
+    valString <- showSM srcVal
+    liftIO $ putStrLn $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
 
-      arrVar <- expToVar arr
-      arrVal <- getVar arrVar
+  pVar <- expToVar parent
+  pVal <- weakGetVar pVar
 
-      -- Make a new vector and reset the array variable
-      case arrVal of
-        SArray typ fs -> do
+  -- If it's an array, calling (expToVar dst) gives us
+  -- the value at the index, NOT a reference that we can
+  -- assign to....so we need to make a new vector and reset the whole array
+  case pVal of
+    SArray typ fs -> do
+      indVal <- getVar =<< expToVar indExp
+      case indVal of
+        SInteger ind -> do
           let newVec = fs V.// [(fromIntegral ind, srcVar)]
-          setVar arrVar (SArray typ newVec)
-          return $ Just srcVal
-        _ -> typeError "illegal assignment to index of a non-array variable" (unparseStatement st)
-    _ -> typeError ("index value ( " ++ (show indVal) ++ ") is not an integer:") (unparseStatement st)
+          setVar pVar (SArray typ newVec)
+          return Nothing
+        _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseStatement st)
+    _ -> do -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
+      dstVar <- expToVar dst
+      setVar dstVar srcVal
+      return Nothing
 
 
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _))) = typeError "IndexAccess: index value cannot be empty" (unparseStatement st)
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _))) = missingField "index value cannot be empty" (unparseStatement st)
+
 
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src))) = do
   srcVal <- getVar =<< expToVar src
@@ -753,7 +762,7 @@ expToVar' (Xabi.MemberAccess (Xabi.Variable "Util") "bytes32ToString") = do
 expToVar' (Xabi.MemberAccess (Xabi.Variable "Util") "b32") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
 
-expToVar' (Xabi.MemberAccess expr name) = do
+expToVar' x@(Xabi.MemberAccess expr name) = do
   val <- getVar =<< expToVar expr
 
   case (val, name) of
@@ -817,7 +826,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
-      _ -> typeError "SolidVM: Illegal member access" ((show val) ++ "." ++ name)
+      _ -> typeError "illegal member access" $ unparseExpression x
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref
@@ -851,9 +860,9 @@ expToVar' (Xabi.MemberAccess expr name) = do
                 $ M.lookup name theMap
             _ -> todo "access member of storage item" (val', name, apt) -}
 
--- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
-expToVar' x@(Xabi.IndexAccess _ (Nothing)) = typeError "IndexAccess: index value cannot be empty" (unparseExpression x)
+expToVar' x@(Xabi.IndexAccess _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
 
+-- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
 expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
   var <- expToVar parent
 
@@ -866,11 +875,11 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
       case (val, theIndex) of
         (SArray _ theVector, SInteger i) -> do
           if (fromIntegral i) >= length theVector then
-            indexOutOfBounds (unparseExpression x) ("index = " ++ (show i) ++ ", array length = " ++ (show $ length theVector))
+            indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x 
           else
             return $ theVector V.! fromIntegral i
         (SReference _, _) -> Constant . SReference <$> expToPath x
-        _ -> typeError "expToVar' called for IndexAccess with unsupported types: " ("\nval = " ++ show val ++ "\ntheIndex = " ++ show theIndex)
+        _ -> typeError "unsupported types for index access" $ unparseExpression x
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 

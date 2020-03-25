@@ -144,10 +144,8 @@ setVal (SReference (AddressedPath addr path)) src = do
   putSolidStorageKeyVal' addr path $ toBasic src
 
 
-setVal dst src = typeError "unknown case called in setVal:" ("\nsrc = " ++ show src ++ "\ndst = " ++ show dst)
+setVal dst src = typeError "unknown case called in setVal:" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
-
-  
   
 {-
 
