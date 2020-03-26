@@ -401,6 +401,15 @@ evmUploadListError = Text.concat
   , "error message, please contact your administrator."
   ]
 
+evmUploadListSolidVMError :: Text
+evmUploadListSolidVMError = Text.concat
+  [ "Upload List (EVM): The given contracts were previously uploaded for "
+  , "SolidVM. To upload for EVM, the contracts' source code must be "
+  , "reuploaded via the /compile route. Please try uploading the contracts' "
+  , "source code via the /compile route, and try again. If you continue to "
+  , "receive this error message, please contact your administrator."
+  ]
+
 postUsersUploadListEVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListEVM' ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
@@ -413,11 +422,12 @@ postUsersUploadListEVM' ContractListParameters{..} sign = do
         Just (b, src, cmId', x) -> return (b, src, cmId', x)
         Nothing -> do
           mContract <- lift . blocQueryMaybe $ proc () -> do
-            (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-            returnA -< (bin16,src,cmId',x'')
+            (bin16,_,cHash,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
+            returnA -< (bin16,cHash,src,cmId',x'')
           case mContract of
             Nothing -> throwError $ UserError evmUploadListError
-            Just (b16,src,(cmId' :: Int32),x') -> do
+            Just (_,SolidVMCode _ _,_,_,_) -> throwError $ UserError evmUploadListSolidVMError
+            Just (b16,_,src,(cmId' :: Int32),x') -> do
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
               x <- lift $ deserializeXabi x'
