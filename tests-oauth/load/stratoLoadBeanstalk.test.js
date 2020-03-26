@@ -18,18 +18,18 @@ let initialNonce = 0;
 const batchSize = util.getArgInt('--batchSize', 1);
 const batchCount = util.getArgInt('--batchCount', 1);
 
-async function callApi(root, user, hash) {
-  const options = {
+async function callApi(nodes, user, hash) {
+  const options = nodes.map((url) => ({
     method: 'GET',
-    uri: `${root}/strato-api/eth/v1.2/transactionResult/${hash}`,
+    uri: `${url}/strato-api/eth/v1.2/transactionResult/${hash}`,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${user.token}`,
     },
-  };
+  }));
 
   try {
-    return await rp(options);
+    return await Promise.all(options.map((option) => rp(option)));
   } catch (e) {
     console.log(e);
     return e;
@@ -128,19 +128,19 @@ describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
       // await util.sleep(1000);
     }
 
-    console.log('------------------------', txResults);
-
     console.log(`Waiting on address '${user.address}' to reach nonce ${batchSize * batchCount}`);
     await waitResult(user, batchSize, batchCount);
 
-    // let thirdT = await callApi('http://multinode202.ci.blockapps.net', user, txResults[(batchSize * batchCount) - 1].hash);
-    // console.log('1 -------------------------------', thirdT);
+    const nodes = ['http://multinode201.ci.blockapps.net', 'http://multinode202.ci.blockapps.net'];
+    if (nodes.length) {
+      const lastTxHash = txResults[(batchSize * batchCount) - 1].hash;
 
-    // while (!thirdT.length) {
-    //   console.log('2 -------------------------------', thirdT);
-    //   thirdT = await callApi('http://multinode202.ci.blockapps.net', user, txResults[(batchSize * batchCount) - 1].hash);
-    //   console.log('3 -------------------------------', thirdT);
-    // }
+      let isSynced = false;
+      while (!isSynced) {
+        const responses = await callApi(nodes, user, lastTxHash);
+        isSynced = responses.every((v) => JSON.parse(v).length === 1);
+      }
+    }
 
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
