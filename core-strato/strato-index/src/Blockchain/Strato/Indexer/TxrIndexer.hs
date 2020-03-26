@@ -183,7 +183,7 @@ getKafkaCheckpoint = withKafkaRetry1s (fetchSingleOffset (snd kafkaClientIds) ta
 setKafkaCheckpoint :: Offset -> IContextM ()
 setKafkaCheckpoint ofs = do
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-    withKafkaViolently (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
+    withKafkaRetry1s (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
         Left err -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
         Right () -> return ()
 
