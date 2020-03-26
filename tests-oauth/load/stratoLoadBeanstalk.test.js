@@ -36,7 +36,7 @@ async function callApi(nodes, user, hash) {
   }
 }
 
-async function factoryCreateContractArgs(size) {
+async function factoryCreateContractArgs(batchNum, size) {
   const source = await importer.combine('./contracts/beanstalk/agreement/AgreementManager.sol');
 
   for (let i = 0; i < size; i++) {
@@ -57,6 +57,7 @@ async function factoryCreateContractArgs(size) {
         _programManager: '2383914a2cffe7bb97e0b622481b945858e08188',
         _userManager: '2383914a2cffe7bb97e0b622481b945858e08188',
       },
+      txParams: { nonce: initialNonce + (batchNum * size) + i },
     });
   }
   return txs;
@@ -111,7 +112,7 @@ describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
 
     for (let i = 0; i < batchCount; i++) {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
-      await factoryCreateContractArgs(batchSize);
+      await factoryCreateContractArgs(i, batchSize);
 
       const transactionStartTime = moment();
       const transactions = txs.slice(batchSize * i, batchSize * i + batchSize);
