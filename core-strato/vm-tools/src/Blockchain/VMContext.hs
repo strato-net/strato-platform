@@ -153,7 +153,7 @@ instance HasMemTXResultDB ContextM where
     let q = contextTxResultQueue ctx
         toWrite = chunksOf 2000 $ map IM.TxResult $ toList q
     recordTxrFlush $ Q.length q
-    mapM_ (K.withKafkaViolently . IK.writeIndexEvents) toWrite
+    mapM_ (K.withKafkaRetry1s . IK.writeIndexEvents) toWrite
     put $ ctx { contextTxResultQueue = Q.empty }
 
 instance HasMemLogDB ContextM where
@@ -165,7 +165,7 @@ instance HasMemLogDB ContextM where
   flushLogEntries = do
     ctx <- get
     let toWrite = contextLogDBQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.LogDBEntry <$> toWrite)
+    _ <- K.withKafkaRetry1s $ IK.writeIndexEvents (IM.LogDBEntry <$> toWrite)
     put $ ctx { contextLogDBQueue = [] }
 
 instance HasMemEventDB ContextM where
@@ -177,7 +177,7 @@ instance HasMemEventDB ContextM where
   flushEventEntries = do
     ctx <- get
     let toWrite = contextEventDBQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.EventDBEntry <$> toWrite)
+    _ <- K.withKafkaRetry1s $ IK.writeIndexEvents (IM.EventDBEntry <$> toWrite)
     put $ ctx { contextEventDBQueue = [] }
 
 instance Mod.Modifiable MP.StateRoot ContextM where
