@@ -544,6 +544,16 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
       Just elseCode -> runStatements elseCode
       Nothing -> return Nothing
 
+runStatement (Xabi.WhileStatement condition code) = do
+  
+     
+  while (getBool =<< expToVar condition) $ do
+      onTraced $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      result <- runStatements code
+      return result
+
+      -- TODO: this can loop infinitely
+
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
   _ <-

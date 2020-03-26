@@ -2410,6 +2410,21 @@ contract qq {
    }
 }|])) `shouldThrow` anyMissingFieldError
 
+  it "supports while loops" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+
+  constructor() {
+    while ( x < 3 )
+    {
+          x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 3]
+
   it "can handle all expr combinations for logical AND clause " . runTest $ do
     runBS [r|
 contract qq {
