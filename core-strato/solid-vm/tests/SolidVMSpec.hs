@@ -2409,3 +2409,20 @@ contract qq {
       bs[] = 42;
    }
 }|])) `shouldThrow` anyMissingFieldError
+
+
+  it "supports while loops" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+
+  constructor() {
+    while ( x < 3 )
+    {
+      x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 3]
+

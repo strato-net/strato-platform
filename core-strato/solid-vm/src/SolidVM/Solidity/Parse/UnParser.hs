@@ -158,6 +158,10 @@ unparseStatement (IfStatement e s1 s2) =
       " else {" ++ unlines (map unparseStatement elseStatements) ++ "}"
   in
     "if (" ++ unparseExpression e ++ ") {\n    " ++ tab (unlines (map unparseStatement s1)) ++ "}" ++ elseString s2
+
+unparseStatement (WhileStatement cond code) =
+  "while (" ++ unparseExpression cond ++ ") \n{ " ++ tab (unlines $ map unparseStatement code) ++ "\n}"
+
 unparseStatement (ForStatement v1 v2 v3 s) =
   "for (" ++ fromMaybe "" (fmap unparseSimpleStatement v1) ++ "; " ++ fromMaybe "" (fmap unparseExpression v2) ++ "; " ++ fromMaybe "" (fmap unparseExpression v3) ++ ") {\n    " ++ tab (unlines (map unparseStatement s)) ++ "}"
 unparseStatement (Return Nothing) = "return;"
@@ -171,6 +175,9 @@ unparseStatement (EmitStatement eventName extups) =
     expVals = map (unparseExpression . snd) extups
   in
     "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
+
+
+  
 
 unparseStatement x = error $ "missing case in call to unparseStatement: " ++ show x
 
