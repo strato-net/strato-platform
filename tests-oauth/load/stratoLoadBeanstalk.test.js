@@ -1,18 +1,40 @@
 /* eslint-disable no-console */
 /* eslint-disable no-await-in-loop */
+import rp from 'request-promise';
 import { rest, importer, util } from 'blockapps-rest';
 import moment from 'moment';
 import config from '../loadConfig';
 import '../loadEnv';
 
-const { createUser, createContractList, getAccounts } = rest;
+const {
+  createUser, createContractList, getAccounts, resolveResults,
+} = rest;
 
 const userArgs = { token: process.env.USER_TOKEN };
 const txs = [];
 let txResults = [];
+let initialNonce = 0;
 
 const batchSize = util.getArgInt('--batchSize', 1);
 const batchCount = util.getArgInt('--batchCount', 1);
+
+async function callApi(root, user, hash) {
+  const options = {
+    method: 'GET',
+    uri: `${root}/strato-api/eth/v1.2/transactionResult/${hash}`,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${user.token}`,
+    },
+  };
+
+  try {
+    return await rp(options);
+  } catch (e) {
+    console.log(e);
+    return e;
+  }
+}
 
 async function factoryCreateContractArgs(size) {
   const source = await importer.combine('./contracts/beanstalk/agreement/AgreementManager.sol');
@@ -53,12 +75,12 @@ async function getAccountDetails(user) {
 }
 
 async function waitResult(user, size, count) {
-  let nonce = 0;
+  let nonce = initialNonce;
 
-  while (nonce < size * count) {
+  while (nonce < initialNonce + (size * count)) {
     await util.sleep(1000);
     try {
-      console.log(`Current Nonce is: ${nonce}. Waiting on address '${user.address}' to reach nonce ${size * count}`);
+      console.log(`Current Nonce is: ${nonce}. Waiting on address '${user.address}' to reach nonce ${initialNonce + (size * count)}`);
       const result = await getAccountDetails(user);
       console.log(`Result: ${JSON.stringify(result)}`);
       nonce = result.nonce;
@@ -69,7 +91,7 @@ async function waitResult(user, size, count) {
 }
 
 
-describe('Strato Load Test (beanstalk)', function () {
+describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
   this.timeout(config.timeout);
 
   const options = { config };
@@ -79,6 +101,8 @@ describe('Strato Load Test (beanstalk)', function () {
     console.log('Creating User');
     user = await createUser(userArgs, options);
     console.log(`User: ${JSON.stringify(user)}`);
+    const account = await getAccountDetails(user);
+    initialNonce = account.nonce;
   });
 
   it('Upload contracts', async () => {
@@ -87,7 +111,7 @@ describe('Strato Load Test (beanstalk)', function () {
 
     for (let i = 0; i < batchCount; i++) {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
-      await factoryCreateContractArgs(batchSize, i);
+      await factoryCreateContractArgs(batchSize);
 
       const transactionStartTime = moment();
       const transactions = txs.slice(batchSize * i, batchSize * i + batchSize);
@@ -101,11 +125,22 @@ describe('Strato Load Test (beanstalk)', function () {
       console.log(`Received ${contracts.length} receipts`);
       txResults = txResults.concat(contracts);
       // NOTE: if we don't sleep only half of the contracts uploaded. any other solution for this?
-      await util.sleep(1000);
+      // await util.sleep(1000);
     }
+
+    console.log('------------------------', txResults);
 
     console.log(`Waiting on address '${user.address}' to reach nonce ${batchSize * batchCount}`);
     await waitResult(user, batchSize, batchCount);
+
+    // let thirdT = await callApi('http://multinode202.ci.blockapps.net', user, txResults[(batchSize * batchCount) - 1].hash);
+    // console.log('1 -------------------------------', thirdT);
+
+    // while (!thirdT.length) {
+    //   console.log('2 -------------------------------', thirdT);
+    //   thirdT = await callApi('http://multinode202.ci.blockapps.net', user, txResults[(batchSize * batchCount) - 1].hash);
+    //   console.log('3 -------------------------------', thirdT);
+    // }
 
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
