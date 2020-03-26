@@ -258,7 +258,7 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
     metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
   unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
-  argsBin <- constructArgValues (fmap (fmap argValueToText) args) xabiArgs
+  argsBin <- constructArgValues args xabiArgs
   tx <- signAndPrepare sign fromAddr metadata' $
     TransactionHeader
       Nothing
@@ -295,7 +295,7 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   $logInfoLS "postUsersContractSolidVM'/args" args
 
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
-  (_, argsAsSource) <- constructArgValuesAndSource (fmap (fmap argValueToText) args) xabiArgs
+  (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
 
   let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource)]
 
@@ -320,14 +320,16 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   getBlocTransactionResult' [hash] resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
-postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts _resolve) = do
+postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts msrcs _resolve) = do
   sk <- getAccountSecKey userName pw addr
-  let bclp = ContractListParameters
+  let getSrc c = uploadlistcontractSrc c <|> (msrcs >>= Map.lookup (uploadlistcontractContractName c))
+      setSrc c = c{uploadlistcontractSrc = getSrc c}
+      bclp = ContractListParameters
                addr
-               contracts
+               (setSrc <$> contracts)
                chainId
                (resolve || _resolve)
-  case join $ fmap (Map.lookup "VM") $ uploadlistcontractMetadata (head contracts) of  --Determine VM option by the metadata of the first tx in list
+  case Map.lookup "VM" =<< uploadlistcontractMetadata (head contracts) of  --Determine VM option by the metadata of the first tx in list
     Just "EVM" -> postUsersUploadListEVM' bclp (return . signTransaction sk)
     Just "SolidVM" -> postUsersUploadListSolidVM' bclp (return . signTransaction sk)
     Nothing -> postUsersUploadListEVM' bclp (return . signTransaction sk) -- The EVM is the default VM
@@ -338,29 +340,33 @@ postUsersUploadListSolidVM' ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces (getAccountNonce fromAddr) uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name args params value cid md) -> do
-      mtuple <- use $ at name
-      (_, src, cmId, xabi) <- case mtuple of
-        Just (b, src, cmId', x) -> return (b, src, cmId', x)
+    \(UploadListContract name mSrc args params value cid md) -> do
+      (src, cmId, xabi) <- case mSrc of
+        Just src -> do
+          (cmId', cd) <- lift $ do
+            idsAndDetails <- sourceToContractDetails (Don't Compile) src
+            blocMaybe "Could not find global contract metadataId" (Map.lookup name idsAndDetails)
+          at name <?= (src, cmId', contractdetailsXabi cd)
         Nothing -> do
-          mContract <- lift . blocQueryMaybe $ proc () -> do
-            (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-            returnA -< (bin16,src,cmId',x'')
-          case mContract of
-            Nothing -> throwError . UserError $ Text.concat
-              [ "Upload List: When deploying multiple contract creation transactions, "
-              , "the contracts' source code must be uploaded via the /compile route "
-              , "ahead of time. Please try uploading the contracts' source code via "
-              , "the /compile route, and try again. If you continue to receive this "
-              , "error message, please contact your administrator."
-              ]
-            Just (b16,src,(cmId' :: Int32),x') -> do
-              let (b, leftOver) = Base16.decode b16
-              unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-              x <- lift $ deserializeXabi x'
-              at name <?= (b, src, cmId', x)
+          mtuple <- use $ at name
+          case mtuple of
+            Just (src, cmId', x) -> return (src, cmId', x)
+            Nothing -> do
+              mContract <- lift . blocQueryMaybe $ proc () -> do
+                (_,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
+                returnA -< (src,cmId',x'')
+              case mContract of
+                Nothing -> throwError . UserError $ Text.concat
+                  [ "Upload List (SolidVM): When deploying multiple contract creation transactions, "
+                  , "the contracts' source code must be supplied when using SolidVM. "
+                  , "Please try supplying the contracts' source code and try again. "
+                  , "If you continue to receive this error message, please contact your administrator."
+                  ]
+                Just (src,(cmId' :: Int32),x') -> do
+                  x <- lift $ deserializeXabi x'
+                  at name <?= (src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
-      (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just (fmap argValueToText args)) xabiArgs
+      (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
       tx <- lift . signAndPrepare sign fromAddr metadata' $
@@ -386,13 +392,22 @@ postUsersUploadListSolidVM' ContractListParameters{..} sign = do
     ]
   getBatchBlocTransactionResult' hashes resolve
 
+evmUploadListError :: Text
+evmUploadListError = Text.concat
+  [ "Upload List (EVM): When deploying multiple contract creation transactions, "
+  , "the contracts' source code must be uploaded via the /compile route "
+  , "ahead of time. Please try uploading the contracts' source code via "
+  , "the /compile route, and try again. If you continue to receive this "
+  , "error message, please contact your administrator."
+  ]
 
 postUsersUploadListEVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListEVM' ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces (getAccountNonce fromAddr) uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name args params value cid md) -> do
+    \(UploadListContract name mSrc args params value cid md) -> do
+      when (isJust mSrc) . lift . throwError $ UserError evmUploadListError
       mtuple <- use $ at name
       (bin, src, cmId, xabi) <- case mtuple of
         Just (b, src, cmId', x) -> return (b, src, cmId', x)
@@ -401,20 +416,14 @@ postUsersUploadListEVM' ContractListParameters{..} sign = do
             (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
             returnA -< (bin16,src,cmId',x'')
           case mContract of
-            Nothing -> throwError . UserError $ Text.concat
-              [ "Upload List: When deploying multiple contract creation transactions, "
-              , "the contracts' source code must be uploaded via the /compile route "
-              , "ahead of time. Please try uploading the contracts' source code via "
-              , "the /compile route, and try again. If you continue to receive this "
-              , "error message, please contact your administrator."
-              ]
+            Nothing -> throwError $ UserError evmUploadListError
             Just (b16,src,(cmId' :: Int32),x') -> do
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
               x <- lift $ deserializeXabi x'
               at name <?= (b, src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
-      argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
+      argsBin <- lift $ constructArgValues (Just args) xabiArgs
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
       tx <- lift . signAndPrepare sign fromAddr metadata' $
           TransactionHeader
@@ -561,7 +570,7 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
              _ -> lift $ throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
           let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
           (argsBin, argsAsSource) <-
-            lift $ constructArgValuesAndSource (Just (fmap argValueToText methodcallArgs)) xabiArgs
+            lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
           let methodcallMetadataWithCallInfo = Just $
                 Map.insert "funcName" methodcallMethodName
                 $ Map.insert "args" argsAsSource
@@ -649,7 +658,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
        Just (_, TypeFunction selector _ _) -> return selector
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
-    (argsBin, argsAsSource) <- constructArgValuesAndSource (Just (fmap argValueToText args)) xabiArgs
+    (argsBin, argsAsSource) <- constructArgValuesAndSource (Just args) xabiArgs
     let metadataWithCallInfo =
           Map.insert "funcName" funcName
           $ Map.insert "args" argsAsSource
@@ -754,7 +763,7 @@ evalAndReturn list = forStateT emptyBatchState list $
             0 -> return $ BlocTransactionResult Success hash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata)
             1 -> contractResult hash mtxr cmId tdata
             2 -> functionResult hash mtxr cmId tdata
-            _ -> error $ "Unexpected transaction type: got" ++ show ttype
+            _ -> throwError $ InternalError $ Text.pack $ "Unexpected transaction type: got" ++ show ttype
 
 contractResult :: Keccak256
                -> Maybe TransactionResult
@@ -830,11 +839,11 @@ convertResultResToVals txResp responseTypes =
   let byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
   in map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
-getArgValues :: Map Text Text -> Map Text Xabi.IndexedType -> Bloc [Value]
+getArgValues :: Map Text ArgValue -> Map Text Xabi.IndexedType -> Bloc [Value]
 getArgValues argsMap argNamesTypes = do
     let
-      determineValue :: Text -> Xabi.IndexedType -> Bloc (Int32, Value)
-      determineValue valStr (Xabi.IndexedType ix xabiType) =
+      determineValue :: ArgValue -> Xabi.IndexedType -> Bloc (Int32, Value)
+      determineValue argVal (Xabi.IndexedType ix xabiType) =
         let
           typeM = case xabiType of
             Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
@@ -868,7 +877,7 @@ getArgValues argsMap argNamesTypes = do
             Xabi.Label _                 -> Right $ SimpleType typeUInt -- since Enums are converted to Ints
         in do
           ty <- either (blocError . UserError) return typeM
-          either (blocError . UserError) (return . (ix,)) (textToValue Nothing valStr ty)
+          either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)
     argsVals <-
       if not (Map.keysSet argNamesTypes `isSubsetOf` Map.keysSet argsMap)
       then do
@@ -879,7 +888,7 @@ getArgValues argsMap argNamesTypes = do
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
 
-constructArgValues :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc ByteString
+constructArgValues :: Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> Bloc ByteString
 constructArgValues args argNamesTypes = do
     case args of
       Nothing ->
@@ -890,7 +899,7 @@ constructArgValues args argNamesTypes = do
         vals <- getArgValues argsMap argNamesTypes
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
-constructArgValuesAndSource :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc (ByteString, Text)
+constructArgValuesAndSource :: Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> Bloc (ByteString, Text)
 constructArgValuesAndSource args argNamesTypes = do
     case args of
       Nothing ->

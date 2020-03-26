@@ -133,48 +133,52 @@ enterVaultWrapper env x
     reThrowError :: VaultWrapperError -> ServantErr
     reThrowError
       = \case
-          DBError _ ->
+          DBError err ->
             err500{errBody = fromString $ unlines
                    [
-                     "Internal Error!",
+                     "DB Error!",
                      "Something is broken in the STRATO database.",
-                     "Please contact your network administrator to have this problem fixed."
+                     "Please contact your network administrator to have this problem fixed.",
+                     "Error Message:",
+                     Text.unpack err
                    ]}
           UserError err -> err400{errBody = fromString $ show err}
           UserDoesNotExist t -> err401{errBody = LB.fromStrict $ encodeUtf8 t}
           NoPasswordError ->
             err503{errBody = fromString $ unlines
                    [
-                     "Internal Error!",
+                     "No Password for Vault-Wrapper!",
                      "STRATO has not been initialized properly.",
                      "Please contact your network administrator to have this problem fixed."
                    ]}
           IncorrectPasswordError ->
             err503{errBody = fromString $ unlines
                    [
-                     "Internal Error!",
+                     "Incorrect Password for Vault-Wrapper!",
                      "STRATO has not been initialized properly.",
                      "Please contact your network administrator to have this problem fixed."
                    ]}
           AlreadyExists err -> err409{errBody = fromString $ show err}
           CouldNotFind err -> err404{errBody = fromString $ show err}
-          AnError _ ->
+          AnError err ->
             err500{errBody = fromString $ unlines
                    [
-                     "Internal Error!",
+                     "An Error!",
                      "Something is broken in STRATO.",
-                     "Please contact your network administrator to have this problem fixed."
+                     "Please contact your network administrator to have this problem fixed.",
+                     "Error Message:",
+                     Text.unpack err
                    ]}
           Unimplemented err ->
             err501{errBody = fromString $ unlines
                    [
-                     "Internal Error!",
+                     "Unimplemented Error!",
                      "You are using a feature that has not yet been implemented.",
                      Text.unpack err
                    ]}
           RuntimeError _ -> err500{errBody = fromString $ unlines
                    [
-                     "Internal Error!",
+                     "Runtime Error!",
                      "Something wrong has happened inside of STRATO.",
                      "Please contact your network administrator to have this problem fixed."
                    ]}

@@ -17,9 +17,8 @@ module Blockchain.SolidVM.Value (
   ) where
 
 
-import           Control.Monad
+import           Control.Monad (forM, when)
 import           Control.Monad.IO.Class
---import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
@@ -169,6 +168,7 @@ valEquals :: Contract -> Value -> Value -> Bool
 valEquals ct lhs rhs = case (lhs, rhs) of
   (SInteger i, _) -> coerceFromInt ct rhs i == rhs
   (_, SInteger i) -> coerceFromInt ct lhs i == lhs
+  (SBool s1, SBool s2) -> s1 == s2
   (SString s1, SString s2) -> s1 == s2
   (SAddress v1, SAddress v2) -> v1 == v2
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
@@ -217,7 +217,7 @@ createDefaultValue ctract (Xabi.Label name) =
   case (M.lookup name $ _enums ctract, M.lookup name $ _structs ctract) of
     (Just (val:_), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
-      items <- 
+      items <-
         forM sdef $ \(n, itemType) -> do
           itemVal <- createDefaultValue ctract $ Xabi.fieldTypeType itemType
           itemVar <- createVar itemVal

@@ -64,6 +64,14 @@ function getCreateArgs(contract, options) {
   return tx;
 }
 
+async function compileContracts(user, contracts, options) {
+  const body = contracts.map(contract => ({ contractName: contract.name, source: contract.source }));
+
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.COMPILE, options);
+  return post(url, endpoint, body, setAuthHeaders(user, options));
+}
+
 async function createContract(user, contract, options) {
   const tx = getCreateArgs(contract, options);
   const body = {
@@ -214,6 +222,27 @@ async function search(user, contract, options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
+async function searchWithContentRange(user, contract, options) {
+  const url = getNodeUrl(options);
+  const urlParams = {
+      name: contract.name
+  };
+  const endpoint = constructEndpoint(Endpoint.SEARCH, options, urlParams);
+  const headersWithCount = { ...options.headers, Prefer: 'count=exact' };
+  const optionsWithCount = { ...options, headers: headersWithCount, getFullResponse: true };
+  const { data, headers } = await get(url, endpoint, setAuthHeaders(user, optionsWithCount));
+  const contentRangeStr = headers['content-range'];
+  const [range, countStr] = contentRangeStr.split('/');
+  const count = parseInt(countStr, 10);
+  if (range === "*") {
+    const contentRange = { count };
+    return { data, contentRange };
+  }
+  const [start, end] = range.split('-').map((s) => parseInt(s, 10));
+  const contentRange = { start, end, count };
+  return { data, contentRange };
+}
+
 // TODO: check options.params and options.headers in axoos wrapper.
 async function getChains(chainIds, options) {
   const url = getNodeUrl(options);
@@ -291,6 +320,7 @@ export default {
   getUser,
   createUser,
   getCreateArgs,
+  compileContracts,
   createContract,
   createContractList,
   fill,
@@ -306,6 +336,7 @@ export default {
   getKey,
   createKey,
   search,
+  searchWithContentRange,
   getChains,
   createChain,
   createChains,

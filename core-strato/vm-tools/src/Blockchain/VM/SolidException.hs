@@ -2,6 +2,7 @@ module Blockchain.VM.SolidException
   ( SolidException(..)
   , typeError
   , todo
+  , indexOutOfBounds
   , checkArity
   , arityMismatch
   , internalError
@@ -10,9 +11,11 @@ module Blockchain.VM.SolidException
   , missingType
   , parseError
   , require
+  , assert
   , unknownFunction
   , unknownConstant
   , unknownVariable
+  , unknownStatement
   ) where
 
 import Control.DeepSeq
@@ -25,31 +28,37 @@ import Text.Printf (printf)
 data SolidException = TypeError String String
                     | InternalError String String
                     | InvalidArguments String String
+                    | IndexOutOfBounds String String
                     | TODO String String
                     | MissingField String String
                     | MissingType String String
                     | ArityMismatch String Int Int
                     | ParseError String String
                     | Require (Maybe String)
+                    | Assert
                     | UnknownFunction String String
                     | UnknownConstant String String
                     | UnknownVariable String String
+                    | UnknownStatement String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
   show (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
   show (InternalError m v) = printf "internal error: %s: %s" m v
-  show (InvalidArguments m v) = printf "invalid arguments: %s %s" m v
+  show (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
+  show (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
   show (MissingField m v) = printf "missing field: %s: %s" m v
   show (MissingType m v) = printf "missing type: %s: %s" m v
   show (ParseError m v) = printf "parse error: %s: %s" m v
   show (Require Nothing) = printf "solidity require failed"
   show (Require (Just m)) = printf "solidity require failed: %s" m
-  show (TODO m v) = printf "TODO: %s: %s" m v
+  show Assert = printf "solidity assert failed"
+  show (TODO m v) = printf "Unimplemented feature in SolidVM: %s: %s" m v
   show (TypeError a b) = printf "type error: %s: %s" a b
   show (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
   show (UnknownFunction a b) = printf "unknown function: %s: %s" a b
   show (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
+  show (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -65,6 +74,9 @@ internalError = toThrower InternalError
 
 invalidArguments :: (Show v) => String -> v -> a
 invalidArguments = toThrower InvalidArguments
+
+indexOutOfBounds :: (Show v) => String -> v -> a
+indexOutOfBounds = toThrower IndexOutOfBounds
 
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField
@@ -84,6 +96,9 @@ parseError = toThrower ParseError
 require :: MonadIO m => Bool -> Maybe String -> m ()
 require c = unless c . liftIO . throwIO . Require
 
+assert :: MonadIO m => Bool -> m ()
+assert c = unless c . liftIO $ throwIO Assert
+
 unknownFunction :: (Show v) => String -> v -> a
 unknownFunction = toThrower UnknownFunction
 
@@ -92,3 +107,6 @@ unknownConstant = toThrower UnknownConstant
 
 unknownVariable :: (Show v) => String -> v -> a
 unknownVariable = toThrower UnknownVariable
+
+unknownStatement :: (Show v) => String -> v -> a
+unknownStatement = toThrower UnknownStatement

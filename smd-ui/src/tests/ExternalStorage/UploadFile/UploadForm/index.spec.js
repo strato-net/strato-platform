@@ -13,9 +13,9 @@ describe('UploadFile: index', () => {
     store = createStore(combineReducers({ form: formReducer }));
   });
 
-  describe('render component (enterprise mode)', () => {
+  describe('render component (Oauth mode)', () => {
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     })
 
     test('without values', () => {
@@ -70,9 +70,9 @@ describe('UploadFile: index', () => {
 
   });
 
-  describe('render component (public mode)', () => {
+  describe('render component (Non Oauth mode)', () => {
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     })
 
     test('without values', () => {
@@ -127,9 +127,9 @@ describe('UploadFile: index', () => {
 
   });
 
-  describe('public mode', () => {
+  describe('Non oauth mode', () => {
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     })
 
     test('Form input', () => {
@@ -239,9 +239,9 @@ describe('UploadFile: index', () => {
           isLoading: false
         },
         user: {
-          currentUser: {
+          oauthUser: {
             username: null,
-            accountAddress: null
+            address: null
           }
         }
       }
@@ -259,9 +259,9 @@ describe('UploadFile: index', () => {
           isLoading: true
         },
         user: {
-          currentUser: {
+          oauthUser: {
             username: 'Admin_1085_64667',
-            accountAddress: 'd2263b71c14010ff03d8f786670aba691b22b158'
+            address: 'd2263b71c14010ff03d8f786670aba691b22b158'
           }
         }
       }

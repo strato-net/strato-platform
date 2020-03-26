@@ -63,8 +63,6 @@ router.post('/dapps', dappController.upload);
 
 // router.get('/dapps', dappController.list);
 
-
-
 router.post('/bloc/file/upload', checkUID, multerMiddleware, fileController.upload);
 router.post('/bloc/file/attest', checkUID, fileController.attest);
 router.get('/bloc/file/verify', fileController.verify);

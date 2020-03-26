@@ -4,7 +4,7 @@
 -- of secp256k1-haskell
 module Crypto.HaskoinShim
   ( PubKey(..)
-  , SecKey
+  , SecKey(..)
   , Msg
   , CompactRecSig(..)
   , CompactSig(..)

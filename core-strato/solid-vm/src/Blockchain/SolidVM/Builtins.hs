@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -9,7 +10,7 @@ import           Blockchain.SolidVM.Value
 import           Blockchain.VM.SolidException
 import qualified SolidVM.Model.Storable as MS
 
-push :: Value -> ValList -> SM Variable
+push :: MonadSM m => Value -> ValList -> m Variable
 push (SReference apt) (OrderedVals [av]) = do
   let lenPath = apt `apSnoc` MS.Field "length"
   len' <- getInt $ Constant $ SReference lenPath

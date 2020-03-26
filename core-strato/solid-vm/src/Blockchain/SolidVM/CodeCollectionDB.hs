@@ -14,7 +14,7 @@ import           Text.Parsec                          (runParser)
 
 import           Blockchain.DB.CodeDB
 import           Blockchain.SHA
-import           Blockchain.SolidVM.Exception
+import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
 
 import           SolidVM.Solidity.Parse.Declarations

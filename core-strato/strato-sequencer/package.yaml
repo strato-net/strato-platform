@@ -85,6 +85,7 @@ executables:
       - strato-sequencer
       - aeson-pretty
       - entropy
+      - haskoin-shim
       - hflags
     other-modules: [Flags]
 

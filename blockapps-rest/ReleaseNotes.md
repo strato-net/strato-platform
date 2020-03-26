@@ -1,5 +1,31 @@
 ## RELEASE NOTES
 
+### Version 7.6.4
+
+- Add source mappings for minified dist code
+- Add babel-preset-minify, remove gulp-uglify
+
+#### Minor upgrades
+
+- Added Bloc /compile endpoint
+
+### Version 7.6.3
+
+- Fix for util.uid() to always return string value for compatibility with STRATO 5.2+
+
+### Version 7.6.2
+
+- Expose searchWithContentRange and searchWithContentRangeUntil
+
+### Version 7.6.1
+
+- Fix distributive
+
+### Version 7.6.0
+
+-   Token-getter updates: no separate config needed - fully mimics the app by following it's config
+-   Fix for @babel/polyfill dependency
+
 ### Version 7.5.8
 
 -   Pass chainid parameter through getCallArgs and getCreateArgs

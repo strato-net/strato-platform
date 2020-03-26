@@ -81,6 +81,7 @@ dependencies:
   - transformers
   - transformers-base
   - unordered-containers
+  - vector
   - wai-cors
   - wai-extra
   - warp

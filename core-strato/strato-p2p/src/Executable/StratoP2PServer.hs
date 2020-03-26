@@ -14,14 +14,11 @@ import           Blockchain.Context
 import           Blockchain.RLPx
 import           Conduit
 import           Control.Monad
-import           Control.Monad.Trans.Identity
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.State
 import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
 import           Data.Streaming.Network                (appCloseConnection)
 import qualified Data.Text                             as T
-import qualified Database.Persist.Types                as SQL
 import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           UnliftIO
 
@@ -38,21 +35,19 @@ runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
              -> Int
              -> m ()
 runEthServer myPriv listenPort = do
-  ctx <- initContext flags_maxReturnedHeaders
+  (cfg, initState) <- initContext flags_maxReturnedHeaders
   let myPubkey = calculatePublic theCurve myPriv
-  void . runContextM ctx $ do
-    initState <- get
+  void . runContextM cfg $ do
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
-    lift . runGeneralTCPServer settings $ \app -> runResourceT $ do
+    runGeneralTCPServer settings $ \app -> do
       let theSockAddr = sockAddrToIP (appSockAddr app)
       ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow theSockAddr
       void $ register ender
-      runIdentityT (getPeerByIP theSockAddr) >>= \case
+      unPPeerByIp (getPeerByIP theSockAddr) >>= \case
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ show theSockAddr ++ ". rejecting violently."
           liftIO (appCloseConnection app)
-        Just peer -> do
-          let p  = SQL.entityVal peer
+        Just p -> do
           case pPeerPubkey p of
             Nothing -> do
               $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ show theSockAddr  ++ ". rejecting violently."

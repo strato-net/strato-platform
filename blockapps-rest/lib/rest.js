@@ -85,6 +85,22 @@ async function fill(user, options) {
 }
 
 // =====================================================================
+//   compile contracts
+// =====================================================================
+
+async function compileContracts(user, contract, options) {
+  try {
+    return await api.compileContracts(user, contract, options);
+  } catch (err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText,
+      err.response.data
+    );
+  }
+}
+
+// =====================================================================
 //   contract
 // =====================================================================
 
@@ -320,6 +336,27 @@ async function searchUntil(user, contract, predicate, options) {
   return results;
 }
 
+async function searchWithContentRange(user, contract, options) {
+  try {
+    const results = await api.searchWithContentRange(user, contract, options);
+    return results;
+  } catch (err) {
+    if (err.response && err.response.status === RestStatus.NOT_FOUND) {
+      return {};
+    }
+    throw err;
+  }
+}
+
+async function searchWithContentRangeUntil(user, contract, predicate, options) {
+  const action = async o => {
+    return searchWithContentRange(user, contract, o);
+  };
+
+  const results = await util.until(predicate, action, options);
+  return results;
+}
+
 // =====================================================================
 //   Chains
 // =====================================================================
@@ -438,6 +475,7 @@ export default {
   getUsers,
   getUser,
   createUser,
+  compileContracts,
   createContract,
   createContractList,
   getState,
@@ -458,6 +496,8 @@ export default {
   //
   search,
   searchUntil,
+  searchWithContentRange,
+  searchWithContentRangeUntil,
   //
   createChain,
   createChains,

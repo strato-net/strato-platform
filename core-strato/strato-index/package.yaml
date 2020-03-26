@@ -17,6 +17,7 @@ dependencies:
   - blockapps-util
   - bytestring
   - clock
+  - conduit
   - containers
   - deepseq
   - format

@@ -14,6 +14,7 @@ OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
+OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK:-false}
 
 # If container is running for the first time - generate config:
@@ -103,10 +104,11 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   if [ "$OAUTH_ENABLED" = true ] ; then
     cp /tmp/openid.tpl.lua /tmp/openid.lua
-    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid.lua
-    sed -i 's*<OAUTH_DISCOVERY_URL>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
+    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY_PLACEHOLDER>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid.lua
+    sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
     sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
     sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
+    sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*'"$OAUTH_SCOPE"'*g' /tmp/openid.lua
 
     if [ "$ssl" = true ] ; then
       sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua

@@ -15,7 +15,6 @@ volumes:
     driver: local
   zookeeperdata:
     driver: local
-
 networks:
   static:
     ipam:
@@ -41,6 +40,11 @@ services:
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.1
@@ -74,6 +78,11 @@ services:
     volumes:
     - dapps:/usr/src/app/apps
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.2
@@ -88,6 +97,11 @@ services:
     build: .
     image: ${DAPPSTORE_IMAGE:-<REPO_URL>dappstore:<VERSION>}
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.3
@@ -116,6 +130,11 @@ services:
     build: .
     image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.4
@@ -123,6 +142,11 @@ services:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.5
@@ -141,6 +165,11 @@ services:
     build: .
     image: ${VAULTWRAPPER_IMAGE:-<REPO_URL>vault-wrapper:<VERSION>}
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.6
@@ -207,6 +236,11 @@ services:
     - 30303:30303
     - 30303:30303/udp
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.7
@@ -226,6 +260,11 @@ services:
     build: .
     image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.8
@@ -236,6 +275,11 @@ services:
     volumes:
     - pgdata:/var/lib/postgresql/data
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.9
@@ -259,6 +303,7 @@ services:
     - OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY}
     - OAUTH_JWT_VALIDATION_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED:-false} # for backwards-compatibility with 4.2
     - OAUTH_JWT_VALIDATION_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL} # for backwards-compatibility with 4.2
+    - OAUTH_SCOPE=${OAUTH_SCOPE}
     - OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK} # for backwards-compatibility with 4.2
     - OAUTH_TEMPORARY_MIXED_AUTH=${OAUTH_TEMPORARY_MIXED_AUTH} # To allow gradual migration of tests to oauth
     - SMD_MODE=${SMD_MODE}
@@ -275,6 +320,11 @@ services:
     volumes:
     - ./ssl:/tmp/ssl:ro
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.10
@@ -283,6 +333,11 @@ services:
     - API_URL=/strato-api/eth/v1.2/swagger.json
     image: swaggerapi/swagger-ui:v3.22.1
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.11
@@ -291,6 +346,11 @@ services:
     restart: always
     volumes:
       - zookeeperdata:/opt/zookeeper-3.4.6/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.12
@@ -314,6 +374,11 @@ services:
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - kafkadata:/kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.13
@@ -325,6 +390,11 @@ services:
     volumes:
     - prometheusdata:/prometheus
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
     networks:
       static:
         ipv4_address: 172.20.20.14

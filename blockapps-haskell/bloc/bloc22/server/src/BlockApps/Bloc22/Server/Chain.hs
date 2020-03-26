@@ -20,6 +20,7 @@ import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
+import qualified Data.Vector                       as V
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
@@ -30,7 +31,6 @@ import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
-import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client           as Strato
 import           BlockApps.Strato.TypeLits
@@ -42,13 +42,14 @@ import           BlockApps.XAbiConverter           (xAbiToContract)
 governanceAddress :: Address
 governanceAddress = Address 0x100
 
+-- TODO: use Value instead of ArgValue here
 replaceMembers :: Struct
                -> [Address]
-               -> Map.Map Text Text
-               -> Map.Map Text Text
+               -> Map.Map Text ArgValue
+               -> Map.Map Text ArgValue
 replaceMembers Struct{..} addrs m =
   let tag = "__members__"
-      members = valueToText $ ValueArrayDynamic . tosparse $ map (SimpleValue . ValueAddress) addrs
+      members = ArgArray . V.fromList $ map (ArgString . Text.pack . addressString) addrs
       m' = Map.alter (const $ Just members) tag m
    in case OMap.lookup tag fields of
         Nothing -> m'
@@ -78,17 +79,16 @@ createChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) =
       Nothing -> return ([],[])
       Just (_, ContractDetails{..}) -> do
           contract <- either (throwError . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
-          let argsText = map (fmap argValueToText) $ Map.toList chaininputArgs
-              argsText' = replaceMembers
+          let argValues = replaceMembers
                             (mainStruct contract)
                             (nmap1' members)
-                            (Map.fromList argsText)
-              storage = encodeValues
-                          (typeDefs contract)
-                          (mainStruct contract)
-                          0
-                          (Map.toList argsText')
-              balMap = Map.fromList $ map toTuple balances
+                            chaininputArgs
+          storage <- either (throwError . UserError) return $ encodeValues
+                       (typeDefs contract)
+                       (mainStruct contract)
+                       0
+                       (Map.toList argValues)
+          let balMap = Map.fromList $ map toTuple balances
               govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
 
           (contractHash, b, s) <-
