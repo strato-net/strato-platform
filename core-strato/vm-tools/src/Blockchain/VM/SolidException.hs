@@ -2,6 +2,7 @@ module Blockchain.VM.SolidException
   ( SolidException(..)
   , typeError
   , todo
+  , indexOutOfBounds
   , checkArity
   , arityMismatch
   , internalError
@@ -27,6 +28,7 @@ import Text.Printf (printf)
 data SolidException = TypeError String String
                     | InternalError String String
                     | InvalidArguments String String
+                    | IndexOutOfBounds String String
                     | TODO String String
                     | MissingField String String
                     | MissingType String String
@@ -43,14 +45,15 @@ data SolidException = TypeError String String
 instance Show SolidException where
   show (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
   show (InternalError m v) = printf "internal error: %s: %s" m v
-  show (InvalidArguments m v) = printf "invalid arguments: %s %s" m v
+  show (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
+  show (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
   show (MissingField m v) = printf "missing field: %s: %s" m v
   show (MissingType m v) = printf "missing type: %s: %s" m v
   show (ParseError m v) = printf "parse error: %s: %s" m v
   show (Require Nothing) = printf "solidity require failed"
   show (Require (Just m)) = printf "solidity require failed: %s" m
   show Assert = printf "solidity assert failed"
-  show (TODO m v) = printf "TODO: %s: %s" m v
+  show (TODO m v) = printf "Unimplemented feature in SolidVM: %s: %s" m v
   show (TypeError a b) = printf "type error: %s: %s" a b
   show (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
   show (UnknownFunction a b) = printf "unknown function: %s: %s" a b
@@ -71,6 +74,9 @@ internalError = toThrower InternalError
 
 invalidArguments :: (Show v) => String -> v -> a
 invalidArguments = toThrower InvalidArguments
+
+indexOutOfBounds :: (Show v) => String -> v -> a
+indexOutOfBounds = toThrower IndexOutOfBounds
 
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField

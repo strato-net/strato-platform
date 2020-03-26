@@ -85,6 +85,22 @@ async function fill(user, options) {
 }
 
 // =====================================================================
+//   compile contracts
+// =====================================================================
+
+async function compileContracts(user, contract, options) {
+  try {
+    return await api.compileContracts(user, contract, options);
+  } catch (err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText,
+      err.response.data
+    );
+  }
+}
+
+// =====================================================================
 //   contract
 // =====================================================================
 
@@ -459,6 +475,7 @@ export default {
   getUsers,
   getUser,
   createUser,
+  compileContracts,
   createContract,
   createContractList,
   getState,

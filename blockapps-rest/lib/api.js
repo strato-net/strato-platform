@@ -64,6 +64,14 @@ function getCreateArgs(contract, options) {
   return tx;
 }
 
+async function compileContracts(user, contracts, options) {
+  const body = contracts.map(contract => ({ contractName: contract.name, source: contract.source }));
+
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.COMPILE, options);
+  return post(url, endpoint, body, setAuthHeaders(user, options));
+}
+
 async function createContract(user, contract, options) {
   const tx = getCreateArgs(contract, options);
   const body = {
@@ -312,6 +320,7 @@ export default {
   getUser,
   createUser,
   getCreateArgs,
+  compileContracts,
   createContract,
   createContractList,
   fill,
