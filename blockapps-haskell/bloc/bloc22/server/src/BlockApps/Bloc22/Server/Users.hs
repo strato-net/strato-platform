@@ -239,6 +239,13 @@ postUsersContract userName addr chainId resolve
     Nothing -> postUsersContractEVM' bcp (return . signTransaction sk) -- The EVM is the default VM
     Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
+evmContractSolidVMError :: Text
+evmContractSolidVMError = Text.concat
+  [ "Upload Contract (EVM): The given contracts were previously uploaded for "
+  , "SolidVM. Please retry your request specifying SolidVM as the VM type. "
+  , "If you are intending to use EVM, please modify your contracts and try again."
+  ]
+
 postUsersContractEVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
@@ -250,7 +257,9 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
      Nothing ->
        case Map.toList idsAndDetails of
          [] -> throwError $ UserError "You need to supply at least one contract in the source"
-         [x] -> return x
+         [(n,(m,cd))] -> case contractdetailsCodeHash cd of
+                  (EVMCode _) -> return (n, (m, cd))
+                  (SolidVMCode _ _) -> throwError $ UserError evmContractSolidVMError
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
      Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   let
@@ -401,15 +410,6 @@ evmUploadListError = Text.concat
   , "error message, please contact your administrator."
   ]
 
-evmUploadListSolidVMError :: Text
-evmUploadListSolidVMError = Text.concat
-  [ "Upload List (EVM): The given contracts were previously uploaded for "
-  , "SolidVM. To upload for EVM, the contracts' source code must be "
-  , "reuploaded via the /compile route. Please try uploading the contracts' "
-  , "source code via the /compile route, and try again. If you continue to "
-  , "receive this error message, please contact your administrator."
-  ]
-
 postUsersUploadListEVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListEVM' ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
@@ -426,7 +426,7 @@ postUsersUploadListEVM' ContractListParameters{..} sign = do
             returnA -< (bin16,cHash,src,cmId',x'')
           case mContract of
             Nothing -> throwError $ UserError evmUploadListError
-            Just (_,SolidVMCode _ _,_,_,_) -> throwError $ UserError evmUploadListSolidVMError
+            Just (_,SolidVMCode _ _,_,_,_) -> throwError $ UserError evmContractSolidVMError
             Just (b16,_,src,(cmId' :: Int32),x') -> do
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
