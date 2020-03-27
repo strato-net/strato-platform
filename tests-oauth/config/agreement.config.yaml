@@ -1,21 +1,31 @@
-apiDebug: false
+apiDebug: true
 VM: SolidVM
 timeout: 600000
 batchCount: 2
 batchSize: 10
 
+multinode:
+  runTest: true
+  nodes: 
+    - http://multinode201.ci.blockapps.net
+    - http://multinode202.ci.blockapps.net
+
 contract: 
-  name: 'AgreementManager'
-  filePath: './contracts/beanstalk/agreement/AgreementManager.sol'
+  name: 'Agreement'
+  filePath: './contracts/beanstalk/agreement/Agreement.sol'
   args: 
     _dappAddress: 2383914a2cffe7bb97e0b622481b945858e08188
-    _permissionManager: '2383914a2cffe7bb97e0b622481b945858e08188'
-    _programManager: '2383914a2cffe7bb97e0b622481b945858e08188'
-    _userManager: '2383914a2cffe7bb97e0b622481b945858e08188'
-
-multinode:
-  - http://multinode201.ci.blockapps.net
-  - http://multinode202.ci.blockapps.net
+    _agreementId: '1234'
+    _chainsIds: []
+    _cropYear: '1234'
+    _dealerId: '1234'
+    _growerId: '1234'
+    _programId: '1234'
+    _programName: '_programName'
+    _region: '1234'
+    _season: '1234'
+    _permissionManager: 2383914a2cffe7bb97e0b622481b945858e08188
+    _programManager: 2383914a2cffe7bb97e0b622481b945858e08188
 
 nodes:
   - id: 0

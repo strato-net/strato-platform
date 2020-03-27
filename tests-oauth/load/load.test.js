@@ -63,13 +63,13 @@ describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
 
     let multinodeEndTimeInSec = 0;
 
-    if (multinode && multinode.length) {
+    if (multinode.runTest) {
       const lastTxHash = txResults[(batchSize * batchCount) - 1].hash;
 
       let isSynced = false;
       while (!isSynced) {
         console.log('Waiting for multinode to be synced');
-        const responses = await utils.callApi(multinode, user, lastTxHash);
+        const responses = await utils.callApi(multinode.nodes, user, lastTxHash);
         isSynced = responses.every((v) => JSON.parse(v).length === 1);
       }
 

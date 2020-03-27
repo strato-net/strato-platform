@@ -8,7 +8,9 @@
   "scripts": {
     "mocha-babel": "node_modules/.bin/mocha --require @babel/register",
     "build": "cd node_modules/blockapps-rest && yarn install && yarn build",
-    "load:test": "CONFIG_FILE=config/beanstalk.config.yaml yarn mocha-babel load/load.test.js",
+    "load:test": "yarn mocha-babel load/load.test.js",
+    "load:test:agreementManager": "CONFIG_FILE=config/agreementManager.config.yaml yarn mocha-babel load/load.test.js",
+    "load:test:agreement": "CONFIG_FILE=config/agreement.config.yaml yarn mocha-babel load/load.test.js",
     "lint": "eslint load/**"
   },
   "dependencies": {
