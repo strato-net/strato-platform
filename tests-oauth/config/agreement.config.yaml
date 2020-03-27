@@ -1,4 +1,4 @@
-apiDebug: true
+apiDebug: false
 VM: SolidVM
 timeout: 600000
 batchCount: 2
