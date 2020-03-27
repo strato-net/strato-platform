@@ -1,108 +1,45 @@
 /* eslint-disable no-console */
 /* eslint-disable no-await-in-loop */
-import rp from 'request-promise';
-import { rest, importer, util } from 'blockapps-rest';
+import { rest, importer } from 'blockapps-rest';
 import moment from 'moment';
+import utils from './utils';
 import config from '../loadConfig';
 import '../loadEnv';
 
-const {
-  createUser, createContractList, getAccounts, resolveResults,
-} = rest;
+const { createUser, createContractList } = rest;
 
 const userArgs = { token: process.env.USER_TOKEN };
 const txs = [];
 let txResults = [];
 let initialNonce = 0;
 
-const batchSize = util.getArgInt('--batchSize', 1);
-const batchCount = util.getArgInt('--batchCount', 1);
-
-async function callApi(nodes, user, hash) {
-  const options = nodes.map((url) => ({
-    method: 'GET',
-    uri: `${url}/strato-api/eth/v1.2/transactionResult/${hash}`,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${user.token}`,
-    },
-  }));
-
-  try {
-    return await Promise.all(options.map((option) => rp(option)));
-  } catch (e) {
-    console.log(e);
-    return e;
-  }
-}
-
-async function factoryCreateContractArgs(batchNum, size) {
-  const source = await importer.combine('./contracts/beanstalk/agreement/AgreementManager.sol');
+async function createContractArgs(contract, size, batchNum) {
+  const { filePath, name, args } = contract;
+  const source = await importer.combine(filePath);
 
   for (let i = 0; i < size; i++) {
-    /*
-      constructor (
-        address _dappAddress,
-        address _permissionManager,
-        address _userManager,
-        address _programManager
-      ) public {
-    */
     txs.push({
-      name: 'AgreementManager',
+      name,
       source,
-      args: {
-        _dappAddress: '2383914a2cffe7bb97e0b622481b945858e08188',
-        _permissionManager: '2383914a2cffe7bb97e0b622481b945858e08188',
-        _programManager: '2383914a2cffe7bb97e0b622481b945858e08188',
-        _userManager: '2383914a2cffe7bb97e0b622481b945858e08188',
-      },
+      args,
       txParams: { nonce: initialNonce + (batchNum * size) + i },
     });
   }
   return txs;
 }
 
-async function getAccountDetails(user) {
-  const account = await getAccounts(user, {
-    config,
-    isAsync: true,
-    query: {
-      address: user.address,
-    },
-  });
-
-  return account[0];
-}
-
-async function waitResult(user, size, count) {
-  let nonce = initialNonce;
-
-  while (nonce < initialNonce + (size * count)) {
-    await util.sleep(1000);
-    try {
-      console.log(`Current Nonce is: ${nonce}. Waiting on address '${user.address}' to reach nonce ${initialNonce + (size * count)}`);
-      const result = await getAccountDetails(user);
-      console.log(`Result: ${JSON.stringify(result)}`);
-      nonce = result.nonce;
-    } catch (e) {
-      console.error(e);
-    }
-  }
-}
-
-
 describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
   this.timeout(config.timeout);
 
   const options = { config };
+  const { batchSize, batchCount, multinode } = config;
   let user;
 
   before(async () => {
     console.log('Creating User');
     user = await createUser(userArgs, options);
     console.log(`User: ${JSON.stringify(user)}`);
-    const account = await getAccountDetails(user);
+    const account = await utils.getAccountDetails(user, config);
     initialNonce = account.nonce;
   });
 
@@ -112,7 +49,7 @@ describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
 
     for (let i = 0; i < batchCount; i++) {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
-      await factoryCreateContractArgs(i, batchSize);
+      await createContractArgs(config.contract, batchSize, i);
 
       const transactionStartTime = moment();
       const transactions = txs.slice(batchSize * i, batchSize * i + batchSize);
@@ -120,31 +57,42 @@ describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
         isAsync: true,
         ...options,
       });
-      const endTime = moment();
-      transactionsTime += endTime.diff(transactionStartTime, 'seconds');
+      transactionsTime += moment().diff(transactionStartTime, 'seconds');
 
       console.log(`Received ${contracts.length} receipts`);
       txResults = txResults.concat(contracts);
-      // NOTE: if we don't sleep only half of the contracts uploaded. any other solution for this?
-      // await util.sleep(1000);
     }
 
     console.log(`Waiting on address '${user.address}' to reach nonce ${batchSize * batchCount}`);
-    await waitResult(user, batchSize, batchCount);
+    await utils.waitResult(initialNonce, user, batchSize, batchCount, config);
 
-    const nodes = ['http://multinode201.ci.blockapps.net', 'http://multinode202.ci.blockapps.net'];
-    if (nodes.length) {
+    const transactionEndTimeinSec = moment().diff(startTime, 'seconds');
+    let message = `
+      --------------------------------------------
+      Transaction Time: ${transactionEndTimeinSec} sec
+      Bloc Submission Time: ${transactionsTime} sec
+      TPS ${batchSize * (batchCount / transactionEndTimeinSec)} sec
+      --------------------------------------------
+    `;
+
+    let multinodeEndTimeInSec = 0;
+
+    if (multinode && multinode.length) {
       const lastTxHash = txResults[(batchSize * batchCount) - 1].hash;
 
       let isSynced = false;
       while (!isSynced) {
-        const responses = await callApi(nodes, user, lastTxHash);
+        console.log('Waiting for multinode to be synced');
+        const responses = await utils.callApi(multinode, user, lastTxHash);
         isSynced = responses.every((v) => JSON.parse(v).length === 1);
       }
+
+      multinodeEndTimeInSec = moment().diff(startTime, 'seconds');
+      message = `
+      --------------------------------------------
+      Multinode Sync Time: ${multinodeEndTimeInSec} sec ${message}`;
     }
 
-    const endTime = moment();
-    const seconds = endTime.diff(startTime, 'seconds');
-    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${transactionsTime}  TPS ${batchSize * (batchCount / seconds)}`);
+    console.log(message);
   });
 });

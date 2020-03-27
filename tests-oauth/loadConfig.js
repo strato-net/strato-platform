@@ -1,5 +1,5 @@
-import { fsUtil } from 'blockapps-rest'
+import { fsUtil } from 'blockapps-rest';
 
-const config = fsUtil.getYaml(`config/localhost.config.yaml`)
+const config = fsUtil.getYaml(process.env.CONFIG_FILE);
 
-export default config
+export default config;
