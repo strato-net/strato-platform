@@ -13,8 +13,9 @@ contract:
     _programManager: '2383914a2cffe7bb97e0b622481b945858e08188'
     _userManager: '2383914a2cffe7bb97e0b622481b945858e08188'
 
-# multinode:
-#   - http://multinode202.ci.blockapps.net
+multinode:
+  - http://multinode201.ci.blockapps.net
+  - http://multinode202.ci.blockapps.net
 
 nodes:
   - id: 0
