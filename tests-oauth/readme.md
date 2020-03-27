@@ -6,7 +6,6 @@ Demo app that uses STRATO to track products through a supply chain using OAuth a
 
 ### STRATO node running with parameters:
    ```
-  PASSWORD=rails \
   OAUTH_ENABLED=true \
   OAUTH_CLIENT_ID=dev-infinite \
   OAUTH_CLIENT_SECRET=091a22ec-3c81-4be4-83fb-d9f82084c3e8 \
@@ -44,6 +43,7 @@ timeout: 600000
 batchCount: 2
 batchSize: 10
 
+# NOTE: mention nodes excluding current node
 multinode:
   runTest: true
   nodes: 

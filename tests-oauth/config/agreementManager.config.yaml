@@ -4,6 +4,7 @@ timeout: 600000
 batchCount: 2
 batchSize: 10
 
+# NOTE: mention node excluding current node
 multinode:
   runTest: false
   nodes: 
