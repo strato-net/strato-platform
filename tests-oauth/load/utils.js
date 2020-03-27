@@ -1,7 +1,7 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-console */
 import rp from 'request-promise';
-import { rest, util } from 'blockapps-rest';
+import { rest, util, importer } from 'blockapps-rest';
 
 const { getAccounts } = rest;
 
@@ -51,8 +51,26 @@ async function callApi(nodes, user, hash) {
   }
 }
 
+async function createContractArgs(contract, size, initialNonce, batchNum) {
+  const { filePath, name, args } = contract;
+  const source = await importer.combine(filePath);
+  const txs = [];
+
+  for (let i = 0; i < size; i++) {
+    txs.push({
+      name,
+      source,
+      args,
+      txParams: { nonce: initialNonce + (batchNum * size) + i },
+    });
+  }
+
+  return txs;
+}
+
 export default {
   callApi,
+  createContractArgs,
   getAccountDetails,
   waitResult,
 };

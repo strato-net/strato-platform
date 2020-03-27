@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 /* eslint-disable no-await-in-loop */
-import { rest, importer } from 'blockapps-rest';
+import { rest } from 'blockapps-rest';
 import moment from 'moment';
 import utils from './utils';
 import config from '../loadConfig';
@@ -8,37 +8,23 @@ import '../loadEnv';
 
 const { createUser, createContractList } = rest;
 
-const userArgs = { token: process.env.USER_TOKEN };
-const txs = [];
-let txResults = [];
-let initialNonce = 0;
-
-async function createContractArgs(contract, size, batchNum) {
-  const { filePath, name, args } = contract;
-  const source = await importer.combine(filePath);
-
-  for (let i = 0; i < size; i++) {
-    txs.push({
-      name,
-      source,
-      args,
-      txParams: { nonce: initialNonce + (batchNum * size) + i },
-    });
-  }
-  return txs;
-}
-
 describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
   this.timeout(config.timeout);
 
+  const userArgs = { token: process.env.USER_TOKEN };
   const options = { config };
+
+  let txs = []; let txResults = []; let initialNonce = 0;
   const { batchSize, batchCount, multinode } = config;
-  let user;
+  let user = null;
 
   before(async () => {
     console.log('Creating User');
     user = await createUser(userArgs, options);
-    console.log(`User: ${JSON.stringify(user)}`);
+    console.log(`
+      Token: ${user.token}
+      Address: ${user.address}
+    `);
     const account = await utils.getAccountDetails(user, config);
     initialNonce = account.nonce;
   });
@@ -49,7 +35,7 @@ describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
 
     for (let i = 0; i < batchCount; i++) {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
-      await createContractArgs(config.contract, batchSize, i);
+      txs = txs.concat(await utils.createContractArgs(config.contract, batchSize, initialNonce, i));
 
       const transactionStartTime = moment();
       const transactions = txs.slice(batchSize * i, batchSize * i + batchSize);
