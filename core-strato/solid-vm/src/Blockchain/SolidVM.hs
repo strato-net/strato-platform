@@ -1306,7 +1306,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       Just theFunction -> do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
-        let Just commands = Xabi.funcContents theFunction
+        let commands = fromMaybe (missingField "contract constructor has been declared but not defined" contractName') $ Xabi.funcContents theFunction
         _ <- pushSender from $ runStatements commands
         return ()
 
@@ -1367,7 +1367,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
   onTraced $ do
     liftIO $ putStrLn $ "            args: " ++ show (map fst args)
     when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
-
+  
   localVars <- 
     forM locals $ \(n, (t, v)) -> do
       newVar <- liftIO $ fmap Variable $ newIORef v
@@ -1377,7 +1377,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
 --  forM_ locals $ \(n, (_, v)) -> do
 --    liftIO $ putStrLn "need to initialize the storage 2"
 --    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
-  let Just commands = Xabi.funcContents theFunction
+  let commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
   val <- runStatements commands
 
   let findNamedReturns = do

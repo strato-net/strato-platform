@@ -259,9 +259,6 @@ functionXabi = do
       }
 
 
--- | Parses an event definition.  At the moment we don't do anything with
--- it, but this prevents the parser from rejecting contracts that use
--- events.
 eventDeclaration :: SolidityParser (String, Declaration)
 eventDeclaration = do
   reserved "event"
