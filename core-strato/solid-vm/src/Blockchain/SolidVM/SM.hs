@@ -525,6 +525,7 @@ hintFromType = \case
            upgrade = mapM (hintFromType . Xabi.fieldTypeType) . first encodeUtf8
        TStruct s <$> mapM upgrade fs
  Xabi.Array{} -> return TComplex
+ Xabi.Mapping{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
 getXabiType' :: B.ByteString -> CallInfo -> Maybe Xabi.Type

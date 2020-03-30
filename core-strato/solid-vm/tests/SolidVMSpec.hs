@@ -2506,3 +2506,20 @@ contract qq {
 
 }|]
     getFields ["x"] `shouldReturn` [BInteger 0]
+
+  it "should accept multiple named return values" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  string y;
+  address z;
+  function f() returns (uint _x, string _y, address _z) {
+    _x = 123;
+    _y = "456";
+    _z = address(0x789);
+  }
+  constructor() {
+    (x,y,z) = f();
+  }
+}|]
+    getFields ["x","y","z"] `shouldReturn` [BInteger 123, BString "456", BAddress 0x789]

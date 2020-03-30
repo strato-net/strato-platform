@@ -1383,11 +1383,21 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
   let findNamedReturns = do
         case returns of
           [] -> return Nothing
-          [(name, _)] -> do
+          [(name,_)] -> do -- We have to break this up because
+                           -- SolidVM cannot distinguish between
+                           -- a value and single-tupled value
             currentCallInfo <- getCurrentCallInfo
-            let Just returnVar = M.lookup name $ localVariables currentCallInfo -- the value must exist in the map, else there is a developer error
-            fmap Just $ getVar $ snd returnVar
-          _ -> todo "multiple named return values" returns
+            let mReturnVar = M.lookup name $ localVariables currentCallInfo
+            case mReturnVar of
+              Nothing -> unknownVariable "findNamedReturns" name
+              Just returnVar -> Just <$> getVar (snd returnVar)
+          xs -> Just . STuple . V.fromList <$> do
+            currentCallInfo <- getCurrentCallInfo
+            for (fst <$> xs) $ \name -> do
+              let mReturnVar = M.lookup name $ localVariables currentCallInfo
+              case mReturnVar of
+                Nothing -> unknownVariable "findNamedReturns" name
+                Just returnVar -> Constant <$> getVar (snd returnVar)
 
   val' <- case val of
              Nothing -> findNamedReturns
