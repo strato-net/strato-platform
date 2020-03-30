@@ -24,7 +24,7 @@ const initialState = {
   contractName: undefined,
   createDisabled: true,
   filename: undefined,
-  solidvm: false,
+  solidvm: true,
   toster: false,
   tosterMessage: ''
 };
