@@ -1,3 +1,4 @@
+// TODO: remove searchable and add scenarios of solidvm
 import React from 'react';
 import CreateContract, { mapStateToProps, validate } from '../../components/CreateContract';
 import { Provider } from 'react-redux';
