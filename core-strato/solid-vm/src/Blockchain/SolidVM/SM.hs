@@ -253,13 +253,11 @@ runSM maybeCode env f = do
 
   eValState <- liftIO . try $ runStateT f startingState
   case eValState of
+    -- NO errors will crash the VM.
     -- InternalError should *never* happen.
     -- TODO should also not happen, but since this is a work in progress they
     -- are a fact of life and should be fixed on demand.
     -- The rest should always be a user error and handled safely
-    Left ie@InternalError{} -> do
-      $logErrorLS "runSM/internalError" ie
-      throw ie
     Left se -> do
       $logErrorLS "runSM/error" se
       if flags_svmDev
