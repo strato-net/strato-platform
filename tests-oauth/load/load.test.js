@@ -8,7 +8,7 @@ import '../loadEnv';
 
 const { createUser, createContractList } = rest;
 
-describe('Strato Load Test (beanstalk)', function beanstalkLoadTest() {
+describe(`Strato Load Test - ${process.env.CONFIG_FILE}`, function beanstalkLoadTest() {
   this.timeout(config.timeout);
 
   const userArgs = { token: process.env.USER_TOKEN };
