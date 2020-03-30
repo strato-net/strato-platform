@@ -609,6 +609,7 @@ export function mapStateToProps(state) {
     username: state.createContract.username,
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
+    // TODO: update the testcase for selector
     solidvm: selector(state, 'solidvm'),
     initialValues: {
       username: state.user.oauthUser ? state.user.oauthUser.username : '',
