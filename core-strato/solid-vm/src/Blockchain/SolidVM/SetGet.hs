@@ -232,7 +232,7 @@ deleteVar (Constant (SReference a@(AddressedPath addr path))) = do
       markDiffForAction addr path $ MS.BDefault
       putSolidStorageKeyVal' addr path $ MS.BDefault
 
-deleteVar _ = error "deleteVar not yet supported for local variables"
+deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 
 
 {-

@@ -24,6 +24,7 @@ import           SolidVM.Solidity.Xabi.Type
 import           SolidVM.Solidity.Xabi.VarDef
 import qualified SolidVM.Solidity.Xabi.Def as Xabi
 
+import           Blockchain.VM.SolidException
 
 
 sortWith :: Ord b => (a -> b) -> [a] -> [a]
@@ -158,6 +159,10 @@ unparseStatement (IfStatement e s1 s2) =
       " else {" ++ unlines (map unparseStatement elseStatements) ++ "}"
   in
     "if (" ++ unparseExpression e ++ ") {\n    " ++ tab (unlines (map unparseStatement s1)) ++ "}" ++ elseString s2
+
+unparseStatement (WhileStatement cond code) =
+  "while (" ++ unparseExpression cond ++ ") \n{ " ++ tab (unlines $ map unparseStatement code) ++ "\n}"
+
 unparseStatement (ForStatement v1 v2 v3 s) =
   "for (" ++ fromMaybe "" (fmap unparseSimpleStatement v1) ++ "; " ++ fromMaybe "" (fmap unparseExpression v2) ++ "; " ++ fromMaybe "" (fmap unparseExpression v3) ++ ") {\n    " ++ tab (unlines (map unparseStatement s)) ++ "}"
 unparseStatement (Return Nothing) = "return;"
@@ -172,7 +177,7 @@ unparseStatement (EmitStatement eventName extups) =
   in
     "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
 
-unparseStatement x = error $ "missing case in call to unparseStatement: " ++ show x
+unparseStatement x = internalError "missing case in call to unparseStatement" $ show x
 
 unparseVarDefEntry :: VarDefEntry -> String
 unparseVarDefEntry BlankEntry = ""
@@ -223,7 +228,7 @@ unparseExpression (FunctionCall e args) =
 unparseExpression (Ternary x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression x) = "new " ++ unparseVarType x
 unparseExpression (ArrayExpression xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
-unparseExpression x = error $ "missing case in call to unparseExpression: " ++ show x
+unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
 unparseModifier :: (Text, Modifier) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
