@@ -332,6 +332,7 @@ type PostContractsCompile = "contracts"
 data PostCompileRequest = PostCompileRequest
   { postcompilerequestContractName :: Maybe Text
   , postcompilerequestSource       :: Text
+  , postcompilerequestVm           :: Maybe Text
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostCompileRequest where arbitrary = GR.genericArbitrary GR.uniform
@@ -354,6 +355,7 @@ instance ToSchema PostCompileRequest where
       ex = PostCompileRequest
         { postcompilerequestContractName = Just "MySampleContract"
         , postcompilerequestSource = "contract MySampleContract { ...} "
+        , postcompilerequestVm = Just "SolidVM"
         }
 
 

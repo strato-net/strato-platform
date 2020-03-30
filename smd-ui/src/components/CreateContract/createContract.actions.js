@@ -86,12 +86,12 @@ export const createContractFailure = function(error) {
   }
 }
 
-export const compileContract = function(name, contract, searchable) {
+export const compileContract = function(name, contract, solidvm) {
   return {
     type: COMPILE_CONTRACT_REQUEST,
     name: name,
     contract: contract,
-    searchable: searchable,
+    solidvm: solidvm,
     isOpen: true,
   }
 }
