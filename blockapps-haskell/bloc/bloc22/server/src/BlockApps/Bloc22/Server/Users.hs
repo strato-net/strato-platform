@@ -239,6 +239,13 @@ postUsersContract userName addr chainId resolve
     Nothing -> postUsersContractEVM' bcp (return . signTransaction sk) -- The EVM is the default VM
     Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
+evmContractSolidVMError :: Text
+evmContractSolidVMError = Text.concat
+  [ "Upload Contract (EVM): The given contracts were previously uploaded for "
+  , "SolidVM. Please retry your request specifying SolidVM as the VM type. "
+  , "If you are intending to use EVM, please modify your contracts and try again."
+  ]
+
 postUsersContractEVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
@@ -250,7 +257,9 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
      Nothing ->
        case Map.toList idsAndDetails of
          [] -> throwError $ UserError "You need to supply at least one contract in the source"
-         [x] -> return x
+         [(n,(m,cd))] -> case contractdetailsCodeHash cd of
+                  (EVMCode _) -> return (n, (m, cd))
+                  (SolidVMCode _ _) -> throwError $ UserError evmContractSolidVMError
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
      Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   let
@@ -413,11 +422,12 @@ postUsersUploadListEVM' ContractListParameters{..} sign = do
         Just (b, src, cmId', x) -> return (b, src, cmId', x)
         Nothing -> do
           mContract <- lift . blocQueryMaybe $ proc () -> do
-            (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-            returnA -< (bin16,src,cmId',x'')
+            (bin16,_,cHash,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
+            returnA -< (bin16,cHash,src,cmId',x'')
           case mContract of
             Nothing -> throwError $ UserError evmUploadListError
-            Just (b16,src,(cmId' :: Int32),x') -> do
+            Just (_,SolidVMCode _ _,_,_,_) -> throwError $ UserError evmContractSolidVMError
+            Just (b16,_,src,(cmId' :: Int32),x') -> do
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
               x <- lift $ deserializeXabi x'
