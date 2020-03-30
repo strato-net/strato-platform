@@ -2506,3 +2506,19 @@ contract qq {
 
 }|]
     getFields ["x"] `shouldReturn` [BInteger 0]
+
+  it "rejects declared but undefined constructor" $ (runTest (runBS [r|
+contract qq {
+   constructor();
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "rejects declared but undefined function" $ (runTest (runBS [r|
+contract qq {
+   function f();
+   
+   constructor()
+   {
+      f();
+   }
+}|])) `shouldThrow` anyMissingFieldError
+
