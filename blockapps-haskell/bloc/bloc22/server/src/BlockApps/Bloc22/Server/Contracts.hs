@@ -145,8 +145,15 @@ getContractsState contract@(ContractName contractName) contractId chainId mName 
   let storage = translateStorageMap storage'
 
   ret <- case (storage', mName) of
-    (Storage{storageKind=SolidVM}:_, Nothing) -> return .
-        decodeSolidVMValues $ map (\Storage{storageKV=SolidVMEntry k v} -> (k, v)) storage'
+    (Storage{storageKind=SolidVM}:_, Nothing) -> do
+      $logInfoS "getContractsState/SolidVM" $ Text.unlines
+        [ "Storage:"
+        , Text.pack $ unlines $ map (("  " ++) . show . storageKV) $ storage'
+        , "End of storage"
+        ]
+      return $
+           (contractFunctions $ mainStruct contract')
+        ++ (decodeSolidVMValues $ map (\Storage{storageKV=SolidVMEntry k v} -> (k, v)) storage')
     (Storage{storageKind=SolidVM}:_, Just name) ->
        error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
     -- Treat this potentially empty storage as the EVM, even though it could be on SolidVM.
@@ -299,7 +306,10 @@ postContractsCompile :: [PostCompileRequest] -> Bloc [PostCompileResponse]
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
-      idsAndDetails <- sourceToContractDetails (Do Compile) postcompilerequestSource
+      let shouldCompile = case Text.toLower <$> postcompilerequestVm of
+            Just "solidvm" -> Don't Compile
+            _ -> Do Compile
+      idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of
@@ -309,7 +319,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
             let ptr = contractdetailsCodeHash details
             case ptr of
               EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) (shaKeccak256 hsh)
-              _ -> throwError $ AnError (Text.pack "Somebody called contracts/compile on SolidVM Code, but it only works on EVM Code")
+              SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) (shaKeccak256 hsh)
 
 postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =

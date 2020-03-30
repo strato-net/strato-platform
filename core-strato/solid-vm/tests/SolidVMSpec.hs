@@ -69,6 +69,26 @@ anyTypeError :: Selector HandledException
 anyTypeError (HE Blockchain.SolidVM.Exception.TypeError{}) = True
 anyTypeError _ = False
 
+anyIndexOOBError :: Selector HandledException
+anyIndexOOBError (HE Blockchain.SolidVM.Exception.IndexOutOfBounds{}) = True
+anyIndexOOBError _ = False
+
+anyMissingFieldError :: Selector HandledException
+anyMissingFieldError (HE Blockchain.SolidVM.Exception.MissingField{}) = True
+anyMissingFieldError _ = False
+
+failedRequirementMsg :: String -> Selector HandledException
+failedRequirementMsg str (HE (Require (Just msg))) = str == msg
+failedRequirementMsg _   _                         = False
+
+failedRequirementNoMsg :: Selector HandledException
+failedRequirementNoMsg (HE (Require Nothing)) = True
+failedRequirementNoMsg _                      = False
+
+failedAssertion :: Selector HandledException
+failedAssertion (HE Assert) = True
+failedAssertion _           = False
+
 sender :: Address
 sender = 0xdeadbeef
 
@@ -509,6 +529,22 @@ contract qq {
   }
 }|]
 
+    it "can handle failed requirement with message" $ runTest (do
+      runBS [r|
+contract qq {
+  constructor() {
+    require(3 == 4, "Who is John Galt?");
+  }
+}|]) `shouldThrow` failedRequirementMsg "SString \"Who is John Galt?\""
+
+    it "can handle failed requirement without message" $ runTest (do
+      runBS [r|
+contract qq {
+  constructor() {
+    require(3 == 4);
+  }
+}|]) `shouldThrow` failedRequirementNoMsg
+
     it "can multiline require" . runTest $ do
       runBS [r|
 contract qq {
@@ -516,6 +552,32 @@ contract qq {
     require(
       3 == 3,
       "Who is John Galt????"
+    );
+  }
+}|]
+
+    it "can assert" . runTest $ do
+      runBS [r|
+contract qq {
+  constructor() {
+    assert(3 == 3);
+  }
+}|]
+
+    it "can handle failed assertion" $ runTest (do
+      runBS [r|
+contract qq {
+  constructor() {
+    assert(3 == 4);
+  }
+}|]) `shouldThrow` failedAssertion
+
+    it "can multiline assert" . runTest $ do
+      runBS [r|
+contract qq {
+  constructor() public {
+    assert(
+      3 == 3
     );
   }
 }|]
@@ -736,6 +798,26 @@ contract qq {
   }
 }|]
     getFields ["found"] `shouldReturn` [BBool False]
+
+  it "supports boolean equality" . runTest $ do
+    runBS [r|
+contract qq {
+  bool x = true;
+  bool y = true;
+  constructor() {
+    assert(x == y);
+  }
+}|]
+
+  it "supports boolean inequality" . runTest $ do
+    runBS [r|
+contract qq {
+  bool x = true;
+  bool y = false;
+  constructor() {
+    assert(x != y);
+  }
+}|]
 
   it "compares equal againts default" . runTest $ do
     liftIO $ pendingWith "add static typing" --TODO- Jim
@@ -2201,3 +2283,258 @@ contract qq {
   uint x = 0;
   uint y = x[1];
 }|])) `shouldThrow` anyTypeError
+
+  it "can emit events" . runTest $ do
+    runBS [r|
+contract qq {
+  event x(uint v);
+  constructor() {
+    emit x(5);
+  }
+}|]
+
+  it "can emit inherited events" . runTest $ do
+    runBS [r|
+contract parent {
+  event x(uint v);
+}
+
+contract qq is parent {
+  constructor() {
+    emit x(6);
+  }
+}|]
+
+  it "can assign directly to index of an array" . runTest $ do
+    runBS [r|
+contract qq {
+  uint[] arr;
+  uint x;
+
+  constructor() {
+    arr[0] = 42;
+    x = arr[0];
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 42]
+
+  it "can assign directly to index of a mapping" . runTest $ do
+    runBS [r|
+contract qq {
+  mapping(bool => uint) bs;
+  uint x;
+
+  constructor() {
+    bs[true] = 42;
+    x = bs[true];
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 42]
+
+  it "throws array index out of bounds exception" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+    
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      x = arr[5];
+   }
+}|])) `shouldThrow` anyIndexOOBError
+
+  it "type checks the index value in array index access" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      x = arr[true];
+   }
+}|])) `shouldThrow` anyTypeError
+ 
+  it "type checks the index value in array index assignment" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      arr[true] = 2112;
+   }
+}|])) `shouldThrow` anyTypeError
+ 
+  it "rejects empty index value on array index access" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      x = arr[];
+   }
+}|])) `shouldThrow` anyMissingFieldError
+ 
+  it "rejects empty index value on mapping index access" $ (runTest (runBS [r|
+contract qq {
+   mapping(bool => uint) bs;
+   uint x;
+
+   constructor()
+   {
+      x = bs[];
+   }
+}|])) `shouldThrow` anyMissingFieldError
+ 
+  it "rejects empty index value on array index assignment" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      arr[] = 2112;
+   }
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "rejects empty index value on mapping index assignment" $ (runTest (runBS [r|
+contract qq {
+   mapping(bool => uint) bs;
+   uint x;
+
+   constructor()
+   {
+      bs[] = 42;
+   }
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "supports while loops" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+
+  constructor() {
+    while ( x < 3 )
+    {
+          x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 3]
+
+  it "can handle all expr combinations for logical AND clause " . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic == 0 && x == 0) {
+      x++;
+    }
+    if (magic == 42 && x == 0) {
+      x++;
+    }
+    if (magic == 100 && x == 1) {
+      x++;
+    }
+    if (magic == 1000 && x == 0) {
+      x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 1]
+
+  it "RHS expr in an AND clause is not evaluated if the LHS expr evaluates to False" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic > 100 && ++x > 100)
+    {
+      return 0;
+    }
+    return 0;
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0]
+
+  it "can handle all expr combinations for logical OR clause " . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic == 0 || x == 0) {
+      x++;
+    }
+    if (magic == 42 || x == 0) {
+      x++;
+    }
+    if (magic == 100 || x == 2) {
+      x++;
+    }
+    if (magic == 1000 || x == 0) {
+      x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 3]
+
+  it "RHS expr in an OR clause is not evaluated if the LHS expr evaluates to True" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic == 42 || ++x > 100)
+    {
+      return 0;
+    }
+    return 0;
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0]
+
+  it "rejects declared but undefined constructor" $ (runTest (runBS [r|
+contract qq {
+   constructor();
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "rejects declared but undefined function" $ (runTest (runBS [r|
+contract qq {
+   function f();
+   
+   constructor()
+   {
+      f();
+   }
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "should accept multiple named return values" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  string y;
+  address z;
+  function f() returns (uint _x, string _y, address _z) {
+    _x = 123;
+    _y = "456";
+    _z = address(0x789);
+  }
+  constructor() {
+    (x,y,z) = f();
+  }
+}|]
+    getFields ["x","y","z"] `shouldReturn` [BInteger 123, BString "456", BAddress 0x789]

@@ -1,67 +1,84 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`App: index mapStateToProps with values 1`] = `
-Object {
-  "isLoggedIn": true,
-}
-`;
+exports[` 1`] = `Object {}`;
 
-exports[`App: index mapStateToProps without values 1`] = `
-Object {
-  "isLoggedIn": false,
-}
-`;
-
-exports[`App: index render in Oauth mode componentDidMount 1`] = `
+exports[`App: index componentDidMount 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
   <withRouter(Connect(ReduxForm)) />
   <SideBar />
-  <main id=\\"outer-container\\" style={{...}}>
-    ENTERPRISE
+  <main id=\\"outer-container\\">
+    <Switch>
+      <Route exact={true} path=\\"/\\" component={[undefined]}>
+        <Redirect to=\\"/home\\" push={false} />
+      </Route>
+      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
+      <Route exact={true} path=\\"/blocks\\" component={[Function: Blocks]} />
+      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/chains\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/transactions\\" component={[Function: Transactions]} />
+      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+    </Switch>
   </main>
 </div>"
 `;
 
-exports[`App: index render in Oauth mode componentDidMount 2`] = `
+exports[`App: index componentDidMount 2`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
   <withRouter(Connect(ReduxForm)) />
   <SideBar />
-  <main id=\\"outer-container\\" style={{...}}>
-    ENTERPRISE
+  <main id=\\"outer-container\\">
+    <Switch>
+      <Route exact={true} path=\\"/\\" component={[undefined]}>
+        <Redirect to=\\"/home\\" push={false} />
+      </Route>
+      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
+      <Route exact={true} path=\\"/blocks\\" component={[Function: Blocks]} />
+      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/chains\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/transactions\\" component={[Function: Transactions]} />
+      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+    </Switch>
   </main>
 </div>"
 `;
 
-exports[`App: index render in enterprise mode 1`] = `
+exports[`App: index render component 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
   <withRouter(Connect(ReduxForm)) />
   <SideBar />
-  <main id=\\"outer-container\\" style={{...}}>
-    ENTERPRISE
-  </main>
-</div>"
-`;
-
-exports[`App: index render in public mode when user is logged in 1`] = `
-"<div className=\\"App\\">
-  <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(ReduxForm)) />
-  <SideBar />
-  <main id=\\"outer-container\\" style={{...}}>
-    PUBLIC
-  </main>
-</div>"
-`;
-
-exports[`App: index render in public mode when user is not logged in 1`] = `
-"<div className=\\"App\\">
-  <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(ReduxForm)) />
-  <main id=\\"outer-container\\" style={{...}}>
-    PUBLIC
+  <main id=\\"outer-container\\">
+    <Switch>
+      <Route exact={true} path=\\"/\\" component={[undefined]}>
+        <Redirect to=\\"/home\\" push={false} />
+      </Route>
+      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
+      <Route exact={true} path=\\"/blocks\\" component={[Function: Blocks]} />
+      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/chains\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/transactions\\" component={[Function: Transactions]} />
+      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+    </Switch>
   </main>
 </div>"
 `;

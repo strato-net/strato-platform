@@ -95,7 +95,7 @@ toBasic = \case
   SContract n a -> MS.BContract (T.pack n) (fromIntegral a)
   SEnumVal k t num -> MS.BEnumVal (T.pack k) (T.pack t) num
   SMappingSentinel -> MS.BMappingSentinel
-  x -> error $ "non basic solidity type cannot be stored atomically: " ++ show x
+  x -> typeError "non basic solidity type cannot be stored atomically: " (show x)
 
 setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
@@ -133,21 +133,20 @@ setVal (SReference dst) (SArray _ fs) = do
 
 setVal (STuple dstVector) (STuple srcVector) = 
   if V.length dstVector /= V.length srcVector
-  then error $ "you are trying to set the value of a tuple to another tuple of the wrong length:\n" ++ show dstVector ++ "\n" ++ show srcVector
+  then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
   else do
     forM_ (V.zip dstVector srcVector) $ \(dstItem, srcItemVar) -> do
       srcItemVal <- getVar srcItemVar
       setVar dstItem srcItemVal
     
-
-
-
 setVal (SReference (AddressedPath addr path)) src = do
   markDiffForAction addr path $ toBasic src
   putSolidStorageKeyVal' addr path $ toBasic src
-setVal dst src = error $ "unknown case called in setVal:\nsrc = " ++ show src ++ "\ndst = " ++ show dst
 
 
+setVal dst src = typeError "unknown case called in setVal:" ("src = " ++ show src ++ ", dst = " ++ show dst)
+
+  
 {-
 
 
@@ -233,7 +232,7 @@ deleteVar (Constant (SReference a@(AddressedPath addr path))) = do
       markDiffForAction addr path $ MS.BDefault
       putSolidStorageKeyVal' addr path $ MS.BDefault
 
-deleteVar _ = error "deleteVar not yet supported for local variables"
+deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 
 
 {-

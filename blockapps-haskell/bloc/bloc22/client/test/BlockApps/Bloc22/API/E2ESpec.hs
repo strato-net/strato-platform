@@ -418,6 +418,7 @@ spec =
         postCompileRequest = PostCompileRequest
           (Just simpleStorageBytes32ArrayContractName)
           simpleStorageBytes32ArraySrc
+          Nothing
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
           , postuserscontractrequestPassword = pw
@@ -559,6 +560,7 @@ spec =
         postCompileRequest = PostCompileRequest
           (Just simpleStorageBytes32ArrayContractName)
           simpleStorageBytes32ArraySrc
+          Nothing
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
           , postuserscontractrequestPassword = pw
@@ -1205,6 +1207,7 @@ spec =
         postCompileRequest = PostCompileRequest
           (Just iamName)
           iamBlob
+          Nothing
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = iamBlob
           , postuserscontractrequestPassword = pw

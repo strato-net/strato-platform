@@ -66,7 +66,7 @@ xabiToContract contractName' parents' xabi = validateXabi xabi `seq`
       case M.toList $ Xabi.xabiConstr xabi of
         [] -> Nothing
         [(_, x)] -> Just x
-        _ -> error "multiple constructors in contract" --TODO- figure out if this is allowed in Solidity
+        _ -> duplicateDefinition "multiple constructors in contract" contractName' --TODO- figure out if this is allowed in Solidity
   }
 
 validateXabi :: Xabi -> ()
@@ -89,6 +89,7 @@ addInheritedObjects cc c =
   _storageDefs=toUnionMaker _storageDefs cc c,
   _enums=toUnionMaker _enums cc c,
   _structs=toUnionMaker _structs cc c,
+  _events = toUnionMaker _events cc c,
   _constants=toUnionMaker _constants cc c
   }
 

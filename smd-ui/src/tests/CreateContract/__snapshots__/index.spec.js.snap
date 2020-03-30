@@ -223,13 +223,13 @@ Object {
   },
   "isOpen": true,
   "isToasts": false,
-  "searchable": undefined,
+  "solidvm": undefined,
   "toastsMessage": "message",
   "username": "",
 }
 `;
 
-exports[`CreateContract: index render component (enterprise mode) render contracts without source 1`] = `
+exports[`CreateContract: index render component (Oauth mode) render contracts without source 1`] = `
 ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
@@ -1026,1609 +1026,7 @@ ShallowWrapper {
 }
 `;
 
-exports[`CreateContract: index render component (enterprise mode) render contracts without values 1`] = `
-ShallowWrapper {
-  "length": 1,
-  Symbol(enzyme.__root__): [Circular],
-  Symbol(enzyme.__unrendered__): <Provider
-    store={
-      Object {
-        "dispatch": [Function],
-        "getState": [Function],
-        "replaceReducer": [Function],
-        "subscribe": [Function],
-        Symbol(observable): [Function],
-      }
-    }
-  >
-    <ReduxForm
-      abi={
-        Object {
-          "src": undefined,
-        }
-      }
-      accounts={
-        Object {
-          "123456789012345678901234567890123": Object {
-            "2327839d6c7fc1188085554193cf578537ee660d": Object {
-              "error": null,
-            },
-          },
-          "Admin_1085_64667": Object {
-            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_31203": Object {
-            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_39206": Object {
-            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_49507": Object {
-            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
-              "error": null,
-            },
-          },
-          "Admin_1301_62816": Object {
-            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
-              "error": null,
-            },
-            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
-              "error": null,
-            },
-          },
-          "Admin_1301_86023": Object {
-            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
-              "error": null,
-            },
-          },
-          "Buyer1": Object {
-            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
-              "error": null,
-            },
-          },
-          "Buyer1177_18955": Object {
-            "73ea1c503b915e28162374591670904732d0e729": Object {
-              "error": null,
-            },
-          },
-          "Buyer2": Object {
-            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
-              "error": null,
-            },
-          },
-          "Supplier0_1301_46441": Object {
-            "error": "error",
-          },
-          "Supplier1": Object {
-            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
-              "error": null,
-            },
-          },
-          "Supplier1177_62701": Object {
-            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
-              "error": null,
-            },
-          },
-          "Supplier1_1301_46441": Object {
-            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
-              "error": null,
-            },
-          },
-          "Supplier2": Object {
-            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
-              "error": null,
-            },
-          },
-          "Supplier2_1301_46441": Object {
-            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
-              "error": null,
-            },
-          },
-          "User_1177_14462": Object {
-            "cd0046de8051af7e2781b58e892b25467133276f": Object {
-              "error": null,
-            },
-          },
-          "User_1177_26292": Object {
-            "dcbdac4d738461fcf11669b73668211371839c76": Object {
-              "error": null,
-            },
-          },
-          "User_1177_37717": Object {
-            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
-              "error": null,
-            },
-          },
-          "User_1177_42489": Object {
-            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
-              "error": null,
-            },
-          },
-          "User_1177_52307": Object {
-            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
-              "error": null,
-            },
-          },
-          "User_1177_59359": Object {
-            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
-              "error": null,
-            },
-          },
-          "User_1177_59578": Object {
-            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
-              "error": null,
-            },
-            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
-              "error": null,
-            },
-          },
-          "User_1177_69645 ?#%!@*": Object {},
-          "User_1177_79118": Object {
-            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
-              "error": null,
-            },
-          },
-        }
-      }
-      chainLabel={
-        Object {
-          "airline cartel 1": Object {
-            "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
-          },
-          "airline cartel 10": Object {
-            "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
-          },
-          "airline cartel 1000": Object {
-            "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
-          },
-          "airline cartel 11": Object {
-            "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
-          },
-          "airline cartel 12": Object {
-            "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
-          },
-          "airline cartel 13": Object {
-            "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
-            "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
-            "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
-          },
-          "airline cartel 14": Object {
-            "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
-          },
-          "airline cartel 2": Object {
-            "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
-          },
-          "airline cartel 200": Object {
-            "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
-          },
-          "airline cartel 2000": Object {
-            "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
-          },
-          "airline cartel 3": Object {
-            "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
-          },
-          "airline cartel 4": Object {
-            "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
-          },
-          "airline cartel 5": Object {
-            "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
-          },
-          "airline cartel 52": Object {
-            "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
-          },
-          "airline cartel 6": Object {
-            "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
-          },
-          "airline cartel 7": Object {
-            "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
-          },
-          "airline cartel 822": Object {
-            "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
-          },
-          "airline cartel 89": Object {
-            "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
-          },
-          "airline cartel 9": Object {
-            "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-            "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-            "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-            "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-            "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-            "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-            "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-          },
-          "airline cartel 900": Object {
-            "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
-          },
-          "airline cartel 9000": Object {
-            "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
-          },
-        }
-      }
-      chainLabelIds={
-        Object {
-          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-        }
-      }
-      compileContract={[Function]}
-      contract="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
-      contractCloseModal={[Function]}
-      contractFormChange={[Function]}
-      contractName="Cloner"
-      contractNameChange={[Function]}
-      contractNameFromEditor="Greeter"
-      contractOpenModal={[Function]}
-      createContract={[Function]}
-      createDisabled={false}
-      enableCreateContract={true}
-      fetchAccounts={[Function]}
-      fetchChainIds={[Function]}
-      fetchContracts={[Function]}
-      fetchUserAddresses={[Function]}
-      getLabelIds={[Function]}
-      initialValues={
-        Object {
-          "address": "",
-          "username": "",
-        }
-      }
-      isOpen={true}
-      isToasts={false}
-      onChangeEditorContractName={[Function]}
-      pristine={false}
-      reset={[Function]}
-      searchable={false}
-      sourceFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
-      submitting={false}
-      textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
-      toastsMessage="message"
-      touch={[Function]}
-      username="Supplier1"
-      usernameChange={[Function]}
-      valid={false}
-    />
-  </Provider>,
-  Symbol(enzyme.__renderer__): Object {
-    "batchedUpdates": [Function],
-    "getNode": [Function],
-    "render": [Function],
-    "simulateEvent": [Function],
-    "unmount": [Function],
-  },
-  Symbol(enzyme.__node__): Object {
-    "instance": null,
-    "key": undefined,
-    "nodeType": "class",
-    "props": Object {
-      "abi": Object {
-        "src": undefined,
-      },
-      "accounts": Object {
-        "123456789012345678901234567890123": Object {
-          "2327839d6c7fc1188085554193cf578537ee660d": Object {
-            "error": null,
-          },
-        },
-        "Admin_1085_64667": Object {
-          "d2263b71c14010ff03d8f786670aba691b22b158": Object {
-            "error": null,
-          },
-        },
-        "Admin_1177_31203": Object {
-          "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
-            "error": null,
-          },
-        },
-        "Admin_1177_39206": Object {
-          "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
-            "error": null,
-          },
-        },
-        "Admin_1177_49507": Object {
-          "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
-            "error": null,
-          },
-        },
-        "Admin_1301_62816": Object {
-          "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
-            "error": null,
-          },
-          "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
-            "error": null,
-          },
-        },
-        "Admin_1301_86023": Object {
-          "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
-            "error": null,
-          },
-        },
-        "Buyer1": Object {
-          "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
-            "error": null,
-          },
-        },
-        "Buyer1177_18955": Object {
-          "73ea1c503b915e28162374591670904732d0e729": Object {
-            "error": null,
-          },
-        },
-        "Buyer2": Object {
-          "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
-            "error": null,
-          },
-        },
-        "Supplier0_1301_46441": Object {
-          "error": "error",
-        },
-        "Supplier1": Object {
-          "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
-            "error": null,
-          },
-        },
-        "Supplier1177_62701": Object {
-          "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
-            "error": null,
-          },
-        },
-        "Supplier1_1301_46441": Object {
-          "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
-            "error": null,
-          },
-        },
-        "Supplier2": Object {
-          "bc7199468816b3b92e54828affa08a010e9adb02": Object {
-            "error": null,
-          },
-        },
-        "Supplier2_1301_46441": Object {
-          "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
-            "error": null,
-          },
-        },
-        "User_1177_14462": Object {
-          "cd0046de8051af7e2781b58e892b25467133276f": Object {
-            "error": null,
-          },
-        },
-        "User_1177_26292": Object {
-          "dcbdac4d738461fcf11669b73668211371839c76": Object {
-            "error": null,
-          },
-        },
-        "User_1177_37717": Object {
-          "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
-            "error": null,
-          },
-        },
-        "User_1177_42489": Object {
-          "a421b5e3c34118266745dd8426a80b35513b2277": Object {
-            "error": null,
-          },
-        },
-        "User_1177_52307": Object {
-          "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
-            "error": null,
-          },
-        },
-        "User_1177_59359": Object {
-          "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
-            "error": null,
-          },
-        },
-        "User_1177_59578": Object {
-          "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
-            "error": null,
-          },
-          "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
-            "error": null,
-          },
-        },
-        "User_1177_69645 ?#%!@*": Object {},
-        "User_1177_79118": Object {
-          "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
-            "error": null,
-          },
-        },
-      },
-      "chainLabel": Object {
-        "airline cartel 1": Object {
-          "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
-        },
-        "airline cartel 10": Object {
-          "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
-        },
-        "airline cartel 1000": Object {
-          "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
-        },
-        "airline cartel 11": Object {
-          "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
-        },
-        "airline cartel 12": Object {
-          "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
-        },
-        "airline cartel 13": Object {
-          "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
-          "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
-          "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
-        },
-        "airline cartel 14": Object {
-          "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
-        },
-        "airline cartel 2": Object {
-          "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
-        },
-        "airline cartel 200": Object {
-          "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
-        },
-        "airline cartel 2000": Object {
-          "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
-        },
-        "airline cartel 3": Object {
-          "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
-        },
-        "airline cartel 4": Object {
-          "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
-        },
-        "airline cartel 5": Object {
-          "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
-        },
-        "airline cartel 52": Object {
-          "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
-        },
-        "airline cartel 6": Object {
-          "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
-        },
-        "airline cartel 7": Object {
-          "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
-        },
-        "airline cartel 822": Object {
-          "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
-        },
-        "airline cartel 89": Object {
-          "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
-        },
-        "airline cartel 9": Object {
-          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-        },
-        "airline cartel 900": Object {
-          "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
-        },
-        "airline cartel 9000": Object {
-          "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
-        },
-      },
-      "chainLabelIds": Object {
-        "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-        "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-        "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-        "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-        "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-        "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-        "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-      },
-      "compileContract": [Function],
-      "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-      "contractCloseModal": [Function],
-      "contractFormChange": [Function],
-      "contractName": "Cloner",
-      "contractNameChange": [Function],
-      "contractNameFromEditor": "Greeter",
-      "contractOpenModal": [Function],
-      "createContract": [Function],
-      "createDisabled": false,
-      "enableCreateContract": true,
-      "fetchAccounts": [Function],
-      "fetchChainIds": [Function],
-      "fetchContracts": [Function],
-      "fetchUserAddresses": [Function],
-      "getLabelIds": [Function],
-      "initialValues": Object {
-        "address": "",
-        "username": "",
-      },
-      "isOpen": true,
-      "isToasts": false,
-      "onChangeEditorContractName": [Function],
-      "pristine": false,
-      "reset": [Function],
-      "searchable": false,
-      "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-      "submitting": false,
-      "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-      "toastsMessage": "message",
-      "touch": [Function],
-      "username": "Supplier1",
-      "usernameChange": [Function],
-      "valid": false,
-    },
-    "ref": null,
-    "rendered": null,
-    "type": [Function],
-  },
-  Symbol(enzyme.__nodes__): Array [
-    Object {
-      "instance": null,
-      "key": undefined,
-      "nodeType": "class",
-      "props": Object {
-        "abi": Object {
-          "src": undefined,
-        },
-        "accounts": Object {
-          "123456789012345678901234567890123": Object {
-            "2327839d6c7fc1188085554193cf578537ee660d": Object {
-              "error": null,
-            },
-          },
-          "Admin_1085_64667": Object {
-            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_31203": Object {
-            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_39206": Object {
-            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_49507": Object {
-            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
-              "error": null,
-            },
-          },
-          "Admin_1301_62816": Object {
-            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
-              "error": null,
-            },
-            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
-              "error": null,
-            },
-          },
-          "Admin_1301_86023": Object {
-            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
-              "error": null,
-            },
-          },
-          "Buyer1": Object {
-            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
-              "error": null,
-            },
-          },
-          "Buyer1177_18955": Object {
-            "73ea1c503b915e28162374591670904732d0e729": Object {
-              "error": null,
-            },
-          },
-          "Buyer2": Object {
-            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
-              "error": null,
-            },
-          },
-          "Supplier0_1301_46441": Object {
-            "error": "error",
-          },
-          "Supplier1": Object {
-            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
-              "error": null,
-            },
-          },
-          "Supplier1177_62701": Object {
-            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
-              "error": null,
-            },
-          },
-          "Supplier1_1301_46441": Object {
-            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
-              "error": null,
-            },
-          },
-          "Supplier2": Object {
-            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
-              "error": null,
-            },
-          },
-          "Supplier2_1301_46441": Object {
-            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
-              "error": null,
-            },
-          },
-          "User_1177_14462": Object {
-            "cd0046de8051af7e2781b58e892b25467133276f": Object {
-              "error": null,
-            },
-          },
-          "User_1177_26292": Object {
-            "dcbdac4d738461fcf11669b73668211371839c76": Object {
-              "error": null,
-            },
-          },
-          "User_1177_37717": Object {
-            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
-              "error": null,
-            },
-          },
-          "User_1177_42489": Object {
-            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
-              "error": null,
-            },
-          },
-          "User_1177_52307": Object {
-            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
-              "error": null,
-            },
-          },
-          "User_1177_59359": Object {
-            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
-              "error": null,
-            },
-          },
-          "User_1177_59578": Object {
-            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
-              "error": null,
-            },
-            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
-              "error": null,
-            },
-          },
-          "User_1177_69645 ?#%!@*": Object {},
-          "User_1177_79118": Object {
-            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
-              "error": null,
-            },
-          },
-        },
-        "chainLabel": Object {
-          "airline cartel 1": Object {
-            "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
-          },
-          "airline cartel 10": Object {
-            "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
-          },
-          "airline cartel 1000": Object {
-            "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
-          },
-          "airline cartel 11": Object {
-            "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
-          },
-          "airline cartel 12": Object {
-            "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
-          },
-          "airline cartel 13": Object {
-            "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
-            "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
-            "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
-          },
-          "airline cartel 14": Object {
-            "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
-          },
-          "airline cartel 2": Object {
-            "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
-          },
-          "airline cartel 200": Object {
-            "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
-          },
-          "airline cartel 2000": Object {
-            "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
-          },
-          "airline cartel 3": Object {
-            "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
-          },
-          "airline cartel 4": Object {
-            "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
-          },
-          "airline cartel 5": Object {
-            "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
-          },
-          "airline cartel 52": Object {
-            "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
-          },
-          "airline cartel 6": Object {
-            "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
-          },
-          "airline cartel 7": Object {
-            "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
-          },
-          "airline cartel 822": Object {
-            "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
-          },
-          "airline cartel 89": Object {
-            "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
-          },
-          "airline cartel 9": Object {
-            "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-            "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-            "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-            "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-            "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-            "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-            "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-          },
-          "airline cartel 900": Object {
-            "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
-          },
-          "airline cartel 9000": Object {
-            "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
-          },
-        },
-        "chainLabelIds": Object {
-          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-        },
-        "compileContract": [Function],
-        "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-        "contractCloseModal": [Function],
-        "contractFormChange": [Function],
-        "contractName": "Cloner",
-        "contractNameChange": [Function],
-        "contractNameFromEditor": "Greeter",
-        "contractOpenModal": [Function],
-        "createContract": [Function],
-        "createDisabled": false,
-        "enableCreateContract": true,
-        "fetchAccounts": [Function],
-        "fetchChainIds": [Function],
-        "fetchContracts": [Function],
-        "fetchUserAddresses": [Function],
-        "getLabelIds": [Function],
-        "initialValues": Object {
-          "address": "",
-          "username": "",
-        },
-        "isOpen": true,
-        "isToasts": false,
-        "onChangeEditorContractName": [Function],
-        "pristine": false,
-        "reset": [Function],
-        "searchable": false,
-        "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-        "submitting": false,
-        "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-        "toastsMessage": "message",
-        "touch": [Function],
-        "username": "Supplier1",
-        "usernameChange": [Function],
-        "valid": false,
-      },
-      "ref": null,
-      "rendered": null,
-      "type": [Function],
-    },
-  ],
-  Symbol(enzyme.__options__): Object {
-    "adapter": ReactFifteenAdapter {
-      "options": Object {
-        "supportPrevContextArgumentOfComponentDidUpdate": true,
-      },
-    },
-  },
-}
-`;
-
-exports[`CreateContract: index render component (public mode) render contracts without source 1`] = `
-ShallowWrapper {
-  "length": 1,
-  Symbol(enzyme.__root__): [Circular],
-  Symbol(enzyme.__unrendered__): <Provider
-    store={
-      Object {
-        "dispatch": [Function],
-        "getState": [Function],
-        "replaceReducer": [Function],
-        "subscribe": [Function],
-        Symbol(observable): [Function],
-      }
-    }
-  >
-    <ReduxForm
-      abi={undefined}
-      accounts={
-        Object {
-          "123456789012345678901234567890123": Object {
-            "2327839d6c7fc1188085554193cf578537ee660d": Object {
-              "error": null,
-            },
-          },
-          "Admin_1085_64667": Object {
-            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_31203": Object {
-            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_39206": Object {
-            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_49507": Object {
-            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
-              "error": null,
-            },
-          },
-          "Admin_1301_62816": Object {
-            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
-              "error": null,
-            },
-            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
-              "error": null,
-            },
-          },
-          "Admin_1301_86023": Object {
-            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
-              "error": null,
-            },
-          },
-          "Buyer1": Object {
-            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
-              "error": null,
-            },
-          },
-          "Buyer1177_18955": Object {
-            "73ea1c503b915e28162374591670904732d0e729": Object {
-              "error": null,
-            },
-          },
-          "Buyer2": Object {
-            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
-              "error": null,
-            },
-          },
-          "Supplier0_1301_46441": Object {
-            "error": "error",
-          },
-          "Supplier1": Object {
-            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
-              "error": null,
-            },
-          },
-          "Supplier1177_62701": Object {
-            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
-              "error": null,
-            },
-          },
-          "Supplier1_1301_46441": Object {
-            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
-              "error": null,
-            },
-          },
-          "Supplier2": Object {
-            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
-              "error": null,
-            },
-          },
-          "Supplier2_1301_46441": Object {
-            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
-              "error": null,
-            },
-          },
-          "User_1177_14462": Object {
-            "cd0046de8051af7e2781b58e892b25467133276f": Object {
-              "error": null,
-            },
-          },
-          "User_1177_26292": Object {
-            "dcbdac4d738461fcf11669b73668211371839c76": Object {
-              "error": null,
-            },
-          },
-          "User_1177_37717": Object {
-            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
-              "error": null,
-            },
-          },
-          "User_1177_42489": Object {
-            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
-              "error": null,
-            },
-          },
-          "User_1177_52307": Object {
-            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
-              "error": null,
-            },
-          },
-          "User_1177_59359": Object {
-            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
-              "error": null,
-            },
-          },
-          "User_1177_59578": Object {
-            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
-              "error": null,
-            },
-            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
-              "error": null,
-            },
-          },
-          "User_1177_69645 ?#%!@*": Object {},
-          "User_1177_79118": Object {
-            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
-              "error": null,
-            },
-          },
-        }
-      }
-      chainLabel={
-        Object {
-          "airline cartel 1": Object {
-            "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
-          },
-          "airline cartel 10": Object {
-            "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
-          },
-          "airline cartel 1000": Object {
-            "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
-          },
-          "airline cartel 11": Object {
-            "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
-          },
-          "airline cartel 12": Object {
-            "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
-          },
-          "airline cartel 13": Object {
-            "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
-            "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
-            "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
-          },
-          "airline cartel 14": Object {
-            "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
-          },
-          "airline cartel 2": Object {
-            "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
-          },
-          "airline cartel 200": Object {
-            "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
-          },
-          "airline cartel 2000": Object {
-            "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
-          },
-          "airline cartel 3": Object {
-            "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
-          },
-          "airline cartel 4": Object {
-            "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
-          },
-          "airline cartel 5": Object {
-            "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
-          },
-          "airline cartel 52": Object {
-            "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
-          },
-          "airline cartel 6": Object {
-            "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
-          },
-          "airline cartel 7": Object {
-            "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
-          },
-          "airline cartel 822": Object {
-            "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
-          },
-          "airline cartel 89": Object {
-            "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
-          },
-          "airline cartel 9": Object {
-            "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-            "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-            "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-            "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-            "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-            "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-            "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-          },
-          "airline cartel 900": Object {
-            "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
-          },
-          "airline cartel 9000": Object {
-            "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
-          },
-        }
-      }
-      chainLabelIds={
-        Object {
-          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-        }
-      }
-      compileContract={[Function]}
-      contract="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
-      contractCloseModal={[Function]}
-      contractFormChange={[Function]}
-      contractName="Cloner"
-      contractNameChange={[Function]}
-      contractNameFromEditor="Greeter"
-      contractOpenModal={[Function]}
-      createContract={[Function]}
-      createDisabled={false}
-      enableCreateContract={true}
-      fetchAccounts={[Function]}
-      fetchChainIds={[Function]}
-      fetchContracts={[Function]}
-      fetchUserAddresses={[Function]}
-      getLabelIds={[Function]}
-      initialValues={
-        Object {
-          "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-          "username": "Admin_1177_49507",
-        }
-      }
-      isOpen={true}
-      isToasts={false}
-      onChangeEditorContractName={[Function]}
-      pristine={false}
-      reset={[Function]}
-      searchable={false}
-      sourceFromEditor={undefined}
-      submitting={false}
-      textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
-      toastsMessage="message"
-      touch={[Function]}
-      username="Supplier1"
-      usernameChange={[Function]}
-      valid={false}
-    />
-  </Provider>,
-  Symbol(enzyme.__renderer__): Object {
-    "batchedUpdates": [Function],
-    "getNode": [Function],
-    "render": [Function],
-    "simulateEvent": [Function],
-    "unmount": [Function],
-  },
-  Symbol(enzyme.__node__): Object {
-    "instance": null,
-    "key": undefined,
-    "nodeType": "class",
-    "props": Object {
-      "abi": undefined,
-      "accounts": Object {
-        "123456789012345678901234567890123": Object {
-          "2327839d6c7fc1188085554193cf578537ee660d": Object {
-            "error": null,
-          },
-        },
-        "Admin_1085_64667": Object {
-          "d2263b71c14010ff03d8f786670aba691b22b158": Object {
-            "error": null,
-          },
-        },
-        "Admin_1177_31203": Object {
-          "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
-            "error": null,
-          },
-        },
-        "Admin_1177_39206": Object {
-          "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
-            "error": null,
-          },
-        },
-        "Admin_1177_49507": Object {
-          "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
-            "error": null,
-          },
-        },
-        "Admin_1301_62816": Object {
-          "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
-            "error": null,
-          },
-          "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
-            "error": null,
-          },
-        },
-        "Admin_1301_86023": Object {
-          "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
-            "error": null,
-          },
-        },
-        "Buyer1": Object {
-          "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
-            "error": null,
-          },
-        },
-        "Buyer1177_18955": Object {
-          "73ea1c503b915e28162374591670904732d0e729": Object {
-            "error": null,
-          },
-        },
-        "Buyer2": Object {
-          "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
-            "error": null,
-          },
-        },
-        "Supplier0_1301_46441": Object {
-          "error": "error",
-        },
-        "Supplier1": Object {
-          "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
-            "error": null,
-          },
-        },
-        "Supplier1177_62701": Object {
-          "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
-            "error": null,
-          },
-        },
-        "Supplier1_1301_46441": Object {
-          "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
-            "error": null,
-          },
-        },
-        "Supplier2": Object {
-          "bc7199468816b3b92e54828affa08a010e9adb02": Object {
-            "error": null,
-          },
-        },
-        "Supplier2_1301_46441": Object {
-          "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
-            "error": null,
-          },
-        },
-        "User_1177_14462": Object {
-          "cd0046de8051af7e2781b58e892b25467133276f": Object {
-            "error": null,
-          },
-        },
-        "User_1177_26292": Object {
-          "dcbdac4d738461fcf11669b73668211371839c76": Object {
-            "error": null,
-          },
-        },
-        "User_1177_37717": Object {
-          "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
-            "error": null,
-          },
-        },
-        "User_1177_42489": Object {
-          "a421b5e3c34118266745dd8426a80b35513b2277": Object {
-            "error": null,
-          },
-        },
-        "User_1177_52307": Object {
-          "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
-            "error": null,
-          },
-        },
-        "User_1177_59359": Object {
-          "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
-            "error": null,
-          },
-        },
-        "User_1177_59578": Object {
-          "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
-            "error": null,
-          },
-          "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
-            "error": null,
-          },
-        },
-        "User_1177_69645 ?#%!@*": Object {},
-        "User_1177_79118": Object {
-          "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
-            "error": null,
-          },
-        },
-      },
-      "chainLabel": Object {
-        "airline cartel 1": Object {
-          "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
-        },
-        "airline cartel 10": Object {
-          "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
-        },
-        "airline cartel 1000": Object {
-          "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
-        },
-        "airline cartel 11": Object {
-          "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
-        },
-        "airline cartel 12": Object {
-          "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
-        },
-        "airline cartel 13": Object {
-          "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
-          "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
-          "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
-        },
-        "airline cartel 14": Object {
-          "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
-        },
-        "airline cartel 2": Object {
-          "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
-        },
-        "airline cartel 200": Object {
-          "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
-        },
-        "airline cartel 2000": Object {
-          "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
-        },
-        "airline cartel 3": Object {
-          "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
-        },
-        "airline cartel 4": Object {
-          "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
-        },
-        "airline cartel 5": Object {
-          "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
-        },
-        "airline cartel 52": Object {
-          "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
-        },
-        "airline cartel 6": Object {
-          "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
-        },
-        "airline cartel 7": Object {
-          "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
-        },
-        "airline cartel 822": Object {
-          "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
-        },
-        "airline cartel 89": Object {
-          "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
-        },
-        "airline cartel 9": Object {
-          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-        },
-        "airline cartel 900": Object {
-          "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
-        },
-        "airline cartel 9000": Object {
-          "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
-        },
-      },
-      "chainLabelIds": Object {
-        "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-        "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-        "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-        "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-        "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-        "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-        "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-      },
-      "compileContract": [Function],
-      "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-      "contractCloseModal": [Function],
-      "contractFormChange": [Function],
-      "contractName": "Cloner",
-      "contractNameChange": [Function],
-      "contractNameFromEditor": "Greeter",
-      "contractOpenModal": [Function],
-      "createContract": [Function],
-      "createDisabled": false,
-      "enableCreateContract": true,
-      "fetchAccounts": [Function],
-      "fetchChainIds": [Function],
-      "fetchContracts": [Function],
-      "fetchUserAddresses": [Function],
-      "getLabelIds": [Function],
-      "initialValues": Object {
-        "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-        "username": "Admin_1177_49507",
-      },
-      "isOpen": true,
-      "isToasts": false,
-      "onChangeEditorContractName": [Function],
-      "pristine": false,
-      "reset": [Function],
-      "searchable": false,
-      "sourceFromEditor": undefined,
-      "submitting": false,
-      "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-      "toastsMessage": "message",
-      "touch": [Function],
-      "username": "Supplier1",
-      "usernameChange": [Function],
-      "valid": false,
-    },
-    "ref": null,
-    "rendered": null,
-    "type": [Function],
-  },
-  Symbol(enzyme.__nodes__): Array [
-    Object {
-      "instance": null,
-      "key": undefined,
-      "nodeType": "class",
-      "props": Object {
-        "abi": undefined,
-        "accounts": Object {
-          "123456789012345678901234567890123": Object {
-            "2327839d6c7fc1188085554193cf578537ee660d": Object {
-              "error": null,
-            },
-          },
-          "Admin_1085_64667": Object {
-            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_31203": Object {
-            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_39206": Object {
-            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
-              "error": null,
-            },
-          },
-          "Admin_1177_49507": Object {
-            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
-              "error": null,
-            },
-          },
-          "Admin_1301_62816": Object {
-            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
-              "error": null,
-            },
-            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
-              "error": null,
-            },
-          },
-          "Admin_1301_86023": Object {
-            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
-              "error": null,
-            },
-          },
-          "Buyer1": Object {
-            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
-              "error": null,
-            },
-          },
-          "Buyer1177_18955": Object {
-            "73ea1c503b915e28162374591670904732d0e729": Object {
-              "error": null,
-            },
-          },
-          "Buyer2": Object {
-            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
-              "error": null,
-            },
-          },
-          "Supplier0_1301_46441": Object {
-            "error": "error",
-          },
-          "Supplier1": Object {
-            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
-              "error": null,
-            },
-          },
-          "Supplier1177_62701": Object {
-            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
-              "error": null,
-            },
-          },
-          "Supplier1_1301_46441": Object {
-            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
-              "error": null,
-            },
-          },
-          "Supplier2": Object {
-            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
-              "error": null,
-            },
-          },
-          "Supplier2_1301_46441": Object {
-            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
-              "error": null,
-            },
-          },
-          "User_1177_14462": Object {
-            "cd0046de8051af7e2781b58e892b25467133276f": Object {
-              "error": null,
-            },
-          },
-          "User_1177_26292": Object {
-            "dcbdac4d738461fcf11669b73668211371839c76": Object {
-              "error": null,
-            },
-          },
-          "User_1177_37717": Object {
-            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
-              "error": null,
-            },
-          },
-          "User_1177_42489": Object {
-            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
-              "error": null,
-            },
-          },
-          "User_1177_52307": Object {
-            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
-              "error": null,
-            },
-          },
-          "User_1177_59359": Object {
-            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
-              "error": null,
-            },
-          },
-          "User_1177_59578": Object {
-            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
-              "error": null,
-            },
-            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
-              "error": null,
-            },
-          },
-          "User_1177_69645 ?#%!@*": Object {},
-          "User_1177_79118": Object {
-            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
-              "error": null,
-            },
-          },
-        },
-        "chainLabel": Object {
-          "airline cartel 1": Object {
-            "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
-          },
-          "airline cartel 10": Object {
-            "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
-          },
-          "airline cartel 1000": Object {
-            "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
-          },
-          "airline cartel 11": Object {
-            "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
-          },
-          "airline cartel 12": Object {
-            "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
-          },
-          "airline cartel 13": Object {
-            "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
-            "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
-            "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
-          },
-          "airline cartel 14": Object {
-            "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
-          },
-          "airline cartel 2": Object {
-            "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
-          },
-          "airline cartel 200": Object {
-            "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
-          },
-          "airline cartel 2000": Object {
-            "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
-          },
-          "airline cartel 3": Object {
-            "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
-          },
-          "airline cartel 4": Object {
-            "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
-          },
-          "airline cartel 5": Object {
-            "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
-          },
-          "airline cartel 52": Object {
-            "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
-          },
-          "airline cartel 6": Object {
-            "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
-          },
-          "airline cartel 7": Object {
-            "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
-          },
-          "airline cartel 822": Object {
-            "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
-          },
-          "airline cartel 89": Object {
-            "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
-          },
-          "airline cartel 9": Object {
-            "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-            "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-            "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-            "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-            "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-            "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-            "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-          },
-          "airline cartel 900": Object {
-            "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
-          },
-          "airline cartel 9000": Object {
-            "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
-          },
-        },
-        "chainLabelIds": Object {
-          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
-          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
-          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
-          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
-          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
-          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
-          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
-        },
-        "compileContract": [Function],
-        "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-        "contractCloseModal": [Function],
-        "contractFormChange": [Function],
-        "contractName": "Cloner",
-        "contractNameChange": [Function],
-        "contractNameFromEditor": "Greeter",
-        "contractOpenModal": [Function],
-        "createContract": [Function],
-        "createDisabled": false,
-        "enableCreateContract": true,
-        "fetchAccounts": [Function],
-        "fetchChainIds": [Function],
-        "fetchContracts": [Function],
-        "fetchUserAddresses": [Function],
-        "getLabelIds": [Function],
-        "initialValues": Object {
-          "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-          "username": "Admin_1177_49507",
-        },
-        "isOpen": true,
-        "isToasts": false,
-        "onChangeEditorContractName": [Function],
-        "pristine": false,
-        "reset": [Function],
-        "searchable": false,
-        "sourceFromEditor": undefined,
-        "submitting": false,
-        "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
-        "toastsMessage": "message",
-        "touch": [Function],
-        "username": "Supplier1",
-        "usernameChange": [Function],
-        "valid": false,
-      },
-      "ref": null,
-      "rendered": null,
-      "type": [Function],
-    },
-  ],
-  Symbol(enzyme.__options__): Object {
-    "adapter": ReactFifteenAdapter {
-      "options": Object {
-        "supportPrevContextArgumentOfComponentDidUpdate": true,
-      },
-    },
-  },
-}
-`;
-
-exports[`CreateContract: index render component (public mode) render contracts without values 1`] = `
+exports[`CreateContract: index render component (Oauth mode) render contracts without values 1`] = `
 ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
@@ -3173,6 +1571,1608 @@ ShallowWrapper {
       "props": Object {
         "abi": Object {
           "src": Object {},
+        },
+        "accounts": Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        },
+        "chainLabel": Object {
+          "airline cartel 1": Object {
+            "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
+          },
+          "airline cartel 10": Object {
+            "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
+          },
+          "airline cartel 1000": Object {
+            "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
+          },
+          "airline cartel 11": Object {
+            "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
+          },
+          "airline cartel 12": Object {
+            "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
+          },
+          "airline cartel 13": Object {
+            "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
+            "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
+            "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
+          },
+          "airline cartel 14": Object {
+            "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
+          },
+          "airline cartel 2": Object {
+            "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
+          },
+          "airline cartel 200": Object {
+            "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
+          },
+          "airline cartel 2000": Object {
+            "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
+          },
+          "airline cartel 3": Object {
+            "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
+          },
+          "airline cartel 4": Object {
+            "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
+          },
+          "airline cartel 5": Object {
+            "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
+          },
+          "airline cartel 52": Object {
+            "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
+          },
+          "airline cartel 6": Object {
+            "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
+          },
+          "airline cartel 7": Object {
+            "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
+          },
+          "airline cartel 822": Object {
+            "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
+          },
+          "airline cartel 89": Object {
+            "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
+          },
+          "airline cartel 9": Object {
+            "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+            "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+            "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+            "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+            "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+            "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+            "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+          },
+          "airline cartel 900": Object {
+            "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
+          },
+          "airline cartel 9000": Object {
+            "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
+          },
+        },
+        "chainLabelIds": Object {
+          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+        },
+        "compileContract": [Function],
+        "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "contractCloseModal": [Function],
+        "contractFormChange": [Function],
+        "contractName": "Cloner",
+        "contractNameChange": [Function],
+        "contractNameFromEditor": "Greeter",
+        "contractOpenModal": [Function],
+        "createContract": [Function],
+        "createDisabled": false,
+        "enableCreateContract": true,
+        "fetchAccounts": [Function],
+        "fetchChainIds": [Function],
+        "fetchContracts": [Function],
+        "fetchUserAddresses": [Function],
+        "getLabelIds": [Function],
+        "initialValues": Object {
+          "address": "",
+          "username": "",
+        },
+        "isOpen": true,
+        "isToasts": false,
+        "onChangeEditorContractName": [Function],
+        "pristine": false,
+        "reset": [Function],
+        "searchable": false,
+        "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "submitting": false,
+        "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "toastsMessage": "message",
+        "touch": [Function],
+        "username": "Supplier1",
+        "usernameChange": [Function],
+        "valid": false,
+      },
+      "ref": null,
+      "rendered": null,
+      "type": [Function],
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
+  },
+}
+`;
+
+exports[`CreateContract: index render component (non Oauth mode) render contracts without source 1`] = `
+ShallowWrapper {
+  "length": 1,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <Provider
+    store={
+      Object {
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+  >
+    <ReduxForm
+      abi={undefined}
+      accounts={
+        Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        }
+      }
+      chainLabel={
+        Object {
+          "airline cartel 1": Object {
+            "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
+          },
+          "airline cartel 10": Object {
+            "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
+          },
+          "airline cartel 1000": Object {
+            "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
+          },
+          "airline cartel 11": Object {
+            "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
+          },
+          "airline cartel 12": Object {
+            "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
+          },
+          "airline cartel 13": Object {
+            "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
+            "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
+            "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
+          },
+          "airline cartel 14": Object {
+            "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
+          },
+          "airline cartel 2": Object {
+            "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
+          },
+          "airline cartel 200": Object {
+            "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
+          },
+          "airline cartel 2000": Object {
+            "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
+          },
+          "airline cartel 3": Object {
+            "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
+          },
+          "airline cartel 4": Object {
+            "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
+          },
+          "airline cartel 5": Object {
+            "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
+          },
+          "airline cartel 52": Object {
+            "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
+          },
+          "airline cartel 6": Object {
+            "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
+          },
+          "airline cartel 7": Object {
+            "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
+          },
+          "airline cartel 822": Object {
+            "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
+          },
+          "airline cartel 89": Object {
+            "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
+          },
+          "airline cartel 9": Object {
+            "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+            "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+            "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+            "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+            "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+            "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+            "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+          },
+          "airline cartel 900": Object {
+            "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
+          },
+          "airline cartel 9000": Object {
+            "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
+          },
+        }
+      }
+      chainLabelIds={
+        Object {
+          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+        }
+      }
+      compileContract={[Function]}
+      contract="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      contractCloseModal={[Function]}
+      contractFormChange={[Function]}
+      contractName="Cloner"
+      contractNameChange={[Function]}
+      contractNameFromEditor="Greeter"
+      contractOpenModal={[Function]}
+      createContract={[Function]}
+      createDisabled={false}
+      enableCreateContract={true}
+      fetchAccounts={[Function]}
+      fetchChainIds={[Function]}
+      fetchContracts={[Function]}
+      fetchUserAddresses={[Function]}
+      getLabelIds={[Function]}
+      initialValues={
+        Object {
+          "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+          "username": "Admin_1177_49507",
+        }
+      }
+      isOpen={true}
+      isToasts={false}
+      onChangeEditorContractName={[Function]}
+      pristine={false}
+      reset={[Function]}
+      searchable={false}
+      sourceFromEditor={undefined}
+      submitting={false}
+      textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      toastsMessage="message"
+      touch={[Function]}
+      username="Supplier1"
+      usernameChange={[Function]}
+      valid={false}
+    />
+  </Provider>,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "class",
+    "props": Object {
+      "abi": undefined,
+      "accounts": Object {
+        "123456789012345678901234567890123": Object {
+          "2327839d6c7fc1188085554193cf578537ee660d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1085_64667": Object {
+          "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_31203": Object {
+          "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_39206": Object {
+          "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_49507": Object {
+          "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_62816": Object {
+          "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+            "error": null,
+          },
+          "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_86023": Object {
+          "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+            "error": null,
+          },
+        },
+        "Buyer1": Object {
+          "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+            "error": null,
+          },
+        },
+        "Buyer1177_18955": Object {
+          "73ea1c503b915e28162374591670904732d0e729": Object {
+            "error": null,
+          },
+        },
+        "Buyer2": Object {
+          "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+            "error": null,
+          },
+        },
+        "Supplier0_1301_46441": Object {
+          "error": "error",
+        },
+        "Supplier1": Object {
+          "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+            "error": null,
+          },
+        },
+        "Supplier1177_62701": Object {
+          "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+            "error": null,
+          },
+        },
+        "Supplier1_1301_46441": Object {
+          "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+            "error": null,
+          },
+        },
+        "Supplier2": Object {
+          "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+            "error": null,
+          },
+        },
+        "Supplier2_1301_46441": Object {
+          "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+            "error": null,
+          },
+        },
+        "User_1177_14462": Object {
+          "cd0046de8051af7e2781b58e892b25467133276f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_26292": Object {
+          "dcbdac4d738461fcf11669b73668211371839c76": Object {
+            "error": null,
+          },
+        },
+        "User_1177_37717": Object {
+          "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+            "error": null,
+          },
+        },
+        "User_1177_42489": Object {
+          "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+            "error": null,
+          },
+        },
+        "User_1177_52307": Object {
+          "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59359": Object {
+          "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59578": Object {
+          "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+            "error": null,
+          },
+          "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_69645 ?#%!@*": Object {},
+        "User_1177_79118": Object {
+          "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+            "error": null,
+          },
+        },
+      },
+      "chainLabel": Object {
+        "airline cartel 1": Object {
+          "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
+        },
+        "airline cartel 10": Object {
+          "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
+        },
+        "airline cartel 1000": Object {
+          "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
+        },
+        "airline cartel 11": Object {
+          "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
+        },
+        "airline cartel 12": Object {
+          "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
+        },
+        "airline cartel 13": Object {
+          "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
+          "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
+          "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
+        },
+        "airline cartel 14": Object {
+          "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
+        },
+        "airline cartel 2": Object {
+          "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
+        },
+        "airline cartel 200": Object {
+          "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
+        },
+        "airline cartel 2000": Object {
+          "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
+        },
+        "airline cartel 3": Object {
+          "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
+        },
+        "airline cartel 4": Object {
+          "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
+        },
+        "airline cartel 5": Object {
+          "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
+        },
+        "airline cartel 52": Object {
+          "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
+        },
+        "airline cartel 6": Object {
+          "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
+        },
+        "airline cartel 7": Object {
+          "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
+        },
+        "airline cartel 822": Object {
+          "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
+        },
+        "airline cartel 89": Object {
+          "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
+        },
+        "airline cartel 9": Object {
+          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+        },
+        "airline cartel 900": Object {
+          "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
+        },
+        "airline cartel 9000": Object {
+          "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
+        },
+      },
+      "chainLabelIds": Object {
+        "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+        "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+        "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+        "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+        "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+        "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+        "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+      },
+      "compileContract": [Function],
+      "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "contractCloseModal": [Function],
+      "contractFormChange": [Function],
+      "contractName": "Cloner",
+      "contractNameChange": [Function],
+      "contractNameFromEditor": "Greeter",
+      "contractOpenModal": [Function],
+      "createContract": [Function],
+      "createDisabled": false,
+      "enableCreateContract": true,
+      "fetchAccounts": [Function],
+      "fetchChainIds": [Function],
+      "fetchContracts": [Function],
+      "fetchUserAddresses": [Function],
+      "getLabelIds": [Function],
+      "initialValues": Object {
+        "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+        "username": "Admin_1177_49507",
+      },
+      "isOpen": true,
+      "isToasts": false,
+      "onChangeEditorContractName": [Function],
+      "pristine": false,
+      "reset": [Function],
+      "searchable": false,
+      "sourceFromEditor": undefined,
+      "submitting": false,
+      "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "toastsMessage": "message",
+      "touch": [Function],
+      "username": "Supplier1",
+      "usernameChange": [Function],
+      "valid": false,
+    },
+    "ref": null,
+    "rendered": null,
+    "type": [Function],
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "class",
+      "props": Object {
+        "abi": undefined,
+        "accounts": Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        },
+        "chainLabel": Object {
+          "airline cartel 1": Object {
+            "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
+          },
+          "airline cartel 10": Object {
+            "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
+          },
+          "airline cartel 1000": Object {
+            "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
+          },
+          "airline cartel 11": Object {
+            "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
+          },
+          "airline cartel 12": Object {
+            "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
+          },
+          "airline cartel 13": Object {
+            "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
+            "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
+            "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
+          },
+          "airline cartel 14": Object {
+            "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
+          },
+          "airline cartel 2": Object {
+            "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
+          },
+          "airline cartel 200": Object {
+            "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
+          },
+          "airline cartel 2000": Object {
+            "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
+          },
+          "airline cartel 3": Object {
+            "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
+          },
+          "airline cartel 4": Object {
+            "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
+          },
+          "airline cartel 5": Object {
+            "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
+          },
+          "airline cartel 52": Object {
+            "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
+          },
+          "airline cartel 6": Object {
+            "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
+          },
+          "airline cartel 7": Object {
+            "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
+          },
+          "airline cartel 822": Object {
+            "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
+          },
+          "airline cartel 89": Object {
+            "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
+          },
+          "airline cartel 9": Object {
+            "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+            "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+            "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+            "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+            "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+            "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+            "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+          },
+          "airline cartel 900": Object {
+            "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
+          },
+          "airline cartel 9000": Object {
+            "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
+          },
+        },
+        "chainLabelIds": Object {
+          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+        },
+        "compileContract": [Function],
+        "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "contractCloseModal": [Function],
+        "contractFormChange": [Function],
+        "contractName": "Cloner",
+        "contractNameChange": [Function],
+        "contractNameFromEditor": "Greeter",
+        "contractOpenModal": [Function],
+        "createContract": [Function],
+        "createDisabled": false,
+        "enableCreateContract": true,
+        "fetchAccounts": [Function],
+        "fetchChainIds": [Function],
+        "fetchContracts": [Function],
+        "fetchUserAddresses": [Function],
+        "getLabelIds": [Function],
+        "initialValues": Object {
+          "address": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+          "username": "Admin_1177_49507",
+        },
+        "isOpen": true,
+        "isToasts": false,
+        "onChangeEditorContractName": [Function],
+        "pristine": false,
+        "reset": [Function],
+        "searchable": false,
+        "sourceFromEditor": undefined,
+        "submitting": false,
+        "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+        "toastsMessage": "message",
+        "touch": [Function],
+        "username": "Supplier1",
+        "usernameChange": [Function],
+        "valid": false,
+      },
+      "ref": null,
+      "rendered": null,
+      "type": [Function],
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
+  },
+}
+`;
+
+exports[`CreateContract: index render component (non Oauth mode) render contracts without values 1`] = `
+ShallowWrapper {
+  "length": 1,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <Provider
+    store={
+      Object {
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+  >
+    <ReduxForm
+      abi={
+        Object {
+          "src": undefined,
+        }
+      }
+      accounts={
+        Object {
+          "123456789012345678901234567890123": Object {
+            "2327839d6c7fc1188085554193cf578537ee660d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1085_64667": Object {
+            "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_31203": Object {
+            "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_39206": Object {
+            "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+              "error": null,
+            },
+          },
+          "Admin_1177_49507": Object {
+            "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_62816": Object {
+            "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+              "error": null,
+            },
+            "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+              "error": null,
+            },
+          },
+          "Admin_1301_86023": Object {
+            "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+              "error": null,
+            },
+          },
+          "Buyer1": Object {
+            "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+              "error": null,
+            },
+          },
+          "Buyer1177_18955": Object {
+            "73ea1c503b915e28162374591670904732d0e729": Object {
+              "error": null,
+            },
+          },
+          "Buyer2": Object {
+            "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+              "error": null,
+            },
+          },
+          "Supplier0_1301_46441": Object {
+            "error": "error",
+          },
+          "Supplier1": Object {
+            "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+              "error": null,
+            },
+          },
+          "Supplier1177_62701": Object {
+            "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+              "error": null,
+            },
+          },
+          "Supplier1_1301_46441": Object {
+            "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+              "error": null,
+            },
+          },
+          "Supplier2": Object {
+            "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+              "error": null,
+            },
+          },
+          "Supplier2_1301_46441": Object {
+            "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+              "error": null,
+            },
+          },
+          "User_1177_14462": Object {
+            "cd0046de8051af7e2781b58e892b25467133276f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_26292": Object {
+            "dcbdac4d738461fcf11669b73668211371839c76": Object {
+              "error": null,
+            },
+          },
+          "User_1177_37717": Object {
+            "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+              "error": null,
+            },
+          },
+          "User_1177_42489": Object {
+            "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+              "error": null,
+            },
+          },
+          "User_1177_52307": Object {
+            "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59359": Object {
+            "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+              "error": null,
+            },
+          },
+          "User_1177_59578": Object {
+            "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+              "error": null,
+            },
+            "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+              "error": null,
+            },
+          },
+          "User_1177_69645 ?#%!@*": Object {},
+          "User_1177_79118": Object {
+            "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+              "error": null,
+            },
+          },
+        }
+      }
+      chainLabel={
+        Object {
+          "airline cartel 1": Object {
+            "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
+          },
+          "airline cartel 10": Object {
+            "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
+          },
+          "airline cartel 1000": Object {
+            "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
+          },
+          "airline cartel 11": Object {
+            "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
+          },
+          "airline cartel 12": Object {
+            "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
+          },
+          "airline cartel 13": Object {
+            "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
+            "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
+            "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
+          },
+          "airline cartel 14": Object {
+            "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
+          },
+          "airline cartel 2": Object {
+            "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
+          },
+          "airline cartel 200": Object {
+            "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
+          },
+          "airline cartel 2000": Object {
+            "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
+          },
+          "airline cartel 3": Object {
+            "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
+          },
+          "airline cartel 4": Object {
+            "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
+          },
+          "airline cartel 5": Object {
+            "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
+          },
+          "airline cartel 52": Object {
+            "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
+          },
+          "airline cartel 6": Object {
+            "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
+          },
+          "airline cartel 7": Object {
+            "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
+          },
+          "airline cartel 822": Object {
+            "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
+          },
+          "airline cartel 89": Object {
+            "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
+          },
+          "airline cartel 9": Object {
+            "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+            "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+            "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+            "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+            "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+            "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+            "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+          },
+          "airline cartel 900": Object {
+            "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
+          },
+          "airline cartel 9000": Object {
+            "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
+          },
+        }
+      }
+      chainLabelIds={
+        Object {
+          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+        }
+      }
+      compileContract={[Function]}
+      contract="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      contractCloseModal={[Function]}
+      contractFormChange={[Function]}
+      contractName="Cloner"
+      contractNameChange={[Function]}
+      contractNameFromEditor="Greeter"
+      contractOpenModal={[Function]}
+      createContract={[Function]}
+      createDisabled={false}
+      enableCreateContract={true}
+      fetchAccounts={[Function]}
+      fetchChainIds={[Function]}
+      fetchContracts={[Function]}
+      fetchUserAddresses={[Function]}
+      getLabelIds={[Function]}
+      initialValues={
+        Object {
+          "address": "",
+          "username": "",
+        }
+      }
+      isOpen={true}
+      isToasts={false}
+      onChangeEditorContractName={[Function]}
+      pristine={false}
+      reset={[Function]}
+      searchable={false}
+      sourceFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      submitting={false}
+      textFromEditor="contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"
+      toastsMessage="message"
+      touch={[Function]}
+      username="Supplier1"
+      usernameChange={[Function]}
+      valid={false}
+    />
+  </Provider>,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "class",
+    "props": Object {
+      "abi": Object {
+        "src": undefined,
+      },
+      "accounts": Object {
+        "123456789012345678901234567890123": Object {
+          "2327839d6c7fc1188085554193cf578537ee660d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1085_64667": Object {
+          "d2263b71c14010ff03d8f786670aba691b22b158": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_31203": Object {
+          "d46ade1b4fb6360fad2d05efd5d6d9fb51849320": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_39206": Object {
+          "b80c7ad40cd178479d480e7136d93f2302692e4d": Object {
+            "error": null,
+          },
+        },
+        "Admin_1177_49507": Object {
+          "0bdd9ade6477ba753650cc5d9ce40a17c42246c1": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_62816": Object {
+          "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+            "error": null,
+          },
+          "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+            "error": null,
+          },
+        },
+        "Admin_1301_86023": Object {
+          "585b8e9f36f43f38d9118b8750a5e6cd753e382e": Object {
+            "error": null,
+          },
+        },
+        "Buyer1": Object {
+          "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6": Object {
+            "error": null,
+          },
+        },
+        "Buyer1177_18955": Object {
+          "73ea1c503b915e28162374591670904732d0e729": Object {
+            "error": null,
+          },
+        },
+        "Buyer2": Object {
+          "ae5bfd0fc750d1d99e28e733bdac933dac826a4f": Object {
+            "error": null,
+          },
+        },
+        "Supplier0_1301_46441": Object {
+          "error": "error",
+        },
+        "Supplier1": Object {
+          "370adf114257cb0e0025eedf0a96261b51af23e3": Object {
+            "error": null,
+          },
+        },
+        "Supplier1177_62701": Object {
+          "21edfc77121d05aba26955b6cd435bd8f864ad78": Object {
+            "error": null,
+          },
+        },
+        "Supplier1_1301_46441": Object {
+          "0ca4a9bb1b37e6d63d142722e7c37bbf8f959547": Object {
+            "error": null,
+          },
+        },
+        "Supplier2": Object {
+          "bc7199468816b3b92e54828affa08a010e9adb02": Object {
+            "error": null,
+          },
+        },
+        "Supplier2_1301_46441": Object {
+          "57f2ed9058d2e868d7bbae9db03af12d27675117": Object {
+            "error": null,
+          },
+        },
+        "User_1177_14462": Object {
+          "cd0046de8051af7e2781b58e892b25467133276f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_26292": Object {
+          "dcbdac4d738461fcf11669b73668211371839c76": Object {
+            "error": null,
+          },
+        },
+        "User_1177_37717": Object {
+          "9677e59a2de0a2e2f712e1d76720857066a396b9": Object {
+            "error": null,
+          },
+        },
+        "User_1177_42489": Object {
+          "a421b5e3c34118266745dd8426a80b35513b2277": Object {
+            "error": null,
+          },
+        },
+        "User_1177_52307": Object {
+          "0e29350e6de10d60e58ffc2a7ad84401af5f2f29": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59359": Object {
+          "cf7a807b9bbb64cab5f988bddb4bedfd066a83de": Object {
+            "error": null,
+          },
+        },
+        "User_1177_59578": Object {
+          "620083a3803fc8a5ad71e403c1a72a0e73ece645": Object {
+            "error": null,
+          },
+          "dcbfca1d9a80d2d78fa6f74d62489a8ff4bd9c5f": Object {
+            "error": null,
+          },
+        },
+        "User_1177_69645 ?#%!@*": Object {},
+        "User_1177_79118": Object {
+          "33c02a81e677ea493aace735f0a6b44cfa18f44e": Object {
+            "error": null,
+          },
+        },
+      },
+      "chainLabel": Object {
+        "airline cartel 1": Object {
+          "79f69ec8f4bdb4a0c43e8970e4f2a9701db43b8b7b046023fe2a874ddb32acae": Object {},
+        },
+        "airline cartel 10": Object {
+          "b3e7a42333819dcb5bf800b7cc74f59eb9861d4ccf8d8138eb8f3d4d9308e5a7": Object {},
+        },
+        "airline cartel 1000": Object {
+          "63e0a0b02a9216d980dde66215d2c2e3b598f58c421d0046c100b4e0a571f40c": Object {},
+        },
+        "airline cartel 11": Object {
+          "1f0744737a6b9e2a0688cc7bb58d3696fe777fe53659613ba164c82a9f210fb4": Object {},
+        },
+        "airline cartel 12": Object {
+          "2206661f918ca9f1fad4578b212f3e5abff7ad714e024297a1ba70fdcf52be67": Object {},
+        },
+        "airline cartel 13": Object {
+          "b5f6dc91e333b20140b007c55f28027be28bb8b54e744fbed609668293376efc": Object {},
+          "f8d3a497da2c7325eab38ed8a48c99e463c4417bf75e1694327f9633fffcaa10": Object {},
+          "fb92498236dfeb519ff6d36a7bc37afd4eab34e05f5d40eabc3539621c09217b": Object {},
+        },
+        "airline cartel 14": Object {
+          "2f19b069f2700ffd7217025efb1bcf47603a6a137a07b0c28bbedc47f0485acf": Object {},
+        },
+        "airline cartel 2": Object {
+          "e5ea4617812076bac15e12e4f70f78076f9f371ac744022905be97e57ca05bf2": Object {},
+        },
+        "airline cartel 200": Object {
+          "2b1ead18005e051e3fb68ce0f00075f4fa289144b1d490c0a04c7c1a90437021": Object {},
+        },
+        "airline cartel 2000": Object {
+          "5b89dd643d729fe9d433f5243acefc596036aacd428499e6994832e5370d4ef9": Object {},
+        },
+        "airline cartel 3": Object {
+          "bd3d6838e2bdcb5b1cf1093873d90e3192aa8bcffe05d1b2d6522f09b4dafef8": Object {},
+        },
+        "airline cartel 4": Object {
+          "bbee98fb39586c13884998ccdeed659abf9b44c2c3eede252f57c83d4245e66c": Object {},
+        },
+        "airline cartel 5": Object {
+          "092cec7cd999b8b4827e0e384d2d8636e8484b6e2d8f824d4727663cd1ba330d": Object {},
+        },
+        "airline cartel 52": Object {
+          "4a8512095130296c0388d3c8277228890ee5b10ee83383ce0be1dd24e3537b7d": Object {},
+        },
+        "airline cartel 6": Object {
+          "6a5abc53876eaae27279b194335526b52c3980e19dff5ab0de384deed1a90950": Object {},
+        },
+        "airline cartel 7": Object {
+          "0d705c5d05ae4cc780655d92939cdb31594ffa8b29c5a26a6ae0bb6b2a66b2c4": Object {},
+        },
+        "airline cartel 822": Object {
+          "6913f2c6faa6e47746c0dae953536116941bdf8473ae2452a2ab6ae01588b2a6": Object {},
+        },
+        "airline cartel 89": Object {
+          "54d04b91157066f2bed14954c7c635b2cd82dc754db4195c61e90e208d9bd5d5": Object {},
+        },
+        "airline cartel 9": Object {
+          "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+          "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+          "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+          "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+          "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+          "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+          "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+        },
+        "airline cartel 900": Object {
+          "c861f9caed98de482888784ba0384e7a23a086d1387702ac3981b81d8df30632": Object {},
+        },
+        "airline cartel 9000": Object {
+          "8d30f74bfe22245ba513ee0d09bbcc0d26f82513fb35bdc9b5862d5c5c88dcf6": Object {},
+        },
+      },
+      "chainLabelIds": Object {
+        "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86": Object {},
+        "86d43e5b7a57711ecf734b79fb998c119d525afa2832ee726d6791cdac1864c6": Object {},
+        "8768cb0769067d78b147974d627884b4de0737d60ea2f4e978663a62946830a5": Object {},
+        "8eeefc708630002bb349ce1e1f914ac3adf8efc385106a1ef04b90c3d9b7ee60": Object {},
+        "90d35b73a7ca7dd4fe4ccfd425bf404f92eb3091e502643bc62b936e331ad08b": Object {},
+        "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
+        "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
+      },
+      "compileContract": [Function],
+      "contract": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "contractCloseModal": [Function],
+      "contractFormChange": [Function],
+      "contractName": "Cloner",
+      "contractNameChange": [Function],
+      "contractNameFromEditor": "Greeter",
+      "contractOpenModal": [Function],
+      "createContract": [Function],
+      "createDisabled": false,
+      "enableCreateContract": true,
+      "fetchAccounts": [Function],
+      "fetchChainIds": [Function],
+      "fetchContracts": [Function],
+      "fetchUserAddresses": [Function],
+      "getLabelIds": [Function],
+      "initialValues": Object {
+        "address": "",
+        "username": "",
+      },
+      "isOpen": true,
+      "isToasts": false,
+      "onChangeEditorContractName": [Function],
+      "pristine": false,
+      "reset": [Function],
+      "searchable": false,
+      "sourceFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "submitting": false,
+      "textFromEditor": "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+      "toastsMessage": "message",
+      "touch": [Function],
+      "username": "Supplier1",
+      "usernameChange": [Function],
+      "valid": false,
+    },
+    "ref": null,
+    "rendered": null,
+    "type": [Function],
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "class",
+      "props": Object {
+        "abi": Object {
+          "src": undefined,
         },
         "accounts": Object {
           "123456789012345678901234567890123": Object {

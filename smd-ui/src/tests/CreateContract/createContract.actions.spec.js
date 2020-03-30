@@ -68,7 +68,7 @@ describe('CreateContract: action', () => {
   describe('compile contract', () => {
 
     test('request', () => {
-      expect(compileContract(payloadCompile.name, payloadCompile.contract, payloadCompile.searchable)).toMatchSnapshot();
+      expect(compileContract(payloadCompile.name, payloadCompile.contract, payloadCompile.solidvm)).toMatchSnapshot();
     });
 
     test('success', () => {

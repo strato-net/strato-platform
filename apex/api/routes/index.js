@@ -64,8 +64,8 @@ router.post('/dapps', dappController.upload);
 
 // router.get('/dapps', dappController.list);
 
-router.post('/login', checkMode, authController.login);
 router.post('/user', checkMode, oAuthController.createUser);
+router.post('/login', checkMode, authController.login);
 router.post('/users', checkMode, authController.create);
 router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
 router.post('/verify-email', checkMode, authController.verifyEmail);

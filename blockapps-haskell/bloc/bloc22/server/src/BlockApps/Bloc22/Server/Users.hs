@@ -239,6 +239,13 @@ postUsersContract userName addr chainId resolve
     Nothing -> postUsersContractEVM' bcp (return . signTransaction sk) -- The EVM is the default VM
     Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
+evmContractSolidVMError :: Text
+evmContractSolidVMError = Text.concat
+  [ "Upload Contract (EVM): The given contracts were previously uploaded for "
+  , "SolidVM. Please retry your request specifying SolidVM as the VM type. "
+  , "If you are intending to use EVM, please modify your contracts and try again."
+  ]
+
 postUsersContractEVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams fromAddr chainId txParams
@@ -250,7 +257,9 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
      Nothing ->
        case Map.toList idsAndDetails of
          [] -> throwError $ UserError "You need to supply at least one contract in the source"
-         [x] -> return x
+         [(n,(m,cd))] -> case contractdetailsCodeHash cd of
+                  (EVMCode _) -> return (n, (m, cd))
+                  (SolidVMCode _ _) -> throwError $ UserError evmContractSolidVMError
          _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
      Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   let
@@ -320,14 +329,16 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
   getBlocTransactionResult' [hash] resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
-postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts _resolve) = do
+postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts msrcs _resolve) = do
   sk <- getAccountSecKey userName pw addr
-  let bclp = ContractListParameters
+  let getSrc c = uploadlistcontractSrc c <|> (msrcs >>= Map.lookup (uploadlistcontractContractName c))
+      setSrc c = c{uploadlistcontractSrc = getSrc c}
+      bclp = ContractListParameters
                addr
-               contracts
+               (setSrc <$> contracts)
                chainId
                (resolve || _resolve)
-  case join $ fmap (Map.lookup "VM") $ uploadlistcontractMetadata (head contracts) of  --Determine VM option by the metadata of the first tx in list
+  case Map.lookup "VM" =<< uploadlistcontractMetadata (head contracts) of  --Determine VM option by the metadata of the first tx in list
     Just "EVM" -> postUsersUploadListEVM' bclp (return . signTransaction sk)
     Just "SolidVM" -> postUsersUploadListSolidVM' bclp (return . signTransaction sk)
     Nothing -> postUsersUploadListEVM' bclp (return . signTransaction sk) -- The EVM is the default VM
@@ -338,27 +349,31 @@ postUsersUploadListSolidVM' ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces (getAccountNonce fromAddr) uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name args params value cid md) -> do
-      mtuple <- use $ at name
-      (_, src, cmId, xabi) <- case mtuple of
-        Just (b, src, cmId', x) -> return (b, src, cmId', x)
+    \(UploadListContract name mSrc args params value cid md) -> do
+      (src, cmId, xabi) <- case mSrc of
+        Just src -> do
+          (cmId', cd) <- lift $ do
+            idsAndDetails <- sourceToContractDetails (Don't Compile) src
+            blocMaybe "Could not find global contract metadataId" (Map.lookup name idsAndDetails)
+          at name <?= (src, cmId', contractdetailsXabi cd)
         Nothing -> do
-          mContract <- lift . blocQueryMaybe $ proc () -> do
-            (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-            returnA -< (bin16,src,cmId',x'')
-          case mContract of
-            Nothing -> throwError . UserError $ Text.concat
-              [ "Upload List: When deploying multiple contract creation transactions, "
-              , "the contracts' source code must be uploaded via the /compile route "
-              , "ahead of time. Please try uploading the contracts' source code via "
-              , "the /compile route, and try again. If you continue to receive this "
-              , "error message, please contact your administrator."
-              ]
-            Just (b16,src,(cmId' :: Int32),x') -> do
-              let (b, leftOver) = Base16.decode b16
-              unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-              x <- lift $ deserializeXabi x'
-              at name <?= (b, src, cmId', x)
+          mtuple <- use $ at name
+          case mtuple of
+            Just (src, cmId', x) -> return (src, cmId', x)
+            Nothing -> do
+              mContract <- lift . blocQueryMaybe $ proc () -> do
+                (_,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
+                returnA -< (src,cmId',x'')
+              case mContract of
+                Nothing -> throwError . UserError $ Text.concat
+                  [ "Upload List (SolidVM): When deploying multiple contract creation transactions, "
+                  , "the contracts' source code must be supplied when using SolidVM. "
+                  , "Please try supplying the contracts' source code and try again. "
+                  , "If you continue to receive this error message, please contact your administrator."
+                  ]
+                Just (src,(cmId' :: Int32),x') -> do
+                  x <- lift $ deserializeXabi x'
+                  at name <?= (src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
@@ -386,29 +401,33 @@ postUsersUploadListSolidVM' ContractListParameters{..} sign = do
     ]
   getBatchBlocTransactionResult' hashes resolve
 
+evmUploadListError :: Text
+evmUploadListError = Text.concat
+  [ "Upload List (EVM): When deploying multiple contract creation transactions, "
+  , "the contracts' source code must be uploaded via the /compile route "
+  , "ahead of time. Please try uploading the contracts' source code via "
+  , "the /compile route, and try again. If you continue to receive this "
+  , "error message, please contact your administrator."
+  ]
 
 postUsersUploadListEVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListEVM' ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces (getAccountNonce fromAddr) uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name args params value cid md) -> do
+    \(UploadListContract name mSrc args params value cid md) -> do
+      when (isJust mSrc) . lift . throwError $ UserError evmUploadListError
       mtuple <- use $ at name
       (bin, src, cmId, xabi) <- case mtuple of
         Just (b, src, cmId', x) -> return (b, src, cmId', x)
         Nothing -> do
           mContract <- lift . blocQueryMaybe $ proc () -> do
-            (bin16,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-            returnA -< (bin16,src,cmId',x'')
+            (bin16,_,cHash,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
+            returnA -< (bin16,cHash,src,cmId',x'')
           case mContract of
-            Nothing -> throwError . UserError $ Text.concat
-              [ "Upload List: When deploying multiple contract creation transactions, "
-              , "the contracts' source code must be uploaded via the /compile route "
-              , "ahead of time. Please try uploading the contracts' source code via "
-              , "the /compile route, and try again. If you continue to receive this "
-              , "error message, please contact your administrator."
-              ]
-            Just (b16,src,(cmId' :: Int32),x') -> do
+            Nothing -> throwError $ UserError evmUploadListError
+            Just (_,SolidVMCode _ _,_,_,_) -> throwError $ UserError evmContractSolidVMError
+            Just (b16,_,src,(cmId' :: Int32),x') -> do
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
               x <- lift $ deserializeXabi x'
@@ -754,7 +773,7 @@ evalAndReturn list = forStateT emptyBatchState list $
             0 -> return $ BlocTransactionResult Success hash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata)
             1 -> contractResult hash mtxr cmId tdata
             2 -> functionResult hash mtxr cmId tdata
-            _ -> error $ "Unexpected transaction type: got" ++ show ttype
+            _ -> throwError $ InternalError $ Text.pack $ "Unexpected transaction type: got" ++ show ttype
 
 contractResult :: Keccak256
                -> Maybe TransactionResult

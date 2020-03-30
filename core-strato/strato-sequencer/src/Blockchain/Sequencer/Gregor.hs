@@ -120,7 +120,7 @@ writeSeqP2pEvents events = do
     P.unsafeAddCounter gregorP2PWrite (fromIntegral(length events))
 
 assertTopicCreation :: GregorM ()
-assertTopicCreation = void $ K.withKafkaViolently SK.assertTopicCreation
+assertTopicCreation = void $ K.withKafkaRetry1s SK.assertTopicCreation
 
 getNextIngestedOffset :: GregorM KP.Offset
 getNextIngestedOffset = fst <$> getNextOffsetAndMetadata
@@ -148,7 +148,7 @@ setNextOffsetAndMetadata newOffset newMeta = do
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
     P.incCounter gregorKafkaCheckpointWrites
     P.setGauge gregorUnseqOffset (fromIntegral newOffset)
-    op <- K.withKafkaViolently $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset newMeta
+    op <- K.withKafkaRetry1s $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset newMeta
     op & \case
         Left err ->
             error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
