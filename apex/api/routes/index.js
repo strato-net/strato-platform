@@ -2,12 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 
-const authHandler = require('../middlewares/authHandler.js');
-const authController = require('../controllers/auth');
 const oAuthController = require('../controllers/oAuth');
-// const oAuthController = require('../lib/oAuth/oAuth');
 const dappController = require('../controllers/dapp');
-// const tokenController = require('../controllers/token');
 const healthHandler = require('../controllers/health');
 const trackHandler = require('../controllers/track');
 const appConfig = require(`${process.cwd()}/config/app.config`);
@@ -62,28 +58,16 @@ const checkUID = async (req, res, next) => {
 router.post('/dapps', dappController.upload);
 
 // router.get('/dapps', dappController.list);
-
+router.post('/user', oAuthController.createUser);
 router.post('/bloc/file/upload', checkUID, multerMiddleware, fileController.upload);
 router.post('/bloc/file/attest', checkUID, fileController.attest);
 router.get('/bloc/file/verify', fileController.verify);
 router.get('/bloc/file/download', fileController.download);
 router.get('/bloc/file/list', fileController.list)
 
-
-// Node governance (for future)
-// router.get('/nodes', authHandler.validateRequest(), nodeController.list);
-// app.get('/_auth', authController.checkAuthenticated); // see https://github.com/nikitamendelbaum/blockapps-task/blob/strato-auth-poc/
-// Invite to network with token
-// router.post('/tokens', authHandler.validateRequest(), tokenController.create);
-// router.get('/tokens', authHandler.validateRequest(), tokenController.list);
-// router.delete('/tokens', authHandler.validateRequest(), tokenController.revoke);
-
 router.get('/status', healthHandler.nodeStatus);
-
 router.get('/health', healthHandler.healthStatus);
-
 router.get('/_ping', healthHandler.ping);
-
 router.get('/_track', trackHandler._track);
 
 
