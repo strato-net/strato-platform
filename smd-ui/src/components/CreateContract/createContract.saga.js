@@ -18,7 +18,7 @@ import { handleErrors } from '../../lib/handleErrors';
 import { isOauthEnabled } from '../../lib/checkMode';
 import { createUrl } from '../../lib/url';
 
-const compileUrl = env.BLOC_URL + "/contracts/xabi";
+const getXabiUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 export function createContractApiCall(contract, src, username, address, password, args, chainid, metadata) {
@@ -62,39 +62,36 @@ export function createContractApiCall(contract, src, username, address, password
     });
 }
 
-export function compileContractApiCall(contractName, source, s) {
-  const searchable = [contractName];
-  if (s) {
-    fetch(blocCompileUrl, {
-      method: 'POST',
-      credentials: "include",
-      headers: {
-        "accept": "application/json",
-        "content-type": "application/json"
-      },
-      body: JSON.stringify([
-        {
-          "contractName": contractName,
-          "source": source,
-          "searchable": searchable
-        }
-      ])
-    })
-      .then(handleErrors)
-      .then(function (res) {
-        if (res.ok) {
-          return res.json();
-        } else {
-          return res.text().then(function (value) {
-            throw value;
-          });
-        }
-      }).catch(function (error) {
-        throw error;
-      });
-  }
+export function compileContractApiCall(contractName, source, solidvm) {
+  fetch(blocCompileUrl, {
+    method: 'POST',
+    credentials: "include",
+    headers: {
+      "accept": "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify([
+      {
+        "contractName": contractName,
+        "source": source,
+        "vm": solidvm ? "SolidVM" : "EVM",
+      }
+    ])
+  })
+    .then(handleErrors)
+    .then(function (res) {
+      if (res.ok) {
+        return res.json();
+      } else {
+        return res.text().then(function (value) {
+          throw value;
+        });
+      }
+    }).catch(function (error) {
+      throw error;
+    });
 
-  return fetch(compileUrl, {
+  return fetch(getXabiUrl, {
     method: 'POST',
     credentials: "include",
     headers: {
@@ -119,7 +116,7 @@ export function compileContractApiCall(contractName, source, s) {
 export function* createContract(action) {
   try {
     let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments, action.payload.chainId, action.payload.metadata);
-    yield put(createContractSuccess(response[0]));
+    yield put(createContractSuccess(response[0] || response));
     yield put(updateToast());
     yield put(fetchContracts());
     yield put(fetchCirrusInstances(action.payload.contract));
@@ -130,7 +127,7 @@ export function* createContract(action) {
 
 export function* compileContract(action) {
   try {
-    let response = yield call(compileContractApiCall, action.name, action.contract, action.searchable);
+    let response = yield call(compileContractApiCall, action.name, action.contract, action.solidvm);
     yield put(compileContractSuccess(response));
   } catch (err) {
     yield put(compileContractFailure(err));
@@ -140,7 +137,7 @@ export function* compileContract(action) {
 
 export function* compileChainContract(action) {
   try {
-    let response = yield call(compileContractApiCall, action.name, action.contract, action.searchable);
+    let response = yield call(compileContractApiCall, action.name, action.contract, action.solidvm);
     yield put(compileChainContractSuccess(response));
   } catch (err) {
     yield put(compileChainContractFailure(err));

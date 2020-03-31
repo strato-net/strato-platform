@@ -9,6 +9,7 @@ module Blockchain.VM.SolidException
   , invalidArguments
   , missingField
   , missingType
+  , duplicateDefinition
   , parseError
   , require
   , assert
@@ -32,6 +33,7 @@ data SolidException = TypeError String String
                     | TODO String String
                     | MissingField String String
                     | MissingType String String
+                    | DuplicateDefinition String String
                     | ArityMismatch String Int Int
                     | ParseError String String
                     | Require (Maybe String)
@@ -49,6 +51,7 @@ instance Show SolidException where
   show (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
   show (MissingField m v) = printf "missing field: %s: %s" m v
   show (MissingType m v) = printf "missing type: %s: %s" m v
+  show (DuplicateDefinition m v) = printf "duplicate definition: %s: %s" m v
   show (ParseError m v) = printf "parse error: %s: %s" m v
   show (Require Nothing) = printf "solidity require failed"
   show (Require (Just m)) = printf "solidity require failed: %s" m
@@ -83,6 +86,9 @@ missingField = toThrower MissingField
 
 missingType :: (Show v) => String -> v -> a
 missingType = toThrower MissingType
+
+duplicateDefinition :: (Show v) => String -> v -> a
+duplicateDefinition = toThrower DuplicateDefinition
 
 checkArity :: (MonadIO m) => String -> Int -> Int -> m ()
 checkArity msg got want = when (got /= want) . liftIO . throwIO $ ArityMismatch msg got want

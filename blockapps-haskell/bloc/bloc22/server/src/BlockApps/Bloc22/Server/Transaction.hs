@@ -28,6 +28,13 @@ import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 
+mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
+mergeTxParams (Just inner) (Just outer) = Just $
+  TxParams (txparamsGasLimit inner <|> txparamsGasLimit outer)
+           (txparamsGasPrice inner <|> txparamsGasPrice outer)
+           (txparamsNonce inner <|> txparamsNonce outer)
+mergeTxParams inner outer = inner <|> outer
+
 postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
 postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   case mUserName of
@@ -46,7 +53,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         addr
                         (transferpayloadToAddress p)
                         (transferpayloadValue p)
-                        txParams
+                        (mergeTxParams (transferpayloadTxParams p) txParams)
                         (transferpayloadMetadata p)
                         (transferpayloadChainid p <|> chainId)
                         resolve
@@ -55,7 +62,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
             p <- mapM fromTransfer xs
             let btlp = TransferListParameters
                         addr
-                        (map (\(TransferPayload t v c m) -> SendTransaction t v txParams c m) p)
+                        (map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) p)
                         chainId
                         resolve
             postUsersSendList' btlp (callSignature userName)
@@ -70,7 +77,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
-                        txParams
+                        (mergeTxParams (contractpayloadTxParams p) txParams)
                         (contractpayloadMetadata p)
                         (contractpayloadChainid p <|> chainId)
                         resolve
@@ -85,8 +92,12 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
             ps <- mapM fromContract xs
             let bclp = ContractListParameters
                         addr
-                        (map (\p@(ContractPayload _ c a v cid m) ->
-                                UploadListContract (fromJust c) (getSrc p) (fromMaybe Map.empty a) txParams v cid m) ps)
+                        (map (\p@(ContractPayload _ c a v x cid m) ->
+                                UploadListContract (fromJust c)
+                                                   (getSrc p)
+                                                   (fromMaybe Map.empty a)
+                                                   (mergeTxParams x txParams)
+                                                   v cid m) ps)
                         chainId
                         resolve
                 md = contractpayloadMetadata $ head ps --Determine VM option by the metadata of the first tx in list
@@ -108,7 +119,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (functionpayloadMethod p)
                         (functionpayloadArgs p)
                         (functionpayloadValue p)
-                        txParams
+                        (mergeTxParams (functionpayloadTxParams p) txParams)
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
@@ -117,8 +128,8 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
                         addr
-                        (map (\(FunctionPayload (ContractName n) a m r v c md) ->
-                                MethodCall n a m r (fromMaybe (Strung 0) v) txParams c md) p)
+                        (map (\(FunctionPayload (ContractName n) a m r v x c md) ->
+                                MethodCall n a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
                         chainId
                         resolve
             postUsersContractMethodList' bflp (callSignature userName)

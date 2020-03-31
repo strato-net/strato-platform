@@ -55,6 +55,7 @@ function getCreateArgs(contract, options) {
       src: contract.source,
       args: contract.args,
       chainid: contract.chainid,
+      txParams: contract.txParams,
       metadata: constructMetadata(options, contract.name)
   };
   const tx = {
@@ -142,7 +143,7 @@ async function getBatchStates(user, stateArgs, options) {
 }
 
 function getCallArgs(callMethodArgs, options) {
-  const { contract, method, args, value, chainid } = callMethodArgs;
+  const { contract, method, args, value, chainid, txParams } = callMethodArgs;
   const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
   const payload = {
       contractName: contract.name,
@@ -151,6 +152,7 @@ function getCallArgs(callMethodArgs, options) {
       value: valueFixed,
       method,
       args,
+      txParams,
       metadata: constructMetadata(options, contract.name)
   };
   const tx = {

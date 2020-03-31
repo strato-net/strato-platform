@@ -76,7 +76,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
 import           Blockchain.ExtWord
-import           Blockchain.MilenaTools                  (withKafkaViolently)
+import           Blockchain.MilenaTools                  (withKafkaRetry1s)
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM                      as SolidVM
@@ -234,7 +234,7 @@ addBlocks unfiltered = do
       timerToUse = Just vmBlockInsertionMined
   unless (null unfiltered) $
     -- emit all blocks to the indexers
-    timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> unfiltered)
+    timeit "writeIndexEvents1 " timerToUse $ void . withKafkaRetry1s $ writeIndexEvents (RanBlock <$> unfiltered)
   bbi <- getContextBestBlockInfo
   case (filtered, bbi) of
     ([], _) -> return []
@@ -270,7 +270,7 @@ addBlocks unfiltered = do
       when didReplaceBest' $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         nbb <- liftIO (readIORef replacedBest)
-        timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+        timeit "writeIndexEvents2 " timerToUse $ void . withKafkaRetry1s $ writeIndexEvents [NewBestBlock nbb]
         when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
           calculateAndEmitStateDiffs srLog oldHeader
       when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'

@@ -114,7 +114,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash
       }
   fmap (either solidvmErrorResults id) . runSM (Just initCode) env' $ do
     let maybeContractName = M.lookup "name" =<< metadata
-        !contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
+        !contractName' = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
     let maybeArgString = M.lookup "args" =<< metadata
         argString = maybe "()" T.unpack maybeArgString
@@ -216,9 +216,9 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 
   fmap (either solidvmErrorResults id) . runSM Nothing env' $ do
     let maybeFuncName = M.lookup "funcName" =<< metadata
-        !funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
+        !funcName = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
-        argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
+        argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
 
@@ -543,6 +543,16 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
     else case maybeElseCode of
       Just elseCode -> runStatements elseCode
       Nothing -> return Nothing
+
+runStatement (Xabi.WhileStatement condition code) = do
+  
+     
+  while (getBool =<< expToVar condition) $ do
+      onTraced $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      result <- runStatements code
+      return result
+
+      -- TODO: this can loop infinitely
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
@@ -954,16 +964,25 @@ expToVar' (Xabi.Binary "<=" expr1 expr2) = do
 
 expToVar' (Xabi.Binary "&&" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
-  b2 <- getBool =<< expToVar expr2
-  logVals b1 b2
-  return $ Constant $ SBool $ b1 && b2
+
+  -- Only evaluate expr2 if b1 is True, otherwise return False
+  if b1 then do
+    b2 <- getBool =<< expToVar expr2
+    logVals b1 b2
+    return $ Constant $ SBool b2
+  else
+    return $ Constant $ SBool False
 
 expToVar' (Xabi.Binary "||" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
 
-  b2 <- getBool =<< expToVar expr2
-  logVals b1 b2
-  return $ Constant $ SBool $ b1 || b2
+  -- Only evaluate expr2 if b1 is False, otherwise return True
+  if b1 then
+    return $ Constant $ SBool True
+  else do
+    b2 <- getBool =<< expToVar expr2
+    logVals b1 b2
+    return $ Constant $ SBool b2
 
 expToVar' (Xabi.TupleExpression exps) = do
   -- Or should STuple be a Vector of Maybe?
@@ -1232,7 +1251,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                     when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
                     return $ NamedVals []
                   _ -> argsToVals contract'
-                                  (fromMaybe (error "arguments provided for missing constructor")
+                                  (fromMaybe (invalidArguments ("arguments provided for missing constructor in contract " ++ contractName') argPairs)
                                         $ _constructor contract')
                                   argExps
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
@@ -1287,7 +1306,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       Just theFunction -> do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
-        let Just commands = Xabi.funcContents theFunction
+        let commands = fromMaybe (missingField "contract constructor has been declared but not defined" contractName') $ Xabi.funcContents theFunction
         _ <- pushSender from $ runStatements commands
         return ()
 
@@ -1348,7 +1367,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
   onTraced $ do
     liftIO $ putStrLn $ "            args: " ++ show (map fst args)
     when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
-
+  
   localVars <- 
     forM locals $ \(n, (t, v)) -> do
       newVar <- liftIO $ fmap Variable $ newIORef v
@@ -1358,17 +1377,27 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
 --  forM_ locals $ \(n, (_, v)) -> do
 --    liftIO $ putStrLn "need to initialize the storage 2"
 --    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
-  let Just commands = Xabi.funcContents theFunction
+  let commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
   val <- runStatements commands
 
   let findNamedReturns = do
         case returns of
           [] -> return Nothing
-          [(name, _)] -> do
+          [(name,_)] -> do -- We have to break this up because
+                           -- SolidVM cannot distinguish between
+                           -- a value and single-tupled value
             currentCallInfo <- getCurrentCallInfo
-            let Just returnVar = M.lookup name $ localVariables currentCallInfo -- the value must exist in the map, else there is a developer error
-            fmap Just $ getVar $ snd returnVar
-          _ -> todo "multiple named return values" returns
+            let mReturnVar = M.lookup name $ localVariables currentCallInfo
+            case mReturnVar of
+              Nothing -> unknownVariable "findNamedReturns" name
+              Just returnVar -> Just <$> getVar (snd returnVar)
+          xs -> Just . STuple . V.fromList <$> do
+            currentCallInfo <- getCurrentCallInfo
+            for (fst <$> xs) $ \name -> do
+              let mReturnVar = M.lookup name $ localVariables currentCallInfo
+              case mReturnVar of
+                Nothing -> unknownVariable "findNamedReturns" name
+                Just returnVar -> Constant <$> getVar (snd returnVar)
 
   val' <- case val of
              Nothing -> findNamedReturns

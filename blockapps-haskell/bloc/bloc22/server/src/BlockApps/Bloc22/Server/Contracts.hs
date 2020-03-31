@@ -306,7 +306,10 @@ postContractsCompile :: [PostCompileRequest] -> Bloc [PostCompileResponse]
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
-      idsAndDetails <- sourceToContractDetails (Do Compile) postcompilerequestSource
+      let shouldCompile = case Text.toLower <$> postcompilerequestVm of
+            Just "solidvm" -> Don't Compile
+            _ -> Do Compile
+      idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of
@@ -316,7 +319,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
             let ptr = contractdetailsCodeHash details
             case ptr of
               EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) (shaKeccak256 hsh)
-              _ -> throwError $ AnError (Text.pack "Somebody called contracts/compile on SolidVM Code, but it only works on EVM Code")
+              SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) (shaKeccak256 hsh)
 
 postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =
