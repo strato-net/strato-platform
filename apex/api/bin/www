@@ -11,7 +11,6 @@ const co = require('co');
 
 const sockets = require('../sockets/init');
 
-const createInitialData = require('../migrations/init-script/init');
 const registerAppMetadata = require('../migrations/init-script/registerAppMetadata');
 
 
@@ -29,9 +28,6 @@ app.set('port', port);
 var server = http.createServer(app);
 
 co(function*(){
-
-  yield createInitialData();
-
   yield registerAppMetadata();
 
   sockets.init(server);
