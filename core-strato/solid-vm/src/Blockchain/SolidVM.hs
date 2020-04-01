@@ -77,7 +77,7 @@ import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
-import           UnliftIO
+import           UnliftIO                             hiding (assert)
 
 import           CodeCollection
 

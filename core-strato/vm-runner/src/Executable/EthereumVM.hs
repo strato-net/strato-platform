@@ -395,23 +395,23 @@ logEventSummaries events = do
 sendOutEvents :: VmOutEventBatch -> ContextM ()
 sendOutEvents OutBatch{..} = do
   loopTimeit "writeActionJSONToKafka" $
-    void . K.withKafkaViolently . writeActionJSONToKafka $
+    void . K.withKafkaRetry1s . writeActionJSONToKafka $
       toList outActions
   loopTimeit "produceUnminedBlocksM" $
-    void . K.withKafkaViolently . produceUnminedBlocksM $
+    void . K.withKafkaRetry1s . produceUnminedBlocksM $
       outputBlockToBlock <$> toList outBlocks
-  void . K.withKafkaViolently . writeIndexEvents $ toList outIndexEvents
+  void . K.withKafkaRetry1s . writeIndexEvents $ toList outIndexEvents
   for_ outToStateDiffs $ uncurry3 initializeChainDBs -- only needed to update Postgres with chain info for API calls
   traverse_ commitSqlDiffs outStateDiffs
   loopTimeit "flushLogEntries" $ do
-    void . K.withKafkaViolently $ writeIndexEvents (LogDBEntry <$> toList outLogs)
+    void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)
   loopTimeit "flushEventEntries" $ do
-    void . K.withKafkaViolently $ writeIndexEvents (EventDBEntry <$> toList outEvents)
+    void . K.withKafkaRetry1s $ writeIndexEvents (EventDBEntry <$> toList outEvents)
   loopTimeit "flushTransactionResults" $ do
     let q = toList outTXRs
         toWrite = chunksOf 2000 $ TxResult <$> q
     recordTxrFlush $ length q
-    mapM_ (K.withKafkaViolently . writeIndexEvents) toWrite
+    mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
       forM_ outASMs $ \(chainId, asm) -> do
