@@ -1008,16 +1008,24 @@ runPrecompiled precompiled = do
   useGas gas
   vmstateModify $ \vmState -> vmState{returnVal = Just ret}
 
-runVMM :: EVMBase m => Bool -> Bool -> S.Set Address -> Int -> Environment -> Gas -> VMM m a -> m ExecResults
+runVMM :: EVMBase m
+       => Bool
+       -> Bool
+       -> S.Set Address
+       -> Int
+       -> Environment
+       -> Gas
+       -> VMM m a
+       -> m ExecResults
 runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGas f = force <$> do
-  csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
+  mdbs <- Mod.get (Mod.Proxy @MemDBs)
   gasref <- liftIO $ newCounter availableGas
   let fillIn v = v
         { callDepth=cDepth
         , vmGasRemaining=gasref
         , suicideList=preExistingSuicideList
         }
-  vmStateRef <- liftIO $ newIORef . fillIn =<< startingState isRunningTests' isHomestead env csMemDBs
+  vmStateRef <- liftIO $ newIORef . fillIn =<< startingState isRunningTests' isHomestead env mdbs
   res <- try $ runReaderT f vmStateRef
   case res of
     Left (e :: VMException) -> do
@@ -1083,8 +1091,8 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
           envMetadata = metadata
           }
 
-  csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
-  vmState <- liftIO $ startingState isRunningTests' isHomestead env csMemDBs
+  mdbs <- Mod.get (Mod.Proxy @MemDBs)
+  vmState <- liftIO $ startingState isRunningTests' isHomestead env mdbs
 
   success <-
     if toInteger value > 0
@@ -1117,7 +1125,8 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
       A.delete (A.Proxy @AddressState) newAddress
       -- Need to zero gas in the case of an exception.
       return execResults{erRemainingTxGas=0, erException=Just e}
-    Nothing -> return $ execResults{erNewContractAddress=Just newAddress}
+    Nothing -> do
+      return execResults{erNewContractAddress=Just newAddress}
 
 create' :: EVMBase m => VMM m Code
 create' = do
@@ -1315,28 +1324,31 @@ create_debugWrapper block owner value initCodeBytes = do
 
       currentVMState <- vmstateGet
 
-      execResults <- lift $
-        create (isRunningTests currentVMState)
-               (vmIsHomestead currentVMState)
-               (suicideList currentVMState)
-               block
-               (currentCallDepth+1)
-               owner
-               origin
-               (toInteger value)
-               gasPrice
-               gasRemaining
-               newAddress
-               initCode
-               txHash
-               chainId
-               metadata
+      (execResults, finalDBs) <- lift $ do
+        mdbs <- Mod.get (Mod.Proxy @MemDBs)
+        Mod.put (Mod.Proxy @MemDBs) $ vmMemDBs currentVMState
+        ers <- create (isRunningTests currentVMState)
+                      (vmIsHomestead currentVMState)
+                      (suicideList currentVMState)
+                      block
+                      (currentCallDepth+1)
+                      owner
+                      origin
+                      (toInteger value)
+                      gasPrice
+                      gasRemaining
+                      newAddress
+                      initCode
+                      txHash
+                      chainId
+                      metadata
+        mdbs' <- Mod.get (Mod.Proxy @MemDBs)
+        Mod.put (Mod.Proxy @MemDBs) mdbs
+        pure (ers, mdbs')
 
-      finalVMState <- vmstateGet
-
-      setStateDBStateRoot $ vmMemDBs finalVMState ^. stateRoot
-      putMemRawStorageTxMap $ vmMemDBs finalVMState ^. storageTxMap
-      putAddressStateTxDBMap $ vmMemDBs finalVMState ^. stateTxMap
+      setStateDBStateRoot $ finalDBs ^. stateRoot
+      putMemRawStorageTxMap $ finalDBs ^. storageTxMap
+      putAddressStateTxDBMap $ finalDBs ^. stateTxMap
       setGasRemaining $ fromIntegral $ erRemainingTxGas execResults
 
       case erException execResults of
@@ -1361,30 +1373,33 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
 
   currentVMState <- vmstateGet
 
-  execResults <- lift $
-    call (isRunningTests currentVMState)
-         (vmIsHomestead currentVMState)
-         noValueTransfer
-         (suicideList currentVMState)
-         (envBlockHeader env)
-         (currentCallDepth+1)
-         receiveAddress
-         (Address address)
-         sender
-         value
-         (fromIntegral $ envGasPrice env)
-         inputData
-         gas
-         (envOrigin env)
-         (envTxHash env)
-         (envChainId env)
-         (envMetadata env)
+  (execResults, finalDBs) <- lift $ do
+    mdbs <- Mod.get (Mod.Proxy @MemDBs)
+    Mod.put (Mod.Proxy @MemDBs) $ vmMemDBs currentVMState
+    ers <- call (isRunningTests currentVMState)
+                (vmIsHomestead currentVMState)
+                noValueTransfer
+                (suicideList currentVMState)
+                (envBlockHeader env)
+                (currentCallDepth+1)
+                receiveAddress
+                (Address address)
+                sender
+                value
+                (fromIntegral $ envGasPrice env)
+                inputData
+                gas
+                (envOrigin env)
+                (envTxHash env)
+                (envChainId env)
+                (envMetadata env)
+    mdbs' <- Mod.get (Mod.Proxy @MemDBs)
+    Mod.put (Mod.Proxy @MemDBs) mdbs
+    pure (ers, mdbs')
 
-  finalVMState <- vmstateGet
-
-  setStateDBStateRoot $ vmMemDBs finalVMState ^. stateRoot
-  putMemRawStorageTxMap $ vmMemDBs finalVMState ^. storageTxMap
-  putAddressStateTxDBMap $ vmMemDBs finalVMState ^. stateTxMap
+  setStateDBStateRoot $ finalDBs ^. stateRoot
+  putMemRawStorageTxMap $ finalDBs ^. storageTxMap
+  putAddressStateTxDBMap $ finalDBs ^. stateTxMap
 
   case erException execResults of
         Nothing -> do

@@ -68,11 +68,9 @@ import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
-import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
@@ -136,15 +134,6 @@ instance MonadIO m => HasMemAddressStateDB (VMM m) where
   putAddressStateBlockDBMap theMap = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
       pure $ s{vmMemDBs=(vmMemDBs s){_stateBlockMap=theMap}}
 
-instance ( MonadIO m
-         , HasMemAddressStateDB m
-         , HasStateDB m
-         , HasHashDB m
-         ) => (Address `A.Alters` AddressState) (VMM m) where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
-
 instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.NodeData) (VMM m) where
   lookup p   = lift . A.lookup p
   insert p k = lift . A.insert p k
@@ -160,6 +149,14 @@ instance MonadIO m => Mod.Modifiable MP.StateRoot (VMM m) where
   put _ sr = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
       pure $ s{vmMemDBs=(vmMemDBs s){_stateRoot=sr}}
 
+instance ( MonadIO m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (N.NibbleString `A.Alters` N.NibbleString) m
+         ) => (Address `A.Alters` AddressState) (VMM m) where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
+
 instance MonadIO m => Mod.Modifiable MemDBs (VMM m) where
   get _ = vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
   put _ md = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
@@ -173,11 +170,14 @@ instance MonadIO m => HasMemRawStorageDB (VMM m) where
   putMemRawStorageBlockMap theMap = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
       pure $ s{vmMemDBs=(vmMemDBs s){_storageBlockMap=theMap}}
 
-instance (RawStorageKey `A.Alters` RawStorageValue) m => (RawStorageKey `A.Alters` RawStorageValue) (VMM m) where
-  lookup p            = lift . A.lookup p
-  insert p k          = lift . A.insert p k
-  delete p            = lift . A.delete p
-  lookupWithDefault p = lift . A.lookupWithDefault p
+instance ( MonadIO m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (N.NibbleString `A.Alters` N.NibbleString) m
+         ) => (RawStorageKey `A.Alters` RawStorageValue) (VMM m) where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance (SHA `A.Alters` DBCode) m => (SHA `A.Alters` DBCode) (VMM m) where
   lookup p   = lift . A.lookup p
@@ -327,31 +327,22 @@ addGas gas = do
     then throwIO OutOfGasException
     else void . liftIO $ atomicAddCounter gasref gas
 
-pay' :: ( MonadIO m
-        , HasMemAddressStateDB m
-        , HasStateDB m
-        , HasHashDB m
-        ) => String -> Address -> Address -> Integer -> VMM m ()
+pay' :: VMBase m => String -> Address -> Address -> Integer -> VMM m ()
 pay' reason from to val = do
   success <- pay reason from to val
   unless success $ throwIO InsufficientFunds
 
-getStorageKeyVal :: (MonadIO m, HasStorageDB m) => Word256 -> VMM m Word256
+getStorageKeyVal :: VMBase m => Word256 -> VMM m Word256
 getStorageKeyVal key = do
   owner <- getEnvVar envOwner
   getStorageKeyVal' owner key
 
-getAllStorageKeyVals :: ( MonadIO m
-                        , HasStorageDB m
-                        , HasMemAddressStateDB m
-                        , HasStateDB m
-                        , HasHashDB m
-                        ) => VMM m [(MP.Key, Word256)]
+getAllStorageKeyVals :: VMBase m => VMM m [(MP.Key, Word256)]
 getAllStorageKeyVals = do
   owner <- getEnvVar envOwner
   getAllStorageKeyVals' owner
 
-putStorageKeyVal :: (MonadIO m, HasStorageDB m) => Word256 -> Word256 -> VMM m ()
+putStorageKeyVal :: VMBase m => Word256 -> Word256 -> VMM m ()
 putStorageKeyVal key val = do
   owner <- getEnvVar envOwner
   putStorageKeyVal' owner key val

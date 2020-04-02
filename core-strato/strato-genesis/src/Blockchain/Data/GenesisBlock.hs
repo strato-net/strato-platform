@@ -253,7 +253,8 @@ genesisInfoToGenesisBlock gi gn as = do
         blockBlockUncles         = []
     })
 
-initializeChainDBs :: ( HasCodeDB m
+initializeChainDBs :: ( MonadLogger m
+                      , HasCodeDB m
                       , HasHashDB m
                       , HasSQLDB m
                       , HasStateDB m
