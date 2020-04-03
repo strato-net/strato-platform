@@ -60,6 +60,22 @@ async function resolveResults(user, pendingResults, _options = {}) {
 }
 
 // =====================================================================
+//   account details
+// =====================================================================
+
+async function getAccounts(user, options) {
+  try {
+    return await api.getAccounts(user, options);
+  } catch(err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText,
+      err.response.data
+    );
+  }
+}
+
+// =====================================================================
 //   user
 // =====================================================================
 
@@ -472,6 +488,7 @@ async function waitForAddress(user, contract, _options) {
 }
 
 export default {
+  getAccounts,
   getUsers,
   getUser,
   createUser,
