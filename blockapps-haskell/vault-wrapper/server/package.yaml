@@ -67,6 +67,7 @@ dependencies:
 - time
 - transformers
 - transformers-base
+- unliftio
 - unordered-containers
 - blockapps-vault-wrapper-api
 - wai
