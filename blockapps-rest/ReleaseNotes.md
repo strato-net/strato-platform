@@ -6,8 +6,8 @@
 - Add babel-preset-minify, remove gulp-uglify
 
 #### Minor upgrades
-
 - Added Bloc /compile endpoint
+- Add getAccounts to get the account details
 
 ### Version 7.6.3
 

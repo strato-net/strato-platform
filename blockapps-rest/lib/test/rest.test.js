@@ -32,6 +32,33 @@ describe("rest_7", function () {
     });
   });
 
+  describe("getAccounts", function () {
+    this.timeout(config.timeout);
+
+    it("getAccounts - success", async () => {
+      const result = await rest.getAccounts(admin, {
+        config,
+        isAsync: true,
+        query: {
+          address: admin.address
+        }
+      })
+      assert.isArray(result, "should be array")
+      assert.equal(result.length, 1, "should be 1")
+      assert.equal(result[0].address, admin.address, "address")
+    });
+
+    it("getAccounts - missing query - BAD_REQUEST 400", async () => {
+      await assert.restStatus(async () => {
+        return await rest.getAccounts(admin, {
+          config,
+          isAsync: true
+        });
+      }, RestStatus.BAD_REQUEST, /Need one of: address , balance , minbalance , maxbalance , nonce , minnonce , maxnonce , maxnumber , code , index , codeHash , chainid/);
+    });
+
+  });
+
   describe("contract call", function () {
     this.timeout(config.timeout);
     let contract;
