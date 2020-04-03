@@ -1,9 +1,10 @@
-const request = require('request');
+// const request = require('request');
 RouteParser = require('route-parser');
 
 const appConfig = require('../config/app.config');
-const apiPatterns = require('../config/api-patterns');
+// const apiPatterns = require('../config/api-patterns');
 
+/*
 const generateMixpanelUrl = function(event) {
   const data = new Buffer(JSON.stringify(
     {
@@ -15,11 +16,14 @@ const generateMixpanelUrl = function(event) {
   )).toString('base64');
   return `http://api.mixpanel.com/track/?data=${data}&ip=1`;
 };
+*/
 
 module.exports = {
   _track: function (req, res) {
     res.status(200).send();
 
+    // TODO: Obsolete, to be removed along with the other mixpanel mode configurations in apex config, STRATO docker-compose and strato-getting-started
+    /*
     if (process.env['STRATO_GS_MODE'] === "1") return;
 
     // req.headers['x-original-method'] has "GET" or "POST";
@@ -41,5 +45,6 @@ module.exports = {
     request(generateMixpanelUrl(eventName), function(err, r, b) {
       if (err) console.warn('error while trying to send track request to mixpanel: ', err)
     })
+    */
   }
 };

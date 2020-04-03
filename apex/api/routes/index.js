@@ -55,16 +55,21 @@ const checkUID = async (req, res, next) => {
   }
 };
 
+// TODO: fully deprecate dapps feature in the future
 router.post('/dapps', dappController.upload);
-
 // router.get('/dapps', dappController.list);
-router.post('/user', oAuthController.createUser);
+
+// Endpoint called by SMD to create key for smd user logged in with oauth
+router.post('/user', oAuthController.createUserKey);
+
+// External storage endpoints
 router.post('/bloc/file/upload', checkUID, multerMiddleware, fileController.upload);
 router.post('/bloc/file/attest', checkUID, fileController.attest);
 router.get('/bloc/file/verify', fileController.verify);
 router.get('/bloc/file/download', fileController.download);
-router.get('/bloc/file/list', fileController.list)
+router.get('/bloc/file/list', fileController.list);
 
+// Health
 router.get('/status', healthHandler.nodeStatus);
 router.get('/health', healthHandler.healthStatus);
 router.get('/_ping', healthHandler.ping);
