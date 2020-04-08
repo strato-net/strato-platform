@@ -49,7 +49,7 @@ npm run start
 docker run -d --name smd-ui -p 3035:3002 -e NODE_NAME=BAYAR6 -e BLOC_URL=http://bayar6.eastus.cloudapp.azure.com/bloc/v2.2 -e STRATO_URL=http://bayar6.eastus.cloudapp.azure.com/strato-api/eth/v1.2 blockapps/smd-ui
 ```
 
-## Setup for Developer Mode
+## Setup for Developer Mode (OAuth Mode)
 *NOTE:* Please use this steps for the development mode
 
 **STEP 1:** Nginx config
@@ -83,3 +83,9 @@ rename Dockerfile-development to Dockerfile
 
 NODE_HOST=localhost:8080 OAUTH_ENABLED=true docker-compose up
 ```
+
+## Setup for Developer Mode (Non-OAuth Mode)
+
+Remove the statement from the saga:
+
+`credentials: "include"`
