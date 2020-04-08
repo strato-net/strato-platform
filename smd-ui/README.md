@@ -81,6 +81,7 @@ cd smd-ui/
 rename docker-development.yml to docker-compose.yml
 rename Dockerfile-development to Dockerfile
 
+docker-compose build
 NODE_HOST=localhost:8080 OAUTH_ENABLED=true docker-compose up
 ```
 
