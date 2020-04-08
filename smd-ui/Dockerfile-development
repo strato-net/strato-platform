@@ -9,5 +9,7 @@ COPY . .
 RUN yarn add react-scripts -g
 RUN yarn install
 
+EXPOSE 3000
+
 # start app
 CMD ["yarn", "start"]

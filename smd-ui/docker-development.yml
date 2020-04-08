@@ -1,0 +1,23 @@
+version: "3"
+networks:
+  strato_static:
+    external: true
+
+services:
+  ui:
+    build: ./
+    environment:
+    - REACT_APP_OAUTH_ENABLED=${OAUTH_ENABLED}
+    - REACT_APP_NODE_HOST=${NODE_HOST}
+    - REACT_APP_EXT_STORAGE_ENABLED=${EXT_STORAGE_ENABLED}
+    - REACT_APP_EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
+    - REACT_APP_NODE_NAME=${NODE_NAME}
+    - REACT_APP_SINGLE_NODE=${SINGLE_NODE}
+    - REACT_APP_ssl=${ssl:-false}
+    volumes:
+     - ./node_modules:/app/node_modules
+     - ./:/app
+    restart: always
+    networks:
+      - strato_static
+      
