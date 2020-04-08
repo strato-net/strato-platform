@@ -186,7 +186,6 @@ services:
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
     - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
-    - blockstanbulSkipCheck=${blockstanbulSkipCheck}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
@@ -195,6 +194,7 @@ services:
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
+    - faucetEnabled=${faucetEnabled}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
     - kafkaHost=kafka

@@ -101,8 +101,7 @@ function newnode {
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
   echo ${blockstanbulAdmins}
-  if [ -n "${blockstanbulSkipCheck}" ]; then
-    scFlag="--blockstanbul_skip_check=${blockstanbulSkipCheck}"
+  if [ -n "${faucetEnabled}" ]; then
     apiKey=
   else
     apiKey="${blockstanbulPrivateKey:-}"
