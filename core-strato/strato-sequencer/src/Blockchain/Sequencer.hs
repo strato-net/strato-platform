@@ -6,16 +6,19 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeOperators     #-}
 module Blockchain.Sequencer where
 
 import           ClassyPrelude                             (atomically)
 import           Conduit
 import           Control.Concurrent                        hiding (yield)
+import           Control.Concurrent.STM.TMChan
 import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
 import           Blockchain.Output
 import           Control.Lens
 import qualified Control.Monad.Change.Alter                as A
+import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.IO.Class                    (liftIO)
@@ -23,8 +26,10 @@ import           Control.Monad.IO.Class                    (liftIO)
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable
+import           Data.IORef
 import           Data.Maybe
 import           Data.Proxy
+import qualified Data.Sequence                             as Q
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -91,6 +96,8 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   unless (null p2pEvs) $ do
     writeSeqP2pEvents p2pEvs
     $logDebugS "sequencer" . T.pack $ "Wrote " ++ format p2pEvs ++ " SeqEvents to P2P"
+  ckpts <- drainCheckpoints
+  unless (null ckpts) $ writeUnseqCheckpoints ckpts
   flush
   return src'
 
@@ -166,7 +173,27 @@ bootstrapBlockstanbul = do
   writeSeqVmEvents [VmCreateBlockCommand]
   createFirstTimer
 
-blockstanbulSend :: [InEvent] -> SequencerM ()
+blockstanbulSend :: ( MonadIO m
+                    , MonadLogger m
+                    , MonadMonitor m
+                    , HasBlockstanbulContext m
+                    , HasPrivateHashDB m
+                    , Mod.Accessible (IORef RoundNumber) m
+                    , Mod.Accessible (TMChan RoundNumber) m
+                    , Mod.Accessible BlockPeriod m
+                    , Mod.Accessible RoundPeriod m
+                    , Mod.Accessible (TQueue VoteResult) m
+                    , Mod.Modifiable (Q.Seq VmEvent) m
+                    , Mod.Modifiable (Q.Seq P2pEvent) m
+                    , Mod.Modifiable (Q.Seq Checkpoint) m
+                    , (SHA `A.Alters` OutputTx) m
+                    , (SHA `A.Alters` OutputBlock) m
+                    , (SHA `A.Alters` ChainHashEntry) m
+                    , (Word256 `A.Alters` ChainIdEntry) m
+                    , (SHA `A.Alters` DependentBlockEntry) m
+                    )
+                 => [InEvent]
+                 -> m ()
 blockstanbulSend = mapM_ $ \ie -> do
   oes <- blockstanbulSend' ie
   mapM_ markForVM =<< runConduit
@@ -175,7 +202,21 @@ blockstanbulSend = mapM_ $ \ie -> do
    .| sinkList
     )
 
-blockstanbulSend' :: InEvent -> SequencerM [VmEvent]
+blockstanbulSend' :: ( MonadIO m
+                     , MonadLogger m
+                     , HasBlockstanbulContext m
+                     , Mod.Accessible (IORef RoundNumber) m
+                     , Mod.Accessible (TMChan RoundNumber) m
+                     , Mod.Accessible BlockPeriod m
+                     , Mod.Accessible RoundPeriod m
+                     , Mod.Accessible (TQueue VoteResult) m
+                     , Mod.Modifiable (Q.Seq P2pEvent) m
+                     , Mod.Modifiable (Q.Seq Checkpoint) m
+                     , (SHA `A.Alters` ChainHashEntry) m
+                     , (SHA `A.Alters` DependentBlockEntry) m
+                     )
+                  => InEvent
+                  -> m [VmEvent]
 blockstanbulSend' msg = do
   resp' <- sendAllMessages [msg]
   let blocks = [b | ToCommit b <- resp']
@@ -187,7 +228,7 @@ blockstanbulSend' msg = do
         [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
-  rch <- asks blockstanbulVoteResps
+  rch <- Mod.access (Mod.Proxy @(TQueue VoteResult))
   atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
   let getSequencedBlock = ingestBlockToSequencedBlock lookupChainIdFromChainHash
@@ -205,14 +246,14 @@ blockstanbulSend' msg = do
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
-    dt <- asks blockstanbulBlockPeriod
+    dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
     let tNext = addUTCTime dt tLast
     now <- liftIO getCurrentTime
     when (now < tNext) $
       liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
-  writeUnseqCheckpoints ckpts
+  mapM_ markCheckpoint ckpts
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
   mapM_ markForP2P p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
@@ -224,7 +265,15 @@ privateWitnessableHash tHash cHash =
   . RL.rlpSerialize
   $ RL.RLPArray [RL.rlpEncode tHash, RL.rlpEncode cHash]
 
-transformPrivateHashTXs :: [(Timestamp, IngestTx)] -> SequencerM ()
+transformPrivateHashTXs :: ( MonadLogger m
+                           , HasPrivateHashDB m
+                           , Mod.Modifiable (Q.Seq VmEvent) m
+                           , Mod.Modifiable (Q.Seq P2pEvent) m
+                           , (SHA `A.Alters` ChainHashEntry) m
+                           , (SHA `A.Alters` ()) m
+                           )
+                        => [(Timestamp, IngestTx)]
+                        -> m ()
 transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
   motx <- wrapTransaction lookupChainIdFromChainHash t
   for_ motx $ \otx -> do
@@ -236,7 +285,20 @@ transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHas
       markForP2P $ P2pTx otx
       markForVM  $ VmTx ts otx
 
-transformFullTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
+transformFullTransactions :: ( MonadLogger m
+                             , MonadMonitor m
+                             , HasPrivateHashDB m
+                             , Mod.Modifiable GetChainsDB m
+                             , Mod.Modifiable (Q.Seq VmEvent) m
+                             , Mod.Modifiable (Q.Seq P2pEvent) m
+                             , (SHA `A.Alters` OutputTx) m
+                             , (SHA `A.Alters` OutputBlock) m
+                             , (SHA `A.Alters` ChainHashEntry) m
+                             , (SHA `A.Alters` ()) m
+                             , (Word256 `A.Alters` ChainIdEntry) m
+                             )
+                          => [(Timestamp, IngestTx)]
+                          -> m ()
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- forM pairs $ \(ts,itx) ->
@@ -320,13 +382,46 @@ transformFullTransactions pairs = do
                 markForP2P $ P2pTx phtx
             mapM_ (markForVM . VmBlock) =<< runBlocks chainId
 
-transformTransactions :: [(Timestamp, IngestTx)] -> SequencerM ()
+transformTransactions :: ( MonadLogger m
+                         , MonadMonitor m
+                         , HasPrivateHashDB m
+                         , Mod.Modifiable GetChainsDB m
+                         , Mod.Modifiable (Q.Seq VmEvent) m
+                         , Mod.Modifiable (Q.Seq P2pEvent) m
+                         , (SHA `A.Alters` OutputTx) m
+                         , (SHA `A.Alters` OutputBlock) m
+                         , (SHA `A.Alters` ChainHashEntry) m
+                         , (SHA `A.Alters` ()) m
+                         , (Word256 `A.Alters` ChainIdEntry) m
+                         )
+                      => [(Timestamp, IngestTx)]
+                      -> m ()
 transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransaction . snd) events) $ \(isPrivateHash, pairs) ->
   if isPrivateHash
     then transformPrivateHashTXs pairs
     else transformFullTransactions pairs
 
-runBlockWithConsensus :: SequencedBlock -> SequencerM ()
+runBlockWithConsensus :: ( MonadIO m
+                         , MonadLogger m
+                         , MonadMonitor m
+                         , HasBlockstanbulContext m
+                         , HasPrivateHashDB m
+                         , Mod.Accessible (IORef RoundNumber) m
+                         , Mod.Accessible (TMChan RoundNumber) m
+                         , Mod.Accessible BlockPeriod m
+                         , Mod.Accessible RoundPeriod m
+                         , Mod.Accessible (TQueue VoteResult) m
+                         , Mod.Modifiable (Q.Seq VmEvent) m
+                         , Mod.Modifiable (Q.Seq P2pEvent) m
+                         , Mod.Modifiable (Q.Seq Checkpoint) m
+                         , (SHA `A.Alters` OutputTx) m
+                         , (SHA `A.Alters` OutputBlock) m
+                         , (SHA `A.Alters` ChainHashEntry) m
+                         , (Word256 `A.Alters` ChainIdEntry) m
+                         , (SHA `A.Alters` DependentBlockEntry) m
+                         )
+                      => SequencedBlock
+                      -> m ()
 runBlockWithConsensus sb =
   mapM_ markForVM =<< runConduit
     ( yield sb
@@ -335,7 +430,12 @@ runBlockWithConsensus sb =
    .| sinkList
     )
 
-expandBlock :: SequencedBlock -> SequencerM [OutputBlock]
+expandBlock :: ( MonadLogger m
+               , MonadMonitor m
+               , (SHA `A.Alters` DependentBlockEntry) m
+               )
+            => SequencedBlock
+            -> m [OutputBlock]
 expandBlock sb = do
   readiness <- enqueueIfParentNotEmitted sb
   case readiness of
@@ -354,18 +454,21 @@ expandBlock sb = do
           $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
           return []
 
-checkBlockReadiness :: SequencedBlock -> SequencerM (Maybe BDB.Block)
-checkBlockReadiness sb = do
-  readiness <- enqueueIfParentNotEmitted sb
-  case readiness of
-    NotReadyToEmit -> do
-      $logInfoS "checkBlockReadiness" . T.pack $ prettyBlock sb ++ " is not yet ready to be run by Blockstanbul."
-      return Nothing
-    (ReadyToEmit _) -> do
-      $logInfoS "checkBlockReadiness" . T.pack $ prettyBlock sb ++ " is ready to be run by Blockstanbul."
-      return . Just $ sequencedBlockToBlock sb
-
-runConsensus :: ConduitM SequencedBlock VmEvent SequencerM ()
+runConsensus :: ( MonadIO m
+                , MonadLogger m
+                , MonadMonitor m
+                , HasBlockstanbulContext m
+                , Mod.Accessible (IORef RoundNumber) m
+                , Mod.Accessible (TMChan RoundNumber) m
+                , Mod.Accessible BlockPeriod m
+                , Mod.Accessible RoundPeriod m
+                , Mod.Accessible (TQueue VoteResult) m
+                , Mod.Modifiable (Q.Seq P2pEvent) m
+                , Mod.Modifiable (Q.Seq Checkpoint) m
+                , (SHA `A.Alters` ChainHashEntry) m
+                , (SHA `A.Alters` DependentBlockEntry) m
+                )
+             => ConduitM SequencedBlock VmEvent m ()
 runConsensus = awaitForever $ \sb -> do
   hasPBFT <- lift $ blockstanbulRunning
   if not hasPBFT
@@ -382,7 +485,16 @@ runConsensus = awaitForever $ \sb -> do
       -- announcing it to the network or forwarding to the EVM.
       traverse_ (yieldMany <=< lift . blockstanbulSend') routed
 
-hydrateAndEmit :: Maybe Word256 -> ConduitM VmEvent VmEvent SequencerM ()
+hydrateAndEmit :: ( MonadLogger m
+                  , MonadMonitor m
+                  , HasPrivateHashDB m
+                  , (SHA `A.Alters` OutputTx) m
+                  , (SHA `A.Alters` OutputBlock) m
+                  , (SHA `A.Alters` ChainHashEntry) m
+                  , (Word256 `A.Alters` ChainIdEntry) m
+                  )
+               => Maybe Word256
+               -> ConduitM VmEvent VmEvent m ()
 hydrateAndEmit chainId = awaitForever $ \case
   VmBlock ob -> do
     when (isNothing chainId) . yield $ VmBlock ob
@@ -390,7 +502,27 @@ hydrateAndEmit chainId = awaitForever $ \case
     for_ ob' $ yield . VmBlock
   oe -> yield oe
 
-transformBlocks :: [IngestBlock] -> SequencerM ()
+transformBlocks :: ( MonadIO m
+                   , MonadLogger m
+                   , MonadMonitor m
+                   , HasBlockstanbulContext m
+                   , HasPrivateHashDB m
+                   , Mod.Accessible (IORef RoundNumber) m
+                   , Mod.Accessible (TMChan RoundNumber) m
+                   , Mod.Accessible BlockPeriod m
+                   , Mod.Accessible RoundPeriod m
+                   , Mod.Accessible (TQueue VoteResult) m
+                   , Mod.Modifiable (Q.Seq VmEvent) m
+                   , Mod.Modifiable (Q.Seq P2pEvent) m
+                   , Mod.Modifiable (Q.Seq Checkpoint) m
+                   , (SHA `A.Alters` OutputTx) m
+                   , (SHA `A.Alters` OutputBlock) m
+                   , (SHA `A.Alters` ChainHashEntry) m
+                   , (Word256 `A.Alters` ChainIdEntry) m
+                   , (SHA `A.Alters` DependentBlockEntry) m
+                   )
+                => [IngestBlock]
+                -> m ()
 transformBlocks = mapM_ $ \ib -> ingestBlockToSequencedBlock lookupChainIdFromChainHash ib >>= \case
   Nothing -> do
     $logWarnS "transformEvents/emitBlocks" . T.pack
@@ -399,7 +531,18 @@ transformBlocks = mapM_ $ \ib -> ingestBlockToSequencedBlock lookupChainIdFromCh
   Just sb -> do
     runBlockWithConsensus sb
 
-transformGenesis :: [IngestGenesis] -> SequencerM ()
+transformGenesis :: ( MonadLogger m
+                    , MonadMonitor m
+                    , HasPrivateHashDB m
+                    , Mod.Modifiable (Q.Seq VmEvent) m
+                    , Mod.Modifiable (Q.Seq P2pEvent) m
+                    , (SHA `A.Alters` OutputTx) m
+                    , (SHA `A.Alters` OutputBlock) m
+                    , (SHA `A.Alters` ChainHashEntry) m
+                    , (Word256 `A.Alters` ChainIdEntry) m
+                    )
+                 => [IngestGenesis]
+                 -> m ()
 transformGenesis chains = forM_ chains $ \ig -> do
   let logF = logFF "transformGenesis"
   let og = ingestGenesisToOutputGenesis ig
@@ -413,10 +556,32 @@ transformGenesis chains = forM_ chains $ \ig -> do
       markForP2P (P2pGenesis og)
       mapM_ (markForVM . VmBlock) =<< insertNewChainInfo chainId cInfo
 
-splitEvents :: [IngestEvent] -> SequencerM ()
+splitEvents :: ( MonadIO m
+               , MonadLogger m
+               , MonadMonitor m
+               , HasBlockstanbulContext m
+               , HasPrivateHashDB m
+               , Mod.Accessible (IORef RoundNumber) m
+               , Mod.Accessible (TMChan RoundNumber) m
+               , Mod.Accessible BlockPeriod m
+               , Mod.Accessible RoundPeriod m
+               , Mod.Accessible (TQueue VoteResult) m
+               , Mod.Modifiable GetChainsDB m
+               , Mod.Modifiable (Q.Seq VmEvent) m
+               , Mod.Modifiable (Q.Seq P2pEvent) m
+               , Mod.Modifiable (Q.Seq Checkpoint) m
+               , (SHA `A.Alters` DependentBlockEntry) m
+               , (SHA `A.Alters` OutputTx) m
+               , (SHA `A.Alters` OutputBlock) m
+               , (SHA `A.Alters` ChainHashEntry) m
+               , (Word256 `A.Alters` ChainIdEntry) m
+               , (SHA `A.Alters` ()) m
+               )
+            => [IngestEvent]
+            -> m ()
 splitEvents es = forM_ (partitionWith iEventType es) $ \(eventType, events) ->
   let num = length events
-      record :: T.Text -> T.Text -> SequencerM ()
+      record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> m ()
       record t k = do
         liftIO $ withLabel eventsplitMetrics t (flip unsafeAddCounter . fromIntegral $ num)
         $logInfoS "splitEvents" . T.pack $ printf "Running %d %s" num k

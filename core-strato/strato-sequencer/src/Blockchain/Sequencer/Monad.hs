@@ -15,6 +15,8 @@ module Blockchain.Sequencer.Monad (
   , SequencerConfig(..)
   , SequencerM
   , HasNamespace(..)
+  , BlockPeriod(..)
+  , RoundPeriod(..)
   , isInNamespace
   , fromNamespace
   , lookupInLDB
@@ -32,11 +34,13 @@ module Blockchain.Sequencer.Monad (
   , pairToVmTx
   , markForVM
   , markForP2P
+  , markCheckpoint
   , clearLdbBatchOps
   , flushLdbBatchOps
   , addLdbBatchOps
   , drainP2P
   , drainVM
+  , drainCheckpoints
   , clearDBERegistry
   , createFirstTimer
   , createNewTimer
@@ -108,19 +112,23 @@ data SequencerContext = SequencerContext
   , _ldbBatchOps         :: Q.Seq LDB.BatchOp
   , _vmEvents            :: Q.Seq VmEvent
   , _p2pEvents           :: Q.Seq P2pEvent
+  , _checkpoints         :: Q.Seq Checkpoint
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
   }
 makeLenses ''SequencerContext
 
+newtype BlockPeriod = BlockPeriod { unBlockPeriod :: NominalDiffTime }
+newtype RoundPeriod = RoundPeriod { unRoundPeriod :: NominalDiffTime }
+
 data SequencerConfig = SequencerConfig
   { depBlockDBCacheSize     :: Int
   , depBlockDBPath          :: String
   , seenTransactionDBSize   :: Int
   , syncWrites              :: Bool
-  , blockstanbulBlockPeriod :: NominalDiffTime
-  , blockstanbulRoundPeriod :: NominalDiffTime
+  , blockstanbulBlockPeriod :: BlockPeriod
+  , blockstanbulRoundPeriod :: RoundPeriod
   , blockstanbulBeneficiary :: TQueue CandidateReceived
   , blockstanbulVoteResps   :: TQueue VoteResult
   , blockstanbulTimeouts    :: TMChan RoundNumber
@@ -300,6 +308,43 @@ instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = assign seenTransactionDB
 
+instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
+  get _ = use ldbBatchOps
+  put _ = assign ldbBatchOps
+
+instance Mod.Modifiable (Q.Seq VmEvent) SequencerM where
+  get _ = use vmEvents
+  put _ = assign vmEvents
+
+instance Mod.Modifiable (Q.Seq P2pEvent) SequencerM where
+  get _ = use p2pEvents
+  put _ = assign p2pEvents
+
+instance Mod.Modifiable (Q.Seq Checkpoint) SequencerM where
+  get _ = use checkpoints
+  put _ = assign checkpoints
+
+instance Mod.Accessible (IORef RoundNumber) SequencerM where
+  access _ = use latestRoundNumber
+
+instance Mod.Accessible (TMChan RoundNumber) SequencerM where
+  access _ = asks blockstanbulTimeouts
+
+instance Mod.Accessible BlockPeriod SequencerM where
+  access _ = asks blockstanbulBlockPeriod
+
+instance Mod.Accessible RoundPeriod SequencerM where
+  access _ = asks blockstanbulRoundPeriod
+
+instance Mod.Accessible (TQueue CandidateReceived) SequencerM where
+  access _ = asks blockstanbulBeneficiary
+
+instance Mod.Accessible (TQueue VoteResult) SequencerM where
+  access _ = asks blockstanbulVoteResps
+
+instance Mod.Accessible View SequencerM where
+  access _ = currentView
+
 instance (SHA `A.Alters` ()) SequencerM where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
@@ -342,6 +387,7 @@ runSequencerM c mbc m = do
             , _ldbBatchOps         = Q.empty
             , _vmEvents            = Q.empty
             , _p2pEvents           = Q.empty
+            , _checkpoints         = Q.empty
             , _blockstanbulContext = mbc
             , _loopTimeout         = loopCh
             , _latestRoundNumber   = latestRound
@@ -351,32 +397,59 @@ runSequencerM c mbc m = do
 pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
 pairToVmTx = uncurry VmTx
 
-markForVM :: VmEvent -> SequencerM ()
-markForVM oe = vmEvents %= (Q.|> oe)
+markForVM :: Mod.Modifiable (Q.Seq VmEvent) m => VmEvent -> m ()
+markForVM oe = Mod.modify_ (Mod.Proxy @(Q.Seq VmEvent)) $ pure . (Q.|> oe)
 
-markForP2P :: P2pEvent -> SequencerM ()
-markForP2P oe = p2pEvents %= (Q.|> oe)
+markForP2P :: Mod.Modifiable (Q.Seq P2pEvent) m => P2pEvent -> m ()
+markForP2P oe = Mod.modify_ (Mod.Proxy @(Q.Seq P2pEvent)) $ pure . (Q.|> oe)
 
-drainP2P :: SequencerM [P2pEvent]
-drainP2P = fmap toList $ p2pEvents <<.= Q.empty
+markCheckpoint :: Mod.Modifiable (Q.Seq Checkpoint) m => Checkpoint -> m ()
+markCheckpoint oe = Mod.modify_ (Mod.Proxy @(Q.Seq Checkpoint)) $ pure . (Q.|> oe)
 
-drainVM :: SequencerM [VmEvent]
-drainVM = fmap toList $ vmEvents <<.= Q.empty
+drainP2P :: Mod.Modifiable (Q.Seq P2pEvent) m => m [P2pEvent]
+drainP2P = do
+  pevs <- Mod.get (Mod.Proxy @(Q.Seq P2pEvent))
+  Mod.put (Mod.Proxy @(Q.Seq P2pEvent)) Q.empty
+  pure $ toList pevs
+
+drainVM :: Mod.Modifiable (Q.Seq VmEvent) m => m [VmEvent]
+drainVM = do
+  vevs <- Mod.get (Mod.Proxy @(Q.Seq VmEvent))
+  Mod.put (Mod.Proxy @(Q.Seq VmEvent)) Q.empty
+  pure $ toList vevs
+
+drainCheckpoints :: Mod.Modifiable (Q.Seq Checkpoint) m => m [Checkpoint]
+drainCheckpoints = do
+  vevs <- Mod.get (Mod.Proxy @(Q.Seq Checkpoint))
+  Mod.put (Mod.Proxy @(Q.Seq Checkpoint)) Q.empty
+  pure $ toList vevs
 
 clearDBERegistry :: SequencerM ()
 clearDBERegistry = dbeRegistry .= M.empty
 
-createFirstTimer :: SequencerM ()
+createFirstTimer :: ( MonadIO m
+                    , Mod.Accessible (IORef RoundNumber) m
+                    , Mod.Accessible (TMChan RoundNumber) m
+                    , Mod.Accessible RoundPeriod m
+                    , Mod.Accessible View m
+                    )
+                 => m ()
 createFirstTimer = do
-  v <- currentView
+  v <- Mod.access (Mod.Proxy @View)
   createNewTimer . _round $ v
 
-createNewTimer :: RoundNumber -> SequencerM ()
+createNewTimer :: ( MonadIO m
+                  , Mod.Accessible (IORef RoundNumber) m
+                  , Mod.Accessible (TMChan RoundNumber) m
+                  , Mod.Accessible RoundPeriod m
+                  )
+               => RoundNumber
+               -> m ()
 createNewTimer rn = do
-  rnref <- use latestRoundNumber
+  rnref <- Mod.access (Mod.Proxy @(IORef RoundNumber))
   liftIO $ atomicModifyIORef' rnref (\x -> (max rn x, ()))
-  ch <- asks blockstanbulTimeouts
-  dt <- asks blockstanbulRoundPeriod
+  ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
+  dt <- unRoundPeriod <$> Mod.access (Mod.Proxy @(RoundPeriod))
   let act :: AlarmClock UTCTime -> IO ()
       act this' = do
         atomically $ writeTMChan ch rn
@@ -404,8 +477,8 @@ drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
 drainVotes :: SequencerM [CandidateReceived]
 drainVotes = atomically . flushTQueue =<< asks blockstanbulBeneficiary
 
-clearLdbBatchOps :: SequencerM ()
-clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
+clearLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => m ()
+clearLdbBatchOps = Mod.put (Mod.Proxy @(Q.Seq LDB.BatchOp)) Q.empty
 
 flushLdbBatchOps :: SequencerM ()
 flushLdbBatchOps = do
@@ -416,11 +489,9 @@ flushLdbBatchOps = do
   $logInfoS "flushLdbBatchOps" "Applied pending LDB writes"
   clearLdbBatchOps
 
-addLdbBatchOps :: [LDB.BatchOp] -> SequencerM ()
-addLdbBatchOps ops = do
-  existingOps <- use ldbBatchOps
-  let newOps = foldl' (Q.|>) existingOps ops
-  ldbBatchOps .= newOps
+addLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => [LDB.BatchOp] -> m ()
+addLdbBatchOps ops = Mod.modify_ (Mod.Proxy @(Q.Seq LDB.BatchOp)) $ \existingOps ->
+  pure $ foldl' (Q.|>) existingOps ops
 
 fuseChannels ::SequencerM (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do

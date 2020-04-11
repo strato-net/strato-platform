@@ -114,8 +114,8 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , depBlockDBPath        = fullPath
                                , seenTransactionDBSize = dedupWindow
                                , syncWrites            = False
-                               , blockstanbulBlockPeriod = 0
-                               , blockstanbulRoundPeriod = 10000000
+                               , blockstanbulBlockPeriod = BlockPeriod 0
+                               , blockstanbulRoundPeriod = RoundPeriod 10000000
                                , blockstanbulBeneficiary = vch
                                , blockstanbulVoteResps = rch
                                , blockstanbulTimeouts = tch
@@ -237,7 +237,7 @@ spec = do
 
       it "queues timeouts -- with retries" $ runTestM $ do
         let input = [20, 45, 30]
-        local (\cfg -> cfg{blockstanbulRoundPeriod=0.00005}) $
+        local (\cfg -> cfg{blockstanbulRoundPeriod = RoundPeriod 0.00005}) $
           mapM_ createNewTimer input
         liftIO $ threadDelay 10000 -- Who are you to judge?
         rnref <- gets _latestRoundNumber
