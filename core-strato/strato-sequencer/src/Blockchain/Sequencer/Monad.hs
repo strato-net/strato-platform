@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances             #-}
 {-# LANGUAGE MultiParamTypeClasses         #-}
 {-# LANGUAGE RankNTypes                    #-}
+{-# LANGUAGE RecordWildCards               #-}
 {-# LANGUAGE TemplateHaskell               #-}
 {-# LANGUAGE TypeFamilies                  #-}
 {-# LANGUAGE TypeApplications              #-}
@@ -32,15 +33,9 @@ module Blockchain.Sequencer.Monad (
   , prunePrivacyDBs
   , runSequencerM
   , pairToVmTx
-  , markForVM
-  , markForP2P
-  , markCheckpoint
   , clearLdbBatchOps
   , flushLdbBatchOps
   , addLdbBatchOps
-  , drainP2P
-  , drainVM
-  , drainCheckpoints
   , clearDBERegistry
   , createFirstTimer
   , createNewTimer
@@ -110,9 +105,6 @@ data SequencerContext = SequencerContext
   , _getChainsDB         :: GetChainsDB
   , _getTransactionsDB   :: GetTransactionsDB
   , _ldbBatchOps         :: Q.Seq LDB.BatchOp
-  , _vmEvents            :: Q.Seq VmEvent
-  , _p2pEvents           :: Q.Seq P2pEvent
-  , _checkpoints         :: Q.Seq Checkpoint
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
@@ -312,18 +304,6 @@ instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
   get _ = use ldbBatchOps
   put _ = assign ldbBatchOps
 
-instance Mod.Modifiable (Q.Seq VmEvent) SequencerM where
-  get _ = use vmEvents
-  put _ = assign vmEvents
-
-instance Mod.Modifiable (Q.Seq P2pEvent) SequencerM where
-  get _ = use p2pEvents
-  put _ = assign p2pEvents
-
-instance Mod.Modifiable (Q.Seq Checkpoint) SequencerM where
-  get _ = use checkpoints
-  put _ = assign checkpoints
-
 instance Mod.Accessible (IORef RoundNumber) SequencerM where
   access _ = use latestRoundNumber
 
@@ -385,9 +365,6 @@ runSequencerM c mbc m = do
             , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty
-            , _vmEvents            = Q.empty
-            , _p2pEvents           = Q.empty
-            , _checkpoints         = Q.empty
             , _blockstanbulContext = mbc
             , _loopTimeout         = loopCh
             , _latestRoundNumber   = latestRound
@@ -396,33 +373,6 @@ runSequencerM c mbc m = do
 
 pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
 pairToVmTx = uncurry VmTx
-
-markForVM :: Mod.Modifiable (Q.Seq VmEvent) m => VmEvent -> m ()
-markForVM oe = Mod.modify_ (Mod.Proxy @(Q.Seq VmEvent)) $ pure . (Q.|> oe)
-
-markForP2P :: Mod.Modifiable (Q.Seq P2pEvent) m => P2pEvent -> m ()
-markForP2P oe = Mod.modify_ (Mod.Proxy @(Q.Seq P2pEvent)) $ pure . (Q.|> oe)
-
-markCheckpoint :: Mod.Modifiable (Q.Seq Checkpoint) m => Checkpoint -> m ()
-markCheckpoint oe = Mod.modify_ (Mod.Proxy @(Q.Seq Checkpoint)) $ pure . (Q.|> oe)
-
-drainP2P :: Mod.Modifiable (Q.Seq P2pEvent) m => m [P2pEvent]
-drainP2P = do
-  pevs <- Mod.get (Mod.Proxy @(Q.Seq P2pEvent))
-  Mod.put (Mod.Proxy @(Q.Seq P2pEvent)) Q.empty
-  pure $ toList pevs
-
-drainVM :: Mod.Modifiable (Q.Seq VmEvent) m => m [VmEvent]
-drainVM = do
-  vevs <- Mod.get (Mod.Proxy @(Q.Seq VmEvent))
-  Mod.put (Mod.Proxy @(Q.Seq VmEvent)) Q.empty
-  pure $ toList vevs
-
-drainCheckpoints :: Mod.Modifiable (Q.Seq Checkpoint) m => m [Checkpoint]
-drainCheckpoints = do
-  vevs <- Mod.get (Mod.Proxy @(Q.Seq Checkpoint))
-  Mod.put (Mod.Proxy @(Q.Seq Checkpoint)) Q.empty
-  pure $ toList vevs
 
 clearDBERegistry :: SequencerM ()
 clearDBERegistry = dbeRegistry .= M.empty
@@ -482,10 +432,10 @@ clearLdbBatchOps = Mod.put (Mod.Proxy @(Q.Seq LDB.BatchOp)) Q.empty
 
 flushLdbBatchOps :: SequencerM ()
 flushLdbBatchOps = do
-  pendingLDBWrites <- gets _ldbBatchOps
+  pendingLDBWrites <- use ldbBatchOps
   applyLDBBatchWrites $ toList pendingLDBWrites
   incCounter seqLdbBatchWrites
-  setGauge seqLdbBatchSize . fromIntegral . length $ pendingLDBWrites
+  setGauge seqLdbBatchSize . fromIntegral $ length pendingLDBWrites
   $logInfoS "flushLdbBatchOps" "Applied pending LDB writes"
   clearLdbBatchOps
 
