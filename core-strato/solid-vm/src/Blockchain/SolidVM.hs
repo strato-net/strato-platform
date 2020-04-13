@@ -896,7 +896,11 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
 expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar' (Xabi.Binary "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
 expToVar' (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
-expToVar' (Xabi.Binary "/" expr1 expr2) = expToVarInteger expr1 div expr2 SInteger
+expToVar' ex@(Xabi.Binary "/" expr1 expr2) = do 
+  rhs <- getInt =<< expToVar expr2
+  case rhs of
+    0 -> divideByZero $ unparseExpression ex
+    _ -> expToVarInteger expr1 div expr2 SInteger
 expToVar' (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
 expToVar' (Xabi.Binary "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (Xabi.Binary "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
