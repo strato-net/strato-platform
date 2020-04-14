@@ -11,10 +11,8 @@ module BlockApps.Bloc22.Server.Users where
 
 import           ClassyPrelude                     ((<>))
 import           Control.Concurrent
-import           Control.Concurrent.Async.Lifted
 import           Control.Applicative               ((<|>))
 import           Control.Arrow
-import           Control.Exception.Lifted          (catch)
 import           Control.Lens                      hiding (from, ix)
 import           Control.Monad
 import           Control.Monad.Except
@@ -43,8 +41,9 @@ import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
-import           Opaleye                           hiding (not, null, index)
 import           Database.PostgreSQL.Simple        (SqlError(..))
+import           Opaleye                           hiding (not, null, index)
+import           UnliftIO
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -105,7 +104,7 @@ getUsers :: Bloc [UserName]
 getUsers = do
   gtfoMyLawn <- asks deployMode
   case gtfoMyLawn of
-    M.Public -> throwError (CouldNotFind "no /users endpoint. thank.")
+    M.Public -> throwIO (CouldNotFind "no /users endpoint. thank.")
     M.Enterprise -> blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
 getUsersUser :: UserName -> Bloc [Address]
@@ -116,12 +115,12 @@ postUsersUser :: UserName -> Password -> Bloc Address
 postUsersUser (UserName name) pass = blocTransaction $ do
   keyStore <- newKeyStore pass
   createdUser <- blocModify $ postUsersUserQuery name keyStore
-  unless createdUser (throwError (DBError "failed to create user"))
+  unless createdUser (throwIO (DBError "failed to create user"))
   return $ keystoreAcctAddress keyStore
 
 getUsersKeyStore :: UserName -> Address -> Password -> Bloc KeyStore
 getUsersKeyStore userName addr password = do
-  let err = throwError . UserError $ "invalid username or password"
+  let err = throwIO . UserError $ "invalid username or password"
   uids <- blocQuery . getUserIdQuery $ userName
   cryptos <- case listToMaybe uids of
     Nothing -> err
@@ -139,7 +138,7 @@ getUsersKeyStore userName addr password = do
 
 postUsersKeyStore :: UserName -> PostUsersKeyStoreRequest -> Bloc Bool
 postUsersKeyStore username (PostUsersKeyStoreRequest password keystore) = do
-  let err = throwError . UserError $ "invalid username or password"
+  let err = throwIO . UserError $ "invalid username or password"
   uids <- blocQuery . getUserIdQuery $ username
   uid <- case uids of
     [] -> err
@@ -151,7 +150,7 @@ postUsersKeyStore username (PostUsersKeyStoreRequest password keystore) = do
   case catMaybes . map (\(s, n, sk) -> decryptSecKey password s n sk) $ cryptos of
     [] -> err
     _ -> blocModify (insertKeyStore uid keystore) `catch`
-          \s@SqlError{..} -> throwError . AlreadyExists $
+          \s@SqlError{..} -> throwIO . AlreadyExists $
             "keystore could not be inserted: " <> Text.pack (show s)
 
 waitForBalance :: Address -> Bloc ()
@@ -181,7 +180,7 @@ postUsersFill _ addr resolve = blocTransaction $ do
   $logInfoLS "postUsersFill/resolve" resolve
   $logInfoLS "postUsersFill/result" result
   when (Failure == blocTransactionStatus result) $
-    throwError $ UnavailableError "faucet transaction failed; please try again"
+    throwIO $ UnavailableError "faucet transaction failed; please try again"
   return result
 
 postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
@@ -237,7 +236,7 @@ postUsersContract userName addr chainId resolve
     Just "EVM" -> postUsersContractEVM' bcp (return . signTransaction sk)
     Just "SolidVM" -> postUsersContractSolidVM' bcp (return . signTransaction sk)
     Nothing -> postUsersContractEVM' bcp (return . signTransaction sk) -- The EVM is the default VM
-    Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
+    Just vmName -> throwIO $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
 evmContractSolidVMError :: Text
 evmContractSolidVMError = Text.concat
@@ -256,16 +255,16 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
     case contract of
      Nothing ->
        case Map.toList idsAndDetails of
-         [] -> throwError $ UserError "You need to supply at least one contract in the source"
+         [] -> throwIO $ UserError "You need to supply at least one contract in the source"
          [(n,(m,cd))] -> case contractdetailsCodeHash cd of
                   (EVMCode _) -> return (n, (m, cd))
-                  (SolidVMCode _ _) -> throwError $ UserError evmContractSolidVMError
-         _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
+                  (SolidVMCode _ _) -> throwIO $ UserError evmContractSolidVMError
+         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
      Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
     metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
-  unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+  unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
   tx <- signAndPrepare sign fromAddr metadata' $
@@ -297,9 +296,9 @@ postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
     case contract of
      Nothing ->
        case Map.toList idsAndDetails of
-         [] -> throwError $ UserError "You need to supply at least one contract in the source" --remove
+         [] -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
          [x] -> return x
-         _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
+         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
      Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   $logInfoLS "postUsersContractSolidVM'/args" args
 
@@ -342,7 +341,7 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
     Just "EVM" -> postUsersUploadListEVM' bclp (return . signTransaction sk)
     Just "SolidVM" -> postUsersUploadListSolidVM' bclp (return . signTransaction sk)
     Nothing -> postUsersUploadListEVM' bclp (return . signTransaction sk) -- The EVM is the default VM
-    Just vmName -> throwError $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
+    Just vmName -> throwIO $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
 postUsersUploadListSolidVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListSolidVM' ContractListParameters{..} sign = do
@@ -365,7 +364,7 @@ postUsersUploadListSolidVM' ContractListParameters{..} sign = do
                 (_,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
                 returnA -< (src,cmId',x'')
               case mContract of
-                Nothing -> throwError . UserError $ Text.concat
+                Nothing -> throwIO . UserError $ Text.concat
                   [ "Upload List (SolidVM): When deploying multiple contract creation transactions, "
                   , "the contracts' source code must be supplied when using SolidVM. "
                   , "Please try supplying the contracts' source code and try again. "
@@ -416,7 +415,7 @@ postUsersUploadListEVM' ContractListParameters{..} sign = do
   txsWithParams <- genNonces (getAccountNonce fromAddr) uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name mSrc args params value cid md) -> do
-      when (isJust mSrc) . lift . throwError $ UserError evmUploadListError
+      when (isJust mSrc) . lift . throwIO $ UserError evmUploadListError
       mtuple <- use $ at name
       (bin, src, cmId, xabi) <- case mtuple of
         Just (b, src, cmId', x) -> return (b, src, cmId', x)
@@ -425,11 +424,11 @@ postUsersUploadListEVM' ContractListParameters{..} sign = do
             (bin16,_,cHash,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
             returnA -< (bin16,cHash,src,cmId',x'')
           case mContract of
-            Nothing -> throwError $ UserError evmUploadListError
-            Just (_,SolidVMCode _ _,_,_,_) -> throwError $ UserError evmContractSolidVMError
+            Nothing -> throwIO $ UserError evmUploadListError
+            Just (_,SolidVMCode _ _,_,_,_) -> throwIO $ UserError evmContractSolidVMError
             Just (b16,_,src,(cmId' :: Int32),x') -> do
               let (b, leftOver) = Base16.decode b16
-              unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+              unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
               x <- lift $ deserializeXabi x'
               at name <?= (b, src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
@@ -570,14 +569,14 @@ postUsersContractMethodList' FunctionListParameters{..} sign = do
               x <- lift $ deserializeXabi x'
               at methodcallContractName <?= (mapKey', x)
           contract' <- case xAbiToContract xabi of
-            Left err -> throwError . AnError $ Text.pack err
+            Left err -> throwIO . AnError $ Text.pack err
             Right c -> return c
           let maybeFunc = OMap.lookup methodcallMethodName (fields $ C.mainStruct contract')
 
           sel <-
             case maybeFunc of
              Just (_, TypeFunction selector _ _) -> return selector
-             _ -> lift $ throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+             _ -> lift $ throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
           let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
           (argsBin, argsAsSource) <-
             lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
@@ -651,13 +650,13 @@ postUsersContractMethod' FunctionParameters{..} sign = do
                 , " at address "
                 , Text.pack $ addressString contractAddr
                 ]
-    (cmId,xabi) <- maybe (throwError err) (return . fmap contractdetailsXabi) =<<
+    (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
       getContractDetailsAndMetadataId
         (ContractName contractName)
         (Unnamed contractAddr)
         chainId
     contract' <- case xAbiToContract xabi of
-      Left e -> throwError . AnError $ Text.pack e
+      Left e -> throwIO . AnError $ Text.pack e
       Right c -> return c
 
     let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
@@ -666,7 +665,7 @@ postUsersContractMethod' FunctionParameters{..} sign = do
     sel <-
       case maybeFunc of
        Just (_, TypeFunction selector _ _) -> return selector
-       _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
+       _ -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
     (argsBin, argsAsSource) <- constructArgValuesAndSource (Just args) xabiArgs
     let metadataWithCallInfo =
@@ -701,7 +700,7 @@ emptyBatchState = BatchState Map.empty Map.empty
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' :: [Keccak256] -> Bool -> Bloc BlocTransactionResult
-getBlocTransactionResult' [] _ = throwError $ AnError "getBlockTransactionResult': no TX hashes"
+getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': no TX hashes"
 getBlocTransactionResult' hashes@(txh:_) resolve =
   if resolve
     then do
@@ -773,7 +772,7 @@ evalAndReturn list = forStateT emptyBatchState list $
             0 -> return $ BlocTransactionResult Success hash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata)
             1 -> contractResult hash mtxr cmId tdata
             2 -> functionResult hash mtxr cmId tdata
-            _ -> throwError $ InternalError $ Text.pack $ "Unexpected transaction type: got" ++ show ttype
+            _ -> throwIO $ InternalError $ Text.pack $ "Unexpected transaction type: got" ++ show ttype
 
 contractResult :: Keccak256
                -> Maybe TransactionResult
@@ -794,9 +793,9 @@ contractResult hash mtxr cmId name = do
         let mDelAddr = stringAddress . Text.unpack =<<
               (listToMaybe . Text.splitOn "," $ transactionresultContractsDeleted txResult)
         case mDelAddr of
-          Just _ -> lift $ throwError $ UserError "Contract failed to upload, likely because the constructor threw"
-          Nothing -> lift $ throwError $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"
-      stratoMsg  -> lift $ throwError $ UserError stratoMsg
+          Just _ -> lift $ throwIO $ UserError "Contract failed to upload, likely because the constructor threw"
+          Nothing -> lift $ throwIO $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"
+      stratoMsg  -> lift $ throwIO $ UserError stratoMsg
     Just addr' -> do
       let cn = ContractName name
       mdetails <- use $ contractDetailsMap . at cn
@@ -824,7 +823,7 @@ functionResult hash mtxr cmId funcName = do
       orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
   orderedResultTypes <- lift $
     for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-      either (throwError . UserError . Text.pack) return $
+      either (throwIO . UserError . Text.pack) return $
         xabiTypeToType xabi indexedTypeType
   let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
       txResp = transactionresultResponse txResult
@@ -835,7 +834,7 @@ functionResult hash mtxr cmId funcName = do
     "Success!" -> do
       formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
       return $ BlocTransactionResult Success hash mtxr (Just $ Call formattedResponse)
-    stratoMsg  -> lift $ throwError $ UserError stratoMsg
+    stratoMsg  -> throwIO $ UserError stratoMsg
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
@@ -894,7 +893,7 @@ getArgValues argsMap argNamesTypes = do
         let
           argNames1 = "(" <> Text.intercalate ", " (Map.keys argNamesTypes) <> ")"
           argNames2 = "(" <> Text.intercalate ", " (Map.keys argsMap) <> ")"
-        throwError (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
+        throwIO (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
 
@@ -904,7 +903,7 @@ constructArgValues args argNamesTypes = do
       Nothing ->
         if Map.null argNamesTypes
           then return ByteString.empty
-          else throwError (UserError "no arguments provided to function.")
+          else throwIO (UserError "no arguments provided to function.")
       Just argsMap -> do
         vals <- getArgValues argsMap argNamesTypes
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
@@ -915,7 +914,7 @@ constructArgValuesAndSource args argNamesTypes = do
       Nothing ->
         if Map.null argNamesTypes
           then return (ByteString.empty, "()")
-          else throwError (UserError "no arguments provided to function.")
+          else throwIO (UserError "no arguments provided to function.")
       Just argsMap -> do
         vals <- getArgValues argsMap argNamesTypes
         let valsAsText = map valueToText vals
@@ -942,14 +941,14 @@ getAccountNonce addr chainIds = do
   $logInfoLS "getAccountNonce/req" params
   $logInfoLS "getAccountNonce/resp" mAccts
   case mAccts of
-    [] -> throwError . UserError $ "User does not have a balance"
+    [] -> throwIO . UserError $ "User does not have a balance"
     accts -> return . Map.fromList $ map (accountChainId &&& accountNonce) accts
 
 getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
 getAccountSecKey userName password addr = do
   uIds <- blocQuery . getUserIdQuery $ userName
   cryptos <- case listToMaybe uIds of
-    Nothing -> throwError . UserError $
+    Nothing -> throwIO . UserError $
       "no user found with name: " <> getUserName userName
     Just uId -> blocQuery $ proc () -> do
       (_,salt,_,nonce,encSecKey,_,addr',uId') <-
@@ -958,12 +957,12 @@ getAccountSecKey userName password addr = do
         .&& addr' .== constant addr
       returnA -< (salt,nonce,encSecKey)
   skMaybe <- case listToMaybe cryptos of
-    Nothing -> throwError . UserError $
+    Nothing -> throwIO . UserError $
       "address does not exist for user:" <> getUserName userName
     Just (salt,nonce,encSecKey) -> return $
       decryptSecKey password salt nonce encSecKey
   case skMaybe of
-    Nothing -> throwError $ UserError "incorrect password"
+    Nothing -> throwIO $ UserError "incorrect password"
     Just sk -> return sk
 
 prepareUnsignedTx :: TransactionHeader -> UnsignedTransaction

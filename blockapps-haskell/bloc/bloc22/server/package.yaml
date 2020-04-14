@@ -80,6 +80,7 @@ dependencies:
   - time
   - transformers
   - transformers-base
+  - unliftio
   - unordered-containers
   - vector
   - wai-cors
