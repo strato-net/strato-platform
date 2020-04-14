@@ -4,7 +4,7 @@ MAINTAINER BlockApps Inc.
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -y apache2-utils curl wget && \
+    apt-get install -y apache2-utils curl wget vim nano && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/local/openresty/nginx/lua && \

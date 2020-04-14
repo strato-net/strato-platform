@@ -1,50 +1,63 @@
 # smd-ui
 
-UI for Strato Management Dashboard
+STRATO Management Dashboard - the UI for STRATO built on React.js.
 
+# Run in production
+In production we run SMD in docker as part of STRATO node (see Dockerfile, docker-run.sh, strato-platform/docker-compose.tpl.yml and github.com/blockapps/strato-getting-started)
 
-## Pre-requisite setup:
+# Run for local development
+To run react dev server locally with all features enabled go through the steps:
 
+1. Run STRATO node normally on your localhost (say, localhost:8080):
 ```
-install node.js npm
+NODE_HOST=localhost:8080 \
+  HTTP_PORT=8080 \
+  OAUTH_ENABLED=true \
+  OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
+  OAUTH_JWT_USERNAME_PROPERTY=email \
+  OAUTH_CLIENT_ID=dev \
+  OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \
+  PASSWORD=123 \
+  EXT_STORAGE_S3_BUCKET=strato-external-storage-test \
+  EXT_STORAGE_S3_ACCESS_KEY_ID=AKIAV5NMROVZIZQY4OAE \
+  EXT_STORAGE_S3_SECRET_ACCESS_KEY=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 \
+  ./strato.sh --single
 ```
 
-## Dependencies
-
-SMD needs a running STRATO platform, options:
-
-  -- Run STRATO platform (Private Ethereum Blockchain node) on your machine or a VM:
-
-     https://github.com/blockapps/strato-getting-started
-
-  -- OR, run STRATO platform (Private Ethereum Blockchain node) using Azure Marketplace
-
-## Deploying and Running SMD Web UI against LOCALHOST
-
-1) Clone this repo
-
-2) Type the following command to run the UI.
-
+2. Get into the nginx container:
 ```
+sudo docker exec -it strato_nginx_1 bash
+```
+and edit the config with vim or nano:
+```
+vim /usr/local/openresty/nginx/conf/nginx.conf
+```
+replace the existing `location / {...}` block with the following (note the difference between linux and mac):
+```
+location / {
+  set $is_ui "true";
+  rewrite_by_lua_file  lua/openid.lua;
+  proxy_set_header Accept-Encoding "";
+  proxy_pass http://172.17.0.1:3000/;                        # !!ON MAC USE `http://docker.for.mac.localhost:3000/` instead
+};
+```
+and add the new location block (note the difference between linux and mac):
+```
+location /sockjs-node {
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
+  proxy_http_version 1.1;
+  proxy_pass http://172.17.0.1:3000/sockjs-node;             # !!ON MAC USE `http://docker.for.mac.localhost:3000/sockjs-node` instead
+}
+```
+
+3. Run SMD react dev server locally:
+```
+cd strato-platform/smd-ui
 npm i
-npm run start
+REACT_APP_OAUTH_ENABLED=true REACT_APP_NODE_HOST=localhost:8080 REACT_APP_EXT_STORAGE_ENABLED=true npm run start
 ```
+(The env vars have the prefix REACT_APP_ as it is the requirement of React in order to pass the unprefixed vars to browser)
 
-## Environment Variables for Packaging
+4. Open `localhost:8080/` in the browser, login and start making changes in SMD code to see updates live in browser. 
 
-
-| Variable | Default |
-| -------- | ------- |
-|`NODE_NAME`|LOCALHOST|
-|`BLOC_URL`|http://localhost/bloc/v2.2|
-|`BLOC_DOC_URL`|http://localhost/docs/?url=/bloc/v2.2/swagger.json|
-|`STRATO_URL`|http://localhost/strato-api/eth/v1.2|
-|`STRATO_DOC_URL`|http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json|
-|`CIRRUS_URL`|http://localhost/cirrus/search|
-|`POLLING_FREQUENCY`|`5 * 1000`|
-
-#### Example Docker Run command
-
-```
-docker run -d --name smd-ui -p 3035:3002 -e NODE_NAME=BAYAR6 -e BLOC_URL=http://bayar6.eastus.cloudapp.azure.com/bloc/v2.2 -e STRATO_URL=http://bayar6.eastus.cloudapp.azure.com/strato-api/eth/v1.2 blockapps/smd-ui
-```
