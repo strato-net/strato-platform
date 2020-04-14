@@ -2538,3 +2538,20 @@ contract qq {
   }
 }|]
     getFields ["x","y","z"] `shouldReturn` [BInteger 123, BString "456", BAddress 0x789]
+
+
+  it "supports ternary operations" . runTest $ do
+    runBS [r|
+contract qq {
+  
+  uint x;
+  uint y;
+
+  constructor() {
+    x = true == true ? 100 : 42;
+    y = true == false ? 100 : 42;
+  
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 100, BInteger 42]
+
