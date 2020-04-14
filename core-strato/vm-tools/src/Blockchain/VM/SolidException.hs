@@ -17,6 +17,7 @@ module Blockchain.VM.SolidException
   , unknownConstant
   , unknownVariable
   , unknownStatement
+  , divideByZero
   ) where
 
 import Control.DeepSeq
@@ -42,6 +43,7 @@ data SolidException = TypeError String String
                     | UnknownConstant String String
                     | UnknownVariable String String
                     | UnknownStatement String String
+                    | DivideByZero String 
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -62,6 +64,7 @@ instance Show SolidException where
   show (UnknownFunction a b) = printf "unknown function: %s: %s" a b
   show (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
   show (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
+  show (DivideByZero a) = printf "divide by zero error: %s" a
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -116,3 +119,6 @@ unknownVariable = toThrower UnknownVariable
 
 unknownStatement :: (Show v) => String -> v -> a
 unknownStatement = toThrower UnknownStatement
+
+divideByZero :: (Show v) => v -> a
+divideByZero x = throw $ DivideByZero (show x)

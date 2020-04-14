@@ -77,6 +77,10 @@ anyMissingFieldError :: Selector HandledException
 anyMissingFieldError (HE Blockchain.SolidVM.Exception.MissingField{}) = True
 anyMissingFieldError _ = False
 
+anyDivideByZeroError :: Selector HandledException
+anyDivideByZeroError (HE Blockchain.SolidVM.Exception.DivideByZero{}) = True
+anyDivideByZeroError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
 failedRequirementMsg _   _                         = False
@@ -2539,6 +2543,17 @@ contract qq {
 }|]
     getFields ["x","y","z"] `shouldReturn` [BInteger 123, BString "456", BAddress 0x789]
 
+  it "catches division by zero error" $ (runTest (runBS [r|
+contract qq {
+  
+   uint x = 42;
+   uint y = 0;
+
+   constructor()
+   {
+      return 42/0;
+   }
+}|])) `shouldThrow` anyDivideByZeroError 
 
   it "supports ternary operations" . runTest $ do
     runBS [r|
@@ -2554,4 +2569,3 @@ contract qq {
   }
 }|]
     getFields ["x", "y"] `shouldReturn` [BInteger 100, BInteger 42]
-
