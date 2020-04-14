@@ -12,7 +12,6 @@ module BlockApps.Bloc22.Database.Queries.Deprecated where
 
 import           ClassyPrelude                   ((<>))
 import           Control.Arrow
-import           Control.Monad.Except
 import           Data.Int                        (Int32)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
@@ -22,6 +21,7 @@ import           Data.Traversable
 import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
 import qualified Opaleye                         (not)
+import           UnliftIO
 
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
@@ -219,7 +219,7 @@ getXabiType typeId = do
     "Label" -> do
       xttd' <- blocMaybe "Missing typedef in type Enum" xttd
       return $ Xabi.Label $ Text.unpack xttd'
-    _ -> throwError $ DBError "Could not match type"
+    _ -> throwIO $ DBError "Could not match type"
 
 getXabiStructFields :: Int32 -> Bloc [(Text, Xabi.FieldType)]
 getXabiStructFields typeDefId = do
@@ -255,7 +255,7 @@ getXabiTypeDefs metadataId = do
         return $ Xabi.Def.Enum names (fromIntegral by)
       "Contract" ->
         return $ Xabi.Def.Contract $ fromIntegral by
-      _ -> throwError $ DBError $
+      _ -> throwIO $ DBError $
         "Invalid type def. Expected Struct or Enum, saw " <> ty
 
 getContractXabiDeprecated ::

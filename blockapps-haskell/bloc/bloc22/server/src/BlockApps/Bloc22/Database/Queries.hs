@@ -12,7 +12,6 @@ module BlockApps.Bloc22.Database.Queries where
 
 import           Control.Arrow
 import           Control.Monad
-import           Control.Monad.Except
 import           Crypto.Hash
 import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
@@ -39,6 +38,7 @@ import           Data.Tuple                      (swap)
 import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
+import           UnliftIO
 
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Crypto
@@ -596,7 +596,7 @@ deserializeXabi = decodeXabiJSON
 
 decodeXabiJSON :: ByteString -> Bloc Xabi
 decodeXabiJSON xabi' = case decode (fromStrict xabi') of
-  Nothing -> throwError $ DBError "Corrupted Xabi stored in database"
+  Nothing -> throwIO $ DBError "Corrupted Xabi stored in database"
   Just x -> return x
 
 getContractDetailsByMetadataId :: Int32 -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
