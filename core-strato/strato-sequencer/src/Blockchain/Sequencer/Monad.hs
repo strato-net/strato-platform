@@ -97,17 +97,17 @@ data Modification a = Modification a | Deletion
 
 data SequencerContext = SequencerContext
   { _dependentBlockDB    :: DependentBlockDB
-  , _seenTransactionDB   :: SeenTransactionDB
-  , _dbeRegistry         :: Map SHA DependentBlockEntry
-  , _blockHashRegistry   :: Map SHA (Modification OutputBlock)
-  , _txHashRegistry      :: Map SHA (Modification OutputTx)
-  , _chainHashRegistry   :: Map SHA (Modification ChainHashEntry)
-  , _chainIdRegistry     :: Map Word256 (Modification ChainIdEntry)
-  , _getChainsDB         :: GetChainsDB
-  , _getTransactionsDB   :: GetTransactionsDB
-  , _ldbBatchOps         :: Q.Seq LDB.BatchOp
-  , _vmEvents            :: Q.Seq VmEvent
-  , _p2pEvents           :: Q.Seq P2pEvent
+  , _seenTransactionDB   :: !SeenTransactionDB
+  , _dbeRegistry         :: !(Map SHA DependentBlockEntry)
+  , _blockHashRegistry   :: !(Map SHA (Modification OutputBlock))
+  , _txHashRegistry      :: !(Map SHA (Modification OutputTx))
+  , _chainHashRegistry   :: !(Map SHA (Modification ChainHashEntry))
+  , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
+  , _getChainsDB         :: !GetChainsDB
+  , _getTransactionsDB   :: !GetTransactionsDB
+  , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
+  , _vmEvents            :: !(Q.Seq VmEvent)
+  , _p2pEvents           :: !(Q.Seq P2pEvent)
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
@@ -138,11 +138,11 @@ instance HasDependentBlockDB SequencerM where
 
 instance Mod.Modifiable GetChainsDB SequencerM where
   get _ = use getChainsDB
-  put _ = assign getChainsDB
+  put _ g = modify' $ getChainsDB .~ g
 
 instance Mod.Modifiable GetTransactionsDB SequencerM where
   get _ = use getTransactionsDB
-  put _ = assign getTransactionsDB
+  put _ g = modify' $ getTransactionsDB .~ g
 
 instance HasPrivateHashDB SequencerM where
   requestChain = insertGetChainsDB
@@ -227,7 +227,7 @@ genericInsertSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
                        -> a
                        -> SequencerM ()
 genericInsertSequencer registry p k a = do
-  registry . at k ?= Modification a
+  modify' $ registry . at k ?~ Modification a
   addLdbBatchOps . (:[]) $ batchInsertInLDB p k a
 
 genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
@@ -236,7 +236,7 @@ genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
                        -> NSKey a
                        -> SequencerM ()
 genericDeleteSequencer registry p k = do
-  registry . at k ?= Deletion
+  modify' $ registry . at k ?~ Deletion
   addLdbBatchOps . (:[]) $ batchDeleteInLDB p k
 
 instance (SHA `A.Alters` OutputBlock) SequencerM where
@@ -290,15 +290,15 @@ instance (SHA `A.Alters` DependentBlockEntry) SequencerM where
       Just v -> return $ Just v
       Nothing -> genericLookupDependentBlockDB k
   insert _ k v = do
-    dbeRegistry . at k ?= v
+    modify' $ dbeRegistry . at k ?~ v
     addLdbBatchOps . (:[]) $ genericBatchInsertDependentBlockDB k v
   delete _ k = do
-    dbeRegistry . at k .= Nothing
+    modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
-  put _ = assign seenTransactionDB
+  put _ = modify' . (.~) seenTransactionDB
 
 instance (SHA `A.Alters` ()) SequencerM where
   lookup _ = genericLookupSeenTransactionDB
@@ -307,7 +307,7 @@ instance (SHA `A.Alters` ()) SequencerM where
 
 instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
-  putBlockstanbulContext = assign (blockstanbulContext . _Just)
+  putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
 
 prunePrivacyDBs :: SequencerM ()
 prunePrivacyDBs = do
@@ -315,9 +315,7 @@ prunePrivacyDBs = do
   prune txHashRegistry
   prune chainHashRegistry
   prune chainIdRegistry
-  where prune = flip (%=) . M.mapMaybe $ \case
-          Modification a -> Just $ Modification a
-          Deletion       -> Nothing
+  where prune r = modify' $ r .~ M.empty
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
@@ -364,7 +362,7 @@ drainVM :: SequencerM [VmEvent]
 drainVM = fmap toList $ vmEvents <<.= Q.empty
 
 clearDBERegistry :: SequencerM ()
-clearDBERegistry = dbeRegistry .= M.empty
+clearDBERegistry = modify' $ dbeRegistry .~ M.empty
 
 createFirstTimer :: SequencerM ()
 createFirstTimer = do
@@ -405,7 +403,7 @@ drainVotes :: SequencerM [CandidateReceived]
 drainVotes = atomically . flushTQueue =<< asks blockstanbulBeneficiary
 
 clearLdbBatchOps :: SequencerM ()
-clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
+clearLdbBatchOps = modify' $ ldbBatchOps .~ Q.empty
 
 flushLdbBatchOps :: SequencerM ()
 flushLdbBatchOps = do

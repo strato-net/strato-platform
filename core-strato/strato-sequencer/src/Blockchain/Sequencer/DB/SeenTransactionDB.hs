@@ -27,10 +27,10 @@ toBool = maybe False $ const True
 type HasSeenTransactionDB = SHA `Alters` ()
 
 data SeenTransactionDB = SeenTransactionDB
-  { _size       :: Int
-  , _operations :: Int -- track number of pushes to start popping after `size`
-  , _clearQueue :: Q.Seq SHA
-  , _seen       :: S.Set SHA
+  { _size       :: {-# UNPACK #-} !Int
+  , _operations :: {-# UNPACK #-} !Int -- track number of pushes to start popping after `size`
+  , _clearQueue :: !(Q.Seq SHA)
+  , _seen       :: !(S.Set SHA)
   }
 makeLenses ''SeenTransactionDB
 

@@ -231,7 +231,7 @@ instance Monad m => Mod.Accessible MaxReturnedHeaders (StateT Context m) where
 
 instance Monad m => Mod.Modifiable PeerAddress (StateT Context m) where
   get _   = use blockstanbulPeerAddr
-  put _ k = blockstanbulPeerAddr .= k
+  put _ k = modify' $ blockstanbulPeerAddr .~ k
 
 instance Monad m => Mod.Accessible PeerAddress (StateT Context m) where
   access _ = Mod.get (Mod.Proxy @PeerAddress)
