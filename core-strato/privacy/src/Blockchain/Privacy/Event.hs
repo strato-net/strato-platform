@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -6,7 +7,9 @@
 {-# LANGUAGE TypeOperators     #-}
 
 module Blockchain.Privacy.Event
-  ( lookupSeenChain
+  ( HasPrivacyRegistries
+  , HasFullPrivacy
+  , lookupSeenChain
   , insertTransaction
   , findChainHashUses
   , lookupChainIdFromChainHash
@@ -46,6 +49,16 @@ import           Prelude                       hiding (lookup)
 import           Prometheus
 import qualified Text.Colors                   as CL
 import           Text.Format
+
+type HasPrivacyRegistries m = ( (SHA `Alters` OutputBlock) m
+                              , (SHA `Alters` OutputTx) m
+                              , (SHA `Alters` ChainHashEntry) m
+                              , (Word256 `Alters` ChainIdEntry) m
+                              )
+
+type HasFullPrivacy m = ( HasPrivacyRegistries m
+                        , HasPrivateHashDB m
+                        )
 
 logFF :: MonadLogger m => Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
@@ -233,11 +246,7 @@ runPrivateHashTX tHash cHash = do
 
 runBlocks :: ( MonadLogger m
              , MonadMonitor m
-             , HasPrivateHashDB m
-             , (SHA `Alters` OutputBlock) m
-             , (SHA `Alters` OutputTx) m
-             , (SHA `Alters` ChainHashEntry) m
-             , (Word256 `Alters` ChainIdEntry) m
+             , HasFullPrivacy m
              )
           => Word256 -> m [OutputBlock]
 runBlocks chainId = go
@@ -266,11 +275,7 @@ accumT s (a:as) run = do
 
 hydratePrivateHashes :: ( MonadLogger m
                         , MonadMonitor m
-                        , HasPrivateHashDB m
-                        , (SHA `Alters` OutputBlock) m
-                        , (SHA `Alters` OutputTx) m
-                        , (SHA `Alters` ChainHashEntry) m
-                        , (Word256 `Alters` ChainIdEntry) m
+                        , HasFullPrivacy m
                         )
                      => Maybe Word256
                      -> OutputBlock
@@ -322,7 +327,7 @@ hydratePrivateHashes chainF b = do
                     logF $ "bHash of this tx: " ++ show bHash
                     adjustStatefully_ (Proxy @ChainIdEntry) chainId $
                       when (isNothing chainF) $
-                        --logF $ "blocksToRun inserting " ++ format bHash 
+                        --logF $ "blocksToRun inserting " ++ format bHash
                         blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                     return (Nothing, (dts,S.insert chainId cs))
                   else do
@@ -331,7 +336,7 @@ hydratePrivateHashes chainF b = do
                         notHydrating "we don't have this transaction's body"
                         adjustStatefully_ (Proxy @ChainIdEntry) chainId $ do
                           when (isNothing chainF) $
-                            -- logF $ "blocksToRun inserting " ++ format bHash 
+                            -- logF $ "blocksToRun inserting " ++ format bHash
                             blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                         return (Nothing, (tHash:dts, S.insert chainId cs))
                       Just ptx -> do
@@ -378,11 +383,7 @@ hydratePrivateHashes chainF b = do
 
 insertNewChainInfo :: ( MonadLogger m
                       , MonadMonitor m
-                      , HasPrivateHashDB m
-                      , (SHA `Alters` OutputBlock) m
-                      , (SHA `Alters` OutputTx) m
-                      , (SHA `Alters` ChainHashEntry) m
-                      , (Word256 `Alters` ChainIdEntry) m
+                      , HasFullPrivacy m
                       )
                    => Word256
                    -> ChainInfo

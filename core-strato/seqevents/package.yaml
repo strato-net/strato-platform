@@ -20,6 +20,7 @@ library:
     - derive
     - ethereum-rlp
     - format
+    - lens
     - monad-alter
     - prometheus-client
     - strato-conf

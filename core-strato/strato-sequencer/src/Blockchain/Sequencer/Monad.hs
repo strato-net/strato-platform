@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds               #-}
 {-# LANGUAGE DefaultSignatures             #-}
 {-# LANGUAGE FlexibleContexts              #-}
 {-# LANGUAGE FlexibleInstances             #-}
@@ -11,8 +12,9 @@
 {-# LANGUAGE OverloadedStrings             #-}
 {-# OPTIONS_GHC -fno-warn-orphans          #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
-module Blockchain.Sequencer.Monad (
-    SequencerContext(..)
+module Blockchain.Sequencer.Monad
+  ( MonadBlockstanbul
+  , SequencerContext(..)
   , SequencerConfig(..)
   , SequencerM
   , HasNamespace(..)
@@ -110,6 +112,15 @@ data SequencerContext = SequencerContext
   , _latestRoundNumber   :: IORef RoundNumber
   }
 makeLenses ''SequencerContext
+
+type MonadBlockstanbul m = ( MonadIO m
+                           , HasBlockstanbulContext m
+                           , Mod.Accessible (IORef RoundNumber) m
+                           , Mod.Accessible (TMChan RoundNumber) m
+                           , Mod.Accessible BlockPeriod m
+                           , Mod.Accessible RoundPeriod m
+                           , Mod.Accessible (TQueue VoteResult) m
+                           )
 
 newtype BlockPeriod = BlockPeriod { unBlockPeriod :: NominalDiffTime }
 newtype RoundPeriod = RoundPeriod { unRoundPeriod :: NominalDiffTime }
@@ -377,10 +388,7 @@ pairToVmTx = uncurry VmTx
 clearDBERegistry :: SequencerM ()
 clearDBERegistry = dbeRegistry .= M.empty
 
-createFirstTimer :: ( MonadIO m
-                    , Mod.Accessible (IORef RoundNumber) m
-                    , Mod.Accessible (TMChan RoundNumber) m
-                    , Mod.Accessible RoundPeriod m
+createFirstTimer :: ( MonadBlockstanbul m
                     , Mod.Accessible View m
                     )
                  => m ()
@@ -388,11 +396,7 @@ createFirstTimer = do
   v <- Mod.access (Mod.Proxy @View)
   createNewTimer . _round $ v
 
-createNewTimer :: ( MonadIO m
-                  , Mod.Accessible (IORef RoundNumber) m
-                  , Mod.Accessible (TMChan RoundNumber) m
-                  , Mod.Accessible RoundPeriod m
-                  )
+createNewTimer :: MonadBlockstanbul m
                => RoundNumber
                -> m ()
 createNewTimer rn = do

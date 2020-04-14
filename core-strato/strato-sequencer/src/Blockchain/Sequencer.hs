@@ -15,7 +15,6 @@ module Blockchain.Sequencer where
 import           ClassyPrelude                             (atomically)
 import           Conduit
 import           Control.Concurrent                        hiding (yield)
-import           Control.Concurrent.STM.TMChan
 import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
 import           Blockchain.Output
@@ -28,10 +27,8 @@ import           Control.Monad.IO.Class                    (liftIO)
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable
-import           Data.IORef
 import           Data.Maybe
 import           Data.Proxy
-import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import           Prometheus                                as P
@@ -133,15 +130,18 @@ oneSequencerIter :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (
 oneSequencerIter src = timeAction seqLoopTiming $ do
   (src', events) <- readEventsInBufferedWindow src
   BatchSeqEvent{..} <- runSequencerBatch events
+  chainIds <- unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
+  txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
+  let toP2p' = (P2pGetChain $ toList chainIds):(P2pGetTx $ toList txHashes):_toP2p
   flushLdbBatchOps
   prunePrivacyDBs
 
   unless (null _toVm) $ do
     writeSeqVmEvents _toVm
     $logDebugS "sequencer" . T.pack $ "Wrote " ++ format _toVm ++ " SeqEvents to VM"
-  unless (null _toP2p) $ do
-    writeSeqP2pEvents _toP2p
-    $logDebugS "sequencer" . T.pack $ "Wrote " ++ format _toP2p ++ " SeqEvents to P2P"
+  unless (null toP2p') $ do
+    writeSeqP2pEvents toP2p'
+    $logDebugS "sequencer" . T.pack $ "Wrote " ++ format toP2p' ++ " SeqEvents to P2P"
   unless (null _toUnseq) $ writeUnseqCheckpoints _toUnseq
   flush
   return src'
@@ -175,46 +175,25 @@ readEventsInBufferedWindow src = do
   logF . printf "read %d events from fused channels" $ length events
   return (src'', events)
 
-runSequencerBatch :: ( MonadIO m
-                     , MonadLogger m
+runSequencerBatch :: ( MonadLogger m
                      , MonadMonitor m
-                     , HasBlockstanbulContext m
-                     , HasPrivateHashDB m
-                     , Mod.Modifiable GetChainsDB m
-                     , Mod.Modifiable GetTransactionsDB m
-                     , Mod.Accessible (IORef RoundNumber) m
-                     , Mod.Accessible (TMChan RoundNumber) m
-                     , Mod.Accessible BlockPeriod m
-                     , Mod.Accessible RoundPeriod m
-                     , Mod.Accessible (TQueue VoteResult) m
-                     , (SHA `A.Alters` OutputTx) m
-                     , (SHA `A.Alters` OutputBlock) m
-                     , (SHA `A.Alters` ChainHashEntry) m
-                     , (Word256 `A.Alters` ChainIdEntry) m
+                     , MonadBlockstanbul m
+                     , HasFullPrivacy m
                      , (SHA `A.Alters` DependentBlockEntry) m
                      , (SHA `A.Alters` ()) m
                      )
                   => [SeqLoopEvent]
                   -> m BatchSeqEvent
-runSequencerBatch events = runBatch $ do -- TODO: perform this destructuring in one traversal
-  checkForVotes [cr | VoteMade cr <- events]
-  checkForTimeouts [rn | TimerFire rn <- events]
-  checkForUnseq [iev | UnseqEvent iev <- events]
+runSequencerBatch events = runBatch $ do
+  let BatchSeqLoopEvent{..} = batchSeqLoopEvents events
+  checkForVotes _votesMade
+  checkForTimeouts _timerFires
+  checkForUnseq _ingestEvents
 
-checkForVotes :: ( MonadIO m
-                 , MonadLogger m
+checkForVotes :: ( MonadLogger m
                  , MonadMonitor m
-                 , HasBlockstanbulContext m
-                 , HasPrivateHashDB m
-                 , Mod.Accessible (IORef RoundNumber) m
-                 , Mod.Accessible (TMChan RoundNumber) m
-                 , Mod.Accessible BlockPeriod m
-                 , Mod.Accessible RoundPeriod m
-                 , Mod.Accessible (TQueue VoteResult) m
-                 , (SHA `A.Alters` OutputTx) m
-                 , (SHA `A.Alters` OutputBlock) m
-                 , (SHA `A.Alters` ChainHashEntry) m
-                 , (Word256 `A.Alters` ChainIdEntry) m
+                 , MonadBlockstanbul m
+                 , HasFullPrivacy m
                  , (SHA `A.Alters` DependentBlockEntry) m
                  )
               => [CandidateReceived]
@@ -233,20 +212,10 @@ checkForVotes crs = do
               bauth = MsgAuth { sender = API.sender br, signature = extsign}
           in NewBeneficiary bauth (API.recipient br, API.votingdir br, API.nonce br)
 
-checkForTimeouts :: ( MonadIO m
-                    , MonadLogger m
+checkForTimeouts :: ( MonadLogger m
                     , MonadMonitor m
-                    , HasBlockstanbulContext m
-                    , HasPrivateHashDB m
-                    , Mod.Accessible (IORef RoundNumber) m
-                    , Mod.Accessible (TMChan RoundNumber) m
-                    , Mod.Accessible BlockPeriod m
-                    , Mod.Accessible RoundPeriod m
-                    , Mod.Accessible (TQueue VoteResult) m
-                    , (SHA `A.Alters` OutputTx) m
-                    , (SHA `A.Alters` OutputBlock) m
-                    , (SHA `A.Alters` ChainHashEntry) m
-                    , (Word256 `A.Alters` ChainIdEntry) m
+                    , MonadBlockstanbul m
+                    , HasFullPrivacy m
                     , (SHA `A.Alters` DependentBlockEntry) m
                     )
                  => [RoundNumber]
@@ -255,22 +224,10 @@ checkForTimeouts rns = do
   withLabel seqLoopEvents "timeout" (flip unsafeAddCounter . fromIntegral . length $ rns)
   blockstanbulSend . map Timeout $ rns
 
-checkForUnseq :: ( MonadIO m
-                 , MonadLogger m
+checkForUnseq :: ( MonadLogger m
                  , MonadMonitor m
-                 , HasBlockstanbulContext m
-                 , HasPrivateHashDB m
-                 , Mod.Accessible (IORef RoundNumber) m
-                 , Mod.Accessible (TMChan RoundNumber) m
-                 , Mod.Accessible BlockPeriod m
-                 , Mod.Accessible RoundPeriod m
-                 , Mod.Accessible (TQueue VoteResult) m
-                 , Mod.Modifiable GetChainsDB m
-                 , Mod.Modifiable GetTransactionsDB m
-                 , (SHA `A.Alters` OutputTx) m
-                 , (SHA `A.Alters` OutputBlock) m
-                 , (SHA `A.Alters` ChainHashEntry) m
-                 , (Word256 `A.Alters` ChainIdEntry) m
+                 , MonadBlockstanbul m
+                 , HasFullPrivacy m
                  , (SHA `A.Alters` DependentBlockEntry) m
                  , (SHA `A.Alters` ()) m
                  )
@@ -279,32 +236,16 @@ checkForUnseq :: ( MonadIO m
 checkForUnseq inEvents = do
   withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ inEvents)
   timeAction seqSplitEventsTiming $ splitEvents inEvents
-  chainIds <- unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
-  unless (S.null chainIds) $
-    yield . ToP2p . P2pGetChain $ toList chainIds
-  txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
-  unless (S.null txHashes) $
-    yield . ToP2p . P2pGetTx $ toList txHashes
 
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
   writeSeqVmEvents [VmCreateBlockCommand]
   createFirstTimer
 
-blockstanbulSend :: ( MonadIO m
-                    , MonadLogger m
+blockstanbulSend :: ( MonadLogger m
                     , MonadMonitor m
-                    , HasBlockstanbulContext m
-                    , HasPrivateHashDB m
-                    , Mod.Accessible (IORef RoundNumber) m
-                    , Mod.Accessible (TMChan RoundNumber) m
-                    , Mod.Accessible BlockPeriod m
-                    , Mod.Accessible RoundPeriod m
-                    , Mod.Accessible (TQueue VoteResult) m
-                    , (SHA `A.Alters` OutputTx) m
-                    , (SHA `A.Alters` OutputBlock) m
-                    , (SHA `A.Alters` ChainHashEntry) m
-                    , (Word256 `A.Alters` ChainIdEntry) m
+                    , MonadBlockstanbul m
+                    , HasFullPrivacy m
                     , (SHA `A.Alters` DependentBlockEntry) m
                     )
                  => [InEvent]
@@ -315,14 +256,8 @@ blockstanbulSend = mapM_ $ \ie -> do
                    .| sinkList
   yieldMany ses
 
-blockstanbulSend' :: ( MonadIO m
-                     , MonadLogger m
-                     , HasBlockstanbulContext m
-                     , Mod.Accessible (IORef RoundNumber) m
-                     , Mod.Accessible (TMChan RoundNumber) m
-                     , Mod.Accessible BlockPeriod m
-                     , Mod.Accessible RoundPeriod m
-                     , Mod.Accessible (TQueue VoteResult) m
+blockstanbulSend' :: ( MonadLogger m
+                     , MonadBlockstanbul m
                      , (SHA `A.Alters` ChainHashEntry) m
                      , (SHA `A.Alters` DependentBlockEntry) m
                      )
@@ -396,13 +331,8 @@ transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHas
 
 transformFullTransactions :: ( MonadLogger m
                              , MonadMonitor m
-                             , HasPrivateHashDB m
-                             , Mod.Modifiable GetChainsDB m
-                             , (SHA `A.Alters` OutputTx) m
-                             , (SHA `A.Alters` OutputBlock) m
-                             , (SHA `A.Alters` ChainHashEntry) m
+                             , HasFullPrivacy m
                              , (SHA `A.Alters` ()) m
-                             , (Word256 `A.Alters` ChainIdEntry) m
                              )
                           => [(Timestamp, IngestTx)]
                           -> ConduitT a SeqEvent m ()
@@ -449,7 +379,7 @@ transformFullTransactions pairs = do
               , CL.yellow $ format chainId
               , ". Inserting the chain Id into the GetChains list"
               ]
-            insertGetChainsDB chainId
+            requestChain chainId
           Just cInfo -> do
             forM_ ptxs $ \(ts, ptx) -> do
               logF . concat $
@@ -491,13 +421,8 @@ transformFullTransactions pairs = do
 
 transformTransactions :: ( MonadLogger m
                          , MonadMonitor m
-                         , HasPrivateHashDB m
-                         , Mod.Modifiable GetChainsDB m
-                         , (SHA `A.Alters` OutputTx) m
-                         , (SHA `A.Alters` OutputBlock) m
-                         , (SHA `A.Alters` ChainHashEntry) m
+                         , HasFullPrivacy m
                          , (SHA `A.Alters` ()) m
-                         , (Word256 `A.Alters` ChainIdEntry) m
                          )
                       => [(Timestamp, IngestTx)]
                       -> ConduitT a SeqEvent m ()
@@ -506,20 +431,10 @@ transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransac
     then transformPrivateHashTXs pairs
     else transformFullTransactions pairs
 
-runBlockWithConsensus :: ( MonadIO m
-                         , MonadLogger m
+runBlockWithConsensus :: ( MonadLogger m
                          , MonadMonitor m
-                         , HasBlockstanbulContext m
-                         , HasPrivateHashDB m
-                         , Mod.Accessible (IORef RoundNumber) m
-                         , Mod.Accessible (TMChan RoundNumber) m
-                         , Mod.Accessible BlockPeriod m
-                         , Mod.Accessible RoundPeriod m
-                         , Mod.Accessible (TQueue VoteResult) m
-                         , (SHA `A.Alters` OutputTx) m
-                         , (SHA `A.Alters` OutputBlock) m
-                         , (SHA `A.Alters` ChainHashEntry) m
-                         , (Word256 `A.Alters` ChainIdEntry) m
+                         , MonadBlockstanbul m
+                         , HasFullPrivacy m
                          , (SHA `A.Alters` DependentBlockEntry) m
                          )
                       => SequencedBlock
@@ -558,15 +473,9 @@ expandBlock sb = do
           $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
           return []
 
-runConsensus :: ( MonadIO m
-                , MonadLogger m
+runConsensus :: ( MonadLogger m
                 , MonadMonitor m
-                , HasBlockstanbulContext m
-                , Mod.Accessible (IORef RoundNumber) m
-                , Mod.Accessible (TMChan RoundNumber) m
-                , Mod.Accessible BlockPeriod m
-                , Mod.Accessible RoundPeriod m
-                , Mod.Accessible (TQueue VoteResult) m
+                , MonadBlockstanbul m
                 , (SHA `A.Alters` ChainHashEntry) m
                 , (SHA `A.Alters` DependentBlockEntry) m
                 )
@@ -589,11 +498,7 @@ runConsensus = awaitForever $ \sb -> do
 
 hydrateAndEmit :: ( MonadLogger m
                   , MonadMonitor m
-                  , HasPrivateHashDB m
-                  , (SHA `A.Alters` OutputTx) m
-                  , (SHA `A.Alters` OutputBlock) m
-                  , (SHA `A.Alters` ChainHashEntry) m
-                  , (Word256 `A.Alters` ChainIdEntry) m
+                  , HasFullPrivacy m
                   )
                => Maybe Word256
                -> ConduitT SeqEvent SeqEvent m ()
@@ -604,20 +509,10 @@ hydrateAndEmit chainId = awaitForever $ \case
     for_ ob' $ yield . ToVm . VmBlock
   oe -> yield oe
 
-transformBlocks :: ( MonadIO m
-                   , MonadLogger m
+transformBlocks :: ( MonadLogger m
                    , MonadMonitor m
-                   , HasBlockstanbulContext m
-                   , HasPrivateHashDB m
-                   , Mod.Accessible (IORef RoundNumber) m
-                   , Mod.Accessible (TMChan RoundNumber) m
-                   , Mod.Accessible BlockPeriod m
-                   , Mod.Accessible RoundPeriod m
-                   , Mod.Accessible (TQueue VoteResult) m
-                   , (SHA `A.Alters` OutputTx) m
-                   , (SHA `A.Alters` OutputBlock) m
-                   , (SHA `A.Alters` ChainHashEntry) m
-                   , (Word256 `A.Alters` ChainIdEntry) m
+                   , MonadBlockstanbul m
+                   , HasFullPrivacy m
                    , (SHA `A.Alters` DependentBlockEntry) m
                    )
                 => [IngestBlock]
@@ -632,11 +527,7 @@ transformBlocks = mapM_ $ \ib -> ingestBlockToSequencedBlock lookupChainIdFromCh
 
 transformGenesis :: ( MonadLogger m
                     , MonadMonitor m
-                    , HasPrivateHashDB m
-                    , (SHA `A.Alters` OutputTx) m
-                    , (SHA `A.Alters` OutputBlock) m
-                    , (SHA `A.Alters` ChainHashEntry) m
-                    , (Word256 `A.Alters` ChainIdEntry) m
+                    , HasFullPrivacy m
                     )
                  => [IngestGenesis]
                  -> ConduitT a SeqEvent m ()
@@ -653,22 +544,11 @@ transformGenesis chains = forM_ chains $ \ig -> do
       yield . ToP2p $ P2pGenesis og
       yieldMany . map (ToVm . VmBlock) =<< insertNewChainInfo chainId cInfo
 
-splitEvents :: ( MonadIO m
-               , MonadLogger m
+splitEvents :: ( MonadLogger m
                , MonadMonitor m
-               , HasBlockstanbulContext m
-               , HasPrivateHashDB m
-               , Mod.Accessible (IORef RoundNumber) m
-               , Mod.Accessible (TMChan RoundNumber) m
-               , Mod.Accessible BlockPeriod m
-               , Mod.Accessible RoundPeriod m
-               , Mod.Accessible (TQueue VoteResult) m
-               , Mod.Modifiable GetChainsDB m
+               , MonadBlockstanbul m
+               , HasFullPrivacy m
                , (SHA `A.Alters` DependentBlockEntry) m
-               , (SHA `A.Alters` OutputTx) m
-               , (SHA `A.Alters` OutputBlock) m
-               , (SHA `A.Alters` ChainHashEntry) m
-               , (Word256 `A.Alters` ChainIdEntry) m
                , (SHA `A.Alters` ()) m
                )
             => [IngestEvent]
