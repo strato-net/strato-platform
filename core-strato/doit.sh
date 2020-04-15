@@ -149,6 +149,9 @@ function newnode {
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
     runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
 
+  echo "Starting core-api"
+    runBackgroundProcess core-api >> logs/core-api 2>&1
+
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
 
