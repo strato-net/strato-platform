@@ -33,24 +33,27 @@ import qualified Handlers.Version                as Version
 
 
 type CoreAPI =
-  Account.API
-  :<|> BatchTransactionResult.API
-  :<|> BlkLast.API
-  :<|> Block.API
-  :<|> Chain.API
-  :<|> Coinbase.API
-  :<|> Faucet.API
-  :<|> Log.API
-  :<|> Peers.API
-  :<|> QueuedTransactions.API
-  :<|> Stats.API
-  :<|> Storage.API
-  :<|> Transaction.API
-  :<|> TransactionResult.API
-  :<|> TxLast.API
-  :<|> UUID.API
-  :<|> Version.API
-
+  "eth" :> "v1.2" :>
+  (
+    Account.API
+    :<|> BatchTransactionResult.API
+    :<|> BlkLast.API
+    :<|> Block.API
+    :<|> Chain.API
+    :<|> Coinbase.API
+    :<|> Faucet.API
+    :<|> Log.API
+    :<|> Peers.API
+    :<|> QueuedTransactions.API
+    :<|> Stats.API
+    :<|> Storage.API
+    :<|> Transaction.API
+    :<|> TransactionResult.API
+    :<|> TxLast.API
+    :<|> UUID.API
+    :<|> Version.API
+  )
+  
 coreServer :: Server CoreAPI
 coreServer =
   Account.server connStr
@@ -85,7 +88,7 @@ coreAPI = Proxy
 
 main :: IO ()
 main = do
-  run 8080 app
+  run 3000 app
 
 app :: Application
 app = serve coreAPI coreServer
