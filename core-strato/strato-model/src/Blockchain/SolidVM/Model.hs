@@ -15,6 +15,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding
 import GHC.Generics
 import Test.QuickCheck
+import Web.HttpApiData
 
 import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
@@ -24,6 +25,9 @@ newtype HexStorage = HexStorage B.ByteString
 
 word256ToHexStorage :: Word256 -> HexStorage
 word256ToHexStorage = HexStorage . word256ToBytes
+
+instance FromHttpApiData HexStorage where
+  parseQueryParam = Right . word256ToHexStorage . read . T.unpack
 
 instance ToSchema HexStorage where
   declareNamedSchema _ = return $ named "solidvm hex storage"  binarySchema

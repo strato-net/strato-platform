@@ -37,6 +37,7 @@ dependencies:
   - fast-ecrecover
   - filepath
   - format
+  - http-api-data
   - json-stream
   - lens
   - leveldb-haskell
