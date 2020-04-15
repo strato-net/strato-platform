@@ -81,7 +81,7 @@ runPeer peer myPriv _ _ = runResourceT $ do
                .| transPipe lift eventSink
                .| appSink app
 
-        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Unactive
+        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Inactive
         case attempt of
           Right () -> $logDebugS "runPeer" "Peer ran successfully!"
           Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err

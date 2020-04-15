@@ -8,7 +8,7 @@ module Blockchain.Strato.Discovery.Metrics
 import Control.Monad.IO.Class
 import Prometheus
 
-data ActivityState = Unactive | Active deriving (Eq, Show, Enum, Ord)
+data ActivityState = Inactive | Active deriving (Eq, Show, Enum, Ord)
 
 numPeers :: Gauge
 numPeers = unsafeRegister
@@ -17,7 +17,7 @@ numPeers = unsafeRegister
 
 recordStateChange :: MonadMonitor m => ActivityState -> m ()
 recordStateChange = \case
-  Unactive -> subGauge numPeers 1
+  Inactive -> subGauge numPeers 1
   Active -> addGauge numPeers 1
 
 getNumPeersMem :: MonadIO m => m Int

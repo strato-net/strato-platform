@@ -46,12 +46,10 @@ runEthServer myPriv listenPort = do
       unPPeerByIp (getPeerByIP theSockAddr) >>= \case
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ show theSockAddr ++ ". rejecting violently."
-          liftIO (appCloseConnection app)
         Just p -> do
           case pPeerPubkey p of
             Nothing -> do
               $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ show theSockAddr  ++ ". rejecting violently."
-              liftIO (appCloseConnection app)
             Just otherPubKey -> do
               void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) Active
               (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` appSink app
@@ -63,7 +61,7 @@ runEthServer myPriv listenPort = do
                   .| transPipe lift eventSink
                   .| appSink app
 
-              void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) Unactive
+              void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) Inactive
               case attempt of
                 Right () -> $logDebugS "runEthServer" "Peer ran successfully!"
                 Left err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
