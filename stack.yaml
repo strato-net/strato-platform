@@ -13,6 +13,7 @@ packages:
 - blockapps-haskell/vault-wrapper/api
 - blockapps-haskell/vault-wrapper/client
 - blockapps-haskell/vault-wrapper/server
+- core-strato/core-api
 - core-strato/blockapps-milena
 - core-strato/strato-conf/
 - core-strato/miner-ethash/
