@@ -79,8 +79,9 @@ runPeer peer myPriv _ _ = do
           pSink = appSink app
           sSource = seqEventNotificationSource $ contextKafkaState initContext
           pStr = show $ appSockAddr app
+      uSink <- asks configUnseqSink
       attempt :: Either SomeException () <- withActivePeer peer $
-        runEthClientConduit peer pSource pSink sSource pStr
+        runEthClientConduit peer pSource pSink sSource uSink pStr
       case attempt of
         Right () -> $logDebugS "runPeer" "Peer ran successfully!"
         Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -94,16 +95,17 @@ runEthClientConduit :: ( MonadP2P m
                     -> ConduitM () B.ByteString m ()
                     -> ConduitM B.ByteString Void m ()
                     -> ConduitM () P2pEvent m ()
+                    -> ([IngestEvent] -> m ())
                     -> String
                     -> m (Either SomeException ())
-runEthClientConduit peer peerSource peerSink seqSource peerStr = do
+runEthClientConduit peer peerSource peerSink seqSource unseqSink peerStr = do
   myPriv <- Mod.access (Mod.Proxy @PrivateNumber)
   let myPublic    = calculatePublic theCurve myPriv
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
   (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` peerSink
 
   !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
-  !eventSink <- mkEthP2PEventConduit peerStr outCtx
+  !eventSink <- mkEthP2PEventConduit peerStr outCtx unseqSink
   initState <- newIORef initContext
   try . local (\c -> c{configContext = initState})
       . runConduit $ eventSource

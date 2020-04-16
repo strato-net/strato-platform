@@ -68,10 +68,10 @@ import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Stream.VMEvent
+import           Blockchain.Util
 import           Blockchain.Verification
 
 import           Blockchain.Sequencer.Event
-import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Model.Class
 
@@ -131,7 +131,9 @@ handleEvents peer = awaitForever $ \case
     MsgEvt (Transactions txs) -> do
         lift stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
-        lift $ SK.emitKafkaTransactions txo txs
+        ts <- liftIO getCurrentMicrotime
+        let ingestTxs = IETx ts . IngestTx txo <$> txs
+        yieldL $ ToUnseq ingestTxs
 
     MsgEvt (NewBlock block' tdiff) -> do
         lift stampActionTimestamp
@@ -153,7 +155,8 @@ handleEvents peer = awaitForever $ \case
             syncFetch Forward fetchNumber
           Just _ -> do
             lift . void $ setTitleAndProduceBlocks [block']
-            void . lift $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
+            let ingestBlock = IEBlock $ blockToIngestBlock (Origin.PeerString $ peerString peer) block'
+            yieldL $ ToUnseq [ingestBlock]
 
     MsgEvt (NewBlockHashes _) -> do
         lift stampActionTimestamp
@@ -301,7 +304,7 @@ handleEvents peer = awaitForever $ \case
         recordMaxBlockNumber "p2p_block_bodies" . maximum $ map blockDataNumber headers
         let blocks' = zipWith createBlockFromHeaderAndBody (morphBlockHeader <$> headers) bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
-        lift . forM_ blocks' $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
+        yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
         rHeaders <- lift getRemainingBHeaders
         let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
         lift $ putBlockHeaders neededHeaders
@@ -314,19 +317,20 @@ handleEvents peer = awaitForever $ \case
             else do
                 yieldR $ GetBlockBodies (map blockHeaderHash neededHeaders)
                 lift stampActionTimestamp
-    MsgEvt (Blockstanbul wm) -> lift $ do
-      stampActionTimestamp
-      setPeerAddrIfUnset $ blockstanbulSender wm
-      peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
-      $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-      SK.emitBlockstanbulMsg wm
+    MsgEvt (Blockstanbul wm) -> do
+      lift $ do
+        stampActionTimestamp
+        setPeerAddrIfUnset $ blockstanbulSender wm
+        peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
+        $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
+      yieldL $ ToUnseq [IEBlockstanbul wm]
 
     -- private chains
     MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'
 
     MsgEvt (ChainDetails chpairs) -> do
       lift stampActionTimestamp
-      lift $ mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
+      yieldL . ToUnseq $ IEGenesis . IngestGenesis (Origin.PeerString $ peerString peer) <$> chpairs
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
     MsgEvt (GetTransactions trHashes) -> do
