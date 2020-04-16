@@ -8,6 +8,7 @@ module Main where
 import           Data.Proxy
 import qualified Data.Text                   as T
 import           Network.Wai.Handler.Warp
+import           Network.Wai.Middleware.RequestLogger
 import           Servant
 
 import           Blockchain.EthConf
@@ -22,7 +23,7 @@ import qualified Handlers.Coinbase               as Coinbase
 import qualified Handlers.Faucet                 as Faucet
 import qualified Handlers.Log                    as Log
 import qualified Handlers.Peers                  as Peers
-import qualified  Handlers.QueuedTransactions    as QueuedTransactions
+import qualified Handlers.QueuedTransactions     as QueuedTransactions
 import qualified Handlers.Stats                  as Stats
 import qualified Handlers.Storage                as Storage
 import qualified Handlers.Transaction            as Transaction
@@ -91,5 +92,5 @@ main = do
   run 3000 app
 
 app :: Application
-app = serve coreAPI coreServer
+app = logStdoutDev $ serve coreAPI coreServer
 
