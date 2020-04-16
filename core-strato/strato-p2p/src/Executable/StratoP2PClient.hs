@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -6,6 +7,8 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
 
 module Executable.StratoP2PClient (stratoP2PClient) where
 
@@ -14,21 +17,21 @@ import           Control.Concurrent                    hiding (yield)
 import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
+import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.State
+import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import           Crypto.PubKey.ECC.DH
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit
-import           Data.Conduit.Lift
 import           Data.Conduit.Network
 import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import qualified Network.Haskoin.Internals             as H
-import           UnliftIO.Exception
+import           UnliftIO
 
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context
@@ -53,11 +56,11 @@ runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
         -> BC.ByteString -- otherServiceCommHost
         -> CommPort      -- otherServiceCommPort
         -> m ()
-runPeer peer myPriv _ _ = runResourceT $ do
-  ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
-  void $ register ender
-  (cfg, initState) <- initContext flags_maxReturnedHeaders
+runPeer peer myPriv _ _ = do
+  cfg <- initConfig myPriv flags_maxReturnedHeaders
   runContextM cfg $ do
+    ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
+    void $ register ender
     let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
         myPublic    = calculatePublic theCurve myPriv
 
@@ -69,22 +72,33 @@ runPeer peer myPriv _ _ = runResourceT $ do
     let peerPort    = pPeerTcpPort peer
         peerAddress = BC.pack . T.unpack $ pPeerIp peer
     runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
-        void . liftIO $ setPeerActiveState (pPeerIp peer) peerPort Active
+      attempt :: Either SomeException () <- withActivePeer peer $ runEthClientConduit peer app
+      case attempt of
+        Right () -> $logDebugS "runPeer" "Peer ran successfully!"
+        Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
 
-        (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
+runEthClientConduit :: ( MonadP2P m
+                       , MonadUnliftIO m
+                       , MonadReader Config m
+                       , Mod.Accessible PrivateNumber m
+                       )
+                    => PPeer
+                    -> AppData
+                    -> m (Either SomeException ())
+runEthClientConduit peer app = do
+  myPriv <- Mod.access (Mod.Proxy @PrivateNumber)
+  let myPublic    = calculatePublic theCurve myPriv
+      otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
+  (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
-        !eventSource <- mkEthP2PEventSource app inCtx (contextKafkaState initState)
-        !eventSink <- mkEthP2PEventConduit (show $ appSockAddr app) outCtx
-        attempt :: Either SomeException () <- try . runConduit . evalStateLC initState $
-                  transPipe lift eventSource
-               .| handleMsgClientConduit myPublic peer
-               .| transPipe lift eventSink
-               .| appSink app
-
-        void . liftIO $ setPeerActiveState (pPeerIp peer) (pPeerTcpPort peer) Inactive
-        case attempt of
-          Right () -> $logDebugS "runPeer" "Peer ran successfully!"
-          Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+  !eventSource <- mkEthP2PEventSource app inCtx (contextKafkaState initContext)
+  !eventSink <- mkEthP2PEventConduit (show $ appSockAddr app) outCtx
+  initState <- newIORef initContext
+  try . local (\c -> c{configContext = initState})
+      . runConduit $ eventSource
+                  .| handleMsgClientConduit myPublic peer
+                  .| eventSink
+                  .| appSink app
 
 getPubKeyRunPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
                  => PPeer

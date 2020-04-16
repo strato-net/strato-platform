@@ -12,8 +12,6 @@
 
 module Blockchain.Event (
   module Blockchain.EventModel,
-  All,
-  All2,
   handleEvents,
   handleGetChainDetails,
   getBestKafkaBlockNumber,
@@ -44,7 +42,6 @@ import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.These
 import           Data.Time.Clock
-import           GHC.Exts                              (Constraint)
 import           MonadUtils
 import           Prelude                               hiding (lookup)
 import           System.Random
@@ -87,24 +84,6 @@ import           Text.Tools
 
 import           Debug.Trace                           (trace)
 
--- TODO: These type families should be exposed by monad-alter, not defined here
---       but merging in the latest monad-alter will take some additional work
-type family All' (k :: * -> (* -> *) -> Constraint) (ts :: [*]) (m :: * -> *) :: Constraint where
-  All' k (t : '[]) m = k t m
-  All' k (t ': ts) m = (k t m, All' k ts m)
-
-type family All (ks :: [* -> (* -> *) -> Constraint]) (ts :: [*]) (m :: * -> *) :: Constraint where
-  All (k ': '[]) ts m = All' k ts m
-  All (k ': ks) ts m = (All' k ts m, All ks ts m)
-
-type family All2' (k :: * -> * -> (* -> *) -> Constraint) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
-  All2' k ('(t1, t2) : '[]) m = k t1 t2 m
-  All2' k ('(t1, t2) ': ts) m = (k t1 t2 m, All2' k ts m)
-
-type family All2 (ks :: [* -> * -> (* -> *) -> Constraint]) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
-  All2 (k ': '[]) ts m = All2' k ts m
-  All2 (k ': ks) ts m = (All2' k ts m, All2 ks ts m)
-
 setTitleAndProduceBlocks :: ( MonadLogger m
                             , MonadIO m
                             , HasVMEventsSink m
@@ -143,39 +122,7 @@ yieldR = yield . Right
 yieldL :: Monad m => e -> ConduitT i (Either e a) m ()
 yieldL = yield . Left
 
-handleEvents :: ( HasVMEventsSink m
-                , MonadIO m
-                , MonadResource m
-                , MonadLogger m
-                , All '[Accessible, Modifiable]
-                    '[ ActionTimestamp
-                     , [BlockData]
-                     , RemainingBlockHeaders
-                     , PeerAddress
-                     ] m
-                , All '[Accessible]
-                    '[ (SK.UnseqSink m)
-                     , MaxReturnedHeaders
-                     , ConnectionTimeout
-                     ] m
-                , All '[Modifiable]
-                    '[ BestBlock
-                     , WorldBestBlock
-                     ] m
-                , All2 '[Selectable]
-                    '[ '(Integer, Canonical BlockData)
-                     , '(IPAddress, IPChains)
-                     , '(OrgId, OrgIdChains)
-                     , '(SHA, ChainTxsInBlock)
-                     , '(Word256, ChainMembers)
-                     , '(Word256, ChainInfo)
-                     , '(SHA, Private (Word256, OutputTx))
-                     ] m
-                , All2 '[Alters]
-                    '[ '(SHA, BlockData)
-                     , '(SHA, OutputBlock)
-                     ] m
-                ) => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
+handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"

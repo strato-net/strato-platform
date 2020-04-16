@@ -1,11 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
 import Conduit
 import Control.Monad
+import qualified Control.Monad.Change.Modify           as Mod
 import qualified Data.Text as T
+import qualified Network.Kafka                         as K
 import Prometheus
 
 import BlockApps.Logging
@@ -28,14 +31,14 @@ recordEvent lab = liftIO $ withLabel loopbackEvents lab incCounter
 stratoP2PLoopback :: LoggingT IO ()
 stratoP2PLoopback = do
   $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
-  (cfg, initState) <- initContext flags_maxReturnedHeaders
+  cfg <- initConfig (error "stratoP2PLoopback trying to use configPrivateKey") flags_maxReturnedHeaders
   void . runContextM cfg $ do
-    let ks = contextKafkaState initState
-        toWireMessage = \case
+    ks <- Mod.get (Mod.Proxy @K.KafkaState)
+    let toWireMessage = \case
           P2pBlockstanbul wm -> Just wm
           _ -> Nothing
 
-    runConduit . evalStateLC initState $
+    runConduit $
          seqEventNotificationSource ks
       .| iterMC (const $ recordEvent "in")
       .| concatMapC toWireMessage

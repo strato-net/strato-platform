@@ -14,7 +14,6 @@ module Blockchain.CommunicationConduit
     , mkEthP2PEventConduit
     ) where
 
-import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
@@ -44,27 +43,21 @@ import           Network.Kafka                         as K
 import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context
 import           Blockchain.Data.Block
-import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Control               (P2PCNC(..))
 import           Blockchain.Data.DataDefs
-import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire                  as W
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
 import           Blockchain.ExtMergeSources
-import           Blockchain.ExtWord
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.Output
 import           Blockchain.Participation
 import           Blockchain.SeqEventNotify
-import           Blockchain.Sequencer.Event
-import qualified Blockchain.Sequencer.Kafka            as SK
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.SHA
 import           Blockchain.Stream.VMEvent
 import           Blockchain.TimerSource
 import           Blockchain.Util
@@ -143,41 +136,7 @@ debounceTxSends = do
       recordEmptyQueue
       yieldMany . map W.Transactions $ chunksOf 100 txs
 
-handleMsgClientConduit :: ( HasVMEventsSink m
-                          , MonadIO m
-                          , MonadResource m
-                          , MonadLogger m
-                          , All '[Mod.Accessible, Mod.Modifiable]
-                              '[ ActionTimestamp
-                               , [BlockData]
-                               , RemainingBlockHeaders
-                               , PeerAddress
-                               ] m
-                          , All '[Mod.Accessible]
-                              '[ (SK.UnseqSink m)
-                               , MaxReturnedHeaders
-                               , ConnectionTimeout
-                               , GenesisBlockHash
-                               , BestBlockNumber
-                               ] m
-                          , All '[Mod.Modifiable]
-                              '[ BestBlock
-                               , WorldBestBlock
-                               ] m
-                          , All2 '[A.Selectable]
-                              '[ '(Integer, Canonical BlockData)
-                               , '(IPAddress, IPChains)
-                               , '(OrgId, OrgIdChains)
-                               , '(SHA, ChainTxsInBlock)
-                               , '(Word256, ChainMembers)
-                               , '(Word256, ChainInfo)
-                               , '(SHA, Private (Word256, OutputTx))
-                               ] m
-                          , All2 '[A.Alters]
-                              '[ '(SHA, BlockData)
-                               , '(SHA, OutputBlock)
-                               ] m
-                          )
+handleMsgClientConduit :: MonadP2P m
                        => Point
                        -> PPeer
                        -> ConduitM Event (Either P2PCNC Message) m ()
@@ -220,44 +179,10 @@ handleMsgClientConduit myId peer = do
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
-handleMsgServerConduit :: ( HasVMEventsSink m
-                          , MonadIO m
-                          , MonadResource m
-                          , MonadLogger m
-                          , All '[Mod.Accessible, Mod.Modifiable]
-                              '[ ActionTimestamp
-                               , [BlockData]
-                               , RemainingBlockHeaders
-                               , PeerAddress
-                               ] m
-                          , All '[Mod.Accessible]
-                              '[ (SK.UnseqSink m)
-                               , MaxReturnedHeaders
-                               , ConnectionTimeout
-                               , GenesisBlockHash
-                               , BestBlockNumber
-                               ] m
-                          , All '[Mod.Modifiable]
-                              '[ BestBlock
-                               , WorldBestBlock
-                               ] m
-                          , All2 '[A.Selectable]
-                              '[ '(Integer, Canonical BlockData)
-                               , '(IPAddress, IPChains)
-                               , '(OrgId, OrgIdChains)
-                               , '(SHA, ChainTxsInBlock)
-                               , '(Word256, ChainMembers)
-                               , '(Word256, ChainInfo)
-                               , '(SHA, Private (Word256, OutputTx))
-                               ] m
-                          , All2 '[A.Alters]
-                              '[ '(SHA, BlockData)
-                               , '(SHA, OutputBlock)
-                               ] m
-                          )
-                 => Point
-                 -> PPeer
-                 -> ConduitM Event (Either P2PCNC Message) m ()
+handleMsgServerConduit :: MonadP2P m
+                       => Point
+                       -> PPeer
+                       -> ConduitM Event (Either P2PCNC Message) m ()
 handleMsgServerConduit myPubkey peer = do
     $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case

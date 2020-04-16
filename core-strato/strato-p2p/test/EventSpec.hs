@@ -19,7 +19,7 @@ import qualified Data.Map.Strict                       as M
 import           Text.Printf
 
 import           Blockchain.Blockstanbul               (blockstanbulSender)
-import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders, maxReturnedHeaders, connectionTimeout, unseqSink, vmEventsSink)
+import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Block                 hiding (bestBlockNumber)
 import           Blockchain.Data.ChainInfo
