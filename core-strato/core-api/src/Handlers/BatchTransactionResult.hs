@@ -29,7 +29,7 @@ import           SQLM
 
 type API = 
   "transactionResult" :> "batch" :> ReqBody '[JSON] [StrungSHA]
-                                 :> Get '[JSON] Value
+                                 :> Post '[JSON] Value
 
 server :: ConnectionString -> Server API
 server connStr = postBatchTransactionResult connStr
