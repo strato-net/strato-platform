@@ -26,7 +26,6 @@ import           Conduit
 import qualified Data.Conduit.Binary                   as CB
 import           Data.Conduit.Combinators              (yieldMany)
 import qualified Data.Conduit.List                     as CL
-import           Data.Conduit.Network
 import           Data.Conduit.TQueue
 import           Data.List.Split
 import           Data.Maybe
@@ -37,8 +36,6 @@ import           Text.Printf
 import           UnliftIO.Concurrent                   hiding (yield)
 import           UnliftIO.Exception
 import           UnliftIO.STM
-
-import           Network.Kafka                         as K
 
 import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context
@@ -56,7 +53,7 @@ import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.Output
 import           Blockchain.Participation
-import           Blockchain.SeqEventNotify
+import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Stream.VMEvent
 import           Blockchain.TimerSource
@@ -74,23 +71,24 @@ mkEthP2PEventSource :: ( MonadResource m
                        , MonadLogger m
                        , MonadUnliftIO m
                        )
-                    => AppData
+                    => ConduitM () B.ByteString m ()
+                    -> ConduitM () P2pEvent m ()
+                    -> String
                     -> EthCryptState
-                    -> K.KafkaState
                     -> m (ConduitM () Event m ())
-mkEthP2PEventSource app inCtx ks = do
+mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
   tid <- myThreadId
   recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
-    [ appSource app
+    [ peerSource
         .| ethDecrypt inCtx
         .| CL.iterM (recordTraffic Inbound)
         .| bytesToMessages
-        .| CL.iterM (displayMessage Inbound (show $ appSockAddr app))
+        .| CL.iterM (displayMessage Inbound peerStr)
         .| CL.map MsgEvt
         .| CL.iterM (const $ petWatchdog recvWatchdog)
-    , seqEventNotificationSource ks
+    , seqEventSource
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
     , timerSource

@@ -23,6 +23,7 @@ import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import           Crypto.PubKey.ECC.DH
+import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit
 import           Data.Conduit.Network
@@ -43,6 +44,8 @@ import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.Output
 import           Blockchain.P2PRPC
+import           Blockchain.SeqEventNotify
+import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.TCPClientWithTimeout
@@ -72,7 +75,12 @@ runPeer peer myPriv _ _ = do
     let peerPort    = pPeerTcpPort peer
         peerAddress = BC.pack . T.unpack $ pPeerIp peer
     runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
-      attempt :: Either SomeException () <- withActivePeer peer $ runEthClientConduit peer app
+      let pSource = appSource app
+          pSink = appSink app
+          sSource = seqEventNotificationSource $ contextKafkaState initContext
+          pStr = show $ appSockAddr app
+      attempt :: Either SomeException () <- withActivePeer peer $
+        runEthClientConduit peer pSource pSink sSource pStr
       case attempt of
         Right () -> $logDebugS "runPeer" "Peer ran successfully!"
         Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -83,22 +91,25 @@ runEthClientConduit :: ( MonadP2P m
                        , Mod.Accessible PrivateNumber m
                        )
                     => PPeer
-                    -> AppData
+                    -> ConduitM () B.ByteString m ()
+                    -> ConduitM B.ByteString Void m ()
+                    -> ConduitM () P2pEvent m ()
+                    -> String
                     -> m (Either SomeException ())
-runEthClientConduit peer app = do
+runEthClientConduit peer peerSource peerSink seqSource peerStr = do
   myPriv <- Mod.access (Mod.Proxy @PrivateNumber)
   let myPublic    = calculatePublic theCurve myPriv
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
-  (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
+  (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` peerSink
 
-  !eventSource <- mkEthP2PEventSource app inCtx (contextKafkaState initContext)
-  !eventSink <- mkEthP2PEventConduit (show $ appSockAddr app) outCtx
+  !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
+  !eventSink <- mkEthP2PEventConduit peerStr outCtx
   initState <- newIORef initContext
   try . local (\c -> c{configContext = initState})
       . runConduit $ eventSource
                   .| handleMsgClientConduit myPublic peer
                   .| eventSink
-                  .| appSink app
+                  .| peerSink
 
 getPubKeyRunPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
                  => PPeer

@@ -21,9 +21,11 @@ import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import           Crypto.PubKey.ECC.DH
+import qualified Data.ByteString                       as B
 import           Data.Conduit.Network
 import           Data.Maybe                            (fromMaybe)
 import qualified Data.Text                             as T
+import           Network.Socket
 import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           UnliftIO
 
@@ -32,6 +34,8 @@ import           Blockchain.EthConf
 import           Blockchain.Options
 import           Blockchain.Output
 import           Blockchain.P2PUtil
+import           Blockchain.SeqEventNotify
+import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Text.Colors                           as C
 
@@ -53,7 +57,12 @@ ethServer :: ( MonadP2P m
           => Int -> m ()
 ethServer listenPort = do
   let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
-  runGeneralTCPServer settings ethServerHandler
+  runGeneralTCPServer settings $ \app ->
+    let pSource = appSource app
+        pSink = appSink app
+        sSource = seqEventNotificationSource $ contextKafkaState initContext
+        sAddr = appSockAddr app
+     in ethServerHandler pSource pSink sSource sAddr
 
 ethServerHandler :: ( MonadP2P m
                     , MonadUnliftIO m
@@ -62,21 +71,26 @@ ethServerHandler :: ( MonadP2P m
                     , A.Selectable String PPeer m
                     , ((T.Text, Int) `A.Alters` ActivityState) m
                     )
-                 => AppData
+                 => ConduitM () B.ByteString m ()
+                 -> ConduitM B.ByteString Void m ()
+                 -> ConduitM () P2pEvent m ()
+                 -> SockAddr
                  -> m ()
-ethServerHandler app = do
-  let theSockAddr = sockAddrToIP (appSockAddr app)
+ethServerHandler peerSource peerSink seqSource sockAddr = do
+  let theSockAddr = sockAddrToIP sockAddr
+      peerStr = show theSockAddr
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow theSockAddr
   void $ register ender
   getPeerByIP theSockAddr >>= \case
     Nothing -> do
-      $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ show theSockAddr ++ ". rejecting violently."
+      $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ peerStr ++ ". rejecting violently."
     Just p -> do
       case pPeerPubkey p of
         Nothing -> do
-          $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ show theSockAddr  ++ ". rejecting violently."
+          $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr  ++ ". rejecting violently."
         Just _ -> do
-          (attempt :: Either SomeException ()) <- withActivePeer p $ runEthServerConduit p app
+          (attempt :: Either SomeException ()) <- withActivePeer p $
+            runEthServerConduit p peerSource peerSink seqSource peerStr
           case attempt of
             Right () -> $logDebugS "runEthServer" "Peer ran successfully!"
             Left err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -87,21 +101,24 @@ runEthServerConduit :: ( MonadP2P m
                        , Mod.Accessible PrivateNumber m
                        )
                     => PPeer
-                    -> AppData
+                    -> ConduitM () B.ByteString m ()
+                    -> ConduitM B.ByteString Void m ()
+                    -> ConduitM () P2pEvent m ()
+                    -> String
                     -> m (Either SomeException ())
-runEthServerConduit p app = do
+runEthServerConduit p peerSource peerSink seqSource peerStr = do
   myPriv <- Mod.access (Mod.Proxy @PrivateNumber)
   let myPubkey = calculatePublic theCurve myPriv
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
-  (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` appSink app
-  !eventSource <- mkEthP2PEventSource app inCtx (contextKafkaState initContext)
-  !eventSink <- mkEthP2PEventConduit (show $ appSockAddr app) outCtx
+  (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` peerSink
+  !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
+  !eventSink <- mkEthP2PEventConduit peerStr outCtx
   initState <- newIORef initContext
   try . local (\c -> c{configContext = initState})
       . runConduit $ eventSource
                   .| handleMsgServerConduit myPubkey p
                   .| eventSink
-                  .| appSink app
+                  .| peerSink
 
 stratoP2PServer :: LoggingT IO ()
 stratoP2PServer = do
