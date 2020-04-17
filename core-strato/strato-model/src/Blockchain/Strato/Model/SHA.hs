@@ -19,12 +19,13 @@ import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
 import qualified    Data.ByteString.Char8                as S8
 import qualified    Data.ByteString.Lazy                 as BL
+import qualified    Data.ByteString.Lazy.Char8           as BLC
 import              Data.Data
 import              Data.Hashable                        (Hashable)
 import qualified    Data.Text                            as T
 import              GHC.Generics
 import              Numeric                              (readHex, showHex)
-import              Web.HttpApiData
+import              Servant
 import              Web.PathPieces
 import              Test.QuickCheck
 
@@ -38,6 +39,9 @@ newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic, Data)
                           deriving anyclass (Hashable)
 
 instance NFData SHA
+
+instance MimeRender PlainText SHA where
+  mimeRender _ = BLC.pack . formatSHAWithoutColor
 
 unSHA :: SHA -> Word256
 unSHA (SHA w) = w

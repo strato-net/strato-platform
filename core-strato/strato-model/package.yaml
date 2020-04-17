@@ -32,6 +32,7 @@ dependencies:
   - path-pieces
   - persistent-template
   - primitive
+  - servant-server
   - swagger2
   - text
   - time

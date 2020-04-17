@@ -72,7 +72,7 @@ type API =
                 :> QueryParams "chainids" Text
                 :> QueryParam "sortby" Sortby
                 :> Get '[JSON] [RawTransaction']
-       :<|> "transaction" :> ReqBody '[JSON] RawTransaction' :> Post '[JSON]  SHA
+       :<|> "transaction" :> ReqBody '[JSON] RawTransaction' :> Post '[JSON,PlainText]  SHA
        :<|> "transactionList" :> ReqBody '[JSON] [RawTransaction'] :> Post '[JSON] Value
 
 server :: ConnectionString -> Server API

@@ -1,4 +1,6 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -28,7 +30,7 @@ import           SQLM
 
 
 type API = 
-  "transactionResult" :> "batch" :> ReqBody '[JSON] [StrungSHA]
+  "transactionResult" :> "batch" :> ReqBody '[JSON,PlainText] [StrungSHA]
                                  :> Post '[JSON] Value
 
 server :: ConnectionString -> Server API
@@ -51,6 +53,9 @@ instance ToJSON StrungSHA where
 instance ToJSONKey StrungSHA where
     toJSONKey = ToJSONKeyText f (text . f)
       where f = T.pack . formatSHAWithoutColor . unStrungSHA
+
+instance MimeUnrender PlainText [StrungSHA] where
+  mimeUnrender _ = maybe (Left "Couldn't decode [Keccak256]") Right . decode
 
 postBatchTransactionResult :: ConnectionString -> [StrungSHA] -> Handler Value
 postBatchTransactionResult connectionString hashes = do
