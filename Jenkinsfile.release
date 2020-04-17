@@ -44,7 +44,7 @@ pipeline {
         withEnv(["RELEASE_VERSION=${env.RELEASE_VERSION}"]) {
           dir ('strato-worktree') {
             sh 'echo ${RELEASE_VERSION} > VERSION'
-            sh 'REPO=private make all'
+            sh 'REPO=public make all'
             dir ('blockapps-rest') {
               sh 'yarn'
               sh 'yarn build'
