@@ -212,7 +212,6 @@ pipeline {
             ]) {
                 sh '''#!/bin/bash -le
                   set -x
-                  rm -rf strato-api-tests
                   git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git"
                   cd strato-api-tests
                   yarn install
