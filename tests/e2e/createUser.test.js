@@ -74,7 +74,7 @@ describe("Create User - isAsync (do not resolve)", function() {
     // FIXME: this might fail in multinode, since fill() will take longer
     const account = yield rest.getAccount(user.address);
     assert.isDefined(account, "account should exist");
-    account[0].balance.should.be.bignumber.eq(constants.FAUCET_REWARD);
+    account[0].balance.should.be.bignumber.above(constants.FAUCET_REWARD);
   });
 
 });
@@ -93,6 +93,6 @@ describe("Create User - sync (resolve)", function() {
     // check account
     const account = yield rest.getAccount(user.address);
     assert.isDefined(account, "account should exist");
-    account[0].balance.should.be.bignumber.eq(constants.FAUCET_REWARD);
+    account[0].balance.should.be.bignumber.above(constants.FAUCET_REWARD);
   });
 });
