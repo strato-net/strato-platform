@@ -35,7 +35,7 @@ type API =
             :> QueryParam "minvalue" HexStorage
             :> QueryParam "maxvalue" HexStorage
             :> QueryParam "address" Address
-            :> QueryParam "chainId" Text
+            :> QueryParam "chainid" Text
             :> QueryParams "chainids" Text
             :> Get '[JSON] Value
 

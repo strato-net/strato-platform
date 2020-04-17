@@ -36,7 +36,7 @@ import           Blockchain.TypeLits
 import           SQLM
 
 type API = 
-  "chain" :> QueryParam "chainId" ChainId  :> Get '[JSON] (NamedMap "id" Word256 "info" ChainInfo)
+  "chain" :> QueryParam "chainid" ChainId  :> Get '[JSON] (NamedMap "id" Word256 "info" ChainInfo)
   :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] Text
   :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [Text]
 
