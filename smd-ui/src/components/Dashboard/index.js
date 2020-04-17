@@ -15,7 +15,8 @@ import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
 import './dashboard.css';
 import { hideLoading } from 'react-redux-loading-bar';
-import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
+import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions';
+import { changeHealthStatus } from './dashboard.action'
 import {
   LAST_BLOCK_NUMBER,
   USERS_COUNT,
@@ -73,6 +74,17 @@ class Dashboard extends Component {
     this.props.subscribeRoom(GET_SYSTEM_INFO)
 
     mixpanelWrapper.track('dashboard_page_load');
+
+    socket.on('disconnect', () => {
+      this.props.changeHealthStatus(false);
+    });
+
+    socket.on('reconnect', () => {
+      this.props.changeHealthStatus(true);
+      this.props.subscribeRoom(GET_HEALTH)
+      this.props.subscribeRoom(GET_NODE_UPTINE)
+      this.props.subscribeRoom(GET_SYSTEM_INFO)
+    });
   }
 
   componentWillUnmount() {
@@ -105,7 +117,7 @@ class Dashboard extends Component {
     const health = this.props.dashboard.healthStatus;
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
-    
+    console.log('Here is uptime', uptime);
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
@@ -208,7 +220,8 @@ const connected = connect(
     hideLoading,
     endTour,
     subscribeRoom,
-    unSubscribeRoom
+    unSubscribeRoom,
+    changeHealthStatus
   }
 )(Dashboard)
 
