@@ -212,7 +212,7 @@ pipeline {
             ]) {
                 sh '''#!/bin/bash -le
                   set -x
-                  git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                  git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git"
                   cd strato-api-tests
                   yarn install
                   yarn test:non-oauth
