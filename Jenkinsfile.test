@@ -204,7 +204,22 @@ pipeline {
               ./check_genesis_ingestion.sh
               popd
             '''
-          }
+          },
+
+          'STRATO API Tests': {
+            withCredentials([
+               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+            ]) {
+                sh '''#!/bin/bash -le
+                  set -x
+                  rm -rf strato-api-tests
+                  git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git"
+                  cd strato-api-tests
+                  yarn install
+                  yarn test:non-oauth
+                '''
+              }
+          },
         )
       }
     }
@@ -336,11 +351,9 @@ pipeline {
                   rm -rf strato-api-tests
                   git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git"
                   cd strato-api-tests
-                  sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
-                  # symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
                   touch .env
                   yarn install
-                  yarn test:public && yarn test:internal
+                  yarn test:oauth
                 '''
               }
             }
