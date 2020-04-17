@@ -14,7 +14,6 @@ module Blockchain.Event (
   module Blockchain.EventModel,
   handleEvents,
   handleGetChainDetails,
-  getBestKafkaBlockNumber,
   checkPeerIsMember' -- For testing
   ) where
 
@@ -86,16 +85,14 @@ import           Debug.Trace                           (trace)
 
 setTitleAndProduceBlocks :: ( MonadLogger m
                             , MonadIO m
-                            , HasVMEventsSink m
+                            , Stacks Block m
                             ) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
-    lastVMEvents <- liftIO $ fetchLastVMEvents 200
-    let lastBlockHashes = [blockHash b | ChainBlock b <- lastVMEvents]
+    lastBlockHashes <- map blockHash <$> takeStack (Proxy @Block) 200
     let newBlocks = filter (not . (`elem` lastBlockHashes) . blockHash) blocks
-    sink <- getVMEventsSink
     unless (null newBlocks) $ do
         liftIO . setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
-        sink . map ChainBlock $ newBlocks
+        pushStack newBlocks
     return $ length newBlocks
 
 -- drop every n-th element from the list

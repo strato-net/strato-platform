@@ -19,6 +19,7 @@
 module Blockchain.Context
     ( All
     , All2
+    , Stacks(..)
     , MonadP2P
     , TcpPortNumber(..)
     , Context(..)
@@ -61,6 +62,7 @@ import           Crypto.PubKey.ECC.DH
 import           Data.Default
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
+import           Data.Proxy
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
@@ -82,7 +84,8 @@ import qualified Blockchain.Sequencer.Kafka            as SK
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Stream.VMEvent             ( HasVMEventsSink(..)
-                                                       , VMEvent
+                                                       , VMEvent(..)
+                                                       , fetchLastVMEvents
                                                        , getBestKafkaBlockNumber
                                                        , produceVMEventsM
                                                        )
@@ -114,6 +117,10 @@ type family All2' (k :: * -> * -> (* -> *) -> Constraint) (ts :: [(*,*)]) (m :: 
 type family All2 (ks :: [* -> * -> (* -> *) -> Constraint]) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
   All2 (k ': '[]) ts m = All2' k ts m
   All2 (k ': ks) ts m = (All2' k ts m, All2 ks ts m)
+
+class Stacks a m where
+  takeStack :: Proxy a -> Int -> m [a]
+  pushStack :: [a] -> m ()
 
 newtype TcpPortNumber = TcpPortNumber { unTcpPortNumber :: Int }
 
@@ -241,39 +248,39 @@ instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
   put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
 
 instance MonadIO m => Mod.Modifiable K.KafkaState (ReaderT Config m) where
-  get _   = contextKafkaState <$> Mod.get (Mod.Proxy @Context)
+  get _   = contextKafkaState <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{contextKafkaState = k},()))
 
 instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
-  get _   = actionTimestamp <$> Mod.get (Mod.Proxy @Context)
+  get _   = actionTimestamp <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{actionTimestamp = k},()))
 
 instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
-  access _ = Mod.get (Mod.Proxy @ActionTimestamp)
+  access _ = Mod.get (Proxy @ActionTimestamp)
 
 instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT Config m) where
-  get _   = blockHeaders <$> Mod.get (Mod.Proxy @Context)
+  get _   = blockHeaders <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{blockHeaders = k},()))
 
 instance MonadIO m => Mod.Accessible [BlockData] (ReaderT Config m) where
-  access _ = Mod.get (Mod.Proxy @[BlockData])
+  access _ = Mod.get (Proxy @[BlockData])
 
 instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
-  get _   = remainingBlockHeaders <$> Mod.get (Mod.Proxy @Context)
+  get _   = remainingBlockHeaders <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{remainingBlockHeaders = k},()))
 
 instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
-  access _ = Mod.get (Mod.Proxy @RemainingBlockHeaders)
+  access _ = Mod.get (Proxy @RemainingBlockHeaders)
 
 instance MonadIO m => Mod.Accessible MaxReturnedHeaders (ReaderT Config m) where
   access _ = asks configMaxReturnedHeaders
 
 instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT Config m) where
-  get _   = _blockstanbulPeerAddr <$> Mod.get (Mod.Proxy @Context)
+  get _   = _blockstanbulPeerAddr <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{_blockstanbulPeerAddr = k},()))
 
 instance MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
-  access _ = Mod.get (Mod.Proxy @PeerAddress)
+  access _ = Mod.get (Proxy @PeerAddress)
 
 instance MonadIO m => Mod.Accessible ConnectionTimeout (ReaderT Config m) where
   access _ = asks configConnectionTimeout
@@ -298,19 +305,25 @@ instance (MonadIO m, MonadLogger m) => Mod.Accessible (SK.UnseqSink (ReaderT Con
 instance (MonadIO m, MonadLogger m) => HasVMEventsSink (ReaderT Config m) where
   getVMEventsSink = asks configVmEventsSink
 
+instance MonadIO m => Stacks Block (ReaderT Config m) where
+  takeStack _ n = do
+    vmEvents <- liftIO . fetchLastVMEvents $ fromIntegral n
+    pure [b | ChainBlock b <- vmEvents]
+  pushStack b = getVMEventsSink >>= \sink -> sink (ChainBlock <$> b)
+
 instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
   select _ ip = do
-    db <- Mod.access (Mod.Proxy @SQLDB)
+    db <- Mod.access (Proxy @SQLDB)
     SQL.runSqlPool actions db >>= \case
         [] -> return Nothing
         lst -> return . Just . SQL.entityVal $ head lst
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
-type MonadP2P m = ( HasVMEventsSink m
-                  , MonadIO m
+type MonadP2P m = ( MonadIO m
                   , MonadResource m
                   , MonadLogger m
+                  , Stacks Block m
                   , All '[Mod.Accessible, Mod.Modifiable]
                       '[ ActionTimestamp
                        , [BlockData]
@@ -318,8 +331,7 @@ type MonadP2P m = ( HasVMEventsSink m
                        , PeerAddress
                        ] m
                   , All '[Mod.Accessible]
-                      '[ (SK.UnseqSink m)
-                       , MaxReturnedHeaders
+                      '[ MaxReturnedHeaders
                        , ConnectionTimeout
                        , GenesisBlockHash
                        , BestBlockNumber
@@ -344,27 +356,27 @@ type MonadP2P m = ( HasVMEventsSink m
                   )
 
 getBlockHeaders :: Mod.Accessible [BlockData] m => m [BlockData]
-getBlockHeaders = Mod.access (Mod.Proxy @[BlockData])
+getBlockHeaders = Mod.access (Proxy @[BlockData])
 
 putBlockHeaders :: Mod.Modifiable [BlockData] m => [BlockData]-> m ()
-putBlockHeaders = Mod.put (Mod.Proxy @[BlockData])
+putBlockHeaders = Mod.put (Proxy @[BlockData])
 
 getRemainingBHeaders :: (Functor m, Mod.Accessible RemainingBlockHeaders m) => m [BlockData]
-getRemainingBHeaders = unRemainingBlockHeaders <$> Mod.access (Mod.Proxy @RemainingBlockHeaders)
+getRemainingBHeaders = unRemainingBlockHeaders <$> Mod.access (Proxy @RemainingBlockHeaders)
 
 putRemainingBHeaders :: Mod.Modifiable RemainingBlockHeaders m => [BlockData]-> m ()
-putRemainingBHeaders = Mod.put (Mod.Proxy @RemainingBlockHeaders) . RemainingBlockHeaders
+putRemainingBHeaders = Mod.put (Proxy @RemainingBlockHeaders) . RemainingBlockHeaders
 
 stampActionTimestamp :: (MonadIO m, Mod.Modifiable ActionTimestamp m) => m ()
 stampActionTimestamp = do
   ts <- liftIO getCurrentTime
-  Mod.put (Mod.Proxy @ActionTimestamp) . ActionTimestamp $ Just ts
+  Mod.put (Proxy @ActionTimestamp) . ActionTimestamp $ Just ts
 
 getActionTimestamp :: Mod.Accessible ActionTimestamp m => m ActionTimestamp
-getActionTimestamp = Mod.access (Mod.Proxy @ActionTimestamp)
+getActionTimestamp = Mod.access (Proxy @ActionTimestamp)
 
 clearActionTimestamp :: Mod.Modifiable ActionTimestamp m => m ()
-clearActionTimestamp = Mod.put (Mod.Proxy @ActionTimestamp) emptyActionTimestamp
+clearActionTimestamp = Mod.put (Proxy @ActionTimestamp) emptyActionTimestamp
 
 runContextM :: MonadUnliftIO m
             => r
@@ -405,13 +417,13 @@ initContext = Context
 getPeerByIP :: A.Selectable String PPeer m
             => String
             -> m (Maybe PPeer)
-getPeerByIP = A.select (A.Proxy @PPeer)
+getPeerByIP = A.select (Proxy @PPeer)
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
-setPeerAddrIfUnset addr = Mod.modify_ (Mod.Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)
+setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)
 
 shouldSendToPeer :: (Functor m, Mod.Accessible PeerAddress m) => Address -> m Bool
-shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Mod.Proxy @PeerAddress)
+shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Proxy @PeerAddress)
         -- 0x0 is for a broadcast sync message.
   where zeroOrArg addr' = addr' == 0x0 || addr' == addr
 
@@ -420,5 +432,5 @@ withActivePeer :: ( MonadUnliftIO m
                   )
                => PPeer -> m a -> m a
 withActivePeer p = bracket a b . const
-  where a   = A.insert (A.Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Active
-        b _ = A.insert (A.Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Inactive
+  where a   = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Active
+        b _ = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Inactive

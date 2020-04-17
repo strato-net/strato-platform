@@ -32,8 +32,6 @@ import           Blockchain.ExtWord
 import           Blockchain.Options                    (AuthorizationMode(..))
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
-import           Blockchain.Sequencer.Kafka
-import           Blockchain.Stream.VMEvent
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 import           Blockchain.Strato.Model.SHA           (SHA, unsafeCreateSHAFromWord256)
 
@@ -42,8 +40,7 @@ import qualified Test.Hspec.Expectations.Lifted        as L
 import           Test.QuickCheck
 
 data TestContext = TestContext
-  { _unseqSink             :: [[IngestEvent]]
-  , _vmEventsSink          :: [[VMEvent]]
+  { _blocks                :: [Block]
   , _blockHeaders          :: [DataDefs.BlockData]
   , _remainingBlockHeaders :: RemainingBlockHeaders
   , _actionTimestamp       :: ActionTimestamp
@@ -69,6 +66,13 @@ data TestContext = TestContext
 makeLenses ''TestContext
 
 type TestContextM = StateT TestContext (ResourceT (LoggingT IO))
+
+instance Monad m => Stacks Block (StateT TestContext m) where
+  takeStack _ n = take n <$> use blocks
+  pushStack bs  = do
+    let maxNum = maximum $ DataDefs.blockDataNumber . blockBlockData <$> bs
+    bestBlockNumber %= (\(BestBlockNumber n) -> BestBlockNumber $ max maxNum n)
+    blocks %= (bs ++)
 
 instance Monad m => (SHA `A.Alters` DataDefs.BlockData) (StateT TestContext m) where
   lookup _ k   = M.lookup k <$> use shaBlockDataMap
@@ -149,12 +153,6 @@ instance Monad m => Mod.Accessible PeerAddress (StateT TestContext m) where
 instance Monad m => Mod.Accessible ConnectionTimeout (StateT TestContext m) where
   access _ = use connectionTimeout
 
-instance Monad m => Mod.Accessible (UnseqSink (StateT TestContext m)) (StateT TestContext m) where
-  access _ = return $ \e -> unseqSink %= (e:)
-
-instance Monad m => HasVMEventsSink (StateT TestContext m) where
-  getVMEventsSink = return $ \v -> vmEventsSink %= (v:)
-
 instance Monad m => A.Selectable String DataPeer.PPeer (StateT TestContext m) where
   select _ tx = M.lookup tx <$> use stringPPeerMap
 
@@ -162,8 +160,7 @@ instance Monad m => A.Selectable String DataPeer.PPeer (StateT TestContext m) wh
 -- Kafka, postgres, redis, or ethconf.
 testContext :: TestContext
 testContext = TestContext
-  { _unseqSink             = []
-  , _vmEventsSink          = []
+  { _blocks                = []
   , _blockHeaders          = []
   , _remainingBlockHeaders = RemainingBlockHeaders []
   , _actionTimestamp       = emptyActionTimestamp
@@ -194,11 +191,6 @@ runTestPeer = void . runNoLoggingT . runResourceT . flip runStateT testContext
 
 spec :: Spec
 spec = do
-  describe "environment sanity checks" $ do
-    it "can pretend to write to kafka" $ do
-      quickCheck . once $ \ori txs -> runTestPeer $ emitKafkaTransactions ori txs
-      quickCheck . once $ \ori blk -> runTestPeer $ emitKafkaBlock ori blk
-
   describe "handleEvents" $ do
     it "should pong a ping" $
       runTestPeer $ do
@@ -216,9 +208,7 @@ spec = do
         runConduit $ yield (MsgEvt (Blockstanbul wm))
                            .| handleEvents testPeer
                            .| sinkList
-           `L.shouldReturn` []
-        unseqEvents <- use unseqSink
-        unseqEvents `L.shouldBe` [[IEBlockstanbul wm]]
+           `L.shouldReturn` [Left $ ToUnseq [IEBlockstanbul wm]]
         -- Now that the peer is known to be addr, we should only send if they are designated
         shouldSendToPeer addr `L.shouldReturn` True
         shouldSendToPeer 0xa `L.shouldReturn` False
