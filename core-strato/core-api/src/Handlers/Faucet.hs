@@ -17,14 +17,18 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson
-import qualified Data.ByteString                as B
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Lazy.Char8            as BLC
 import           Data.IORef
 import           Data.Maybe
-import qualified Data.Text                      as T
-import qualified Database.Esqueleto             as E
+import           Data.Text                             (Text)
+import qualified Data.Text                             as T
+import qualified Database.Esqueleto                    as E
 import           Database.Persist.Postgresql
-import qualified Network.Haskoin.Crypto         as H
+import qualified Network.Haskoin.Crypto                as H
+import           Numeric
 import           Servant
+import           Servant.Multipart
 import           System.IO.Unsafe
 import           Text.Printf
 
@@ -54,12 +58,18 @@ type API =
   "faucet" :> ReqBody '[FormUrlEncoded] Address
            :> Post '[JSON] Value
   :<|>
+  "faucet" :> MultipartForm Mem (MultipartData Mem)
+           :> Post '[JSON] Value
+  :<|>
   "dataFaucet" :> QueryParam "size" Int
                :> QueryParam "count" Int
                :> Get '[JSON] Value
 
 server :: ConnectionString -> Server API
-server connectionString = postFaucet connectionString :<|> postDataFaucet connectionString
+server connectionString =
+  postFaucet connectionString
+  :<|> postFaucetMultipart connectionString
+  :<|> postDataFaucet connectionString
 
 -----------------------------------------
 
@@ -96,6 +106,22 @@ postFaucet connectionString addressParam = runStdoutLoggingT $ do
         
     where
       putTX maxN k a = emitTransaction <=< makeSendTX maxN k a
+
+postFaucetMultipart :: ConnectionString -> MultipartData Mem -> Handler Value
+postFaucetMultipart connectionString multipartData = do
+  case lookupInput "address" multipartData of
+    Just a ->
+      case toAddr a of
+        Right address -> postFaucet connectionString address
+        Left e -> throwError err400{ errBody = BLC.pack e }
+    Nothing -> throwError err400{ errBody = "You need to provide the 'address' parameter" }
+
+toAddr :: Text -> Either String Address
+toAddr v =
+  case readHex $ T.unpack v of
+    [(wd160, "")] -> Right $ Address wd160
+    _ -> Left $ "Can't convert text to Address: " ++ show v
+
 
 postDataFaucet :: ConnectionString -> Maybe Int -> Maybe Int -> Handler Value
 postDataFaucet connectionString mSize mCountOf = runStdoutLoggingT $ do

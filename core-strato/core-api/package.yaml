@@ -27,6 +27,7 @@ dependencies:
 - persistent
 - persistent-postgresql
 - process
+- servant-multipart
 - servant-server
 - seqevents
 - strato-conf
