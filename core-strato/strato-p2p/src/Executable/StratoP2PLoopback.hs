@@ -31,7 +31,7 @@ recordEvent lab = liftIO $ withLabel loopbackEvents lab incCounter
 stratoP2PLoopback :: LoggingT IO ()
 stratoP2PLoopback = do
   $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
-  cfg <- initConfig (error "stratoP2PLoopback trying to use configPrivateKey") flags_maxReturnedHeaders
+  cfg <- initConfig flags_maxReturnedHeaders
   void . runContextM cfg $ do
     ks <- Mod.get (Mod.Proxy @K.KafkaState)
     let toWireMessage = \case

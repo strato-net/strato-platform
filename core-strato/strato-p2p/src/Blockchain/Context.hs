@@ -58,7 +58,6 @@ import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Blockchain.Output
 import           Control.Monad.Reader
-import           Crypto.PubKey.ECC.DH
 import           Data.Default
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
@@ -126,7 +125,6 @@ newtype TcpPortNumber = TcpPortNumber { unTcpPortNumber :: Int }
 
 data Config = Config
   { configSQLDB              :: SQLDB
-  , configPrivateKey         :: PrivateNumber
   , configRedisBlockDB       :: RBDB.RedisConnection
   , configUnseqSink          :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
   , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
@@ -291,9 +289,6 @@ instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) whe
 instance MonadIO m => Mod.Accessible SQLDB (ReaderT Config m) where
   access _ = asks configSQLDB
 
-instance MonadIO m => Mod.Accessible PrivateNumber (ReaderT Config m) where
-  access _ = asks configPrivateKey
-
 instance MonadIO m => ((T.Text, Int) `A.Alters` ActivityState) (ReaderT Config m) where
   lookup _ _ = error "lookup ActivityState undefined for ContextM"
   insert _ k = void . liftIO . setPeerActiveState (fst k) (snd k)
@@ -321,8 +316,9 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
 type MonadP2P m = ( MonadIO m
-                  , MonadResource m
                   , MonadLogger m
+                  , MonadResource m
+                  , MonadUnliftIO m
                   , Stacks Block m
                   , All '[Mod.Accessible, Mod.Modifiable]
                       '[ ActionTimestamp
@@ -387,14 +383,13 @@ runContextM r = void . runResourceT . flip runReaderT r
 initConfig :: ( MonadLogger m
               , MonadUnliftIO m
               )
-           => PrivateNumber -> Int -> m Config
-initConfig myPriv maxHeaders = do
+           => Int -> m Config
+initConfig maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   initState <- newIORef initContext
   return $ Config
     { configSQLDB = sqlDB' dbs
-    , configPrivateKey = myPriv
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configUnseqSink = void . K.withKafkaRetry1s . SK.writeUnseqEvents
     , configVmEventsSink = void . produceVMEventsM

@@ -41,7 +41,6 @@ import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context
 import           Blockchain.Data.Block
 import           Blockchain.Data.Control               (P2PCNC(..))
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire                  as W
 import           Blockchain.Display
@@ -55,7 +54,6 @@ import           Blockchain.Output
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Stream.VMEvent
 import           Blockchain.TimerSource
 import           Blockchain.Util
 import           Blockchain.Watchdog
@@ -170,9 +168,8 @@ handleMsgClientConduit myId peer = do
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-                Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
                 mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-                yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
+                yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
                 yield . Right $ GetChainDetails []
                 handleGetChainDetails peer S.empty
                 lift stampActionTimestamp

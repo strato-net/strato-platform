@@ -126,6 +126,7 @@ handleEvents peer = awaitForever $ \case
     MsgEvt Ping     -> yieldR Pong
 
     MsgEvt (Transactions txs) -> do
+        $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s)"
         lift stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
         ts <- liftIO getCurrentMicrotime

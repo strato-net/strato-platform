@@ -102,6 +102,7 @@ tests:
     ghc-options: -Wall -Werror
     main: Main.hs
     dependencies:
+      - crypto-random
       - QuickCheck
       - blockapps-data
       - blockapps-datadefs
