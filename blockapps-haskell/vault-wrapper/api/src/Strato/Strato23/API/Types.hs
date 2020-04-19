@@ -10,18 +10,21 @@ module Strato.Strato23.API.Types
   ) where
 
 import           BlockApps.Ethereum
+import           Crypto.PubKey.ECC.ECDSA 
 import           Control.Lens                 ((&), (?~), mapped)
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types             hiding (fieldLabelModifier)
-import           Data.Text                    (Text)
+import           Data.Text                    (Text, pack, unpack)
 import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named)
 import           Data.Word
 import           GHC.Generics
 
+
 vaultWrapperSchemaOptions :: SchemaOptions
 vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
+
 
 newtype StatusAndAddress = StatusAndAddress { unStatusAndAddress :: Address } deriving (Show, Generic)
 
@@ -61,4 +64,21 @@ data User = User
   { username :: Text
   , address :: Address
   } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
-  
+
+
+data NodeKey = NodeKey { unNodeKey :: PublicKey } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
+
+instance ToJSON PublicKey
+instance FromJSON PublicKey
+instance ToSchema PublicKey
+--instance ToJSON NodeKey where
+--  toJSON (NodeKey pub) = object
+--                       [ "pubkey" .= (show pub)]
+
+-- instance FromJSON NodeKey where
+--  parseJSON (Object o) = NodeKey . read <$> (o .: "pubkey")
+--  parseJSON o = error $ "parseJSON NodeKey: expected object, but got " ++ show o
+
+--instance ToSchema NodeKey where
+--  declareNamedSchema proxy = genericDeclareNamedSchema vaultWrapperSchemaOptions proxy
+--    & mapped.schema.description ?~ "The node's secp256k1 public key"
