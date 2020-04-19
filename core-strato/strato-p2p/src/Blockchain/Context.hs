@@ -307,9 +307,7 @@ instance MonadIO m => Stacks Block (ReaderT Config m) where
   pushStack b = getVMEventsSink >>= \sink -> sink (ChainBlock <$> b)
 
 instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
-  select _ ip = do
-    db <- Mod.access (Proxy @SQLDB)
-    SQL.runSqlPool actions db >>= \case
+  select _ ip = sqlQuery actions >>= \case
         [] -> return Nothing
         lst -> return . Just . SQL.entityVal $ head lst
 
