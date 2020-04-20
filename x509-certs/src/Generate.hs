@@ -227,7 +227,7 @@ signCert priv' cert = objectToSignedExactF (signWithECDSA $ priv) cert
 
 makeCert :: Issuer -> Subject -> IO (Certificate)
 makeCert iss sub = do
-  serial <- getStdRandom (randomR (100000000, 99999999))
+  serial <- (randomRIO (10000000, 99999999))
   validity <- getValidity
   
 
