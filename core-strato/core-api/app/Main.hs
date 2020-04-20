@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
@@ -8,6 +9,7 @@ module Main where
 import           Data.Proxy
 import qualified Data.Text                   as T
 import           Network.Wai.Handler.Warp
+import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
 
@@ -31,6 +33,7 @@ import qualified Handlers.TransactionResult      as TransactionResult
 import qualified Handlers.TxLast                 as TxLast
 import qualified Handlers.UUID                   as UUID
 import qualified Handlers.Version                as Version
+
 
 
 type CoreAPI =
@@ -92,5 +95,8 @@ main = do
   run 3000 app
 
 app :: Application
-app = logStdoutDev $ serve coreAPI coreServer
+app =
+  logStdoutDev
+  $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
+  $ serve coreAPI coreServer
 

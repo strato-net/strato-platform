@@ -35,6 +35,7 @@ dependencies:
 - template-haskell
 - text
 - transformers
+- wai-cors
 - wai-extra
 - warp
 - yaml
