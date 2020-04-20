@@ -24,25 +24,31 @@ defineFlag "root" (True :: Bool) "should generate new root private/public key an
 defineFlag "org" ("blockapps" :: String) "name of the organization"
 defineFlag "node" ("" :: String) "name of the new node"
 defineFlag "url" ("blockapps-licensing" :: String) "URL of the new node"
+defineFlag "country" ("US" :: String) "organization's home country"
 
 $(return []) -- an 8+ year old bug in HFlags requires this...
 
 
 
 
---------------------------------------------------------------------------------------------
--------------------------------------- GENERATE CERT ---------------------------------------
---------------------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
   
  
   _ <- $initHFlags "Certificate Generator tool for X.509/Identity"
-  putStrLn $ "cert-gen -> root cert: " ++ show flags_root
-  putStrLn $ "cert-gen -> orgName: " ++ show flags_org
-  putStrLn $ "cert-gen -> nodeName: " ++ show flags_node
-  putStrLn $ "cert-gen -> nodeURL: " ++ show flags_url
+  
+  putStrLn $ "X509 Node Certificate Generator\n\nFLAGS: "
+  putStrLn $ "\troot: " ++ show flags_root
+  putStrLn $ "\torg: " ++ show flags_org
+  putStrLn $ "\tnode: " ++ show flags_node
+  putStrLn $ "\turl: " ++ show flags_url
+  putStrLn $ "\tcountry: " ++ show flags_country
+
+
+--------------------------------------------------------------------------------------------
+-------------------------------------- GENERATE CERT ---------------------------------------
+--------------------------------------------------------------------------------------------
 
 
   (rootPriv, clientPub) <-
@@ -59,16 +65,12 @@ main = do
 
 
 
-  --TODO: ovbs this go in vault
---  B.writeFile "artifacts/pubkey.pem" $ pubToBytes clientPub
-
-
 
   --TODO: have a function to read cert and generate this....
   -- create issuer and subject
   let subject = Subject {
           subCommonName = flags_url
-        , subCountry    = "US" -- TODO: grab from flag? remove?
+        , subCountry    = flags_country
         , subOrg        = flags_org
         , subUnit       = flags_node
         , subPub        = clientPub 
@@ -97,5 +99,6 @@ main = do
           , issPriv = rootPriv
           }
 
-
-  B.writeFile fp $ certToBytes $ makeSignedCert issuer subject
+  -- generate and write cert
+  cert <- makeSignedCert issuer subject
+  B.writeFile fp $ certToBytes $ cert

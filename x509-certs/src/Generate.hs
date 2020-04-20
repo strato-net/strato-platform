@@ -30,26 +30,28 @@ import           Crypto.Number.Serialize
 import qualified Crypto.Hash.Algorithms         as CH
 
 
-
 import           Data.ASN1.Encoding
 import           Data.ASN1.BinaryEncoding
 import           Data.ASN1.OID
 import           Data.ASN1.Types.String
 import           Data.ASN1.Types                
 import           Data.Serialize
-import           Data.Hourglass.Types
-
-
 import qualified Data.ByteString                as B
 import           Data.X509
 import           Data.X509.EC
 import           Data.PEM
 import           Data.Maybe
 
+
+import           Time.Types
+import           Time.System
+import           System.Random
+import           GHC.Generics
+
+
 import qualified ECDSA                          as ECD
 
 
-import           GHC.Generics
 
 
 -- import           System.IO.Unsafe               -- please, don't shame me!
@@ -215,41 +217,41 @@ bsToPub bs =
 
 
 
-makeSignedCert :: Issuer -> Subject -> SignedCertificate 
-makeSignedCert iss sub = signCert (issPriv iss) $ makeCert iss sub
+makeSignedCert :: Issuer -> Subject -> IO (SignedCertificate)
+makeSignedCert iss sub = signCert (issPriv iss) =<< makeCert iss sub
 
-signCert :: PrivateNumber -> Certificate -> SignedCertificate
-signCert priv' cert = fst $ objectToSignedExact (signWithECDSA $ priv) cert
+signCert :: PrivateNumber -> Certificate -> IO (SignedCertificate)
+signCert priv' cert = objectToSignedExactF (signWithECDSA $ priv) cert
   where
     priv = PrivateKey (getCurveByName SEC_p256k1) priv'
 
-makeCert :: Issuer -> Subject -> Certificate
-makeCert iss sub = Certificate {
+makeCert :: Issuer -> Subject -> IO (Certificate)
+makeCert iss sub = do
+  serial <- getStdRandom (randomR (100000000, 99999999))
+  validity <- getValidity
+  
+
+  return Certificate {
     certVersion = 0x02
-  , certSerial = serial -- TODO: have to at some point randomly generate this and store it
+  , certSerial = serial
   , certSignatureAlg = SignatureALG HashSHA256 PubKeyALG_EC
   , certIssuerDN = getIssuerDN iss
-  , certValidity = getValidity
+  , certValidity = validity
   , certSubjectDN = getSubjectDN sub
   , certPubKey = getCertPub sub 
   , certExtensions = Extensions Nothing
   }
-  where
-    serial = 1234567
 
 
 
-
--- We must provide the signing function with a a specific signature, so here is a wrapper for
---   the ECDSA signing function
--- TODO: would rather not use signWith (need a random number, not 19), can we figure out the MonadRandom signature and use sign? Or get entropy to seed that number
-signWithECDSA :: PrivateKey -> B.ByteString -> (B.ByteString, SignatureALG, ())
+-- We must provide the signing function to the Data.X509 objectToSignedExact function 
+-- with this return type
+signWithECDSA :: PrivateKey -> B.ByteString -> IO (B.ByteString, SignatureALG) 
 signWithECDSA priv msg = do
-  let hash = CH.SHA256
-      sig = case (signWith 19 priv hash msg) of
-        Just sig' -> sig'
-        Nothing -> error "Could not sign x509 cert with private key"
-  (ECD.signatureEncodeDER $ sillySignatureConversion sig, SignatureALG HashSHA256 PubKeyALG_EC, ()) 
+  let hashAlg = CH.SHA256
+  sig <- sign priv hashAlg msg
+  
+  return (ECD.signatureEncodeDER $ sillySignatureConversion sig, SignatureALG HashSHA256 PubKeyALG_EC) 
 
 
 
@@ -281,14 +283,12 @@ getSubjectDN sub =
   ]
 
 
--- Pure garbage right now....TODO: get it from IO? do it unsafe? 
-getValidity :: (DateTime, DateTime)
+getValidity :: IO (DateTime, DateTime)
 getValidity = do
-  let startDate = Date 2019 November 21
-      startTime = TimeOfDay 16 33 0 0
-      endDate = Date 2020 November 22
-      endTime = TimeOfDay 16 33 0 0
-  (DateTime startDate startTime, DateTime endDate endTime)
+  curDate <- dateCurrent
+  let endDate = Date 2021 April 19
+      endTime = TimeOfDay 9 0 0 0
+  return (curDate, DateTime endDate endTime)
  
 
 
@@ -321,7 +321,6 @@ sillySignatureConversion sig = ECD.Signature (sign_r sig) (sign_s sig)
 
 -- NOTE: This function serializePoint is literally stolen from a PR made to the Data.X509 repo 
 --    that was never merged
---    for someone reason they have a function to deserialize but not to serialize points 
 
 -- https://github.com/vincenthz/hs-certificate/pull/111/files
 
