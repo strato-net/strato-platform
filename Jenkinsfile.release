@@ -44,7 +44,7 @@ pipeline {
         withEnv(["RELEASE_VERSION=${env.RELEASE_VERSION}"]) {
           dir ('strato-worktree') {
             sh 'echo ${RELEASE_VERSION} > VERSION'
-            sh 'REPO=private make all'
+            sh 'REPO=public make all'
             dir ('blockapps-rest') {
               sh 'yarn'
               sh 'yarn build'
@@ -223,9 +223,7 @@ pipeline {
               set -x
               rm -rf track-and-trace
               git clone https://github.com/blockapps/track-and-trace.git
-              cd track-and-trace
-              git submodule update --init --recursive
-              cd server
+              cd track-and-trace/server
               sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
               # symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
               cp -r ../../strato-worktree/blockapps-rest blockapps-rest
