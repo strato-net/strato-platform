@@ -214,8 +214,8 @@ pipeline {
                   set -x
                   git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                   cd strato-api-tests
-                  yarn install
-                  yarn test:non-oauth
+                  docker build --tag strato-api-tests .
+                  docker run --network strato_static --name strato-api-tests -e STRATO_NODE_URL=http://nginx:80 -e OAUTH_ENABLED=false strato-api-tests
                 '''
               }
           },
@@ -351,8 +351,8 @@ pipeline {
                   git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git"
                   cd strato-api-tests
                   touch .env
-                  yarn install
-                  yarn test:oauth
+                  docker build --tag strato-api-tests .
+                  docker run --network strato_static --name strato-api-tests -e STRATO_NODE_URL=http://nginx:80 -e OAUTH_ENABLED=true strato-api-tests
                 '''
               }
             }
