@@ -15,6 +15,7 @@ build-type: Simple
 dependencies:
   - base
   - blockapps-solidity
+  - cache
   - containers
   - text
 

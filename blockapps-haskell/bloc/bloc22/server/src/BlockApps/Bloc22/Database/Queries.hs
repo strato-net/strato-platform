@@ -57,9 +57,6 @@ import           Blockchain.Strato.Model.Keccak256
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
-data Should a = Don't a | Do a
-data Compile = Compile
-
 {- |
 SELECT address from key_store;
 -}

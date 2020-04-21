@@ -36,6 +36,7 @@ module BlockApps.Bloc22.Client
   , getBlocTransactionResult
   , postBlocTransactionResults
   , postBlocTransaction
+  , postBlocTransactionParallel
   ) where
 
 import           Data.Map.Strict                  (Map)
@@ -202,3 +203,11 @@ postBlocTransaction
   -> PostBlocTransactionRequest
   -> ClientM [BlocTransactionResult]
 postBlocTransaction = client (Proxy @ PostBlocTransaction)
+
+postBlocTransactionParallel
+  :: Maybe Text
+  -> Maybe ChainId
+  -> Bool
+  -> PostBlocTransactionRequest
+  -> ClientM [BlocTransactionResult]
+postBlocTransactionParallel = client (Proxy @ PostBlocTransactionParallel)

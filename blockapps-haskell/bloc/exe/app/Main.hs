@@ -10,6 +10,7 @@ module Main where
 
 import           Control.Monad
 import           Database.PostgreSQL.Simple
+import           Data.Cache
 import           Data.Pool
 import           HFlags
 import           Network.HTTP.Client hiding (Proxy, responseStatus)
@@ -22,6 +23,7 @@ import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Servant.Options
 import           Servant
 import           Servant.Client
+import           System.Clock
 import           System.IO                          (BufferMode (..),
                                                      hSetBuffering, stderr,
                                                      stdout)
@@ -73,8 +75,9 @@ main = do
   mgr <- newManager defaultManagerSettings
   stratoUrl <- parseBaseUrl flags_stratourl
   vaultWrapperUrl <- parseBaseUrl flags_vaultwrapperurl
+  nonceCache <- newCache . Just $ TimeSpec (fromIntegral flags_nonceCounterTimeout) 0
   let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
-  let blocEnv = Bloc22.BlocEnv stratoUrl vaultWrapperUrl mgr pool22 mode flags_stateFetchLimit
+  let blocEnv = Bloc22.BlocEnv stratoUrl vaultWrapperUrl mgr pool22 mode flags_stateFetchLimit nonceCache
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   void $ Bloc22.runBlocToIO blocEnv Bloc22.runBlocMigrations
   run flags_port (appBloc blocEnv)

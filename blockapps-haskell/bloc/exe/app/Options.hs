@@ -14,3 +14,4 @@ defineFlag "stratourl" ("http://strato-int.centralus.cloudapp.azure.com/strato-a
 defineFlag "vaultwrapperurl" ("http://strato-int.centralus.cloudapp.azure.com/strato/v2.3"::String) "URL of the Strato server Bloc will connect to"
 defineFlag "publicmode" (False::Bool) "Whether this is bloc in private or public mode"
 defineFlag "stateFetchLimit" (100::Integer) "The maximum number of array entries to return from the state route"
+defineFlag "nonceCounterTimeout" (10::Integer) "The number of seconds nonces are held in the global nonce counter cache"

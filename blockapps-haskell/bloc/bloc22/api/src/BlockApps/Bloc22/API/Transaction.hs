@@ -49,6 +49,14 @@ transactionType (BlocTransfer _) = TRANSFER
 transactionType (BlocContract _) = CONTRACT
 transactionType (BlocFunction _) = FUNCTION
 
+type PostBlocTransactionParallel = "transaction"
+  :> "parallel"
+  :> S.Header "X-USER-UNIQUE-NAME" Text
+  :> QueryParam "chainid" ChainId
+  :> QueryFlag "resolve"
+  :> ReqBody '[JSON] PostBlocTransactionRequest
+  :> Post '[JSON] [BlocTransactionResult]
+
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
   :> QueryParam "chainid" ChainId

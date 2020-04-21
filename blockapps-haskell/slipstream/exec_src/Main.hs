@@ -62,6 +62,7 @@ createBlocEnv = liftIO $ do
                  , dbPool = pool
                  , deployMode = Public
                  , stateFetchLimit = 0
+                 , globalNonceCounter = error "globalNonceCounter being accessed in Slipstream"
                  }
 
 connectToCirrus :: MonadIO m => m PGConnection

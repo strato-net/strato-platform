@@ -17,6 +17,7 @@ import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Except
 import qualified Data.Aeson                         as JSON
 import qualified Data.ByteString.Lazy.Char8         as Lazy.Char8
+import           Data.Cache
 import           Data.Foldable
 import qualified Data.HashMap.Lazy                  as HashMap
 import           Data.Maybe                         (fromMaybe)
@@ -36,7 +37,12 @@ import           Text.Printf
 
 import           UnliftIO                           hiding (Handler(..))
 
+import           BlockApps.Ethereum                 (Address, ChainId, Nonce)
 import           BlockApps.Logging
+
+data Should a = Don't a | Do a
+data Compile = Compile
+data CacheNonce = CacheNonce
 
 type Bloc = ReaderT BlocEnv (LoggingT IO)
 
@@ -78,6 +84,7 @@ data BlocEnv = BlocEnv
   , dbPool          :: Pool Connection
   , deployMode      :: DeployMode
   , stateFetchLimit :: Integer
+  , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
   }
 
 data BlocError
