@@ -249,7 +249,7 @@ pipeline {
             export OAUTH_ENABLED=true
             export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration
             export OAUTH_CLIENT_ID=all-test-ci-blockapps-net-infinite
-            export OAUTH_CLIENT_SECRET=5718a315-2beb-487f-87a8-413cd88e6a5d
+            export OAUTH_CLIENT_SECRET=a7f199dc-9f50-45fc-9f50-13b40727ba31
             export PASSWORD=123
             export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
             export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
