@@ -182,7 +182,7 @@ async function callList(user, callListArgs, options) {
 
 async function sendTransactions(user, body, options) {
   const url = getNodeUrl(options);
-  const sendOptions = { cacheNonce, ...options };
+  const { cacheNonce, ...sendOptions } = options;
   if (cacheNonce) {
     const endpoint = constructEndpoint(Endpoint.SEND_PARALLEL, sendOptions);
     return post(url, endpoint, body, setAuthHeaders(user, sendOptions));
