@@ -213,10 +213,10 @@ pipeline {
                 sh '''#!/bin/bash -le
                   set -x
                   rm -rf strato-api-tests
-                  git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                  git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                   cd strato-api-tests
                   docker build --tag strato-api-tests .
-                  docker run --network strato_static -e STRATO_NODE_URL=http://nginx:80 -e OAUTH_ENABLED=false strato-api-tests
+                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=false strato-api-tests
                 '''
               }
           },
@@ -350,12 +350,12 @@ pipeline {
                     
                 sh '''#!/bin/bash -le
                   set -x
+                  # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
                   rm -rf strato-api-tests
-                  git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                  git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                   cd strato-api-tests
-                  touch .env
                   docker build --tag strato-api-tests .
-                  docker run --network strato_static -e STRATO_NODE_URL=http://nginx:80 -e OAUTH_ENABLED=true strato-api-tests
+                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=true strato-api-tests
                 '''
               }
             }
