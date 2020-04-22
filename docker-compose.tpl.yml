@@ -114,7 +114,7 @@ services:
     - BLOC_DEBUG=${BLOC_DEBUG}
     - kafkaHost=kafka
     - kafkaPort=9092
-    - nonceCounterTimeout=${nonceCounterTimeout}
+    - nonceCounterTimeout=${nonceCounterTimeout:-10}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432

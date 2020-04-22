@@ -122,7 +122,7 @@ runBackgroundProcess logserver "--directory=/logs" --uri_root=/logs/bloc/ &>> /l
 runBackgroundProcess blockapps-strato-server >> /logs/strato-server 2>&1
 
 runBackgroundProcess blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" --nonceCounterTimeout="${nonceCounterTimeout}" +RTS -N1 &>> /logs/bloc
+           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" --nonceCounterTimeout="$nonceCounterTimeout" +RTS -N1 &>> /logs/bloc
 
 until curl localhost:8000 &> /dev/null; do
   echo "Slipstream is waiting for bloc to come up..."

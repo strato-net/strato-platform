@@ -9,7 +9,7 @@
 
 module BlockApps.Bloc22.Server.Users where
 
-import           ClassyPrelude                     ((<>))
+import           ClassyPrelude                     ((<>), Hashable)
 import           Control.Concurrent
 import           Control.Applicative               ((<|>), liftA2)
 import           Control.Arrow
@@ -30,7 +30,7 @@ import qualified Data.Cache                        as Cache
 import           Data.Either
 import           Data.Foldable
 import           Data.Int                          (Int32)
-import           Data.List                         (sortOn)
+import           Data.List                         (partition, sortOn)
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import qualified Data.Map.Ordered                  as OMap
@@ -533,6 +533,13 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
                (resolve || postmethodlistrequestResolve)
   postUsersContractMethodList' (Don't CacheNonce) bflp (return . signTransaction sk)
 
+cacheLookup :: (Eq k, Hashable k)
+            => Cache.Cache k v
+            -> TimeSpec
+            -> k
+            -> STM (Maybe v)
+cacheLookup c t k = Cache.lookupSTM True k c t
+
 genNonces :: Show a
           => Should CacheNonce
           -> Address
@@ -542,19 +549,24 @@ genNonces :: Show a
           -> Bloc [a]
 genNonces cacheNonce fromAddr chainLens l unindexedAs = do
   let getChainId = view chainLens
-      chainIds = S.fromList $ map getChainId unindexedAs
+      chainIdsList = S.toList . S.fromList $ getChainId <$> unindexedAs
+      cacheKeys = (fromAddr,) <$> chainIdsList
       viewNonce = txparamsNonce <=< view l
-  nonceMap <- getAccountNonce fromAddr chainIds
-  now <- liftIO $ getTime Monotonic
   let indexedByChainId = indexedPartitionWith getChainId unindexedAs
   nonceCache <- asks globalNonceCounter
+  now <- liftIO $ getTime Monotonic
+  chainNonceVals <- zip chainIdsList <$> atomically (traverse (cacheLookup nonceCache now) cacheKeys)
+  let ~(chainsWithNonces, chainsWithoutNonces) = partition (isJust . snd) chainNonceVals
+      cachedNonceMap = Map.fromList $ fmap fromJust <$> chainsWithNonces
+  fetchedNonceMap <- getAccountNonce fromAddr . S.fromList $ fst <$> chainsWithoutNonces
+  let nonceMap = Map.union cachedNonceMap fetchedNonceMap
   liftIO . atomically $ fmap mergePartitions . forM indexedByChainId $ \(chainId, indexedAs) -> do
     let noncesInUse = S.fromList $ mapMaybe (viewNonce . snd) indexedAs
     nonce <- if S.size noncesInUse == length indexedAs
                then pure . Nonce . error $
                       "internal error: unused nonce when already specified " ++ show indexedAs
                else do
-                 mmNonce <- Cache.lookupSTM True (fromAddr, chainId) nonceCache now
+                 mmNonce <- cacheLookup nonceCache now (fromAddr, chainId)
                  let mNonce = case cacheNonce of
                        Do CacheNonce -> mmNonce
                        Don't CacheNonce -> Nothing
@@ -953,11 +965,15 @@ constructArgValuesAndSource args argNamesTypes = do
 getAccountTxParams :: Should CacheNonce -> Address -> Maybe ChainId -> Maybe TxParams -> Bloc TxParams
 getAccountTxParams cacheNonce addr chainId mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
-  nonceMap <- getAccountNonce addr (S.singleton chainId)
-  now <- liftIO $ getTime Monotonic
+      cacheKey = (addr, chainId)
   nonceCache <- asks globalNonceCounter
+  now <- liftIO $ getTime Monotonic
+  mCachedNonce <- atomically $ cacheLookup nonceCache now cacheKey
+  nonceMap <- case mCachedNonce of
+                Just n -> pure $ Map.singleton chainId n
+                Nothing -> getAccountNonce addr (S.singleton chainId)
   liftIO . atomically $ do
-    mmNonce <- Cache.lookupSTM True (addr, chainId) nonceCache now
+    mmNonce <- cacheLookup nonceCache now cacheKey
     let mNonce = case cacheNonce of
           Do CacheNonce -> mmNonce
           Don't CacheNonce -> Nothing
@@ -965,7 +981,7 @@ getAccountTxParams cacheNonce addr chainId mTxParams = do
         maxNonce = liftA2 max mNonce sNonce
         newNonce = fromMaybe 0 $ txparamsNonce params <|> maxNonce <|> mNonce <|> sNonce
         expTime = (now +) <$> Cache.defaultExpiration nonceCache
-    Cache.insertSTM (addr, chainId) (newNonce + 1) nonceCache expTime
+    Cache.insertSTM cacheKey (newNonce + 1) nonceCache expTime
     pure params{ txparamsNonce = Just newNonce }
 
 getAccountNonce :: Address -> S.Set (Maybe ChainId) -> Bloc (Map (Maybe ChainId) Nonce)
