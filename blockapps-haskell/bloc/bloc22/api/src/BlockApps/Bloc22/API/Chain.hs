@@ -46,6 +46,7 @@ data ChainInput  = ChainInput
   , chaininputArgs     :: Map Text ArgValue
   , chaininputMembers  :: NamedMap "address" Address "enode" Text
   , chaininputMetadata :: Maybe (Map Text Text)
+  , chaininputAsync    :: Maybe Bool
   } deriving (Eq, Show, Generic)
 
 instance ToSchema (NamedTuple "address" Address "balance" Integer) where
@@ -94,6 +95,7 @@ exChainInput = ChainInput
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
        ]
     , chaininputMetadata = Just $ Map.fromList [("history","Governance")]
+    , chaininputAsync = Nothing
     }
 
 instance ToSample ChainInput where
