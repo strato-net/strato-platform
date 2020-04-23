@@ -20,6 +20,8 @@ import qualified Data.ByteString.Lazy.Char8         as Lazy.Char8
 import           Data.Cache
 import           Data.Foldable
 import qualified Data.HashMap.Lazy                  as HashMap
+import           Data.Int                           (Int32)
+import           Data.Map.Strict                    (Map)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Pool (Pool, withResource)
 import           Data.Profunctor.Product.Default
@@ -39,6 +41,7 @@ import           UnliftIO                           hiding (Handler(..))
 
 import           BlockApps.Ethereum                 (Address, ChainId, Nonce)
 import           BlockApps.Logging
+import           BlockApps.Solidity.Xabi
 
 data Should a = Don't a | Do a
 data Compile = Compile
@@ -85,6 +88,7 @@ data BlocEnv = BlocEnv
   , deployMode      :: DeployMode
   , stateFetchLimit :: Integer
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
+  , globalSourceCache :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
   }
 
 data BlocError

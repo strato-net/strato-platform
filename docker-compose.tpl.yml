@@ -115,6 +115,7 @@ services:
     - kafkaHost=kafka
     - kafkaPort=9092
     - nonceCounterTimeout=${nonceCounterTimeout:-10}
+    - sourceCacheTimeout=${sourceCacheTimeout:-60}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432

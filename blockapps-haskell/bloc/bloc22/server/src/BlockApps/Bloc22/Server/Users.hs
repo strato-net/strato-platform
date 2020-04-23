@@ -27,6 +27,7 @@ import qualified Data.ByteString.Char8             as BC
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
 import qualified Data.Cache                        as Cache
+import qualified Data.Cache.Internal               as Cache
 import           Data.Either
 import           Data.Foldable
 import           Data.Int                          (Int32)
@@ -562,11 +563,12 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
   let nonceMap = Map.union cachedNonceMap fetchedNonceMap
   liftIO . atomically $ fmap mergePartitions . forM indexedByChainId $ \(chainId, indexedAs) -> do
     let noncesInUse = S.fromList $ mapMaybe (viewNonce . snd) indexedAs
+    now' <- Cache.nowSTM
     nonce <- if S.size noncesInUse == length indexedAs
                then pure . Nonce . error $
                       "internal error: unused nonce when already specified " ++ show indexedAs
                else do
-                 mmNonce <- cacheLookup nonceCache now (fromAddr, chainId)
+                 mmNonce <- cacheLookup nonceCache now' (fromAddr, chainId)
                  let mNonce = case cacheNonce of
                        Do CacheNonce -> mmNonce
                        Don't CacheNonce -> Nothing
@@ -584,7 +586,7 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
                     id <<+= 1
                 return (i, (l .~ Just params'{txparamsNonce = Just newNonce}) a)
         newCachedNonce = 1 + getMax (foldMap (Max . fromMaybe 0 . viewNonce . snd) txs)
-        expTime = (now +) <$> Cache.defaultExpiration nonceCache
+        expTime = (now' +) <$> Cache.defaultExpiration nonceCache
     Cache.insertSTM (fromAddr, chainId) newCachedNonce nonceCache expTime
     pure (chainId, txs)
 
@@ -973,14 +975,15 @@ getAccountTxParams cacheNonce addr chainId mTxParams = do
                 Just n -> pure $ Map.singleton chainId n
                 Nothing -> getAccountNonce addr (S.singleton chainId)
   liftIO . atomically $ do
-    mmNonce <- cacheLookup nonceCache now cacheKey
+    now' <- Cache.nowSTM
+    mmNonce <- cacheLookup nonceCache now' cacheKey
     let mNonce = case cacheNonce of
           Do CacheNonce -> mmNonce
           Don't CacheNonce -> Nothing
         sNonce = Map.lookup chainId nonceMap
         maxNonce = liftA2 max mNonce sNonce
         newNonce = fromMaybe 0 $ txparamsNonce params <|> maxNonce <|> mNonce <|> sNonce
-        expTime = (now +) <$> Cache.defaultExpiration nonceCache
+        expTime = (now' +) <$> Cache.defaultExpiration nonceCache
     Cache.insertSTM cacheKey (newNonce + 1) nonceCache expTime
     pure params{ txparamsNonce = Just newNonce }
 

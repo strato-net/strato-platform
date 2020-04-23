@@ -15,3 +15,4 @@ defineFlag "vaultwrapperurl" ("http://strato-int.centralus.cloudapp.azure.com/st
 defineFlag "publicmode" (False::Bool) "Whether this is bloc in private or public mode"
 defineFlag "stateFetchLimit" (100::Integer) "The maximum number of array entries to return from the state route"
 defineFlag "nonceCounterTimeout" (10::Integer) "The number of seconds nonces are held in the global nonce counter cache"
+defineFlag "sourceCacheTimeout" (60::Integer) "The number of seconds nonces are held in the global source code cache"

@@ -12,7 +12,9 @@ module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Applicative               (liftA2)
 import           Control.Monad                     (when)
+import           Control.Monad.Reader              (asks)
 import           Crypto.Random.Entropy
+import qualified Data.Cache                        as Cache
 import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
@@ -41,6 +43,7 @@ import           BlockApps.XAbiConverter           (xAbiToContract)
 
 import           Blockchain.Strato.Model.Address
 
+import           System.Clock
 import           UnliftIO
 
 governanceAddress :: Address
@@ -64,14 +67,30 @@ replaceMembers Struct{..} addrs m =
 
 createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
 createChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = do
-  let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
-
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
-  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
-  idsAndDetails <- if (Text.null src)
-                     then return Map.empty
-                     else sourceToContractDetails shouldCompile src
+
+  let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
+      shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
+      cacheKey = (theVM, src)
+  srcCache <- asks globalSourceCache
+  now <- liftIO $ getTime Monotonic
+  let later = (now +) <$> Cache.defaultExpiration srcCache
+  mCachedDetails <- atomically $ do
+    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
+                                       --       but we need this to prevent the cache growing unboundedly
+    r <- Cache.lookupSTM True cacheKey srcCache now
+    for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
+    pure r
+
+  idsAndDetails <- case mCachedDetails of
+    Just cachedDetails -> pure cachedDetails
+    Nothing -> do
+      details <- if (Text.null src)
+                   then return Map.empty
+                   else sourceToContractDetails shouldCompile src
+      liftIO $ Cache.insert srcCache cacheKey details
+      pure details
   mContract <- case Map.toList idsAndDetails of
             [] -> return Nothing
             [(_, x)] -> return $ Just x
