@@ -20,11 +20,12 @@ import           Data.Maybe
 --------------------------------------------------------------------------------------------
 
 
-defineFlag "root" (True :: Bool) "should generate new root private/public key and root cert"
+defineFlag "root" (False :: Bool) "whether to generate this cert as a self-signed root cert. If True, will generate new root private key. If false, will look for existing root private key/cert with which to issue the cert"
 defineFlag "org" ("blockapps" :: String) "name of the organization"
 defineFlag "node" ("" :: String) "name of the new node"
 defineFlag "url" ("blockapps-licensing" :: String) "URL of the new node"
 defineFlag "country" ("US" :: String) "organization's home country"
+
 
 $(return []) -- an 8+ year old bug in HFlags requires this...
 
@@ -38,6 +39,7 @@ main = do
  
   _ <- $initHFlags "Certificate Generator tool for X.509/Identity"
   
+
   putStrLn $ "X509 Node Certificate Generator\n\nFLAGS: "
   putStrLn $ "\troot: " ++ show flags_root
   putStrLn $ "\torg: " ++ show flags_org
@@ -67,7 +69,6 @@ main = do
 
 
   --TODO: have a function to read cert and generate this....
-  -- create issuer and subject
   let subject = Subject {
           subCommonName = flags_url
         , subCountry    = flags_country
