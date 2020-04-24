@@ -158,6 +158,7 @@ services:
     depends_on:
     - postgres
     environment:
+    - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
