@@ -23,7 +23,7 @@ import           Servant
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 
 import           SQLM
 
