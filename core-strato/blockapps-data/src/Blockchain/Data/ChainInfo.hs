@@ -24,9 +24,9 @@ import           Blockchain.ExtWord
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON()
-import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.TypeLits
 import           Blockchain.Util
 

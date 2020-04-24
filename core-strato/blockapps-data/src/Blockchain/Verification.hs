@@ -15,7 +15,7 @@ import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia             as MP
 import           Blockchain.Database.MerklePatricia.InternalMem
 import           Blockchain.Database.MerklePatriciaMem
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 
 import           Data.Functor.Identity

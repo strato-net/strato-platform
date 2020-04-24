@@ -30,7 +30,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.EthConf (lookupRedisBlockDBConfig, connStr)
 import           Blockchain.Output
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
 

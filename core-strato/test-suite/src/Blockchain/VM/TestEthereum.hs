@@ -56,8 +56,7 @@ import           Blockchain.EVM.VMM (readGasRemaining)
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.SHA                 (keccak256)
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 import           Blockchain.VMContext
 

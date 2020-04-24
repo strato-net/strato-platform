@@ -35,7 +35,6 @@ import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
-import           Blockchain.SHA                     (hash)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model

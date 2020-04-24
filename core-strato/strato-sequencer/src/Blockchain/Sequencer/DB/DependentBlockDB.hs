@@ -18,7 +18,7 @@ import           Prelude                      hiding (lookup)
 import           Blockchain.Data.DataDefs
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 
 type DependentBlockDB = LDB.DB
 

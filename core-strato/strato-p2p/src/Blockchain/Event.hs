@@ -68,8 +68,8 @@ import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.ExtWord
 import           Blockchain.Options
-import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Verification
 

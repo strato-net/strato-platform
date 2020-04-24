@@ -12,7 +12,7 @@ import qualified Data.Text                                   as T
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs (BlockData(..))
 import           Blockchain.ExtWord
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 
 newtype Sender = Sender { unSender :: Address }
 

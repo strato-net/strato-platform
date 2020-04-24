@@ -13,9 +13,9 @@ import           System.IO.Unsafe
 import           Text.Parsec                          (runParser)
 
 import           Blockchain.DB.CodeDB
-import           Blockchain.SHA
 import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
+import           Blockchain.Strato.Model.SHA
 
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File

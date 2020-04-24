@@ -64,7 +64,7 @@ import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 import           Blockchain.EVM.Code
 import           Blockchain.EVM.Environment

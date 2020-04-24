@@ -50,7 +50,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.FastECRecover
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 
 import           Blockchain.ExtendedECDSA

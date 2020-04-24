@@ -73,7 +73,7 @@ import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Output
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.VM.VMException
 import           Blockchain.VMContext
 
