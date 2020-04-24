@@ -74,6 +74,7 @@ import           Text.Read
 -- TODO: Unify Bloch and Strato transactions
 import           BlockApps.Ethereum           hiding (Transaction(..), transactionFrom)
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Keccak256
 import           BlockApps.Strato.TypeLits
 
 instance (ToHttpApiData a) => ToHttpApiData [a] where

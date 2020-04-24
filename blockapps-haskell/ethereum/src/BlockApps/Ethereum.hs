@@ -27,8 +27,6 @@ module BlockApps.Ethereum
   , ChainId (..)
   , chainIdString
   , stringChainId
-    -- * Keccak 256 Hashes
-  , Keccak256 (..)
   , CodePtr(..)
   , SHA(..)
   , shaToHex

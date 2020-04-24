@@ -16,6 +16,7 @@ import           Test.QuickCheck.Instances ()
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Client
 import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.Keccak256
 import           Network.HTTP.Client
 
 

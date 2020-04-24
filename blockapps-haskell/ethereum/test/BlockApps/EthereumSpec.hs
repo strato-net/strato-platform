@@ -16,6 +16,7 @@ import Web.FormUrlEncoded
 import Web.HttpApiData
 
 import BlockApps.Ethereum
+import Blockchain.Strato.Model.Keccak256
 
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do
