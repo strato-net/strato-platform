@@ -11,6 +11,7 @@ import Test.Hspec.Expectations.Lifted
 import BlockApps.Ethereum
 import BlockApps.Logging
 import BlockApps.Solidity.Value
+import Blockchain.Strato.Model.Address
 import Slipstream.GlobalsColdStorage
 
 runTest :: ReaderT SqlBackend (NoLoggingT (ResourceT IO)) () -> IO ()

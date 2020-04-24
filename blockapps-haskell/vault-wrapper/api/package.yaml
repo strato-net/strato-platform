@@ -33,6 +33,7 @@ dependencies:
   - saltine
   - servant
   - servant-server
+  - strato-model
   - swagger2
   - text
   - wai

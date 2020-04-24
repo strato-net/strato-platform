@@ -28,6 +28,9 @@ import           Opaleye                         hiding (not, null, index)
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Tables
 
+import           Blockchain.Strato.Model.Address
+
+
 countUsers :: Text -> Query (Column PGInt8)
 countUsers username = aggregate countStar $ proc () -> do
   (_, name, _, _, _, _, _) <- queryTable usersTable -< ()

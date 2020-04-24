@@ -32,6 +32,8 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.TypeLits
 
+import           Blockchain.Strato.Model.Address
+
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------

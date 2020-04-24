@@ -17,8 +17,6 @@ module BlockApps.Ethereum
   , bytesToWord256
   , lastWord64
   , Hex (..)
-  -- * Addresses
-  , Address (..)
   , unAddress
   , deriveAddress
   , addressString

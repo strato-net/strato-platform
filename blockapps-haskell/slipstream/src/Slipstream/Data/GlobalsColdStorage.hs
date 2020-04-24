@@ -11,6 +11,7 @@ import qualified Data.Aeson as Ae
 
 import BlockApps.Ethereum
 import BlockApps.Solidity.Value
+import Blockchain.Strato.Model.Address
 
 data QueueElem = PreStorageEntry Address (Maybe ChainId) [(Text, Value)]
                | SyncFlush

@@ -16,8 +16,6 @@ module Slipstream.GlobalsColdStorage
   , fakeHandle
   ) where
 
-import BlockApps.Ethereum
-import BlockApps.Solidity.Value
 import ClassyPrelude hiding (Handle)
 import Data.Binary hiding (get)
 import Database.Persist
@@ -27,6 +25,10 @@ import qualified Prelude as P ()
 import System.IO.Unsafe
 import UnliftIO.Concurrent
 import UnliftIO.Resource
+
+import BlockApps.Ethereum
+import BlockApps.Solidity.Value
+import Blockchain.Strato.Model.Address
 
 import qualified Slipstream.DelayedBloomFilter as DBF
 import Slipstream.Metrics

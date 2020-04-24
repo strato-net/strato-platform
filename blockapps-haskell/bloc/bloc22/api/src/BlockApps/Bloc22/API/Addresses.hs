@@ -5,7 +5,7 @@ module BlockApps.Bloc22.API.Addresses where
 
 import           Servant.API
 
-import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.Address
 
 --------------------------------------------------------------------------------
 -- Routes and Types

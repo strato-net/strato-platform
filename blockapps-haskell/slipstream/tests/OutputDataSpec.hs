@@ -18,6 +18,7 @@ import Text.RawString.QQ
 import BlockApps.Ethereum --(Keccak256, Address)
 import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA (hash)
 import Slipstream.Events
 import Slipstream.Globals

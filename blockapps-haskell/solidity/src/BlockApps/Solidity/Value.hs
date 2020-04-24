@@ -29,6 +29,8 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 
+import           Blockchain.Strato.Model.Address
+
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 valueUInt :: Integer -> SimpleValue

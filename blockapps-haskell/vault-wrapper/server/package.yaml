@@ -62,6 +62,7 @@ dependencies:
 - servant-server
 - servant-swagger
 - split
+- strato-model
 - swagger2
 - text
 - time

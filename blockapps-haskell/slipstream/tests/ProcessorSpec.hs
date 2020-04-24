@@ -9,7 +9,7 @@ import qualified Data.ByteString as B
 import Test.Hspec
 import Text.RawString.QQ
 
-import BlockApps.Ethereum
+import Blockchain.Strato.Model.Address
 import Slipstream.Processor
 
 messageToSplit :: B.ByteString

@@ -9,7 +9,6 @@ module Strato.Strato23.API.Types
   , Address(..)
   ) where
 
-import           BlockApps.Ethereum
 import           Control.Lens                 ((&), (?~), mapped)
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -19,6 +18,9 @@ import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named)
 import           Data.Word
 import           GHC.Generics
+
+import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.Address
 
 vaultWrapperSchemaOptions :: SchemaOptions
 vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}

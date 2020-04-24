@@ -6,7 +6,6 @@
 
 module Strato.Strato23.Crypto where
 
-import           BlockApps.Ethereum                hiding (deriveAddress)
 import           Control.Monad                     ((<=<))
 import           Control.Monad.IO.Class
 import qualified Crypto.KDF.Scrypt                 as Scrypt
@@ -21,6 +20,9 @@ import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
 import           Text.Printf
+
+import           BlockApps.Ethereum                hiding (deriveAddress)
+import           Blockchain.Strato.Model.Address
 
 newtype Password = Password ByteString
   deriving (Eq,Show)
