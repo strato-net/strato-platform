@@ -34,8 +34,10 @@ import qualified Foreign.Storable          as FS
 import           GHC.Exts
 import           GHC.Integer.GMP.Internals
 import           GHC.Word
+import           Numeric
 import           System.Endian
 import           System.IO.Unsafe
+import           Web.HttpApiData
 
 import           Network.Haskoin.Internals (Word128, Word160, Word256, Word512, BigWord(..))
 import           Blockchain.Data.RLP
@@ -170,6 +172,12 @@ instance Ix Word256 where
     inRange (x, y) z | z >= x && z <= y = True
     inRange _ _      = False
 
+
+instance FromHttpApiData Word160 where
+  parseQueryParam v =
+    case readHex $ T.unpack v of
+      [(n, "")] -> Right n
+      _ -> Left $ T.pack $ "Error parsing Word160: " ++ show v
 
 instance RLPSerializable Word512 where
     rlpEncode val = RLPString $ BL.toStrict $ encode val

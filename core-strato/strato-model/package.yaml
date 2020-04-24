@@ -36,6 +36,7 @@ dependencies:
   - relapse           # remove this
   - servant
   - servant-docs
+  - servant-server
   - swagger2
   - text
   - time
