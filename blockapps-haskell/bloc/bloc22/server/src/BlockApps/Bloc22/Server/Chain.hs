@@ -12,9 +12,7 @@ module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Applicative               (liftA2)
 import           Control.Monad                     (when, unless)
-import           Control.Monad.Reader              (asks)
 import           Crypto.Random.Entropy
-import qualified Data.Cache                        as Cache
 import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
@@ -71,33 +69,7 @@ createChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd _)
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
   let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
-      shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
-      cacheKey = (theVM, src)
-  srcCache <- asks globalSourceCache
-  now <- liftIO $ getTime Monotonic
-  let later = (now +) <$> Cache.defaultExpiration srcCache
-  mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
-                                       --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True cacheKey srcCache now
-    for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
-    pure r
-
-  idsAndDetails <- case mCachedDetails of
-    Just cachedDetails -> pure cachedDetails
-    Nothing -> do
-      details <- if (Text.null src)
-                   then return Map.empty
-                   else sourceToContractDetails shouldCompile src
-      liftIO $ Cache.insert srcCache cacheKey details
-      pure details
-  mContract <- case Map.toList idsAndDetails of
-            [] -> return Nothing
-            [(_, x)] -> return $ Just x
-            _ -> case cname of
-                   Nothing -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-                   Just name -> fmap Just $ blocMaybe "Could not find contract name in compilation details"
-                                      $ Map.lookup name idsAndDetails
+  mContract <- fmap snd <$> getContractDetailsForContract theVM src cname
   (cAcctInfo, codeInfo) <- case mContract of
       Nothing -> return ([],[])
       Just (_, ContractDetails{..}) -> do

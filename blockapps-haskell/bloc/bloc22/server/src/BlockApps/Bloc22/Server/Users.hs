@@ -249,29 +249,14 @@ postUsersContract userName addr chainId resolve
     Nothing -> postUsersContractEVM' cacheNonce bcp (return . signTransaction sk) -- The EVM is the default VM
     Just vmName -> throwIO $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
-evmContractSolidVMError :: Text
-evmContractSolidVMError = Text.concat
-  [ "Upload Contract (EVM): The given contracts were previously uploaded for "
-  , "SolidVM. Please retry your request specifying SolidVM as the VM type. "
-  , "If you are intending to use EVM, please modify your contracts and try again."
-  ]
-
 postUsersContractEVM' :: Should CacheNonce -> ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
-  idsAndDetails <- sourceToContractDetails (Do Compile) src
   $logInfoLS "postUsersContractEVM'/args" args
-  (cName,(cmId,ContractDetails{..})) <-
-    case contract of
-     Nothing ->
-       case Map.toList idsAndDetails of
-         [] -> throwIO $ UserError "You need to supply at least one contract in the source"
-         [(n,(m,cd))] -> case contractdetailsCodeHash cd of
-                  (EVMCode _) -> return (n, (m, cd))
-                  (SolidVMCode _ _) -> throwIO $ UserError evmContractSolidVMError
-         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "EVM" src contract >>= \case
+    Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
+    Just x -> pure x
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
     metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
@@ -302,16 +287,10 @@ postUsersContractSolidVM' :: Should CacheNonce -> ContractParameters -> Signer -
 postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransaction $ do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
-  idsAndDetails <- sourceToContractDetails (Don't Compile) src
-  (cName,(cmId,ContractDetails{..})) <-
-    case contract of
-     Nothing ->
-       case Map.toList idsAndDetails of
-         [] -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
-         [x] -> return x
-         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
-     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   $logInfoLS "postUsersContractSolidVM'/args" args
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" src contract >>= \case
+    Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+    Just x -> pure x
 
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
@@ -363,9 +342,9 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
     \(UploadListContract name mSrc args params value cid md) -> do
       (src, cmId, xabi) <- case mSrc of
         Just src -> do
-          (cmId', cd) <- lift $ do
-            idsAndDetails <- sourceToContractDetails (Don't Compile) src
-            blocMaybe "Could not find global contract metadataId" (Map.lookup name idsAndDetails)
+          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" src (Just name) >>= \case
+            Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+            Just x -> pure x
           at name <?= (src, cmId', contractdetailsXabi cd)
         Nothing -> do
           mtuple <- use $ at name
