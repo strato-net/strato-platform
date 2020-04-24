@@ -65,11 +65,11 @@ type API =
                :> QueryParam "count" Int
                :> Get '[JSON] Value
 
-server :: ConnectionString -> Server API
-server connectionString =
-  postFaucet connectionString
-  :<|> postFaucetMultipart connectionString
-  :<|> postDataFaucet connectionString
+server :: ConnectionPool -> Server API
+server pool =
+  postFaucet pool
+  :<|> postFaucetMultipart pool
+  :<|> postDataFaucet pool
 
 -----------------------------------------
 
@@ -85,13 +85,13 @@ instance FromForm Address where
   fromForm v = Address <$> parseUnique "address" v
 
 
-postFaucet :: ConnectionString -> Address -> Handler Value
-postFaucet connectionString addressParam = runStdoutLoggingT $ do
+postFaucet :: ConnectionPool -> Address -> Handler Value
+postFaucet pool addressParam = runStdoutLoggingT $ do
 
   let addresses = [addressParam]
   
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lookupNonce connectionString $ prvKey2Address key
+  minNonce <- lookupNonce pool $ prvKey2Address key
 
   toJSON <$> case addresses of
     [target] -> do
@@ -107,12 +107,12 @@ postFaucet connectionString addressParam = runStdoutLoggingT $ do
     where
       putTX maxN k a = emitTransaction <=< makeSendTX maxN k a
 
-postFaucetMultipart :: ConnectionString -> MultipartData Mem -> Handler Value
-postFaucetMultipart connectionString multipartData = do
+postFaucetMultipart :: ConnectionPool -> MultipartData Mem -> Handler Value
+postFaucetMultipart pool multipartData = do
   case lookupInput "address" multipartData of
     Just a ->
       case toAddr a of
-        Right address -> postFaucet connectionString address
+        Right address -> postFaucet pool address
         Left e -> throwError err400{ errBody = BLC.pack e }
     Nothing -> throwError err400{ errBody = "You need to provide the 'address' parameter" }
 
@@ -123,10 +123,10 @@ toAddr v =
     _ -> Left $ "Can't convert text to Address: " ++ show v
 
 
-postDataFaucet :: ConnectionString -> Maybe Int -> Maybe Int -> Handler Value
-postDataFaucet connectionString mSize mCountOf = runStdoutLoggingT $ do
+postDataFaucet :: ConnectionPool -> Maybe Int -> Maybe Int -> Handler Value
+postDataFaucet pool mSize mCountOf = runStdoutLoggingT $ do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lookupNonce connectionString $ prvKey2Address key
+  minNonce <- lookupNonce pool $ prvKey2Address key
   let size = fromMaybe 4096 mSize
       countOf = fromMaybe 1 mCountOf
   fmap toJSON . replicateM countOf $ do
@@ -152,8 +152,8 @@ acquireNewMaxNonce minNonce = do
 
 
 
-lookupNonce :: MonadIO m => ConnectionString -> Address -> m Integer
-lookupNonce connectionString addr' = liftIO $ runSQLM connectionString $ do
+lookupNonce :: MonadIO m => ConnectionPool -> Address -> m Integer
+lookupNonce pool addr' = liftIO $ runSQLM pool $ do
   addrSt <- sqlQuery $ E.select $
                       E.from $ \accStateRef -> do
                       E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0

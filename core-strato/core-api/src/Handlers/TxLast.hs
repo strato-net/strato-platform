@@ -29,13 +29,13 @@ type API =
                  :> Get '[JSON] [RawTransaction']
 
 
-server :: ConnectionString -> Server API
-server connectionString = getTxLast connectionString
+server :: ConnectionPool -> Server API
+server pool = getTxLast pool
 
 ---------------------
 
-getTxLast :: ConnectionString -> Integer -> Maybe ChainId -> Handler [RawTransaction']
-getTxLast connectionString num mChainId =  liftIO $ runSQLM connectionString $ do
+getTxLast :: ConnectionPool -> Integer -> Maybe ChainId -> Handler [RawTransaction']
+getTxLast pool num mChainId =  liftIO $ runSQLM pool $ do
   tx <- sqlQuery $ E.select $
         E.from $ \(rawTX `E.InnerJoin` btx `E.InnerJoin` b) -> do
           E.on (b E.^. BlockDataRefId E.==. btx E.^. BlockTransactionBlockDataRefId)

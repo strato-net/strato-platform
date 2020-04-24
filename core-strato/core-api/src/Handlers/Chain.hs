@@ -40,13 +40,13 @@ type API =
   :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] Text
   :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [Text]
 
-server :: ConnectionString -> Server API
+server :: ConnectionPool -> Server API
 server connStr = getChain connStr :<|> postChain :<|> postChains
 
 -----------------------
 
-getChain :: ConnectionString -> Maybe ChainId -> Handler (NamedMap "id" Word256 "info" ChainInfo)
-getChain connectionString mChainId = liftIO $ runSQLM connectionString $ 
+getChain :: ConnectionPool -> Maybe ChainId -> Handler (NamedMap "id" Word256 "info" ChainInfo)
+getChain pool mChainId = liftIO $ runSQLM pool $ 
   case mChainId of
     Nothing -> getChainInfos []
     Just (ChainId (Just chainid)) -> getChainInfos [chainid]

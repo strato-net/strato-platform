@@ -75,7 +75,7 @@ type API =
        :<|> "transaction" :> ReqBody '[JSON] RawTransaction' :> Post '[JSON,PlainText]  SHA
        :<|> "transactionList" :> ReqBody '[JSON] [RawTransaction'] :> Post '[JSON] Value
 
-server :: ConnectionString -> Server API
+server :: ConnectionPool -> Server API
 server connStr = getTransaction connStr :<|> postTransaction :<|> postTransactionList
 
 ---------------------------
@@ -126,13 +126,13 @@ postTransactionList raws = runStdoutLoggingT $ do
                   _        -> False
 
 
-getTransaction :: ConnectionString
+getTransaction :: ConnectionPool
                -> Maybe Address -> Maybe Address -> Maybe Address -> Maybe SHA
                -> Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer 
                -> Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer 
                -> Maybe Integer -> Maybe Int -> Maybe Text -> [Text]
                -> Maybe Sortby -> Handler [RawTransaction']
-getTransaction connectionString
+getTransaction pool
   address from to hash
   gasprice mingasprice maxgasprice gaslimit
   mingaslimit maxgaslimit value minvalue
@@ -157,7 +157,7 @@ getTransaction connectionString
     throwError err400{ errBody = BLC.pack $ "Need one of: " ++ intercalate ", " transactionQueryParams }
 
 
-  txs <- liftIO $ runSQLM connectionString $
+  txs <- liftIO $ runSQLM pool $
     sqlQuery $ E.select $ E.from $ \(rawTx) -> do
       let criteria = catMaybes
             [

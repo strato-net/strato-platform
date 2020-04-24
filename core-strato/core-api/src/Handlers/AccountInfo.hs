@@ -46,18 +46,18 @@ type API =
             :> QueryParam "chainid" Text
             :> Get '[JSON] [AddressStateRef']
 
-server :: ConnectionString -> Server API
-server connStr = getAccount connStr
+server :: ConnectionPool -> Server API
+server pool = getAccount pool
 
 ---------------------------
 
-getAccount :: ConnectionString ->
+getAccount :: ConnectionPool ->
                   Maybe Address -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
                   Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
                   Maybe Text -> Maybe SHA -> Maybe Text ->
                   Handler [AddressStateRef']
 
-getAccount connectionString 
+getAccount pool 
   address balance minbalance maxbalance
   nonce minnonce maxnonce maxnumber
   code codeHash chainid
@@ -71,7 +71,7 @@ getAccount connectionString
       throwError err400{ errBody = BLC.pack $ "Need one of: " ++ intercalate ", " accountQueryParams }
     
     addrs <-
-      liftIO $ runSQLM connectionString $ sqlQuery $ E.select . E.distinct $
+      liftIO $ runSQLM pool $ sqlQuery $ E.select . E.distinct $
               E.from $ \(accStateRef) -> do
 
               let

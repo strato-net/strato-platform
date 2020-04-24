@@ -31,14 +31,14 @@ type API =
         :> Get '[JSON] [LogDB]
 
 
-server :: ConnectionString -> Server API
-server connectionString = getLog connectionString
+server :: ConnectionPool -> Server API
+server pool = getLog pool
 
 ---------------------
 
 
-getLog :: ConnectionString -> Maybe Address -> Maybe SHA -> Maybe Sortby -> Handler [LogDB]
-getLog connectionString address hash sortParam = liftIO $ runSQLM connectionString $ do
+getLog :: ConnectionPool -> Maybe Address -> Maybe SHA -> Maybe Sortby -> Handler [LogDB]
+getLog pool address hash sortParam = liftIO $ runSQLM pool $ do
   logs <- sqlQuery $ E.select $ E.from $ \lg -> do
     let criteria = catMaybes
                    [

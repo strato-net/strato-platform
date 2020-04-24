@@ -52,19 +52,19 @@ type API =
           :> QueryParam "sortby" Sortby :> Get '[JSON] [Block']
 
 
-server :: ConnectionString -> Server API
-server connectionString = getBlockInfo connectionString
+server :: ConnectionPool -> Server API
+server pool = getBlockInfo pool
 
 ---------------------
 
-getBlockInfo :: ConnectionString ->
+getBlockInfo :: ConnectionPool ->
                  Maybe Address -> Maybe Address -> Maybe Address -> Maybe Text ->
                  Maybe SHA -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
                  Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
                  Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
                  Maybe Integer -> Maybe Int -> Maybe SHA -> Maybe Sortby ->
                  Handler [Block']
-getBlockInfo connectionString
+getBlockInfo pool
   txaddress coinbase address blockid hash mindiff maxdiff diff
   gasused mingasused maxgasused gaslim mingaslim maxgaslim number minnumber
   maxnumber index chainid sortby = do
@@ -78,7 +78,7 @@ getBlockInfo connectionString
 
 
   
-  blks <- liftIO $ runSQLM connectionString $
+  blks <- liftIO $ runSQLM pool $
     sqlQuery $
     E.select $
     E.from $ \(bdRef `E.LeftOuterJoin` btx `E.FullOuterJoin` rawTX `E.LeftOuterJoin` accStateRef) -> do
@@ -121,7 +121,7 @@ getBlockInfo connectionString
 
   let blockIds = map entityKey blks
 
-  txs <- liftIO $ runSQLM connectionString $ 
+  txs <- liftIO $ runSQLM pool $ 
          sqlQuery $ E.select $
                      E.from $ \(btx `E.InnerJoin` rawTX) -> do
                        E.on ( rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction )
@@ -165,7 +165,7 @@ toBlockDataRefId :: Text -> Key BlockDataRef
 toBlockDataRefId = toSqlKey . read . T.unpack
 
 {-
-runDB :: ConnectionString -> SqlPersistT (LoggingT IO) a -> IO a
-runDB connectionString x =  runStdoutLoggingT $ withPostgresqlPool connectionString 10 $ \p -> do
+runDB :: ConnectionPool -> SqlPersistT (LoggingT IO) a -> IO a
+runDB pool x =  runStdoutLoggingT $ withPostgresqlPool pool 10 $ \p -> do
   runSqlPool x p
 -}

@@ -39,7 +39,7 @@ type API =
             :> QueryParams "chainids" Text
             :> Get '[JSON] Value
 
-server :: ConnectionString -> Server API
+server :: ConnectionPool -> Server API
 server connStr = getStorage connStr
 
 
@@ -58,11 +58,11 @@ instance ToJSON StorageAddress
 storage2StorageAddress :: Storage -> Address -> StorageAddress
 storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) (storageKind stor) addr)
 
-getStorage :: ConnectionString ->
+getStorage :: ConnectionPool ->
               Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage ->
               Maybe HexStorage -> Maybe HexStorage -> Maybe Address ->
               Maybe Text -> [Text] -> Handler Value
-getStorage connectionString
+getStorage pool
   theKey minkey maxkey theValue
   minvalue maxvalue theAddress
   chainidParam chainidsParam
@@ -74,7 +74,7 @@ getStorage connectionString
       (Just c, []) -> return [c]
       _ -> throwError err400{ errBody = "You can't use both the chainid and chainids parameters at the same time" }
           
-  addrs <- liftIO $ runSQLM connectionString $ sqlQuery $ E.select . E.distinct $
+  addrs <- liftIO $ runSQLM pool $ sqlQuery $ E.select . E.distinct $
 
            E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
