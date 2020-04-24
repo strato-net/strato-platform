@@ -20,7 +20,7 @@ import { createUrl } from '../../../../lib/url';
 
 export function getState(contractName, contractAddress, chainid) {
   const options = { params: { contractName, contractAddress }, query: { chainid } };
-  const url = env.BLOC_URL + createUrl("/contracts/:contractName/:contractAddress/state", options);
+  const url = env.BLOC_URL + createUrl("/contracts/::contractName/::contractAddress/state", options);
 
   return fetch(
     url,
@@ -42,7 +42,7 @@ export function getState(contractName, contractAddress, chainid) {
 
 export function getCirrusInstances(contractName) {
   const options = { params: { contractName } };
-  const url = env.CIRRUS_URL + createUrl("/:contractName", options);
+  const url = env.CIRRUS_URL + createUrl("/::contractName", options);
 
   return fetch(
     url,

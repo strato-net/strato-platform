@@ -25,7 +25,7 @@ export function createContractApiCall(contract, src, username, address, password
   const isOauth = isOauthEnabled();
   const options = isOauth ? { query: { resolve: true, chainid } } : { params: { username, address }, query: { resolve: true, chainid } };
   const prefix = isOauth ? env.STRATO_URL_V23 : env.BLOC_URL;
-  const url = prefix + createUrl(isOauth ? "/transaction" : "/users/:username/:address/contract", options);
+  const url = prefix + createUrl(isOauth ? "/transaction" : "/users/::username/::address/contract", options);
 
   const blocBody = { contract, value: 0, password, src, args, metadata };
   const oauthBody = {

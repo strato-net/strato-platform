@@ -6,7 +6,7 @@
 export function createUrl(url, options = {}) {
   const { params, query } = options;
 
-  const withParams = params ? url.replace(/:(\w+)/g, (_, key) => {
+  const withParams = params ? url.replace(/::(\w+)/g, (_, key) => {
     return params[key];
   }) : url;
 

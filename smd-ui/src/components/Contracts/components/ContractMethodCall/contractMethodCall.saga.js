@@ -19,7 +19,7 @@ import { isOauthEnabled } from '../../../../lib/checkMode';
 
 export function getArgs(contractName, contractAddress, symbol, chainid) {
   const options = { params: { contractName, contractAddress }, query: { chainid } };
-  const url = env.BLOC_URL + createUrl("/contracts/:contractName/:contractAddress", options);
+  const url = env.BLOC_URL + createUrl("/contracts/::contractName/::contractAddress", options);
 
   return fetch(
     url,
@@ -52,7 +52,7 @@ export function postMethodCall(payload) {
     };
 
   const prefix = isModeOauth ? env.STRATO_URL_V23 : env.BLOC_URL;
-  const url = prefix + createUrl(isModeOauth ? '/transaction' : '/users/:username/:userAddress/contract/:contractName/:contractAddress/call', options);
+  const url = prefix + createUrl(isModeOauth ? '/transaction' : '/users/::username/::userAddress/contract/::contractName/::contractAddress/call', options);
 
   const blocBody = {
     password: payload.password,
