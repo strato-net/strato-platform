@@ -33,7 +33,7 @@ import           System.Timeout
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.P2PUtil

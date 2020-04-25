@@ -32,6 +32,8 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Keccak256
 
 --------------------------------------------------------------------------------
 -- | Routes and types

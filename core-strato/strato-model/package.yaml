@@ -15,6 +15,7 @@ dependencies:
   - blockapps-haskoin
   - bytestring
   - bytestring-arbitrary
+  - classy-prelude
   - containers
   - cpu
   - cryptonite
@@ -32,12 +33,15 @@ dependencies:
   - path-pieces
   - persistent-template
   - primitive
+  - relapse           # remove this
+  - servant
+  - servant-docs
   - servant-server
   - swagger2
   - text
   - time
   - unordered-containers
-
+ 
 ghc-options: -Wall -Werror -fno-warn-warnings-deprecations
 
 library:

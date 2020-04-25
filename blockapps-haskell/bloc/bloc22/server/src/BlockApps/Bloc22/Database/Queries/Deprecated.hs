@@ -31,6 +31,7 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Def     as Xabi.Def
 import qualified BlockApps.Solidity.Xabi.Type    as Xabi
+import           Blockchain.Strato.Model.Address
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 

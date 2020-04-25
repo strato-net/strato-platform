@@ -6,8 +6,10 @@
 
 module Main where
 
+import           Control.Monad.Logger
 import           Data.Proxy
 import qualified Data.Text                   as T
+import           Database.Persist.Postgresql
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.RequestLogger
@@ -58,23 +60,23 @@ type CoreAPI =
     :<|> Version.API
   )
   
-coreServer :: Server CoreAPI
-coreServer =
-  Account.server connStr
-  :<|> BatchTransactionResult.server connStr
-  :<|> BlkLast.server connStr
-  :<|> Block.server connStr
-  :<|> Chain.server connStr
+coreServer :: ConnectionPool -> Server CoreAPI
+coreServer pool =
+  Account.server pool
+  :<|> BatchTransactionResult.server pool
+  :<|> BlkLast.server pool
+  :<|> Block.server pool
+  :<|> Chain.server pool
   :<|> Coinbase.server
-  :<|> Faucet.server connStr
-  :<|> Log.server connStr
+  :<|> Faucet.server pool
+  :<|> Log.server pool
   :<|> Peers.server
-  :<|> QueuedTransactions.server connStr
-  :<|> Stats.server connStr
-  :<|> Storage.server connStr
-  :<|> Transaction.server connStr
-  :<|> TransactionResult.server connStr
-  :<|> TxLast.server connStr
+  :<|> QueuedTransactions.server pool
+  :<|> Stats.server pool
+  :<|> Storage.server pool
+  :<|> Transaction.server pool
+  :<|> TransactionResult.server pool
+  :<|> TxLast.server pool
   :<|> UUID.server
   :<|> Version.server
 
@@ -92,11 +94,12 @@ coreAPI = Proxy
 
 main :: IO ()
 main = do
-  run 3000 app
+  pool <- runNoLoggingT $ createPostgresqlPool connStr 20
+  run 3000 $ app pool
 
-app :: Application
-app =
+app :: ConnectionPool -> Application
+app pool = 
   logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
-  $ serve coreAPI coreServer
+  $ serve coreAPI $ coreServer pool
 

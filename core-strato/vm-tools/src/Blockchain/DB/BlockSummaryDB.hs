@@ -25,7 +25,7 @@ import qualified Database.LevelDB             as LDB
 
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.RLP
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 
 import           Text.Format
 

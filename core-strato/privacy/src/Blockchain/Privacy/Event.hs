@@ -30,7 +30,7 @@ import           Blockchain.Output
 import           Blockchain.Privacy.Monad
 import           Blockchain.Privacy.Metrics
 import           Blockchain.Sequencer.Event
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.Class
 import           Control.Lens
 import           Control.Monad

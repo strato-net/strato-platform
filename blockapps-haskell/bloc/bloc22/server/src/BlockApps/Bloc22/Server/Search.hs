@@ -8,6 +8,7 @@ import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
 
 getSearchContract :: ContractName -> Bloc [Greedy (MaybeNamed Address) ChainId]
 getSearchContract (ContractName contractName) = blocTransaction $

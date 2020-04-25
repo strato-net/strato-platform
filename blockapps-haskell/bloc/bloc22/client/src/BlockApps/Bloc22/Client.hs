@@ -49,6 +49,8 @@ import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Keccak256
 
 getGitInfo :: ClientM GitInfo
 getGitInfo = client (Proxy @ GetGitInfo)

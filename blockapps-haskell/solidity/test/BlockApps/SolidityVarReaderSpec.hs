@@ -7,7 +7,6 @@ import qualified Data.Map.Ordered as OM
 import qualified Data.Map.Strict as M
 import Test.Hspec
 
-import BlockApps.Ethereum
 import BlockApps.Solidity.Struct
 import qualified Data.Text as T
 import BlockApps.Storage
@@ -16,6 +15,8 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
 import BlockApps.SolidityVarReader (decodeCacheValues, structSort)
+
+import Blockchain.Strato.Model.Address
 
 addr :: Address -> Value
 addr = SimpleValue . ValueAddress

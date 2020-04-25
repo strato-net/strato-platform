@@ -23,7 +23,7 @@ import           Servant
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 
 import           SQLM
 
@@ -33,7 +33,7 @@ type API =
   "transactionResult" :> "batch" :> ReqBody '[JSON,PlainText] [StrungSHA]
                                  :> Post '[JSON] Value
 
-server :: ConnectionString -> Server API
+server :: ConnectionPool -> Server API
 server connStr = postBatchTransactionResult connStr
 
 ---------------------------
@@ -57,13 +57,13 @@ instance ToJSONKey StrungSHA where
 instance MimeUnrender PlainText [StrungSHA] where
   mimeUnrender _ = maybe (Left "Couldn't decode [Keccak256]") Right . decode
 
-postBatchTransactionResult :: ConnectionString -> [StrungSHA] -> Handler Value
-postBatchTransactionResult connectionString hashes = do
+postBatchTransactionResult :: ConnectionPool -> [StrungSHA] -> Handler Value
+postBatchTransactionResult pool hashes = do
 
   when (null hashes) $ throwError err400{ errBody="missing parameter: hashes" }
   
 --  hashesR <- parseJsonBody :: HandlerFor App (Result [StrungSHA])
-  txrs <- liftIO $ runSQLM connectionString $ sqlQuery . E.select . E.from $ \txr -> do
+  txrs <- liftIO $ runSQLM pool $ sqlQuery . E.select . E.from $ \txr -> do
     let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList (unStrungSHA <$> hashes)
     E.where_ matchHashes
     return txr

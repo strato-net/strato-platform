@@ -27,7 +27,7 @@ type API =
   "stats" :> "totaltx" :> Get '[JSON] Value
   :<|> "stats" :> "difficulty" :> Get '[JSON] Value
 
-server :: ConnectionString -> Server API
+server :: ConnectionPool -> Server API
 server connectionString = getStatTx connectionString :<|> getStatDiff connectionString
 
 ---------------------
@@ -41,14 +41,14 @@ data Stats = Stats
 instance ToJSON Stats
 
 
-getStatDiff :: ConnectionString -> Handler Value
+getStatDiff :: ConnectionPool -> Handler Value
 getStatDiff connectionString = liftIO $ runSQLM connectionString $ do
   bestBlock <- getBestBlock
   return $ object ["difficulty" .= blockDataRefTotalDifficulty bestBlock]
 
 
-getStatTx :: ConnectionString -> Handler Value
-getStatTx connectionString = liftIO $ runSQLM connectionString $ do
+getStatTx :: ConnectionPool -> Handler Value
+getStatTx pool = liftIO $ runSQLM pool $ do
   tx <- sqlQuery $ E.select $ E.from $ \(_ :: E.SqlExpr (E.Entity RawTransaction)) -> return E.countRows
   return $ myval (tx :: [E.Value Integer])
     where

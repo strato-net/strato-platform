@@ -24,7 +24,7 @@ import           Blockchain.Mining.Instant
 import           Blockchain.Mining.Normal
 import           Blockchain.Mining.SHA
 import           Blockchain.Sequencer.Event
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 import           Blockchain.Verification
 import           Blockchain.VMContext

@@ -44,8 +44,8 @@ import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..), NodeData)
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
-import           Blockchain.SHA                     hiding (hash)
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA        hiding (hash)
 import qualified Blockchain.Verification            as V
 
 import           Executable.EVMFlags                (flags_maxTxsPerBlock)

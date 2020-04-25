@@ -19,8 +19,8 @@ import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.ExtWord             (Word256)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
-import           Blockchain.SHA
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.SHA
 
 import           Handler.Filters
 import           Import                         hiding (hash)

@@ -9,9 +9,11 @@ module Slipstream.Events where
 
 import           Data.Map                 (Map)
 import           Data.Text                (Text)
-import qualified BlockApps.Solidity.Value as V
-import           BlockApps.Ethereum (Address, CodePtr, SHA)
 import           Data.Time
+
+import qualified BlockApps.Solidity.Value as V
+import           BlockApps.Ethereum (CodePtr, SHA)
+import           Blockchain.Strato.Model.Address
 import           Slipstream.SolidityValue
 
 type StateRoot = Text

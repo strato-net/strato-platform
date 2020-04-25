@@ -23,15 +23,15 @@ type API =
   "account" :> Capture "txHash" SHA
             :> Get '[JSON] [TransactionResult]
 
-server :: ConnectionString -> Server API
-server connStr = getTransactionResult connStr
+server :: ConnectionPool -> Server API
+server pool = getTransactionResult pool
 
 ---------------------------
 
 
-getTransactionResult :: ConnectionString -> SHA -> Handler [TransactionResult]
+getTransactionResult :: ConnectionPool -> SHA -> Handler [TransactionResult]
 
-getTransactionResult connectionString txHash = liftIO $ runSQLM connectionString $ do
+getTransactionResult pool txHash = liftIO $ runSQLM pool $ do
   rs <- sqlQuery $ E.select $
     E.from $ \(txr) -> do
     let matchHash = (txr E.^. TransactionResultTransactionHash) E.==. (E.val txHash)

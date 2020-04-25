@@ -45,9 +45,8 @@ import           System.Timeout
 import           Blockchain.Data.RLP
 import           Blockchain.ExtendedECDSA
 import           Blockchain.ExtWord
-import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..), hPubKeyToPubKey)
-import           Blockchain.Strato.Model.SHA           (keccak256)
+import           Blockchain.Strato.Model.SHA           
 import           Blockchain.Util
 
 import           Blockchain.Strato.Discovery.Data.Peer

@@ -75,6 +75,8 @@ import           Text.Read
 import           BlockApps.Ethereum           hiding (Transaction(..), transactionFrom)
 import           Blockchain.SolidVM.Model
 import           BlockApps.Strato.TypeLits
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Keccak256
 
 instance (ToHttpApiData a) => ToHttpApiData [a] where
   toUrlPiece = Text.pack . show . map toUrlPiece

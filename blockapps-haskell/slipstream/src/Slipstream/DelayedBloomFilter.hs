@@ -15,6 +15,7 @@ import qualified Data.BloomFilter.Easy as BF
 import Prelude hiding (elem)
 
 import BlockApps.Ethereum
+import Blockchain.Strato.Model.Address
 
 instance BF.Hashable ChainId where
   hashIO32 (ChainId n) = BF.hashIO32 (toInteger n)

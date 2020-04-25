@@ -27,8 +27,8 @@ import qualified Blockchain.Database.MerklePatricia      as MP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Sequencer.Event
-import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.VMContext
 import           Blockchain.VMOptions       ()
 import           Executable.EVMFlags        ()

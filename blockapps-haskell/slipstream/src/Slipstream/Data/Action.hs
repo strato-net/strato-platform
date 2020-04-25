@@ -28,6 +28,7 @@ import           GHC.Generics
 
 import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
                                                 , CallType(..), CallData(..))
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Event
 
 data AggregateAction = AggregateAction

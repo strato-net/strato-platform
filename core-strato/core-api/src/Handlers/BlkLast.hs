@@ -28,13 +28,13 @@ type API =
           :> Get '[JSON] [Block']
 
 
-server :: ConnectionString -> Server API
-server connectionString = getBlkLast connectionString
+server :: ConnectionPool -> Server API
+server pool = getBlkLast pool
 
 ---------------------
 
-getBlkLast :: ConnectionString -> Integer -> Handler [Block']
-getBlkLast connectionString n =  liftIO $ runSQLM connectionString $ do
+getBlkLast :: ConnectionPool -> Integer -> Handler [Block']
+getBlkLast pool n =  liftIO $ runSQLM pool $ do
   blks <- sqlQuery $ E.select $
           E.from $ \a -> do
             E.limit $ max 1 $ min (fromIntegral n :: Int64) appFetchLimit

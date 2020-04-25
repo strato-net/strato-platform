@@ -12,7 +12,7 @@ import qualified Blockchain.Data.DataDefs as DD
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.MilenaTools   as KP
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.VMContext     (ContextBestBlockInfo (..))
 
 import qualified Text.Colors        as CL

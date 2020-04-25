@@ -11,8 +11,6 @@ module Slipstream.Globals
   ) where
 
 
-import           BlockApps.Logging
-import           BlockApps.Solidity.Value
 import           Control.DeepSeq
 
 import           Control.Monad
@@ -29,9 +27,13 @@ import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8)
-import           BlockApps.Ethereum
-import           BlockApps.Solidity.Xabi     (ContractDetails(..), Xabi(..))
 import           UnliftIO.IORef
+
+import           BlockApps.Ethereum
+import           BlockApps.Logging
+import           BlockApps.Solidity.Value
+import           BlockApps.Solidity.Xabi     (ContractDetails(..), Xabi(..))
+import           Blockchain.Strato.Model.Address
 
 import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage

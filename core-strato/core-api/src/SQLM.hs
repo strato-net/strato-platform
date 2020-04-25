@@ -7,21 +7,15 @@
 module SQLM where
 
 import qualified Control.Monad.Change.Modify as Mod
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import           Control.Monad.Trans.Reader
+import           Database.Persist.Sql
 
-import           Database.Persist.Postgresql
+type SQLM = ReaderT ConnectionPool IO
 
-import           Blockchain.DB.SQLDB
-  
-type SQLM = ReaderT SQLDB IO
-
-instance Mod.Accessible SQLDB SQLM where
+instance Mod.Accessible ConnectionPool SQLM where
   access _ = ask
 
-runSQLM :: ConnectionString -> SQLM a -> IO a
-runSQLM connStr f = do
-  conn <- liftIO $ runNoLoggingT $ createPostgresqlPool connStr 20
-  runReaderT f conn
+runSQLM :: ConnectionPool -> SQLM a -> IO a
+runSQLM pool f = do
+  runReaderT f pool
 

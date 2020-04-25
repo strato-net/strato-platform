@@ -17,7 +17,7 @@ import           Data.Time.Clock.POSIX
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 
 data BlockSummary = BlockSummary {
                       bSumParentHash      :: SHA,
