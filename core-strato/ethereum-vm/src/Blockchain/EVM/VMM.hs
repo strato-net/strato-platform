@@ -242,7 +242,7 @@ incrementPC p = do
   pcref <- lift $ gets pc
   void . liftIO $ atomicAddCounter pcref p
 
-addToRefund::Int->VMM ()
+addToRefund::Gas->VMM ()
 addToRefund val = do
   refundref <- lift $ gets refund
   void . liftIO . atomicAddCounter refundref $ val
