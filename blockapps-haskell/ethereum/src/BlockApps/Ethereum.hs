@@ -101,7 +101,7 @@ import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Gas2
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.SHA (shaToHex)
