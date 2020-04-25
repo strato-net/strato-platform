@@ -1013,7 +1013,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
   dbs' <- get
   sqldbs' <- ask
   vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
-  gasref <- liftIO $ newCounter availableGas
+  gasref <- liftIO $ newCounter $ fromIntegral availableGas
   (res, vmState') <- lift . lift $
       flip runStateT vmState{
                          callDepth=callDepth,
