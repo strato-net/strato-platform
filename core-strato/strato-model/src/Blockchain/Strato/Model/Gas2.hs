@@ -1,0 +1,48 @@
+{-# LANGUAGE OverloadedStrings     #-}
+
+module Blockchain.Strato.Model.Gas2 where
+
+import           Control.Lens.Operators
+import           Control.DeepSeq (NFData)
+import           Data.Aeson             hiding (Array, String)
+import           Data.RLP
+import           Data.Swagger
+import           GHC.Generics
+import           Test.QuickCheck        hiding ((.&.))
+
+
+newtype Gas = Gas Integer
+--  deriving newtype Num
+--  deriving newtype Integral
+--  deriving newtype Real
+--  deriving newtype Enum
+--  deriving newtype Ord
+  deriving (Eq,Show,Generic)
+  deriving anyclass (NFData)
+
+instance Arbitrary Gas where arbitrary = Gas <$> arbitrary
+
+instance ToJSON Gas where
+  toJSON (Gas g) = toJSON g
+
+instance FromJSON Gas where
+  parseJSON = fmap Gas . parseJSON
+
+instance ToParamSchema Gas where
+  toParamSchema _ = mempty
+    & type_ .~ SwaggerInteger
+    & minimum_ ?~ 0
+    & maximum_ ?~ (2^(256 :: Integer) - 1)
+    & format ?~ "hex string"
+
+instance ToSchema Gas where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Gas")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (Gas 1000)
+        & description ?~ "Number of Gas units" )
+
+instance RLPEncodable Gas where
+  rlpEncode (Gas n) = rlpEncode n
+  rlpDecode obj = Gas <$> rlpDecode obj

@@ -12,7 +12,7 @@
 module BlockApps.Ethereum
   ( -- Number type reexports
   word256ToBytes
-  , bytesToWord256
+  , bytesToWord256            -- not used
   , lastWord64
   , Hex (..)
   , unAddress
@@ -25,38 +25,38 @@ module BlockApps.Ethereum
   , stringChainId
   , shaToHex
   , keccak256
-  , keccak256lazy
+  , keccak256lazy   -- not used
   , keccak256SHA
   , shaKeccak256
   , keccak256ByteString
   , byteStringKeccak256
   , keccak256String
-  , stringKeccak256
+  , stringKeccak256    -- not used
   , keccak256Address
     -- * Account States
   , AccountState (..)
     -- * Transactions
   , Transaction (..)
   , UnsignedTransaction (..)
-  , rlpMsg
+  , rlpMsg                     -- not used
   , rlpHash
   , signTransaction
   , verifyTransaction
   , recoverTransaction
   , transactionFrom
-  , newAccountAddress
+  , newAccountAddress           -- not used
     -- * Blocks
-  , BlockHeader (..)
+  , BlockHeader (..)            -- not used
     -- * Ethereum Types
   , Nonce (..)
-  , incrNonce
+  , incrNonce                  -- not used
   , Wei (..)
   -- , eth
   , Gas (..)
   , BloomFilter (..)
   , CodeInfo (..)
   , AccountInfo (..)
-  , padZeros
+  , padZeros                  -- not used
   ) where
 
 import           Control.Lens.Operators
@@ -78,7 +78,6 @@ import           Data.Either.Extra      (maybeToEither)
 import           Data.Map.Strict        (Map)
 import qualified Data.Map.Strict        as M
 import           Data.Maybe
-import           Data.Proxy
 import           Data.RLP
 import qualified Data.RLP               as RLP (RLPObject(..))
 import           Data.Swagger
@@ -102,8 +101,11 @@ import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Gas2
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.SHA (shaToHex)
+import           Blockchain.Strato.Model.Wei
 
 lastWord64 :: Word256 -> Word64
 lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
@@ -518,98 +520,7 @@ data BlockHeader = BlockHeader
   , blockHeaderChainId          :: Maybe Word256
   } deriving (Eq,Show,Generic)
 
-newtype Nonce = Nonce Word256
-               deriving (Eq, Show, Generic)
-               deriving newtype (Num, Ord)
-               deriving anyclass (NFData)
 
-instance ToJSON Nonce where
-  toJSON (Nonce n) = toJSON $ toInteger n
-
-instance FromJSON Nonce where
-  parseJSON = fmap (Nonce . fromInteger) . parseJSON
-
-instance ToParamSchema Nonce where
-  toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
-
-instance ToSchema Nonce where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "Nonce")
-      ( mempty
-        & type_ .~ SwaggerInteger
-        & example ?~ toJSON (Nonce 1)
-        & description ?~ "Numeric Nonce" )
-
-instance Arbitrary Nonce where arbitrary = Nonce . fromInteger <$> arbitrary
-
-instance RLPEncodable Nonce where
-  rlpEncode (Nonce n) = rlpEncode $ toInteger n
-  rlpDecode obj = Nonce . fromInteger <$> rlpDecode obj
-
-incrNonce :: Nonce -> Nonce
-incrNonce (Nonce n) = Nonce (n+1)
-
-newtype Wei = Wei Word256
-  deriving (Eq,Show,Generic)
-  deriving anyclass (NFData)
-
--- --TODO- this might be unsafe, since it could lead to an overflow.  A Word256 * 10^18 certainly can be much higer than a Word256
--- eth::Word256->Wei
--- eth = Wei
-
-instance Arbitrary Wei where arbitrary = Wei . fromInteger <$> arbitrary
-
-instance ToParamSchema Wei where
-  toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
-
-instance ToSchema Wei where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "Wei")
-      ( mempty
-        & type_ .~ SwaggerInteger
-        & example ?~ toJSON (Wei 1000000)
-        & description ?~ "Number of Wei currency units" )
-
-instance ToJSON Wei where
-  toJSON (Wei g) = toJSON $ toInteger g
-
-instance FromJSON Wei where
-  parseJSON = fmap (Wei . fromInteger) . parseJSON
-
-instance RLPEncodable Wei where
-  rlpEncode (Wei n) = rlpEncode $ toInteger n
-  rlpDecode obj = Wei . fromInteger <$> rlpDecode obj
-
-newtype Gas = Gas Integer
-  deriving (Eq,Show,Generic)
-  deriving anyclass (NFData)
-
-instance Arbitrary Gas where arbitrary = Gas <$> arbitrary
-
-instance ToJSON Gas where
-  toJSON (Gas g) = toJSON g
-
-instance FromJSON Gas where
-  parseJSON = fmap Gas . parseJSON
-
-instance ToParamSchema Gas where
-  toParamSchema _ = mempty
-    & type_ .~ SwaggerInteger
-    & minimum_ ?~ 0
-    & maximum_ ?~ (2^(256 :: Integer) - 1)
-    & format ?~ "hex string"
-
-instance ToSchema Gas where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "Gas")
-      ( mempty
-        & type_ .~ SwaggerInteger
-        & example ?~ toJSON (Gas 1000)
-        & description ?~ "Number of Gas units" )
-
-instance RLPEncodable Gas where
-  rlpEncode (Gas n) = rlpEncode n
-  rlpDecode obj = Gas <$> rlpDecode obj
 
 newtype BloomFilter = BloomFilter ByteString deriving (Eq, Show, Generic)
 
