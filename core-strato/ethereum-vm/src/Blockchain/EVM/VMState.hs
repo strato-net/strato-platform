@@ -33,10 +33,9 @@ import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Text.Format
-
-type Gas = Int
 
 instance Show Counter where
   show = const "<unboxed_ioref>"
