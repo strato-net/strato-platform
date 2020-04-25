@@ -78,6 +78,7 @@ import           BlockApps.Strato.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Nonce
 
 instance (ToHttpApiData a) => ToHttpApiData [a] where
   toUrlPiece = Text.pack . show . map toUrlPiece

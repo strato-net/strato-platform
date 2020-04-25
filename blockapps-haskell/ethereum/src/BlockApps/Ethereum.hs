@@ -48,11 +48,8 @@ module BlockApps.Ethereum
     -- * Blocks
   , BlockHeader (..)            -- not used
     -- * Ethereum Types
-  , Nonce (..)
   , incrNonce                  -- not used
-  , Wei (..)
   -- , eth
-  , Gas (..)
   , BloomFilter (..)
   , CodeInfo (..)
   , AccountInfo (..)

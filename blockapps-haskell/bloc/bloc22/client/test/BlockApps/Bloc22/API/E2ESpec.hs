@@ -30,6 +30,9 @@ import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Wei
+
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 spec :: SpecWith TestConfig

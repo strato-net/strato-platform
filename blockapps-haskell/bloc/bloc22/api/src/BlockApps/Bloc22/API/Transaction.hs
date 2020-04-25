@@ -32,6 +32,10 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.Types
 
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.Wei
+
 --------------------------------------------------------------------------------
 ---- Routes and Types
 --------------------------------------------------------------------------------

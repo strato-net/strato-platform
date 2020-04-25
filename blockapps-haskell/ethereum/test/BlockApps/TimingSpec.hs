@@ -16,6 +16,9 @@ import Web.HttpApiData
 
 import BlockApps.Ethereum
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Gas
+import Blockchain.Strato.Model.Nonce
+import Blockchain.Strato.Model.Wei
 
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do

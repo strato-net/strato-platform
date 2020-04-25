@@ -24,7 +24,9 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances        ()
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.Wei
 
 newtype ContractName = ContractName Text deriving (Eq,Ord,Show,Generic)
 

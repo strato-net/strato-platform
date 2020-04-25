@@ -70,6 +70,9 @@ import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.Wei
 
 data TransactionHeader = TransactionHeader
   { transactionheaderToAddr   :: Maybe Address
