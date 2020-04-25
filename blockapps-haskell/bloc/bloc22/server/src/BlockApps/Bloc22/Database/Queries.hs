@@ -51,6 +51,7 @@ import           BlockApps.SolidityVarReader     (byteStringToWord256, word256To
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
+import           Blockchain.Strato.Model.CodePtr
 
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

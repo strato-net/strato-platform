@@ -69,6 +69,7 @@ import           BlockApps.SolidityVarReader
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
+import           Blockchain.Strato.Model.CodePtr
 
 data TransactionHeader = TransactionHeader
   { transactionheaderToAddr   :: Maybe Address

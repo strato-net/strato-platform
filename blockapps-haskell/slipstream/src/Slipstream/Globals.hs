@@ -34,6 +34,7 @@ import           BlockApps.Logging
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi     (ContractDetails(..), Xabi(..))
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
 
 import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage

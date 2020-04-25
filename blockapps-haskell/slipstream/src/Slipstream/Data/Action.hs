@@ -29,6 +29,7 @@ import           GHC.Generics
 import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
                                                 , CallType(..), CallData(..))
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.SHA
 

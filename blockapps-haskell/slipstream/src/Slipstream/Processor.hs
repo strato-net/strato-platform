@@ -64,7 +64,7 @@ import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr (codePtrToSHA)
+import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.SHA
 
 

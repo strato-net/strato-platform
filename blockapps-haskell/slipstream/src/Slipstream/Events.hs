@@ -12,8 +12,8 @@ import           Data.Text                (Text)
 import           Data.Time
 
 import qualified BlockApps.Solidity.Value as V
-import           BlockApps.Ethereum (CodePtr)
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.SHA
 import           Slipstream.SolidityValue
 

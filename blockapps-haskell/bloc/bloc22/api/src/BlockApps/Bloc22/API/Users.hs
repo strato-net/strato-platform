@@ -39,6 +39,7 @@ import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
+import           Blockchain.Strato.Model.CodePtr
 
 --------------------------------------------------------------------------------
 -- | Routes and types

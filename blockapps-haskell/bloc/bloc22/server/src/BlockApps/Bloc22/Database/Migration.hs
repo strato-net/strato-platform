@@ -23,6 +23,7 @@ import           BlockApps.Bloc22.Database.Queries.Deprecated
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Ethereum
 import           BlockApps.Logging
+import           Blockchain.Strato.Model.CodePtr
 
 data Migration = MigrationAction (Bloc ())
                | MigrationQuery (MigrationErrorBehavior, Query)
