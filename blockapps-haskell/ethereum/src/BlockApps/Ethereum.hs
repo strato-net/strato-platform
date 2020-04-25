@@ -107,14 +107,6 @@ import           Blockchain.Strato.Model.Wei
 lastWord64 :: Word256 -> Word64
 lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
 
-instance ToSchema Word256 where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "Word256")
-      ( mempty
-        & type_ .~ SwaggerString
-        & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
-        & description ?~ "Fixed-size words of 256 bits" )
-
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic, Ord)
 
 instance (Integral n, Show n) => Show (Hex n) where
