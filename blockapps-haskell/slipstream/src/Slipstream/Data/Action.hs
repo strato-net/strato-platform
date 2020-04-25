@@ -30,6 +30,7 @@ import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), Ac
                                                 , CallType(..), CallData(..))
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Event
+import           Blockchain.Strato.Model.SHA
 
 data AggregateAction = AggregateAction
   { actionBlockHash      :: SHA

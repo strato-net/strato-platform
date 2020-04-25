@@ -26,7 +26,6 @@ module BlockApps.Ethereum
   , chainIdString
   , stringChainId
   , CodePtr(..)
-  , SHA(..)
   , shaToHex
   , keccak256
   , keccak256lazy
@@ -107,7 +106,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.SHA (shaToHex, SHA(..))
+import           Blockchain.Strato.Model.SHA (shaToHex)
 
 lastWord64 :: Word256 -> Word64
 lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
