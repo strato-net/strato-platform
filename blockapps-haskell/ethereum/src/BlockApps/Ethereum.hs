@@ -11,9 +11,7 @@
 
 module BlockApps.Ethereum
   ( -- Number type reexports
-    Word160
-  , Word256
-  , word256ToBytes
+  word256ToBytes
   , bytesToWord256
   , lastWord64
   , Hex (..)

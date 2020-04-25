@@ -8,12 +8,12 @@ import qualified Data.Map                    as Map
 import qualified Data.Text                   as T
 import           GHC.Generics
 
-import           BlockApps.Ethereum          (Word256)
 import           BlockApps.Solidity.Struct   (Struct)
 import qualified BlockApps.Solidity.Struct   as Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 import qualified BlockApps.Storage           as Storage
+import           Blockchain.Strato.Model.ExtendedWord
 
 data Contract = Contract { mainStruct :: Struct
                          , typeDefs   :: TypeDefs

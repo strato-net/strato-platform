@@ -6,9 +6,9 @@ import           Data.Map.Ordered        (OMap, assocs)
 import           Data.Text               (Text)
 import           GHC.Generics
 
-import           BlockApps.Ethereum      (Word256)
 import           BlockApps.Solidity.Type
 import qualified BlockApps.Storage       as Storage
+import           Blockchain.Strato.Model.ExtendedWord
 
 instance (NFData a, NFData b) => NFData (OMap a b) where
   rnf = rnf . assocs

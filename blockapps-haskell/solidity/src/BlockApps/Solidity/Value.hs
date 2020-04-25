@@ -30,6 +30,7 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 

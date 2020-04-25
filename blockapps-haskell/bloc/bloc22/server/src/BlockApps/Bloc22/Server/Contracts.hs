@@ -43,6 +43,7 @@ import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types          as T
 import           BlockApps.XAbiConverter
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.ExtendedWord
 
 getContracts :: Maybe ChainId -> Bloc GetContractsResponse
 getContracts chainId = blocTransaction $ do
