@@ -21,9 +21,9 @@ import           BlockApps.Bloc22.Database.Create
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Queries.Deprecated
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
 
 data Migration = MigrationAction (Bloc ())
                | MigrationQuery (MigrationErrorBehavior, Query)

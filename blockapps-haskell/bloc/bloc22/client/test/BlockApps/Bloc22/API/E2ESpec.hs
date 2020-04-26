@@ -32,6 +32,7 @@ import           BlockApps.Strato.Types
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Wei
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

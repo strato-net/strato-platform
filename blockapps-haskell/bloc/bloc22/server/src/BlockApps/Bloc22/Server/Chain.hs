@@ -24,7 +24,7 @@ import qualified Data.Vector                       as V
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum                hiding (keccak256)
+import           BlockApps.Ethereum               
 import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue

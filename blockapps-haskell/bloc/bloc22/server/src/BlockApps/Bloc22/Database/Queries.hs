@@ -53,6 +53,7 @@ import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
 
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

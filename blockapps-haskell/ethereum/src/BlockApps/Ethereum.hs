@@ -21,15 +21,6 @@ module BlockApps.Ethereum
   , chainIdString
   , stringChainId
   , shaToHex
-  , keccak256
-  , keccak256lazy   -- not used
-  , keccak256SHA
-  , shaKeccak256
-  , keccak256ByteString
-  , byteStringKeccak256
-  , keccak256String
-  , stringKeccak256    -- not used
-  , keccak256Address
     -- * Account States
   , AccountState (..)
     -- * Transactions
