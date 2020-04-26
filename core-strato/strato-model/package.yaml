@@ -22,6 +22,7 @@ dependencies:
   - deepseq
   - derive
   - ethereum-rlp
+  - extra
   - fast-keccak256
   - format
   - hashable
