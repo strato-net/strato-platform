@@ -28,7 +28,7 @@ import           Servant.Docs
 import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Ethereum
+import           BlockApps.Ethereum                 ()
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.TypeLits
 

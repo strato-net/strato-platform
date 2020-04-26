@@ -46,7 +46,6 @@ import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
-import           BlockApps.Ethereum
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi

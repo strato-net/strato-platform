@@ -51,7 +51,6 @@ import Blockapps.Crossmon
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
-import BlockApps.Ethereum
 import BlockApps.Logging
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type

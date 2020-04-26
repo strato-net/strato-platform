@@ -25,7 +25,6 @@ import           Data.Word               (Word8)
 import           GHC.Generics
 import           Text.Read
 
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 

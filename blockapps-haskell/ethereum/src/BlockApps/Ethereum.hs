@@ -9,36 +9,24 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TypeApplications      #-}
 
+-- {-# OPTIONS -fno-warn-unused-top-binds #-}
+-- {-# OPTIONS -fno-warn-unused-imports #-}
+
 module BlockApps.Ethereum
   ( -- Number type reexports
-  word256ToBytes
-  , bytesToWord256            -- not used
-  , lastWord64
+    lastWord64
   , Hex (..)
   , deriveAddress
-  , stringAddress
   , newSecKey
-  , chainIdString
-  , stringChainId
-  , shaToHex
-    -- * Account States
-  , AccountState (..)
-    -- * Transactions
   , Transaction (..)
   , UnsignedTransaction (..)
-  , rlpMsg                     -- not used
   , rlpHash
   , signTransaction
   , verifyTransaction
   , recoverTransaction
   , transactionFrom
-  , newAccountAddress           -- not used
-    -- * Ethereum Types
-  , incrNonce                  -- not used
-  -- , eth
   , CodeInfo (..)
   , AccountInfo (..)
-  , padZeros                  -- not used
   ) where
 
 import           Control.Lens.Operators
@@ -79,7 +67,6 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
-import           Blockchain.Strato.Model.SHA (shaToHex)
 import           Blockchain.Strato.Model.Wei
 
 lastWord64 :: Word256 -> Word64
@@ -138,16 +125,6 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
     err = error "could not generate secret key"
 --------------------------------------------------------------------------------
 
-
-
-
-data AccountState = AccountState
-  { accountStateNonce       :: Nonce
-  , accountStateBalance     :: Wei
-  , accountStateStorageRoot :: Keccak256
-  , accountStateCodeHash    :: Keccak256
-  , accountStateChainId     :: Maybe ChainId
-  } deriving (Eq,Show,Generic)
 
 data Transaction = Transaction
   { transactionNonce      :: Nonce
@@ -319,10 +296,12 @@ recoverTransaction t@Transaction{transactionR = r, transactionS = s, transaction
 transactionFrom :: Transaction -> Maybe Address
 transactionFrom = fmap deriveAddress . recoverTransaction
 
+{-
 -- | Yellow Paper (82)
 newAccountAddress :: Transaction -> Address
 newAccountAddress Transaction{..}
   = keccak256Address $ rlpSerialize (transactionTo, transactionNonce)
+-}
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: Text

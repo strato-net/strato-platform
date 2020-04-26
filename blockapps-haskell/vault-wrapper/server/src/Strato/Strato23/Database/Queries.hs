@@ -10,7 +10,6 @@
 
 module Strato.Strato23.Database.Queries where
 
-import           BlockApps.Ethereum
 import           Control.Arrow
 import           Control.Monad                   (void)
 import qualified Crypto.Saltine.Class            as Saltine

@@ -28,7 +28,6 @@ import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
-import           BlockApps.Ethereum
 import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 import           Blockchain.Strato.Model.Address
