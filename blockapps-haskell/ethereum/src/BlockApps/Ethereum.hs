@@ -36,7 +36,6 @@ module BlockApps.Ethereum
     -- * Ethereum Types
   , incrNonce                  -- not used
   -- , eth
-  , BloomFilter (..)
   , CodeInfo (..)
   , AccountInfo (..)
   , padZeros                  -- not used
@@ -324,8 +323,6 @@ transactionFrom = fmap deriveAddress . recoverTransaction
 newAccountAddress :: Transaction -> Address
 newAccountAddress Transaction{..}
   = keccak256Address $ rlpSerialize (transactionTo, transactionNonce)
-
-newtype BloomFilter = BloomFilter ByteString deriving (Eq, Show, Generic)
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: Text
