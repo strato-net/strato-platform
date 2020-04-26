@@ -8,7 +8,6 @@ module Main where
 
 import           Control.Monad.Logger
 import           Data.Proxy
-import qualified Data.Text                   as T
 import           Database.Persist.Postgresql
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
@@ -16,7 +15,6 @@ import           Network.Wai.Middleware.RequestLogger
 import           Servant
 
 import           Blockchain.EthConf
-import           Blockchain.Data.Address
 
 import qualified Handlers.AccountInfo            as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
@@ -82,12 +80,6 @@ coreServer pool =
 
 ----------------
 
-instance FromHttpApiData Address where
-  parseQueryParam x =
-    case stringAddress $ T.unpack x of
-      Just address -> Right address
-      _ -> Left $ T.pack $ "Could not parse address: " ++ show x
-  
 
 coreAPI :: Proxy CoreAPI
 coreAPI = Proxy

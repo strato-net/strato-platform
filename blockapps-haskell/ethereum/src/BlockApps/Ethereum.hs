@@ -15,7 +15,6 @@ module BlockApps.Ethereum
   , bytesToWord256            -- not used
   , lastWord64
   , Hex (..)
-  , unAddress
   , deriveAddress
   , stringAddress
   , newSecKey
@@ -67,9 +66,7 @@ import           Data.Bits
 import qualified Data.ByteArray         as ByteArray
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString        as ByteString
-import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8  as Char8
-import qualified Data.ByteString.Lazy   as Lazy
 import           Data.Either.Extra      (maybeToEither)
 import           Data.Map.Strict        (Map)
 import qualified Data.Map.Strict        as M
@@ -138,56 +135,6 @@ padZeros n string = replicate (n - length string) '0' ++ string
 show256 :: Word256 -> String
 show256 = padZeros 64 . flip showHex ""
 
-unAddress :: Address -> Word160
-unAddress (Address n) = n
-
-instance FromHttpApiData Address where
-  parseUrlPiece text = case stringAddress (Text.unpack text) of
-    Nothing      -> Left $ "Could not decode Address: " <> text
-    Just address -> Right address
-
-instance ToForm Address where
-  toForm address = [("address", toQueryParam address)]
-
-instance FromForm Address where fromForm = parseUnique "address"
-
-instance ToSample Address where
-  toSamples _ = samples [Address 0xdeadbeef, Address 0x12345678]
-
-instance ToCapture (Capture "address" Address) where
-  toCapture _ = DocCapture "address" "an Ethereum address"
-
-instance ToCapture (Capture "contractAddress" Address) where
-  toCapture _ = DocCapture "contractAddress" "an Ethereum address"
-
-instance RLPEncodable Address where
-  rlpEncode addr = rlpEncode . fst . Base16.decode . Char8.pack $ formatAddressWithoutColor addr
-  rlpDecode obj = Address . fromInteger <$> rlpDecode obj
-
-instance RLPEncodable (Maybe Address) where
-  rlpEncode = maybe rlp0 rlpEncode
-  rlpDecode x = if x == rlp0 then return Nothing else Just <$> rlpDecode x
-
-instance ToCapture (Capture "userAddress" Address) where
-  toCapture _ = DocCapture "userAddress" "an Ethereum address"
-
-instance ToParamSchema Address where
-  toParamSchema _ = mempty
-    & type_ .~ SwaggerString
-    & minimum_ ?~ fromInteger (toInteger . unAddress $ (minBound :: Address))
-    & maximum_ ?~ fromInteger (toInteger . unAddress $ (maxBound :: Address))
-    & format ?~ "hex string"
-
-instance ToSchema Address where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "Address")
-      ( mempty
-        & type_ .~ SwaggerString
-        & example ?~ "address=deadbeef" --toJSON (Address 0xdeadbeef) -- FIXME if causing troubles outside /faucet
-        & description ?~ "Ethereum Address, 20 byte hex encoded string" )
-
-deriveAddress :: PubKey -> Address
-deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
 
 
 instance RLPEncodable CodePtr where
@@ -575,12 +522,8 @@ instance ToSchema AccountInfo where
 
 
 
-keccak256Address :: ByteString -> Address
-keccak256Address
-  = Address
-  . Binary.decode
-  . Lazy.fromStrict
-  . ByteString.drop 12
-  . ByteArray.convert
-  . digestKeccak256
-  . keccak256
+deriveAddress :: PubKey -> Address
+deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
+
+
+
