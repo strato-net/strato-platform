@@ -42,6 +42,7 @@ import           BlockApps.Storage               as S
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types          as T
 import           BlockApps.XAbiConverter
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
 
@@ -203,7 +204,7 @@ getContractsDetails :: Address -> Maybe ChainId -> Bloc ContractDetails
 getContractsDetails contractAddress chainId = do
   let err = UserError $ Text.concat
               [ "getContractsDetails: couldn't find contract details for address "
-              , Text.pack $ addressString contractAddress
+              , Text.pack $ formatAddressWithoutColor contractAddress
               , " on chain "
               , maybe "Main" (Text.pack . show) chainId
               ]

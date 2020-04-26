@@ -6,7 +6,8 @@
 module Blockchain.Strato.Model.Address
     ( Address(..),
       prvKey2Address, pubKey2Address,
-      formatAddress, formatAddressWithoutColor, stringAddress,
+      formatAddressWithoutColor,
+      stringAddress,
       getNewAddress_unsafe,
       addressAsNibbleString, addressFromNibbleString,
       addressToHex, addressFromHex
@@ -31,6 +32,7 @@ import qualified Data.NibbleString                    as N
 
 import           Data.Hashable
 import qualified Data.Text                            as T
+import           Database.Persist.Sql                 hiding (get)
 import           Text.Read                            (readMaybe)
 
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
@@ -91,19 +93,15 @@ instance PathPiece Address where
     where
       ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word160,String)]
 
-
-formatAddress :: Address -> String
-formatAddress (Address x) = padZeros 40 $ showHex x ""
-
 {-
  make into a string rather than an object
 -}
 instance AS.ToJSON Address where
-  toJSON = String . T.pack . formatAddress
+  toJSON = String . T.pack . formatAddressWithoutColor
 
 instance AS.ToJSONKey Address where
   toJSONKey = ToJSONKeyText f (Enc.text . f)
-          where f = T.pack . formatAddress
+          where f = T.pack . formatAddressWithoutColor
 
 instance AS.FromJSON Address where
   parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ drop0x $ T.unpack s
@@ -116,10 +114,10 @@ instance FromJSONKey Address where
   fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
 instance Lei.Pretty Address where
-  pretty = Lei.text . CL.yellow . formatAddress
+  pretty = Lei.text . CL.yellow . formatAddressWithoutColor
 
 instance Format Address where
-  format = CL.yellow . formatAddress
+  format = CL.yellow . formatAddressWithoutColor
 
 instance ShortDescription Address where
   shortDescription x = CL.yellow . shorten 12 . padZeros 40 $ showHex x ""
@@ -131,11 +129,22 @@ instance Binary Address where
     let byteString = B.pack bytes
     return (Address $ fromInteger $ byteString2Integer byteString)
 
+instance PersistField Address where
+  toPersistValue = PersistText . T.pack . formatAddressWithoutColor
+  fromPersistValue (PersistText t) = maybeToEither "could not decode address"
+                                   . stringAddress
+                                   . T.unpack $ t
+  fromPersistValue x = Left . T.pack $ "PersistField Address: expected PersistText: " ++ show x
+
+instance PersistFieldSql Address where
+  sqlType _ = SqlOther "text"
+--  sqlType _ = SqlOther "varchar(64)"
+
 stringAddress :: String -> Maybe Address
 stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
 
 instance ToHttpApiData Address where
-  toUrlPiece = T.pack . formatAddress
+  toUrlPiece = T.pack . formatAddressWithoutColor
 
 instance NFData Address
 
@@ -152,7 +161,7 @@ addressFromNibbleString::N.NibbleString->Address
 addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteString
 
 formatAddressWithoutColor::Address->String
-formatAddressWithoutColor = formatAddress
+formatAddressWithoutColor x = padZeros 40 $ showHex x ""
 
 addressToHex :: Address -> B.ByteString
 addressToHex = B16.encode . BL.toStrict . encode

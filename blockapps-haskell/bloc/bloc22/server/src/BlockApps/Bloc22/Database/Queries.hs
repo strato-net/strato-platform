@@ -51,6 +51,7 @@ import           BlockApps.SolidityVarReader     (byteStringToWord256, word256To
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 
 
@@ -772,7 +773,7 @@ instance QueryRunnerColumnDefault PGBytea Address where
     (fromMaybe (error "could not decode address") . stringAddress . Char8.unpack)
     queryRunnerColumnDefault
 instance Default Constant Address (Column PGBytea) where
-  def = lmap (Char8.pack . addressString) def
+  def = lmap (Char8.pack . formatAddressWithoutColor) def
 
 instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
   queryRunnerColumnDefault = queryRunnerColumn id

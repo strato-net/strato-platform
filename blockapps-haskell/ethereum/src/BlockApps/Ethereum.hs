@@ -17,7 +17,6 @@ module BlockApps.Ethereum
   , Hex (..)
   , unAddress
   , deriveAddress
-  , addressString
   , stringAddress
   , newSecKey
   , ChainId (..)
@@ -132,26 +131,12 @@ instance (Integral n, Show n) => ToHttpApiData (Hex n) where
 instance Arbitrary x => Arbitrary (Hex x) where
   arbitrary = genericArbitrary uniform
 
-instance PersistField Address where
-  toPersistValue = PersistText . Text.pack . addressString
-  fromPersistValue (PersistText t) = maybeToEither "could not decode address"
-                                   . stringAddress
-                                   . Text.unpack $ t
-  fromPersistValue x = Left . Text.pack
-                     $ "PersistField Address: expected PersistText: " ++ show x
-
-
-instance PersistFieldSql Address where
-  sqlType _ = SqlOther "text"
 
 padZeros :: Int -> String -> String
 padZeros n string = replicate (n - length string) '0' ++ string
 
 show256 :: Word256 -> String
 show256 = padZeros 64 . flip showHex ""
-
-addressString :: Address -> String
-addressString = formatAddress
 
 unAddress :: Address -> Word160
 unAddress (Address n) = n
@@ -176,7 +161,7 @@ instance ToCapture (Capture "contractAddress" Address) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address"
 
 instance RLPEncodable Address where
-  rlpEncode addr = rlpEncode . fst . Base16.decode . Char8.pack $ addressString addr
+  rlpEncode addr = rlpEncode . fst . Base16.decode . Char8.pack $ formatAddressWithoutColor addr
   rlpDecode obj = Address . fromInteger <$> rlpDecode obj
 
 instance RLPEncodable (Maybe Address) where

@@ -8,7 +8,6 @@ module BlockApps.Ethereum
   (
     Address(..)
   , stringAddress
-  , addressString
   , ChainId (..)
   , Keccak256 (..)
   ) where
@@ -24,9 +23,6 @@ import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Address
-
-addressString :: Address -> String
-addressString = formatAddress
 
 --------------------------------------------------------------------------------
 

@@ -13,7 +13,6 @@
 module BlockApps.Strato.Types
   ( Strung (..)
   , Address (..)
-  , addressString
   , stringAddress
   , ChainId (..)
   , Keccak256 (..)

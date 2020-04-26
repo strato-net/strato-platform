@@ -402,7 +402,7 @@ instance Arbitrary a => Arbitrary (MaybeNamed a) where
 
 instance ToHttpApiData (MaybeNamed Address) where
   toUrlPiece (Named _name)  = _name
-  toUrlPiece (Unnamed addr) = Text.pack . addressString $ addr
+  toUrlPiece (Unnamed addr) = Text.pack . formatAddressWithoutColor $ addr
 
 instance FromHttpApiData (MaybeNamed Address) where
   parseUrlPiece txt = case stringAddress (Text.unpack txt) of

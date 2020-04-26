@@ -72,7 +72,7 @@ main = do
                 let !bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
                     !pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                     selfAddress = prvKey2Address pkey
-                putStrLn . ("NODEKEY address: " ++) . formatAddress $ selfAddress
+                putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
                 addSelfAsMetric selfAddress
                 when (null validators) . ioError . userError
                     $ "must specify --validators with --blockstanbul"

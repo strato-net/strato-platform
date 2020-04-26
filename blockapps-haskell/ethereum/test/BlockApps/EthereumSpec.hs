@@ -46,7 +46,7 @@ spec = modifyMaxSuccess (const 10) $ do
     prop "has inverse HTTP Api Data decode/encode" $ httpApiDataProp @ Address
     prop "has inverse Form Url decode/encode" $ formProp @ Address
     prop "has inverse String decode/encode" $ \ address ->
-      stringAddress (addressString address) === Just address
+      stringAddress (formatAddressWithoutColor address) === Just address
 
   describe "Keccak256" $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ Keccak256

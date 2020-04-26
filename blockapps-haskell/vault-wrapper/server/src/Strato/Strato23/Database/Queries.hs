@@ -103,7 +103,7 @@ instance QueryRunnerColumnDefault PGBytea Address where
     (fromMaybe (error "could not decode address") . stringAddress . C8.unpack)
     queryRunnerColumnDefault
 instance Default Constant Address (Column PGBytea) where
-  def = lmap (C8.pack . addressString) def
+  def = lmap (C8.pack . formatAddressWithoutColor) def
 
 instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
   queryRunnerColumnDefault = queryRunnerColumn id

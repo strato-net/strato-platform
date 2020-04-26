@@ -236,7 +236,7 @@ valueToText = \case
   ValueMapping m ->
     let pairs = map (\(sv, v) -> simpleValueToText sv <> ": " <> valueToText v) $ Map.toList m
     in "{" <> Text.intercalate "," pairs <> "}"
-  ValueContract addr -> Text.pack $ addressString addr
+  ValueContract addr -> Text.pack $ formatAddressWithoutColor addr
   ValueEnum{}        -> error "ValueEnum to text"
   ValueFunction{}    -> error "ValueFunction to text"
   ValueStruct{}      -> error "ValueStruct to text"
@@ -245,7 +245,7 @@ valueToText = \case
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
   ValueBool tf -> if tf then "true" else "false"
-  ValueAddress addr -> Text.pack $ "0x" ++ addressString addr
+  ValueAddress addr -> Text.pack $ "0x" ++ formatAddressWithoutColor addr
   ValueString tx -> Text.pack $ show tx
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b

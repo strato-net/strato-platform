@@ -30,6 +30,7 @@ import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Wei
 
@@ -1244,7 +1245,7 @@ spec =
       threadDelay 4000000
       let
         Right bobAddr = postBobEither
-        args = Map.singleton "userKey" . ArgString . Text.pack . addressString $ bobAddr
+        args = Map.singleton "userKey" . ArgString . Text.pack . formatAddressWithoutColor $ bobAddr
         contrMethodReq = PostUsersContractMethodRequest pw "createIdentityAgent" args (Just $ Strung 0) Nothing Nothing
       identityAgentEither <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod iamUsername iamUserAddr (ContractName "IdentityAccessManager") iamAddr Nothing True contrMethodReq)

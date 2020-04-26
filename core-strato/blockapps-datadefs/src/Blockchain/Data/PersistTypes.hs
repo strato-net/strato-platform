@@ -15,7 +15,6 @@ import           Database.Persist.Sql
 import           Database.Persist.TH
 import           Numeric
 
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.StateRoot
@@ -30,16 +29,6 @@ integerCap = 1000
 showHexFixed :: (Integral a, Show a) => Int -> a -> String
 showHexFixed len val = pad $ showHex val ""
     where pad s = if length s >= len then s else pad ('0' : s)
-
-instance PersistField Address where
-  toPersistValue (Address x) = PersistText . T.pack $ showHex  (fromIntegral $ x :: Integer) ""
-  fromPersistValue (PersistText t) = Right $ (Address wd160)
-    where
-      ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word160,String)]
-  fromPersistValue x = Left $ T.pack $ "PersistField Address: expected PersistText: " ++ (show x)
-
-instance PersistFieldSql Address where
-  sqlType _ = SqlOther $ T.pack "varchar(64)"
 
 {-
 instance PersistField Integer where
