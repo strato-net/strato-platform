@@ -33,8 +33,6 @@ module BlockApps.Ethereum
   , recoverTransaction
   , transactionFrom
   , newAccountAddress           -- not used
-    -- * Blocks
-  , BlockHeader (..)            -- not used
     -- * Ethereum Types
   , incrNonce                  -- not used
   -- , eth
@@ -63,12 +61,12 @@ import qualified Data.RLP               as RLP (RLPObject(..))
 import           Data.Swagger
 import           Data.Text              (Text)
 import qualified Data.Text              as Text
-import           Data.Time
+--import           Data.Time
 import           Data.Word
 import           Generic.Random
 import           GHC.Generics
 import           Numeric
-import           Numeric.Natural
+--import           Numeric.Natural
 import           Servant.API
 import           Test.QuickCheck        hiding ((.&.))
 import           Test.QuickCheck.Instances    ()
@@ -326,27 +324,6 @@ transactionFrom = fmap deriveAddress . recoverTransaction
 newAccountAddress :: Transaction -> Address
 newAccountAddress Transaction{..}
   = keccak256Address $ rlpSerialize (transactionTo, transactionNonce)
-
-data BlockHeader = BlockHeader
-  { blockHeaderParentHash       :: Keccak256
-  , blockHeaderOmmersHash       :: Keccak256
-  , blockHeaderBeneficiary      :: Address
-  , blockHeaderStateRoot        :: Keccak256
-  , blockHeaderTransactionsRoot :: Keccak256
-  , blockHeaderReceiptsRoot     :: Keccak256
-  , blockHeaderLogsBloom        :: BloomFilter
-  , blockHeaderDifficulty       :: Natural
-  , blockHeaderNumber           :: Natural
-  , blockHeaderGasLimit         :: Gas
-  , blockHeaderGasUsed          :: Gas
-  , blockHeaderTimeStamp        :: UTCTime
-  , blockHeaderExtraData        :: Word256
-  , blockHeaderMixHash          :: Keccak256
-  , blockHeaderNonce            :: Nonce
-  , blockHeaderChainId          :: Maybe Word256
-  } deriving (Eq,Show,Generic)
-
-
 
 newtype BloomFilter = BloomFilter ByteString deriving (Eq, Show, Generic)
 
