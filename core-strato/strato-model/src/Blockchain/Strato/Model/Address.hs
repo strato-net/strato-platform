@@ -6,11 +6,6 @@
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
-
-
-
-
-
 module Blockchain.Strato.Model.Address
     ( Address(..),
       prvKey2Address, pubKey2Address,
@@ -26,56 +21,51 @@ module Blockchain.Strato.Model.Address
 import           Control.DeepSeq
 import           Control.Lens.Operators
 import           Control.Monad
-import           Data.Data
-import           Data.Maybe                           (fromMaybe)
-import           Numeric
-import           Test.QuickCheck                      (Arbitrary(..))
-
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
-import qualified Data.ByteArray         as ByteArray
-
-import qualified Data.RLP                             as RLP2
-
 import           Data.Binary
+import qualified Data.ByteArray         as ByteArray
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy                 as BL
-import qualified Data.NibbleString                    as N
-
+import           Data.Data
 import           Data.Hashable
+import           Data.Maybe                           (fromMaybe)
 import           Data.Swagger                         hiding (Format, format, get, put)
 import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
 import           Database.Persist.Sql                 hiding (get)
-import           Text.Read                            (readMaybe)
-
+import           GHC.Generics
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
+import           Numeric
+import           Servant.API
+import           Servant.Docs
 import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
 import           Text.Printf
+import           Test.QuickCheck                      (Arbitrary(..))
+import           Text.Read                            (readMaybe)
+import           Web.FormUrlEncoded
 import           Web.PathPieces
-import           Web.HttpApiData
+
+
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
 import           Blockchain.Strato.Model.Util
+import qualified Data.NibbleString                    as N
+import qualified Data.RLP                             as RLP2
 import qualified Text.Colors       as CL
 import           Text.Format
 import           Text.ShortDescription
 import           Text.Tools                           (shorten)
 
-import           Servant.API
-import           Servant.Docs
 
-import           GHC.Generics
-
-import           Web.FormUrlEncoded
 
 instance RLPSerializable Address where
   rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
