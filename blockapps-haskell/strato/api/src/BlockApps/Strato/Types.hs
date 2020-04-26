@@ -75,6 +75,7 @@ import           BlockApps.Ethereum           hiding (Transaction(..), transacti
 import           Blockchain.SolidVM.Model
 import           BlockApps.Strato.TypeLits
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce

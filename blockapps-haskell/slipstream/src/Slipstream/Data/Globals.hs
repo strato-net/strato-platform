@@ -12,8 +12,8 @@ import           GHC.Generics
 
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi     (ContractDetails(..))
-import           BlockApps.Ethereum
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.SHA
 import           Slipstream.Data.GlobalsColdStorage (Handle)

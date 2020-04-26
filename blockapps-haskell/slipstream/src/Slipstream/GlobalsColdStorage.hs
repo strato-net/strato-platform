@@ -26,9 +26,9 @@ import System.IO.Unsafe
 import UnliftIO.Concurrent
 import UnliftIO.Resource
 
-import BlockApps.Ethereum
 import BlockApps.Solidity.Value
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainId
 
 import qualified Slipstream.DelayedBloomFilter as DBF
 import Slipstream.Metrics

@@ -28,7 +28,6 @@ import           Test.QuickCheck
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.Types
 

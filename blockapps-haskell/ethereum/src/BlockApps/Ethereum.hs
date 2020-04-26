@@ -18,7 +18,6 @@ module BlockApps.Ethereum
   , deriveAddress
   , stringAddress
   , newSecKey
-  , ChainId (..)
   , chainIdString
   , stringChainId
   , shaToHex

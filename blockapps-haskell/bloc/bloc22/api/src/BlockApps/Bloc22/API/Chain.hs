@@ -33,6 +33,7 @@ import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.TypeLits
 
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
 
 --------------------------------------------------------------------------------
 -- | Routes and types
