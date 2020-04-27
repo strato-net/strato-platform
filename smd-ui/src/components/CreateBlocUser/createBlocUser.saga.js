@@ -19,7 +19,7 @@ import { createUrl } from '../../lib/url';
 
 export function createBlocUserApiCall(username, password) {
   const options = { params: { username } };
-  const url = env.BLOC_URL + createUrl("/users/:username", options);
+  const url = env.BLOC_URL + createUrl("/users/::username", options);
 
   return fetch(
     url,
