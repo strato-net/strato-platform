@@ -178,9 +178,6 @@ instance FromHttpApiData Word256 where
     Nothing      -> Left $ "Could not decode Word256: " <> text
     Just (Hex w256) -> Right w256
 
-instance ToParamSchema Keccak256 where
-  toParamSchema _ = mempty & type_ .~ SwaggerString
-
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
 

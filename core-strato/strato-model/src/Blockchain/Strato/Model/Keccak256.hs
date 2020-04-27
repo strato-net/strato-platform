@@ -111,6 +111,10 @@ instance Arbitrary Keccak256 where
 instance ToCapture (Capture "hash" Keccak256) where
   toCapture _ = DocCapture "hash" "a transaction hash"
 
+instance ToParamSchema Keccak256 where
+  toParamSchema _ = mempty & type_ .~ SwaggerString
+
+
 keccak256 :: ByteString -> Keccak256
 keccak256 = Keccak256 . hash
 
