@@ -14,7 +14,7 @@ import { handleErrors } from '../../../../lib/handleErrors';
 import { isOauthEnabled } from '../../../../lib/checkMode';
 import { createUrl } from '../../../../lib/url';
 
-const blocSendUrl = env.BLOC_URL + "/users/:user/:address/send";
+const blocSendUrl = env.BLOC_URL + "/users/::user/::address/send";
 const transactionUrl = env.STRATO_URL_V23 + "/transaction";
 
 export function sendTokensAPICall(from, fromAddress, toAddress, value, password, chainid) {
