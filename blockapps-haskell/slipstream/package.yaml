@@ -44,7 +44,6 @@ dependencies:
   - http-client
   - lens
   - lrucache
-  - MissingH
   - monad-control
   - mtl
   - network
@@ -81,6 +80,7 @@ executables:
     main: Main.hs
     dependencies:
       - base
+      - aeson
       - hflags
       - monad-control
       - mtl
