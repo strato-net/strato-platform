@@ -55,9 +55,6 @@ default-extensions:
   - UnboxedTuples
 
 dependencies:
-  - text
-  - bytestring
-  - base-prelude
   - base
 
 library:
@@ -70,6 +67,10 @@ library:
     c-source/secp256k1/include
   extra-libraries:
     gmp
+  dependencies:
+  - base-prelude
+  - bytestring
+  - text
 
 tests:
   blockapps-ecrecover:
@@ -79,14 +80,11 @@ tests:
       - blockapps-ecrecover
       # testing:
       - tasty
-      - tasty-quickcheck
       - tasty-hunit
-      - QuickCheck
       # parallelism and concurrency:
       - parallel
       # basics:
       - base
-      - bytestring
 
 benchmarks:
   sequential-benchmark:
