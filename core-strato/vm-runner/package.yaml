@@ -100,11 +100,14 @@ benchmarks:
     main: Microbench.hs
     other-modules: []
     dependencies:
+      - bytestring
       - blockapps-haskoin
+      - containers
       - criterion
       - deepseq
       - ethereum-vm
       - hashable
+      - strato-model
       - vector
       - unordered-containers
 
@@ -113,5 +116,6 @@ benchmarks:
     main: ExtractBench.hs
     other-modules: []
     dependencies:
+      - bytestring
       - criterion
       - ethereum-vm

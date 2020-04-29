@@ -50,7 +50,9 @@ benchmarks:
     main: MPBench.hs
     source-dirs: bench/
     dependencies:
+      - bytestring
       - criterion
+      - deepseq
       - directory
       - merkle-patricia-db
       - directory

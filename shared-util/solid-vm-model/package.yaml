@@ -39,6 +39,10 @@ benchmarks:
     main: StorageBench.hs
     other-modules: []
     dependencies:
+      - binary
+      - bytestring
       - cereal
       - criterion
+      - ethereum-rlp
       - solid-vm-model
+      - strato-model
