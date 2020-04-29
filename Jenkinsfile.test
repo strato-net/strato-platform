@@ -216,7 +216,7 @@ pipeline {
                   git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                   cd strato-api-tests
                   docker build --tag strato-api-tests .
-                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=false strato-api-tests
+                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=false -e DEBUG_LOG=false strato-api-tests
                 '''
               }
           },
@@ -355,7 +355,7 @@ pipeline {
                   git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                   cd strato-api-tests
                   docker build --tag strato-api-tests .
-                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=true strato-api-tests
+                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=true -e DEBUG_LOG=false strato-api-tests
                 '''
               }
             }
