@@ -78,6 +78,7 @@ tests:
     main: Main.hs
     dependencies:
       - blockapps-ecrecover
+      - bytestring
       # testing:
       - tasty
       - tasty-hunit
