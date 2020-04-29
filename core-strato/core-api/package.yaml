@@ -2,47 +2,44 @@ name:                core-api
 
 dependencies:
 - base >= 4.7 && < 5
-- aeson
-- base16-bytestring
-- base64-bytestring
-- binary
-- blockapps-data
-- blockapps-datadefs
-- blockapps-haskoin
-- blockapps-util
-- bytestring
-- clock
-- containers
-- deepseq
-- directory
-- esqueleto
-- ethereum-discovery
-- extra
-- filepath
-- format
-- http-api-data
-- monad-alter
-- monad-logger
-- mtl
 - persistent
 - persistent-postgresql
-- process
-- servant-multipart
 - servant-server
-- seqevents
 - strato-conf
-- strato-model
-- template-haskell
-- text
-- transformers
-- wai-cors
-- wai-extra
-- warp
-- yaml
 
 
 library:
   source-dirs: src
+  dependencies:
+  - aeson
+  - base16-bytestring
+  - base64-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-haskoin
+  - blockapps-util
+  - bytestring
+  - clock
+  - containers
+  - deepseq
+  - directory
+  - esqueleto
+  - ethereum-discovery
+  - extra
+  - filepath
+  - format
+  - http-api-data
+  - monad-alter
+  - monad-logger
+  - mtl
+  - process
+  - seqevents
+  - servant-multipart
+  - strato-model
+  - template-haskell
+  - text
+  - transformers
 
 executables:
   core-api:
@@ -54,3 +51,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - core-api
+    - monad-logger
+    - wai-cors
+    - wai-extra
+    - warp

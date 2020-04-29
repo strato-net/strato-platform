@@ -10,7 +10,6 @@ module Handlers.Chain (
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.IO.Class
---import           Data.Aeson
 import qualified Data.ByteString.Char8          as BC
 import qualified Data.ByteString.Lazy.Char8     as BLC
 import qualified Data.Map                       as M
@@ -22,7 +21,6 @@ import           Database.Persist.Postgresql
 import           Numeric
 import           Servant
 
-import           Blockchain.Data.ChainId
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
 import           Blockchain.Data.TXOrigin
@@ -30,6 +28,7 @@ import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.TypeLits
@@ -49,8 +48,7 @@ getChain :: ConnectionPool -> Maybe ChainId -> Handler (NamedMap "id" Word256 "i
 getChain pool mChainId = liftIO $ runSQLM pool $ 
   case mChainId of
     Nothing -> getChainInfos []
-    Just (ChainId (Just chainid)) -> getChainInfos [chainid]
-    Just (ChainId Nothing) -> getChainInfos [0]
+    Just (ChainId chainid) -> getChainInfos [chainid]
     
 postChain :: ChainInfo -> Handler Text
 postChain ci = runStdoutLoggingT $ do

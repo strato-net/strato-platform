@@ -2,7 +2,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Blockchain.Strato.Model.SHA where
+
+module Blockchain.Strato.Model.SHA (
+  SHA(..),
+  keccak256,
+  keccak512,
+  blockstanbulMixHash,
+  formatSHAWithoutColor,
+  hash,
+  rlpHash,
+  shaFromHex,
+  shaToHex,
+  superProprietaryStratoSHAHash,
+  unSHA
+  ) where
 
 
 import              Blockchain.Strato.Model.Util

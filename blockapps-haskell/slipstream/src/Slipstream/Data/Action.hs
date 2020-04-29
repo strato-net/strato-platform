@@ -15,7 +15,6 @@ module Slipstream.Data.Action
   , module Slipstream.Data.Action
   ) where
 
-import           BlockApps.Ethereum
 import           Control.DeepSeq
 import           Data.Map.Strict         (Map)
 import qualified Data.Map.Strict         as M
@@ -29,7 +28,10 @@ import           GHC.Generics
 import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
                                                 , CallType(..), CallData(..))
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
+import           Blockchain.Strato.Model.SHA
 
 data AggregateAction = AggregateAction
   { actionBlockHash      :: SHA

@@ -297,7 +297,7 @@ runTest test = do
   RawData (fromMaybe B.empty retVal) `shouldBe` out test
   unless (null postTest && isLeft result) $
     afterAddressStates `shouldBe` postTest
-  mapM_ (gasRemaining `shouldBe`) $ remainingGas test
+  mapM_ (gasRemaining `shouldBe`) $ fmap fromIntegral $ remainingGas test
   if isNothing (callcreates test)
       then returnedCallCreates `shouldBe` Just []
       else fmap reverse returnedCallCreates `shouldBe` callcreates test

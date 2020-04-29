@@ -51,7 +51,6 @@ import Blockapps.Crossmon
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
-import BlockApps.Ethereum
 import BlockApps.Logging
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
@@ -64,8 +63,9 @@ import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr (codePtrToSHA)
-import Blockchain.Strato.Model.SHA (hash)
+import Blockchain.Strato.Model.ChainId
+import Blockchain.Strato.Model.CodePtr
+import Blockchain.Strato.Model.SHA
 
 
 import Slipstream.Data.Action

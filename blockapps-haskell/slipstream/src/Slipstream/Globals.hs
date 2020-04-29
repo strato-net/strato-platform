@@ -29,11 +29,12 @@ import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8)
 import           UnliftIO.IORef
 
-import           BlockApps.Ethereum
 import           BlockApps.Logging
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi     (ContractDetails(..), Xabi(..))
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.CodePtr
 
 import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage

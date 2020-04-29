@@ -4,7 +4,7 @@ module BlockApps.Storage where
 import           Control.DeepSeq
 import           GHC.Generics
 
-import           BlockApps.Ethereum (Word256)
+import           Blockchain.Strato.Model.ExtendedWord
 
 type Storage = Word256 -> Word256
 

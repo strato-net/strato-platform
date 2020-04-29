@@ -50,9 +50,6 @@ import           Text.Format
 
 import           FaucetKey
 import           SQLM
-
-import Web.FormUrlEncoded
-
   
 type API = 
   "faucet" :> ReqBody '[FormUrlEncoded] Address
@@ -80,10 +77,6 @@ appFaucetNonce :: IORef Integer -- The last maximum nonce given out
 appFaucetNonce = unsafePerformIO (newIORef 0)
 
 ---------------
-
-instance FromForm Address where
-  fromForm v = Address <$> parseUnique "address" v
-
 
 postFaucet :: ConnectionPool -> Address -> Handler Value
 postFaucet pool addressParam = runStdoutLoggingT $ do
