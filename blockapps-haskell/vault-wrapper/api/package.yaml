@@ -21,38 +21,21 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
   - base >= 4.7 && < 5
-  - base16-bytestring
-  - binary
+
+library:
+  source-dirs: src
+  dependencies:
+  - aeson
+  - aeson-casing
   - blockapps-ethereum
   - bytestring
   - cryptonite
   - haskoin-shim
-  - http-media
   - lens
-  - memory
   - saltine
   - servant
   - servant-server
   - strato-model
   - swagger2
   - text
-  - wai
-  - wai-extra
-  - wai-middleware-static
-  - warp
-  - aeson
-  - aeson-casing
 
-library:
-  source-dirs: src
-
-tests:
-  API-test:
-    main:                Spec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - blockapps-vault-wrapper-api

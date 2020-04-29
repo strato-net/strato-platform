@@ -16,40 +16,33 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - aeson
-  - base16-bytestring
-  - binary
-  - bytestring
-  - classy-prelude
-  - containers
-  - cryptonite
   - deepseq
-  - extra
-  - generic-random
-  - hashable
   - haskoin-shim
   - http-api-data
-  - lens
-  - largeword
-  - memory
-  - persistent
   - QuickCheck
   - quickcheck-instances
   - relapse
-  - servant
-  - servant-docs
   - strato-model
-  - swagger2
-  - text
-  - time
 
 library:
   source-dirs: src/
+  dependencies:
+    - bytestring
+    - containers
+    - cryptonite
+    - generic-random
+    - lens
+    - memory
+    - servant
+    - swagger2
+    - text
 
 tests:
   blockapps-ethereum-test:
     main: Main.hs
     source-dirs: test/
     dependencies:
+      - base16-bytestring
       - blockapps-ethereum
       - clock
       - hspec

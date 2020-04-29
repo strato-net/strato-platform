@@ -6,44 +6,13 @@ build-type:          Simple
 license:             Apache-2.0
 
 dependencies:
-  - QuickCheck
-  - aeson
-  - ansi-wl-pprint
   - base
-  - base16-bytestring
-  - binary
   - blockapps-haskoin
   - bytestring
-  - bytestring-arbitrary
-  - classy-prelude
-  - containers
-  - cpu
-  - cryptonite
-  - deepseq
-  - derive
-  - ethereum-rlp
-  - extra
-  - fast-keccak256
-  - format
-  - hashable
-  - http-api-data
-  - integer-gmp
-  - lens
-  - memory
-  - nibblestring
-  - path-pieces
-  - persistent
-  - persistent-template
-  - primitive
-  - relapse           # remove this
-  - servant
-  - servant-docs
-  - servant-server
-  - swagger2
-  - text
-  - time
-  - unordered-containers
- 
+
+
+
+
 ghc-options: -Wall -Werror -fno-warn-warnings-deprecations
 
 library:
@@ -56,13 +25,51 @@ library:
     - GADTs
     - RecordWildCards
     - FunctionalDependencies
+  dependencies:
+    - QuickCheck
+    - aeson
+    - ansi-wl-pprint
+    - base16-bytestring
+    - binary
+    - bytestring-arbitrary
+    - classy-prelude
+    - containers
+    - cpu
+    - cryptonite
+    - deepseq
+    - derive
+    - ethereum-rlp
+    - extra
+    - fast-keccak256
+    - format
+    - hashable
+    - http-api-data
+    - integer-gmp
+    - lens
+    - memory
+    - nibblestring
+    - path-pieces
+    - persistent
+    - persistent-template
+    - primitive
+    - relapse           # remove this
+    - servant
+    - servant-docs
+    - servant-server
+    - swagger2
+    - text
+    - time
+    - unordered-containers
 
 tests:
   word256-tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
+      - aeson
       - aeson-qq
+      - base16-bytestring
+      - integer-gmp
       - strato-model
       - hspec
       - QuickCheck

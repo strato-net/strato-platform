@@ -20,27 +20,7 @@ github: blockapps/strato-platform/core-strato/blockapps-haskoin
 ghc-options: -Wall
 
 dependencies:
-  - aeson                    >= 0.7          && < 2
   - base                     >= 4.8          && < 5
-  - binary                   >= 0.7          && < 0.9
-  - byteable                 >= 0.1          && < 0.2
-  - bytestring               >= 0.10         && < 0.11
-  - bytestring-arbitrary
-  - base16-bytestring        >= 0.1          && < 0.2
-  - conduit                  >= 1.2          && < 1.4
-  - containers               >= 0.5          && < 0.6
-  - cryptohash               >= 0.11         && < 0.12
-  - deepseq                  >= 1.4          && < 2
-  - hashable
-  - mtl                      >= 2.2          && < 3
-  - murmur3                  >= 1.0          && < 2
-  - network                  >= 2.6          && < 3
-  - pbkdf                    >= 1.1          && < 2
-  - QuickCheck               >= 2.6          && < 3
-  - split                    >= 0.2          && < 0.3
-  - text                     >= 0.11         && < 2
-  - time                     >= 1.4          && < 2
-  - transformers
 
 library:
   source-dirs: ./
@@ -62,6 +42,27 @@ library:
     - RecordWildCards
     - DeriveDataTypeable
     - GADTs
+  dependencies:
+  - QuickCheck               >= 2.6          && < 3
+  - aeson                    >= 0.7          && < 2
+  - base16-bytestring        >= 0.1          && < 0.2
+  - binary                   >= 0.7          && < 0.9
+  - byteable                 >= 0.1          && < 0.2
+  - bytestring               >= 0.10         && < 0.11
+  - bytestring-arbitrary
+  - conduit                  >= 1.2          && < 1.4
+  - containers               >= 0.5          && < 0.6
+  - cryptohash               >= 0.11         && < 0.12
+  - deepseq                  >= 1.4          && < 2
+  - hashable
+  - mtl                      >= 2.2          && < 3
+  - murmur3                  >= 1.0          && < 2
+  - network                  >= 2.6          && < 3
+  - pbkdf                    >= 1.1          && < 2
+  - split                    >= 0.2          && < 0.3
+  - text                     >= 0.11         && < 2
+  - time                     >= 1.4          && < 2
+  - transformers
 
 
 tests:
@@ -69,8 +70,14 @@ tests:
     main:           Main.hs
     source-dirs: tests/
     dependencies:
+      - aeson                    >= 0.7          && < 2
+      - binary                   >= 0.7          && < 0.9
       - blockapps-haskoin
+      - bytestring               >= 0.10         && < 0.11
+      - containers               >= 0.5          && < 0.6
       - HUnit
+      - mtl                      >= 2.2          && < 3
+      - split                    >= 0.2          && < 0.3
       - test-framework                 >= 0.8        && < 0.9
       - test-framework-quickcheck2     >= 0.3        && < 0.4
       - test-framework-hunit           >= 0.3        && < 0.4
@@ -82,6 +89,7 @@ benchmarks:
     dependencies:
       - blockapps-haskoin
       - criterion
+      - deepseq                  >= 1.4          && < 2
       - largeword
       - data-dword
 

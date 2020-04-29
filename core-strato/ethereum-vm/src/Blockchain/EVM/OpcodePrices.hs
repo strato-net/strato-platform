@@ -133,8 +133,8 @@ gCREATEDATA = 200 :: Gas
 
 
 
-gSHA3BASE = 30 :: Gas
-gSHA3WORD = 6 :: Gas
+--gSHA3BASE = 30 :: Gas
+--gSHA3WORD = 6 :: Gas
 gECRECOVER = 3000 :: Gas
 gSHA256BASE = 60 :: Gas
 gSHA256WORD = 12 :: Gas
