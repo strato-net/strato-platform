@@ -14,30 +14,13 @@ ghc-options: -Wall
 
 dependencies:
   - base
-  - QuickCheck
-  - aeson
-  - aeson-casing
-  - binary
-  - blockapps-ethereum
   - blockapps-init
-  - blockapps-solidity
   - blockapps-strato-api
-  - containers
-  - generic-random
-  - http-api-data
-  - http-client
   - lens
-  - quickcheck-instances
-  - prettyprinter
   - servant
-  - servant-client
-  - servant-docs
   - servant-server
   - servant-swagger
   - swagger2
-  - text
-  - time
-  - unordered-containers
   - wai-cors
   - warp
 

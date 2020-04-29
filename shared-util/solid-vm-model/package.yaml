@@ -1,23 +1,7 @@
 name: solid-vm-model
 
 dependencies:
-  - aeson
-  - attoparsec
   - base
-  - base16-bytestring
-  - binary
-  - bytestring
-  - containers
-  - deepseq
-  - derive
-  - ethereum-rlp
-  - format
-  - hashable
-  - QuickCheck
-  - scientific
-  - strato-model
-  - text
-  - unordered-containers
 
 default-extensions:
   - BangPatterns
@@ -25,6 +9,17 @@ default-extensions:
 
 library:
   source-dirs: src/
+  dependencies:
+  - attoparsec
+  - binary
+  - bytestring
+  - deepseq
+  - ethereum-rlp
+  - format
+  - hashable
+  - scientific
+  - strato-model
+  - text
 
 tests:
   storage-test:
@@ -32,6 +27,8 @@ tests:
     main: StorageTest.hs
     other-modules: []
     dependencies:
+      - bytestring
+      - ethereum-rlp
       - hspec
       - solid-vm-model
       - unliftio
