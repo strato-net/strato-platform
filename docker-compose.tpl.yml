@@ -127,6 +127,7 @@ services:
     - SMD_MODE=${SMD_MODE}
     #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
+    - txQueueSize=${txQueueSize:-4096}
     - vaultWrapperHost=vault-wrapper:8000
     - zookeeper_conn=zookeeper
     build: .

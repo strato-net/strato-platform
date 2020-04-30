@@ -39,9 +39,11 @@ import           Text.Printf
 
 import           UnliftIO                           hiding (Handler(..))
 
-import           BlockApps.Ethereum                 (Address, ChainId, Nonce)
+import           BlockApps.Bloc22.API.Transaction
+import           BlockApps.Ethereum                 (ChainId, Nonce)
 import           BlockApps.Logging
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
 
 data Should a = Don't a | Do a
 data Compile = Compile
@@ -81,14 +83,15 @@ blocError err = do
 data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
 
 data BlocEnv = BlocEnv
-  { urlStrato       :: BaseUrl
-  , urlVaultWrapper :: BaseUrl
-  , httpManager     :: Manager
-  , dbPool          :: Pool Connection
-  , deployMode      :: DeployMode
-  , stateFetchLimit :: Integer
+  { urlStrato          :: BaseUrl
+  , urlVaultWrapper    :: BaseUrl
+  , httpManager        :: Manager
+  , dbPool             :: Pool Connection
+  , deployMode         :: DeployMode
+  , stateFetchLimit    :: Integer
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
-  , globalSourceCache :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
+  , globalSourceCache  :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
+  , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
 
 data BlocError

@@ -16,6 +16,7 @@ dependencies:
   - base
   - blockapps-solidity
   - cache
+  - clock
   - containers
   - text
 

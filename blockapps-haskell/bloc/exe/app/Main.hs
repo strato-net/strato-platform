@@ -24,9 +24,8 @@ import           Network.Wai.Middleware.Servant.Options
 import           Servant
 import           Servant.Client
 import           System.Clock
-import           System.IO                          (BufferMode (..),
-                                                     hSetBuffering, stderr,
-                                                     stdout)
+import           System.IO (BufferMode (..), stderr, stdout)
+import           UnliftIO
 
 
 
@@ -35,6 +34,7 @@ import qualified BlockApps.Bloc22.Database.Create as Bloc22
 import qualified BlockApps.Bloc22.Database.Migration as Bloc22
 import qualified BlockApps.Bloc22.Monad as Bloc22
 import qualified BlockApps.Bloc22.Server as Bloc22
+import qualified BlockApps.Bloc22.Server.Transaction as Bloc22
 import           BlockApps.Init
 import           BlockApps.Logging (LogLevel(..), flags_minLogLevel)
 import           HTTPQuantiles
@@ -77,6 +77,7 @@ main = do
   vaultWrapperUrl <- parseBaseUrl flags_vaultwrapperurl
   nonceCache <- newCache . Just $ TimeSpec (fromIntegral flags_nonceCounterTimeout) 0
   sourceCache <- newCache . Just $ TimeSpec (fromIntegral flags_sourceCacheTimeout) 0
+  tbqueue <- newTBQueueIO $ fromIntegral flags_txQueueSize
   let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
   let blocEnv = Bloc22.BlocEnv stratoUrl
                                vaultWrapperUrl
@@ -86,9 +87,14 @@ main = do
                                flags_stateFetchLimit
                                nonceCache
                                sourceCache
+                               tbqueue
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   void $ Bloc22.runBlocToIO blocEnv Bloc22.runBlocMigrations
-  run flags_port (appBloc blocEnv)
+  eRes <- race (Bloc22.runBlocToIO blocEnv Bloc22.txWorker)
+               (run flags_port (appBloc blocEnv))
+  case eRes of
+    Left e -> putStrLn $ "txWorker crashed with: " ++ show e
+    Right () -> putStrLn $ "Bloc Server crashed"
 
 dbExistsQuery22 :: Query
 dbExistsQuery22 = "SELECT 1 FROM pg_database WHERE datname='bloc22';"

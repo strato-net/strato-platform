@@ -24,6 +24,7 @@ dependencies:
   - servant-options
   - servant-server
   - text
+  - unliftio
   - wai
   - wai-cors
   - wai-extra

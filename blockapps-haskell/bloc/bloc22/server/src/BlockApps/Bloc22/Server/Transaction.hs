@@ -9,6 +9,9 @@ module BlockApps.Bloc22.Server.Transaction where
 
 import           Control.Applicative               ((<|>), liftA2)
 import           Control.Monad
+import           Control.Monad.Reader
+import           Data.Conduit
+import           Data.Conduit.TQueue
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Text                         (Text)
@@ -36,12 +39,26 @@ mergeTxParams (Just inner) (Just outer) = Just $
            (txparamsNonce inner <|> txparamsNonce outer)
 mergeTxParams inner outer = inner <|> outer
 
+txWorker :: Bloc ()
+txWorker = do
+  tbqueue <- asks txTBQueue
+  runConduit $ sourceTBQueue tbqueue .| processTxs
+  where processTxs = awaitForever $ \(a,b,r,c) ->
+          lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
+
 postBlocTransactionParallel :: Maybe Text
                             -> Maybe ChainId
-                            -> Bool
+                            -> Bool -- resolve
+                            -> Bool -- queue
                             -> PostBlocTransactionRequest
                             -> Bloc [BlocTransactionResult]
-postBlocTransactionParallel = postBlocTransaction' (Do CacheNonce)
+postBlocTransactionParallel a b resolve queue c =
+  if queue && not resolve
+    then do
+      tbqueue <- asks txTBQueue
+      atomically $ writeTBQueue tbqueue (a,b,resolve,c)
+      pure [] 
+    else postBlocTransaction' (Do CacheNonce) a b resolve c
 
 postBlocTransaction :: Maybe Text
                     -> Maybe ChainId

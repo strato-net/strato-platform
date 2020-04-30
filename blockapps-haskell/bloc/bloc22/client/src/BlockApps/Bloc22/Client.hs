@@ -208,6 +208,7 @@ postBlocTransactionParallel
   :: Maybe Text
   -> Maybe ChainId
   -> Bool
+  -> Bool
   -> PostBlocTransactionRequest
   -> ClientM [BlocTransactionResult]
 postBlocTransactionParallel = client (Proxy @ PostBlocTransactionParallel)

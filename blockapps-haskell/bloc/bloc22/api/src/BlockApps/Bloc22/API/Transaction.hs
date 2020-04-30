@@ -49,11 +49,16 @@ transactionType (BlocTransfer _) = TRANSFER
 transactionType (BlocContract _) = CONTRACT
 transactionType (BlocFunction _) = FUNCTION
 
+instance ToParam (QueryFlag "queue") where
+  toParam _ =
+    DocQueryParam "queue" ["true","false",""] "flag for queueing a transaction request" Flag
+
 type PostBlocTransactionParallel = "transaction"
   :> "parallel"
   :> S.Header "X-USER-UNIQUE-NAME" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
+  :> QueryFlag "queue"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocTransactionResult]
 
