@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
@@ -24,6 +25,7 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Users
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
+import           BlockApps.Logging
 import           BlockApps.Solidity.Contract()
 import           BlockApps.SolidityVarReader       (byteStringToWord256) -- TODO: Find a better module for this function
 import           BlockApps.Strato.Types            hiding (Transaction (..))
@@ -40,9 +42,12 @@ mergeTxParams (Just inner) (Just outer) = Just $
 mergeTxParams inner outer = inner <|> outer
 
 txWorker :: Bloc ()
-txWorker = do
+txWorker = forever $ do
   tbqueue <- asks txTBQueue
-  runConduit $ sourceTBQueue tbqueue .| processTxs
+  e <- try . runConduit $ sourceTBQueue tbqueue .| processTxs
+  case e of
+    Left (ex :: SomeException) -> $logErrorS "txWorker/error" . Text.pack $ show ex
+    Right () -> error "txWorker returned a Right (). This should never happen. Please contact Simon Peyton Jones."
   where processTxs = awaitForever $ \(a,b,r,c) ->
           lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
 
