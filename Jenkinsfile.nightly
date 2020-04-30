@@ -195,7 +195,22 @@ pipeline {
             dir ('strato-worktree/core-strato/strato-init') {
               sh './check_genesis_ingestion.sh'
             }
-          }
+          },
+
+          'STRATO API Tests': {
+            withCredentials([
+               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+            ]) {
+                sh '''#!/bin/bash -le
+                  set -x
+                  rm -rf strato-api-tests
+                  git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                  cd strato-api-tests
+                  docker build --tag strato-api-tests .
+                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=false -e DEBUG_LOG=false strato-api-tests
+                '''
+              }
+          },
         )
       }
     }
@@ -312,6 +327,29 @@ pipeline {
               cd strato-worktree/smd-ui
               docker build -f Dockerfile.test .
             '''
+          },
+
+          'STRATO API Tests': {
+            withCredentials([
+               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+            ]) {
+              withEnv([
+                "OAUTH_CLIENT_ID=all-test-ci-blockapps-net-infinite",
+                "OAUTH_CLIENT_SECRET=a7f199dc-9f50-45fc-9f50-13b40727ba31",
+                "OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration"
+              ]) {
+                    
+                sh '''#!/bin/bash -le
+                  set -x
+                  # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
+                  rm -rf strato-api-tests
+                  git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                  cd strato-api-tests
+                  docker build --tag strato-api-tests .
+                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=true -e DEBUG_LOG=false strato-api-tests
+                '''
+              }
+            }
           },
         )
       }
