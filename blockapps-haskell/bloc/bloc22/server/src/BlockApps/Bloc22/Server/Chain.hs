@@ -41,7 +41,6 @@ import           BlockApps.XAbiConverter           (xAbiToContract)
 
 import           Blockchain.Strato.Model.Address
 
-import           System.Clock
 import           UnliftIO
 
 governanceAddress :: Address

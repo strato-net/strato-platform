@@ -40,10 +40,11 @@ import           Text.Printf
 import           UnliftIO                           hiding (Handler(..))
 
 import           BlockApps.Bloc22.API.Transaction
-import           BlockApps.Ethereum                 (ChainId, Nonce)
 import           BlockApps.Logging
 import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Nonce
 
 data Should a = Don't a | Do a
 data Compile = Compile
