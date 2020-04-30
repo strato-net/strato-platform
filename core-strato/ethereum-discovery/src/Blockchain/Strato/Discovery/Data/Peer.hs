@@ -29,8 +29,8 @@ import           Blockchain.Data.PersistTypes ()
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB          (withGlobalSQLPool)
 import           Blockchain.MiscJSON          ()
-import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Metrics
+import           Blockchain.Strato.Model.SHA
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 PPeer

@@ -55,6 +55,9 @@ import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
 import           BlockApps.Storage                (Storage, Cache)
 import qualified BlockApps.Storage                as Storage
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Keccak256
 
 data SolidityDecodingException = EnumOutOfBounds Text Int
                                | MissingTypeStruct Text

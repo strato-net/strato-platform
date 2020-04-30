@@ -24,7 +24,7 @@ import qualified Data.Vector                       as V
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum                hiding (keccak256)
+import           BlockApps.Ethereum               
 import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue
@@ -39,6 +39,8 @@ import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
+import           Blockchain.Strato.Model.Address
+
 import           UnliftIO
 
 governanceAddress :: Address
@@ -51,7 +53,7 @@ replaceMembers :: Struct
                -> Map.Map Text ArgValue
 replaceMembers Struct{..} addrs m =
   let tag = "__members__"
-      members = ArgArray . V.fromList $ map (ArgString . Text.pack . addressString) addrs
+      members = ArgArray . V.fromList $ map (ArgString . Text.pack . formatAddressWithoutColor) addrs
       m' = Map.alter (const $ Just members) tag m
    in case OMap.lookup tag fields of
         Nothing -> m'

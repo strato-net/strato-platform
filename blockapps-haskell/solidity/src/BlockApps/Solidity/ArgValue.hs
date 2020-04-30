@@ -2,7 +2,6 @@
 
 module BlockApps.Solidity.ArgValue where
 
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
@@ -21,6 +20,8 @@ import qualified Data.Text.Encoding           as Text
 import qualified Data.Vector                  as V
 import           Test.QuickCheck
 import           Text.Read                    (readMaybe)
+
+import           Blockchain.Strato.Model.Address
 
 data ArgValue
   = ArgInt Integer

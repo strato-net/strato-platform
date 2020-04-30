@@ -161,6 +161,6 @@ genEthConf = do
                      peerId = uniqueString
                    },
                    quarryConfig = (quarryConfig cfg) {
-                    coinbaseAddress = formatAddress . fromInteger $ coerce myPrivKey
+                    coinbaseAddress = formatAddressWithoutColor . fromInteger $ coerce myPrivKey
                    }
                  }

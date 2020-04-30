@@ -2,7 +2,7 @@
 
 module Handler.TransactionResult where
 
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import qualified Database.Esqueleto           as E
 import           Handler.Common
 import           Import

@@ -5,7 +5,7 @@
 
 module Blockchain.Sequencer.DB.GetTransactionsDB where
 
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Control.Monad.Change.Modify
 import qualified Data.Set                     as S
 
