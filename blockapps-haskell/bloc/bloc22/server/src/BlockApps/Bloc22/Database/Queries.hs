@@ -46,11 +46,13 @@ import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
-import           BlockApps.Ethereum
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
 
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -771,7 +773,7 @@ instance QueryRunnerColumnDefault PGBytea Address where
     (fromMaybe (error "could not decode address") . stringAddress . Char8.unpack)
     queryRunnerColumnDefault
 instance Default Constant Address (Column PGBytea) where
-  def = lmap (Char8.pack . addressString) def
+  def = lmap (Char8.pack . formatAddressWithoutColor) def
 
 instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
   queryRunnerColumnDefault = queryRunnerColumn id

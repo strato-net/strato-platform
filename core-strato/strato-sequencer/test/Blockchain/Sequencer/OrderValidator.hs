@@ -11,7 +11,7 @@ import qualified Data.Map.Strict            as Map
 import           Blockchain.Data.BlockDB    (blockHeaderHash)
 import           Blockchain.Data.DataDefs
 import qualified Blockchain.Sequencer.Event as SE
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util            (tab)
 

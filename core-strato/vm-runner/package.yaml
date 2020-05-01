@@ -8,17 +8,25 @@ category:      Data Structures
 
 dependencies:
   - base >= 4 && < 5
+  - blockstanbul # This dependency doesn't appear to be used at all, except for one symbol that doesn't exist.
+                 # To avoid breaking builds, please leave this here: https://blockapps.atlassian.net/browse/OPS-65
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Blockchain.BlockChain
+    - Executable.EthereumVM
+  ghc-options: -Wall -O2
+  dependencies:
   - ansi-wl-pprint
   - base16-bytestring
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-init
   - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
-  - classy-prelude
   - conduit
   - containers
   - cross-monitoring
@@ -27,49 +35,40 @@ dependencies:
   - ethereum-vm
   - extra
   - format
-  - hflags
   - lens
   - merkle-patricia-db
   - monad-alter
   - mtl
   - prometheus-client
-  - resourcet
+  - seqevents
   - solid-vm
   - strato-adit
   - strato-conf
   - strato-genesis
   - strato-index
   - strato-model
-  - strato-redis-blockdb
-  - seqevents
   - strato-statediff
   - text
   - time
   - transformers
-  - vm-tools
-  - wai-middleware-prometheus
-  - warp
-  - async
   - unliftio
   - util
-  - blockstanbul # This dependency doesn't appear to be used at all, except for one symbol that doesn't exist.
-                 # To avoid breaking builds, please leave this here: https://blockapps.atlassian.net/browse/OPS-65
-
-
-library:
-  source-dirs: src/
-  exposed-modules:
-    - Blockchain.BlockChain
-    - Executable.EthereumVM
-  ghc-options: -Wall -O2
-
+  - vm-tools
 
 executables:
   vm-runner:
     source-dirs: exec_src
     main: Main.hs
     dependencies:
+      - async
+      - blockapps-init
+      - blockapps-util
+      - hflags
+      - strato-conf
       - vm-runner
+      - vm-tools
+      - wai-middleware-prometheus
+      - warp
     ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 tests:
@@ -77,12 +76,22 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
-      - aeson
-      - data-default
+      - base16-bytestring
+      - blockapps-data
+      - blockapps-mpdbs
+      - blockapps-util
+      - bytestring
+      - containers
       - ethereum-vm
-      - vm-runner
+      - hflags
       - hspec
       - hspec-expectations-lifted
+      - merkle-patricia-db
+      - monad-alter
+      - strato-conf
+      - strato-model
+      - vm-runner
+      - vm-tools
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
 
 benchmarks:
@@ -91,11 +100,14 @@ benchmarks:
     main: Microbench.hs
     other-modules: []
     dependencies:
+      - bytestring
       - blockapps-haskoin
+      - containers
       - criterion
       - deepseq
       - ethereum-vm
       - hashable
+      - strato-model
       - vector
       - unordered-containers
 
@@ -104,5 +116,6 @@ benchmarks:
     main: ExtractBench.hs
     other-modules: []
     dependencies:
+      - bytestring
       - criterion
       - ethereum-vm

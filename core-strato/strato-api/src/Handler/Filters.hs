@@ -16,9 +16,9 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
-import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.SHA
 
 import           Control.Monad
 import           Data.Set

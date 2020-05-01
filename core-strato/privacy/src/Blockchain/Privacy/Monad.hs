@@ -8,8 +8,8 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord            (Word256)
 import           Blockchain.Sequencer.Event
-import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 import           Control.Lens
 import           Data.Aeson

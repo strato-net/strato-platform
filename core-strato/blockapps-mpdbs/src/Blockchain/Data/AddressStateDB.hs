@@ -21,7 +21,7 @@ import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.ExtWord
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Util
 import qualified Text.Colors                      as CL

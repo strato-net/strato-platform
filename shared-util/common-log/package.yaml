@@ -2,18 +2,18 @@ name: common-log
 
 dependencies:
   - base
-  - bytestring
-  - fast-logger
-  - format
-  - global-lock
-  - hflags
-  - monad-logger
-  - template-haskell
   - text
   - time
 
 library:
   source-dirs: src
+  dependencies:
+    - bytestring
+    - fast-logger
+    - global-lock
+    - hflags
+    - monad-logger
+    - template-haskell
 
 tests:
   common-log-test:

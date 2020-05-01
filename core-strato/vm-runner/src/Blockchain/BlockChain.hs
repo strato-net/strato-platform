@@ -92,7 +92,6 @@ import           Blockchain.VMOptions
 
 import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
-import           Blockchain.SHA                          (formatSHAWithoutColor)
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
@@ -675,8 +674,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultTrace            = theTrace'
                                , transactionResultGasUsed          = gasUsed
                                , transactionResultEtherUsed        = etherUsed
-                               , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
-                               , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
+                               , transactionResultContractsCreated = intercalate "," $ map formatAddressWithoutColor newAddresses
+                               , transactionResultContractsDeleted = intercalate "," $ map formatAddressWithoutColor $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
                                , transactionResultStateDiff        = ""
                                , transactionResultTime             = realToFrac deltaT
                                , transactionResultNewStorage       = ""

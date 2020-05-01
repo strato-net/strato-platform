@@ -9,18 +9,18 @@ ghc-options: -Wall -O2
 
 dependencies:
   - base
-  - arithmoi
   - array
   - binary
   - bytestring
-  - cryptohash
-  - strato-model
-  - time
 
 library:
   source-dirs: src/
   other-modules:
     - Blockchain.Strato.Mining.Ethash.Util
+  dependencies:
+    - arithmoi
+    - strato-model
+    - time
 
 executables:
   miner-ethash:

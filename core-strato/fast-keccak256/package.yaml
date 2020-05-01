@@ -4,8 +4,6 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - bytestring
-  - cryptonite
-  - memory
 
 library:
   source-dirs: src/
@@ -13,6 +11,9 @@ library:
   cc-options: -std=c11
   include-dirs: c-src/
   other-extensions: ForeignFunctionInterface
+  dependencies:
+  - cryptonite
+  - memory
 
 tests:
   keccak256-test:

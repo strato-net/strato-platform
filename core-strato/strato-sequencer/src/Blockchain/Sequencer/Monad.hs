@@ -86,7 +86,7 @@ import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
 import           Text.Format

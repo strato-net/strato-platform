@@ -6,17 +6,18 @@
 {-# LANGUAGE RecordWildCards       #-}
 module BlockApps.Bloc22.API.SpecUtils where
 
+import           Data.Either
 import           Data.Text                 (Text, pack)
-import           Test.Hspec
 import           GHC.Generics
-import Data.Either
+import           Network.HTTP.Client
 import           Servant.Client
+import           Test.Hspec
 import           Test.QuickCheck.Instances ()
 
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Client
-import           BlockApps.Ethereum
-import           Network.HTTP.Client
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Keccak256
 
 
 data TestConfig = TestConfig

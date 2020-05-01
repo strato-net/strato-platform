@@ -22,7 +22,7 @@ import           Blockchain.Data.Address
 import qualified Blockchain.Data.DataDefs           as DD
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 
 {-# NOINLINE upsertPT #-}
 

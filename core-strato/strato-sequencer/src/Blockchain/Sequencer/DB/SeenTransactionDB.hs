@@ -6,8 +6,8 @@
 {-# LANGUAGE TypeOperators         #-}
 module Blockchain.Sequencer.DB.SeenTransactionDB where
 
-import           Blockchain.SHA
 import           Blockchain.Sequencer.DB.Witnessable
+import           Blockchain.Strato.Model.SHA
 import           Control.Applicative
 import           Control.Lens
 import           Control.Monad.Change.Alter

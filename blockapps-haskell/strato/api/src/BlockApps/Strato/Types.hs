@@ -13,7 +13,6 @@
 module BlockApps.Strato.Types
   ( Strung (..)
   , Address (..)
-  , addressString
   , stringAddress
   , ChainId (..)
   , Keccak256 (..)
@@ -75,6 +74,11 @@ import           Text.Read
 import           BlockApps.Ethereum           hiding (Transaction(..), transactionFrom)
 import           Blockchain.SolidVM.Model
 import           BlockApps.Strato.TypeLits
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Nonce
 
 instance (ToHttpApiData a) => ToHttpApiData [a] where
   toUrlPiece = Text.pack . show . map toUrlPiece
@@ -173,9 +177,6 @@ instance FromHttpApiData Word256 where
   parseUrlPiece text = case readMaybe (Text.unpack text) of
     Nothing      -> Left $ "Could not decode Word256: " <> text
     Just (Hex w256) -> Right w256
-
-instance ToParamSchema Keccak256 where
-  toParamSchema _ = mempty & type_ .~ SwaggerString
 
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung

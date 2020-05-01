@@ -24,7 +24,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Database.MerklePatricia
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 
 
 data GenesisInfo =

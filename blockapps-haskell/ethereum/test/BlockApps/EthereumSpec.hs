@@ -16,6 +16,12 @@ import Web.FormUrlEncoded
 import Web.HttpApiData
 
 import BlockApps.Ethereum
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Gas
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Nonce
+import Blockchain.Strato.Model.Wei
 
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do
@@ -40,7 +46,7 @@ spec = modifyMaxSuccess (const 10) $ do
     prop "has inverse HTTP Api Data decode/encode" $ httpApiDataProp @ Address
     prop "has inverse Form Url decode/encode" $ formProp @ Address
     prop "has inverse String decode/encode" $ \ address ->
-      stringAddress (addressString address) === Just address
+      stringAddress (formatAddressWithoutColor address) === Just address
 
   describe "Keccak256" $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ Keccak256

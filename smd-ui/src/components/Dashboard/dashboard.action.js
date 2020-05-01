@@ -18,6 +18,7 @@ export const PRELOAD_NODE_UPTIME = 'PRELOAD_NODE_UPTIME'
 export const UPDATE_NODE_UPTIME = 'UPDATE_NODE_UPTIME'
 export const PRELOAD_SYSTEM_INFO = 'PRELOAD_SYSTEM_INFO'
 export const UPDATE_SYSTEM_INFO = 'UPDATE_SYSTEM_INFO'
+export const CHANGE_HEALTH_STATUS = 'CHANGE_HEALTH_STATUS'
 
 // will trigger from socket.saga and update the dashboard store
 export const preloadBlockNumber = function (data) {
@@ -169,3 +170,10 @@ export const updateSystemInfo = function (data) {
     data
   }
 }
+
+export const changeHealthStatus = function (data) {
+  return {
+    type: CHANGE_HEALTH_STATUS,
+    data
+  }
+};
