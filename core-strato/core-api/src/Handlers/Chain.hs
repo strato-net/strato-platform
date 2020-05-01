@@ -8,7 +8,6 @@ module Handlers.Chain (
   ) where
 
 import           Control.Monad
-import           Control.Monad.Logger
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8          as BC
 import qualified Data.ByteString.Lazy.Char8     as BLC
@@ -26,6 +25,7 @@ import           Blockchain.Data.ChainInfoDB
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.ExtWord
+import           Blockchain.Output
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.ChainId
@@ -51,7 +51,7 @@ getChain pool mChainId = liftIO $ runSQLM pool $
     Just (ChainId chainid) -> getChainInfos [chainid]
     
 postChain :: ChainInfo -> Handler Text
-postChain ci = runStdoutLoggingT $ do
+postChain ci = runLoggingT $ do
     case processChainInfos [ci] of
       Left (_, err) -> throwError $ err400{ errBody=BLC.pack $ "invalid args: " ++ err }
       Right [] -> error "postChainR: The impossible happened. processChainInfos succeeded, but returned an empty list"
@@ -63,7 +63,7 @@ postChain ci = runStdoutLoggingT $ do
         return hexCid
 
 postChains :: [ChainInfo] -> Handler [Text]
-postChains cis = runStdoutLoggingT $ do
+postChains cis = runLoggingT $ do
   case processChainInfos cis of
       Left (i, err) -> throwError err400{ errBody=BLC.pack $ "invalid args at index " ++ show i ++ ": " ++ err }
       Right cids -> do

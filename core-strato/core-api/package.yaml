@@ -29,6 +29,7 @@ library:
   - extra
   - filepath
   - format
+  - hflags
   - http-api-data
   - monad-alter
   - monad-logger
@@ -50,7 +51,9 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - blockapps-util
     - core-api
+    - hflags
     - monad-logger
     - wai-cors
     - wai-extra

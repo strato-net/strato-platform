@@ -104,8 +104,8 @@ data Context = Context
   { contextRedisBlockDB   :: RBDB.RedisConnection
   , contextKafkaState     :: K.KafkaState
   , vmTrace               :: [String]
-  , unseqSink             :: forall m . (MonadIO m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
-  , vmEventsSink          :: forall m . (MonadIO m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
+  , unseqSink             :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
+  , vmEventsSink          :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
   , blockHeaders          :: [BlockData]
   , remainingBlockHeaders :: RemainingBlockHeaders
   , actionTimestamp       :: ActionTimestamp
@@ -248,10 +248,10 @@ instance MonadReader Config m => Mod.Accessible SQLDB m where
 instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
   runWithSQL = lift
 
-instance MonadIO m => Mod.Accessible (UnseqSink (StateT Context m)) (StateT Context m) where
+instance (MonadIO m, MonadLogger m) => Mod.Accessible (UnseqSink (StateT Context m)) (StateT Context m) where
   access _ = gets unseqSink
 
-instance MonadIO m => HasVMEventsSink (StateT Context m) where
+instance (MonadIO m, MonadLogger m) => HasVMEventsSink (StateT Context m) where
   getVMEventsSink = gets vmEventsSink
 
 -- dummy newtype wrapper to avoid overlapping instance

@@ -201,7 +201,7 @@ postBlocTransaction
   -> Maybe ChainId
   -> Bool
   -> PostBlocTransactionRequest
-  -> ClientM [BlocTransactionResult]
+  -> ClientM [BlocChainOrTransactionResult]
 postBlocTransaction = client (Proxy @ PostBlocTransaction)
 
 postBlocTransactionParallel
@@ -210,5 +210,5 @@ postBlocTransactionParallel
   -> Bool
   -> Bool
   -> PostBlocTransactionRequest
-  -> ClientM [BlocTransactionResult]
+  -> ClientM [BlocChainOrTransactionResult]
 postBlocTransactionParallel = client (Proxy @ PostBlocTransactionParallel)

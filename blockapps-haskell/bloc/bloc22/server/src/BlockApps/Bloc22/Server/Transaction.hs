@@ -22,6 +22,7 @@ import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Monad
+import           BlockApps.Bloc22.Server.Chain
 import           BlockApps.Bloc22.Server.Users
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
@@ -56,7 +57,7 @@ postBlocTransactionParallel :: Maybe Text
                             -> Bool -- resolve
                             -> Bool -- queue
                             -> PostBlocTransactionRequest
-                            -> Bloc [BlocTransactionResult]
+                            -> Bloc [BlocChainOrTransactionResult]
 postBlocTransactionParallel a b resolve queue c =
   if queue && not resolve
     then do
@@ -69,7 +70,7 @@ postBlocTransaction :: Maybe Text
                     -> Maybe ChainId
                     -> Bool
                     -> PostBlocTransactionRequest
-                    -> Bloc [BlocTransactionResult]
+                    -> Bloc [BlocChainOrTransactionResult]
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransaction' :: Should CacheNonce
@@ -77,7 +78,7 @@ postBlocTransaction' :: Should CacheNonce
                      -> Maybe ChainId
                      -> Bool
                      -> PostBlocTransactionRequest
-                     -> Bloc [BlocTransactionResult]
+                     -> Bloc [BlocChainOrTransactionResult]
 postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   case mUserName of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
@@ -99,7 +100,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (transferpayloadMetadata p)
                         (transferpayloadChainid p <|> chainId)
                         resolve
-            fmap (:[]) $ postUsersSend' cacheNonce btp (callSignature userName)
+            fmap ((:[]) . BlocTxResult) $ postUsersSend' cacheNonce btp (callSignature userName)
           xs -> do
             p <- mapM fromTransfer xs
             let btlp = TransferListParameters
@@ -107,7 +108,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) p)
                         chainId
                         resolve
-            postUsersSendList' cacheNonce btlp (callSignature userName)
+            fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp (callSignature userName)
         CONTRACT -> case txs of
           [] -> return []
           [x] -> do
@@ -129,7 +130,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                             Just "SolidVM" -> postUsersContractSolidVM'
                             Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
                                                $ "Invalid value for VM choice: " ++ show vm
-            fmap (:[]) $ poster cacheNonce bcp (callSignature userName)
+            fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp (callSignature userName)
           xs -> do
             ps <- mapM fromContract xs
             let bclp = ContractListParameters
@@ -149,7 +150,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                   Just "SolidVM" -> postUsersUploadListSolidVM'
                   Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
                                      $ "Invalid value for VM choice: " ++ show vm
-            poster cacheNonce bclp (callSignature userName)
+            fmap BlocTxResult <$> poster cacheNonce bclp (callSignature userName)
         FUNCTION -> case txs of
           [] -> return []
           [x] -> do
@@ -165,7 +166,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
-            fmap (:[]) $ postUsersContractMethod' cacheNonce bfp (callSignature userName)
+            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp (callSignature userName)
           xs -> do
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
@@ -174,7 +175,10 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                                 MethodCall n a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
                         chainId
                         resolve
-            postUsersContractMethodList' cacheNonce bflp (callSignature userName)
+            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp (callSignature userName)
+        GENESIS -> case txs of
+          [] -> return []
+          xs -> fmap (fmap BlocChainResult) $ postChainInfos =<< traverse fromGenesis xs
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
@@ -183,6 +187,9 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           _ -> throwIO $ UserError "Could not decode contract arguments from body"
         fromFunction = \case
           BlocFunction f -> return f
+          _ -> throwIO $ UserError "Could not decode function arguments from body"
+        fromGenesis = \case
+          BlocGenesis f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 callSignature :: Text -> UnsignedTransaction -> Bloc Transaction
