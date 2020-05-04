@@ -36,6 +36,7 @@ import qualified    Data.ByteString.Lazy.Char8           as BLC
 import              Data.Data
 import              Data.Hashable                        (Hashable)
 import qualified    Data.Text                            as T
+import              Database.Persist.Sql
 import              GHC.Generics
 import              Numeric                              (readHex, showHex)
 import              Servant
@@ -77,6 +78,19 @@ instance Ae.FromJSON SHA where
 instance Ae.ToJSONKey SHA where
   toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
       where f = T.pack . shaToHex
+
+showHexFixed :: (Integral a, Show a) => Int -> a -> String
+showHexFixed len val = pad $ showHex val ""
+    where pad s = if length s >= len then s else pad ('0' : s)
+
+instance PersistField SHA where
+  toPersistValue (SHA i) = PersistText . T.pack $ showHexFixed 64 i
+  fromPersistValue (PersistText s) = Right $ SHA $ (fromIntegral $ ((fst . head .  readHex $ T.unpack s) :: Integer) :: Word256)
+  fromPersistValue _ = Left $ T.pack $ "PersistField SHA must be persisted as PersistText"
+
+instance PersistFieldSql SHA where
+  sqlType _ = SqlOther $ T.pack "varchar(64)"
+
 
 shaToHex :: SHA -> String
 shaToHex (SHA sha) = replicate (64 - length hex) '0' ++ hex

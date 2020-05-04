@@ -16,7 +16,6 @@ import           Database.Persist.TH
 import           Numeric
 
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.StateRoot
 import           Blockchain.SolidVM.Model
 
@@ -92,14 +91,6 @@ instance PersistField Point where
 instance PersistFieldSql Point where
   sqlType _ = SqlOther $ T.pack "varchar"
 -}
-
-instance PersistField SHA where
-  toPersistValue (SHA i) = PersistText . T.pack $ showHexFixed 64 i
-  fromPersistValue (PersistText s) = Right $ SHA $ (fromIntegral $ ((fst . head .  readHex $ T.unpack s) :: Integer) :: Word256)
-  fromPersistValue _ = Left $ T.pack $ "PersistField SHA must be persisted as PersistText"
-
-instance PersistFieldSql SHA where
-  sqlType _ = SqlOther $ T.pack "varchar(64)"
 
 instance PersistField BSS.ShortByteString where
     toPersistValue = toPersistValue . BSS.fromShort
