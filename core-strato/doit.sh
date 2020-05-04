@@ -145,7 +145,7 @@ function newnode {
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
-  if [ "${useStratoApi}" = true ]; then
+  if [ "${USE_STRATO_API}" = true ]; then
       tbFlag="--blockstanbul=${blockstanbul}"
       echo "Starting strato-api"
       HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
