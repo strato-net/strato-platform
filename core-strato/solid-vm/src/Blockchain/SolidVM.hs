@@ -1416,10 +1416,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
 
 
 
-
-
-
-
 logAssigningVariable :: MonadSM m => Value -> m ()
 logAssigningVariable v = do
   valueString <- showSM v
@@ -1454,16 +1450,14 @@ encodeForReturn (SString s) = do
 --   2) if a fixed type, encode it directly into the next 32 characters in the bytestring
 --   3) if dynamic:
 --      a) encode an offset value into the next 32 characters.
---      b) at that offset, put the encoded string's length in the next 32 characters, 
+--      b) at that offset, put the encoded string's length in the first 32 characters, 
 --         followed by the encoded string
 --   4) repeat for the remaining values
 --   
 --   The headers of the bytestring are the initial (tuple_length * 32) characters.
 --   They are either encoded simple values, or offsets. If some are offsets (to
---   encoded strings), then they point to characters after all the headers. So
---   the final bytestring encoding looks like:
---   
---      headers `B.append` encodedStrings
+--   encoded strings), then they point to characters beyond the (tuple_length * 32)
+--   In other words, the final bytestring is headers `B.append` encodedStrings
 --  
 --
 --   As an example, return type (string, uint, string) would have the following encoding:
@@ -1490,5 +1484,5 @@ encodeForReturn (STuple items) = do
         bs <- encodeForReturn v
         return (headers `B.append` bs, strings)
 
-encodeForReturn x = todo "can't encode for this return type" x
+encodeForReturn x = todo "can't encode this return type" x
 
