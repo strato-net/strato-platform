@@ -73,26 +73,26 @@ pipeline {
             ./strato -m 1 --single
             docker ps
             # Few quick tests
-            check_bloc() {
+            check_availability() {
               counter=0
-              until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
+              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
               do
                 if [[ "$counter" -gt 120 ]]; then
-                  echo "bloc took longer than 2 minutes to initialize! aborting."
+                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
                   exit 73
                 fi
-                echo "waiting for bloc to be available through nginx"
+                echo "waiting for STRATO health endpoint to be available through nginx"
                 counter=$((counter+1))
                 sleep 1
               done
-              echo "bloc is available through nginx - node is running"
+              echo "STRATO health endpoint is available through nginx - node is running"
             }
-            check_bloc
+            check_availability
             echo "Restarting docker containers to simulate computer restart..."
             docker-compose -p strato --log-level ERROR stop
             docker-compose -p strato --log-level ERROR start
             PASSWORD=${PASSWORD} ./strato --set-password
-            check_bloc
+            check_availability
           '''
         }
       }
@@ -259,7 +259,7 @@ pipeline {
             # Few quick tests
             check_availability() {
               counter=0
-              until curl --silent --output /dev/null --fail --location ${NODE_HOST}/health
+              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
               do
                 if [[ "$counter" -gt 120 ]]; then
                   echo "STRATO node took longer than 2 minutes to initialize! aborting."
