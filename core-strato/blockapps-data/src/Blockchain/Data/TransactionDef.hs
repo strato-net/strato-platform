@@ -75,15 +75,15 @@ instance Binary Transaction where
 formatChainId :: Maybe Word256 -> String
 formatChainId = \case
   Nothing -> "<main chain>"
-  Just cid -> format $ SHA cid
+  Just cid -> CL.yellow $ format cid
 
 instance Format Transaction where
   format PrivateHashTX{transactionTxHash=h, transactionChainHash=ch} =
     CL.blue "Private Transaction Hash" ++
     tab (
       "\n" ++
-      "Transaction Hash:       " ++ format (SHA h) ++ "\n" ++
-      "Transaction Chain Hash: " ++ format (SHA ch) ++ "\n")
+      "Transaction Hash:       " ++ CL.yellow (format h) ++ "\n" ++
+      "Transaction Chain Hash: " ++ CL.yellow (format ch) ++ "\n")
   format t@MessageTX
              { transactionNonce=n
              , transactionGasPrice=gp

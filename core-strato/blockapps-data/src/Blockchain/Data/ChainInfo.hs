@@ -46,6 +46,7 @@ import qualified GHC.Generics                         as GHCG
 import           Numeric                              (showHex)
 import           Text.Format
 
+import qualified Text.Colors                          as CL
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
@@ -188,8 +189,8 @@ instance Format ChainSignature where
   format (ChainSignature r s v) = unlines
     [ "ChainSignature"
     , "--------------"
-    , tab $ "r: " ++ format (SHA r)
-    , tab $ "s: " ++ format (SHA s)
+    , tab $ "r: " ++ CL.yellow (format r)
+    , tab $ "s: " ++ CL.yellow (format s)
     , tab $ "v: " ++ showHex v "0x"
     ]
 
@@ -240,9 +241,9 @@ instance Format UnsignedChainInfo where
     , tab $ "Account info:   " ++ format accountInfo
     , tab $ "Code info:      " ++ format codeInfo
     , tab $ "Members:        " ++ show members
-    , tab $ "Parent chain:   " ++ format (SHA <$> parentChain)
+    , tab $ "Parent chain:   " ++ CL.yellow (format parentChain)
     , tab $ "Creation block: " ++ format creationBlock
-    , tab $ "Nonce:          " ++ format (SHA chainNonce)
+    , tab $ "Nonce:          " ++ CL.yellow (format chainNonce)
     , tab $ "Metadata:       " ++ show chainMetadata
     ]
 
