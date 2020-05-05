@@ -50,6 +50,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - blockapps-init
     - core-api
     - monad-logger
     - wai-cors

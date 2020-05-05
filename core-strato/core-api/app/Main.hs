@@ -15,6 +15,7 @@ import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
 
+import           BlockApps.Init
 import           Blockchain.EthConf
 
 import qualified Handlers.AccountInfo            as Account
@@ -87,6 +88,7 @@ coreAPI = Proxy
 
 main :: IO ()
 main = do
+  blockappsInit "strato-api"
   pool <- runNoLoggingT $ createPostgresqlPool connStr 20
   run 3000 $ app pool
 
