@@ -89,7 +89,7 @@ instance FromJSON RawTransaction' where
       (tv :: Word8) <- parseHexStr (t .:? "v" .!= "0")
       md <- t .:? "metadata"
       bn <- t .:? "blockNumber" .!= (-1)
-      h <- (t .:? "hash" .!= (SHA $ fromIntegral tr)) -- when transaction is PrivateHashTX
+      h <- (t .:? "hash" .!= (unsafeCreateSHAFromWord256 $ fromIntegral tr)) -- when transaction is PrivateHashTX
       -- Unfortunately, time is rendered with `show` in ToJSON for RawTransaction'
       -- instead of using the ToJSON instance for UTCTime, and so it fails
       -- to parse in FromJSON for UTCTime.
@@ -163,9 +163,9 @@ instance ToJSON Transaction' where
                   "transactionType" .= (show $ transactionSemantics $ tx)]
                  ++ (("chainId" .=) <$> (maybeToList tcid))
                  ++ (("metadata" .=) <$> maybeToList md)
-    toJSON (Transaction' tx@(PrivateHashTX (SHA th) (SHA tch))) =
-        object ["transactionHash" .= showHex th "",
-                "chainHash" .= showHex tch "",
+    toJSON (Transaction' tx@(PrivateHashTX th tch)) =
+        object ["transactionHash" .= showHex (shaToWord256 th) "",
+                "chainHash" .= showHex (shaToWord256 tch) "",
                 "transactionType" .= (show $ transactionSemantics $ tx)]
 
 
@@ -174,7 +174,7 @@ instance FromJSON Transaction' where
       th <- (t .:? "transactionHash")
       tch <- (t .:? "chainHash")
       case (th, tch) of
-        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (SHA $ readHexStr h) (SHA $ readHexStr ch)))
+        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (unsafeCreateSHAFromWord256 $ readHexStr h) (unsafeCreateSHAFromWord256 $ readHexStr ch)))
         _ -> do
           tto <- (t .:? "to")
           tnon <- (t .:? "nonce" .!= 0)
@@ -191,7 +191,7 @@ instance FromJSON Transaction' where
             Nothing -> do
               (mti :: Maybe Code) <- (t .:? "init")
               case mti of
-                Nothing -> return . Transaction' $ PrivateHashTX (SHA $ fromInteger tr) (SHA $ fromInteger ts)
+                Nothing -> return . Transaction' $ PrivateHashTX (unsafeCreateSHAFromWord256 $ fromInteger tr) (unsafeCreateSHAFromWord256 $ fromInteger ts)
                 Just ti -> return . Transaction' $ ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv md
             (Just to') -> do
               td <- (t .: "data")

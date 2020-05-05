@@ -235,7 +235,7 @@ instance RLPSerializable WireMessage where
       [ rlpEncode roundchangeCode
       , RLPString . rlpSerialize . RLPArray $
         [ rlpEncode vw,
-          rlpEncode $ SHA 0]
+          rlpEncode $ unsafeCreateSHAFromWord256 0]
       , rlpEncode addr
       , rlpEncode sig
       , RLPString ""]

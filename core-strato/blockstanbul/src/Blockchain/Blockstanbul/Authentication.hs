@@ -99,7 +99,7 @@ verifyProposerSeal blk sig =
   in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
 
 commitmentMessage :: SHA -> HK.Word256
-commitmentMessage (SHA dig) = unSHA . hash . (<> B.singleton 2) . word256ToBytes $ dig
+commitmentMessage dig = unSHA . hash . (<> B.singleton 2) . shaToByteString $ dig
 
 commitmentSeal :: SHA -> HK.PrvKey -> ExtendedSignature
 commitmentSeal sha pk =

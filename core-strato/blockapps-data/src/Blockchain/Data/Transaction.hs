@@ -117,7 +117,7 @@ instance TransactionLike Transaction where
     morphTx t = case type' of
         Message          -> MessageTX n gp gl dest val dat chainId r s v md
         ContractCreation -> ContractCreationTX n gp gl val code chainId r s v md
-        PrivateHash      -> PrivateHashTX (SHA $ fromInteger r) (SHA $ fromInteger s)
+        PrivateHash      -> PrivateHashTX (unsafeCreateSHAFromWord256 $ fromInteger r) (unsafeCreateSHAFromWord256 $ fromInteger s)
         where type'     = txType t
               n         = txNonce t
               gp        = txGasPrice t
@@ -134,7 +134,7 @@ rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v md _ _ _) =
   MessageTX nonce' gp gl to' val dat (toMaybe 0 cid) r s v (M.fromList <$> md)
 rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _) | init' == B.empty =
-  PrivateHashTX (SHA $ fromInteger h) (SHA $ fromInteger ch)
+  PrivateHashTX (unsafeCreateSHAFromWord256 $ fromInteger h) (unsafeCreateSHAFromWord256 $ fromInteger ch)
 rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) =
   ContractCreationTX nonce' gp gl val (Code init') (toMaybe 0 cid) r s v (M.fromList <$> md)
 
@@ -145,8 +145,8 @@ txAndTime2RawTX origin tx blkNum time =
         RawTransaction time signer nonce' gp gl (Just to') val dat (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (ContractCreationTX nonce' gp gl val (Code init') cid r s v md) ->
         RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
-    (PrivateHashTX (SHA h) (SHA ch)) ->
-        RawTransaction time signer 0 0 0 Nothing 0 B.empty 0 (fromIntegral h) (fromIntegral ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
+    (PrivateHashTX h ch) ->
+        RawTransaction time signer 0 0 0 Nothing 0 B.empty 0 (fromIntegral $ shaToWord256 h) (fromIntegral $ shaToWord256 ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -211,8 +211,8 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
                      transactionV = 0,
                      transactionMetadata = md
                    }
-  let SHA theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature yIsOdd <- extSignMsg theHash prvKey
+  let theHash = partialTransactionHash unsignedTX
+  ExtendedSignature signature yIsOdd <- extSignMsg (shaToWord256 theHash) prvKey
   return
     unsignedTX {
       transactionR =
@@ -253,8 +253,8 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
                      transactionMetadata = md
                    }
 
-  let SHA theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature yIsOdd <- extSignMsg theHash prvKey
+  let theHash = partialTransactionHash unsignedTX
+  ExtendedSignature signature yIsOdd <- extSignMsg (shaToWord256 theHash) prvKey
   return
     unsignedTX {
       transactionR =
@@ -275,10 +275,10 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction tx = case tx of
   PrivateHashTX{} -> Just (Address 0)
-  t -> pubKey2Address <$> getPubKeyFromSignature_fast xSignature theHash
+  t -> pubKey2Address <$> getPubKeyFromSignature_fast xSignature (shaToWord256 theHash)
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
-          SHA theHash = partialTransactionHash t
+          theHash = partialTransactionHash t
 
 isContractCreationTX::Transaction->Bool
 isContractCreationTX ContractCreationTX{} = True

@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Strato.Model.SHA (
-  SHA(..),
+  SHA,
   keccak256,
   keccak512,
   blockstanbulMixHash,
@@ -12,8 +12,12 @@ module Blockchain.Strato.Model.SHA (
   hash,
   rlpHash,
   shaFromHex,
+  shaToByteString,
   shaToHex,
+  shaToWord256,
   superProprietaryStratoSHAHash,
+  unsafeCreateSHAFromByteString,
+  unsafeCreateSHAFromWord256,
   unSHA
   ) where
 
@@ -27,6 +31,7 @@ import              Data.Binary
 import              Data.Binary.Get
 import              Data.Binary.Put
 import              Data.ByteArray                       (convert)
+import              Data.ByteString                      (ByteString)
 import qualified    Data.ByteString                      as B
 import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
@@ -59,6 +64,19 @@ instance MimeRender PlainText SHA where
 
 unSHA :: SHA -> Word256
 unSHA (SHA w) = w
+
+shaToWord256 :: SHA -> Word256
+shaToWord256 (SHA val) = val 
+
+shaToByteString :: SHA -> ByteString
+shaToByteString (SHA val) = word256ToBytes val
+
+unsafeCreateSHAFromWord256 :: Word256 -> SHA
+unsafeCreateSHAFromWord256 = SHA
+
+unsafeCreateSHAFromByteString :: ByteString -> SHA
+unsafeCreateSHAFromByteString = SHA . bytesToWord256
+
 
 instance Binary SHA where
     put (SHA x) = putByteString . word256ToBytes $ x

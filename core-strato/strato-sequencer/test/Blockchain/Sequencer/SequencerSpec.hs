@@ -402,26 +402,26 @@ spec = do
 
       -- chain 1
       let cInfo1 = ChainInfo
-                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (unsafeCreateSHAFromWord256 0) 0 M.empty)
                     Nothing
-          SHA chainId1 = SHA.rlpHash cInfo1
+          chainId1 = SHA.rlpHash cInfo1
           chainHash1 = SHA.rlpHash cInfo1
-          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (chainId1, cInfo1))
+          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (shaToWord256 chainId1, cInfo1))
       tx1 <- runIO . HK.withSource HK.devURandom $ do
         pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId1) Nothing pk
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ shaToWord256 chainId1) Nothing pk
       let hashTx1 = PrivateHashTX (txHash tx1) chainHash1
 
       -- chain 2
       let cInfo2 = ChainInfo
-                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (unsafeCreateSHAFromWord256 0) 0 M.empty)
                     Nothing
-          SHA chainId2 = SHA.rlpHash cInfo2
+          chainId2 = SHA.rlpHash cInfo2
           chainHash2 = SHA.rlpHash cInfo2
-          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (chainId2, cInfo2))
+          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (shaToWord256 chainId2, cInfo2))
       tx2 <- runIO . HK.withSource HK.devURandom $ do
         pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId2) Nothing pk
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ shaToWord256 chainId2) Nothing pk
       let hashTx2 = PrivateHashTX (txHash tx2) chainHash2
 
       let b1' = makeBlockWithTransactions [hashTx1]

@@ -17,8 +17,8 @@ import Blockchain.Strato.Model.ExtendedWord
 
 rsvp :: Word256 -> String -> Address -> IO ()
 rsvp chainId member addr = do
-  let txHash = SHA 0x7065
-      blkHash = SHA 0x7065
+  let txHash = unsafeCreateSHAFromWord256 0x7065
+      blkHash = unsafeCreateSHAFromWord256 0x7065
       govAddr = 0x100
       bloom = 0x0
       memberLen = fromIntegral $ length member

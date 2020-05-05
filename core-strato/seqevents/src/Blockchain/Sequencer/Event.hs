@@ -29,7 +29,7 @@ import           Blockchain.ExtWord                        (Word256)
 import qualified GHC.Generics                              as GHCG
 
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA               (SHA (..))
+import           Blockchain.Strato.Model.SHA               (SHA)
 import           Blockchain.Util
 
 import qualified Blockchain.Blockstanbul                   as PBFT
@@ -132,7 +132,7 @@ instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
-  format (IENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
+  format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
 
@@ -184,9 +184,9 @@ instance Format P2pEvent where
   format (P2pTx o)                 = format o
   format (P2pBlock o)              = format o
   format (P2pGenesis o)            = show o
-  format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (CL.yellow . format) cids) ++ "]"
   format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format (P2pNewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
+  format (P2pNewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (P2pBlockstanbul o)       = format o
   format x                          = show x
 

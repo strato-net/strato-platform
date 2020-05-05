@@ -127,7 +127,7 @@ someHashes = M.fromList $ map (\x -> (hash (word256ToBytes x), fromIntegral x)) 
 
 showHash::Integer->String
 showHash val =
-  case M.lookup (SHA (fromIntegral val)) someHashes of
+  case M.lookup (unsafeCreateSHAFromWord256 (fromIntegral val)) someHashes of
    Nothing -> showHexInt val ++ "[#ed]"
    Just x  -> show x
 
@@ -170,11 +170,11 @@ runTest test = do
   let block =
         Block {
           blockBlockData = BlockData {
-             blockDataParentHash = fromMaybe (SHA 0x0) . previousHash . env $ test,
+             blockDataParentHash = fromMaybe (unsafeCreateSHAFromWord256 0x0) . previousHash . env $ test,
              blockDataNumber = read . currentNumber . env $ test,
              blockDataCoinbase = currentCoinbase . env $ test,
              blockDataDifficulty = read . currentDifficulty . env $ test,
-             blockDataUnclesHash = SHA 0, --error "unclesHash not set",
+             blockDataUnclesHash = unsafeCreateSHAFromWord256 0, --error "unclesHash not set",
              blockDataStateRoot = StateRoot "", -- error "bStateRoot not set",
              blockDataTransactionsRoot = StateRoot "", -- error "transactionsRoot not set",
              blockDataReceiptsRoot = StateRoot "", -- error "receiptsRoot not set", -- StateRoot ""
@@ -185,7 +185,7 @@ runTest test = do
              --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
              blockDataExtraData = "", --error "extraData not set",
              blockDataNonce = 0, --error "nonce not set",
-             blockDataMixHash=SHA 0 --error "mixHash not set"
+             blockDataMixHash=unsafeCreateSHAFromWord256 0 --error "mixHash not set"
              },
           blockReceiptTransactions = [], --error "receiptTransactions not set",
           blockBlockUncles = [] --error "blockUncles not set"
@@ -206,7 +206,7 @@ runTest test = do
                 envValue = getNumber $ value' exec,
                 envCode = code exec,
                 envJumpDests = getValidJUMPDESTs $ code exec,
-                envTxHash = SHA 0,
+                envTxHash = unsafeCreateSHAFromWord256 0,
                 envChainId = Nothing,
                 envMetadata = Nothing
                 }

@@ -55,6 +55,7 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Util
+import qualified Text.Colors                               as CL
 import           Text.Format
 
 logFF :: MonadLogger m => T.Text -> String -> m ()
@@ -265,7 +266,7 @@ transformFullTransactions pairs = do
           [ "Transforming "
           , show (length txs)
           , " private transactions on chain "
-          , format (SHA chainId)
+          , CL.yellow $ format chainId
           ]
         mapM_ (insertTransaction . snd) ptxs
         mapM_ (markForVM . VmPrivateTx . snd) ptxs -- we want to get these transactions into the
@@ -276,7 +277,7 @@ transformFullTransactions pairs = do
           Nothing -> do
             logF . concat $
               [ "We haven't seen the details for chain "
-              , format (SHA chainId)
+              , CL.yellow $ format chainId
               , ". Inserting the chain Id into the GetChains list"
               ]
             insertGetChainsDB chainId
@@ -284,7 +285,7 @@ transformFullTransactions pairs = do
             forM_ ptxs $ \(ts, ptx) -> do
               logF . concat $
                 [ "We know the details for chain "
-                , format (SHA chainId)
+                , CL.yellow $ format chainId
                 , ". Sending to P2P."
                 ]
               markForP2P $ P2pTx ptx
@@ -403,7 +404,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
   let logF = logFF "transformGenesis"
   let og = ingestGenesisToOutputGenesis ig
       (chainId, cInfo) = ogGenesisInfo og
-  logF $ "Transforming ChainInfo for chain " ++ format (SHA chainId) ++ " with info " ++ show cInfo
+  logF $ "Transforming ChainInfo for chain " ++ CL.yellow (format chainId) ++ " with info " ++ show cInfo
   lookupSeenChain chainId >>= \case
     True -> logF "We've seen this chain before. Not emitting to VM"
     False -> do
