@@ -101,12 +101,18 @@ instance PersistFieldSql SHA where
 
 
 shaToHex :: SHA -> String
-shaToHex (SHA sha) = replicate (64 - length hex) '0' ++ hex
-    where hex = showHex sha ""
+shaToHex (SHA sha) = padZeros 64 $ showHex sha ""
 
 -- todo: this shouldn't be partial... ever...
 shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . head . readHex
+
+formatSHAWithoutColor :: SHA -> String
+formatSHAWithoutColor s
+  | s == hash "" = "<blank>"
+  | otherwise    = shaToHex s
+
+
 
 rlpHash :: RLPSerializable a => a -> SHA
 rlpHash = hash . rlpSerialize . rlpEncode
@@ -114,10 +120,6 @@ rlpHash = hash . rlpSerialize . rlpEncode
 hash :: BC.ByteString -> SHA
 hash = SHA . bytesToWord256 . fastKeccak256
 
-formatSHAWithoutColor :: SHA -> String
-formatSHAWithoutColor s@(SHA x)
-  | s == hash "" = "<blank>"
-  | otherwise    = padZeros 64 $ showHex x ""
 
 instance Format SHA where
   format = CL.yellow . formatSHAWithoutColor
