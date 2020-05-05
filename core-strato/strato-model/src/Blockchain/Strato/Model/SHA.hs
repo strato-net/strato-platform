@@ -1,12 +1,10 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Strato.Model.SHA (
   SHA,
   keccak256,
-  keccak512,
   blockstanbulMixHash,
   formatSHAWithoutColor,
   hash,
@@ -22,18 +20,16 @@ module Blockchain.Strato.Model.SHA (
 
 import              Blockchain.Strato.Model.Util
 import              Control.DeepSeq
-import qualified "cryptonite" Crypto.Hash                as Cr (Digest, hash, Keccak_512)
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Encoding                  as Enc
 import              Data.Binary
 import              Data.Binary.Get
 import              Data.Binary.Put
-import              Data.ByteArray                       (convert)
 import              Data.ByteString                      (ByteString)
 import qualified    Data.ByteString                      as B
 import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
-import qualified    Data.ByteString.Char8                as S8
+import qualified    Data.ByteString.Char8                as BC
 import qualified    Data.ByteString.Lazy                 as BL
 import qualified    Data.ByteString.Lazy.Char8           as BLC
 import              Data.Data
@@ -82,7 +78,7 @@ instance RLPSerializable SHA where
     rlpDecode (RLPScalar 0) = SHA 0 --special case seems to be allowed, even if length of zeros is wrong
     rlpDecode x             = error ("Missing case in rlpDecode for SHA: " ++ show x)
     --rlpEncode (SHA 0) = RLPNumber 0
-    rlpEncode (SHA val) = RLPString $ fst $ B16.decode $ S8.pack $ padZeros 64 $ showHex val ""
+    rlpEncode (SHA val) = RLPString $ fst $ B16.decode $ BC.pack $ padZeros 64 $ showHex val ""
 
 instance Ae.ToJSON SHA where
   toJSON = Ae.String . T.pack . shaToHex
@@ -113,16 +109,13 @@ shaToHex (SHA sha) = replicate (64 - length hex) '0' ++ hex
 shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . head . readHex
 
-keccak256 :: S8.ByteString -> S8.ByteString
+keccak256 :: BC.ByteString -> BC.ByteString
 keccak256 = fastKeccak256
-
-keccak512 :: S8.ByteString -> S8.ByteString
-keccak512 bs = convert (Cr.hash bs :: Cr.Digest Cr.Keccak_512)
 
 rlpHash :: RLPSerializable a => a -> SHA
 rlpHash = hash . rlpSerialize . rlpEncode
 
-hash :: S8.ByteString -> SHA
+hash :: BC.ByteString -> SHA
 hash = SHA . bytesToWord256 . keccak256
 
 formatSHAWithoutColor :: SHA -> String

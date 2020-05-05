@@ -14,7 +14,8 @@ import           Data.Word
 import           Blockchain.Strato.Mining.Ethash.Constants
 import           Blockchain.Strato.Mining.Ethash.Dataset
 import           Blockchain.Strato.Mining.Ethash.Util
-import           Blockchain.Strato.Model.SHA               (keccak256, keccak512)
+import           Blockchain.Strato.Model.SHA                (keccak256)
+import           Blockchain.Strato.Model.Keccak512          (keccak512)
 
 --import Debug.Trace
 
