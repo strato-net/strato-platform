@@ -220,7 +220,7 @@ blockstanbulSend' msg = do
 
 privateWitnessableHash :: SHA -> SHA -> SHA
 privateWitnessableHash tHash cHash =
-  superProprietaryStratoSHAHash
+  hash
   . RL.rlpSerialize
   $ RL.RLPArray [RL.rlpEncode tHash, RL.rlpEncode cHash]
 

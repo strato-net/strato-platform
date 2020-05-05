@@ -15,7 +15,6 @@ module Blockchain.Strato.Model.SHA (
   shaToByteString,
   shaToHex,
   shaToWord256,
-  superProprietaryStratoSHAHash,
   unsafeCreateSHAFromByteString,
   unsafeCreateSHAFromWord256
   ) where
@@ -114,9 +113,6 @@ shaToHex (SHA sha) = replicate (64 - length hex) '0' ++ hex
 shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . head . readHex
 
-superProprietaryStratoSHAHash :: S8.ByteString -> SHA
-superProprietaryStratoSHAHash = SHA . bytesToWord256 . keccak256
-
 keccak256 :: S8.ByteString -> S8.ByteString
 keccak256 = fastKeccak256
 
@@ -124,10 +120,10 @@ keccak512 :: S8.ByteString -> S8.ByteString
 keccak512 bs = convert (Cr.hash bs :: Cr.Digest Cr.Keccak_512)
 
 rlpHash :: RLPSerializable a => a -> SHA
-rlpHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode
+rlpHash = hash . rlpSerialize . rlpEncode
 
 hash :: S8.ByteString -> SHA
-hash = superProprietaryStratoSHAHash
+hash = SHA . bytesToWord256 . keccak256
 
 formatSHAWithoutColor :: SHA -> String
 formatSHAWithoutColor s@(SHA x)

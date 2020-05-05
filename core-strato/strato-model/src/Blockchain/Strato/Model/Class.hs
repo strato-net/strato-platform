@@ -63,7 +63,7 @@ class RLPSerializable h => BlockHeaderLike h where
                 blockHeaderMixHash, blockHeaderModifyExtra, morphBlockHeader #-}
 
     blockHeaderHash :: h -> SHA
-    blockHeaderHash = superProprietaryStratoSHAHash
+    blockHeaderHash = hash
                     . rlpSerialize
                     . rlpEncode
                     . blockHeaderModifyExtra scrubCommitmentSeals
