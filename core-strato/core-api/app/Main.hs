@@ -93,7 +93,7 @@ main = do
 app :: ConnectionPool -> Application
 app pool = 
   prometheus def{prometheusInstrumentApp = False}
-  $ instrumentApp "strato-api"
+  $ instrumentApp "core-api"
   $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
   $ serve coreAPI $ coreServer pool
