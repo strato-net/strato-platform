@@ -17,8 +17,7 @@ module Blockchain.Strato.Model.SHA (
   shaToWord256,
   superProprietaryStratoSHAHash,
   unsafeCreateSHAFromByteString,
-  unsafeCreateSHAFromWord256,
-  unSHA
+  unsafeCreateSHAFromWord256
   ) where
 
 
@@ -61,9 +60,6 @@ instance NFData SHA
 
 instance MimeRender PlainText SHA where
   mimeRender _ = BLC.pack . formatSHAWithoutColor
-
-unSHA :: SHA -> Word256
-unSHA (SHA w) = w
 
 shaToWord256 :: SHA -> Word256
 shaToWord256 (SHA val) = val 

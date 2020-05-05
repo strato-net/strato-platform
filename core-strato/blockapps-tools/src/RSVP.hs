@@ -23,7 +23,7 @@ rsvp chainId member addr = do
       bloom = 0x0
       memberLen = fromIntegral $ length member
       payload = word256ToBytes (fromIntegral addr) <> word256ToBytes 0x0 <> word256ToBytes memberLen <> C8.pack member
-      entry = LogDB blkHash txHash (Just $ chainId) govAddr (Just $ unSHA addTopic) Nothing Nothing Nothing payload bloom
+      entry = LogDB blkHash txHash (Just $ chainId) govAddr (Just $ shaToWord256 addTopic) Nothing Nothing Nothing payload bloom
   result <- runKafkaConfigured "queryStrato" $ do
     let req = [LogDBEntry entry]
     liftIO $ printf "request: %s\n" (show req)

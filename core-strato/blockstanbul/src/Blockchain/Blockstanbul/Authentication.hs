@@ -80,7 +80,7 @@ scrubAllSeals = uncookRawExtra
 
 proposalMessage :: Block -> HK.Word256
 -- TODO(tim): Clear everything out of extraData except vanity and validators
-proposalMessage = unSHA
+proposalMessage = shaToWord256
                 . hash
                 . rlpSerialize
                 . rlpEncode
@@ -99,7 +99,7 @@ verifyProposerSeal blk sig =
   in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
 
 commitmentMessage :: SHA -> HK.Word256
-commitmentMessage dig = unSHA . hash . (<> B.singleton 2) . shaToByteString $ dig
+commitmentMessage dig = shaToWord256 . hash . (<> B.singleton 2) . shaToByteString $ dig
 
 commitmentSeal :: SHA -> HK.PrvKey -> ExtendedSignature
 commitmentSeal sha pk =
@@ -120,13 +120,13 @@ finalHash = hash
 
 signBenfInfo  :: HK.PrvKey -> (Address, Bool, Int) -> ExtendedSignature
 signBenfInfo pk bnf =
-  let msg = unSHA . hash . BL.toStrict $ encode (bnf)
+  let msg = shaToWord256 . hash . BL.toStrict $ encode (bnf)
       -- addr = prvKey2Address pk
   in detExtSignMsg msg pk
 
 verifyBenfInfo :: (Address, Bool, Int) -> ExtendedSignature -> Maybe Address
 verifyBenfInfo bnf sign =
-  let msg = unSHA . hash . BL.toStrict $ encode (bnf)
+  let msg = shaToWord256 . hash . BL.toStrict $ encode (bnf)
   in pubKey2Address <$> getPubKeyFromSignature_fast sign msg
 
 signMessage :: HK.PrvKey -> TrustedMessage -> OutEvent

@@ -79,7 +79,7 @@ instance TransactionLike Transaction where
                        PrivateHashTX{} -> 0
                        t -> transactionNonce t
     txSignature   = \case
-                       PrivateHashTX{..} -> (fromIntegral $ unSHA transactionTxHash, fromIntegral $ unSHA transactionChainHash, 0)
+                       PrivateHashTX{..} -> (fromIntegral $ shaToWord256 transactionTxHash, fromIntegral $ shaToWord256 transactionChainHash, 0)
                        t -> (transactionR t, transactionS t, transactionV t)
     txValue       = \case
                        PrivateHashTX{} -> 0
