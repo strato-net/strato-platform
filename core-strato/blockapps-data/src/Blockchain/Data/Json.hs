@@ -163,7 +163,7 @@ instance ToJSON Transaction' where
                   "transactionType" .= (show $ transactionSemantics $ tx)]
                  ++ (("chainId" .=) <$> (maybeToList tcid))
                  ++ (("metadata" .=) <$> maybeToList md)
-    toJSON (Transaction' tx@(PrivateHashTX th tch)) =
+    toJSON (Transaction' tx@(PrivateHashTX (SHA th) (SHA tch))) =
         object ["transactionHash" .= showHex th "",
                 "chainHash" .= showHex tch "",
                 "transactionType" .= (show $ transactionSemantics $ tx)]
@@ -174,7 +174,7 @@ instance FromJSON Transaction' where
       th <- (t .:? "transactionHash")
       tch <- (t .:? "chainHash")
       case (th, tch) of
-        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (readHexStr h) (readHexStr ch)))
+        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (SHA $ readHexStr h) (SHA $ readHexStr ch)))
         _ -> do
           tto <- (t .:? "to")
           tnon <- (t .:? "nonce" .!= 0)
@@ -191,7 +191,7 @@ instance FromJSON Transaction' where
             Nothing -> do
               (mti :: Maybe Code) <- (t .:? "init")
               case mti of
-                Nothing -> return . Transaction' $ PrivateHashTX (fromInteger tr) (fromInteger ts)
+                Nothing -> return . Transaction' $ PrivateHashTX (SHA $ fromInteger tr) (SHA $ fromInteger ts)
                 Just ti -> return . Transaction' $ ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv md
             (Just to') -> do
               td <- (t .: "data")

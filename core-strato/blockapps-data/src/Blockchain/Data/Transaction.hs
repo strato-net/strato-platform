@@ -64,13 +64,13 @@ import           Blockchain.Strato.Model.ExtendedWord (Word256)
 
 instance TransactionLike Transaction where
     txHash        = \case
-                       PrivateHashTX{..} -> SHA transactionTxHash
+                       PrivateHashTX{..} -> transactionTxHash
                        t -> hash . rlpSerialize $ rlpEncode t
     txPartialHash = \case
-                       PrivateHashTX{..} -> SHA transactionTxHash
+                       PrivateHashTX{..} -> transactionTxHash
                        t -> hash . rlpSerialize $ partialRLPEncode t
     txChainHash   = \case
-                       PrivateHashTX{..} -> SHA transactionChainHash
+                       PrivateHashTX{..} -> transactionChainHash
                        _ -> error "Transaction.txChainHash: Not a private transaction"
     txSigner      = \case
                        PrivateHashTX{} -> Just (Address 0) -- TODO: Should this be an error instead?
@@ -79,7 +79,7 @@ instance TransactionLike Transaction where
                        PrivateHashTX{} -> 0
                        t -> transactionNonce t
     txSignature   = \case
-                       PrivateHashTX{..} -> (fromIntegral transactionTxHash, fromIntegral transactionChainHash, 0)
+                       PrivateHashTX{..} -> (fromIntegral $ unSHA transactionTxHash, fromIntegral $ unSHA transactionChainHash, 0)
                        t -> (transactionR t, transactionS t, transactionV t)
     txValue       = \case
                        PrivateHashTX{} -> 0
@@ -117,7 +117,7 @@ instance TransactionLike Transaction where
     morphTx t = case type' of
         Message          -> MessageTX n gp gl dest val dat chainId r s v md
         ContractCreation -> ContractCreationTX n gp gl val code chainId r s v md
-        PrivateHash      -> PrivateHashTX (fromInteger r) (fromInteger s)
+        PrivateHash      -> PrivateHashTX (SHA $ fromInteger r) (SHA $ fromInteger s)
         where type'     = txType t
               n         = txNonce t
               gp        = txGasPrice t
@@ -134,7 +134,7 @@ rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v md _ _ _) =
   MessageTX nonce' gp gl to' val dat (toMaybe 0 cid) r s v (M.fromList <$> md)
 rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _) | init' == B.empty =
-  PrivateHashTX (fromInteger h) (fromInteger ch)
+  PrivateHashTX (SHA $ fromInteger h) (SHA $ fromInteger ch)
 rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) =
   ContractCreationTX nonce' gp gl val (Code init') (toMaybe 0 cid) r s v (M.fromList <$> md)
 
@@ -145,7 +145,7 @@ txAndTime2RawTX origin tx blkNum time =
         RawTransaction time signer nonce' gp gl (Just to') val dat (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (ContractCreationTX nonce' gp gl val (Code init') cid r s v md) ->
         RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
-    (PrivateHashTX h ch) ->
+    (PrivateHashTX (SHA h) (SHA ch)) ->
         RawTransaction time signer 0 0 0 Nothing 0 B.empty 0 (fromIntegral h) (fromIntegral ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
@@ -286,10 +286,10 @@ isContractCreationTX _                    = False
 
 transactionHash::Transaction->SHA
 transactionHash = \case
-                     PrivateHashTX{..} -> SHA transactionTxHash
+                     PrivateHashTX{..} -> transactionTxHash
                      t -> hash . rlpSerialize $ rlpEncode t
 
 partialTransactionHash::Transaction->SHA
 partialTransactionHash = \case
-                            PrivateHashTX{..} -> SHA transactionTxHash -- TODO: Should this be an error instead?
+                            PrivateHashTX{..} -> transactionTxHash -- TODO: Should this be an error instead?
                             t -> hash . rlpSerialize $ partialRLPEncode t

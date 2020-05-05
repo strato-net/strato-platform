@@ -64,8 +64,8 @@ data Transaction =
     transactionMetadata :: Maybe (Map Text Text)
     } |
   PrivateHashTX {
-    transactionTxHash    :: Word256,
-    transactionChainHash :: Word256
+    transactionTxHash    :: SHA,
+    transactionChainHash :: SHA
     } deriving (Show, Read, Eq, Ord, Generic, Data, NFData)
 
 instance Binary Transaction where

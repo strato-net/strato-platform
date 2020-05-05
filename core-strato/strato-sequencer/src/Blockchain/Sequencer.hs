@@ -217,7 +217,7 @@ blockstanbulSend' msg = do
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   return vmevs
 
-privateWitnessableHash :: Word256 -> Word256 -> SHA
+privateWitnessableHash :: SHA -> SHA -> SHA
 privateWitnessableHash tHash cHash =
   superProprietaryStratoSHAHash
   . RL.rlpSerialize
@@ -231,7 +231,7 @@ transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHas
     pwitnessed <- wasTransactionHashWitnessed privateWitnessHash
     unless pwitnessed $ do
       witnessTransactionHash privateWitnessHash
-      runPrivateHashTX (SHA th') (SHA ch')
+      runPrivateHashTX th' ch'
       markForP2P $ P2pTx otx
       markForVM  $ VmTx ts otx
 
@@ -304,8 +304,8 @@ transformFullTransactions pairs = do
                     return iHash
                   Just ch -> return ch
                 let tHash = txHash ptx
-                    SHA th' = txHash ptx
-                    SHA ch' = cHash
+                    th' = txHash ptx
+                    ch' = cHash
                     phtx = ptx{otBaseTx = TD.PrivateHashTX th' ch'}
                     privateWitnessHash = privateWitnessableHash th' ch'
                 witnessTransactionHash privateWitnessHash
