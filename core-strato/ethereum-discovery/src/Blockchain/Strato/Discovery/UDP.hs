@@ -219,7 +219,7 @@ sendPacket sock prv addr packet = do
       r' = H.sigR signature'
       s' = H.sigS signature'
       theSignature = word256ToBytes (fromIntegral r') <> word256ToBytes (fromIntegral s') <> B.singleton v'
-      theHash = keccak256 $ theSignature <> B.singleton theType' <> theData
+      theHash = shaToByteString $ hash $ theSignature <> B.singleton theType' <> theData
 
   _ <- liftIO $ NB.sendTo sock ( theHash <> theSignature <> B.singleton theType' <> theData) addr
   return ()
@@ -307,7 +307,7 @@ getServerPubKey myPriv domain _ =
           s = H.sigS signature
           theSignature =
             word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s) <> B.singleton v
-          theHash = keccak256 $ theSignature <> B.singleton theType <> theData
+          theHash = shaToByteString $ hash $ theSignature <> B.singleton theType <> theData
 
       _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData
 
@@ -342,7 +342,7 @@ findNeighbors myPriv domain _ =
           s = H.sigS signature
           theSignature =
             word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s) <> B.singleton v
-          theHash = keccak256 $ theSignature <> B.singleton theType <> theData
+          theHash = shaToByteString $ hash $ theSignature <> B.singleton theType <> theData
 
       _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData
 

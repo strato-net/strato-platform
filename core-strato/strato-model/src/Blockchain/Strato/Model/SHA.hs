@@ -4,7 +4,6 @@
 
 module Blockchain.Strato.Model.SHA (
   SHA,
-  keccak256,
   blockstanbulMixHash,
   formatSHAWithoutColor,
   hash,
@@ -109,14 +108,11 @@ shaToHex (SHA sha) = replicate (64 - length hex) '0' ++ hex
 shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . head . readHex
 
-keccak256 :: BC.ByteString -> BC.ByteString
-keccak256 = fastKeccak256
-
 rlpHash :: RLPSerializable a => a -> SHA
 rlpHash = hash . rlpSerialize . rlpEncode
 
 hash :: BC.ByteString -> SHA
-hash = SHA . bytesToWord256 . keccak256
+hash = SHA . bytesToWord256 . fastKeccak256
 
 formatSHAWithoutColor :: SHA -> String
 formatSHAWithoutColor s@(SHA x)

@@ -1184,7 +1184,7 @@ callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
 callBuiltin "keccak256" [SString buf] Nothing = do
-  return . SString . BC.unpack . keccak256 . BC.pack $ buf
+  return . SString . BC.unpack . shaToByteString . hash . BC.pack $ buf
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing
