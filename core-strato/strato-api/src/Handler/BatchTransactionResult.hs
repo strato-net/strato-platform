@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Handler.BatchTransactionResult where
 
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Data.Aeson
 import           Data.Aeson.Encoding
 import qualified Data.Map.Strict     as M

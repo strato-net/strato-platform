@@ -30,8 +30,8 @@ import           Numeric
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.EVM.VMState
-import           Blockchain.SHA
 import           Blockchain.Util
+import           Blockchain.Strato.Model.SHA
 
 data Env =
   Env {

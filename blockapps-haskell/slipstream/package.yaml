@@ -8,72 +8,54 @@ license-file: LICENSE
 copyright: 2016 BlockApps
 category: Web
 
-library:
-  source-dirs: src/
 
 ghc-options: -Wall -Werror -rtsopts
 
 dependencies:
   - base
-  - aeson
-  - base16-bytestring
-  - lifted-base
-  - binary
-  - blockapps-bloc22-api
-  - blockapps-bloc22-server
-  - blockapps-ethereum
-  - blockapps-init
-  - blockapps-milena
-  - blockapps-solidity
-  - blockapps-strato-client
-  - blockapps-strato-api
-  - blockapps-util
-  - bloomfilter
   - bytestring
-  - classy-prelude
   - common-log
-  - conduit
-  - conduit-combinators
-  - containers
-  - cross-monitoring
-  - data-default
-  - deepseq
-  - extra
-  - format
   - hflags
-  - http-client
-  - lens
-  - lrucache
-  - MissingH
-  - monad-control
-  - mtl
-  - network
-  - ordered-containers
-  - persistent
-  - persistent-template
-  - postgresql-simple
-  - postgresql-typed
-  - prometheus-client
   - raw-strings-qq
-  - resource-pool
   - resourcet
-  - retry
-  - scientific
   - semigroups
-  - servant-client
-  - split
-  - strato-model
-  - template-haskell
   - text
-  - time
-  - transformers-base
   - transformers
-  - unliftio
-  - unliftio-core
-  - unordered-containers
-  - vector
-  - warp
-  - wai-middleware-prometheus
+
+library:
+  source-dirs: src/
+  dependencies: 
+    - aeson
+    - binary
+    - blockapps-bloc22-server
+    - blockapps-milena
+    - blockapps-solidity
+    - blockapps-util
+    - bloomfilter
+    - classy-prelude
+    - conduit
+    - containers
+    - cross-monitoring
+    - deepseq
+    - extra
+    - lens
+    - lifted-base
+    - lrucache
+    - mtl
+    - network
+    - ordered-containers
+    - persistent
+    - persistent-template
+    - postgresql-typed
+    - prometheus-client
+    - retry
+    - scientific
+    - strato-model
+    - template-haskell
+    - time
+    - unliftio
+    - unliftio-core
+    - unordered-containers
 
 executables:
   slipstream:
@@ -81,12 +63,20 @@ executables:
     main: Main.hs
     dependencies:
       - base
+      - blockapps-bloc22-server
+      - blockapps-init
+      - blockapps-milena
       - hflags
-      - monad-control
-      - mtl
+      - http-client
       - persistent-postgresql
+      - postgresql-simple
+      - postgresql-typed
+      - resource-pool
+      - servant-client
       - slipstream
-      - time
+      - template-haskell
+      - wai-middleware-prometheus
+      - warp
 
 tests:
   slipstream-test:
@@ -97,15 +87,19 @@ tests:
       - aeson
       - aeson-qq
       - base16-bytestring
+      - blockapps-solidity
       - bytestring
+      - classy-prelude
+      - conduit
       - containers
       - hflags
       - hspec
       - hspec-expectations-lifted
-      - largeword
-      - parsec
+      - persistent
       - persistent-sqlite
       - QuickCheck
       - slipstream
       - strato-model
       - text
+      - time
+      - vector

@@ -213,6 +213,7 @@ services:
     - postgres_user=postgres
     - privateChainAuthorizationMode=${privateChainAuthorizationMode}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
+    - USE_STRATO_API=${USE_STRATO_API}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379

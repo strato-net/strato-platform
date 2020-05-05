@@ -45,7 +45,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Util
 

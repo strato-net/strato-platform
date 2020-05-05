@@ -33,10 +33,9 @@ import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Text.Format
-
-type Gas = Int
 
 instance Show Counter where
   show = const "<unboxed_ioref>"
@@ -68,6 +67,7 @@ data DebugCallCreate =
     ccValue       :: Integer
     } deriving (Show, Eq, Generic, NFData)
 
+--TODO- gas and refund use Counter for performance reasons, but this is based on Int, which could overflow....  in practice this should not matter, as gas values are bounded by what the user has in the account, which will always be low, but we should keep an eye on this if we change the nature of how gas works
 data VMState =
   VMState {
     vmIsHomestead    :: Bool,

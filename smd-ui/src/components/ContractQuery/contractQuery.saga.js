@@ -45,7 +45,7 @@ export function queryCirrusRequest(name, queryString, chainId) {
 
 export function queryCirrusVarsRequest(contractName) {
   const options = { params: { contractName } };
-  const url = env.BLOC_URL + createUrl('/contracts/:contractName/Latest', options);
+  const url = env.BLOC_URL + createUrl('/contracts/::contractName/Latest', options);
 
   return fetch(
     url,

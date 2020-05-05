@@ -37,6 +37,7 @@ import           Web.HttpApiData
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.Address
 
 
 newtype Password = Password ByteString

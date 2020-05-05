@@ -29,9 +29,10 @@ import qualified Data.Text.Encoding               as Text
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum         hiding (Transaction (..))
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
+
+import           Blockchain.Strato.Model.Keccak256
 
 import           UnliftIO
 

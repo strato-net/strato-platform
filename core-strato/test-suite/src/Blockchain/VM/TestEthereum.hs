@@ -56,8 +56,7 @@ import           Blockchain.EVM.VMM (readGasRemaining)
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.SHA                 (keccak256)
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 import           Blockchain.VMContext
 
@@ -298,7 +297,7 @@ runTest test = do
   RawData (fromMaybe B.empty retVal) `shouldBe` out test
   unless (null postTest && isLeft result) $
     afterAddressStates `shouldBe` postTest
-  mapM_ (gasRemaining `shouldBe`) $ remainingGas test
+  mapM_ (gasRemaining `shouldBe`) $ fmap fromIntegral $ remainingGas test
   if isNothing (callcreates test)
       then returnedCallCreates `shouldBe` Just []
       else fmap reverse returnedCallCreates `shouldBe` callcreates test

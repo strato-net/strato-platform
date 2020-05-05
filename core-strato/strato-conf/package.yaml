@@ -16,7 +16,6 @@ library:
     - filepath
     - hflags
     - network
-    - hostname
     - yaml
     - postgresql-simple
     - containers

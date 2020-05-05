@@ -27,9 +27,9 @@ import           GHC.Generics
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.Data.RLP
-import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
+import           Blockchain.Strato.Model.SHA
 import qualified Text.Colors                  as CL
 import           Text.Format
 import           Text.ShortDescription

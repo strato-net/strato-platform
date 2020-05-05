@@ -17,13 +17,14 @@ dependencies:
   - base
   - blockapps-haskoin
   - ethereum-encryption
-  - blockapps-util
-  - blockapps-ecrecover == 0.4.*
-  - binary < 0.9
-  - bytestring >= 0.10 && < 0.20
 
 library:
   source-dirs: src/
+  dependencies:
+  - binary < 0.9
+  - blockapps-ecrecover == 0.4.*
+  - blockapps-util
+  - bytestring >= 0.10 && < 0.20
 
 benchmarks:
   fast-ecrecover-benchmark:

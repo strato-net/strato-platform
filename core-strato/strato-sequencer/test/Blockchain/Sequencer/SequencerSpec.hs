@@ -47,9 +47,9 @@ import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
-import qualified Blockchain.SHA                      as SHA
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
+import qualified Blockchain.Strato.Model.SHA         as SHA
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Haskoin.Crypto     as HK
 import           Network.Wai.Handler.Warp

@@ -39,8 +39,8 @@ import qualified Database.LevelDB                   as DB
 import           Prelude                            hiding (lookup)
 
 import           Blockchain.Database.MerklePatricia
-import           Blockchain.SHA
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.SHA
 
 newtype CodeDB = CodeDB { unCodeDB :: DB.DB }
 

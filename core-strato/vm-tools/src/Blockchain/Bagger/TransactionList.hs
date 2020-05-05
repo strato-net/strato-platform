@@ -1,6 +1,6 @@
 module Blockchain.Bagger.TransactionList
  ( TransactionList
- , emptyTransactionList
+-- , emptyTransactionList
  , singletonTransactionList
  , insertTransaction
  , trimBelowNonce
@@ -22,8 +22,8 @@ nonce = transactionNonce . otBaseTx
 gasPrice :: OutputTx -> Integer
 gasPrice = transactionGasPrice . otBaseTx
 
-emptyTransactionList :: TransactionList
-emptyTransactionList = M.empty
+--emptyTransactionList :: TransactionList
+--emptyTransactionList = M.empty
 
 singletonTransactionList :: OutputTx -> TransactionList
 singletonTransactionList t = M.singleton (transactionNonce $ otBaseTx t) t
