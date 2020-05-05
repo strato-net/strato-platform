@@ -88,7 +88,7 @@ coreAPI = Proxy
 
 main :: IO ()
 main = do
-  blockappsInit "strato-api"
+  blockappsInit "core-api"
   pool <- runNoLoggingT $ createPostgresqlPool connStr 20
   run 3000 $ app pool
 
