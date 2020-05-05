@@ -17,7 +17,6 @@ module Blockchain.Strato.Model.SHA (
   ) where
 
 
-import              Blockchain.Strato.Model.Util
 import              Control.DeepSeq
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Encoding                  as Enc
@@ -36,7 +35,6 @@ import              Data.Hashable                        (Hashable)
 import qualified    Data.Text                            as T
 import              Database.Persist.Sql
 import              GHC.Generics
-import              Numeric                              (readHex, showHex)
 import              Servant
 import              Web.PathPieces
 import              Test.QuickCheck
@@ -47,8 +45,8 @@ import              Blockchain.Strato.Model.ExtendedWord
 import qualified    Text.Colors                          as CL
 import              Text.Format
 
-newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic, Data)
-                          deriving anyclass (Hashable)
+newtype SHA = SHA ByteString deriving (Eq, Read, Show, Ord, Generic, Data)
+                             deriving anyclass (Hashable)
 
 instance NFData SHA
 
@@ -56,44 +54,50 @@ instance MimeRender PlainText SHA where
   mimeRender _ = BLC.pack . formatSHAWithoutColor
 
 shaToWord256 :: SHA -> Word256
-shaToWord256 (SHA val) = val 
+shaToWord256 (SHA val) = bytesToWord256 val 
 
 shaToByteString :: SHA -> ByteString
-shaToByteString (SHA val) = word256ToBytes val
+shaToByteString (SHA val) = val
 
 unsafeCreateSHAFromWord256 :: Word256 -> SHA
-unsafeCreateSHAFromWord256 = SHA
+unsafeCreateSHAFromWord256 = SHA . word256ToBytes
 
 unsafeCreateSHAFromByteString :: ByteString -> SHA
-unsafeCreateSHAFromByteString = SHA . bytesToWord256
+unsafeCreateSHAFromByteString = SHA
 
 
 instance Binary SHA where
-    put (SHA x) = putByteString . word256ToBytes $ x
-    get = SHA . bytesToWord256 <$> getByteString 32
+    put (SHA x) = putByteString x
+    get = SHA <$> getByteString 32
 
 instance RLPSerializable SHA where
     rlpDecode (RLPString s) | B.length s == 32 = SHA $ decode $ BL.fromStrict s
-    rlpDecode (RLPScalar 0) = SHA 0 --special case seems to be allowed, even if length of zeros is wrong
+    rlpDecode (RLPScalar 0) = unsafeCreateSHAFromWord256 0 --special case seems to be allowed, even if length of zeros is wrong
     rlpDecode x             = error ("Missing case in rlpDecode for SHA: " ++ show x)
     --rlpEncode (SHA 0) = RLPNumber 0
-    rlpEncode (SHA val) = RLPString $ fst $ B16.decode $ BC.pack $ padZeros 64 $ showHex val ""
+    rlpEncode (SHA val) = RLPString val
 
 instance Ae.ToJSON SHA where
   toJSON = Ae.String . T.pack . shaToHex
 instance Ae.FromJSON SHA where
+  parseJSON = Ae.withText "SHA" $ \t ->
+    case B16.decode $ BC.pack $ T.unpack t of
+      (val, "") -> pure $ SHA val
+      _ -> fail $ "error parsing SHA: " ++ show t
 
 instance Ae.ToJSONKey SHA where
   toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
       where f = T.pack . shaToHex
 
-showHexFixed :: (Integral a, Show a) => Int -> a -> String
-showHexFixed len val = pad $ showHex val ""
-    where pad s = if length s >= len then s else pad ('0' : s)
-
 instance PersistField SHA where
-  toPersistValue (SHA i) = PersistText . T.pack $ showHexFixed 64 i
-  fromPersistValue (PersistText s) = Right $ SHA $ (fromIntegral $ ((fst . head .  readHex $ T.unpack s) :: Integer) :: Word256)
+  toPersistValue (SHA i) = PersistText . T.pack $ BC.unpack $ B16.encode i
+  fromPersistValue (PersistText s) =
+    case B16.decode $ BC.pack $ T.unpack s of
+      (val, "") -> Right $ SHA val
+      _ -> Left $ T.pack $ "unable to parse SHA: " ++ show s
+
+
+    
   fromPersistValue _ = Left $ T.pack $ "PersistField SHA must be persisted as PersistText"
 
 instance PersistFieldSql SHA where
@@ -101,11 +105,11 @@ instance PersistFieldSql SHA where
 
 
 shaToHex :: SHA -> String
-shaToHex (SHA sha) = padZeros 64 $ showHex sha ""
+shaToHex (SHA sha) = BC.unpack $ B16.encode sha
 
 -- todo: this shouldn't be partial... ever...
 shaFromHex :: String -> SHA
-shaFromHex = SHA . fst . head . readHex
+shaFromHex = SHA . fst . B16.decode . BC.pack
 
 formatSHAWithoutColor :: SHA -> String
 formatSHAWithoutColor s
@@ -118,7 +122,7 @@ rlpHash :: RLPSerializable a => a -> SHA
 rlpHash = hash . rlpSerialize . rlpEncode
 
 hash :: BC.ByteString -> SHA
-hash = SHA . bytesToWord256 . fastKeccak256
+hash = SHA . fastKeccak256
 
 
 instance Format SHA where
@@ -138,8 +142,8 @@ instance PathPiece SHA where
 instance PathPiece SHA where
   toPathPiece = T.pack . show
   fromPathPiece t =
-    case readHex $ T.unpack t of
-      [(x, "")] -> Just $ SHA x
+    case B16.decode $ BC.pack $ T.unpack t of
+      (x, "") -> Just $ SHA x
       _         -> Nothing
 
 instance ToHttpApiData SHA where
@@ -154,8 +158,8 @@ instance FromHttpApiData SHA where
 instance Arbitrary SHA where
     arbitrary = do
         random256Bit <- fastRandBs 32
-        return . SHA . fromIntegral . byteString2Integer $ random256Bit
+        return $ SHA random256Bit
 
 blockstanbulMixHash :: SHA
-blockstanbulMixHash = SHA 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
+blockstanbulMixHash = unsafeCreateSHAFromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
 
