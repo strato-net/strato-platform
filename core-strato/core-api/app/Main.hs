@@ -11,6 +11,7 @@ import           Data.Proxy
 import           Database.Persist.Postgresql
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
+import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
 
@@ -91,7 +92,9 @@ main = do
 
 app :: ConnectionPool -> Application
 app pool = 
-  logStdoutDev
+  prometheus def{prometheusInstrumentApp = False}
+  $ instrumentApp "strato-api"
+  $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
   $ serve coreAPI $ coreServer pool
 

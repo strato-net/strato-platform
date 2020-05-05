@@ -54,4 +54,5 @@ executables:
     - monad-logger
     - wai-cors
     - wai-extra
+    - wai-middleware-prometheus
     - warp
