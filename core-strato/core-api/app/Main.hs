@@ -7,7 +7,6 @@
 
 module Main where
 
-import           Blockchain.EthConf
 import           Blockchain.Output
 import           Data.Proxy
 import           Database.Persist.Postgresql
