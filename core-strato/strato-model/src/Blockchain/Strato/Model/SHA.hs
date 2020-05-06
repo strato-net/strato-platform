@@ -28,7 +28,6 @@ import qualified    Data.ByteString                      as B
 import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
 import qualified    Data.ByteString.Char8                as BC
-import qualified    Data.ByteString.Lazy                 as BL
 import qualified    Data.ByteString.Lazy.Char8           as BLC
 import              Data.Data
 import              Data.Hashable                        (Hashable)
@@ -71,7 +70,7 @@ instance Binary SHA where
     get = SHA <$> getByteString 32
 
 instance RLPSerializable SHA where
-    rlpDecode (RLPString s) | B.length s == 32 = SHA $ decode $ BL.fromStrict s
+    rlpDecode (RLPString s) | B.length s == 32 = SHA s
     rlpDecode (RLPScalar 0) = unsafeCreateSHAFromWord256 0 --special case seems to be allowed, even if length of zeros is wrong
     rlpDecode x             = error ("Missing case in rlpDecode for SHA: " ++ show x)
     --rlpEncode (SHA 0) = RLPNumber 0
