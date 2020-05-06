@@ -63,10 +63,11 @@ replaceMembers Struct{..} addrs m =
           _ -> m
 
 createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
-createChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd _) = do
+createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
+  let src = fromMaybe "" msrc
   let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
   mContract <- fmap snd <$> getContractDetailsForContract theVM src cname
   (cAcctInfo, codeInfo) <- case mContract of

@@ -39,7 +39,7 @@ import           Blockchain.Strato.Model.ChainId
 -- | Routes and types
 --------------------------------------------------------------------------------
 data ChainInput  = ChainInput
-  { chaininputSrc      :: Text
+  { chaininputSrc      :: Maybe Text
   , chaininputContract :: Maybe Text
   , chaininputLabel    :: Text
   , chaininputBalances :: NamedMap "address" Address "balance" Integer
@@ -79,7 +79,7 @@ exampleEnode2 = "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d8
 
 exChainInput :: ChainInput
 exChainInput = ChainInput
-    { chaininputSrc = exampleSrc
+    { chaininputSrc = Just exampleSrc
     , chaininputContract = Just "Governance"
     , chaininputLabel = "my chain"
     , chaininputBalances = map fromTuple [

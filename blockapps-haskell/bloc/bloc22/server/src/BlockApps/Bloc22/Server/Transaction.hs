@@ -18,6 +18,7 @@ import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 
+import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -178,7 +179,10 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp (callSignature userName)
         GENESIS -> case txs of
           [] -> return []
-          xs -> fmap (fmap BlocChainResult) $ postChainInfos =<< traverse fromGenesis xs
+          xs -> do
+            chainInputs <- traverse fromGenesis xs
+            let hydrate p = p{ chaininputSrc = chaininputSrc p <|> join (liftA2 Map.lookup (chaininputContract p) msrcs) }
+            fmap (fmap BlocChainResult) . postChainInfos $ hydrate <$> chainInputs
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
