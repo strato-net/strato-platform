@@ -213,7 +213,6 @@ services:
     - postgres_user=postgres
     - privateChainAuthorizationMode=${privateChainAuthorizationMode}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
-    - USE_STRATO_API=${USE_STRATO_API}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
@@ -227,6 +226,7 @@ services:
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
+    - USE_STRATO_API=${USE_STRATO_API}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}

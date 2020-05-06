@@ -53,6 +53,22 @@ const enumContract = `contract EnumContract {
 }
 `;
 
+const stringsContract = `contract StringReturns {
+
+  function single() returns (string) {
+    return "how are you?";
+  }
+
+  function stringTup() returns (string, string) {
+    return ("I'm fine thanks,", "how have you been?");
+  }
+
+  function mixedTup() returns (uint, string, address, string) {
+    return (42, "the meaning of life", msg.sender, "STRATO");
+  }
+}
+`;
+
 async function upload(vm, name, source) {
   const username = 'Solidvm_User_' + util.uid();
   const password = '2345';
@@ -153,5 +169,28 @@ describe('Solid VM: Contract uploads', async () => {
     console.log(`Index returned: ${JSON.stringify(index, null, 2)}`);
     assert.equal(index[0].address, contract.address);
     assert.equal(index[0].e, 2);
+  }).timeout(config.timeout);
+
+  it ('Can encode strings as return values', async () => {
+    const [user, contract] = await upload('SolidVM', 'StringReturns', stringsContract);
+    
+    const single =  await co.wrap(rest.callMethod)(
+        user, contract, "single", {}, {'VM': 'SolidVM'});
+    const stringTup = await co.wrap(rest.callMethod)(
+        user, contract, "stringTup", {}, {'VM': 'SolidVM'});
+    const mixedTup = await co.wrap(rest.callMethod)(
+        user, contract, "mixedTup", {}, {'VM': 'SolidVM'});
+
+    console.log(`Single: ${JSON.stringify(single)}`);
+    assert.equal(single, "how are you?");
+    console.log(`StringTup: ${JSON.stringify(stringTup)}`); 
+    assert.equal(stringTup[0], "I'm fine thanks,");
+    assert.equal(stringTup[1], "how have you been?");
+    console.log(`MixedTup: ${JSON.stringify(mixedTup)}`); 
+    assert.equal(mixedTup[0], 42);
+    assert.equal(mixedTup[1], "the meaning of life");
+    assert.equal(mixedTup[3], "STRATO");
+   
+
   }).timeout(config.timeout);
 })

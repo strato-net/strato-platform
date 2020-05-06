@@ -23,10 +23,10 @@ import           Settings
 import           SQLM
 
 type API = 
-  "transactions" :> "last"
-                 :> Capture "num" Integer
-                 :> QueryParam "chainId" ChainId
-                 :> Get '[JSON] [RawTransaction']
+  "transaction" :> "last"
+                :> Capture "num" Integer
+                :> QueryParam "chainId" ChainId
+                :> Get '[JSON] [RawTransaction']
 
 
 server :: ConnectionPool -> Server API
