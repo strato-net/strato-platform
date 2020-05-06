@@ -162,7 +162,7 @@ instance Bagger.MonadBagger ContextM where
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
             $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
             void . lift $ putTransactionResult
-                     TransactionResult { transactionResultBlockHash        = SHA 0
+                     TransactionResult { transactionResultBlockHash        = unsafeCreateSHAFromWord256 0
                                        , transactionResultTransactionHash  = theHash
                                        , transactionResultMessage          = message
                                        , transactionResultResponse         = BSS.empty
@@ -791,7 +791,7 @@ calculateAndEmitStateDiffs srLog oldHeader = do
 calculateAndEmitChainDiffs :: M.Map Word256 (Integer, SHA) -> ContextM ()
 calculateAndEmitChainDiffs chainMap = do
   let chainList = M.toList chainMap
-      chainIds = format . SHA . fst <$> chainList
+      chainIds = format . unsafeCreateSHAFromWord256 . fst <$> chainList
   $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
   chainDiffs <- fmap catMaybes . forM chainList $
     \(cId, (newNumber, newHash)) -> chainDiff cId newNumber newHash

@@ -87,7 +87,7 @@ readSupplementaryAccounts genesisBlockName = do
                                   [] -> []
                                   "s":_ -> []
                                   ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ SHA (parseHex c))]
+                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ unsafeCreateSHAFromWord256 (parseHex c))]
                                   _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
@@ -150,7 +150,7 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
     $logInfoS "initgen" "best block info inserted"
     liftIO $ bootstrapIndexer obGB
     $logInfoS "initgen" "indexer has been bootstrapped"
-    let rewrite (_, CodeInfo bin src name) = (superProprietaryStratoSHAHash bin, Map.fromList [("src", src),("name",name)])
+    let rewrite (_, CodeInfo bin src name) = (hash bin, Map.fromList [("src", src),("name",name)])
         metadatas = Map.fromList . map rewrite $ srcInfo
         findMetadata = flip Map.lookup metadatas
     populateStorageDBs findMetadata genesisBlock genesisChainId
@@ -188,7 +188,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             { A._actionBlockHash = blockHeaderHash $ blockHeader genesisBlock
             , A._actionBlockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
             , A._actionBlockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
-            , A._actionTransactionHash = SHA $ fromMaybe 0 genesisChainId
+            , A._actionTransactionHash = unsafeCreateSHAFromWord256 $ fromMaybe 0 genesisChainId
             , A._actionTransactionChainId = genesisChainId
             , A._actionTransactionSender = Ad.Address 0
             , A._actionData = Map.singleton a $

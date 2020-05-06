@@ -100,8 +100,8 @@ instance Arbitrary Transaction where
       isPrivHash <- arbitrary :: Gen Bool
       if isPrivHash
         then do
-          tHash <- arbitrary `suchThat` (/= 0)
-          cHash <- arbitrary `suchThat` (/= 0)
+          tHash <- arbitrary
+          cHash <- arbitrary
           return $ PrivateHashTX tHash cHash
         else do
           nonce     <- unboxPI <$> arbitrary

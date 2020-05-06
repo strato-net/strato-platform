@@ -21,6 +21,7 @@ import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
 import           GHC.Generics
+import qualified Text.Colors                   as CL
 import           Text.Format
 
 data CircularBuffer a = CircularBuffer
@@ -92,7 +93,7 @@ instance Format ChainHashEntry where
     [ "ChainHashEntry"
     , "--------------"
     , tab $ "Used:      " ++ show _used
-    , tab $ "On chain:  " ++ format (SHA <$> _onChainId)
+    , tab $ "On chain:  " ++ CL.yellow (format _onChainId)
     , tab $ "In blocks: " ++ format (toList _inBlocks)
     ]
 

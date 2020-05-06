@@ -71,6 +71,7 @@ import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
 import           Blockchain.Timing
 import           Blockchain.Util
 
+import qualified Text.Colors                           as CL
 import           Text.Format                           (format)
 
 ethereumVM :: LoggingT IO ()
@@ -162,7 +163,7 @@ handleVmEvents makeLazyBlocks events = do
 insertNewChains :: [OutputGenesis] -> ContextM [(Word256, ChainInfo)]
 insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
   let (cId, cInfo) = ogGenesisInfo
-  $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
+  $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
   $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
   let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
   sr' <- chainInfoToGenesisState theVM cInfo
@@ -182,7 +183,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
     Nothing -> do
       $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
       initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
-      Just (cId, cInfo) <$ putChainGenesisInfo cId (SHA 0) sr
+      Just (cId, cInfo) <$ putChainGenesisInfo cId (unsafeCreateSHAFromWord256 0) sr
 
 outputNewChains :: [(Word256, ChainInfo)] -> ContextM ()
 outputNewChains = void . K.withKafkaRetry1s . writeIndexEvents . map (uncurry NewChainInfo)
@@ -247,8 +248,8 @@ runChainConstructor cId maybeSource = do
          False --noValueTransfer
          S.empty --pre-existing suicide list
          (BlockData
-            (SHA 0)
-            (SHA 0)
+            (unsafeCreateSHAFromWord256 0)
+            (unsafeCreateSHAFromWord256 0)
             (Address 0)
             MP.emptyTriePtr
             MP.emptyTriePtr
@@ -261,7 +262,7 @@ runChainConstructor cId maybeSource = do
             (posixSecondsToUTCTime 0)
             ""
             0
-            (SHA 0))
+            (unsafeCreateSHAFromWord256 0))
          0 --callDepth
          (Address 0) --receiveAddress
          (Address 0x100) --codeAddress
@@ -271,7 +272,7 @@ runChainConstructor cId maybeSource = do
          ""
          1000000000000 --availableGas
          (Address 0)
-         (SHA 0)
+         (unsafeCreateSHAFromWord256 0)
          (Just cId)
          (Just $ M.fromList $
            [("args", "()"), ("funcName", "<constructor>")]

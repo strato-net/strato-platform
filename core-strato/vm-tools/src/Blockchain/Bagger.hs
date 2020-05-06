@@ -459,7 +459,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataGasUsed          = 0
                         , DD.blockDataTimestamp        = time
                         , DD.blockDataExtraData        = txsLen2ExtraData (length txs)
-                        , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else SHA 0x0
+                        , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else unsafeCreateSHAFromWord256 0x0
                         , DD.blockDataNonce            = nonce
                         }
 

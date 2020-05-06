@@ -112,6 +112,6 @@ processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Us
     case accountCodeHashes S.\\ codeCodeHashes of
       s | s /= S.empty -> Left (i, "Each contract code hash in accountInfo must match a corresponding code hash in codeInfo.")
         | otherwise -> do
-          let SHA cid = rlpHash gen
-          return cid
+          let cid = rlpHash gen
+          return $ shaToWord256 cid
 

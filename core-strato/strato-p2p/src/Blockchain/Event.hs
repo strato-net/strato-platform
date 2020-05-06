@@ -81,6 +81,7 @@ import           Blockchain.Strato.Model.Class
 import           Blockapps.Crossmon                    (recordMaxBlockNumber)
 import           Blockchain.Metrics
 
+import qualified Text.Colors                           as CL
 import           Text.Format
 import           Text.Tools
 
@@ -432,7 +433,7 @@ handleEvents peer = awaitForever $ \case
       P2pGetChain chainIds -> yieldR $ GetChainDetails chainIds
       P2pGetTx shas -> yieldR $ GetTransactions shas
       P2pNewChainMember cId _ _ -> do
-        let formatted = format $ SHA cId
+        let formatted = CL.yellow $ format cId
         $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "New member added to chain " ++ formatted
         mems <- lift $ selectWithDefault (Proxy @ChainMembers) cId
         when (checkPeerIsMember peer mems) $ do

@@ -158,8 +158,8 @@ instance Word256Storable Address where
   toWord256 (Address h) = fromIntegral h
 
 instance Word256Storable SHA where
-  fromWord256 h = SHA h
-  toWord256 (SHA h) = h
+  fromWord256 h = unsafeCreateSHAFromWord256 h
+  toWord256 = shaToWord256
 
 instance Word256Storable Int where
   fromWord256 = fromIntegral

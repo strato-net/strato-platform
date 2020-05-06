@@ -11,7 +11,7 @@ import           Data.Maybe                                     (isJust)
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.InternalMem
 import           Blockchain.Database.MerklePatricia.StateRoot
-import           Blockchain.Strato.Model.SHA                    (keccak256)
+import           Blockchain.Strato.Model.SHA                    (hash, shaToByteString)
 
 putKeyValMem::Monad m=>MPMem
            ->Key
@@ -49,7 +49,7 @@ initializeBlankMem =
         bytes = rlpSerialize theRLP
     in
       MPMem {
-        mpMap = Map.insert (keccak256 bytes) bytes Map.empty,
+        mpMap = Map.insert (shaToByteString $ hash bytes) bytes Map.empty,
         mpStateRoot = StateRoot bytes
       }
 

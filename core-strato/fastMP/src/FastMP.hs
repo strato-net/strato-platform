@@ -26,7 +26,7 @@ import           Blockchain.Database.MerklePatricia          ()
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
 
-import Blockchain.Strato.Model.SHA (keccak256)
+import Blockchain.Strato.Model.SHA (hash, shaToByteString)
 
 import KV
 import LevelDBTools
@@ -168,7 +168,7 @@ putNodeData :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
             => MP.NodeData -> m MP.StateRoot
 putNodeData nd = do
   let bytes = rlpSerialize $ rlpEncode nd
-      ptr = keccak256 bytes
+      ptr = shaToByteString $ hash bytes
       sr = MP.StateRoot ptr
   when debug $
     $logDebugS "putNodeData" . T.pack $
