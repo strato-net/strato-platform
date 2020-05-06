@@ -36,7 +36,6 @@ import           Servant.Docs
 import           Test.QuickCheck        hiding ((.&.))
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
-import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.SHA    hiding (hash)
 
 newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
@@ -134,10 +133,10 @@ instance ToSchema Keccak256 where
         & description ?~ "Keccak256 hash, 32 byte hex encoded string" )
 
 keccak256SHA :: Keccak256 -> SHA
-keccak256SHA = SHA . bytesToWord256 . ByteArray.convert . digestKeccak256
+keccak256SHA = unsafeCreateSHAFromByteString . ByteArray.convert . digestKeccak256
 
 shaKeccak256 :: SHA -> Keccak256
-shaKeccak256 (SHA hsh) = Keccak256
-                       . fromMaybe (error $ "internal error: shaKeccak256" ++ show hsh)
-                       . digestFromByteString
-                       $ word256ToBytes hsh
+shaKeccak256 hsh = Keccak256
+                   . fromMaybe (error $ "internal error: shaKeccak256" ++ show hsh)
+                   . digestFromByteString
+                   $ shaToByteString hsh

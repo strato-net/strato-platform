@@ -51,10 +51,12 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - blockapps-init
     - blockapps-util
     - core-api
     - hflags
     - monad-logger
     - wai-cors
     - wai-extra
+    - wai-middleware-prometheus
     - warp

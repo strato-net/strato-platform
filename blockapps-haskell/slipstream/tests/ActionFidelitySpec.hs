@@ -15,7 +15,6 @@ import Test.QuickCheck
 import Test.Hspec
 
 import qualified Blockchain.Strato.Model.Action as BS
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.SHA
 import Blockchain.Strato.Model.Event
@@ -27,13 +26,13 @@ convert :: BS.Action -> Either String SS.Action -- 🤔
 convert = eitherDecode . encode
 
 emptyEVMData :: BS.ActionData
-emptyEVMData = BS.ActionData (EVMCode $ SHA 0) EVM (BS.ActionEVMDiff M.empty) []
+emptyEVMData = BS.ActionData (EVMCode $ unsafeCreateSHAFromWord256 0) EVM (BS.ActionEVMDiff M.empty) []
 
 emptySolidVMData :: BS.ActionData
-emptySolidVMData = BS.ActionData (SolidVMCode "ContractName" $ SHA 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
+emptySolidVMData = BS.ActionData (SolidVMCode "ContractName" $ unsafeCreateSHAFromWord256 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
 
 emptyAction :: BS.Action
-emptyAction = BS.Action (SHA 0) (posixSecondsToUTCTime 0) 0 (SHA 0) Nothing 0x0 M.empty Nothing S.empty
+emptyAction = BS.Action (unsafeCreateSHAFromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateSHAFromWord256 0) Nothing 0x0 M.empty Nothing S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -65,7 +64,7 @@ spec = describe "Action conversions" $ do
      convert a `shouldSatisfy` isRight
 
    it "should be backwards compatible" $ do
-     let forceHash = SHA . bytesToWord256 . fst . B16.decode
+     let forceHash = unsafeCreateSHAFromByteString . fst . B16.decode
          oldStyle = [aesonQQ| {
          "chainId": null,
          "data": {

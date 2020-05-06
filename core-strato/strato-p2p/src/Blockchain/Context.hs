@@ -132,7 +132,7 @@ instance MonadIO m => (SHA `A.Alters` BlockData) (StateT Context m) where
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (StateT Context m) where
   get _ = RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
-    Nothing -> WorldBestBlock $ BestBlock (SHA 0) (-1) 0
+    Nothing -> WorldBestBlock $ BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> WorldBestBlock $ BestBlock s n d
   put _ (WorldBestBlock (BestBlock s n d)) =
     RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n d) >>= \case
@@ -142,7 +142,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (StateT Con
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (StateT Context m) where
   get _ = RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
-    Nothing -> BestBlock (SHA 0) (-1) 0
+    Nothing -> BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> BestBlock s n d
   put _ (BestBlock s n d) =
     RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n d) >>= \case

@@ -217,7 +217,7 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
                          , pPeerLastMsgTime = curTime
                          , pPeerEnableTime = curTime
                          , pPeerUdpEnableTime = curTime
-                         , pPeerLastBestBlockHash = SHA 0
+                         , pPeerLastBestBlockHash = unsafeCreateSHAFromWord256 0
                          , pPeerBondState = 0
                          , pPeerActiveState = 0
                          , pPeerVersion = T.pack "61" -- fix
@@ -241,7 +241,7 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
                           ,  pPeerLastMsgTime = curTime
                           ,  pPeerEnableTime = curTime
                           ,  pPeerUdpEnableTime = curTime
-                          ,  pPeerLastBestBlockHash = SHA 0
+                          ,  pPeerLastBestBlockHash = unsafeCreateSHAFromWord256 0
                           ,  pPeerBondState = 0
                           ,  pPeerActiveState = 0
                           ,  pPeerVersion = T.pack "61" -- fix

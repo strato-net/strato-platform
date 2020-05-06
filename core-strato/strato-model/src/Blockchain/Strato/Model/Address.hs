@@ -56,7 +56,7 @@ import           Web.PathPieces
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
 import           Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
+import qualified Blockchain.Strato.Model.SHA          as SHA (hash, shaToWord256)
 import           Blockchain.Strato.Model.Util
 import qualified Data.NibbleString                    as N
 import qualified Data.RLP                             as RLP2
@@ -83,7 +83,7 @@ instance PrintfArg Address where
 
 prvKey2Address :: PrvKey -> Address
 prvKey2Address prvKey =
-  Address $ fromInteger $ byteString2Integer $ SHA.keccak256 $ BL.toStrict $ encode x `BL.append` encode y
+  Address $ fromIntegral $ SHA.shaToWord256 $ SHA.hash $ BL.toStrict $ encode x `BL.append` encode y
   where
     point = pubKeyPoint $ derivePubKey prvKey
     x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
@@ -91,7 +91,7 @@ prvKey2Address prvKey =
 
 pubKey2Address :: PubKey -> Address
 pubKey2Address pubKey =
-  Address $ fromInteger $ byteString2Integer $ SHA.keccak256 $ BL.toStrict $ encode x `BL.append` encode y
+  Address $ fromIntegral $ SHA.shaToWord256 $ SHA.hash $ BL.toStrict $ encode x `BL.append` encode y
   where
     x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
     y = fromMaybe (error "getY failed in prvKey2Address") $ getY point

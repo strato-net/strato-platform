@@ -14,8 +14,12 @@ import           Database.Persist.Postgresql
 import           HFlags
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
+import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
+
+import           BlockApps.Init
+import           Blockchain.EthConf
 
 import qualified Handlers.AccountInfo            as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
@@ -88,12 +92,15 @@ coreAPI = Proxy
 main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
+  blockappsInit "core-api"
   pool <- runNoLoggingT $ createPostgresqlPool connStr 20
   run 3000 $ app pool
 
 app :: ConnectionPool -> Application
 app pool = 
-  logStdoutDev
+  prometheus def{prometheusInstrumentApp = False}
+  $ instrumentApp "core-api"
+  $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
   $ serve coreAPI $ coreServer pool
 
