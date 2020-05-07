@@ -902,7 +902,7 @@ getContractDetailsForContract theVM src mContract = do
         [x] -> Just <$> checkCodeHash x
         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
     Just contract -> do
-      x <- blocMaybe "Could not find global contract metadataId" (Map.lookup contract idsAndDetails)
+      x <- blocMaybe ("Could not find global contract metadataId for " <> contract <> " in source " <> src)  (Map.lookup contract idsAndDetails)
       Just <$> checkCodeHash (contract, x)
   where checkCodeHash x@(_,(_,cd)) = case contractdetailsCodeHash cd of
           (EVMCode _) -> pure x
