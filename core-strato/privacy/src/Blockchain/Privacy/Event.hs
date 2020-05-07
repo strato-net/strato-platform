@@ -30,7 +30,7 @@ import           Blockchain.Output
 import           Blockchain.Privacy.Monad
 import           Blockchain.Privacy.Metrics
 import           Blockchain.Sequencer.Event
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.Class
 import           Control.Lens
 import           Control.Monad
@@ -44,6 +44,7 @@ import qualified Data.Text                     as T
 import           Data.Traversable
 import           Prelude                       hiding (lookup)
 import           Prometheus
+import qualified Text.Colors                   as CL
 import           Text.Format
 
 logFF :: MonadLogger m => Text -> String -> m ()
@@ -185,7 +186,7 @@ getNewChainHash chainId = do
   CircularBuffer cap sz q <- getChainBuffer chainId
   case Q.viewl q of
     Q.EmptyL -> do
-      logFF "getNewChainHash" $ "Empty chain buffer for chainId " ++ format (SHA chainId)
+      logFF "getNewChainHash" $ "Empty chain buffer for chainId " ++ CL.yellow (format chainId)
       fmap (generateInitialChainHash . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
     (h Q.:< q') -> do
       adjustStatefully_ (Proxy @ChainIdEntry) chainId $
@@ -209,7 +210,7 @@ checkIfIsMissingTX th ch = do
     Just chainId -> do
       logF . concat $
         [ "We know this transaction's chain Id. It's "
-        , format (SHA chainId)
+        , CL.yellow $ format chainId
         , ". Requesting transaction from peers"
         ]
       requestTransaction th

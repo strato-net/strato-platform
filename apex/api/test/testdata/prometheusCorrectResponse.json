@@ -32,8 +32,8 @@
         "metric": {
           "__name__": "health_check",
           "instance": "localhost",
-          "job": "strato-api",
-          "location": "strato-api"
+          "job": "core-api",
+          "location": "core-api"
         },
         "value": [
           1553824884.792,

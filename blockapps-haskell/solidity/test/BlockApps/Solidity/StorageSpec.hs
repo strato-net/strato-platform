@@ -6,10 +6,10 @@ import qualified Data.ByteString.Base16 as Base16
 import Data.Maybe (isJust, fromJust)
 import Test.Hspec
 
-import BlockApps.Ethereum
 import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Type
+import Blockchain.Strato.Model.Address
 
 {-# ANN module ("HLint: ignore Redundant do" :: String) #-}
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

@@ -8,8 +8,8 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord            (Word256)
 import           Blockchain.Sequencer.Event
-import           Blockchain.SHA
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 import           Control.Lens
 import           Data.Aeson
@@ -21,6 +21,7 @@ import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
 import           GHC.Generics
+import qualified Text.Colors                   as CL
 import           Text.Format
 
 data CircularBuffer a = CircularBuffer
@@ -92,7 +93,7 @@ instance Format ChainHashEntry where
     [ "ChainHashEntry"
     , "--------------"
     , tab $ "Used:      " ++ show _used
-    , tab $ "On chain:  " ++ format (SHA <$> _onChainId)
+    , tab $ "On chain:  " ++ CL.yellow (format _onChainId)
     , tab $ "In blocks: " ++ format (toList _inBlocks)
     ]
 

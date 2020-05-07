@@ -66,7 +66,7 @@ xabiToContract contractName' parents' xabi = validateXabi xabi `seq`
       case M.toList $ Xabi.xabiConstr xabi of
         [] -> Nothing
         [(_, x)] -> Just x
-        _ -> error "multiple constructors in contract" --TODO- figure out if this is allowed in Solidity
+        _ -> duplicateDefinition "multiple constructors in contract" contractName' --TODO- figure out if this is allowed in Solidity
   }
 
 validateXabi :: Xabi -> ()

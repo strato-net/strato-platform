@@ -1,0 +1,9 @@
+# dependecies 
+node_modules
+
+# lock files not needed for testcases 
+package-lock.json
+yarn.lock
+
+# dotenv environment variables file
+.env

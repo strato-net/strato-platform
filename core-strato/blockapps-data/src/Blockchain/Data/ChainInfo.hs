@@ -24,9 +24,9 @@ import           Blockchain.ExtWord
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON()
-import           Blockchain.SHA
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.TypeLits
 import           Blockchain.Util
 
@@ -37,6 +37,7 @@ import qualified Data.ByteString.Char8                as C8
 import           Data.Data
 import qualified Data.JsonStream.Parser               as JS
 import qualified Data.Map.Strict                      as M
+import           Data.Swagger                         hiding (Format, format)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
@@ -46,6 +47,7 @@ import qualified GHC.Generics                         as GHCG
 import           Numeric                              (showHex)
 import           Text.Format
 
+import qualified Text.Colors                          as CL
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
@@ -188,8 +190,8 @@ instance Format ChainSignature where
   format (ChainSignature r s v) = unlines
     [ "ChainSignature"
     , "--------------"
-    , tab $ "r: " ++ format (SHA r)
-    , tab $ "s: " ++ format (SHA s)
+    , tab $ "r: " ++ CL.yellow (format r)
+    , tab $ "s: " ++ CL.yellow (format s)
     , tab $ "v: " ++ showHex v "0x"
     ]
 
@@ -232,6 +234,28 @@ data UnsignedChainInfo = UnsignedChainInfo
   , chainMetadata  :: (M.Map T.Text T.Text)
   } deriving (Eq, Show, GHCG.Generic, Data)
 
+
+
+instance ToSchema IPAddress where
+instance ToSchema OrgId where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "OrgId")
+      ( mempty )
+  
+instance ToSchema Enode where
+instance ToSchema CodeInfo where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "CodeInfo")
+      ( mempty )
+    
+instance ToSchema AccountInfo where
+instance ToSchema ChainSignature where
+instance ToSchema UnsignedChainInfo where
+instance ToSchema ChainInfo where
+--  declareNamedSchema _ = return $
+--    NamedSchema (Just "ChainInfo")
+--      ( mempty )
+
 instance Format UnsignedChainInfo where
   format UnsignedChainInfo{..} = unlines
     [ "UnsignedChainInfo"
@@ -240,9 +264,9 @@ instance Format UnsignedChainInfo where
     , tab $ "Account info:   " ++ format accountInfo
     , tab $ "Code info:      " ++ format codeInfo
     , tab $ "Members:        " ++ show members
-    , tab $ "Parent chain:   " ++ format (SHA <$> parentChain)
+    , tab $ "Parent chain:   " ++ CL.yellow (format parentChain)
     , tab $ "Creation block: " ++ format creationBlock
-    , tab $ "Nonce:          " ++ format (SHA chainNonce)
+    , tab $ "Nonce:          " ++ CL.yellow (format chainNonce)
     , tab $ "Metadata:       " ++ show chainMetadata
     ]
 

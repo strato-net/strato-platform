@@ -74,7 +74,7 @@ getKafkaCheckpoint = withKafkaRetry1s (fetchSingleOffset (snd kafkaClientIds) ta
 setKafkaCheckpoint :: Offset -> IContextM ()
 setKafkaCheckpoint ofs = do
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-    op <- withKafkaViolently (setKafkaCheckpoint' ofs)
+    op <- withKafkaRetry1s (setKafkaCheckpoint' ofs)
     case op of
         Left err -> error $ "Client error: " ++ show err
         Right _  -> return ()

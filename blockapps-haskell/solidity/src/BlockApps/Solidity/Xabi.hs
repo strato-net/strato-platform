@@ -28,10 +28,12 @@ import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
-import           BlockApps.Ethereum
 import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
-
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.SHA
 
 data XabiKind = ContractKind
               | InterfaceKind
@@ -374,7 +376,7 @@ instance ToSchema ContractDetails where
         { contractdetailsBin = "ContractBin"
         , contractdetailsAddress = Just (Unnamed (Address 0xdeadbeef))
         , contractdetailsBinRuntime = "ContractRuntime"
-        , contractdetailsCodeHash = EVMCode $ SHA 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
+        , contractdetailsCodeHash = EVMCode $ unsafeCreateSHAFromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
         , contractdetailsName = "DetailsName"
         , contractdetailsSrc = "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi
@@ -400,7 +402,7 @@ instance Arbitrary a => Arbitrary (MaybeNamed a) where
 
 instance ToHttpApiData (MaybeNamed Address) where
   toUrlPiece (Named _name)  = _name
-  toUrlPiece (Unnamed addr) = Text.pack . addressString $ addr
+  toUrlPiece (Unnamed addr) = Text.pack . formatAddressWithoutColor $ addr
 
 instance FromHttpApiData (MaybeNamed Address) where
   parseUrlPiece txt = case stringAddress (Text.unpack txt) of

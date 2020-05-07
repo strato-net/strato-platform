@@ -44,8 +44,8 @@ import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..), NodeData)
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
-import           Blockchain.SHA                     hiding (hash)
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA        hiding (hash)
 import qualified Blockchain.Verification            as V
 
 import           Executable.EVMFlags                (flags_maxTxsPerBlock)
@@ -459,7 +459,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataGasUsed          = 0
                         , DD.blockDataTimestamp        = time
                         , DD.blockDataExtraData        = txsLen2ExtraData (length txs)
-                        , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else SHA 0x0
+                        , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else unsafeCreateSHAFromWord256 0x0
                         , DD.blockDataNonce            = nonce
                         }
 

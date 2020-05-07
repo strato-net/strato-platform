@@ -71,6 +71,7 @@ import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
 import           Blockchain.Timing
 import           Blockchain.Util
 
+import qualified Text.Colors                           as CL
 import           Text.Format                           (format)
 
 ethereumVM :: LoggingT IO ()
@@ -150,19 +151,19 @@ handleVmEvents makeLazyBlocks events = do
       newBlock <- --loopTimeit "Bagger.makeNewBlock"
                   Bagger.makeNewBlock
       $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
-      loopTimeit "produceUnminedBlocksM" $ K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
+      loopTimeit "produceUnminedBlocksM" $ K.withKafkaRetry1s (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
   -- todo: is this the best place to put this?
   loopTimeit "flushLogEntries" $ flushLogEntries
   loopTimeit "flushEventEntries" $ flushEventEntries
   loopTimeit "flushTransactionResults" $ flushTransactionResults
-  loopTimeit "writeActionJSONToKafka" $ void . K.withKafkaViolently $ writeActionJSONToKafka actions
+  loopTimeit "writeActionJSONToKafka" $ void . K.withKafkaRetry1s $ writeActionJSONToKafka actions
   loopTimeit "compactContextM" $ compactContextM
 
 insertNewChains :: [OutputGenesis] -> ContextM [(Word256, ChainInfo)]
 insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
   let (cId, cInfo) = ogGenesisInfo
-  $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ format (SHA cId)
+  $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
   $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
   let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
   sr' <- chainInfoToGenesisState theVM cInfo
@@ -182,10 +183,10 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
     Nothing -> do
       $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
       initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
-      Just (cId, cInfo) <$ putChainGenesisInfo cId (SHA 0) sr
+      Just (cId, cInfo) <$ putChainGenesisInfo cId (unsafeCreateSHAFromWord256 0) sr
 
 outputNewChains :: [(Word256, ChainInfo)] -> ContextM ()
-outputNewChains = void . K.withKafkaViolently . writeIndexEvents . map (uncurry NewChainInfo)
+outputNewChains = void . K.withKafkaRetry1s . writeIndexEvents . map (uncurry NewChainInfo)
 
 processBlocks :: [OutputBlock] -> ContextM [Action]
 processBlocks blocks = do
@@ -226,7 +227,7 @@ processTransactions txPairs = do
 outputTransactions :: [(Timestamp, OutputTx)] -> ContextM ()
 outputTransactions txPairs =
   unless (null txPairs) . void
-                        . K.withKafkaViolently
+                        . K.withKafkaRetry1s
                         . writeIndexEvents
                         $ map (uncurry IndexTransaction) txPairs
 
@@ -247,8 +248,8 @@ runChainConstructor cId maybeSource = do
          False --noValueTransfer
          S.empty --pre-existing suicide list
          (BlockData
-            (SHA 0)
-            (SHA 0)
+            (unsafeCreateSHAFromWord256 0)
+            (unsafeCreateSHAFromWord256 0)
             (Address 0)
             MP.emptyTriePtr
             MP.emptyTriePtr
@@ -261,7 +262,7 @@ runChainConstructor cId maybeSource = do
             (posixSecondsToUTCTime 0)
             ""
             0
-            (SHA 0))
+            (unsafeCreateSHAFromWord256 0))
          0 --callDepth
          (Address 0) --receiveAddress
          (Address 0x100) --codeAddress
@@ -271,7 +272,7 @@ runChainConstructor cId maybeSource = do
          ""
          1000000000000 --availableGas
          (Address 0)
-         (SHA 0)
+         (unsafeCreateSHAFromWord256 0)
          (Just cId)
          (Just $ M.fromList $
            [("args", "()"), ("funcName", "<constructor>")]
@@ -283,7 +284,7 @@ runChainConstructor cId maybeSource = do
   case maybeAction of
     Nothing -> return ()
     Just action -> 
-      void . K.withKafkaViolently $ writeActionJSONToKafka [action]
+      void . K.withKafkaRetry1s $ writeActionJSONToKafka [action]
   
   Mod.get (Proxy @MP.StateRoot)
 
@@ -343,7 +344,7 @@ getCheckpointNoMetadata = do
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpointNoMetadata" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-    K.withKafkaViolently (K.fetchSingleOffset consumerGroup topic 0) >>= \case
+    K.withKafkaRetry1s (K.fetchSingleOffset consumerGroup topic 0) >>= \case
         Left KP.UnknownTopicOrPartition -> setCheckpointNoMetadata 1 >> getCheckpointNoMetadata
         Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (ofs, _) -> do
@@ -354,20 +355,20 @@ setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()
 setCheckpoint ofs checkpoint = do
     $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
     let kMetadata = toKafkaMetadata checkpoint
-    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
+    ret  <- K.withKafkaRetry1s $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
     either (error . show) return ret
 
 setCheckpointNoMetadata :: KP.Offset -> ContextM ()
 setCheckpointNoMetadata ofs = do
     $logInfoS "setCheckpointNoMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
     let emptyMetadata = KP.Metadata $ KP.KString BS.empty
-    ret  <- K.withKafkaViolently $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
+    ret  <- K.withKafkaRetry1s $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
     either (error . show) return ret
 
 getUnprocessedKafkaEvents :: KP.Offset -> ContextM [VmEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
-    ret <- K.withKafkaViolently (readSeqVmEvents offset)
+    ret <- K.withKafkaRetry1s (readSeqVmEvents offset)
     let countLimit = if flags_seqEventsBatchSize > 0
                          then take flags_seqEventsBatchSize
                          else id

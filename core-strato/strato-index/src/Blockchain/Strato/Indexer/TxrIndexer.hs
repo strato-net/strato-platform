@@ -35,7 +35,6 @@ import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
-import           Blockchain.SHA                     (hash)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
@@ -102,7 +101,7 @@ indexEventToTxrResults :: IndexEvent -> [TxrResult]
 indexEventToTxrResults = \case
   LogDBEntry l -> (:) (PutLogDB l) . maybeToList $ logDBChainId l >>= \chainId ->
     case logDBTopic1 l of
-      Just x | SHA x == addTopic ->
+      Just x | x == shaToWord256 addTopic ->
         let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l --TODO: unhack
             enodelen = fromInteger . byteString2Integer . BS.take 32 . BS.drop 64 $ logDBTheData l
             enode' = T.unpack . decodeUtf8 . BS.take enodelen . BS.drop 96 $ logDBTheData l
@@ -111,10 +110,10 @@ indexEventToTxrResults = \case
          in case eEnode of
           Left err -> Just . AddMember . Left $ "failed to parse enode: " ++ show err
           Right enode -> Just . AddMember $ Right (chainId, address, enode)
-      Just x | SHA x == removeTopic ->
+      Just x | x == shaToWord256 removeTopic ->
         let address = decode . BL.fromStrict . BS.take 20 . BS.drop 12 $ logDBTheData l
          in Just . RemoveMember $ Right (chainId, address)
-      Just x | SHA x == terminateTopic -> Just . TerminateChain $ Right chainId
+      Just x | x == shaToWord256 terminateTopic -> Just . TerminateChain $ Right chainId
       _ -> Nothing
   EventDBEntry ev -> (:) (PutEventDB ev) . maybeToList $ eventDBChainId ev >>= \chainId ->
      case (eventDBName ev, eventDBArgs ev) of
@@ -183,7 +182,7 @@ getKafkaCheckpoint = withKafkaRetry1s (fetchSingleOffset (snd kafkaClientIds) ta
 setKafkaCheckpoint :: Offset -> IContextM ()
 setKafkaCheckpoint ofs = do
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-    withKafkaViolently (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
+    withKafkaRetry1s (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
         Left err -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
         Right () -> return ()
 

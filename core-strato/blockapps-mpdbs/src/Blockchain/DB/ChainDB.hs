@@ -33,7 +33,7 @@ import           Blockchain.Data.RLP
 
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
-import           Blockchain.Strato.Model.SHA          (SHA(..))
+import           Blockchain.Strato.Model.SHA          (SHA, shaToByteString, unsafeCreateSHAFromWord256)
 
 import           GHC.Generics
 import           Text.Format
@@ -126,7 +126,7 @@ bootstrapChainDB :: ( Modifiable BlockHashRoot m
                     , (MP.StateRoot `Alters` MP.NodeData) m
                     )
                  => SHA -> m ()
-bootstrapChainDB genesisHash = putChainBlockHashInfo genesisHash (SHA 0) MP.emptyTriePtr
+bootstrapChainDB genesisHash = putChainBlockHashInfo genesisHash (unsafeCreateSHAFromWord256 0) MP.emptyTriePtr
 
 putBlockHeaderInChainDB :: ( BlockHeaderLike h
                            , Modifiable BlockHashRoot m
@@ -150,17 +150,17 @@ getChainBlockHashInfo :: ( Modifiable BlockHashRoot m
                          , (MP.StateRoot `Alters` MP.NodeData) m
                          )
                       => SHA -> m (Maybe (SHA, MP.StateRoot))
-getChainBlockHashInfo (SHA h) = do
+getChainBlockHashInfo h = do
   bhr <- unBlockHashRoot <$> get Proxy
-  getkv bhr (word256ToMPKey h)
+  getkv bhr (N.EvenNibbleString $ shaToByteString h)
 
 putChainBlockHashInfo :: ( Modifiable BlockHashRoot m
                          , (MP.StateRoot `Alters` MP.NodeData) m
                          )
                       => SHA -> SHA -> MP.StateRoot -> m ()
-putChainBlockHashInfo (SHA h) parentHash sr = do
+putChainBlockHashInfo h parentHash sr = do
   bhr <- unBlockHashRoot <$> get Proxy
-  newBlockHashRoot <- putkv bhr (word256ToMPKey h) (parentHash, sr)
+  newBlockHashRoot <- putkv bhr (N.EvenNibbleString $ shaToByteString h) (parentHash, sr)
   put Proxy $ BlockHashRoot newBlockHashRoot
 
 getGenesisStateRoot :: ( Modifiable GenesisRoot m

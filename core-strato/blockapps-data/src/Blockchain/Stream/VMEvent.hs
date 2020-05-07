@@ -72,7 +72,7 @@ class HasVMEventsSink k where
 
 produceVMEventsM :: (Modifiable KafkaState m, MonadIO m) => [VMEvent] -> m Offset
 produceVMEventsM vmEvents = do
-    x <- withKafkaViolently . produceMessages $
+    x <- withKafkaRetry1s . produceMessages $
         map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents
 
     let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x

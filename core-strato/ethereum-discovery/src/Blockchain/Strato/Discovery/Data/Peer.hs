@@ -29,8 +29,8 @@ import           Blockchain.Data.PersistTypes ()
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB          (withGlobalSQLPool)
 import           Blockchain.MiscJSON          ()
-import           Blockchain.SHA
 import           Blockchain.Strato.Discovery.Metrics
+import           Blockchain.Strato.Model.SHA
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 PPeer
@@ -77,7 +77,7 @@ buildPeer (pubkeyMaybe, ip, _) =
         pPeerLastMsgTime = jamshidBirth,
         pPeerEnableTime = jamshidBirth,
         pPeerUdpEnableTime = jamshidBirth,
-        pPeerLastBestBlockHash = SHA 0,
+        pPeerLastBestBlockHash = unsafeCreateSHAFromWord256 0,
         pPeerBondState=0,
         pPeerActiveState = 0,
         pPeerVersion = T.pack "61", -- fix

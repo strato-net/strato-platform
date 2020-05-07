@@ -29,12 +29,12 @@ import qualified Data.Vector as V
 import Data.Text.Encoding
 import GHC.Generics
 
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.SHA hiding (hash)
-import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Data.GenesisInfo
-import Blockchain.Data.ChainInfo
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
+import qualified Blockchain.Strato.Model.SHA              as SHA
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Data.GenesisInfo
+import           Blockchain.Data.ChainInfo
 
 data Type = Number Integer
           | Stryng Text
@@ -83,7 +83,7 @@ equalChunksOf n ws | BS.length ws == 0 = []
                                  in car : (equalChunksOf n cdr)
 
 hash :: Word256 -> Word256
-hash = bytesToWord256 . keccak256 . word256ToBytes
+hash = bytesToWord256 . SHA.shaToByteString . SHA.hash . word256ToBytes
 
 encodeSequentially :: Word256 -> [Type] -> ([(Word256, Word256)], Word256)
 encodeSequentially k [] = ([], k)
@@ -93,7 +93,7 @@ encodeSequentially k (t:ts) =
   in (tSlots ++ tsSlots, k'')
 
 mapHash :: Word256 -> Word256 -> Word256
-mapHash x y = bytesToWord256 . keccak256 $ word256ToBytes x <> word256ToBytes y
+mapHash x y = bytesToWord256 . SHA.shaToByteString $ SHA.hash $ word256ToBytes x <> word256ToBytes y
 
 -- First return value is the slots for this value, and the second return value
 -- is the next available slot.
@@ -165,7 +165,7 @@ insertContracts slotss name src code start gi =
       (decoded, extra) = B16.decode code
       codeHash = if extra /= "" && extra /= "\n"
                    then error ("bytecode not encoded in base16:" ++ show code)
-                   else superProprietaryStratoSHAHash decoded
+                   else SHA.hash decoded
       mkContract (addr, slots) = ContractWithStorage addr 0 (EVMCode codeHash) slots
       addrs = map (start+) [0..]
       addrsAndSlots = zip addrs slotss

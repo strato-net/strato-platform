@@ -2,12 +2,13 @@ name: blockapps-init
 
 dependencies:
   - base
-  - cross-monitoring
-  - text
-  - unix
 
 library:
   source-dirs: src
+  dependencies:
+  - cross-monitoring
+  - text
+  - unix
 
 executables:
   test-reload:

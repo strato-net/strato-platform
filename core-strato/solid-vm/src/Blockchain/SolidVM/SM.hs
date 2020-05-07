@@ -253,13 +253,11 @@ runSM maybeCode env f = do
 
   eValState <- liftIO . try $ runStateT f startingState
   case eValState of
+    -- NO errors will crash the VM.
     -- InternalError should *never* happen.
     -- TODO should also not happen, but since this is a work in progress they
     -- are a fact of life and should be fixed on demand.
     -- The rest should always be a user error and handled safely
-    Left ie@InternalError{} -> do
-      $logErrorLS "runSM/internalError" ie
-      throw ie
     Left se -> do
       $logErrorLS "runSM/error" se
       if flags_svmDev
@@ -495,7 +493,7 @@ setLocal name val = do
                 (ci:r) -> (ci,r)
                 [] -> internalError "setLocal stack underflow" ()
       locals = localVariables info
-      (theType, _) = fromMaybe (error $ "setLocal called for variable that doesn't exist: " ++ name)
+      (theType, _) = fromMaybe (unknownVariable "setLocal called for variable that doesn't exist" name)
                      $ M.lookup name locals
       newVariables = M.insert name (theType, val) locals
   Mod.put (Mod.Proxy @[CallInfo]) $ info{localVariables=newVariables} : rest
@@ -525,6 +523,7 @@ hintFromType = \case
            upgrade = mapM (hintFromType . Xabi.fieldTypeType) . first encodeUtf8
        TStruct s <$> mapM upgrade fs
  Xabi.Array{} -> return TComplex
+ Xabi.Mapping{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
 getXabiType' :: B.ByteString -> CallInfo -> Maybe Xabi.Type
@@ -574,7 +573,7 @@ getXabiValueType (AddressedPath loc path) = do
                    let mt'' = lookup (decodeUtf8 n) fs
                     in case mt'' of
                         Just t'' -> Xabi.fieldTypeType t''
-                        Nothing -> error $ "field not present in struct definition: " ++ show (n, fs)
+                        Nothing -> missingField "field not present in struct definition" $ show (n, fs)
                  (_, StructTypo{}) -> typeError "non field access to struct" x
                  (_, ContractTypo{}) -> todo "getValueType/contract access" t'
                  (_, EnumTypo{}) -> todo "getValueType/enum acess" t'
@@ -599,7 +598,7 @@ markDiffForAction owner key' val' = do
       val = rlpSerialize $ rlpEncode val'
       ins = \case
               ActionSolidVMDiff m -> ActionSolidVMDiff $ M.insert key val m
-              _ -> error "SolidVM Diff executing in EVM"
+              e -> internalError "SolidVM Diff executing in EVM" $ show e
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData . at owner . mapped . actionDataStorageDiffs %= ins
 

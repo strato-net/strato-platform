@@ -61,16 +61,6 @@ getConsumerGroupCoordinator group = do
         NoError -> return broker
         other   -> throwError $ KafkaFailedToFetchGroupCoordinator other
 
-withKafkaViolently :: (MonadIO m, Mod.Modifiable KafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
-withKafkaViolently k = do
-    s <- Mod.get (Mod.Proxy @KafkaState)
-    r <- liftIO . runExceptT $ runStateT k s
-    case r of
-        Left err -> error $ show err
-        Right (a, newS) -> do
-            Mod.put (Mod.Proxy @KafkaState) newS
-            return a
-
 withKafkaRetry :: (MonadIO m, Mod.Modifiable KafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry t k = do
   s <- Mod.get (Mod.Proxy @KafkaState)

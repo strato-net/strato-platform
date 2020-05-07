@@ -1,14 +1,19 @@
 ## RELEASE NOTES
 
-### Version 7.6.4
+### Version 7.6.5
 
-- Add source mappings for minified dist code
-- Add babel-preset-minify, remove gulp-uglify
+- Added Bloc /compile endpoint
+- Add getAccounts to get the account details
 
 #### Minor upgrades
 
 - Added Bloc /compile endpoint
 - Bug fix for createContractList
+
+### Version 7.6.4
+
+- Add source mappings for minified dist code
+- Add babel-preset-minify, remove gulp-uglify
 
 ### Version 7.6.3
 

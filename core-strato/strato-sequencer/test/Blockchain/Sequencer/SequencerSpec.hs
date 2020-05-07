@@ -47,9 +47,9 @@ import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
-import qualified Blockchain.SHA                      as SHA
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
+import qualified Blockchain.Strato.Model.SHA         as SHA
 import qualified Data.ByteString.Char8               as C8
 import qualified Network.Haskoin.Crypto     as HK
 import           Network.Wai.Handler.Warp
@@ -402,27 +402,27 @@ spec = do
 
       -- chain 1
       let cInfo1 = ChainInfo
-                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (unsafeCreateSHAFromWord256 0) 0 M.empty)
                     Nothing
-          SHA chainId1 = SHA.rlpHash cInfo1
-          SHA chainHash1 = SHA.rlpHash cInfo1
-          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (chainId1, cInfo1))
+          chainId1 = SHA.rlpHash cInfo1
+          chainHash1 = SHA.rlpHash cInfo1
+          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (shaToWord256 chainId1, cInfo1))
       tx1 <- runIO . HK.withSource HK.devURandom $ do
         pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId1) Nothing pk
-      let hashTx1 = PrivateHashTX (unSHA $ txHash tx1) chainHash1
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ shaToWord256 chainId1) Nothing pk
+      let hashTx1 = PrivateHashTX (txHash tx1) chainHash1
 
       -- chain 2
       let cInfo2 = ChainInfo
-                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (unsafeCreateSHAFromWord256 0) 0 M.empty)
                     Nothing
-          SHA chainId2 = SHA.rlpHash cInfo2
-          SHA chainHash2 = SHA.rlpHash cInfo2
-          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (chainId2, cInfo2))
+          chainId2 = SHA.rlpHash cInfo2
+          chainHash2 = SHA.rlpHash cInfo2
+          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (shaToWord256 chainId2, cInfo2))
       tx2 <- runIO . HK.withSource HK.devURandom $ do
         pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId2) Nothing pk
-      let hashTx2 = PrivateHashTX (unSHA $ txHash tx2) chainHash2
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ shaToWord256 chainId2) Nothing pk
+      let hashTx2 = PrivateHashTX (txHash tx2) chainHash2
 
       let b1' = makeBlockWithTransactions [hashTx1]
           blk1' h = Block (blockBlockData b1'){ blockDataParentHash = h
@@ -440,8 +440,8 @@ spec = do
           iev2' = IEBlock . blockToIngestBlock TO.Morphism . blk2'
 
       it "should forward a private transaction hash" . runTestM $ do
-        SHA th <- fmap SHA.hash . liftIO $ getEntropy 32
-        SHA ch <- fmap SHA.hash . liftIO $ getEntropy 32
+        th <- fmap SHA.hash . liftIO $ getEntropy 32
+        ch <- fmap SHA.hash . liftIO $ getEntropy 32
         let hashTx = PrivateHashTX th ch
         checkForUnseq [IETx 0 (IngestTx TO.Morphism hashTx)]
         vmevs <- drainVM
@@ -452,8 +452,8 @@ spec = do
         map txType txs' `shouldBe` [PrivateHash]
 
       it "should forward a private transaction hash only once" . runTestM $ do
-        SHA th <- fmap SHA.hash . liftIO $ getEntropy 32
-        SHA ch <- fmap SHA.hash . liftIO $ getEntropy 32
+        th <- fmap SHA.hash . liftIO $ getEntropy 32
+        ch <- fmap SHA.hash . liftIO $ getEntropy 32
         let hashTx = PrivateHashTX th ch
             ietx = IETx 0 (IngestTx TO.Morphism hashTx)
         checkForUnseq [ietx,ietx]

@@ -32,6 +32,7 @@ import           Data.Maybe
 import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
+import qualified Data.Text.Encoding                   as TE
 --import qualified Data.List                            as List
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
@@ -57,10 +58,10 @@ import           Blockchain.SolidVM.Model
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
-import           Blockchain.SHA
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
@@ -114,7 +115,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash
       }
   fmap (either solidvmErrorResults id) . runSM (Just initCode) env' $ do
     let maybeContractName = M.lookup "name" =<< metadata
-        !contractName' = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'name'") maybeContractName
+        !contractName' = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
     let maybeArgString = M.lookup "args" =<< metadata
         argString = maybe "()" T.unpack maybeArgString
@@ -216,9 +217,9 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 
   fmap (either solidvmErrorResults id) . runSM Nothing env' $ do
     let maybeFuncName = M.lookup "funcName" =<< metadata
-        !funcName = T.unpack $ fromMaybe (error "TX is missing a metadata parameter called 'funcName'") maybeFuncName
+        !funcName = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
-        argString = T.unpack $ fromMaybe (error "TX is missing metadata parameter called 'args'") maybeArgString
+        argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
 
@@ -396,6 +397,40 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 -}
 
 
+
+-- Assignment to an index into an array or mapping
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst@(Xabi.IndexAccess parent (Just indExp)) src))) = do
+  srcVar <- expToVar src
+  srcVal <- getVar srcVar
+
+  onTraced $ do
+    valString <- showSM srcVal
+    liftIO $ putStrLn $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
+
+  pVar <- expToVar parent
+  pVal <- weakGetVar pVar
+
+  -- If it's an array, calling (expToVar dst) gives us
+  -- the value at the index, NOT a reference that we can
+  -- assign to....so we need to make a new vector and reset the whole array
+  case pVal of
+    SArray typ fs -> do
+      indVal <- getVar =<< expToVar indExp
+      case indVal of
+        SInteger ind -> do
+          let newVec = fs V.// [(fromIntegral ind, srcVar)]
+          setVar pVar (SArray typ newVec)
+          return Nothing
+        _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseStatement st)
+    _ -> do -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
+      dstVar <- expToVar dst
+      setVar dstVar srcVal
+      return Nothing
+
+
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _))) = missingField "index value cannot be empty" (unparseStatement st)
+
+
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src))) = do
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
@@ -509,6 +544,16 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
     else case maybeElseCode of
       Just elseCode -> runStatements elseCode
       Nothing -> return Nothing
+
+runStatement (Xabi.WhileStatement condition code) = do
+  
+     
+  while (getBool =<< expToVar condition) $ do
+      onTraced $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      result <- runStatements code
+      return result
+
+      -- TODO: this can loop infinitely
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
@@ -728,7 +773,7 @@ expToVar' (Xabi.MemberAccess (Xabi.Variable "Util") "bytes32ToString") = do
 expToVar' (Xabi.MemberAccess (Xabi.Variable "Util") "b32") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
 
-expToVar' (Xabi.MemberAccess expr name) = do
+expToVar' x@(Xabi.MemberAccess expr name) = do
   val <- getVar =<< expToVar expr
 
   case (val, name) of
@@ -792,7 +837,7 @@ expToVar' (Xabi.MemberAccess expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
-      _ -> typeError "SolidVM: Illegal member access" ((show val) ++ "." ++ name)
+      _ -> typeError "illegal member access" $ unparseExpression x
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref
@@ -826,6 +871,8 @@ expToVar' (Xabi.MemberAccess expr name) = do
                 $ M.lookup name theMap
             _ -> todo "access member of storage item" (val', name, apt) -}
 
+expToVar' x@(Xabi.IndexAccess _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
+
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
 expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
   var <- expToVar parent
@@ -838,16 +885,23 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
       val <- getVar var
       case (val, theIndex) of
         (SArray _ theVector, SInteger i) -> do
-          return $ theVector V.! fromIntegral i
+          if (fromIntegral i) >= length theVector then
+            indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x 
+          else
+            return $ theVector V.! fromIntegral i
         (SReference _, _) -> Constant . SReference <$> expToPath x
-        _ -> typeError "expToVar' called for IndexAccess with unsupported types: " ("\nval = " ++ show val ++ "\ntheIndex = " ++ show theIndex)
+        _ -> typeError "unsupported types for index access" $ unparseExpression x
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 
 expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar' (Xabi.Binary "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
 expToVar' (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
-expToVar' (Xabi.Binary "/" expr1 expr2) = expToVarInteger expr1 div expr2 SInteger
+expToVar' ex@(Xabi.Binary "/" expr1 expr2) = do 
+  rhs <- getInt =<< expToVar expr2
+  case rhs of
+    0 -> divideByZero $ unparseExpression ex
+    _ -> expToVarInteger expr1 div expr2 SInteger
 expToVar' (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
 expToVar' (Xabi.Binary "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (Xabi.Binary "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
@@ -915,16 +969,25 @@ expToVar' (Xabi.Binary "<=" expr1 expr2) = do
 
 expToVar' (Xabi.Binary "&&" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
-  b2 <- getBool =<< expToVar expr2
-  logVals b1 b2
-  return $ Constant $ SBool $ b1 && b2
+
+  -- Only evaluate expr2 if b1 is True, otherwise return False
+  if b1 then do
+    b2 <- getBool =<< expToVar expr2
+    logVals b1 b2
+    return $ Constant $ SBool b2
+  else
+    return $ Constant $ SBool False
 
 expToVar' (Xabi.Binary "||" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
 
-  b2 <- getBool =<< expToVar expr2
-  logVals b1 b2
-  return $ Constant $ SBool $ b1 || b2
+  -- Only evaluate expr2 if b1 is False, otherwise return True
+  if b1 then
+    return $ Constant $ SBool True
+  else do
+    b2 <- getBool =<< expToVar expr2
+    logVals b1 b2
+    return $ Constant $ SBool b2
 
 expToVar' (Xabi.TupleExpression exps) = do
   -- Or should STuple be a Vector of Maybe?
@@ -1122,7 +1185,7 @@ callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
 callBuiltin "keccak256" [SString buf] Nothing = do
-  return . SString . BC.unpack . keccak256 . BC.pack $ buf
+  return . SString . BC.unpack . shaToByteString . hash . BC.pack $ buf
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing
@@ -1193,7 +1256,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                     when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
                     return $ NamedVals []
                   _ -> argsToVals contract'
-                                  (fromMaybe (error "arguments provided for missing constructor")
+                                  (fromMaybe (invalidArguments ("arguments provided for missing constructor in contract " ++ contractName') argPairs)
                                         $ _constructor contract')
                                   argExps
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
@@ -1248,7 +1311,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       Just theFunction -> do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
-        let Just commands = Xabi.funcContents theFunction
+        let commands = fromMaybe (missingField "contract constructor has been declared but not defined" contractName') $ Xabi.funcContents theFunction
         _ <- pushSender from $ runStatements commands
         return ()
 
@@ -1309,7 +1372,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
   onTraced $ do
     liftIO $ putStrLn $ "            args: " ++ show (map fst args)
     when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
-
+  
   localVars <- 
     forM locals $ \(n, (t, v)) -> do
       newVar <- liftIO $ fmap Variable $ newIORef v
@@ -1319,17 +1382,27 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
 --  forM_ locals $ \(n, (_, v)) -> do
 --    liftIO $ putStrLn "need to initialize the storage 2"
 --    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
-  let Just commands = Xabi.funcContents theFunction
+  let commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
   val <- runStatements commands
 
   let findNamedReturns = do
         case returns of
           [] -> return Nothing
-          [(name, _)] -> do
+          [(name,_)] -> do -- We have to break this up because
+                           -- SolidVM cannot distinguish between
+                           -- a value and single-tupled value
             currentCallInfo <- getCurrentCallInfo
-            let Just returnVar = M.lookup name $ localVariables currentCallInfo -- the value must exist in the map, else there is a developer error
-            fmap Just $ getVar $ snd returnVar
-          _ -> todo "multiple named return values" returns
+            let mReturnVar = M.lookup name $ localVariables currentCallInfo
+            case mReturnVar of
+              Nothing -> unknownVariable "findNamedReturns" name
+              Just returnVar -> Just <$> getVar (snd returnVar)
+          xs -> Just . STuple . V.fromList <$> do
+            currentCallInfo <- getCurrentCallInfo
+            for (fst <$> xs) $ \name -> do
+              let mReturnVar = M.lookup name $ localVariables currentCallInfo
+              case mReturnVar of
+                Nothing -> unknownVariable "findNamedReturns" name
+                Just returnVar -> Constant <$> getVar (snd returnVar)
 
   val' <- case val of
              Nothing -> findNamedReturns
@@ -1338,10 +1411,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
   popCallInfo
 
   return val'
-
-
-
-
 
 
 
@@ -1357,18 +1426,63 @@ logVals val1 val2 = onTraced . liftIO $ printf
   "            %%%% val1 = %s\n\
   \            %%%% val2 = %s\n" (show val1) (show val2)
 
---TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
+--TODO: It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: MonadSM m => Value -> m ByteString
+
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
 encodeForReturn (SEnumVal _ _ v) = return . word256ToBytes . fromIntegral $ v
 encodeForReturn (SAddress a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
-encodeForReturn (SString s) =
-  -- TODO: Wings expects all return values as bytes32 and never string.
-  -- This will have to be changed when wings drops bytes32 usage, or to support
-  -- string returning applications as well.
-  return $ stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
-  where stringBytes = BC.pack s
-encodeForReturn (STuple items) = B.concat <$> forM (V.toList items) (encodeForReturn <=< getVar)
-encodeForReturn x = todo "encodeForReturn type case" x
+
+-- if it's just a single string, harcode offset as 32 and append strLen + str
+encodeForReturn (SString s) = do
+  let offset = word256ToBytes $ fromIntegral (32 :: Int)
+      encodedLength = word256ToBytes $ fromIntegral (B.length stringBytes)
+      retStr = offset `B.append` (encodedLength `B.append` stringBytes)
+  return retStr 
+  where stringBytes = TE.encodeUtf8 $ T.pack s
+
+
+-- in the case of tuples, we need to follow the EVM/Solidity encoding convention:
+--   1) starting at the first value to encode, check if it is fixed length type (32), or
+--      dynamic (right now, this group is only strings since we don't return arrays). 
+--   2) if a fixed type, encode it directly into the next 32 characters in the bytestring
+--   3) if dynamic:
+--      a) encode an offset value into the next 32 characters.
+--      b) at that offset, put the encoded string's length in the first 32 characters, 
+--         followed by the encoded string
+--   4) repeat for the remaining values
+--   
+--   The headers of the bytestring are the initial (tuple_length * 32) characters.
+--   They are either encoded simple values, or offsets. If some are offsets (to
+--   encoded strings), then they point to characters beyond the (tuple_length * 32)
+--   In other words, the final bytestring is headers `B.append` encodedStrings
+--  
+--
+--   As an example, return type (string, uint, string) would have the following encoding:
+--                                                                            
+--                                       (offsetStr1)            (offsetStr2)
+--   |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
+--   |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
+
+encodeForReturn (STuple items) = do
+  (headers, strings) <- foldM buildEncoding (B.empty, B.empty) =<< mapM getVar (V.toList items)
+  return $ headers `B.append` strings
+  where
+    headerLen = (V.length items) * 32
+    buildEncoding :: MonadSM m => (ByteString, ByteString) -> Value -> m (ByteString, ByteString)
+    buildEncoding (headers, strings) val = case val of
+      SString s -> do
+        let offset = word256ToBytes $ fromIntegral (headerLen + (B.length strings))
+            encStr = TE.encodeUtf8 $ T.pack s
+            encStrLen = word256ToBytes $ fromIntegral (B.length encStr)
+            strBS =  encStrLen `B.append` encStr
+        return (headers `B.append` offset, strings `B.append` strBS)
+      tup@(STuple _) -> todo "encoding nested tuples as return values" tup 
+      v -> do 
+        bs <- encodeForReturn v
+        return (headers `B.append` bs, strings)
+
+encodeForReturn x = todo "can't encode this return type" x
+

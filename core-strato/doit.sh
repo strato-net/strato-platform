@@ -101,8 +101,7 @@ function newnode {
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
   echo ${blockstanbulAdmins}
-  if [ -n "${blockstanbulSkipCheck}" ]; then
-    scFlag="--blockstanbul_skip_check=${blockstanbulSkipCheck}"
+  if [ -n "${faucetEnabled}" ]; then
     apiKey=
   else
     apiKey="${blockstanbulPrivateKey:-}"
@@ -146,9 +145,18 @@ function newnode {
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
-  echo "Starting strato-api"
-  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
-    runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
+  if [ "${USE_STRATO_API}" = true ]; then
+      tbFlag="--blockstanbul=${blockstanbul}"
+      echo "Starting strato-api"
+      HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
+	  runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
+  else
+      echo "Starting core-api"
+      runBackgroundProcess core-api >> logs/core-api 2>&1
+  fi
+
+  
+
 
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation

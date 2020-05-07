@@ -64,7 +64,7 @@ import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Util
 import           Blockchain.EVM.Code
 import           Blockchain.EVM.Environment
@@ -254,8 +254,8 @@ runOperation SHA3 = do
   p <- pop
   size <- pop
   theData <- unsafeSliceByteString p size
-  let SHA theHash = hash theData
-  push $ theHash
+  let theHash = hash theData
+  push $ shaToWord256 theHash
 
 runOperation ADDRESS = pushEnvVar envOwner
 
@@ -357,8 +357,8 @@ runOperation BLOCKHASH = do
            Nothing           -> push (0::Word256)
            Just theBlockHash -> push theBlockHash
    (True, True) -> do
-          let SHA h = hash $ BC.pack $ show $ toInteger number
-          push h
+          let h = hash $ BC.pack $ show $ toInteger number
+          push $ shaToWord256 h
 
 runOperation COINBASE = pushEnvVar (blockDataCoinbase . envBlockHeader)
 runOperation TIMESTAMP = do
@@ -1013,7 +1013,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth env availabl
   dbs' <- get
   sqldbs' <- ask
   vmState <- liftIO $ startingState isRunningTests' isHomestead env sqldbs' dbs'
-  gasref <- liftIO $ newCounter availableGas
+  gasref <- liftIO $ newCounter $ fromIntegral availableGas
   (res, vmState') <- lift . lift $
       flip runStateT vmState{
                          callDepth=callDepth,
@@ -1121,7 +1121,7 @@ create' :: VMM Code
 create' = do
 
   owner <- getEnvVar envOwner
-  action . actionData %= M.insert owner (ActionData (EVMCode $ SHA 0) EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert owner (ActionData (EVMCode $ unsafeCreateSHAFromWord256 0) EVM (ActionEVMDiff M.empty) [])
 
   runCodeFromStart
 
@@ -1265,7 +1265,7 @@ callPrecompiled' noValueTransfer precompiled = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  action . actionData %= M.insert receiveAddress (ActionData (EVMCode (SHA 0)) EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert receiveAddress (ActionData (EVMCode (unsafeCreateSHAFromWord256 0)) EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do

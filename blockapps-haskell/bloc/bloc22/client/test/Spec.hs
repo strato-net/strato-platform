@@ -20,8 +20,11 @@ import           BlockApps.Bloc22.API.Users
 import qualified BlockApps.Bloc22.API.UsersSpec     as Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Client
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.Wei
 
 {-# ANN module ("HLint: ignore Redundant do" :: String) #-}
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -92,7 +95,7 @@ setup = do
           in 6 * second
       }
 
-    postCompileRequest1 = PostCompileRequest (Just $ simpleStorageContractName testConfig) (simpleStorageSrc testConfig)
+    postCompileRequest1 = PostCompileRequest (Just $ simpleStorageContractName testConfig) (simpleStorageSrc testConfig) Nothing
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig

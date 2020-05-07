@@ -223,7 +223,7 @@ Object {
   },
   "isOpen": true,
   "isToasts": false,
-  "searchable": undefined,
+  "solidvm": undefined,
   "toastsMessage": "message",
   "username": "",
 }

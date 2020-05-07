@@ -2,15 +2,10 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 
-const authHandler = require('../middlewares/authHandler.js');
-const authController = require('../controllers/auth');
 const oAuthController = require('../controllers/oAuth');
-// const oAuthController = require('../lib/oAuth/oAuth');
 const dappController = require('../controllers/dapp');
-// const tokenController = require('../controllers/token');
 const healthHandler = require('../controllers/health');
 const trackHandler = require('../controllers/track');
-const checkMode = require('../lib/checkMode').checkMode;
 const appConfig = require(`${process.cwd()}/config/app.config`);
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
@@ -43,7 +38,7 @@ const checkUID = async (req, res, next) => {
   const uID = req.headers['x-user-unique-name'];
   if (!uID) {
     // every request should have the username forwarded by nginx
-    let err = new Error('server misconfigured: no x-user-unique-name header provided in request');
+    let err = new Error('server misconfigured: was not able to fetch user id from bearer token provided in request');
     console.error(err);
     err.status = RestStatus.INTERNAL_SERVER_ERROR;
     return next(err);
@@ -53,45 +48,42 @@ const checkUID = async (req, res, next) => {
     await oAuth.getOrCreateKey(uID);
     return next()
   } catch (error) {
-    let err = new Error('server misconfigured: could not post transaction');
+    let err = new Error('server misconfigured: could not get/create the user key to post transaction');
     console.error(err);
     err.status = RestStatus.SERVICE_UNAVAILABLE;
     return next(err);
   }
 };
 
-router.post('/dapps', dappController.upload);
+const checkExtStorageEnabled = async (req, res, next) => {
+  if (process.env.EXT_STORAGE_S3_BUCKET) {
+    return next();
+  } else {
+    let err = new Error('external storage feature is not enabled on that node');
+    console.error(err);
+    err.status = RestStatus.METHOD_NOT_ALLOWED;
+    return next(err);
+  }
+}
 
+// TODO: fully deprecate dapps feature in the future
+router.post('/dapps', dappController.upload);
 // router.get('/dapps', dappController.list);
 
-router.post('/user', checkMode, oAuthController.createUser);
-router.post('/login', checkMode, authController.login);
-router.post('/users', checkMode, authController.create);
-router.post('/logout', checkMode, authHandler.validateRequest(), authController.logout);
-router.post('/verify-email', checkMode, authController.verifyEmail);
-router.post('/verify-temporary-password', checkMode, authController.verifyTemporaryPassword);
+// Endpoint called by SMD to create key for smd user logged in with oauth
+router.post('/user', oAuthController.createUserKey);
 
-router.post('/bloc/file/upload', checkUID, multerMiddleware, fileController.upload);
-router.post('/bloc/file/attest', checkUID, fileController.attest);
-router.get('/bloc/file/verify', fileController.verify);
-router.get('/bloc/file/download', fileController.download);
-router.get('/bloc/file/list', fileController.list)
+// External storage endpoints
+router.post('/bloc/file/upload', checkExtStorageEnabled, checkUID, multerMiddleware, fileController.upload);
+router.post('/bloc/file/attest', checkExtStorageEnabled, checkUID, fileController.attest);
+router.get('/bloc/file/verify', checkExtStorageEnabled, fileController.verify);
+router.get('/bloc/file/download', checkExtStorageEnabled, fileController.download);
+router.get('/bloc/file/list', checkExtStorageEnabled, fileController.list);
 
-
-// Node governance (for future)
-// router.get('/nodes', authHandler.validateRequest(), nodeController.list);
-// app.get('/_auth', authController.checkAuthenticated); // see https://github.com/nikitamendelbaum/blockapps-task/blob/strato-auth-poc/
-// Invite to network with token
-// router.post('/tokens', authHandler.validateRequest(), tokenController.create);
-// router.get('/tokens', authHandler.validateRequest(), tokenController.list);
-// router.delete('/tokens', authHandler.validateRequest(), tokenController.revoke);
-
+// Health
 router.get('/status', healthHandler.nodeStatus);
-
 router.get('/health', healthHandler.healthStatus);
-
 router.get('/_ping', healthHandler.ping);
-
 router.get('/_track', trackHandler._track);
 
 

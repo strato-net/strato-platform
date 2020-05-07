@@ -48,10 +48,10 @@ export const createContractResponse = {
 }
 
 export const payloadCompile = {
-  contract: "contract GreeterC {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterC(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵",
+  contract: "contract SimpleStorage { uint public storedData; }",
   isOpen: true,
-  name: "Greeter",
-  searchable: undefined,
+  name: "SimpleStorage",
+  solidvm: true,
   type: "COMPILE_CONTRACT_REQUEST"
 }
 

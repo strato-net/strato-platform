@@ -29,9 +29,11 @@ import           Web.FormUrlEncoded               hiding (fieldLabelModifier)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Keccak256
 
 --------------------------------------------------------------------------------
 -- | Routes and types
@@ -332,6 +334,7 @@ type PostContractsCompile = "contracts"
 data PostCompileRequest = PostCompileRequest
   { postcompilerequestContractName :: Maybe Text
   , postcompilerequestSource       :: Text
+  , postcompilerequestVm           :: Maybe Text
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostCompileRequest where arbitrary = GR.genericArbitrary GR.uniform
@@ -354,6 +357,7 @@ instance ToSchema PostCompileRequest where
       ex = PostCompileRequest
         { postcompilerequestContractName = Just "MySampleContract"
         , postcompilerequestSource = "contract MySampleContract { ...} "
+        , postcompilerequestVm = Just "SolidVM"
         }
 
 

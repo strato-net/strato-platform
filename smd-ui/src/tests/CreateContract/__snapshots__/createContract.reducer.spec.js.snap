@@ -255,6 +255,7 @@ Object {
   "filename": undefined,
   "isOpen": false,
   "response": "Status: Upload Contract",
+  "solidvm": true,
   "toster": false,
   "tosterMessage": "",
   "username": "",

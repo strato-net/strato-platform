@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Handler.BatchTransactionResult where
 
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.SHA
 import           Data.Aeson
 import           Data.Aeson.Encoding
 import qualified Data.Map.Strict     as M
@@ -18,7 +18,7 @@ data StrungSHA = StrungSHA { unStrungSHA :: SHA }
 
 instance FromJSON StrungSHA where
     parseJSON (String s) = case readHex $ T.unpack s of
-        [(x, "")] -> return . StrungSHA $ SHA x
+        [(x, "")] -> return . StrungSHA $ unsafeCreateSHAFromWord256 x
         _         -> fail "Expected a hex string of 32 bytes"
     parseJSON _ = fail "Expected a String containing a SHA"
 

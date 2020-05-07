@@ -9,7 +9,6 @@ module BlockApps.Bloc22.Server.Transaction where
 
 import           Control.Applicative               ((<|>), liftA2)
 import           Control.Monad
-import           Control.Monad.Except
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Text                         (Text)
@@ -28,10 +27,19 @@ import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 
+import           UnliftIO
+
+mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
+mergeTxParams (Just inner) (Just outer) = Just $
+  TxParams (txparamsGasLimit inner <|> txparamsGasLimit outer)
+           (txparamsGasPrice inner <|> txparamsGasPrice outer)
+           (txparamsNonce inner <|> txparamsNonce outer)
+mergeTxParams inner outer = inner <|> outer
+
 postBlocTransaction :: Maybe Text -> Maybe ChainId -> Bool -> PostBlocTransactionRequest -> Bloc [BlocTransactionResult]
 postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   case mUserName of
-    Nothing -> throwError $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+    Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
     Just userName -> do
       addr <- case mAddr of
         Nothing -> fmap unStatusAndAddress . blocVaultWrapper $ getKey userName Nothing
@@ -46,7 +54,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         addr
                         (transferpayloadToAddress p)
                         (transferpayloadValue p)
-                        txParams
+                        (mergeTxParams (transferpayloadTxParams p) txParams)
                         (transferpayloadMetadata p)
                         (transferpayloadChainid p <|> chainId)
                         resolve
@@ -55,7 +63,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
             p <- mapM fromTransfer xs
             let btlp = TransferListParameters
                         addr
-                        (map (\(TransferPayload t v c m) -> SendTransaction t v txParams c m) p)
+                        (map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) p)
                         chainId
                         resolve
             postUsersSendList' btlp (callSignature userName)
@@ -70,7 +78,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
-                        txParams
+                        (mergeTxParams (contractpayloadTxParams p) txParams)
                         (contractpayloadMetadata p)
                         (contractpayloadChainid p <|> chainId)
                         resolve
@@ -78,15 +86,19 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                             Nothing -> postUsersContractEVM'
                             Just "EVM" -> postUsersContractEVM'
                             Just "SolidVM" -> postUsersContractSolidVM'
-                            Just vm -> \_ _ -> throwError $ UserError $ Text.pack
+                            Just vm -> \_ _ -> throwIO $ UserError $ Text.pack
                                              $ "Invalid value for VM choice: " ++ show vm
             fmap (:[]) $ poster bcp (callSignature userName)
           xs -> do
             ps <- mapM fromContract xs
             let bclp = ContractListParameters
                         addr
-                        (map (\p@(ContractPayload _ c a v cid m) ->
-                                UploadListContract (fromJust c) (getSrc p) (fromMaybe Map.empty a) txParams v cid m) ps)
+                        (map (\p@(ContractPayload _ c a v x cid m) ->
+                                UploadListContract (fromJust c)
+                                                   (getSrc p)
+                                                   (fromMaybe Map.empty a)
+                                                   (mergeTxParams x txParams)
+                                                   v cid m) ps)
                         chainId
                         resolve
                 md = contractpayloadMetadata $ head ps --Determine VM option by the metadata of the first tx in list
@@ -94,7 +106,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                   Nothing -> postUsersUploadListEVM'
                   Just "EVM" -> postUsersUploadListEVM'
                   Just "SolidVM" -> postUsersUploadListSolidVM'
-                  Just vm -> \_ _ -> throwError $ UserError $ Text.pack
+                  Just vm -> \_ _ -> throwIO $ UserError $ Text.pack
                                    $ "Invalid value for VM choice: " ++ show vm
             poster bclp (callSignature userName)
         FUNCTION -> case txs of
@@ -108,7 +120,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
                         (functionpayloadMethod p)
                         (functionpayloadArgs p)
                         (functionpayloadValue p)
-                        txParams
+                        (mergeTxParams (functionpayloadTxParams p) txParams)
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
@@ -117,20 +129,20 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
                         addr
-                        (map (\(FunctionPayload (ContractName n) a m r v c md) ->
-                                MethodCall n a m r (fromMaybe (Strung 0) v) txParams c md) p)
+                        (map (\(FunctionPayload (ContractName n) a m r v x c md) ->
+                                MethodCall n a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
                         chainId
                         resolve
             postUsersContractMethodList' bflp (callSignature userName)
   where fromTransfer = \case
           BlocTransfer t -> return t
-          _ -> throwError $ UserError "Could not decode transfer arguments from body"
+          _ -> throwIO $ UserError "Could not decode transfer arguments from body"
         fromContract = \case
           BlocContract c -> return c
-          _ -> throwError $ UserError "Could not decode contract arguments from body"
+          _ -> throwIO $ UserError "Could not decode contract arguments from body"
         fromFunction = \case
           BlocFunction f -> return f
-          _ -> throwError $ UserError "Could not decode function arguments from body"
+          _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 callSignature :: Text -> UnsignedTransaction -> Bloc Transaction
 callSignature userName unsigned@UnsignedTransaction{..} = do

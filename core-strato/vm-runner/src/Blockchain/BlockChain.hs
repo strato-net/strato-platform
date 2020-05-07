@@ -76,7 +76,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
 import           Blockchain.ExtWord
-import           Blockchain.MilenaTools                  (withKafkaViolently)
+import           Blockchain.MilenaTools                  (withKafkaRetry1s)
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM                      as SolidVM
@@ -92,7 +92,6 @@ import           Blockchain.VMOptions
 
 import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
-import           Blockchain.SHA                          (formatSHAWithoutColor)
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
@@ -163,7 +162,7 @@ instance Bagger.MonadBagger ContextM where
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
             $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
             void . lift $ putTransactionResult
-                     TransactionResult { transactionResultBlockHash        = SHA 0
+                     TransactionResult { transactionResultBlockHash        = unsafeCreateSHAFromWord256 0
                                        , transactionResultTransactionHash  = theHash
                                        , transactionResultMessage          = message
                                        , transactionResultResponse         = BSS.empty
@@ -234,7 +233,7 @@ addBlocks unfiltered = do
       timerToUse = Just vmBlockInsertionMined
   unless (null unfiltered) $
     -- emit all blocks to the indexers
-    timeit "writeIndexEvents1 " timerToUse $ void . withKafkaViolently $ writeIndexEvents (RanBlock <$> unfiltered)
+    timeit "writeIndexEvents1 " timerToUse $ void . withKafkaRetry1s $ writeIndexEvents (RanBlock <$> unfiltered)
   bbi <- getContextBestBlockInfo
   case (filtered, bbi) of
     ([], _) -> return []
@@ -270,7 +269,7 @@ addBlocks unfiltered = do
       when didReplaceBest' $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         nbb <- liftIO (readIORef replacedBest)
-        timeit "writeIndexEvents2 " timerToUse $ void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+        timeit "writeIndexEvents2 " timerToUse $ void . withKafkaRetry1s $ writeIndexEvents [NewBestBlock nbb]
         when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
           calculateAndEmitStateDiffs srLog oldHeader
       when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
@@ -675,8 +674,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                                , transactionResultTrace            = theTrace'
                                , transactionResultGasUsed          = gasUsed
                                , transactionResultEtherUsed        = etherUsed
-                               , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
-                               , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
+                               , transactionResultContractsCreated = intercalate "," $ map formatAddressWithoutColor newAddresses
+                               , transactionResultContractsDeleted = intercalate "," $ map formatAddressWithoutColor $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
                                , transactionResultStateDiff        = ""
                                , transactionResultTime             = realToFrac deltaT
                                , transactionResultNewStorage       = ""
@@ -792,7 +791,7 @@ calculateAndEmitStateDiffs srLog oldHeader = do
 calculateAndEmitChainDiffs :: M.Map Word256 (Integer, SHA) -> ContextM ()
 calculateAndEmitChainDiffs chainMap = do
   let chainList = M.toList chainMap
-      chainIds = format . SHA . fst <$> chainList
+      chainIds = format . unsafeCreateSHAFromWord256 . fst <$> chainList
   $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
   chainDiffs <- fmap catMaybes . forM chainList $
     \(cId, (newNumber, newHash)) -> chainDiff cId newNumber newHash

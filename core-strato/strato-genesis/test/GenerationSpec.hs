@@ -51,10 +51,10 @@ vehicleContractB16 = "60606040526000357c0100000000000000000000000000000000000000
 
 
 emptyHash :: SHA
-emptyHash = SHA 0xc4295782f7f9af2134f7beb6b68eedcd32a5a44f8fbcc68d87e663d1d56b3d4f
+emptyHash = unsafeCreateSHAFromWord256 0xc4295782f7f9af2134f7beb6b68eedcd32a5a44f8fbcc68d87e663d1d56b3d4f
 
 vehicleHash :: SHA
-vehicleHash = SHA 0x7e24eb3319d8b055c7a27509a1abee64fed1b7acb070accf6a6764a11915c915
+vehicleHash = unsafeCreateSHAFromWord256 0x7e24eb3319d8b055c7a27509a1abee64fed1b7acb070accf6a6764a11915c915
 
 sharedStart :: Address
 sharedStart = Address 0x692a70d2e424a56d2c6c27aa97d1a86395877b3a
@@ -93,7 +93,7 @@ spec = do
       let input = defaultGenesisInfo
           want = [vehicleHash]
           slots = replicate 10 []
-          got = map superProprietaryStratoSHAHash .
+          got = map hash .
                 map (\(CodeInfo bin _ _) -> bin) .
                 genesisInfoCodeInfo .
                 insertContracts slots "Vehicle" vehicleSource vehicleContractB16 sharedStart $ input

@@ -35,7 +35,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Stream.VMEvent
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
-import           Blockchain.Strato.Model.SHA           (SHA(..))
+import           Blockchain.Strato.Model.SHA           (SHA, unsafeCreateSHAFromWord256)
 
 import           Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted        as L
@@ -171,8 +171,8 @@ testContext = TestContext
   , _maxReturnedHeaders    = MaxReturnedHeaders 1000
   , _peerAddr              = PeerAddress Nothing
   , _shaBlockDataMap       = M.empty
-  , _worldBestBlock        = WorldBestBlock (BestBlock (SHA 0) (-1) 0)
-  , _bestBlock             = BestBlock (SHA 0) (-1) 0
+  , _worldBestBlock        = WorldBestBlock (BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0)
+  , _bestBlock             = BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
   , _canonicalBlockDataMap = M.empty
   , _ipAddressIpChainsMap  = M.empty
   , _orgIdChainsMap        = M.empty
@@ -181,7 +181,7 @@ testContext = TestContext
   , _chainInfoMap          = M.empty
   , _privateTxMap          = M.empty
   , _shaOutputBlockMap     = M.empty
-  , _genesisBlockHash      = GenesisBlockHash (SHA 0)
+  , _genesisBlockHash      = GenesisBlockHash (unsafeCreateSHAFromWord256 0)
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.empty
   }

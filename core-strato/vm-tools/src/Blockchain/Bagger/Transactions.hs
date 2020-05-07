@@ -17,9 +17,9 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputTx (..))
-import           Blockchain.SHA                     hiding (hash)
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA        hiding (hash)
 
 import           Text.Format
 
