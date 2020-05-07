@@ -125,11 +125,11 @@ pipeline {
                 rm -rf track-and-trace
                 git clone https://github.com/blockapps/track-and-trace.git
                 cd track-and-trace
-                git checkout oauth42style
+                git checkout oauth42style-test-fix
                 git submodule update --init --recursive
                 cd server
                 sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
-                # oauth42style uses the old hardcoded ba-rest version
+                # oauth42style-test-fix uses the old hardcoded ba-rest version
                 touch .env
                 yarn build
                 yarn install
