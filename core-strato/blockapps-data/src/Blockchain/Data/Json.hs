@@ -14,6 +14,7 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe
+import           Data.Swagger                         hiding (format)
 import qualified Data.Text.Encoding                   as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
@@ -39,6 +40,10 @@ jsonBlk = return . toJSON
 data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show, Generic)
 
 {- note we keep the file MiscJSON around for the instances we don't want to export - ByteString, Point -}
+
+instance ToSchema RawTransaction' where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "RawTransaction'") mempty
 
 instance ToJSON RawTransaction' where
     toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl (Just (Address ta)) val cod cid r s v md bn h o) next) =
@@ -207,6 +212,10 @@ tPrimeToT (Transaction' tx) = tx
 
 data Block' = Block' Block String deriving (Eq, Show)
 
+instance ToSchema Block' where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Block'") mempty
+
 instance ToJSON Block' where
       toJSON (Block' (Block bd rt bu) next) =
         object ["next" .= next, "kind" .= ("Block" :: String), "blockData" .= bdToBdPrime bd,
@@ -305,6 +314,10 @@ bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
 bdrToBdrPrime = BlockDataRef'
 
 data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
+
+instance ToSchema AddressStateRef' where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "AddresStateRef'") mempty
 
 instance ToJSON AddressStateRef' where
     toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch cid bNum) next) =

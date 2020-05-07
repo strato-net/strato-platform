@@ -2,6 +2,8 @@
 
 module SortDirection where
 
+import           Control.Lens.Operators
+import           Data.Swagger
 import qualified Data.Text                   as T
 import qualified Database.Esqueleto as E
 import           Database.Persist.Postgresql
@@ -17,6 +19,8 @@ instance FromHttpApiData Sortby where
       _ -> Left $ T.pack $ "Could not parse sortby parameter: " ++ show x
 
 
+instance ToParamSchema Sortby where
+  toParamSchema _ = mempty & type_ .~ SwaggerString
 
 sortToOrderBy :: (E.Esqueleto query expr backend, PersistField a)
             => Maybe Sortby -> expr (E.Value a) -> (expr E.OrderBy)

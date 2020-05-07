@@ -15,11 +15,13 @@ import           Control.Monad.IO.Class
 import           Data.Aeson
 import           Data.Aeson.Encoding
 import qualified Data.Map.Strict     as M
+import           Data.Swagger
 import qualified Data.Text           as T
 import qualified Database.Esqueleto  as E
 import           Database.Persist.Postgresql
 import           Numeric             (readHex)
 import           Servant
+
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
@@ -56,6 +58,10 @@ instance ToJSONKey StrungSHA where
 
 instance MimeUnrender PlainText [StrungSHA] where
   mimeUnrender _ = maybe (Left "Couldn't decode [Keccak256]") Right . decode
+
+instance ToSchema StrungSHA where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "StrungSHA") mempty
 
 postBatchTransactionResult :: ConnectionPool -> [StrungSHA] -> Handler Value
 postBatchTransactionResult pool hashes = do
