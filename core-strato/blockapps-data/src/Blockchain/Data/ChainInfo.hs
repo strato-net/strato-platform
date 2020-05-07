@@ -37,6 +37,7 @@ import qualified Data.ByteString.Char8                as C8
 import           Data.Data
 import qualified Data.JsonStream.Parser               as JS
 import qualified Data.Map.Strict                      as M
+import           Data.Swagger                         hiding (Format, format)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
@@ -232,6 +233,28 @@ data UnsignedChainInfo = UnsignedChainInfo
   , chainNonce     :: Word256
   , chainMetadata  :: (M.Map T.Text T.Text)
   } deriving (Eq, Show, GHCG.Generic, Data)
+
+
+
+instance ToSchema IPAddress where
+instance ToSchema OrgId where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "OrgId")
+      ( mempty )
+  
+instance ToSchema Enode where
+instance ToSchema CodeInfo where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "CodeInfo")
+      ( mempty )
+    
+instance ToSchema AccountInfo where
+instance ToSchema ChainSignature where
+instance ToSchema UnsignedChainInfo where
+instance ToSchema ChainInfo where
+--  declareNamedSchema _ = return $
+--    NamedSchema (Just "ChainInfo")
+--      ( mempty )
 
 instance Format UnsignedChainInfo where
   format UnsignedChainInfo{..} = unlines

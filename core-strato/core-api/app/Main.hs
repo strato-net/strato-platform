@@ -1,14 +1,21 @@
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeOperators     #-}
+
+
 
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Main where
 
 import           Blockchain.Output
+import           Control.Lens.Operators
+import           Data.Aeson
 import           Data.Proxy
+import           Data.Swagger
 import           Database.Persist.Postgresql
 import           HFlags
 import           Network.Wai.Handler.Warp
@@ -16,6 +23,9 @@ import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
+import           Servant.Multipart
+import           Servant.Swagger
+import           Servant.Swagger.UI
 
 import           BlockApps.Init
 import           Blockchain.EthConf
@@ -91,15 +101,37 @@ coreAPI = Proxy
 main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
+  let theDoc = toSwagger (Proxy :: Proxy CoreAPI)
+               & info.title .~ "Strato API"
+               & info.description ?~
+               "This is the great Strato API, which let's \
+               \ you query the blockchain."
+               & info.version .~ "1.2"
+
+  --print theDoc
   blockappsInit "core-api"
   pool <- runNoLoggingT $ createPostgresqlPool connStr 20
-  run 3000 $ app pool
+  run 3000 $ app pool theDoc
 
-app :: ConnectionPool -> Application
-app pool = 
+app :: ConnectionPool -> Swagger -> Application
+app pool theDoc = 
   prometheus def{prometheusInstrumentApp = False}
   $ instrumentApp "core-api"
   $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
-  $ serve coreAPI $ coreServer pool
+  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
 
+
+
+
+
+----------
+
+--Temporary location for a couple of instance definitions needed for toSwagger, we need to find a better place
+
+instance HasSwagger a => HasSwagger (MultipartForm Mem (MultipartData Mem) :> a) where
+  toSwagger _ = toSwagger (Proxy :: Proxy a)
+
+instance ToSchema Value where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "JSON Value") mempty

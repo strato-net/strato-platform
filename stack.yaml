@@ -87,6 +87,7 @@ extra-deps:
 - bloomfilter-2.0.1.0
 - servant-aeson-specs-0.6.2.0
 - servant-multipart-0.11.2
+- servant-swagger-tags-0.1.0.0@sha256:ffd61b869e56a7543f0641fe017647cf05fb57a76cb2d2acd045fc47bfbafb07,1079
 - strings-1.1
 - git: https://github.com/iostat/relapse
   commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
