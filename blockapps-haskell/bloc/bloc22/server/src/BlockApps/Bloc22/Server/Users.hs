@@ -535,7 +535,10 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
   let indexedByChainId = indexedPartitionWith getChainId unindexedAs
   nonceCache <- asks globalNonceCounter
   now <- liftIO $ getTime Monotonic
-  chainNonceVals <- zip chainIdsList <$> atomically (traverse (cacheLookup nonceCache now) cacheKeys)
+  let lookupCached = case cacheNonce of
+        Do CacheNonce -> atomically (traverse (cacheLookup nonceCache now) cacheKeys)
+        Don't CacheNonce -> pure $ repeat Nothing
+  chainNonceVals <- zip chainIdsList <$> lookupCached
   let ~(chainsWithNonces, chainsWithoutNonces) = partition (isJust . snd) chainNonceVals
       cachedNonceMap = Map.fromList $ fmap fromJust <$> chainsWithNonces
   fetchedNonceMap <- getAccountNonce fromAddr . S.fromList $ fst <$> chainsWithoutNonces
@@ -949,7 +952,9 @@ getAccountTxParams cacheNonce addr chainId mTxParams = do
       cacheKey = (addr, chainId)
   nonceCache <- asks globalNonceCounter
   now <- liftIO $ getTime Monotonic
-  mCachedNonce <- atomically $ cacheLookup nonceCache now cacheKey
+  mCachedNonce <- case cacheNonce of
+    Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
+    Don't CacheNonce -> pure Nothing
   nonceMap <- case mCachedNonce of
                 Just n -> pure $ Map.singleton chainId n
                 Nothing -> getAccountNonce addr (S.singleton chainId)
