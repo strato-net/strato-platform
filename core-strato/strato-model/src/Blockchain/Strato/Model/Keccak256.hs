@@ -9,9 +9,23 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TypeApplications      #-}
 
-module Blockchain.Strato.Model.Keccak256 where
+-- {-# OPTIONS_GHC -fno-warn-unused-imports  #-}
+-- {-# OPTIONS_GHC -fno-warn-unused-top-binds  #-}
 
-import           ClassyPrelude ((<>), Hashable(hashWithSalt))
+
+module Blockchain.Strato.Model.Keccak256 (
+  Keccak256(..),
+  byteStringKeccak256,
+  keccak256,
+  keccak256ByteString,
+  keccak256lazy,
+  keccak256SHA,
+  keccak256String,
+  shaKeccak256,
+  stringKeccak256
+  ) where
+
+--import           ClassyPrelude ((<>), Hashable(hashWithSalt))
 import           Control.DeepSeq (NFData)
 import           Control.Lens.Operators
 import           Control.Monad          ((<=<))
@@ -42,15 +56,6 @@ newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
   deriving (Eq,Ord,Show,Generic)
   deriving anyclass (NFData)
 
-
-instance RLPEncodable Keccak256 where
-  rlpEncode = rlpEncode . keccak256ByteString
-  rlpDecode = maybe (Left "RLPEncodable.Keccak256: Could not decode") Right . byteStringKeccak256 <=< rlpDecode
-
-
-instance Hashable Keccak256 where
-  hashWithSalt salt = hashWithSalt salt . keccak256SHA
-
 keccak256ByteString :: Keccak256 -> ByteString
 keccak256ByteString = ByteArray.convert . digestKeccak256
 
@@ -66,6 +71,14 @@ stringKeccak256 string =
   where
     (bs, r) = Base16.decode $ Char8.pack string
 
+instance RLPEncodable Keccak256 where
+  rlpEncode = rlpEncode . keccak256ByteString
+  rlpDecode = maybe (Left "RLPEncodable.Keccak256: Could not decode") Right . byteStringKeccak256 <=< rlpDecode
+{-
+instance Hashable Keccak256 where
+  hashWithSalt salt = hashWithSalt salt . keccak256SHA
+-}
+
 instance ToJSON Keccak256 where toJSON = toJSON . keccak256String
 
 instance FromJSON Keccak256 where
@@ -74,10 +87,12 @@ instance FromJSON Keccak256 where
     case stringKeccak256 string of
       Nothing      -> fail $ "Could not decode Keccak256: " <> string
       Just hash256 -> return hash256
+
 instance ToJSONKey Keccak256 where
     toJSONKey = ToJSONKeyText f f'
         where f k = let (Aeson.String s) = toJSON k in s
               f'  = AesonEnc.text . f
+              
 instance FromJSONKey Keccak256 where
     fromJSONKey = FromJSONKeyTextParser (parseJSON . Aeson.String)
 
@@ -93,11 +108,13 @@ instance ToForm Keccak256 where
   toForm hash256 = [("hash", toQueryParam hash256)]
 
 instance FromForm Keccak256 where fromForm = parseUnique "hash"
+
 instance MimeUnrender PlainText Keccak256 where
   mimeUnrender _ = maybe (Left "Couldn't read Keccak") Right . stringKeccak256 . Char8.unpack . Lazy.toStrict
+{-
 instance MimeRender PlainText Keccak256 where
   mimeRender _ = Lazy.fromStrict . Char8.pack . keccak256String
-
+-}
 instance MimeRender PlainText [Keccak256] where
   mimeRender _ = encode
 
@@ -114,12 +131,6 @@ instance ToParamSchema Keccak256 where
   toParamSchema _ = mempty & type_ .~ SwaggerString
 
 
-keccak256 :: ByteString -> Keccak256
-keccak256 = Keccak256 . hash
-
-keccak256lazy :: Lazy.ByteString -> Keccak256
-keccak256lazy = Keccak256 . hashlazy
-
 instance ToSample Keccak256 where
   toSamples _ =
     samples [keccak256lazy (Binary.encode @ Integer n) | n <- [1..10]]
@@ -131,6 +142,15 @@ instance ToSchema Keccak256 where
         & type_ .~ SwaggerString
         & example ?~ toJSON (keccak256lazy (Binary.encode @ Integer 1))
         & description ?~ "Keccak256 hash, 32 byte hex encoded string" )
+
+
+
+keccak256 :: ByteString -> Keccak256
+keccak256 = Keccak256 . hash
+
+keccak256lazy :: Lazy.ByteString -> Keccak256
+keccak256lazy = Keccak256 . hashlazy
+
 
 keccak256SHA :: Keccak256 -> SHA
 keccak256SHA = unsafeCreateSHAFromByteString . ByteArray.convert . digestKeccak256
