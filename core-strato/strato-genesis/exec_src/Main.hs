@@ -95,8 +95,8 @@ showAccountInfo (ContractWithStorage (Address address) balance code storage) =
   "a " ++ addressString ++ " " ++ show balance ++ " " ++ showCodeHash code "" ++ "\n"
   ++ unlines (map (\(k, v) -> "s " ++ addressString ++ " " ++ showHex k "" ++ " " ++ showHex v "") storage)
   where addressString = showHex address ""
-        showCodeHash (EVMCode (SHA c)) = showHex c
-        showCodeHash (SolidVMCode _ (SHA c)) = showHex c
+        showCodeHash (EVMCode c) = showHex $ shaToWord256 c
+        showCodeHash (SolidVMCode _ c) = showHex $ shaToWord256 c
 
 
 

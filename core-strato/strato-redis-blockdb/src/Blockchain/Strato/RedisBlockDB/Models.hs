@@ -153,4 +153,4 @@ displayForNamespace ns input = case ns of
     PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
     PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
   where
-    readSHA = let SHA x = fromValue input in format x
+    readSHA = let x = fromValue input in format (shaToWord256 x)

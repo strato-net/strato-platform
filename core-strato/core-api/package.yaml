@@ -30,13 +30,16 @@ library:
   - filepath
   - format
   - http-api-data
+  - lens
   - monad-alter
   - monad-logger
   - mtl
   - process
   - seqevents
   - servant-multipart
+  - servant-swagger-tags
   - strato-model
+  - swagger2
   - template-haskell
   - text
   - transformers
@@ -50,8 +53,16 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - aeson
+    - blockapps-init
     - core-api
+    - lens
     - monad-logger
+    - servant-multipart
+    - servant-swagger
+    - servant-swagger-ui
+    - swagger2
     - wai-cors
     - wai-extra
+    - wai-middleware-prometheus
     - warp

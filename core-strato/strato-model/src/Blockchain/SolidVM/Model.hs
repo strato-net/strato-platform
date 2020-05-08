@@ -17,12 +17,19 @@ import GHC.Generics
 import Test.QuickCheck
 import Web.HttpApiData
 
+import              Control.Lens.Operators
+
+import Data.Swagger
+
 import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
 newtype HexStorage = HexStorage B.ByteString
                    deriving (Eq, Show, Read, Generic)
                    deriving anyclass (NFData)
 
+instance ToParamSchema HexStorage where
+  toParamSchema _ =  mempty & type_ .~ SwaggerString
+  
 word256ToHexStorage :: Word256 -> HexStorage
 word256ToHexStorage = HexStorage . word256ToBytes
 

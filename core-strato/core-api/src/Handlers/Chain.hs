@@ -15,6 +15,7 @@ import qualified Data.ByteString.Lazy.Char8     as BLC
 import qualified Data.Map                       as M
 import           Data.Maybe
 import qualified Data.Set                       as S
+import           Data.Swagger
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
 import           Database.Persist.Postgresql
@@ -43,6 +44,10 @@ server :: ConnectionPool -> Server API
 server connStr = getChain connStr :<|> postChain :<|> postChains
 
 -----------------------
+
+instance ToSchema (NamedTuple "id" Word256 "info" ChainInfo) where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
 getChain :: ConnectionPool -> Maybe ChainId -> Handler (NamedMap "id" Word256 "info" ChainInfo)
 getChain pool mChainId = liftIO $ runSQLM pool $ 
@@ -112,6 +117,6 @@ processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Us
     case accountCodeHashes S.\\ codeCodeHashes of
       s | s /= S.empty -> Left (i, "Each contract code hash in accountInfo must match a corresponding code hash in codeInfo.")
         | otherwise -> do
-          let SHA cid = rlpHash gen
-          return cid
+          let cid = rlpHash gen
+          return $ shaToWord256 cid
 

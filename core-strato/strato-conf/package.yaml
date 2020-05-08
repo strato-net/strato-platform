@@ -27,3 +27,4 @@ library:
     - mtl
     - transformers
     - hedis
+    - swagger2

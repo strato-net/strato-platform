@@ -376,7 +376,7 @@ instance ToSchema ContractDetails where
         { contractdetailsBin = "ContractBin"
         , contractdetailsAddress = Just (Unnamed (Address 0xdeadbeef))
         , contractdetailsBinRuntime = "ContractRuntime"
-        , contractdetailsCodeHash = EVMCode $ SHA 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
+        , contractdetailsCodeHash = EVMCode $ unsafeCreateSHAFromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
         , contractdetailsName = "DetailsName"
         , contractdetailsSrc = "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi
