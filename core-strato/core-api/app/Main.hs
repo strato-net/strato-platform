@@ -125,8 +125,8 @@ app pool theDoc =
   $ instrumentApp "core-api"
   $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
-  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
---  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw)) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404)
+--  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
+  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw)) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404)
 
 
 
