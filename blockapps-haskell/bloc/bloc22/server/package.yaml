@@ -31,8 +31,11 @@ library:
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - bytestring
+    - cache
     - classy-prelude
+    - clock
     - common-log
+    - conduit
     - cryptonite
     - directory
     - extra
@@ -58,6 +61,7 @@ library:
     - servant-client
     - servant-server
     - servant-swagger
+    - stm-conduit
     - strato-model
     - swagger2
     - temporary

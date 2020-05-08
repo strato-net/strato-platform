@@ -29,6 +29,7 @@ library:
   - extra
   - filepath
   - format
+  - hflags
   - http-api-data
   - lens
   - monad-alter
@@ -56,8 +57,10 @@ executables:
     - aeson
     - bytestring
     - blockapps-init
+    - blockapps-util
     - core-api
     - format
+    - hflags
     - http-types
     - insert-ordered-containers
     - lens

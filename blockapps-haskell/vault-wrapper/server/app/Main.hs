@@ -9,6 +9,7 @@ module Main where
 
 import           Control.Monad
 import           Database.PostgreSQL.Simple
+import           Data.Cache
 import           Data.IORef
 import           Data.Pool
 import           HFlags
@@ -19,6 +20,7 @@ import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Servant.Options
 import           Servant
+import           System.Clock
 import           System.IO                              (BufferMode (..),
                                                         hSetBuffering, stderr,
                                                         stdout)
@@ -63,7 +65,8 @@ main = do
   pool <- createPool (connect dbConnectInfo) close 20 3 20
   mgr <- newManager defaultManagerSettings
   password <- newIORef Nothing
-  let env = Strato23.VaultWrapperEnv mgr pool password
+  cache <- newCache . Just $ TimeSpec (fromIntegral flags_keyStoreCacheTimeout) 0
+  let env = Strato23.VaultWrapperEnv mgr pool password cache
   run flags_port (appVaultWrapper env)
 
 appVaultWrapper :: Strato23.VaultWrapperEnv -> Application

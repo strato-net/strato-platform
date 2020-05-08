@@ -9,9 +9,9 @@
 
 module BlockApps.Bloc22.Server.Users where
 
-import           ClassyPrelude                     ((<>))
+import           ClassyPrelude                     ((<>), Hashable)
 import           Control.Concurrent
-import           Control.Applicative               ((<|>))
+import           Control.Applicative               ((<|>), liftA2)
 import           Control.Arrow
 import           Control.Lens                      hiding (from, ix)
 import           Control.Monad
@@ -26,15 +26,18 @@ import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Char8             as BC
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
+import qualified Data.Cache                        as Cache
+import qualified Data.Cache.Internal               as Cache
 import           Data.Either
 import           Data.Foldable
 import           Data.Int                          (Int32)
-import           Data.List                         (sortOn)
+import           Data.List                         (partition, sortOn)
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import qualified Data.Map.Ordered                  as OMap
 import           Data.Maybe
 import           Data.RLP
+import           Data.Semigroup                    (Max(..))
 import           Data.Set                          (isSubsetOf)
 import qualified Data.Set                          as S
 import           Data.Text                         (Text)
@@ -42,7 +45,8 @@ import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
 import           Database.PostgreSQL.Simple        (SqlError(..))
-import           Opaleye                           hiding (not, null, index)
+import           Opaleye                           hiding (not, null, index, max)
+import           System.Clock
 import           UnliftIO
 
 import           BlockApps.Bloc22.API.Users
@@ -201,11 +205,11 @@ postUsersSend userName addr chainId resolve
                 md
                 chainId
                 resolve
-    postUsersSend' btp (return . signTransaction sk)
+    postUsersSend' (Don't CacheNonce) btp (return . signTransaction sk)
 
-postUsersSend' :: TransferParameters -> Signer -> Bloc BlocTransactionResult
-postUsersSend' TransferParameters{..} sign = do
-    params <- getAccountTxParams fromAddress chainId txParams
+postUsersSend' :: Should CacheNonce -> TransferParameters -> Signer -> Bloc BlocTransactionResult
+postUsersSend' cacheNonce TransferParameters{..} sign = do
+    params <- getAccountTxParams cacheNonce fromAddress chainId txParams
     tx <- signAndPrepare sign fromAddress metadata $
       TransactionHeader
         (Just toAddress)
@@ -238,35 +242,21 @@ postUsersContract userName addr chainId resolve
               md
               chainId
               resolve
+      cacheNonce = Don't CacheNonce
   case join $ fmap (Map.lookup "VM") $ md of
-    Just "EVM" -> postUsersContractEVM' bcp (return . signTransaction sk)
-    Just "SolidVM" -> postUsersContractSolidVM' bcp (return . signTransaction sk)
-    Nothing -> postUsersContractEVM' bcp (return . signTransaction sk) -- The EVM is the default VM
+    Just "EVM" -> postUsersContractEVM' cacheNonce bcp (return . signTransaction sk)
+    Just "SolidVM" -> postUsersContractSolidVM' cacheNonce bcp (return . signTransaction sk)
+    Nothing -> postUsersContractEVM' cacheNonce bcp (return . signTransaction sk) -- The EVM is the default VM
     Just vmName -> throwIO $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
-evmContractSolidVMError :: Text
-evmContractSolidVMError = Text.concat
-  [ "Upload Contract (EVM): The given contracts were previously uploaded for "
-  , "SolidVM. Please retry your request specifying SolidVM as the VM type. "
-  , "If you are intending to use EVM, please modify your contracts and try again."
-  ]
-
-postUsersContractEVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
-postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
-  params <- getAccountTxParams fromAddr chainId txParams
+postUsersContractEVM' :: Should CacheNonce -> ContractParameters -> Signer -> Bloc BlocTransactionResult
+postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $ do
+  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
-  idsAndDetails <- sourceToContractDetails (Do Compile) src
   $logInfoLS "postUsersContractEVM'/args" args
-  (cName,(cmId,ContractDetails{..})) <-
-    case contract of
-     Nothing ->
-       case Map.toList idsAndDetails of
-         [] -> throwIO $ UserError "You need to supply at least one contract in the source"
-         [(n,(m,cd))] -> case contractdetailsCodeHash cd of
-                  (EVMCode _) -> return (n, (m, cd))
-                  (SolidVMCode _ _) -> throwIO $ UserError evmContractSolidVMError
-         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "EVM" src contract >>= \case
+    Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
+    Just x -> pure x
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
     metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
@@ -293,20 +283,14 @@ postUsersContractEVM' ContractParameters{..} sign = blocTransaction $ do
     )]
   getBlocTransactionResult' [hash] resolve
 
-postUsersContractSolidVM' :: ContractParameters -> Signer -> Bloc BlocTransactionResult
-postUsersContractSolidVM' ContractParameters{..} sign = blocTransaction $ do
-  params <- getAccountTxParams fromAddr chainId txParams
+postUsersContractSolidVM' :: Should CacheNonce -> ContractParameters -> Signer -> Bloc BlocTransactionResult
+postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransaction $ do
+  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
-  idsAndDetails <- sourceToContractDetails (Don't Compile) src
-  (cName,(cmId,ContractDetails{..})) <-
-    case contract of
-     Nothing ->
-       case Map.toList idsAndDetails of
-         [] -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
-         [x] -> return x
-         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data" --remove
-     Just contract' -> (,) contract' <$> blocMaybe "Could not find global contract metadataId" (Map.lookup contract' idsAndDetails)
   $logInfoLS "postUsersContractSolidVM'/args" args
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" src contract >>= \case
+    Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+    Just x -> pure x
 
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
@@ -343,23 +327,24 @@ postUsersUploadList userName addr chainId resolve (UploadListRequest pw contract
                (setSrc <$> contracts)
                chainId
                (resolve || _resolve)
+      cacheNonce = Don't CacheNonce
   case Map.lookup "VM" =<< uploadlistcontractMetadata (head contracts) of  --Determine VM option by the metadata of the first tx in list
-    Just "EVM" -> postUsersUploadListEVM' bclp (return . signTransaction sk)
-    Just "SolidVM" -> postUsersUploadListSolidVM' bclp (return . signTransaction sk)
-    Nothing -> postUsersUploadListEVM' bclp (return . signTransaction sk) -- The EVM is the default VM
+    Just "EVM" -> postUsersUploadListEVM' cacheNonce bclp (return . signTransaction sk)
+    Just "SolidVM" -> postUsersUploadListSolidVM' cacheNonce bclp (return . signTransaction sk)
+    Nothing -> postUsersUploadListEVM' cacheNonce bclp (return . signTransaction sk) -- The EVM is the default VM
     Just vmName -> throwIO $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
-postUsersUploadListSolidVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
-postUsersUploadListSolidVM' ContractListParameters{..} sign = do
+postUsersUploadListSolidVM' :: Should CacheNonce -> ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
-  txsWithParams <- genNonces (getAccountNonce fromAddr) uploadlistcontractChainid uploadlistcontractTxParams contracts'
+  txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name mSrc args params value cid md) -> do
       (src, cmId, xabi) <- case mSrc of
         Just src -> do
-          (cmId', cd) <- lift $ do
-            idsAndDetails <- sourceToContractDetails (Don't Compile) src
-            blocMaybe "Could not find global contract metadataId" (Map.lookup name idsAndDetails)
+          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" src (Just name) >>= \case
+            Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+            Just x -> pure x
           at name <?= (src, cmId', contractdetailsXabi cd)
         Nothing -> do
           mtuple <- use $ at name
@@ -415,10 +400,10 @@ evmUploadListError = Text.concat
   , "error message, please contact your administrator."
   ]
 
-postUsersUploadListEVM' :: ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
-postUsersUploadListEVM' ContractListParameters{..} sign = do
+postUsersUploadListEVM' :: Should CacheNonce -> ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
-  txsWithParams <- genNonces (getAccountNonce fromAddr) uploadlistcontractChainid uploadlistcontractTxParams contracts'
+  txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name mSrc args params value cid md) -> do
       when (isJust mSrc) . lift . throwIO $ UserError evmUploadListError
@@ -471,12 +456,12 @@ postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve'
                txs
                chainId
                (resolve || resolve')
-  postUsersSendList' btlp (return . signTransaction sk)
+  postUsersSendList' (Don't CacheNonce) btlp (return . signTransaction sk)
 
-postUsersSendList' :: TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
-postUsersSendList' TransferListParameters{..} sign = do
+postUsersSendList' :: Should CacheNonce -> TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersSendList' cacheNonce TransferListParameters{..} sign = do
   let txsWithChainids = map (sendtransactionChainid %~ (<|> chainId)) txs
-  txsWithParams <- genNonces (getAccountNonce fromAddr) sendtransactionChainid sendtransactionTxParams txsWithChainids
+  txsWithParams <- genNonces cacheNonce fromAddr sendtransactionChainid sendtransactionTxParams txsWithChainids
   txs'' <- mapM
     (\(SendTransaction toAddr (Strung value) params cid md) -> do
         let header = TransactionHeader
@@ -526,43 +511,74 @@ postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequ
                postmethodlistrequestTxs
                chainId
                (resolve || postmethodlistrequestResolve)
-  postUsersContractMethodList' bflp (return . signTransaction sk)
+  postUsersContractMethodList' (Don't CacheNonce) bflp (return . signTransaction sk)
 
-genNonces :: (Show a, Monad m) => (S.Set (Maybe ChainId) -> m (Map (Maybe ChainId) Nonce))
-                               -> Lens' a (Maybe ChainId)
-                               -> Lens' a (Maybe TxParams)
-                               -> [a]
-                               -> m [a]
-genNonces retrieveNoncesForChains chainLens l unindexedAs = do
+cacheLookup :: (Eq k, Hashable k)
+            => Cache.Cache k v
+            -> TimeSpec
+            -> k
+            -> STM (Maybe v)
+cacheLookup c t k = Cache.lookupSTM True k c t
+
+genNonces :: Show a
+          => Should CacheNonce
+          -> Address
+          -> Lens' a (Maybe ChainId)
+          -> Lens' a (Maybe TxParams)
+          -> [a]
+          -> Bloc [a]
+genNonces cacheNonce fromAddr chainLens l unindexedAs = do
   let getChainId = view chainLens
-      chainIds = S.fromList $ map getChainId unindexedAs
-  nonceMap <- retrieveNoncesForChains chainIds
+      chainIdsList = S.toList . S.fromList $ getChainId <$> unindexedAs
+      cacheKeys = (fromAddr,) <$> chainIdsList
+      viewNonce = txparamsNonce <=< view l
   let indexedByChainId = indexedPartitionWith getChainId unindexedAs
-  fmap mergePartitions . forM indexedByChainId $ \(chainId, indexedAs) -> do
-    let noncesInUse = S.fromList $ mapMaybe ((txparamsNonce <=< view l) . snd) indexedAs
-        nonce = if S.size noncesInUse == length indexedAs
-                  then Nonce . error $
-                         "internal error: unused nonce when already specified " ++ show indexedAs
-                  else fromMaybe 0 $ Map.lookup chainId nonceMap
-    return . (chainId,) . runIdentity . forStateT nonce indexedAs $ \(i,a) -> do
-      let params' = fromMaybe emptyTxParams (a ^. l)
-      newNonce <- case txparamsNonce params' of
-        Just v -> return v
-        Nothing -> do
-          whileM $ do
-            inUse <- gets (`S.member` noncesInUse)
-            when inUse $ id += 1
-            return inUse
-          id <<+= 1
-      return (i, (l .~ Just params'{txparamsNonce = Just newNonce}) a)
+  nonceCache <- asks globalNonceCounter
+  now <- liftIO $ getTime Monotonic
+  let lookupCached = case cacheNonce of
+        Do CacheNonce -> atomically (traverse (cacheLookup nonceCache now) cacheKeys)
+        Don't CacheNonce -> pure $ repeat Nothing
+  chainNonceVals <- zip chainIdsList <$> lookupCached
+  let ~(chainsWithNonces, chainsWithoutNonces) = partition (isJust . snd) chainNonceVals
+      cachedNonceMap = Map.fromList $ fmap fromJust <$> chainsWithNonces
+  fetchedNonceMap <- getAccountNonce fromAddr . S.fromList $ fst <$> chainsWithoutNonces
+  let nonceMap = Map.union cachedNonceMap fetchedNonceMap
+  liftIO . atomically $ fmap mergePartitions . forM indexedByChainId $ \(chainId, indexedAs) -> do
+    let noncesInUse = S.fromList $ mapMaybe (viewNonce . snd) indexedAs
+    now' <- Cache.nowSTM
+    nonce <- if S.size noncesInUse == length indexedAs
+               then pure . Nonce . error $
+                      "internal error: unused nonce when already specified " ++ show indexedAs
+               else do
+                 mmNonce <- cacheLookup nonceCache now' (fromAddr, chainId)
+                 let mNonce = case cacheNonce of
+                       Do CacheNonce -> mmNonce
+                       Don't CacheNonce -> Nothing
+                     sNonce = Map.lookup chainId nonceMap
+                 pure . fromMaybe 0 $ liftA2 max mNonce sNonce <|> mNonce <|> sNonce
+    let txs = runIdentity . forStateT nonce indexedAs $ \(i,a) -> do
+                let params' = fromMaybe emptyTxParams (a ^. l)
+                newNonce <- case txparamsNonce params' of
+                  Just v -> return v
+                  Nothing -> do
+                    whileM $ do
+                      inUse <- gets (`S.member` noncesInUse)
+                      when inUse $ id += 1
+                      return inUse
+                    id <<+= 1
+                return (i, (l .~ Just params'{txparamsNonce = Just newNonce}) a)
+        newCachedNonce = 1 + getMax (foldMap (Max . fromMaybe 0 . viewNonce . snd) txs)
+        expTime = (now' +) <$> Cache.defaultExpiration nonceCache
+    Cache.insertSTM (fromAddr, chainId) newCachedNonce nonceCache expTime
+    pure (chainId, txs)
 
-postUsersContractMethodList' :: FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
-postUsersContractMethodList' FunctionListParameters{..} sign = do
+postUsersContractMethodList' :: Should CacheNonce -> FunctionListParameters -> Signer -> Bloc [BlocTransactionResult]
+postUsersContractMethodList' cacheNonce FunctionListParameters{..} sign = do
   if null txs
     then return []
     else do
       let txsWithChainids = map (methodcallChainid %~ (<|> chainId)) txs
-      txsWithParams <- genNonces (getAccountNonce fromAddr) methodcallChainid methodcallTxParams txsWithChainids
+      txsWithParams <- genNonces cacheNonce fromAddr methodcallChainid methodcallTxParams txsWithChainids
       txsCmIdsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall{..}) -> do
           mtuple <- use $ at methodcallContractName
@@ -644,11 +660,11 @@ postUsersContractMethod
                 md
                 chainId
                 resolve
-    postUsersContractMethod' bfp (return . signTransaction sk)
+    postUsersContractMethod' (Don't CacheNonce) bfp (return . signTransaction sk)
 
-postUsersContractMethod' :: FunctionParameters -> Signer -> Bloc BlocTransactionResult
-postUsersContractMethod' FunctionParameters{..} sign = do
-    params <- getAccountTxParams fromAddr chainId txParams
+postUsersContractMethod' :: Should CacheNonce -> FunctionParameters -> Signer -> Bloc BlocTransactionResult
+postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
+    params <- getAccountTxParams cacheNonce fromAddr chainId txParams
 
     let err = UserError $ Text.concat
                 [ "postUsersContractMethod': Couldn't find contract details for "
@@ -930,14 +946,30 @@ constructArgValuesAndSource args argNamesTypes = do
             "(" <> Text.intercalate "," valsAsText <> ")"
           )
 
-getAccountTxParams :: Address -> Maybe ChainId -> Maybe TxParams -> Bloc TxParams
-getAccountTxParams addr chainId mTxParams = do
+getAccountTxParams :: Should CacheNonce -> Address -> Maybe ChainId -> Maybe TxParams -> Bloc TxParams
+getAccountTxParams cacheNonce addr chainId mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
-  case txparamsNonce params of
-    Nothing -> do
-      mNonce <- Map.lookup chainId <$> getAccountNonce addr (S.singleton chainId)
-      return params{txparamsNonce = Just (fromMaybe 0 mNonce)}
-    Just{} -> return params
+      cacheKey = (addr, chainId)
+  nonceCache <- asks globalNonceCounter
+  now <- liftIO $ getTime Monotonic
+  mCachedNonce <- case cacheNonce of
+    Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
+    Don't CacheNonce -> pure Nothing
+  nonceMap <- case mCachedNonce of
+                Just n -> pure $ Map.singleton chainId n
+                Nothing -> getAccountNonce addr (S.singleton chainId)
+  liftIO . atomically $ do
+    now' <- Cache.nowSTM
+    mmNonce <- cacheLookup nonceCache now' cacheKey
+    let mNonce = case cacheNonce of
+          Do CacheNonce -> mmNonce
+          Don't CacheNonce -> Nothing
+        sNonce = Map.lookup chainId nonceMap
+        maxNonce = liftA2 max mNonce sNonce
+        newNonce = fromMaybe 0 $ txparamsNonce params <|> maxNonce <|> mNonce <|> sNonce
+        expTime = (now' +) <$> Cache.defaultExpiration nonceCache
+    Cache.insertSTM cacheKey (newNonce + 1) nonceCache expTime
+    pure params{ txparamsNonce = Just newNonce }
 
 getAccountNonce :: Address -> S.Set (Maybe ChainId) -> Bloc (Map (Maybe ChainId) Nonce)
 getAccountNonce addr chainIds = do
