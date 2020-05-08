@@ -114,6 +114,8 @@ services:
     - BLOC_DEBUG=${BLOC_DEBUG}
     - kafkaHost=kafka
     - kafkaPort=9092
+    - nonceCounterTimeout=${nonceCounterTimeout:-10}
+    - sourceCacheTimeout=${sourceCacheTimeout:-60}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
@@ -125,6 +127,7 @@ services:
     - SMD_MODE=${SMD_MODE}
     #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
+    - txQueueSize=${txQueueSize:-4096}
     - vaultWrapperHost=vault-wrapper:8000
     - zookeeper_conn=zookeeper
     build: .
@@ -156,6 +159,7 @@ services:
     depends_on:
     - postgres
     environment:
+    - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432

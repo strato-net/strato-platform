@@ -29,6 +29,7 @@ library:
   - extra
   - filepath
   - format
+  - hflags
   - http-api-data
   - lens
   - monad-alter
@@ -55,7 +56,9 @@ executables:
     dependencies:
     - aeson
     - blockapps-init
+    - blockapps-util
     - core-api
+    - hflags
     - lens
     - monad-logger
     - servant-multipart

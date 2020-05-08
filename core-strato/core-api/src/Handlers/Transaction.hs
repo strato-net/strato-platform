@@ -14,7 +14,6 @@ module Handlers.Transaction (
 import           Control.DeepSeq
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8  as BLC
 import           Data.List
@@ -31,6 +30,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.ExtWord
+import           Blockchain.Output
 import           Blockchain.Strato.Model.SHA hiding (hash)
 import           Text.Format
 
@@ -83,7 +83,7 @@ server connStr = getTransaction connStr :<|> postTransaction :<|> postTransactio
 instance NFData RawTransaction'
 
 postTransaction :: RawTransaction' -> Handler SHA
-postTransaction (RawTransaction' raw "") = runStdoutLoggingT $ do
+postTransaction (RawTransaction' raw "") = runLoggingT $ do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
   emitKafkaTransactions [tx']
@@ -94,7 +94,7 @@ postTransaction _ =
 
 
 postTransactionList :: [RawTransaction'] -> Handler Value
-postTransactionList raws = runStdoutLoggingT $ do
+postTransactionList raws = runLoggingT $ do
    handlerStart <- liftIO $ getTime Realtime
 
    parserStart <- liftIO $ getTime Realtime
@@ -136,7 +136,7 @@ getTransaction pool
   address from to hash
   gasprice mingasprice maxgasprice gaslimit
   mingaslimit maxgaslimit value minvalue
-  maxvalue blocknumber chainidparam chainidsparam sortby = runStdoutLoggingT $ do
+  maxvalue blocknumber chainidparam chainidsparam sortby = runLoggingT $ do
 
   chainids <-
     case (chainidparam, chainidsparam) of
