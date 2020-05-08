@@ -1,14 +1,12 @@
 ## RELEASE NOTES
 
+### Version 7.6.6
+- Bug fix for createContractList
+
 ### Version 7.6.5
 
 - Added Bloc /compile endpoint
 - Add getAccounts to get the account details
-
-#### Minor upgrades
-
-- Added Bloc /compile endpoint
-- Bug fix for createContractList
 
 ### Version 7.6.4
 
