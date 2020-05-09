@@ -12,6 +12,7 @@ module BlockApps.Bloc22.Database.Queries where
 
 import           Control.Arrow
 import           Control.Monad
+import           Control.Monad.Reader            (asks)
 import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
@@ -20,7 +21,9 @@ import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Char8           as Char8
 import           Data.ByteString.Lazy            (fromStrict, toStrict)
+import qualified Data.Cache                      as Cache
 import           Data.Either                     (fromRight)
+import           Data.Foldable                   (for_)
 import           Data.Int                        (Int32)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
@@ -36,6 +39,7 @@ import           Data.Tuple                      (swap)
 import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
+import           System.Clock
 import           UnliftIO
 
 import           BlockApps.Bloc22.API.Utils
@@ -55,9 +59,6 @@ import           Blockchain.Strato.Model.SHA     (shaToByteString, unsafeCreateS
 
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
-
-data Should a = Don't a | Do a
-data Compile = Compile
 
 {- |
 SELECT address from key_store;
@@ -861,6 +862,50 @@ insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertMa
   )
   ]
   (\ (contractInstanceId,_,_,_,_) -> contractInstanceId)
+
+evmContractSolidVMError :: Text
+evmContractSolidVMError = Text.concat
+  [ "Upload Contract (EVM): The given contracts were previously uploaded for "
+  , "SolidVM. Please retry your request specifying SolidVM as the VM type. "
+  , "If you are intending to use EVM, please modify your contracts and try again."
+  ]
+
+getContractDetailsForContract :: Text -> Text -> Maybe Text -> Bloc (Maybe (Text, (Int32, ContractDetails)))
+getContractDetailsForContract theVM src mContract = do
+  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
+      cacheKey = (theVM, src)
+  srcCache <- asks globalSourceCache
+  now <- liftIO $ getTime Monotonic
+  let later = (now +) <$> Cache.defaultExpiration srcCache
+  mCachedDetails <- atomically $ do
+    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
+                                       --       but we need this to prevent the cache growing unboundedly
+    r <- Cache.lookupSTM True cacheKey srcCache now
+    for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
+    pure r
+
+  idsAndDetails <- case mCachedDetails of
+    Just cachedDetails -> pure cachedDetails
+    Nothing -> do
+      details <- if (Text.null src)
+                   then return Map.empty
+                   else sourceToContractDetails shouldCompile src
+      liftIO $ Cache.insert srcCache cacheKey details
+      pure details
+  case mContract of
+    Nothing ->
+      case Map.toList idsAndDetails of
+        [] -> pure Nothing
+        [x] -> Just <$> checkCodeHash x
+        _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
+    Just contract -> do
+      x <- blocMaybe ("Could not find global contract metadataId for " <> contract <> " in source " <> src)  (Map.lookup contract idsAndDetails)
+      Just <$> checkCodeHash (contract, x)
+  where checkCodeHash x@(_,(_,cd)) = case contractdetailsCodeHash cd of
+          (EVMCode _) -> pure x
+          (SolidVMCode _ _) -> case theVM of
+            "EVM" -> throwIO $ UserError evmContractSolidVMError
+            _ -> pure x
 
 sourceToContractDetails :: Should Compile -> Text -> Bloc (Map Text (Int32, ContractDetails))
 sourceToContractDetails shouldCompile source = do

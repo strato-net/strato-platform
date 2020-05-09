@@ -74,6 +74,7 @@ type BlocAPI =
   -- /chains endpoints
   :<|> PostChainInfos
   -- /transaction endpoints
+  :<|> PostBlocTransactionParallel
   :<|> PostBlocTransaction
 
 markdownBloc :: String

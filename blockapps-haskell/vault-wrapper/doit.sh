@@ -15,6 +15,7 @@ vault-wrapper:
 --password=\$postgres_password="${postgres_password}"
 --database=\$postgres_vault_wrapper_db="${postgres_vault_wrapper_db}"
 --minLogLevel="${minLogLevel}"
+--keyStoreCacheTimeout="${keyStoreCacheTimeout}"
 "
 
 echo 'Waiting for postgres to be available...'
@@ -42,4 +43,4 @@ fi
 
 blockapps-vault-wrapper-server \
   --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" \
-  --password="$postgres_password" --database="$postgres_vault_wrapper_db" --minLogLevel="${minLogLevel}"
+  --password="$postgres_password" --database="$postgres_vault_wrapper_db" --minLogLevel="${minLogLevel}" --keyStoreCacheTimeout="$keyStoreCacheTimeout"

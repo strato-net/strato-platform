@@ -11,7 +11,7 @@
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Applicative               (liftA2)
-import           Control.Monad                     (when)
+import           Control.Monad                     (when, unless)
 import           Crypto.Random.Entropy
 import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
@@ -63,22 +63,13 @@ replaceMembers Struct{..} addrs m =
           _ -> m
 
 createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
-createChainInfo (ChainInput src cname lbl balances chaininputArgs members mmd) = do
-  let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
-
+createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
-  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
-  idsAndDetails <- if (Text.null src)
-                     then return Map.empty
-                     else sourceToContractDetails shouldCompile src
-  mContract <- case Map.toList idsAndDetails of
-            [] -> return Nothing
-            [(_, x)] -> return $ Just x
-            _ -> case cname of
-                   Nothing -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-                   Just name -> fmap Just $ blocMaybe "Could not find contract name in compilation details"
-                                      $ Map.lookup name idsAndDetails
+
+  let src = fromMaybe "" msrc
+  let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
+  mContract <- fmap snd <$> getContractDetailsForContract theVM src cname
   (cAcctInfo, codeInfo) <- case mContract of
       Nothing -> return ([],[])
       Just (_, ContractDetails{..}) -> do
@@ -127,7 +118,8 @@ postChainInfo :: ChainInput -> Bloc ChainId
 postChainInfo chainInput = do
   (mCmId, chainInfo) <- createChainInfo chainInput
   chainId <- blocStrato $ Strato.postChain chainInfo
-  waitForChainInfo chainId
+  let isAsync = fromMaybe False $ chaininputAsync chainInput
+  unless isAsync $ waitForChainInfo chainId
   for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
@@ -135,7 +127,9 @@ postChainInfos :: [ChainInput] -> Bloc [ChainId]
 postChainInfos chainInputs = do
   chainInfos <- traverse createChainInfo chainInputs
   chainIds <- blocStrato . Strato.postChains $ map snd chainInfos
-  waitForChainInfos chainIds
+  let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
+      asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
+  unless (null asyncChains) $ waitForChainInfos asyncChains
   let cmIdChains = catMaybes $ zipWith (liftA2 (,)) (map fst chainInfos) (map Just chainIds)
   for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainIds

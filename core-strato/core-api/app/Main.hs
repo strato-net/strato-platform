@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeOperators     #-}
 
 
@@ -10,14 +11,15 @@
 
 module Main where
 
+import           Blockchain.Output
 import           Control.Lens.Operators
-import           Control.Monad.Logger
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.HashMap.Strict.InsOrd           as H
 import           Data.Proxy
 import           Data.Swagger
 import           Database.Persist.Postgresql
+import           HFlags
 import           Network.HTTP.Types.Status
 import           Network.Wai
 import           Network.Wai.Handler.Warp
@@ -107,6 +109,7 @@ coreAPI = Proxy
 
 main :: IO ()
 main = do
+  _ <- $initHFlags "Core API"
   let theDoc = toSwagger (Proxy :: Proxy CoreAPI)
                & info.title .~ "Strato API"
                & info.description ?~

@@ -206,11 +206,13 @@ describe("rest_7", function () {
         await rest.compileContracts(admin, contracts, { config });
       }, RestStatus.BAD_REQUEST);
     });
-
-    // Skipped because of platform issue. https://blockapps.atlassian.net/browse/STRATO-1331
-    it.skip("create contract list - async - SKIPPED - STRATO-1331", async () => {
+    
+    it("create contract list - async - VM: EVM", async () => {
+      const count = 1;
       const count = 5;
       const contracts = factory.createContractListArgs(count);
+      // compile contracts
+      await rest.compileContracts(admin, contracts, { config });
       const pendingResults = await rest.createContractList(admin, contracts, {
         config,
         isAsync: true
@@ -228,11 +230,12 @@ describe("rest_7", function () {
       assert.isOk(verifyStatus, "results");
     });
 
-    // Skipped because of platform issue. https://blockapps.atlassian.net/browse/STRATO-1331
-    it.skip("create contracts list - sync - SKIPPED - STRATO-1331", async () => {
-      const count = 5;
+    it("create contracts list - sync - VM: EVM", async () => {
+      const count = 1;
       const contracts = factory.createContractListArgs(count);
-      const results = await rest.createContractMany(admin, contracts, {
+      // compile contracts
+      await rest.compileContracts(admin, contracts, { config });
+      const results = await rest.createContractList(admin, contracts, {
         config
       });
       const verifyContracts = results.reduce(
@@ -243,16 +246,53 @@ describe("rest_7", function () {
       assert.isOk(verifyContracts, "contracts");
     });
 
-    // when this test fails, the bug has been fixed and the above tests should be reactivated
-    it.skip("create contract list - INTERNAL_SERVER_ERROR 500 - when this test fails, STRATO-1331 was fixed", async () => {
+    it("create contract list - async - VM: SolidVM", async () => {
+      const count = 2;
+      const contracts = factory.createContractListArgs(count);
+      const pendingResults = await rest.createContractList(admin, contracts, {
+        config: { ...config, VM: "SolidVM" },
+        isAsync: true,
+      });
+      const verifyHashes = pendingResults.reduce(
+        (a, r) => a && util.isHash(r.hash),
+        true
+      );
+      assert.isOk(verifyHashes, "hash");
+      const results = await rest.resolveResults(admin, pendingResults, options);
+      const verifyStatus = results.reduce(
+        (a, r) => a && r.status !== TxResultStatus.PENDING,
+        true
+      );
+      assert.isOk(verifyStatus, "results");
+    });
+
+    it("create contracts list - sync - VM: SolidVM", async () => {
       const count = 5;
       const contracts = factory.createContractListArgs(count);
+      const results = await rest.createContractList(admin, contracts, {
+        config: { ...config, VM: "SolidVM" }
+      });
+      const verifyContracts = results.reduce(
+        (a, r, i) =>
+          a && util.isAddress(r.address) && r.name === contracts[i].name,
+        true
+      );
+      assert.isOk(verifyContracts, "contracts");
+    });
+
+    xit("create contract list - BAD_REQUEST 400 - EVM", async () => {
+      const count = 5;
+      const contracts = factory.createContractListArgs(count);
+
+      // compile contracts
+      await rest.compileContracts(admin, contracts, { config });
+
       await assert.restStatus(async () => {
         return rest.createContractList(admin, contracts, {
           config,
           isAsync: true
         });
-      }, RestStatus.INTERNAL_SERVER_ERROR);
+      }, RestStatus.BAD_REQUEST);
     });
     // VM
     it("call - option VM", async () => {
