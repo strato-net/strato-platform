@@ -41,6 +41,7 @@ data KeyStore = KeyStore
   , keystoreAcctNonce     :: SecretBox.Nonce
   , keystoreAcctEncSecKey :: ByteString
   , keystoreAcctAddress   :: Address
+  , keystoreAcctPubKey    :: PubKey
   } deriving (Eq, Show)
 
 decrypt
@@ -116,9 +117,11 @@ newKeyStore pw = liftIO $ do
   acctSk <- liftIO newSecKey
   let encAcctSk = encrypt pw salt acctNonce $ getSecKey acctSk
       acctAddr = deriveAddress acctSk
+      acctPubKey = derivePubKey acctSk
   return KeyStore
     { keystoreSalt = salt
     , keystoreAcctNonce = acctNonce
     , keystoreAcctEncSecKey = encAcctSk
     , keystoreAcctAddress = acctAddr
+    , keystoreAcctPubKey = acctPubKey
     }

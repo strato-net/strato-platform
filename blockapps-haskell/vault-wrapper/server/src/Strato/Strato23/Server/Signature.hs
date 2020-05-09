@@ -18,7 +18,7 @@ postSignature userName (UserData (Hex msgHash)) = do
   mpk <- vaultTransaction
         . vaultQueryMaybe
         $ getUserKeyQuery userName
-  (salt,nonce,pKey,(_ :: Address)) <- case mpk of
+  (salt,nonce,pKey,(_ :: Address), (_ :: PubKey)) <- case mpk of
     Just pk -> return pk
     Nothing -> do
       _ <- postKey userName

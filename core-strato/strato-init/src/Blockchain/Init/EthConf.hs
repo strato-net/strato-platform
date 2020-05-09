@@ -8,8 +8,14 @@ import qualified Data.ByteString.Char8              as C8
 import Data.Coerce
 import Data.Maybe
 import Data.Either.Extra
+import qualified Data.Text as T
 import System.Entropy
 import System.Environment
+
+import Servant.Client
+import Network.HTTP.Client (newManager, defaultManagerSettings)
+
+import Strato.Strato23.Client
 
 import Blockchain.EthConf
 import Blockchain.Init.Options
@@ -119,6 +125,28 @@ genEthConf = do
          host' -> return host'
 
   bytes <- getEntropy 20
+  
+  mgr <- newManager defaultManagerSettings
+  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
+  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+  vwKey <- do
+    eNull <- runClientM (postPassword $ T.pack "sTrAtOSeCrEtPaSsWoRd") clientEnv
+    _ <- case eNull of
+      Left err -> error $ "error posting password: " ++ (show err)
+      Right _ -> return ()
+    ePub <- runClientM (postKey $ T.pack "_nodekey") clientEnv
+    putStrLn $ "addy is: " ++ (show ePub)
+    ePub2 <- runClientM (getKey (T.pack "_nodekey") Nothing) clientEnv
+    putStrLn $ "addy is: " ++ (show ePub2)
+    case ePub of
+      Left err -> error $ "error creating nodekey: " ++ (show err)
+      Right pk -> return pk
+
+  putStrLn $ "final publickey/addy: " ++ (show vwKey)
+  
+  
+  
+  
   myPrivKey <-
     if flags_singlePrivateKey
       then do

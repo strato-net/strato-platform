@@ -10,10 +10,11 @@ module Strato.Strato23.API.Types
   ) where
 
 import           Control.Lens                 ((&), (?~), mapped)
+import           Crypto.HaskoinShim
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types             hiding (fieldLabelModifier)
-import           Data.Text                    (Text, pack, unpack)
+import           Data.Text                    (Text) 
 import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named)
 import           Data.Word
@@ -27,23 +28,33 @@ vaultWrapperSchemaOptions :: SchemaOptions
 vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
 
 
-newtype StatusAndAddress = StatusAndAddress { unStatusAndAddress :: Address } deriving (Show, Generic)
+data AddressAndKey = AddressAndKey { unAddress :: Address, unPubKey :: PubKey } deriving (Show, Generic)
 
-instance ToJSON StatusAndAddress where
-  toJSON (StatusAndAddress a) = object
+instance ToJSON AddressAndKey where
+  toJSON (AddressAndKey a k) = object
                               [ "status" .= ("success" :: Text) -- hey, don't blame me, this is part of the spec
                               , "address" .= a
+                              , "pubkey" .= k 
                               ]
 
-instance FromJSON StatusAndAddress where
-  parseJSON (Object o) = StatusAndAddress <$> (o .: "address")
-  parseJSON o = error $ "parseJSON StatusAndAddress: expected object, but got " ++ show o
+instance FromJSON AddressAndKey where
+  parseJSON (Object o) = do 
+    a <- o .: "address"
+    k <- o .: "pubkey"
+    return $ AddressAndKey a k 
+  parseJSON o = error $ "parseJSON AddressAndKey: expected object, but got " ++ show o
 
-instance ToSchema StatusAndAddress where
+
+instance ToSchema AddressAndKey where
   declareNamedSchema proxy = genericDeclareNamedSchema vaultWrapperSchemaOptions proxy
-    & mapped.schema.description ?~ "Status and Address"
+    & mapped.schema.description ?~ "Address and Key"
     & mapped.schema.example ?~ toJSON ex
-    where ex = StatusAndAddress $ Address 0xdeadbeef
+    where ex = AddressAndKey (Address 0xdeadbeef) (PubKey $ makePubKey InfPoint)
+
+
+--TODO: move to dedicated PubKey file
+instance ToSchema PubKey where
+  declareNamedSchema _  = return $ named "PublicKey" binarySchema
 
 data SignatureDetails = SignatureDetails {
     r :: Hex Word256

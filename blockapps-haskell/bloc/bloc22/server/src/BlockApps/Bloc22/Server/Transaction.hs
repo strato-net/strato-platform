@@ -42,7 +42,7 @@ postBlocTransaction mUserName chainId resolve (PostBlocTransactionRequest mAddr 
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
     Just userName -> do
       addr <- case mAddr of
-        Nothing -> fmap unStatusAndAddress . blocVaultWrapper $ getKey userName Nothing
+        Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
         Just addr' -> return addr'
       let getSrc p = contractpayloadSrc p <|> join (liftA2 Map.lookup (contractpayloadContract p) msrcs)
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
