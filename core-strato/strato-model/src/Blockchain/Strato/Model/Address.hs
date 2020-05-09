@@ -14,7 +14,6 @@ module Blockchain.Strato.Model.Address
       getNewAddress_unsafe,
       addressAsNibbleString, addressFromNibbleString,
       addressToHex, addressFromHex,
-      keccak256Address,
       unAddress
     ) where
 
@@ -25,8 +24,6 @@ import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
 import           Data.Binary
-import qualified Data.ByteArray         as ByteArray
-import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
@@ -55,7 +52,6 @@ import           Web.PathPieces
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.SHA          as SHA (hash, shaToWord256)
 import           Blockchain.Strato.Model.Util
 import qualified Data.NibbleString                    as N
@@ -211,16 +207,6 @@ instance ToSchema Address where
         & type_ .~ SwaggerString
         & example ?~ "address=deadbeef" --toJSON (Address 0xdeadbeef) -- FIXME if causing troubles outside /faucet
         & description ?~ "Ethereum Address, 20 byte hex encoded string" )
-
-keccak256Address :: ByteString -> Address
-keccak256Address
-  = Address
-  . decode
-  . BL.fromStrict
-  . B.drop 12
-  . ByteArray.convert
-  . digestKeccak256
-  . keccak256
 
 
 

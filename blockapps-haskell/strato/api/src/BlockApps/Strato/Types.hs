@@ -15,7 +15,7 @@ module BlockApps.Strato.Types
   , Address (..)
   , stringAddress
   , ChainId (..)
-  , Keccak256 (..)
+  , Keccak256
   , WithNext (..)
   , TransactionType (..)
   , Transaction (..)

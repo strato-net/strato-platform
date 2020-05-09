@@ -12,12 +12,10 @@ module BlockApps.Bloc22.Database.Queries where
 
 import           Control.Arrow
 import           Control.Monad
-import           Crypto.Hash
 import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON, decode, encode)
-import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Char8           as Char8
@@ -53,6 +51,7 @@ import           BlockApps.Strato.Types
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.SHA     (shaToByteString, unsafeCreateSHAFromByteString)
 
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -808,15 +807,13 @@ instance QueryRunnerColumnDefault PGBytea Keccak256 where
     where
       toKecc :: ByteString -> Keccak256
       toKecc
-        = Keccak256
-        . fromMaybe (error "could not decode hash")
-        . digestFromByteString
+        = shaKeccak256 . unsafeCreateSHAFromByteString
 
 instance Default Constant Keccak256 (Column PGBytea) where
   def = lmap fromKecc def
     where
       fromKecc :: Keccak256 -> ByteString
-      fromKecc (Keccak256 digest) = ByteArray.convert digest
+      fromKecc = shaToByteString . keccak256SHA
 
 instance QueryRunnerColumnDefault PGBytea CodePtr where
   queryRunnerColumnDefault =

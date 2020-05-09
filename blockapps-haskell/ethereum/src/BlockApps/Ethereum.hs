@@ -36,9 +36,7 @@ import           Crypto.HaskoinShim
 import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson             as Aeson
 import           Data.Bits
-import qualified Data.ByteArray         as ByteArray
 import           Data.ByteString        (ByteString)
-import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Char8  as Char8
 import           Data.Map.Strict        (Map)
 import qualified Data.Map.Strict        as M
@@ -67,6 +65,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.SHA         hiding (rlpHash)
 import           Blockchain.Strato.Model.Wei
 
 lastWord64 :: Word256 -> Word64
@@ -231,9 +230,8 @@ rlpMsg
 
 rlpHash :: RLPEncodable x => x -> ByteString
 rlpHash
-  = ByteArray.convert
-  . digestKeccak256
-  . keccak256
+  = shaToByteString
+  . hash
   . packRLP
   . rlpEncode
 
@@ -381,7 +379,7 @@ instance ToSchema AccountInfo where
 
 
 deriveAddress :: PubKey -> Address
-deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
+deriveAddress (PubKey val) = pubKey2Address val
 
 
 

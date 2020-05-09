@@ -14,7 +14,7 @@
 
 
 module Blockchain.Strato.Model.Keccak256 (
-  Keccak256(..),
+  Keccak256,
   byteStringKeccak256,
   keccak256,
   keccak256ByteString,
