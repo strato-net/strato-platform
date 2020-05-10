@@ -76,7 +76,7 @@ import           BlockApps.XAbiConverter
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
-import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
 

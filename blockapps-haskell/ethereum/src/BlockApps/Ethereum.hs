@@ -63,7 +63,7 @@ import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
-import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Keccak256   (keccak256SHA, shaKeccak256)
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.SHA         hiding (rlpHash)
 import           Blockchain.Strato.Model.Wei
