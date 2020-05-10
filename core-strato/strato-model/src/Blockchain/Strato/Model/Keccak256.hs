@@ -205,10 +205,11 @@ instance MimeRender PlainText Keccak256 where
   mimeRender _ = BLC.pack . formatKeccak256WithoutColor
 
 instance MimeRender PlainText [Keccak256] where
-  mimeRender _ = encode
+  mimeRender _ = Ae.encode
 
 instance MimeUnrender PlainText [Keccak256] where
-  mimeUnrender _ = maybe (Left "Couldn't decode [Keccak256]") Right . decode
+  mimeUnrender _ val =
+    maybe (Left $ "Couldn't decode [Keccak256]: " ++ show val) Right . Ae.decode $ val
 
 instance ToForm Keccak256 where
   toForm hash256 = [("hash", toQueryParam hash256)]
