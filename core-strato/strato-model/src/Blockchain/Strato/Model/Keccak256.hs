@@ -25,7 +25,8 @@ module Blockchain.Strato.Model.Keccak256 (
   keccak256,
   keccak256lazy,
   keccak256String,
-  byteStringKeccak256
+  byteStringKeccak256,
+  keccak256ByteString
   ) where
 
 
@@ -434,3 +435,6 @@ keccak256String = formatKeccak256WithoutColor
 
 byteStringKeccak256 :: ByteString -> Maybe Keccak256
 byteStringKeccak256 = Just . Keccak256 
+
+keccak256ByteString :: Keccak256 -> ByteString
+keccak256ByteString (Keccak256 val) = val
