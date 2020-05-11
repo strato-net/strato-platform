@@ -53,39 +53,39 @@ import              Blockchain.Strato.Model.ExtendedWord
 import qualified    Text.Colors                          as CL
 import              Text.Format
 
-newtype SHA = SHA ByteString deriving (Eq, Read, Show, Ord, Generic, Data)
+newtype SHA = Keccak256 ByteString deriving (Eq, Read, Show, Ord, Generic, Data)
                              deriving anyclass (Hashable)
 
 instance NFData SHA
 
 keccak256ToWord256 :: SHA -> Word256
-keccak256ToWord256 (SHA val) = bytesToWord256 val 
+keccak256ToWord256 (Keccak256 val) = bytesToWord256 val 
 
 keccak256ToByteString :: SHA -> ByteString
-keccak256ToByteString (SHA val) = val
+keccak256ToByteString (Keccak256 val) = val
 
 unsafeCreateKeccak256FromWord256 :: Word256 -> SHA
-unsafeCreateKeccak256FromWord256 = SHA . word256ToBytes
+unsafeCreateKeccak256FromWord256 = Keccak256 . word256ToBytes
 
 unsafeCreateKeccak256FromByteString :: ByteString -> SHA
-unsafeCreateKeccak256FromByteString = SHA
+unsafeCreateKeccak256FromByteString = Keccak256
 
 
 instance Binary SHA where
-    put (SHA x) = putByteString x
-    get = SHA <$> getByteString 32
+    put (Keccak256 x) = putByteString x
+    get = Keccak256 <$> getByteString 32
 
 instance RLPSerializable SHA where
-    rlpDecode (RLPString s) | B.length s == 32 = SHA s
+    rlpDecode (RLPString s) | B.length s == 32 = Keccak256 s
     rlpDecode (RLPScalar 0) = unsafeCreateKeccak256FromWord256 0 --special case seems to be allowed, even if length of zeros is wrong
     rlpDecode x             = error ("Missing case in rlpDecode for SHA: " ++ show x)
-    --rlpEncode (SHA 0) = RLPNumber 0
-    rlpEncode (SHA val) = RLPString val
+    --rlpEncode (Keccak256 0) = RLPNumber 0
+    rlpEncode (Keccak256 val) = RLPString val
 
 -- Someday we should remove the second RLP library...
 instance RLP2.RLPEncodable SHA where
   rlpEncode = RLP2.rlpEncode . keccak256ToByteString
-  rlpDecode = Right . SHA <=< RLP2.rlpDecode
+  rlpDecode = Right . Keccak256 <=< RLP2.rlpDecode
 
 
 instance Ae.ToJSON SHA where
@@ -93,7 +93,7 @@ instance Ae.ToJSON SHA where
 instance Ae.FromJSON SHA where
   parseJSON = Ae.withText "SHA" $ \t ->
     case B16.decode $ BC.pack $ T.unpack t of
-      (val, "") -> pure $ SHA val
+      (val, "") -> pure $ Keccak256 val
       _ -> fail $ "error parsing SHA: " ++ show t
 
 instance Ae.ToJSONKey SHA where
@@ -104,10 +104,10 @@ instance Ae.FromJSONKey SHA where
     fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)
 
 instance PersistField SHA where
-  toPersistValue (SHA i) = PersistText . T.pack $ BC.unpack $ B16.encode i
+  toPersistValue (Keccak256 i) = PersistText . T.pack $ BC.unpack $ B16.encode i
   fromPersistValue (PersistText s) =
     case B16.decode $ BC.pack $ T.unpack s of
-      (val, "") -> Right $ SHA val
+      (val, "") -> Right $ Keccak256 val
       _ -> Left $ T.pack $ "unable to parse SHA: " ++ show s
 
 
@@ -119,11 +119,11 @@ instance PersistFieldSql SHA where
 
 
 keccak256ToHex :: SHA -> String
-keccak256ToHex (SHA sha) = BC.unpack $ B16.encode sha
+keccak256ToHex (Keccak256 sha) = BC.unpack $ B16.encode sha
 
 -- todo: this shouldn't be partial... ever...
 keccak256FromHex :: String -> SHA
-keccak256FromHex = SHA . fst . B16.decode . BC.pack
+keccak256FromHex = Keccak256 . fst . B16.decode . BC.pack
 
 formatKeccak256WithoutColor :: SHA -> String
 formatKeccak256WithoutColor s
@@ -136,7 +136,7 @@ rlpHash :: RLPSerializable a => a -> SHA
 rlpHash = hash . rlpSerialize . rlpEncode
 
 hash :: BC.ByteString -> SHA
-hash = SHA . fastKeccak256
+hash = Keccak256 . fastKeccak256
 
 
 instance Format SHA where
@@ -158,11 +158,11 @@ instance PathPiece SHA where
   toPathPiece = T.pack . show
   fromPathPiece t =
     case B16.decode $ BC.pack $ T.unpack t of
-      (x, "") -> Just $ SHA x
+      (x, "") -> Just $ Keccak256 x
       _         -> Nothing
 
 instance ToHttpApiData SHA where
-  toUrlPiece (SHA bytes) = T.pack . BC.unpack . B16.encode $ bytes
+  toUrlPiece (Keccak256 bytes) = T.pack . BC.unpack . B16.encode $ bytes
 
 instance FromHttpApiData SHA where
     parseUrlPiece = unmaybe . fromPathPiece
@@ -173,7 +173,7 @@ instance FromHttpApiData SHA where
 instance MimeUnrender PlainText SHA where
   mimeUnrender _ v =
     case B16.decode $ BLC.toStrict v of
-      (bytes, "") -> Right $ SHA bytes
+      (bytes, "") -> Right $ Keccak256 bytes
       _ -> Left "Couldn't read Keccak"
 
 instance MimeRender PlainText SHA where
@@ -195,7 +195,7 @@ instance FromForm SHA where
 instance Arbitrary SHA where
     arbitrary = do
         random256Bit <- fastRandBs 32
-        return $ SHA random256Bit
+        return $ Keccak256 random256Bit
 
 instance ToCapture (Capture "hash" SHA) where
   toCapture _ = DocCapture "hash" "a transaction hash"
