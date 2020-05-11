@@ -101,7 +101,7 @@ getArrayStartingKey :: Word256 -> Word256
 getArrayStartingKey = getArrayStartingKeyBS . word256ToByteString
 
 getArrayStartingKeyBS :: ByteString -> Word256
-getArrayStartingKeyBS = shaToWord256 . hash
+getArrayStartingKeyBS = keccak256ToWord256 . hash
 
 decodeStorageKeySimple :: SimpleType -> Word256 -> Integer -> Integer -> [(Word256, Word256)]
 decodeStorageKeySimple TypeString          o ofs cnt = let sk = toInteger $ getArrayStartingKey o

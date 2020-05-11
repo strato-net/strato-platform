@@ -190,7 +190,7 @@ dataToPacket msg = do
     theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 97 msg
     let messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
     otherPubkey <- note (MalformedUDPException $ "malformed signature in udpHandshakeServer: " ++ show (signature, messageHash))
-                        (getPubKeyFromSignature signature $ shaToWord256 messageHash)
+                        (getPubKeyFromSignature signature $ keccak256ToWord256 messageHash)
     packet <- typeToPacket theType rlp
     return (packet, otherPubkey)
   where
@@ -213,13 +213,13 @@ sendPacket sock prv addr packet = do
       theData = rlpSerialize theRLP
       theMsgHash = hash $ B.singleton theType' <> theData
 
-  ExtendedSignature signature' yIsOdd' <- liftIO $ H.withSource H.devURandom $ extSignMsg (shaToWord256 theMsgHash) prv
+  ExtendedSignature signature' yIsOdd' <- liftIO $ H.withSource H.devURandom $ extSignMsg (keccak256ToWord256 theMsgHash) prv
 
   let v' = if yIsOdd' then 1 else 0
       r' = H.sigR signature'
       s' = H.sigS signature'
       theSignature = word256ToBytes (fromIntegral r') <> word256ToBytes (fromIntegral s') <> B.singleton v'
-      theHash = shaToByteString $ hash $ theSignature <> B.singleton theType' <> theData
+      theHash = keccak256ToByteString $ hash $ theSignature <> B.singleton theType' <> theData
 
   _ <- liftIO $ NB.sendTo sock ( theHash <> theSignature <> B.singleton theType' <> theData) addr
   return ()
@@ -242,10 +242,10 @@ processDataStream' bs =
       (rlp, _) = rlpSplit rest
 
       messageHash = hash $ B.singleton theType <> rlpSerialize rlp
-      publicKey = getPubKeyFromSignature signature $ shaToWord256 messageHash
+      publicKey = getPubKeyFromSignature signature $ keccak256ToWord256 messageHash
       theHash' = hash $ word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s)
                          <> B.singleton v <> B.singleton theType <> rlpSerialize rlp
-  in if theHash /= shaToWord256 theHash'
+  in if theHash /= keccak256ToWord256 theHash'
     then error "bad UDP data sent from peer, the hash isn't correct"
     else fromMaybe (error "malformed signature in call to processDataStream") publicKey
 
@@ -300,14 +300,14 @@ getServerPubKey myPriv domain _ =
           theData = rlpSerialize theRLP
           theMsgHash = hash $ B.singleton theType <> theData
 
-      ExtendedSignature signature yIsOdd <- H.withSource H.devURandom $ encrypt prvKey' $ shaToWord256 theMsgHash
+      ExtendedSignature signature yIsOdd <- H.withSource H.devURandom $ encrypt prvKey' $ keccak256ToWord256 theMsgHash
 
       let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
           r = H.sigR signature
           s = H.sigS signature
           theSignature =
             word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s) <> B.singleton v
-          theHash = shaToByteString $ hash $ theSignature <> B.singleton theType <> theData
+          theHash = keccak256ToByteString $ hash $ theSignature <> B.singleton theType <> theData
 
       _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData
 
@@ -335,14 +335,14 @@ findNeighbors myPriv domain _ =
           theMsgHash = hash $ B.singleton theType <> theData
 
       ExtendedSignature signature yIsOdd <-
-        H.withSource H.devURandom $ encrypt prvKey' $ shaToWord256 theMsgHash
+        H.withSource H.devURandom $ encrypt prvKey' $ keccak256ToWord256 theMsgHash
 
       let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
           r = H.sigR signature
           s = H.sigS signature
           theSignature =
             word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s) <> B.singleton v
-          theHash = shaToByteString $ hash $ theSignature <> B.singleton theType <> theData
+          theHash = keccak256ToByteString $ hash $ theSignature <> B.singleton theType <> theData
 
       _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData
 

@@ -183,7 +183,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
     Nothing -> do
       $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
       initializeChainDBs cId cInfo sr -- only needed to update Postgres with chain info for API calls
-      Just (cId, cInfo) <$ putChainGenesisInfo cId (unsafeCreateSHAFromWord256 0) sr
+      Just (cId, cInfo) <$ putChainGenesisInfo cId (unsafeCreateKeccak256FromWord256 0) sr
 
 outputNewChains :: [(Word256, ChainInfo)] -> ContextM ()
 outputNewChains = void . K.withKafkaRetry1s . writeIndexEvents . map (uncurry NewChainInfo)
@@ -248,8 +248,8 @@ runChainConstructor cId maybeSource = do
          False --noValueTransfer
          S.empty --pre-existing suicide list
          (BlockData
-            (unsafeCreateSHAFromWord256 0)
-            (unsafeCreateSHAFromWord256 0)
+            (unsafeCreateKeccak256FromWord256 0)
+            (unsafeCreateKeccak256FromWord256 0)
             (Address 0)
             MP.emptyTriePtr
             MP.emptyTriePtr
@@ -262,7 +262,7 @@ runChainConstructor cId maybeSource = do
             (posixSecondsToUTCTime 0)
             ""
             0
-            (unsafeCreateSHAFromWord256 0))
+            (unsafeCreateKeccak256FromWord256 0))
          0 --callDepth
          (Address 0) --receiveAddress
          (Address 0x100) --codeAddress
@@ -272,7 +272,7 @@ runChainConstructor cId maybeSource = do
          ""
          1000000000000 --availableGas
          (Address 0)
-         (unsafeCreateSHAFromWord256 0)
+         (unsafeCreateKeccak256FromWord256 0)
          (Just cId)
          (Just $ M.fromList $
            [("args", "()"), ("funcName", "<constructor>")]

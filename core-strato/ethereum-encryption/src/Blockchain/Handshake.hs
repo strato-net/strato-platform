@@ -22,7 +22,7 @@ import                 Blockchain.Data.PubKey
 import qualified       Blockchain.ECIES            as ECIES
 import                 Blockchain.ExtendedECDSA
 import                 Blockchain.ExtWord
-import                 Blockchain.Strato.Model.SHA (hash, shaToByteString)
+import                 Blockchain.Strato.Model.SHA (hash, keccak256ToByteString)
 
 sigToBytes::ExtendedSignature->B.ByteString
 sigToBytes (ExtendedSignature signature yIsOdd) =
@@ -94,7 +94,7 @@ getHandshakeBytes myPriv otherPubKey myNonce = do
     ephemeral =
       fromMaybe (error "malformed signature given to call getHandshakeBytes") $
       getPubKeyFromSignature sig msg
-    hepubk = shaToByteString $ hash $ pubKeyToBytes ephemeral
+    hepubk = keccak256ToByteString $ hash $ pubKeyToBytes ephemeral
     pubk = pointToBytes myPublic
     theData = sigToBytes sig `B.append`
                 hepubk `B.append`

@@ -69,13 +69,13 @@ defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache
                                   }
 
 defaultMiningCache :: MiningCache
-defaultMiningCache  = MiningCache { bestBlockSHA          = unsafeCreateSHAFromWord256 0
+defaultMiningCache  = MiningCache { bestBlockSHA          = unsafeCreateKeccak256FromWord256 0
                                   , bestBlockHeader       = (DD.BlockData
-                                      (unsafeCreateSHAFromWord256 0) (unsafeCreateSHAFromWord256 0) (Address 0x7777)
+                                      (unsafeCreateKeccak256FromWord256 0) (unsafeCreateKeccak256FromWord256 0) (Address 0x7777)
                                       blankStateRoot blankStateRoot blankStateRoot
                                       "" 100 100 100 100
                                       (posixSecondsToUTCTime 0)
-                                      "" 137 (unsafeCreateSHAFromWord256 30))
+                                      "" 137 (unsafeCreateKeccak256FromWord256 30))
 
                                   , bestBlockTxHashes     = []
                                   , lastExecutedStateRoot = blankStateRoot

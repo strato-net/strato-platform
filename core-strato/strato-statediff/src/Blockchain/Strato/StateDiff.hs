@@ -166,7 +166,7 @@ chainDiff :: ( HasStateDB m
           => Word256 -> Integer -> SHA -> m (Maybe StateDiff)
 chainDiff chainId newBlockNum newBlockHash = do
   newSR <- fromMaybe emptyTriePtr <$> getChainStateRoot chainId newBlockHash
-  ~(bHash, bNum) <- fromMaybe (unsafeCreateSHAFromWord256 0, 0) <$> getChainBestBlock chainId
+  ~(bHash, bNum) <- fromMaybe (unsafeCreateKeccak256FromWord256 0, 0) <$> getChainBestBlock chainId
   if newBlockNum < bNum
     then return Nothing
     else do

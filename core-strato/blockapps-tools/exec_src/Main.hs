@@ -429,7 +429,7 @@ run Checkpoints{..}            = case operation of
 run AskForBlocks{..}           = insertP2P (P2pAskForBlocks startBlock endBlock peer)
 run PushBlocks{..}             = insertP2P (P2pPushBlocks startBlock endBlock peer)
 run AskForTxs                  = insertP2P . P2pGetTx
-                                           . map (unsafeCreateSHAFromByteString . fst . B16.decode)
+                                           . map (unsafeCreateKeccak256FromByteString . fst . B16.decode)
                                            . filter (not . B.null)
                                            . BC.split '\n' =<< B.getContents
 run RSVP{..}                   = rsvp chainId memberId address

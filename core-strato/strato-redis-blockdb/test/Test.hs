@@ -66,11 +66,11 @@ specTest = around (withConn 1) $ do
     flushDB
 
     it "Should not have a header for SHA 0" $ \c -> do
-      r <- runRedis c (RDB.getHeader $ unsafeCreateSHAFromWord256 0)
+      r <- runRedis c (RDB.getHeader $ unsafeCreateKeccak256FromWord256 0)
       HUnit.assertBool "Found header for SHA 0" $ isNothing r
 
     it "Should not have a block for SHA 0" $ \c -> do
-      r <- runRedis c (RDB.getBlock $ unsafeCreateSHAFromWord256 0)
+      r <- runRedis c (RDB.getBlock $ unsafeCreateKeccak256FromWord256 0)
       HUnit.assertBool "Found block for SHA 0" $ isNothing r
 
     it "Should put and get a header" $ \c -> do

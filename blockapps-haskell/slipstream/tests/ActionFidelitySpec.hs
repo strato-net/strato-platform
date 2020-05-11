@@ -26,13 +26,13 @@ convert :: BS.Action -> Either String SS.Action -- 🤔
 convert = eitherDecode . encode
 
 emptyEVMData :: BS.ActionData
-emptyEVMData = BS.ActionData (EVMCode $ unsafeCreateSHAFromWord256 0) EVM (BS.ActionEVMDiff M.empty) []
+emptyEVMData = BS.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) EVM (BS.ActionEVMDiff M.empty) []
 
 emptySolidVMData :: BS.ActionData
-emptySolidVMData = BS.ActionData (SolidVMCode "ContractName" $ unsafeCreateSHAFromWord256 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
+emptySolidVMData = BS.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
 
 emptyAction :: BS.Action
-emptyAction = BS.Action (unsafeCreateSHAFromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateSHAFromWord256 0) Nothing 0x0 M.empty Nothing S.empty
+emptyAction = BS.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing 0x0 M.empty Nothing S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -64,7 +64,7 @@ spec = describe "Action conversions" $ do
      convert a `shouldSatisfy` isRight
 
    it "should be backwards compatible" $ do
-     let forceHash = unsafeCreateSHAFromByteString . fst . B16.decode
+     let forceHash = unsafeCreateKeccak256FromByteString . fst . B16.decode
          oldStyle = [aesonQQ| {
          "chainId": null,
          "data": {

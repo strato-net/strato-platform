@@ -87,7 +87,7 @@ readSupplementaryAccounts genesisBlockName = do
                                   [] -> []
                                   "s":_ -> []
                                   ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ unsafeCreateSHAFromWord256 (parseHex c))]
+                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ unsafeCreateKeccak256FromWord256 (parseHex c))]
                                   _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
@@ -188,7 +188,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             { A._actionBlockHash = blockHeaderHash $ blockHeader genesisBlock
             , A._actionBlockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
             , A._actionBlockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
-            , A._actionTransactionHash = unsafeCreateSHAFromWord256 $ fromMaybe 0 genesisChainId
+            , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId
             , A._actionTransactionChainId = genesisChainId
             , A._actionTransactionSender = Ad.Address 0
             , A._actionData = Map.singleton a $

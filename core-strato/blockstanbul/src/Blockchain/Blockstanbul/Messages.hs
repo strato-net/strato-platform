@@ -196,10 +196,10 @@ getHash :: TrustedMessage -> Word256
 -- will have the same signature despite being different messages.
 -- It also needs a code for the message type.
 getHash = \case
-              (Preprepare _ blk) -> shaToWord256 . blockHash $ blk
-              (Prepare _ di) -> shaToWord256 di
-              (Commit _ di _) -> shaToWord256 di
-              (RoundChange _) -> shaToWord256 $ hash "TODO(tim): this signature is predictable"
+              (Preprepare _ blk) -> keccak256ToWord256 . blockHash $ blk
+              (Prepare _ di) -> keccak256ToWord256 di
+              (Commit _ di _) -> keccak256ToWord256 di
+              (RoundChange _) -> keccak256ToWord256 $ hash "TODO(tim): this signature is predictable"
 
 instance RLPSerializable View where
   rlpEncode (View r s) = RLPArray [rlpEncode r, rlpEncode s]
@@ -235,7 +235,7 @@ instance RLPSerializable WireMessage where
       [ rlpEncode roundchangeCode
       , RLPString . rlpSerialize . RLPArray $
         [ rlpEncode vw,
-          rlpEncode $ unsafeCreateSHAFromWord256 0]
+          rlpEncode $ unsafeCreateKeccak256FromWord256 0]
       , rlpEncode addr
       , rlpEncode sig
       , RLPString ""]

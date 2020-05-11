@@ -75,7 +75,7 @@ blk2BlkDataRef :: Block
 blk2BlkDataRef b hash' difficulty' makeHashOne =
   BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
-      hash'' = if makeHashOne then unsafeCreateSHAFromWord256 1 else hash'
+      hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
       bd = blockBlockData b
       uncles = blockBlockUncles b
       pH = blockDataParentHash bd

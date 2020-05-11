@@ -18,16 +18,16 @@ data StrungSHA = StrungSHA { unStrungSHA :: SHA }
 
 instance FromJSON StrungSHA where
     parseJSON (String s) = case readHex $ T.unpack s of
-        [(x, "")] -> return . StrungSHA $ unsafeCreateSHAFromWord256 x
+        [(x, "")] -> return . StrungSHA $ unsafeCreateKeccak256FromWord256 x
         _         -> fail "Expected a hex string of 32 bytes"
     parseJSON _ = fail "Expected a String containing a SHA"
 
 instance ToJSON StrungSHA where
-    toJSON = String . T.pack . formatSHAWithoutColor . unStrungSHA
+    toJSON = String . T.pack . formatKeccak256WithoutColor . unStrungSHA
 
 instance ToJSONKey StrungSHA where
     toJSONKey = ToJSONKeyText f (text . f)
-      where f = T.pack . formatSHAWithoutColor . unStrungSHA
+      where f = T.pack . formatKeccak256WithoutColor . unStrungSHA
 
 postBatchTransactionResultR :: HandlerFor App Value
 postBatchTransactionResultR = do

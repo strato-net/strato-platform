@@ -64,7 +64,7 @@ instance RLPSerializable ContextBestBlockInfo where
 instance Format EVMCheckpoint where -- todo add format instance for ContextBestBlockInfo and show it here as well.
     format (EVMCheckpoint sha _ _ _) =
         "EVMCheckpoint " ++ CL.red (short sha)
-            where short = take 16 . formatSHAWithoutColor
+            where short = take 16 . formatKeccak256WithoutColor
 
 toKafkaMetadata :: EVMCheckpoint -> KP.Metadata
 toKafkaMetadata = KP.Metadata . KP.KString . B16.encode . rlpSerialize . rlpEncode

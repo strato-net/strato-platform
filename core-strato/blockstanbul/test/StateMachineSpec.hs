@@ -417,7 +417,7 @@ spec = parallel $ do
       runTest $ do
         let blk = over extraLens (BS.take 32) . setBlockNo 19 $ blk'
         selfElected
-        lastParent .= Just (unsafeCreateSHAFromWord256 0x999992)
+        lastParent .= Just (unsafeCreateKeccak256FromWord256 0x999992)
         sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
 
     it "accepts a block if the parent hash matches" $ property $ \blk' ->
@@ -425,9 +425,9 @@ spec = parallel $ do
         let blk = over extraLens (BS.take 32)
                     blk'{blockBlockData = (blockBlockData blk'){
                       blockDataNumber = 19,
-                      blockDataParentHash = unsafeCreateSHAFromWord256 0x999992}}
+                      blockDataParentHash = unsafeCreateKeccak256FromWord256 0x999992}}
         selfElected
-        lastParent .= Just (unsafeCreateSHAFromWord256 0x999992)
+        lastParent .= Just (unsafeCreateKeccak256FromWord256 0x999992)
         sendMessages [UnannouncedBlock blk] `shouldNotReturn` [MakeBlockCommand]
 
     it "seals the block" $ property $ \blk'' ->

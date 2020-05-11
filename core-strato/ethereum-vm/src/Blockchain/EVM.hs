@@ -255,7 +255,7 @@ runOperation SHA3 = do
   size <- pop
   theData <- unsafeSliceByteString p size
   let theHash = hash theData
-  push $ shaToWord256 theHash
+  push $ keccak256ToWord256 theHash
 
 runOperation ADDRESS = pushEnvVar envOwner
 
@@ -358,7 +358,7 @@ runOperation BLOCKHASH = do
            Just theBlockHash -> push theBlockHash
    (True, True) -> do
           let h = hash $ BC.pack $ show $ toInteger number
-          push $ shaToWord256 h
+          push $ keccak256ToWord256 h
 
 runOperation COINBASE = pushEnvVar (blockDataCoinbase . envBlockHeader)
 runOperation TIMESTAMP = do
@@ -1121,7 +1121,7 @@ create' :: VMM Code
 create' = do
 
   owner <- getEnvVar envOwner
-  action . actionData %= M.insert owner (ActionData (EVMCode $ unsafeCreateSHAFromWord256 0) EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert owner (ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) EVM (ActionEVMDiff M.empty) [])
 
   runCodeFromStart
 
@@ -1265,7 +1265,7 @@ callPrecompiled' noValueTransfer precompiled = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  action . actionData %= M.insert receiveAddress (ActionData (EVMCode (unsafeCreateSHAFromWord256 0)) EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert receiveAddress (ActionData (EVMCode (unsafeCreateKeccak256FromWord256 0)) EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do

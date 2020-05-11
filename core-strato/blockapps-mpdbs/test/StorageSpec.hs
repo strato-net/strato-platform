@@ -147,7 +147,7 @@ storageSpec = do
       flushMemStorageDB
       use stx `shouldReturn` M.empty
       use sbs `shouldReturn` M.empty
-      let toKey = N.EvenNibbleString . shaToByteString . hash . word256ToBytes
+      let toKey = N.EvenNibbleString . keccak256ToByteString . hash . word256ToBytes
       kvs <- getAllStorageKeyVals' 0x1
       kvs `shouldMatchList` [ (toKey 2, 3)
                             , (toKey 3, 6)

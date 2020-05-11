@@ -622,7 +622,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                 let oldSha = head oldShaChain
                     newSha = head newShaChain
                 ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
-                let seen' = foldl' (flip S.insert) seen (filter (/= (unsafeCreateSHAFromWord256 0)) ps) -- todo double S.insert is probably more optimal
+                let seen' = foldl' (flip S.insert) seen (filter (/= (unsafeCreateKeccak256FromWord256 0)) ps) -- todo double S.insert is probably more optimal
                 if newParent `S.member` seen
                 then complete newParent (mkParentChain newParent newShaChain)
                 else if oldParent `S.member` seen
@@ -637,13 +637,13 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               -- the second case is impossible because `helper`, which calls mkParentChain,
               -- always gets called with a list of at least length 1
               mkParentChain :: SHA -> [SHA] -> [SHA]
-              mkParentChain h xs | shaToWord256 h == 0 = xs
+              mkParentChain h xs | keccak256ToWord256 h == 0 = xs
               mkParentChain y xs@(x:_) = if x == y then xs else y:xs
               mkParentChain _ []       = error "the impossible happened, somehow called (mkParentChain _ [])"
 
               complete :: SHA -> [SHA] -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
               complete lca newShaChain = getHeader lca >>= \case
-                      Nothing -> if lca /= (unsafeCreateSHAFromWord256 0) -- genesis block is sha 0
+                      Nothing -> if lca /= (unsafeCreateKeccak256FromWord256 0) -- genesis block is sha 0
                                      then return . Left . SingleLine . S8.pack $
                                               "Could not get ancestor header for SHA " ++ shaToHex lca
                                      else complete (head newShaChain) newShaChain

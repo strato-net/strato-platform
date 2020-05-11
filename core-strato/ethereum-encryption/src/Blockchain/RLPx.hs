@@ -34,7 +34,7 @@ import                 Blockchain.ExtendedECDSA
 import                 Blockchain.ExtWord
 import                 Blockchain.Frame
 import                 Blockchain.Handshake
-import                 Blockchain.Strato.Model.SHA        (hash, shaToByteString)
+import                 Blockchain.Strato.Model.SHA        (hash, keccak256ToByteString)
 
 intToBytes :: Integer -> [Word8]
 intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
@@ -87,7 +87,7 @@ ethCryptConnect myPriv otherPubKey = do
 add :: B.ByteString
     -> B.ByteString
     -> B.ByteString
-add acc val | B.length acc ==32 && B.length val == 32 = shaToByteString $ hash $ val `B.append` acc
+add acc val | B.length acc ==32 && B.length val == 32 = keccak256ToByteString $ hash $ val `B.append` acc
 add _ _     = error "add called with ByteString of length not 32"
 
 hPubKeyToPubKey :: H.PubKey -> Point

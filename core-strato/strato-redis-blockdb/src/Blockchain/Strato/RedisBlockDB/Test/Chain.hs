@@ -25,7 +25,7 @@ $(makeLensesBy (\n -> Just ("_" ++ n)) ''Block)
 
 makeGenesisBlock :: IO BlockData
 makeGenesisBlock = do
-    startBlock <-  ( (over _blockDataParentHash (const . unsafeCreateSHAFromWord256 $ 0))
+    startBlock <-  ( (over _blockDataParentHash (const . unsafeCreateKeccak256FromWord256 $ 0))
 --                   . (over _blockDataUnclesHash (const (ommersVerificationValue [])))
                    . (over _blockDataNumber     (const 0))
                    . (over _blockDataGasUsed    (const 0))

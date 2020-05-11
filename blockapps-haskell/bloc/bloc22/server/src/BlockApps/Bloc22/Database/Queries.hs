@@ -55,7 +55,7 @@ import           BlockApps.Strato.Types
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.SHA     (shaToByteString)
+import qualified Blockchain.Strato.Model.SHA     as SHA (keccak256ToByteString)
 
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -814,7 +814,7 @@ instance Default Constant Keccak256 (Column PGBytea) where
   def = lmap fromKecc def
     where
       fromKecc :: Keccak256 -> ByteString
-      fromKecc = shaToByteString . keccak256SHA
+      fromKecc = SHA.keccak256ToByteString . keccak256SHA
 
 instance QueryRunnerColumnDefault PGBytea CodePtr where
   queryRunnerColumnDefault =

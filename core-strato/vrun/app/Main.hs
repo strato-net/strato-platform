@@ -57,11 +57,11 @@ main = do
   signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
 
   let blockData = BlockData {
-        blockDataParentHash = unsafeCreateSHAFromWord256 0xabcd,
+        blockDataParentHash = unsafeCreateKeccak256FromWord256 0xabcd,
         blockDataNumber = 1,
         blockDataCoinbase = Address 0xabcd,
         blockDataDifficulty = 1,
-        blockDataUnclesHash = unsafeCreateSHAFromWord256 0xabcd,
+        blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0xabcd,
         blockDataStateRoot = MP.blankStateRoot,
         blockDataTransactionsRoot = MP.blankStateRoot,
         blockDataReceiptsRoot = MP.blankStateRoot,
@@ -72,7 +72,7 @@ main = do
         --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
         blockDataExtraData = "",
         blockDataNonce = 0,
-        blockDataMixHash=unsafeCreateSHAFromWord256 0
+        blockDataMixHash=unsafeCreateKeccak256FromWord256 0
         }
 
   let signedTransaction = txToOutputTx signedTransaction'
@@ -86,7 +86,7 @@ main = do
       addressStateNonce=0,
         addressStateBalance=10000000000000000000000000000000000000000,
         addressStateContractRoot=MP.blankStateRoot,
-        addressStateCodeHash=EVMCode $ unsafeCreateSHAFromWord256 0,
+        addressStateCodeHash=EVMCode $ unsafeCreateKeccak256FromWord256 0,
         addressStateChainId=Nothing
       }
 

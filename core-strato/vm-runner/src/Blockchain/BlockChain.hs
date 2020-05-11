@@ -162,7 +162,7 @@ instance Bagger.MonadBagger ContextM where
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
             $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
             void . lift $ putTransactionResult
-                     TransactionResult { transactionResultBlockHash        = unsafeCreateSHAFromWord256 0
+                     TransactionResult { transactionResultBlockHash        = unsafeCreateKeccak256FromWord256 0
                                        , transactionResultTransactionHash  = theHash
                                        , transactionResultMessage          = message
                                        , transactionResultResponse         = BSS.empty
@@ -220,7 +220,7 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     GasLimitTooLow s q _ OutputTx{otHash=hsh} ->
         (p' s q ++ "tx gas limit", hsh)
     LessLucrative  s q OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
-        (p s q ++ formatSHAWithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
+        (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "
@@ -791,7 +791,7 @@ calculateAndEmitStateDiffs srLog oldHeader = do
 calculateAndEmitChainDiffs :: M.Map Word256 (Integer, SHA) -> ContextM ()
 calculateAndEmitChainDiffs chainMap = do
   let chainList = M.toList chainMap
-      chainIds = format . unsafeCreateSHAFromWord256 . fst <$> chainList
+      chainIds = format . unsafeCreateKeccak256FromWord256 . fst <$> chainList
   $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
   chainDiffs <- fmap catMaybes . forM chainList $
     \(cId, (newNumber, newHash)) -> chainDiff cId newNumber newHash

@@ -36,7 +36,7 @@ spec = do
           want = Right $ ContractNoStorage
               (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)
               1809251394333065553493296640760748560207343510400633813116524750123642650624
-              (EVMCode $ unsafeCreateSHAFromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
+              (EVMCode $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
           got = eitherDecode input
       in got `shouldBe` want
 
@@ -51,7 +51,7 @@ spec = do
           want = Right $ ContractWithStorage
               (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)
               909090909090909090
-              (EVMCode $ unsafeCreateSHAFromWord256 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+              (EVMCode $ unsafeCreateKeccak256FromWord256 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
               [(0x026a54d859003c49ea00384498c11dd9f3ec99d4b56b89b90662e6b16ea12bfbf,
                 0x0a94fd1bcabfd728d386de8b2e1d94f4cbce9b8d0286105239acb929d8a298fd),
                (0x2663ad8b7c4a0cf2bff889181d195381a043c512716163b62ef42cc6c956bc23,
@@ -84,8 +84,8 @@ spec = do
 \          \"nonce\":42\
 \       }"
           want = Right $ GenesisInfo {
-            genesisInfoParentHash = unsafeCreateSHAFromWord256 0,
-            genesisInfoUnclesHash = unsafeCreateSHAFromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
+            genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
+            genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
             genesisInfoCoinbase = Address 0,
             genesisInfoAccountInfo = [
               NonContract
@@ -93,7 +93,7 @@ spec = do
                   1809251394333065553493296640760748560207343510400633813116524750123642650624,
               ContractNoStorage (Address 0x692a70d2e424a56d2c6c27aa97d1a86395877b3a)
                        9000
-                       (EVMCode $ unsafeCreateSHAFromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
+                       (EVMCode $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
               ],
             genesisInfoCodeInfo = [],
             genesisInfoTransactionRoot = StateRoot . fst . B16.decode $
@@ -107,7 +107,7 @@ spec = do
             genesisInfoGasUsed = 0,
             genesisInfoTimestamp = UTCTime (fromGregorian 1970 0 1) (secondsToDiffTime 0),
             genesisInfoExtraData = 0,
-            genesisInfoMixHash = unsafeCreateSHAFromWord256 0,
+            genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
             genesisInfoNonce = 42
           }
           got = eitherDecode input
@@ -136,8 +136,8 @@ spec = do
 \          \"nonce\":42\
 \       }"
           want = [GenesisInfo {
-            genesisInfoParentHash = unsafeCreateSHAFromWord256 0,
-            genesisInfoUnclesHash = unsafeCreateSHAFromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
+            genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
+            genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
             genesisInfoCoinbase = Address 0,
             genesisInfoAccountInfo = [
               NonContract
@@ -145,7 +145,7 @@ spec = do
                   1809251394333065553493296640760748560207343510400633813116524750123642650624,
               ContractNoStorage (Address 0x692a70d2e424a56d2c6c27aa97d1a86395877b3a)
                        9000
-                       (EVMCode $ unsafeCreateSHAFromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
+                       (EVMCode $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
               ],
             genesisInfoCodeInfo = [],
             genesisInfoTransactionRoot = StateRoot . fst . B16.decode $
@@ -159,7 +159,7 @@ spec = do
             genesisInfoGasUsed = 0,
             genesisInfoTimestamp = UTCTime (fromGregorian 1970 0 1) (secondsToDiffTime 0),
             genesisInfoExtraData = 0,
-            genesisInfoMixHash = unsafeCreateSHAFromWord256 0,
+            genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
             genesisInfoNonce = 42
           }]
           got = JS.parseLazyByteString genesisParser input

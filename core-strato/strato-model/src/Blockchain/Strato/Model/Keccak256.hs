@@ -408,10 +408,10 @@ shaKeccak256 hsh = Keccak256
 
 
 keccak256SHA :: Keccak256 -> THEREALSHA.SHA
-keccak256SHA (Keccak256 val) = THEREALSHA.unsafeCreateSHAFromByteString val
+keccak256SHA (Keccak256 val) = THEREALSHA.unsafeCreateKeccak256FromByteString val
 
 shaKeccak256 :: THEREALSHA.SHA -> Keccak256
-shaKeccak256 sha = Keccak256 $ THEREALSHA.shaToByteString sha
+shaKeccak256 sha = Keccak256 $ THEREALSHA.keccak256ToByteString sha
 
 stringKeccak256 :: String -> Maybe Keccak256
 stringKeccak256 string =

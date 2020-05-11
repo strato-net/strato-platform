@@ -8,15 +8,15 @@
 module Blockchain.Strato.Model.SHA (
   SHA,
   blockstanbulMixHash,
-  formatSHAWithoutColor,
+  formatKeccak256WithoutColor,
   hash,
   rlpHash,
   shaFromHex,
-  shaToByteString,
+  keccak256ToByteString,
   shaToHex,
-  shaToWord256,
-  unsafeCreateSHAFromByteString,
-  unsafeCreateSHAFromWord256
+  keccak256ToWord256,
+  unsafeCreateKeccak256FromByteString,
+  unsafeCreateKeccak256FromWord256
   ) where
 
 
@@ -58,17 +58,17 @@ newtype SHA = SHA ByteString deriving (Eq, Read, Show, Ord, Generic, Data)
 
 instance NFData SHA
 
-shaToWord256 :: SHA -> Word256
-shaToWord256 (SHA val) = bytesToWord256 val 
+keccak256ToWord256 :: SHA -> Word256
+keccak256ToWord256 (SHA val) = bytesToWord256 val 
 
-shaToByteString :: SHA -> ByteString
-shaToByteString (SHA val) = val
+keccak256ToByteString :: SHA -> ByteString
+keccak256ToByteString (SHA val) = val
 
-unsafeCreateSHAFromWord256 :: Word256 -> SHA
-unsafeCreateSHAFromWord256 = SHA . word256ToBytes
+unsafeCreateKeccak256FromWord256 :: Word256 -> SHA
+unsafeCreateKeccak256FromWord256 = SHA . word256ToBytes
 
-unsafeCreateSHAFromByteString :: ByteString -> SHA
-unsafeCreateSHAFromByteString = SHA
+unsafeCreateKeccak256FromByteString :: ByteString -> SHA
+unsafeCreateKeccak256FromByteString = SHA
 
 
 instance Binary SHA where
@@ -77,14 +77,14 @@ instance Binary SHA where
 
 instance RLPSerializable SHA where
     rlpDecode (RLPString s) | B.length s == 32 = SHA s
-    rlpDecode (RLPScalar 0) = unsafeCreateSHAFromWord256 0 --special case seems to be allowed, even if length of zeros is wrong
+    rlpDecode (RLPScalar 0) = unsafeCreateKeccak256FromWord256 0 --special case seems to be allowed, even if length of zeros is wrong
     rlpDecode x             = error ("Missing case in rlpDecode for SHA: " ++ show x)
     --rlpEncode (SHA 0) = RLPNumber 0
     rlpEncode (SHA val) = RLPString val
 
 -- Someday we should remove the second RLP library...
 instance RLP2.RLPEncodable SHA where
-  rlpEncode = RLP2.rlpEncode . shaToByteString
+  rlpEncode = RLP2.rlpEncode . keccak256ToByteString
   rlpDecode = Right . SHA <=< RLP2.rlpDecode
 
 
@@ -125,8 +125,8 @@ shaToHex (SHA sha) = BC.unpack $ B16.encode sha
 shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . B16.decode . BC.pack
 
-formatSHAWithoutColor :: SHA -> String
-formatSHAWithoutColor s
+formatKeccak256WithoutColor :: SHA -> String
+formatKeccak256WithoutColor s
   | s == hash "" = "<blank>"
   | otherwise    = shaToHex s
 
@@ -140,7 +140,7 @@ hash = SHA . fastKeccak256
 
 
 instance Format SHA where
-  format = CL.yellow . formatSHAWithoutColor
+  format = CL.yellow . formatKeccak256WithoutColor
 
 
 -- I think we want this first definition, but the API already uses the second one!
@@ -177,7 +177,7 @@ instance MimeUnrender PlainText SHA where
       _ -> Left "Couldn't read Keccak"
 
 instance MimeRender PlainText SHA where
-  mimeRender _ = BLC.pack . formatSHAWithoutColor
+  mimeRender _ = BLC.pack . formatKeccak256WithoutColor
 
 instance MimeRender PlainText [SHA] where
   mimeRender _ = Ae.encode
@@ -216,4 +216,4 @@ instance ToSchema SHA where
         & description ?~ "Keccak256 hash, 32 byte hex encoded string" )
 
 blockstanbulMixHash :: SHA
-blockstanbulMixHash = unsafeCreateSHAFromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
+blockstanbulMixHash = unsafeCreateKeccak256FromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365

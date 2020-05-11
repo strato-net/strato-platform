@@ -54,8 +54,8 @@ nullStateRoot = StateRoot . fst . B16.decode $
 defaultGenesisInfo :: GenesisInfo
 defaultGenesisInfo =
   GenesisInfo {
-    genesisInfoParentHash = unsafeCreateSHAFromWord256 0,
-    genesisInfoUnclesHash = unsafeCreateSHAFromWord256 13478047122767188135818125966132228187941283477090363246179690878162135454535,
+    genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
+    genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 13478047122767188135818125966132228187941283477090363246179690878162135454535,
     genesisInfoCoinbase = Address 0,
     genesisInfoAccountInfo = [],
     genesisInfoCodeInfo = [],
@@ -68,7 +68,7 @@ defaultGenesisInfo =
     genesisInfoGasUsed = 0,
     genesisInfoTimestamp = read "1970-01-01 00:00:00 UTC"  ::  UTCTime,
     genesisInfoExtraData = 0,
-    genesisInfoMixHash = unsafeCreateSHAFromWord256 0,
+    genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
     genesisInfoNonce = 42
 }
 

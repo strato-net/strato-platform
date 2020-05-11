@@ -42,7 +42,7 @@ import qualified Database.LevelDB                            as DB
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.Internal
-import           Blockchain.Strato.Model.SHA                 (hash, shaToByteString)
+import           Blockchain.Strato.Model.SHA                 (hash, keccak256ToByteString)
 
 genericLookupDB :: MonadIO m => m DB.DB -> StateRoot -> m (Maybe NodeData)
 genericLookupDB f (StateRoot sr) = do
@@ -101,11 +101,11 @@ keyExists sr key = isJust <$> getKeyVal sr key
 
 -- | Returns the StateRoot of the blank database
 blankStateRoot :: StateRoot
-blankStateRoot = StateRoot $ shaToByteString $ hash (rlpSerialize $ rlpEncode (0 :: Integer))
+blankStateRoot = StateRoot $ keccak256ToByteString $ hash (rlpSerialize $ rlpEncode (0 :: Integer))
 
 -- | Initialize the DB by adding a blank stateroot.
 initializeBlank :: (StateRoot `Alters` NodeData) m
                 => m ()
 initializeBlank =
     let bytes = rlpSerialize $ rlpEncode EmptyNodeData
-    in insert Proxy (StateRoot (shaToByteString $ hash bytes)) EmptyNodeData
+    in insert Proxy (StateRoot (keccak256ToByteString $ hash bytes)) EmptyNodeData

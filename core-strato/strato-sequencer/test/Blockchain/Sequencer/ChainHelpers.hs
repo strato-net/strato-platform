@@ -13,7 +13,7 @@ import           Test.QuickCheck
 -- todo should genesis block make somebody exceptionally wealthy?
 makeGenesisBlock :: IO IngestBlock
 makeGenesisBlock = do
-    startBlock <-  ( (setIngestBlockParentHash (unsafeCreateSHAFromWord256 . fromIntegral $ (0 :: Int)))
+    startBlock <-  ( (setIngestBlockParentHash (unsafeCreateKeccak256FromWord256 . fromIntegral $ (0 :: Int)))
                    . (setIngestBlockUnclesHash (ommersVerificationValue []))
                    . (setIngestBlockNumber 0)
                    . (setIngestBlockGasUsed 0)

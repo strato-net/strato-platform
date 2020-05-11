@@ -88,18 +88,18 @@ spec = do
         parse = Ae.eitherDecode . Ae.encode
     it "can parse legacy digests" $
       parse [aesonQQ|"ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"|]
-        `shouldBe` Right (EVMCode $ unsafeCreateSHAFromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+        `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
 
     it "can parse evm object digests" $
       parse [aesonQQ|{"kind": "EVM",
                       "digest": "ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"}|]
-        `shouldBe` Right (EVMCode $ unsafeCreateSHAFromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+        `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
 
     it "can parse solidvm object digests" $
       parse [aesonQQ|{"kind": "SolidVM", "name": "SimpleStorage",
                       "digest": "ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"}|]
         `shouldBe` Right (SolidVMCode "SimpleStorage"
-                            $ unsafeCreateSHAFromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+                            $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
 
     it "round trips correctly" $ property $ \(ptr::CodePtr) -> do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr

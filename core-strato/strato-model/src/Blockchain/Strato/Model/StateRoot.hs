@@ -56,10 +56,10 @@ instance RLPSerializable StateRoot where
 
 -- | The stateRoot of the empty database.
 emptyTriePtr::StateRoot
-emptyTriePtr = StateRoot $ shaToByteString $ hash $ rlpSerialize $ rlpEncode (0::Integer)
+emptyTriePtr = StateRoot $ keccak256ToByteString $ hash $ rlpSerialize $ rlpEncode (0::Integer)
 
 sha2StateRoot::SHA->StateRoot
-sha2StateRoot x = StateRoot $ shaToByteString x
+sha2StateRoot x = StateRoot $ keccak256ToByteString x
 
 unboxStateRoot :: StateRoot -> B.ByteString
 unboxStateRoot (StateRoot b) = b

@@ -230,7 +230,7 @@ rlpMsg
 
 rlpHash :: RLPEncodable x => x -> ByteString
 rlpHash
-  = shaToByteString
+  = keccak256ToByteString
   . hash
   . packRLP
   . rlpEncode

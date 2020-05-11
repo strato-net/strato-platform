@@ -116,7 +116,7 @@ txRejectionToAPIFailureCause (BalanceTooLow  stage queue needed actual _) =
 txRejectionToAPIFailureCause (GasLimitTooLow stage queue needed tx) =
     Failure (show stage) (Just $ show queue) IntrinsicGasExceedsLimit (Just needed) (Just . TD.transactionGasLimit $ otBaseTx tx) Nothing
 txRejectionToAPIFailureCause (LessLucrative  stage queue newTx _) =
-    Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatSHAWithoutColor (otHash newTx))
+    Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatKeccak256WithoutColor (otHash newTx))
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
