@@ -14,6 +14,7 @@ import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson.Encoding    as AesonEnc
 import qualified Data.Binary            as Binary
 import           Data.Either.Extra      (maybeToEither)
+import           Data.Hashable
 import           Data.RLP
 import           Data.Swagger
 import qualified Data.Text              as Text
@@ -30,6 +31,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 
 newtype ChainId = ChainId { unChainId :: Word256 }
   deriving (Eq, Ord, Generic, Bounded)
+  deriving newtype (Hashable)
   deriving anyclass (NFData, Binary.Binary)
 
 instance Show ChainId where show = chainIdString

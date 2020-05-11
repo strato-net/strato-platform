@@ -17,8 +17,11 @@ import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Except
 import qualified Data.Aeson                         as JSON
 import qualified Data.ByteString.Lazy.Char8         as Lazy.Char8
+import           Data.Cache
 import           Data.Foldable
 import qualified Data.HashMap.Lazy                  as HashMap
+import           Data.Int                           (Int32)
+import           Data.Map.Strict                    (Map)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Pool (Pool, withResource)
 import           Data.Profunctor.Product.Default
@@ -36,7 +39,16 @@ import           Text.Printf
 
 import           UnliftIO                           hiding (Handler(..))
 
+import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Logging
+import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Nonce
+
+data Should a = Don't a | Do a
+data Compile = Compile
+data CacheNonce = CacheNonce
 
 type Bloc = ReaderT BlocEnv (LoggingT IO)
 
@@ -72,12 +84,15 @@ blocError err = do
 data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
 
 data BlocEnv = BlocEnv
-  { urlStrato       :: BaseUrl
-  , urlVaultWrapper :: BaseUrl
-  , httpManager     :: Manager
-  , dbPool          :: Pool Connection
-  , deployMode      :: DeployMode
-  , stateFetchLimit :: Integer
+  { urlStrato          :: BaseUrl
+  , urlVaultWrapper    :: BaseUrl
+  , httpManager        :: Manager
+  , dbPool             :: Pool Connection
+  , deployMode         :: DeployMode
+  , stateFetchLimit    :: Integer
+  , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
+  , globalSourceCache  :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
+  , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
 
 data BlocError

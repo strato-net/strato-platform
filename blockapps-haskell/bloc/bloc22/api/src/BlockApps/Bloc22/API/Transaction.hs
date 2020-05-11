@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -11,6 +12,7 @@
 
 module BlockApps.Bloc22.API.Transaction where
 
+import           Control.Applicative                ((<|>))
 import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
@@ -23,8 +25,9 @@ import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API                        as S
 import           Servant.Docs
-import           Test.QuickCheck
+import           Test.QuickCheck                    hiding (Success)
 
+import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -32,6 +35,7 @@ import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.Types
 
 import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
 
@@ -39,7 +43,8 @@ import           Blockchain.Strato.Model.Wei
 ---- Routes and Types
 --------------------------------------------------------------------------------
 
-data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION deriving (Eq, Ord, Show, Generic)
+data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION | GENESIS
+  deriving (Eq, Ord, Show, Generic)
 
 instance ToJSON BlocTransactionType where
 instance FromJSON BlocTransactionType where
@@ -48,13 +53,27 @@ transactionType :: BlocTransactionPayload -> BlocTransactionType
 transactionType (BlocTransfer _) = TRANSFER
 transactionType (BlocContract _) = CONTRACT
 transactionType (BlocFunction _) = FUNCTION
+transactionType (BlocGenesis _)  = GENESIS
+
+instance ToParam (QueryFlag "queue") where
+  toParam _ =
+    DocQueryParam "queue" ["true","false",""] "flag for queueing a transaction request" Flag
+
+type PostBlocTransactionParallel = "transaction"
+  :> "parallel"
+  :> S.Header "X-USER-UNIQUE-NAME" Text
+  :> QueryParam "chainid" ChainId
+  :> QueryFlag "resolve"
+  :> QueryFlag "queue"
+  :> ReqBody '[JSON] PostBlocTransactionRequest
+  :> Post '[JSON] [BlocChainOrTransactionResult]
 
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest
-  :> Post '[JSON] [BlocTransactionResult]
+  :> Post '[JSON] [BlocChainOrTransactionResult]
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Maybe Address
@@ -108,6 +127,7 @@ instance ToSchema PostBlocTransactionRequest where
 data BlocTransactionPayload = BlocTransfer TransferPayload
                             | BlocContract ContractPayload
                             | BlocFunction FunctionPayload
+                            | BlocGenesis  ChainInput
                             deriving (Eq, Show, Generic)
 
 instance Arbitrary BlocTransactionPayload where
@@ -118,6 +138,7 @@ instance ToJSON BlocTransactionPayload where
   toJSON (BlocTransfer t) = object ["type" .= TRANSFER, "payload" .= t]
   toJSON (BlocContract c) = object ["type" .= CONTRACT, "payload" .= c]
   toJSON (BlocFunction f) = object ["type" .= FUNCTION, "payload" .= f]
+  toJSON (BlocGenesis  g) = object ["type" .= GENESIS,  "payload" .= g]
 
 instance FromJSON BlocTransactionPayload where
   parseJSON (Object o) = do
@@ -126,6 +147,7 @@ instance FromJSON BlocTransactionPayload where
       TRANSFER -> BlocTransfer <$> (o .: "payload")
       CONTRACT -> BlocContract <$> (o .: "payload")
       FUNCTION -> BlocFunction <$> (o .: "payload")
+      GENESIS  -> BlocGenesis  <$> (o .: "payload")
   parseJSON o = error $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload
@@ -243,4 +265,41 @@ instance ToSchema FunctionPayload where
         , functionpayloadTxParams        = Nothing
         , functionpayloadChainid         = Nothing
         , functionpayloadMetadata        = Nothing
+        }
+
+data BlocChainOrTransactionResult = BlocChainResult ChainId
+                                  | BlocTxResult BlocTransactionResult
+                                  deriving (Eq, Show, Generic)
+
+instance ToJSON BlocChainOrTransactionResult where
+  toJSON (BlocChainResult cid) = toJSON cid
+  toJSON (BlocTxResult btr) = toJSON btr
+
+instance FromJSON BlocChainOrTransactionResult where
+  parseJSON o = (BlocTxResult <$> parseJSON o)
+            <|> (BlocChainResult <$> parseJSON o)
+            <|> pure (error $ "fromJSON BlocChainOrTransactionResult: Expected Object or hex-encoded string, but got " ++ show o)
+
+instance Arbitrary BlocChainOrTransactionResult where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToSample BlocChainOrTransactionResult where
+  toSamples _ = singleSample . BlocTxResult $ BlocTransactionResult
+    { blocTransactionStatus = Success
+    , blocTransactionHash = keccak256 "foo"
+    , blocTransactionTxResult = Nothing
+    , blocTransactionData = Nothing
+    }
+
+instance ToSchema BlocChainOrTransactionResult where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Bloc Chain or Transaction Result"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: BlocChainOrTransactionResult
+      ex = BlocTxResult $ BlocTransactionResult
+        { blocTransactionStatus = Success
+        , blocTransactionHash = keccak256 "foo"
+        , blocTransactionTxResult = Nothing
+        , blocTransactionData = Nothing
         }

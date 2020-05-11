@@ -30,6 +30,8 @@ library:
   dependencies:
     - blockapps-ethereum
     - bytestring
+    - cache
+    - clock
     - haskoin-shim
     - http-client
     - lens
@@ -57,6 +59,8 @@ executables:
     dependencies:
       - blockapps-vault-wrapper-server
       - blockapps-init
+      - cache
+      - clock
       - hflags
       - http-client
       - resource-pool
