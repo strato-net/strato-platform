@@ -46,7 +46,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.ExtendedECDSA
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..), hPubKeyToPubKey)
-import           Blockchain.Strato.Model.SHA           
+import           Blockchain.Strato.Model.Keccak256           
 import           Blockchain.Util
 
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -57,7 +57,7 @@ encrypt :: H.PrvKey -> Word256 -> H.SecretT IO ExtendedSignature
 encrypt = flip extSignMsg
 
 data RawNodeDiscoveryPacket =
-  RawNDPacket SHA ExtendedSignature Integer RLPObject deriving (Show)
+  RawNDPacket Keccak256 ExtendedSignature Integer RLPObject deriving (Show)
 
 data NodeDiscoveryPacket =
   Ping Integer Endpoint Endpoint Integer |

@@ -14,12 +14,12 @@ import Prometheus
 import Prelude hiding (lookup)
 
 import Blockchain.Bagger.Transactions
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
 
 type CacheValue = (StateRoot, Integer, [TxRunResult])
 
-newtype Cache = Cache (IORef (LRU.LRU SHA CacheValue))
+newtype Cache = Cache (IORef (LRU.LRU Keccak256 CacheValue))
 
 -- The IORef is modified only with strict writes and
 -- the LRU is strict in its map.
@@ -53,13 +53,13 @@ recomputeCacheSize (Cache ioref) = do
 new :: Integer -> IO Cache
 new = fmap Cache . newIORef . LRU.newLRU . Just
 
-insert :: Cache -> SHA -> CacheValue -> IO ()
+insert :: Cache -> Keccak256 -> CacheValue -> IO ()
 insert trrc@(Cache ioref) hsh trrs = do
   modifyIORef' ioref (LRU.insert hsh trrs)
   recomputeCacheSize trrc
   withLabel resultsCacheStats "inserts" incCounter
 
-lookup :: Cache -> SHA -> IO (Maybe CacheValue)
+lookup :: Cache -> Keccak256 -> IO (Maybe CacheValue)
 lookup (Cache ioref) hsh = do
   withLabel resultsCacheStats "lookups" incCounter
   -- The new LRU is thrown away, because the expected access pattern will

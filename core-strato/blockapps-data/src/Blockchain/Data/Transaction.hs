@@ -50,7 +50,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.FastECRecover
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 
 import           Blockchain.ExtendedECDSA
@@ -284,12 +284,12 @@ isContractCreationTX::Transaction->Bool
 isContractCreationTX ContractCreationTX{} = True
 isContractCreationTX _                    = False
 
-transactionHash::Transaction->SHA
+transactionHash::Transaction->Keccak256
 transactionHash = \case
                      PrivateHashTX{..} -> transactionTxHash
                      t -> hash . rlpSerialize $ rlpEncode t
 
-partialTransactionHash::Transaction->SHA
+partialTransactionHash::Transaction->Keccak256
 partialTransactionHash = \case
                             PrivateHashTX{..} -> transactionTxHash -- TODO: Should this be an error instead?
                             t -> hash . rlpSerialize $ partialRLPEncode t

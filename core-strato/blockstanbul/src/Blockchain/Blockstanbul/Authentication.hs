@@ -29,7 +29,7 @@ import Blockchain.ExtendedECDSA
 import Blockchain.FastECRecover
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import qualified Network.Haskoin.Crypto as HK
 
 instance Arbitrary IstanbulExtra where
@@ -98,20 +98,20 @@ verifyProposerSeal blk sig =
   let msg = proposalMessage blk
   in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
 
-commitmentMessage :: SHA -> HK.Word256
+commitmentMessage :: Keccak256 -> HK.Word256
 commitmentMessage dig = keccak256ToWord256 . hash . (<> B.singleton 2) . keccak256ToByteString $ dig
 
-commitmentSeal :: SHA -> HK.PrvKey -> ExtendedSignature
+commitmentSeal :: Keccak256 -> HK.PrvKey -> ExtendedSignature
 commitmentSeal sha pk =
   let msg = commitmentMessage sha
   in detExtSignMsg msg pk
 
-verifyCommitmentSeal :: SHA -> ExtendedSignature -> Maybe Address
+verifyCommitmentSeal :: Keccak256 -> ExtendedSignature -> Maybe Address
 verifyCommitmentSeal sha sig =
   let msg = commitmentMessage sha
   in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
 
-finalHash :: Block -> SHA
+finalHash :: Block -> Keccak256
 finalHash = hash
           . rlpSerialize
           . rlpEncode

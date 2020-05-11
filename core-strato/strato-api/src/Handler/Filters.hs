@@ -18,7 +18,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
 import           Blockchain.Util
 import           Blockchain.SolidVM.Model
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad
 import           Data.Set
@@ -225,7 +225,7 @@ toHex = word256ToHexStorage . P.read . T.unpack
 toInteger' :: Text -> Integer
 toInteger' v = P.read $ T.unpack v
 
-toSHA :: Text -> SHA
+toSHA :: Text -> Keccak256
 toSHA v = unsafeCreateKeccak256FromWord256 . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v
 
 toCode :: Text -> ByteString

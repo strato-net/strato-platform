@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Strato.Model.SHA (
-  SHA,
+--  SHA,
   Keccak256,
   blockstanbulMixHash,
   formatKeccak256WithoutColor,
@@ -25,5 +25,5 @@ module Blockchain.Strato.Model.SHA (
 
 import              Blockchain.Strato.Model.Keccak256
 
-type SHA = Keccak256
+--type SHA = Keccak256
 

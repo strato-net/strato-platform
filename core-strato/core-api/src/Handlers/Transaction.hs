@@ -31,7 +31,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.ExtWord
 import           Blockchain.Output
-import           Blockchain.Strato.Model.SHA hiding (hash)
+import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 import           Text.Format
 
 
@@ -57,7 +57,7 @@ type API =
   "transaction" :> QueryParam "address" Address
                 :> QueryParam "from" Address
                 :> QueryParam "to" Address
-                :> QueryParam "hash" SHA
+                :> QueryParam "hash" Keccak256
                 :> QueryParam "gasprice" Integer
                 :> QueryParam "mingasprice" Integer
                 :> QueryParam "maxgasprice" Integer
@@ -72,7 +72,7 @@ type API =
                 :> QueryParams "chainids" Text
                 :> QueryParam "sortby" Sortby
                 :> Get '[JSON] [RawTransaction']
-       :<|> "transaction" :> ReqBody '[JSON] RawTransaction' :> Post '[JSON,PlainText]  SHA
+       :<|> "transaction" :> ReqBody '[JSON] RawTransaction' :> Post '[JSON,PlainText]  Keccak256
        :<|> "transactionList" :> ReqBody '[JSON] [RawTransaction'] :> Post '[JSON] Value
 
 server :: ConnectionPool -> Server API
@@ -82,7 +82,7 @@ server connStr = getTransaction connStr :<|> postTransaction :<|> postTransactio
 
 instance NFData RawTransaction'
 
-postTransaction :: RawTransaction' -> Handler SHA
+postTransaction :: RawTransaction' -> Handler Keccak256
 postTransaction (RawTransaction' raw "") = runLoggingT $ do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
@@ -127,7 +127,7 @@ postTransactionList raws = runLoggingT $ do
 
 
 getTransaction :: ConnectionPool
-               -> Maybe Address -> Maybe Address -> Maybe Address -> Maybe SHA
+               -> Maybe Address -> Maybe Address -> Maybe Address -> Maybe Keccak256
                -> Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer 
                -> Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer 
                -> Maybe Integer -> Maybe Int -> Maybe Text -> [Text]

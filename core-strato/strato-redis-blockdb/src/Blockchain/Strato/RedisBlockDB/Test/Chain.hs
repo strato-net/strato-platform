@@ -15,7 +15,7 @@ import           Test.QuickCheck
 
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Data.BlockDB
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 ------------------------------------------------------------------------------
 -- Lenses
@@ -190,5 +190,5 @@ showTree = drawTree . prettyTree
 prettyTree' :: Tree BlockData -> Tree String
 prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
 
-showHash :: SHA -> String
+showHash :: Keccak256 -> String
 showHash = take 8 . keccak256ToHex

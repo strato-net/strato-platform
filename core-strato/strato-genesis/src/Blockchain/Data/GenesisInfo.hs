@@ -24,13 +24,13 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Database.MerklePatricia
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 
 data GenesisInfo =
   GenesisInfo {
-    genesisInfoParentHash       :: SHA,
-    genesisInfoUnclesHash       :: SHA,
+    genesisInfoParentHash       :: Keccak256,
+    genesisInfoUnclesHash       :: Keccak256,
     genesisInfoCoinbase         :: Address,
     genesisInfoAccountInfo      :: [AccountInfo],
     genesisInfoCodeInfo         :: [CodeInfo],
@@ -43,7 +43,7 @@ data GenesisInfo =
     genesisInfoGasUsed          :: Integer,
     genesisInfoTimestamp        :: UTCTime,
     genesisInfoExtraData        :: Integer,
-    genesisInfoMixHash          :: SHA,
+    genesisInfoMixHash          :: Keccak256,
     genesisInfoNonce            :: Word64
 } deriving (Show, Read, Eq, Generic)
 

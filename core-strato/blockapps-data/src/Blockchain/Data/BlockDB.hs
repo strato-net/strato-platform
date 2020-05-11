@@ -57,7 +57,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 
 import           Blockchain.Strato.Model.Class
@@ -68,7 +68,7 @@ instance Pretty B.ByteString where
   pretty = blue . text . BC.unpack . B16.encode
 
 blk2BlkDataRef :: Block
-               -> SHA
+               -> Keccak256
                -> Integer
                -> Bool
                -> BlockDataRef
@@ -95,7 +95,7 @@ blk2BlkDataRef b hash' difficulty' makeHashOne =
       mH = blockDataMixHash bd
 
 getBlock :: HasSQLDB m
-         => SHA
+         => Keccak256
          -> m (Maybe BlockDataRef)
 getBlock h = do
   db <- access (Proxy @SQLDB)

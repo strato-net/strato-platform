@@ -29,7 +29,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.RLP
 import           Blockchain.Util
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors                  as CL
 import           Text.Format
 import           Text.ShortDescription
@@ -64,8 +64,8 @@ data Transaction =
     transactionMetadata :: Maybe (Map Text Text)
     } |
   PrivateHashTX {
-    transactionTxHash    :: SHA,
-    transactionChainHash :: SHA
+    transactionTxHash    :: Keccak256,
+    transactionChainHash :: Keccak256
     } deriving (Show, Read, Eq, Ord, Generic, Data, NFData)
 
 instance Binary Transaction where

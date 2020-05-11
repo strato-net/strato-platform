@@ -39,20 +39,20 @@ import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Util                    (byteString2Integer)
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 import           Text.Format
 
-addTopic :: SHA
+addTopic :: Keccak256
 addTopic = hash $ C8.pack "MemberAdded(address,string)"
 
-removeTopic :: SHA
+removeTopic :: Keccak256
 removeTopic = hash $ C8.pack "MemberRemoved(address)"
 
-terminateTopic :: SHA
+terminateTopic :: Keccak256
 terminateTopic = hash $ C8.pack "ChainTerminated()"
 
 logF :: MonadLogger m => [String] -> m ()

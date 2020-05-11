@@ -21,7 +21,7 @@ import           Blockchain.Data.TransactionDef (formatChainId)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Text.Format
 
 data BlockDBNamespace = Headers
@@ -55,10 +55,10 @@ instance RedisDBValuable S8.ByteString where
         (v, "") -> v
         _       -> error "leftovers in base16 decode"
 
-instance RedisDBKeyable SHA where
+instance RedisDBKeyable Keccak256 where
     toKey = S8.pack . keccak256ToHex
 
-instance RedisDBValuable SHA where
+instance RedisDBValuable Keccak256 where
     toValue   = S8.pack . keccak256ToHex
     fromValue = keccak256FromHex . S8.unpack
 
@@ -113,7 +113,7 @@ newtype RedisTxs       = RedisTxs      [RedisTx]       deriving newtype (Eq, Rea
 newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving newtype (Eq, Read, Show, RedisDBValuable)
 newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving newtype (Eq, Show, RLPSerializable)
-newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [SHA]) deriving newtype (Eq, Show, RLPSerializable)
+newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [Keccak256]) deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
 
@@ -125,7 +125,7 @@ instance RLPSerializable RedisOrgIdChains where
   rlpEncode (RedisOrgIdChains s) = rlpEncode $ S.toList s
   rlpDecode = RedisOrgIdChains . S.fromList . rlpDecode
 
-data RedisBestBlock = RedisBestBlock { bestBlockHash            :: SHA
+data RedisBestBlock = RedisBestBlock { bestBlockHash            :: Keccak256
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
                                      , bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty
                                      } deriving (Eq, Read, Show)

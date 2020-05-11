@@ -8,7 +8,7 @@ import           Database.Redis
 
 -- import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import           Blockchain.Data.DataDefs
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB
 import           Blockchain.Strato.RedisBlockDB.Models
 
@@ -40,13 +40,13 @@ canonRedis ip start range = do
     getBestBlockNumber :: Redis (Maybe Int)
     getBestBlockNumber = ((fromIntegral . bestBlockNumber) <$>) <$>  getBestBlockInfo
 
-    validateChainAndLogInvalid :: [(SHA,BlockData)] -> Redis ()
+    validateChainAndLogInvalid :: [(Keccak256,BlockData)] -> Redis ()
     validateChainAndLogInvalid hs = do
       let b = head hs
           bs = tail hs
       foldM_ validateMethod b bs
 
-    validateMethod :: (SHA,BlockData) -> (SHA,BlockData) -> Redis (SHA,BlockData)
+    validateMethod :: (Keccak256,BlockData) -> (Keccak256,BlockData) -> Redis (Keccak256,BlockData)
     validateMethod prev curr = do
       if (fst prev == (blockDataParentHash . snd $ curr) )
         then return ()
@@ -56,10 +56,10 @@ canonRedis ip start range = do
           liftIO $ printBlockHeader prev
       return curr
 
-    isCanonical :: SHA -> Integer -> Redis Bool
+    isCanonical :: Keccak256 -> Integer -> Redis Bool
     isCanonical hsh num = (== Just hsh) <$> getCanonical num
 
-    printBlockHeader :: (SHA,BlockData) -> IO ()
+    printBlockHeader :: (Keccak256,BlockData) -> IO ()
     printBlockHeader (sha, h) = do
       putStrLn $ "Number "
         <> show (blockDataNumber h)

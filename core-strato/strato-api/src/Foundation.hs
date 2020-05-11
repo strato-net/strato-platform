@@ -20,7 +20,7 @@ import           Yesod.Core.Types         (Logger)
 
 import           Network.Haskoin.Crypto   as HK
 import           Blockchain.DB.SQLDB
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 timeFormat :: String
 timeFormat = "%Y-%m-%dT%T.%q"

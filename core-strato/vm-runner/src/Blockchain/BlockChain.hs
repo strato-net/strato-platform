@@ -94,7 +94,7 @@ import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff             hiding (StateDiff (blockHash))
 import qualified Blockchain.Strato.StateDiff             as SD (StateDiff)
 import           Blockchain.Strato.StateDiff.Database
@@ -209,7 +209,7 @@ instance Bagger.MonadBagger ContextM where
               let trrs' = map (rewriteBlockHash (blockHeaderHash bd)) trrs
               return $ Just (sr, gasRemaining, trrs')
 
-baggerRejectionToTransactionResultBits :: TxRejection -> (String, SHA) -- pretty, txHash
+baggerRejectionToTransactionResultBits :: TxRejection -> (String, Keccak256) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
     WrongChainId   s q OutputTx{otHash=hsh, otBaseTx=bt} ->
         (p' s q ++ "chainId (expected: main, actual: " ++ formatChainId (txChainId bt) ++ ")", hsh)
@@ -633,7 +633,7 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
 
 
 outputTransactionResult :: BlockData
-                        -> (BlockData -> SHA)
+                        -> (BlockData -> Keccak256)
                         -> TxRunResult
                         -> ContextM (Maybe Action)
 outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t} result deltaT beforeMap afterMap newAddresses) = do
@@ -731,7 +731,7 @@ indexMaybe (_:rest) i = indexMaybe rest (i-1)
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> ContextM (Bool, M.Map Word256 (Integer, SHA), (SHA, Integer, Integer))
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     bbi <- getContextBestBlockInfo
 
@@ -778,7 +778,7 @@ splitCreateDiffs =
         srch = map ch . join . map sequence . map sr
      in S.toList . S.fromList . srch
 
-calculateAndEmitStateDiffs :: [(MP.StateRoot, SHA, Integer, Int)]
+calculateAndEmitStateDiffs :: [(MP.StateRoot, Keccak256, Integer, Int)]
                            -> BlockData
                            -> ContextM ()
 calculateAndEmitStateDiffs srLog oldHeader = do
@@ -788,7 +788,7 @@ calculateAndEmitStateDiffs srLog oldHeader = do
             .| mapMC completeDiff
             .| mapM_C (lift . commitSqlDiffs)
 
-calculateAndEmitChainDiffs :: M.Map Word256 (Integer, SHA) -> ContextM ()
+calculateAndEmitChainDiffs :: M.Map Word256 (Integer, Keccak256) -> ContextM ()
 calculateAndEmitChainDiffs chainMap = do
   let chainList = M.toList chainMap
       chainIds = format . unsafeCreateKeccak256FromWord256 . fst <$> chainList
@@ -800,8 +800,8 @@ calculateAndEmitChainDiffs chainMap = do
 diffMaxCost :: Int
 diffMaxCost = 500
 
-type PreDiff = (MP.StateRoot, SHA, Integer, Int)
-type ToDiff = (MP.StateRoot, MP.StateRoot, SHA, Integer)
+type PreDiff = (MP.StateRoot, Keccak256, Integer, Int)
+type ToDiff = (MP.StateRoot, MP.StateRoot, Keccak256, Integer)
 
 promote :: MP.StateRoot -> PreDiff -> ToDiff
 promote base (next, hsh, num, _) = (base, next, hsh, num)

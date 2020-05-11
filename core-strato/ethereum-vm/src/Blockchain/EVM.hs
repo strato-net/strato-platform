@@ -64,7 +64,7 @@ import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.EVM.Code
 import           Blockchain.EVM.Environment
@@ -170,7 +170,7 @@ accountCreationHack address = do
 
 
 
-getBlockHashWithNumber::Integer->SHA->VMM (Maybe SHA)
+getBlockHashWithNumber::Integer->Keccak256->VMM (Maybe Keccak256)
 getBlockHashWithNumber num h = do
   lift $ $logInfoS "getBlockHashWithNumber" . T.pack $ "calling getBSum with " ++ format h
   bSum <- getBSum h
@@ -1058,7 +1058,7 @@ create :: Bool
        -> Gas
        -> Address
        -> Code
-       -> SHA
+       -> Keccak256
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
        -> ContextM ExecResults
@@ -1188,7 +1188,7 @@ call :: Bool
      -> B.ByteString
      -> Gas
      -> Address
-     -> SHA
+     -> Keccak256
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
      -> ContextM ExecResults

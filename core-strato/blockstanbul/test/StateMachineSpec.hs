@@ -34,7 +34,7 @@ import Blockchain.Blockstanbul.EventLoop
 import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import qualified Network.Haskoin.Crypto as HK
 
 testContext :: BlockstanbulContext
@@ -54,7 +54,7 @@ instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) wher
 disableAuth :: StateMachineM m => m ()
 disableAuth = productionAuth .= False
 
-setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
+setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, Keccak256)
 setupRound blk' as = do
   let blk = truncateExtra blk'
   proposal .= Just blk

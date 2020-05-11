@@ -31,7 +31,7 @@ import           Blockchain.EVM
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.Opcodes
 import           Blockchain.Output
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.VMContext
 import           Blockchain.VMOptions()
@@ -128,7 +128,7 @@ spec = do
   describe "BatchedDiffs" $ do
     let toRoot = MP.StateRoot . word256ToBytes
         base = toRoot 0
-        costForN :: Int -> Word256 -> (MP.StateRoot, SHA, Integer, Int)
+        costForN :: Int -> Word256 -> (MP.StateRoot, Keccak256, Integer, Int)
         costForN c n = (toRoot n, unsafeCreateKeccak256FromWord256 n, fromIntegral n, c)
 
     it "will leave a single block alone, no matter the cost" $ do

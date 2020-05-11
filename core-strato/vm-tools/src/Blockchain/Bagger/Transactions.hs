@@ -19,7 +19,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA        hiding (hash)
+import           Blockchain.Strato.Model.Keccak256        hiding (hash)
 
 import           Text.Format
 
@@ -32,7 +32,7 @@ data TxRunResult = TxRunResult { trrTransaction :: OutputTx
                                } deriving (Show, Eq, Generic)
 
 -- When we use a cached TxRunResult, the blockHash does not account for consensus values added.
-rewriteBlockHash :: SHA -> TxRunResult -> TxRunResult
+rewriteBlockHash :: Keccak256 -> TxRunResult -> TxRunResult
 rewriteBlockHash hsh (TxRunResult otx res t before after new) =
   TxRunResult otx{otOrigin = BlockHash hsh} res' t before after new
   where res' = case res of

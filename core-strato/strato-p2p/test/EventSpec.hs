@@ -35,7 +35,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Stream.VMEvent
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
-import           Blockchain.Strato.Model.SHA           (SHA, unsafeCreateKeccak256FromWord256)
+import           Blockchain.Strato.Model.Keccak256           (Keccak256, unsafeCreateKeccak256FromWord256)
 
 import           Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted        as L
@@ -50,17 +50,17 @@ data TestContext = TestContext
   , _connectionTimeout     :: ConnectionTimeout
   , _maxReturnedHeaders    :: MaxReturnedHeaders
   , _peerAddr              :: PeerAddress
-  , _shaBlockDataMap       :: Map SHA DataDefs.BlockData
+  , _shaBlockDataMap       :: Map Keccak256 DataDefs.BlockData
   , _worldBestBlock        :: WorldBestBlock
   , _bestBlock             :: BestBlock
   , _canonicalBlockDataMap :: Map Integer (Canonical DataDefs.BlockData)
   , _ipAddressIpChainsMap  :: Map IPAddress IPChains
   , _orgIdChainsMap        :: Map OrgId OrgIdChains
-  , _shaChainTxsInBlockMap :: Map SHA ChainTxsInBlock
+  , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
   , _chainMembersMap       :: Map Word256 ChainMembers
   , _chainInfoMap          :: Map Word256 ChainInfo
-  , _privateTxMap          :: Map SHA (Private (Word256, OutputTx))
-  , _shaOutputBlockMap     :: Map SHA OutputBlock
+  , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
+  , _shaOutputBlockMap     :: Map Keccak256 OutputBlock
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String DataPeer.PPeer
@@ -70,7 +70,7 @@ makeLenses ''TestContext
 
 type TestContextM = StateT TestContext (ResourceT (LoggingT IO))
 
-instance Monad m => (SHA `A.Alters` DataDefs.BlockData) (StateT TestContext m) where
+instance Monad m => (Keccak256 `A.Alters` DataDefs.BlockData) (StateT TestContext m) where
   lookup _ k   = M.lookup k <$> use shaBlockDataMap
   insert _ k v = shaBlockDataMap %= M.insert k v
   delete _ k   = shaBlockDataMap %= M.delete k
@@ -92,7 +92,7 @@ instance Monad m => A.Selectable IPAddress IPChains (StateT TestContext m) where
 instance Monad m => A.Selectable OrgId OrgIdChains (StateT TestContext m) where
   select _ ip = M.lookup ip <$> use orgIdChainsMap
 
-instance Monad m => A.Selectable SHA ChainTxsInBlock (StateT TestContext m) where
+instance Monad m => A.Selectable Keccak256 ChainTxsInBlock (StateT TestContext m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
 instance Monad m => A.Selectable Word256 ChainMembers (StateT TestContext m) where
@@ -101,10 +101,10 @@ instance Monad m => A.Selectable Word256 ChainMembers (StateT TestContext m) whe
 instance Monad m => A.Selectable Word256 ChainInfo (StateT TestContext m) where
   select _ cid = M.lookup cid <$> use chainInfoMap
 
-instance Monad m => A.Selectable SHA (Private (Word256, OutputTx)) (StateT TestContext m) where
+instance Monad m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (StateT TestContext m) where
   select _ tx = M.lookup tx <$> use privateTxMap
 
-instance Monad m => (SHA `A.Alters` OutputBlock) (StateT TestContext m) where
+instance Monad m => (Keccak256 `A.Alters` OutputBlock) (StateT TestContext m) where
   lookup _ k   = M.lookup k <$> use shaOutputBlockMap
   insert _ k v = shaOutputBlockMap %= M.insert k v
   delete _ k   = shaOutputBlockMap %= M.delete k

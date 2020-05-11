@@ -32,7 +32,7 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import qualified Network.Haskoin.Crypto as HK
 import Text.Format
 
@@ -52,9 +52,9 @@ data BlockstanbulContext = BlockstanbulContext {
   -- The total group of participants
   , _validators :: S.Set Address
   -- Validators who have sent us a prepare for this round
-  , _prepared :: M.Map Address SHA
+  , _prepared :: M.Map Address Keccak256
   -- Validators who have sent us a commitment seal for this round
-  , _committed :: M.Map Address (SHA, ExtendedSignature)
+  , _committed :: M.Map Address (Keccak256, ExtendedSignature)
   -- We've already sent out a commit message to indicate a transition
   -- to prepared
   , _hasPreprepared :: Bool
@@ -72,7 +72,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _authSenders :: M.Map Address Int
   -- TODO(tim): Initialize _lastParent with the genesis block and
   -- make it required
-  , _lastParent :: Maybe SHA
+  , _lastParent :: Maybe Keccak256
 }
 
 makeLenses ''BlockstanbulContext
@@ -193,7 +193,7 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
       unless ret . raiseInProd $ "Rejecting Commit; bad seal"
     _ -> return () -- No specific auth for any other messages
 
-assertChainConsistency :: HK.Word256 -> Maybe SHA -> Block -> Either T.Text ()
+assertChainConsistency :: HK.Word256 -> Maybe Keccak256 -> Block -> Either T.Text ()
 assertChainConsistency seqNo wantParent blk = do
   let blkData = blockBlockData blk
       blkNo = fromIntegral . blockDataNumber $ blkData
@@ -208,7 +208,7 @@ assertChainConsistency seqNo wantParent blk = do
 generateNonceMap :: [Address] -> M.Map Address Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
 
-hasSameHash :: (StateMachineM m) => SHA -> m Bool
+hasSameHash :: (StateMachineM m) => Keccak256 -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
 
 roundChange :: (StateMachineM m) => ConduitM InEvent OutEvent m ()

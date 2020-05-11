@@ -56,7 +56,7 @@ import           Blockchain.EVM.VMM (readGasRemaining)
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.VMContext
 
@@ -122,7 +122,7 @@ getNumber "" = 0
 getNumber x  = read x
 
 --Just a cheap trick to enable the display of nearly all storage keys in the tests
-someHashes::M.Map SHA Int
+someHashes::M.Map Keccak256 Int
 someHashes = M.fromList $ map (\x -> (hash (word256ToBytes x), fromIntegral x)) [0..255]
 
 showHash::Integer->String

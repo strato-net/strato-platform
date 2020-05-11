@@ -14,13 +14,13 @@ import           Servant
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.Strato.Model.SHA hiding (hash)
+import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 
 import           SQLM
 
 type API = 
-  "transactionResult" :> Capture "txHash" SHA
+  "transactionResult" :> Capture "txHash" Keccak256
                       :> Get '[JSON] [TransactionResult]
 
 server :: ConnectionPool -> Server API
@@ -29,7 +29,7 @@ server pool = getTransactionResult pool
 ---------------------------
 
 
-getTransactionResult :: ConnectionPool -> SHA -> Handler [TransactionResult]
+getTransactionResult :: ConnectionPool -> Keccak256 -> Handler [TransactionResult]
 
 getTransactionResult pool txHash = liftIO $ runSQLM pool $ do
   rs <- sqlQuery $ E.select $

@@ -12,14 +12,14 @@ import qualified Blockchain.Data.DataDefs as DD
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.MilenaTools   as KP
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext     (ContextBestBlockInfo (..))
 
 import qualified Text.Colors        as CL
 import           Text.Format
 
 data EVMCheckpoint = EVMCheckpoint {
-    checkpointSHA    :: SHA,
+    checkpointSHA    :: Keccak256,
     checkpointHead   :: DD.BlockData,
     ctxBestBlockInfo :: ContextBestBlockInfo,
     ctxChainDBStateRoot :: Maybe MP.StateRoot

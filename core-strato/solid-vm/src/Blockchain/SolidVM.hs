@@ -61,7 +61,7 @@ import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
@@ -97,7 +97,7 @@ create :: Bool
        -> Gas
        -> Address
        -> Code
-       -> SHA
+       -> Keccak256
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
        -> ContextM ExecResults
@@ -125,7 +125,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash
     (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' newAddress hsh cc contractName' args
 
-create' :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
+create' :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
 create' creator newAddress ch cc contractName' argExps = do
   initializeAction newAddress contractName' ch
 
@@ -196,7 +196,7 @@ call :: Bool
      -> B.ByteString
      -> Gas
      -> Address
-     -> SHA
+     -> Keccak256
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
      -> ContextM ExecResults
@@ -243,7 +243,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       }
 
 
-getCodeAndCollection :: MonadSM m => Address -> m (Contract, SHA, CodeCollection)
+getCodeAndCollection :: MonadSM m => Address -> m (Contract, Keccak256, CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
@@ -1235,7 +1235,7 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ()
+runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
@@ -1342,7 +1342,7 @@ runTheCall :: MonadSM m
            => Address
            -> Contract
            -> String
-           -> SHA
+           -> Keccak256
            -> CodeCollection
            -> Xabi.Func
            -> ValList
