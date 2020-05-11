@@ -1288,7 +1288,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         testContractName' = "ReturnTuple"
-        hash = KECCAK256.keccak256ByteString $ KECCAK256.hash "foo"
+        hash = KECCAK256.keccak256ToByteString $ KECCAK256.hash "foo"
         arghash = ArgString $ Text.decodeUtf8 $ Base16.encode hash
         argcontents = ArgString "foo"
         postUsersContractRequest = PostUsersContractRequest

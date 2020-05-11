@@ -21,9 +21,7 @@ module Blockchain.Strato.Model.Keccak256 (
 
   keccak256SHA,
   shaKeccak256,
-  stringKeccak256,
-  byteStringKeccak256,
-  keccak256ByteString
+  stringKeccak256
   ) where
 
 
@@ -420,9 +418,3 @@ stringKeccak256 string =
   case B16.decode $ BC.pack string of
     (x, "") -> Just $ Keccak256 x
     _ -> Nothing
-
-byteStringKeccak256 :: ByteString -> Maybe Keccak256
-byteStringKeccak256 = Just . Keccak256 
-
-keccak256ByteString :: Keccak256 -> ByteString
-keccak256ByteString (Keccak256 val) = val

@@ -142,7 +142,7 @@ migrateCodeHashToCodePtr = do
   idsAndCodeHashes <- blocModify $ flip query_ idQuery
   $logInfoS "migrateCodeHashToCodePtr" "Migrating code hashes to CodePtrs"
   forM_ idsAndCodeHashes $ \(i :: Integer, bs) ->
-    for_ (byteStringKeccak256 bs) $ \kecc -> do
+    for_ (Just $ unsafeCreateKeccak256FromByteString bs) $ \kecc -> do
       let codePtrBS = Binary . rlpSerialize . EVMCode $ keccak256SHA kecc
       $logInfoS "migrateCodeHashToCodePtr" . T.pack $ concat
         [ "Processing ID "
