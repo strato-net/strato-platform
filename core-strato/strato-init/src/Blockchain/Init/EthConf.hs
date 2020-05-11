@@ -129,22 +129,12 @@ genEthConf = do
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
   let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
-  vwKey <- do
-    eNull <- runClientM (postPassword $ T.pack "sTrAtOSeCrEtPaSsWoRd") clientEnv
-    _ <- case eNull of
-      Left err -> error $ "error posting password: " ++ (show err)
-      Right _ -> return ()
-    ePub <- runClientM (postKey $ T.pack "_nodekey") clientEnv
-    putStrLn $ "addy is: " ++ (show ePub)
-    ePub2 <- runClientM (getKey (T.pack "_nodekey") Nothing) clientEnv
-    putStrLn $ "addy is: " ++ (show ePub2)
-    case ePub of
-      Left err -> error $ "error creating nodekey: " ++ (show err)
-      Right pk -> return pk
+  (AddressAndKey _ pub) <- runClientM (postPassword $ T.pack "sTrAtOSeCrEtPaSsWoRd") clientEnv >> runClientM (postKey $ T.pack "_nodekey") clientEnv 
+  
+  putStrLn $ "generated node public key: " ++ (show pub)
 
-  putStrLn $ "final publickey/addy: " ++ (show vwKey)
-  
-  
+  -- TODO: what to do with the pubkey, privkey in ethconf file?
+  --       and what about existing nodekeys? errors?
   
   
   myPrivKey <-
