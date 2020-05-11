@@ -37,7 +37,7 @@ import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
 import Blockchain.Output
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import qualified Data.NibbleString as N
 import qualified SolidVM.Model.Storable as MS
 

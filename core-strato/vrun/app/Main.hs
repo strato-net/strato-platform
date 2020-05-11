@@ -28,7 +28,7 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext
 import           Blockchain.VMOptions       ()
 import           Executable.EVMFlags        ()

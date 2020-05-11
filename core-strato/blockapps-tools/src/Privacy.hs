@@ -36,7 +36,7 @@ import           Blockchain.Constants
 import           Blockchain.Privacy.Monad
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 minBoundP :: Bounded a => Proxy a -> a
 minBoundP _ = minBound

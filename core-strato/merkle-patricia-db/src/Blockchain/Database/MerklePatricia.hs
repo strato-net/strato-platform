@@ -42,7 +42,7 @@ import qualified Database.LevelDB                            as DB
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.Internal
-import           Blockchain.Strato.Model.SHA                 (hash, keccak256ToByteString)
+import           Blockchain.Strato.Model.Keccak256           (hash, keccak256ToByteString)
 
 genericLookupDB :: MonadIO m => m DB.DB -> StateRoot -> m (Maybe NodeData)
 genericLookupDB f (StateRoot sr) = do

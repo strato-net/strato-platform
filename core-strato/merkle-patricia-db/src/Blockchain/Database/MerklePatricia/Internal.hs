@@ -41,7 +41,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.MPDB
 import           Blockchain.Database.MerklePatricia.NodeData
 import           Blockchain.Database.MerklePatricia.StateRoot
-import           Blockchain.Strato.Model.SHA                  (hash, keccak256ToByteString)
+import           Blockchain.Strato.Model.Keccak256            (hash, keccak256ToByteString)
 import           Text.Format
 
 unsafePutKeyVal :: (StateRoot `Alters` NodeData) m

@@ -18,7 +18,7 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Generation (insertContractsCount, insertContractsJSON, insertContractsJSONHashMaps)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 
 
 defineFlag "g:genesis_file" ("" :: String) "Filename containing pre-modifications genesis block"

@@ -33,7 +33,7 @@ import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 data XabiKind = ContractKind
               | InterfaceKind

@@ -17,7 +17,7 @@ import           Blockchain.Output
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
-import           Blockchain.Strato.Model.SHA                  (hash, keccak256ToByteString)
+import           Blockchain.Strato.Model.Keccak256            (hash, keccak256ToByteString)
 
 import FastMP
 import KV

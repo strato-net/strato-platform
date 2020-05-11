@@ -12,7 +12,7 @@ import Blockchain.ExtendedECDSA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Internals as HK

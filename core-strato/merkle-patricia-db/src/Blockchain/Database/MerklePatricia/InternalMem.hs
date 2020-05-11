@@ -22,7 +22,7 @@ import qualified Data.NibbleString                            as N
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.NodeData
 import           Blockchain.Database.MerklePatricia.StateRoot
-import           Blockchain.Strato.Model.SHA                  (hash, keccak256ToByteString)
+import           Blockchain.Strato.Model.Keccak256            (hash, keccak256ToByteString)
 import           Text.Format
 
 type MPMap = Map.Map B.ByteString B.ByteString

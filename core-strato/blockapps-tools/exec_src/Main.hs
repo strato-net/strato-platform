@@ -43,7 +43,7 @@ import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.SHA hiding (hash)
+import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 data Options = State{root::String, db::String}
              | Block{hash::String, db::String}

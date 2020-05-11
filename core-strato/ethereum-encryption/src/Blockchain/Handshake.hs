@@ -22,7 +22,7 @@ import                 Blockchain.Data.PubKey
 import qualified       Blockchain.ECIES            as ECIES
 import                 Blockchain.ExtendedECDSA
 import                 Blockchain.ExtWord
-import                 Blockchain.Strato.Model.SHA (hash, keccak256ToByteString)
+import                 Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 
 sigToBytes::ExtendedSignature->B.ByteString
 sigToBytes (ExtendedSignature signature yIsOdd) =

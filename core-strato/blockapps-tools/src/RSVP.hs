@@ -12,7 +12,7 @@ import Blockchain.Strato.Indexer.Model
 import Blockchain.Strato.Indexer.TxrIndexer (addTopic)
 import Blockchain.Strato.Indexer.Kafka
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ExtendedWord
 
 rsvp :: Word256 -> String -> Address -> IO ()

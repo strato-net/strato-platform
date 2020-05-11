@@ -3,7 +3,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 --import Crypto.Hash.Keccak
 
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 
 main :: IO ()
 main = do

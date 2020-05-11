@@ -27,7 +27,7 @@ import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
-import           Blockchain.Strato.Model.SHA (hash, keccak256ToByteString)
+import           Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import           Blockchain.Stream.Raw
 
 import qualified APIProxy                    as API

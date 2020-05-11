@@ -30,7 +30,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util                      (toMaybe)
 import           Text.Format
 

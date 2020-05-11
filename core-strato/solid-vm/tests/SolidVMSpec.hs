@@ -41,7 +41,7 @@ import Blockchain.Strato.Model.Action
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception

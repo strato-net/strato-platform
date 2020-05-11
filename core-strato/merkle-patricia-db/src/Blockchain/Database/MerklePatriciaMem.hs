@@ -11,7 +11,7 @@ import           Data.Maybe                                     (isJust)
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.InternalMem
 import           Blockchain.Database.MerklePatricia.StateRoot
-import           Blockchain.Strato.Model.SHA                    (hash, keccak256ToByteString)
+import           Blockchain.Strato.Model.Keccak256              (hash, keccak256ToByteString)
 
 putKeyValMem::Monad m=>MPMem
            ->Key

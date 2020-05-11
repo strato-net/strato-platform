@@ -2,7 +2,7 @@ module DumpRedis where
 import           Database.Redis
 
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB
 import           Blockchain.Strato.RedisBlockDB.Models
 

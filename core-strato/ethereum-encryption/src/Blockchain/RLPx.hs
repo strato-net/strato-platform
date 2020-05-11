@@ -34,7 +34,7 @@ import                 Blockchain.ExtendedECDSA
 import                 Blockchain.ExtWord
 import                 Blockchain.Frame
 import                 Blockchain.Handshake
-import                 Blockchain.Strato.Model.SHA        (hash, keccak256ToByteString)
+import                 Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 
 intToBytes :: Integer -> [Word8]
 intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]

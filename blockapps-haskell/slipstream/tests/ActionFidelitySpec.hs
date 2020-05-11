@@ -15,10 +15,10 @@ import Test.QuickCheck
 import Test.Hspec
 
 import qualified Blockchain.Strato.Model.Action as BS
-import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.SHA
-import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.CodePtr
+import Blockchain.Strato.Model.Event
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.SolidVM.Model
 import qualified Slipstream.Data.Action as SS
 

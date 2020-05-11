@@ -15,7 +15,7 @@ import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Database.MerklePatricia.StateRoot
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 
 spec :: Spec
 spec = do

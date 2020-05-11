@@ -31,7 +31,7 @@ import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), Ingest
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util
 import           Blockchain.TypeLits
 import           SQLM
