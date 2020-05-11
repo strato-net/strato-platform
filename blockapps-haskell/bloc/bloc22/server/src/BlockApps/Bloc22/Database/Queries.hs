@@ -810,10 +810,7 @@ instance QueryRunnerColumnDefault PGBytea Keccak256 where
         = unsafeCreateKeccak256FromByteString
 
 instance Default Constant Keccak256 (Column PGBytea) where
-  def = lmap fromKecc def
-    where
-      fromKecc :: Keccak256 -> ByteString
-      fromKecc = keccak256ToByteString . keccak256SHA
+  def = lmap keccak256ToByteString def
 
 instance QueryRunnerColumnDefault PGBytea CodePtr where
   queryRunnerColumnDefault =
@@ -950,7 +947,7 @@ compileContract source = do
         { contractdetailsBin = bin
         , contractdetailsAddress = Just (Named "Latest")
         , contractdetailsBinRuntime = binRuntime
-        , contractdetailsCodeHash =  EVMCode . keccak256SHA $ binRuntimeToCodeHash binRuntime
+        , contractdetailsCodeHash =  EVMCode $ binRuntimeToCodeHash binRuntime
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi
@@ -977,7 +974,7 @@ createMetadataNoCompile source = do
         { contractdetailsBin = source
         , contractdetailsAddress = Just (Named "Latest")
         , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ keccak256SHA $ hash (Char8.pack $ Text.unpack source)
+        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ hash (Char8.pack $ Text.unpack source)
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi

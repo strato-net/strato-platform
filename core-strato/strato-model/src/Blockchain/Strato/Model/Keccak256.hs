@@ -18,8 +18,6 @@ module Blockchain.Strato.Model.Keccak256 (
   unsafeCreateKeccak256FromByteString,
   unsafeCreateKeccak256FromWord256,
 
-  keccak256SHA,
-  shaKeccak256,
   stringKeccak256
   ) where
 
@@ -403,12 +401,6 @@ shaKeccak256 hsh = Keccak256
                    $ shaToByteString hsh
 -}
 
-
-keccak256SHA :: Keccak256 -> Keccak256
-keccak256SHA = id
-
-shaKeccak256 :: Keccak256 -> Keccak256
-shaKeccak256 = id
 
 stringKeccak256 :: String -> Maybe Keccak256
 stringKeccak256 string =

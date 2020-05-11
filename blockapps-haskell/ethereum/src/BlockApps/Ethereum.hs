@@ -105,14 +105,14 @@ show256 = padZeros 64 . flip showHex ""
 
 
 instance RLPEncodable CodePtr where
-  rlpEncode (EVMCode codeHash) = rlpEncode $ shaKeccak256 codeHash
+  rlpEncode (EVMCode codeHash) = rlpEncode codeHash
   rlpEncode (SolidVMCode n ch) = RLP.Array [RLP.String $ Char8.pack "SolidVM"
                                            , rlpEncode n
-                                           , rlpEncode $ shaKeccak256 ch
+                                           , rlpEncode ch
                                            ]
 
-  rlpDecode (RLP.Array [RLP.String "SolidVM", n, ch]) = SolidVMCode <$> rlpDecode n <*> (keccak256SHA <$> rlpDecode ch)
-  rlpDecode ch = EVMCode . keccak256SHA <$> rlpDecode ch
+  rlpDecode (RLP.Array [RLP.String "SolidVM", n, ch]) = SolidVMCode <$> rlpDecode n <*> rlpDecode ch
+  rlpDecode ch = EVMCode <$> rlpDecode ch
 
 --------------------------------------------------------------------------------
 

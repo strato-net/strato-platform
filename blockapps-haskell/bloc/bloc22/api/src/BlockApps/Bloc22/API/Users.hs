@@ -115,7 +115,7 @@ instance ToSample BlocTransactionData where
         contractdetailsBin        = "Contract Bin"
       , contractdetailsAddress    = Just (Named "Latest")
       , contractdetailsBinRuntime = "Contract Bin Runtime"
-      , contractdetailsCodeHash   = EVMCode $ keccak256SHA $ hash "Contract Code Hash"
+      , contractdetailsCodeHash   = EVMCode $ hash "Contract Code Hash"
       , contractdetailsName       = "Example"
       , contractdetailsSrc        = "contract Example { }"
       , contractdetailsXabi       = sampleXabi
