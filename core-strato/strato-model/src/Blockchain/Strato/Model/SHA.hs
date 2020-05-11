@@ -7,6 +7,7 @@
 
 module Blockchain.Strato.Model.SHA (
   SHA,
+  Keccak256,
   blockstanbulMixHash,
   formatKeccak256WithoutColor,
   hash,
@@ -53,161 +54,163 @@ import              Blockchain.Strato.Model.ExtendedWord
 import qualified    Text.Colors                          as CL
 import              Text.Format
 
-newtype SHA = Keccak256 ByteString deriving (Eq, Read, Show, Ord, Generic, Data)
+type SHA = Keccak256
+
+newtype Keccak256 = Keccak256 ByteString deriving (Eq, Read, Show, Ord, Generic, Data)
                              deriving anyclass (Hashable)
 
-instance NFData SHA
+instance NFData Keccak256
 
-keccak256ToWord256 :: SHA -> Word256
+keccak256ToWord256 :: Keccak256 -> Word256
 keccak256ToWord256 (Keccak256 val) = bytesToWord256 val 
 
-keccak256ToByteString :: SHA -> ByteString
+keccak256ToByteString :: Keccak256 -> ByteString
 keccak256ToByteString (Keccak256 val) = val
 
-unsafeCreateKeccak256FromWord256 :: Word256 -> SHA
+unsafeCreateKeccak256FromWord256 :: Word256 -> Keccak256
 unsafeCreateKeccak256FromWord256 = Keccak256 . word256ToBytes
 
-unsafeCreateKeccak256FromByteString :: ByteString -> SHA
+unsafeCreateKeccak256FromByteString :: ByteString -> Keccak256
 unsafeCreateKeccak256FromByteString = Keccak256
 
 
-instance Binary SHA where
+instance Binary Keccak256 where
     put (Keccak256 x) = putByteString x
     get = Keccak256 <$> getByteString 32
 
-instance RLPSerializable SHA where
+instance RLPSerializable Keccak256 where
     rlpDecode (RLPString s) | B.length s == 32 = Keccak256 s
     rlpDecode (RLPScalar 0) = unsafeCreateKeccak256FromWord256 0 --special case seems to be allowed, even if length of zeros is wrong
-    rlpDecode x             = error ("Missing case in rlpDecode for SHA: " ++ show x)
+    rlpDecode x             = error ("Missing case in rlpDecode for Keccak256: " ++ show x)
     --rlpEncode (Keccak256 0) = RLPNumber 0
     rlpEncode (Keccak256 val) = RLPString val
 
 -- Someday we should remove the second RLP library...
-instance RLP2.RLPEncodable SHA where
+instance RLP2.RLPEncodable Keccak256 where
   rlpEncode = RLP2.rlpEncode . keccak256ToByteString
   rlpDecode = Right . Keccak256 <=< RLP2.rlpDecode
 
 
-instance Ae.ToJSON SHA where
+instance Ae.ToJSON Keccak256 where
   toJSON = Ae.String . T.pack . keccak256ToHex
-instance Ae.FromJSON SHA where
-  parseJSON = Ae.withText "SHA" $ \t ->
+instance Ae.FromJSON Keccak256 where
+  parseJSON = Ae.withText "Keccak256" $ \t ->
     case B16.decode $ BC.pack $ T.unpack t of
       (val, "") -> pure $ Keccak256 val
-      _ -> fail $ "error parsing SHA: " ++ show t
+      _ -> fail $ "error parsing Keccak256: " ++ show t
 
-instance Ae.ToJSONKey SHA where
+instance Ae.ToJSONKey Keccak256 where
   toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
       where f = T.pack . keccak256ToHex
 
-instance Ae.FromJSONKey SHA where
+instance Ae.FromJSONKey Keccak256 where
     fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)
 
-instance PersistField SHA where
+instance PersistField Keccak256 where
   toPersistValue (Keccak256 i) = PersistText . T.pack $ BC.unpack $ B16.encode i
   fromPersistValue (PersistText s) =
     case B16.decode $ BC.pack $ T.unpack s of
       (val, "") -> Right $ Keccak256 val
-      _ -> Left $ T.pack $ "unable to parse SHA: " ++ show s
+      _ -> Left $ T.pack $ "unable to parse Keccak256: " ++ show s
 
 
     
-  fromPersistValue _ = Left $ T.pack $ "PersistField SHA must be persisted as PersistText"
+  fromPersistValue _ = Left $ T.pack $ "PersistField Keccak256 must be persisted as PersistText"
 
-instance PersistFieldSql SHA where
+instance PersistFieldSql Keccak256 where
   sqlType _ = SqlOther $ T.pack "varchar(64)"
 
 
-keccak256ToHex :: SHA -> String
+keccak256ToHex :: Keccak256 -> String
 keccak256ToHex (Keccak256 sha) = BC.unpack $ B16.encode sha
 
 -- todo: this shouldn't be partial... ever...
-keccak256FromHex :: String -> SHA
+keccak256FromHex :: String -> Keccak256
 keccak256FromHex = Keccak256 . fst . B16.decode . BC.pack
 
-formatKeccak256WithoutColor :: SHA -> String
+formatKeccak256WithoutColor :: Keccak256 -> String
 formatKeccak256WithoutColor s
   | s == hash "" = "<blank>"
   | otherwise    = keccak256ToHex s
 
 
 
-rlpHash :: RLPSerializable a => a -> SHA
+rlpHash :: RLPSerializable a => a -> Keccak256
 rlpHash = hash . rlpSerialize . rlpEncode
 
-hash :: BC.ByteString -> SHA
+hash :: BC.ByteString -> Keccak256
 hash = Keccak256 . fastKeccak256
 
 
-instance Format SHA where
+instance Format Keccak256 where
   format = CL.yellow . formatKeccak256WithoutColor
 
 
 -- I think we want this first definition, but the API already uses the second one!
 -- Someday we should fix this, but it will probably change our external (API) behavior.
 {-
-instance PathPiece SHA where
-  toPathPiece (SHA x) = T.pack $ padZeros 64 $ showHex x ""
-  fromPathPiece t = Just (SHA wd160)
+instance PathPiece Keccak256 where
+  toPathPiece (Keccak256 x) = T.pack $ padZeros 64 $ showHex x ""
+  fromPathPiece t = Just (Keccak256 wd160)
     where
       ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word256,String)]
 -}
 
 -- Note!  PathPiece can be removed once we stop using Yesod/strato-api
-instance PathPiece SHA where
+instance PathPiece Keccak256 where
   toPathPiece = T.pack . show
   fromPathPiece t =
     case B16.decode $ BC.pack $ T.unpack t of
       (x, "") -> Just $ Keccak256 x
       _         -> Nothing
 
-instance ToHttpApiData SHA where
+instance ToHttpApiData Keccak256 where
   toUrlPiece (Keccak256 bytes) = T.pack . BC.unpack . B16.encode $ bytes
 
-instance FromHttpApiData SHA where
+instance FromHttpApiData Keccak256 where
     parseUrlPiece = unmaybe . fromPathPiece
         where unmaybe = \case
-                Nothing -> Left "couldn't parse SHA"
+                Nothing -> Left "couldn't parse Keccak256"
                 Just x  -> Right x
 
-instance MimeUnrender PlainText SHA where
+instance MimeUnrender PlainText Keccak256 where
   mimeUnrender _ v =
     case B16.decode $ BLC.toStrict v of
       (bytes, "") -> Right $ Keccak256 bytes
       _ -> Left "Couldn't read Keccak"
 
-instance MimeRender PlainText SHA where
+instance MimeRender PlainText Keccak256 where
   mimeRender _ = BLC.pack . formatKeccak256WithoutColor
 
-instance MimeRender PlainText [SHA] where
+instance MimeRender PlainText [Keccak256] where
   mimeRender _ = Ae.encode
 
-instance MimeUnrender PlainText [SHA] where
-  mimeUnrender _ val = maybe (Left $ "Couldn't decode [Keccak256] in SHA: " ++ show val) Right . Ae.decode $ val
+instance MimeUnrender PlainText [Keccak256] where
+  mimeUnrender _ val = maybe (Left $ "Couldn't decode [Keccak256] in Keccak256: " ++ show val) Right . Ae.decode $ val
 
-instance ToForm SHA where
+instance ToForm Keccak256 where
   toForm hash256 = [("hash", toQueryParam hash256)]
 
-instance FromForm SHA where
+instance FromForm Keccak256 where
   fromForm = parseUnique "hash"
 
 
-instance Arbitrary SHA where
+instance Arbitrary Keccak256 where
     arbitrary = do
         random256Bit <- fastRandBs 32
         return $ Keccak256 random256Bit
 
-instance ToCapture (Capture "hash" SHA) where
+instance ToCapture (Capture "hash" Keccak256) where
   toCapture _ = DocCapture "hash" "a transaction hash"
 
-instance ToParamSchema SHA where
+instance ToParamSchema Keccak256 where
   toParamSchema _ = mempty & type_ .~ SwaggerString
 
-instance ToSample SHA where
+instance ToSample Keccak256 where
   toSamples _ =
     samples [hash $ BLC.toStrict (encode @ Integer n) | n <- [1..10]]
 
-instance ToSchema SHA where
+instance ToSchema Keccak256 where
   declareNamedSchema _ = return $
     NamedSchema (Just "Keccak256 hash, 32 byte hex encoded string")
       ( mempty
@@ -215,5 +218,5 @@ instance ToSchema SHA where
         & example ?~ Ae.toJSON (hash $ BLC.toStrict (encode @ Integer 1))
         & description ?~ "Keccak256 hash, 32 byte hex encoded string" )
 
-blockstanbulMixHash :: SHA
+blockstanbulMixHash :: Keccak256
 blockstanbulMixHash = unsafeCreateKeccak256FromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
