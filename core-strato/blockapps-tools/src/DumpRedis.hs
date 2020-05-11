@@ -17,5 +17,5 @@ dumpRedis _ = do
 formatBB :: RedisBestBlock -> String
 formatBB b = unlines [ ("Best block number:\t" ++) . show . bestBlockNumber $ b
                      , ("Best block tot. diff:\t" ++) . show . bestBlockTotalDifficulty $ b
-                     , ("Best block hash:\t" ++) . shaToHex . bestBlockHash $ b
+                     , ("Best block hash:\t" ++) . keccak256ToHex . bestBlockHash $ b
                      ]

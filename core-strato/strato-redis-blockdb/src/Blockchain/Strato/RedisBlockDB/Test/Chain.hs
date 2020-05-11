@@ -191,4 +191,4 @@ prettyTree' :: Tree BlockData -> Tree String
 prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
 
 showHash :: SHA -> String
-showHash = take 8 . shaToHex
+showHash = take 8 . keccak256ToHex

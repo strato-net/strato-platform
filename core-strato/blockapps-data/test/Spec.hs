@@ -261,7 +261,7 @@ matchingHash = it "doesnt mutate the hash" $ do
                    Just (String hs) -> hs
                    _ -> undefined
   jsonHash `shouldBe` ( T.pack
-                      .  shaToHex
+                      .  keccak256ToHex
                       .  transactionHash
                       . tPrimeToT $ tx)
 

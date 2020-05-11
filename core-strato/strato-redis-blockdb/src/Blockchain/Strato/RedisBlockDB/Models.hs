@@ -56,11 +56,11 @@ instance RedisDBValuable S8.ByteString where
         _       -> error "leftovers in base16 decode"
 
 instance RedisDBKeyable SHA where
-    toKey = S8.pack . shaToHex
+    toKey = S8.pack . keccak256ToHex
 
 instance RedisDBValuable SHA where
-    toValue   = S8.pack . shaToHex
-    fromValue = shaFromHex . S8.unpack
+    toValue   = S8.pack . keccak256ToHex
+    fromValue = keccak256FromHex . S8.unpack
 
 instance RedisDBKeyable Word256 where
     toKey = word256ToBytes

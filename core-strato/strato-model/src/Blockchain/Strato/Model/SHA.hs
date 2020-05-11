@@ -11,9 +11,9 @@ module Blockchain.Strato.Model.SHA (
   formatKeccak256WithoutColor,
   hash,
   rlpHash,
-  shaFromHex,
+  keccak256FromHex,
   keccak256ToByteString,
-  shaToHex,
+  keccak256ToHex,
   keccak256ToWord256,
   unsafeCreateKeccak256FromByteString,
   unsafeCreateKeccak256FromWord256
@@ -89,7 +89,7 @@ instance RLP2.RLPEncodable SHA where
 
 
 instance Ae.ToJSON SHA where
-  toJSON = Ae.String . T.pack . shaToHex
+  toJSON = Ae.String . T.pack . keccak256ToHex
 instance Ae.FromJSON SHA where
   parseJSON = Ae.withText "SHA" $ \t ->
     case B16.decode $ BC.pack $ T.unpack t of
@@ -98,7 +98,7 @@ instance Ae.FromJSON SHA where
 
 instance Ae.ToJSONKey SHA where
   toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
-      where f = T.pack . shaToHex
+      where f = T.pack . keccak256ToHex
 
 instance Ae.FromJSONKey SHA where
     fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)
@@ -118,17 +118,17 @@ instance PersistFieldSql SHA where
   sqlType _ = SqlOther $ T.pack "varchar(64)"
 
 
-shaToHex :: SHA -> String
-shaToHex (SHA sha) = BC.unpack $ B16.encode sha
+keccak256ToHex :: SHA -> String
+keccak256ToHex (SHA sha) = BC.unpack $ B16.encode sha
 
 -- todo: this shouldn't be partial... ever...
-shaFromHex :: String -> SHA
-shaFromHex = SHA . fst . B16.decode . BC.pack
+keccak256FromHex :: String -> SHA
+keccak256FromHex = SHA . fst . B16.decode . BC.pack
 
 formatKeccak256WithoutColor :: SHA -> String
 formatKeccak256WithoutColor s
   | s == hash "" = "<blank>"
-  | otherwise    = shaToHex s
+  | otherwise    = keccak256ToHex s
 
 
 

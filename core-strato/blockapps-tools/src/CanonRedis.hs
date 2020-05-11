@@ -64,7 +64,7 @@ canonRedis ip start range = do
       putStrLn $ "Number "
         <> show (blockDataNumber h)
         <> " -- Hash "
-        <> show (shaToHex $ sha)
+        <> show (keccak256ToHex $ sha)
         <> " -- Parent hash "
-        <> show (shaToHex $ blockDataParentHash h)
+        <> show (keccak256ToHex $ blockDataParentHash h)
 

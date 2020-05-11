@@ -591,17 +591,17 @@ putBestBlockInfo :: SHA
                  -> Integer
                  -> Redis (Either Reply Status)
 putBestBlockInfo newSha newNumber newTDiff = do
-    --liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
+    --liftIO . putStrLn . ("New args" ++) $ show (keccak256ToHex newSha, newNumber, newTDiff)
     oldBBI' <- getBestBlockInfo
     case oldBBI' of
         Nothing      -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
         Just (RedisBestBlock oldSha oldNumber _) -> do
-            --liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
+            --liftIO . putStrLn . ("Old args" ++) $ show (keccak256ToHex oldSha, oldNumber, oldTDiff)
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
                 Left err -> error $ "god save the queen! " ++ show err
                 Right (updates, deletions) -> do
-                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
+                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (keccak256ToHex x, y)) <$> updates)
                     --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                   res <- multiExec $ do
                       forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
@@ -645,10 +645,10 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               complete lca newShaChain = getHeader lca >>= \case
                       Nothing -> if lca /= (unsafeCreateKeccak256FromWord256 0) -- genesis block is sha 0
                                      then return . Left . SingleLine . S8.pack $
-                                              "Could not get ancestor header for SHA " ++ shaToHex lca
+                                              "Could not get ancestor header for SHA " ++ keccak256ToHex lca
                                      else complete (head newShaChain) newShaChain
                       Just ancestor -> do
-                          --liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
+                          --liftIO . putStrLn $ show (keccak256ToHex lca, keccak256ToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
                               updates        = flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
