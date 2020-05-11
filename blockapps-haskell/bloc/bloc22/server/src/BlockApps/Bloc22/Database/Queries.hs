@@ -714,7 +714,7 @@ insertContractSourceQuery
   :: Text
   -> Bloc (Int32, Keccak256)
 insertContractSourceQuery src = do
-  let srcHash = (keccak256 $ Text.encodeUtf8 src)
+  let srcHash = (hash $ Text.encodeUtf8 src)
   blocModify1 $ \ conn ->
     runInsertManyReturning conn contractsSourceTable [
       ( Nothing
@@ -761,7 +761,7 @@ insertContractMetaDataBatchQuery srcHash details = blocModify $ \ conn ->
         , constant (Text.encodeUtf8 contractdetailsBin)
         , constant (Text.encodeUtf8 contractdetailsBinRuntime)
         , constant contractdetailsCodeHash
-        , constant $ keccak256 (Text.encodeUtf8 contractdetailsBin)
+        , constant $ hash (Text.encodeUtf8 contractdetailsBin)
         , constant srcHash
         , constant (serializeXabi contractdetailsXabi)
         )
@@ -913,7 +913,7 @@ sourceToContractDetails shouldCompile source = do
         case shouldCompile of
           Do Compile -> compileContract
           Don't Compile -> createMetadataNoCompile
-  details <- blocQuery . contractBySourceHash . keccak256 $ Text.encodeUtf8 source
+  details <- blocQuery . contractBySourceHash . hash $ Text.encodeUtf8 source
   if null details
     then createContractDetails source
     else fmap Map.fromList . forM details $
@@ -978,7 +978,7 @@ createMetadataNoCompile source = do
         { contractdetailsBin = source
         , contractdetailsAddress = Just (Named "Latest")
         , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ keccak256SHA $ keccak256 (Char8.pack $ Text.unpack source)
+        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ keccak256SHA $ hash (Char8.pack $ Text.unpack source)
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi

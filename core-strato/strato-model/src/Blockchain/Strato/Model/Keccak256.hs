@@ -22,9 +22,6 @@ module Blockchain.Strato.Model.Keccak256 (
   keccak256SHA,
   shaKeccak256,
   stringKeccak256,
-  keccak256,
-  keccak256lazy,
-  keccak256String,
   byteStringKeccak256,
   keccak256ByteString
   ) where
@@ -43,7 +40,6 @@ import qualified    Data.ByteString                      as B
 import              Data.ByteString.Arbitrary
 import qualified    Data.ByteString.Base16               as B16
 import qualified    Data.ByteString.Char8                as BC
-import qualified    Data.ByteString.Lazy                 as BL
 import qualified    Data.ByteString.Lazy.Char8           as BLC
 import              Data.Data
 import              Data.Hashable                        (Hashable)
@@ -424,15 +420,6 @@ stringKeccak256 string =
   case B16.decode $ BC.pack string of
     (x, "") -> Just $ Keccak256 x
     _ -> Nothing
-
-keccak256 :: ByteString -> Keccak256
-keccak256 = hash
-
-keccak256lazy :: BL.ByteString -> Keccak256
-keccak256lazy = hash . BL.toStrict
-
-keccak256String :: Keccak256 -> String
-keccak256String = formatKeccak256WithoutColor
 
 byteStringKeccak256 :: ByteString -> Maybe Keccak256
 byteStringKeccak256 = Just . Keccak256 

@@ -54,7 +54,7 @@ spec = modifyMaxSuccess (const 10) $ do
       httpApiDataProp @ Keccak256
     prop "has inverse Form Url decode/encode" $ formProp @ Keccak256
     prop "has inverse String decode/encode" $ \ hash ->
-      stringKeccak256 (keccak256String hash) === Just hash
+      stringKeccak256 (formatKeccak256WithoutColor hash) === Just hash
 
   let
     Just key1 = secKey . fst $ Base16.decode

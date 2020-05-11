@@ -31,7 +31,7 @@ import           BlockApps.Strato.Types
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Gas
-import           Blockchain.Strato.Model.Keccak256 hiding (hash)
+import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import           Blockchain.Strato.Model.Wei
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -1288,7 +1288,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         testContractName' = "ReturnTuple"
-        hash = keccak256ByteString $ keccak256 "foo"
+        hash = KECCAK256.keccak256ByteString $ KECCAK256.hash "foo"
         arghash = ArgString $ Text.decodeUtf8 $ Base16.encode hash
         argcontents = ArgString "foo"
         postUsersContractRequest = PostUsersContractRequest

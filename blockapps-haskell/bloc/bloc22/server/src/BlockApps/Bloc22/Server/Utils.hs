@@ -63,7 +63,7 @@ emptyTxParams :: TxParams
 emptyTxParams = TxParams Nothing Nothing Nothing
 
 binRuntimeToCodeHash :: Text.Text -> Keccak256
-binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
+binRuntimeToCodeHash = hash . fst . BS16.decode . Text.encodeUtf8
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
 partitionWith f = map (fmap (map snd)) . indexedPartitionWith f
