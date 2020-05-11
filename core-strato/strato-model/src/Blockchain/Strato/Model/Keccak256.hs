@@ -7,7 +7,6 @@
 
 module Blockchain.Strato.Model.Keccak256 (
   Keccak256,
-  SHA,
   blockstanbulMixHash,
   formatKeccak256WithoutColor,
   hash,
@@ -57,8 +56,6 @@ import              Blockchain.Data.RLP
 import              Blockchain.Strato.Model.ExtendedWord
 import qualified    Text.Colors                          as CL
 import              Text.Format
-
-import qualified    Blockchain.Strato.Model.SHA          as THEREALSHA
 
 
 newtype Keccak256 = Keccak256 ByteString deriving (Eq, Read, Show, Ord, Generic, Data)
@@ -407,11 +404,11 @@ shaKeccak256 hsh = Keccak256
 -}
 
 
-keccak256SHA :: Keccak256 -> THEREALSHA.SHA
-keccak256SHA (Keccak256 val) = THEREALSHA.unsafeCreateKeccak256FromByteString val
+keccak256SHA :: Keccak256 -> Keccak256
+keccak256SHA = id
 
-shaKeccak256 :: THEREALSHA.SHA -> Keccak256
-shaKeccak256 sha = Keccak256 $ THEREALSHA.keccak256ToByteString sha
+shaKeccak256 :: Keccak256 -> Keccak256
+shaKeccak256 = id
 
 stringKeccak256 :: String -> Maybe Keccak256
 stringKeccak256 string =
