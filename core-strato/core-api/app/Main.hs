@@ -14,10 +14,14 @@ module Main where
 import           Blockchain.Output
 import           Control.Lens.Operators
 import           Data.Aeson
+import qualified Data.ByteString.Lazy.Char8      as BLC
+import qualified Data.HashMap.Strict.InsOrd           as H
 import           Data.Proxy
 import           Data.Swagger
 import           Database.Persist.Postgresql
 import           HFlags
+import           Network.HTTP.Types.Status
+import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.Prometheus
@@ -27,8 +31,13 @@ import           Servant.Multipart
 import           Servant.Swagger
 import           Servant.Swagger.UI
 
+
+
+
 import           BlockApps.Init
 import           Blockchain.EthConf
+
+import           Text.Tools
 
 import qualified Handlers.AccountInfo            as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
@@ -119,10 +128,18 @@ app pool theDoc =
   $ instrumentApp "core-api"
   $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
-  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
+--  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
+  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw)) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404)
 
 
 
+serveCustom404 :: Application
+serveCustom404 x respond =
+  respond $ responseLBS notFound404 [("Content-Type", "text/plain")] $ BLC.pack
+  $ "There is no content at: " ++ show (rawPathInfo x)
+  ++ "\nHere are the available routes:" ++ tab ("\n" ++ unlines allPaths) ++ "\n"
+  where
+    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy CoreAPI)
 
 
 ----------
