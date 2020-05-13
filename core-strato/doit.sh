@@ -152,7 +152,7 @@ function newnode {
 	  runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
   else
       echo "Starting core-api"
-      runBackgroundProcess core-api >> logs/core-api 2>&1
+      NODEKEY=$apiKey runBackgroundProcess core-api >> logs/core-api 2>&1
   fi
 
   
