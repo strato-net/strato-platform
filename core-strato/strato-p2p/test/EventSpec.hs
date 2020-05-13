@@ -16,10 +16,15 @@ import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Crypto.PubKey.ECC.DH
-import           Crypto.Random
+import           Crypto.PubKey.ECC.Types
+import           Data.Bits                             (shiftR)
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Base16                as B16
+import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.TQueue                   hiding (newTQueueIO)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
+import           Data.Word                             (Word8)
 import           Text.Printf
 
 import           Blockchain.Blockstanbul               (blockstanbulSender)
@@ -30,11 +35,9 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Control
 import qualified Blockchain.Data.DataDefs              as DataDefs
 import           Blockchain.Data.Enode
-import           Blockchain.Data.PubKey
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
-import           Blockchain.ECIES
 import           Blockchain.Event
 import           Blockchain.ExtWord
 import           Blockchain.Options                    (AuthorizationMode(..))
@@ -52,6 +55,22 @@ import           Test.QuickCheck
 
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
+
+-- TODO: these were imported from ethereum-encryption, which is still using
+--       crypto-pubkey and crypto-random. Remove these once ethereum-encryption
+--       switches over to cryptonite
+theCurve :: Curve
+theCurve = getCurveByName SEC_p256k1
+
+pointToString :: Point -> String
+pointToString = BC.unpack . B16.encode . pointToBytes
+
+pointToBytes :: Point -> B.ByteString
+pointToBytes (Point x y) = B.pack $ intToBytes x ++ intToBytes y
+pointToBytes PointO      = error "pointToBytes got value PointO, I don't know what to do here"
+
+intToBytes :: Integer -> [Word8]
+intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
 
 data TestContext = TestContext
   { _blocks                :: [Block]
@@ -222,13 +241,11 @@ spec :: Spec
 spec = do
   describe "network simulation" $ do
     it "should send a transaction from server to client" $ do
-      entropyPool <- liftIO createEntropyPool
-      let g = cprgCreate entropyPool :: SystemRNG
-          serverPriv = fst $ generatePrivate g theCurve
-          serverPub = calculatePublic theCurve serverPriv
+      serverPriv <- generatePrivate theCurve
+      let serverPub = calculatePublic theCurve serverPriv
           serverPeer = DataPeer.buildPeer (Just $ pointToString serverPub, "1.2.3.4", 30303)
-          clientPriv = fst $ generatePrivate g theCurve
-          clientPub = calculatePublic theCurve clientPriv
+      clientPriv <- generatePrivate theCurve
+      let clientPub = calculatePublic theCurve clientPriv
           clientPeer = DataPeer.buildPeer (Just $ pointToString clientPub, "5.6.7.8", 30303)
           clearChainId tx = case tx of
             MessageTX{} -> tx{transactionChainId = Nothing}

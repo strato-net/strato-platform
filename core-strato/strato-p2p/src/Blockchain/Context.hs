@@ -300,7 +300,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Accessible (SK.UnseqSink (ReaderT Con
 instance (MonadIO m, MonadLogger m) => HasVMEventsSink (ReaderT Config m) where
   getVMEventsSink = asks configVmEventsSink
 
-instance MonadIO m => Stacks Block (ReaderT Config m) where
+instance (MonadIO m, MonadLogger m) => Stacks Block (ReaderT Config m) where
   takeStack _ n = do
     vmEvents <- liftIO . fetchLastVMEvents $ fromIntegral n
     pure [b | ChainBlock b <- vmEvents]
