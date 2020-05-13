@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Sequencer.SequencerSpec where
 
@@ -21,6 +23,7 @@ import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
+import qualified Control.Monad.Change.Modify         as Mod
 import           Control.Monad.IO.Class              (liftIO)
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
@@ -44,6 +47,7 @@ import           Blockchain.Sequencer
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.ChainHelpers
 import           Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
@@ -51,6 +55,7 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.Model.SHA         as SHA
 import qualified Data.ByteString.Char8               as C8
+import qualified Data.Set                            as S
 import qualified Network.Haskoin.Crypto     as HK
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
@@ -522,8 +527,8 @@ spec = do
         b2 <- runBatch $ checkForUnseq [chainDetails1]
         let obs' = [b | VmBlock b <- _toVm b2]
         obs' `shouldBe` []
-        let gtxs' = [th | P2pGetTx th <- _toP2p b2]
-        gtxs' `shouldBe` [[txHash tx1]]
+        txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
+        txHashes `shouldBe` S.singleton (txHash tx1)
         b3 <- runBatch $ checkForUnseq [ietx tx1]
         let obs'' = [b | VmBlock b <- _toVm b3]
         map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message]]

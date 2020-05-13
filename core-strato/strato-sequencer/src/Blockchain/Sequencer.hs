@@ -132,7 +132,11 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   BatchSeqEvent{..} <- runSequencerBatch events
   chainIds <- unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
   txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
-  let toP2p' = (P2pGetChain $ toList chainIds):(P2pGetTx $ toList txHashes):_toP2p
+  let chainIdsList = toList chainIds
+      txHashesList = toList txHashes
+      getChains = if null chainIdsList then [] else [P2pGetChain chainIdsList]
+      getTxs = if null txHashesList then [] else [P2pGetTx txHashesList]
+      toP2p' = getChains ++ getTxs ++ _toP2p
   flushLdbBatchOps
   prunePrivacyDBs
 
@@ -443,7 +447,6 @@ runBlockWithConsensus sb = do
   ses <- runConduit
     ( yield sb
    .| runConsensus
-   .| mapC ToVm
    .| hydrateAndEmit Nothing
    .| sinkList
     )
@@ -479,14 +482,14 @@ runConsensus :: ( MonadLogger m
                 , (SHA `A.Alters` ChainHashEntry) m
                 , (SHA `A.Alters` DependentBlockEntry) m
                 )
-             => ConduitT SequencedBlock VmEvent (ConduitT a SeqEvent m) ()
+             => ConduitT SequencedBlock SeqEvent m ()
 runConsensus = awaitForever $ \sb -> do
-  hasPBFT <- lift . lift $ blockstanbulRunning
+  hasPBFT <- lift blockstanbulRunning
   if not hasPBFT
     then do
-      obs <- lift . lift $ expandBlock sb
-      lift $ traverse_ (yield . ToP2p . P2pBlock) obs
-      yieldMany $ VmBlock <$> obs
+      obs <- lift $ expandBlock sb
+      traverse_ (yield . ToP2p . P2pBlock) obs
+      yieldMany $ ToVm . VmBlock <$> obs
     else do
       let blk = sequencedBlockToBlock sb
       routed <- if isHistoricBlock blk
@@ -494,7 +497,7 @@ runConsensus = awaitForever $ \sb -> do
                    else pure [UnannouncedBlock blk]
       -- Blockstanbul will check that the seals and validators match up before
       -- announcing it to the network or forwarding to the EVM.
-      traverse_ (lift . blockstanbulSend') routed
+      traverse_ blockstanbulSend' routed
 
 hydrateAndEmit :: ( MonadLogger m
                   , MonadMonitor m
