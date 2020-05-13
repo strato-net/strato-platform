@@ -14,6 +14,7 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe
+import           Data.Swagger                         hiding (format)
 import qualified Data.Text.Encoding                   as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
@@ -39,6 +40,10 @@ jsonBlk = return . toJSON
 data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show, Generic)
 
 {- note we keep the file MiscJSON around for the instances we don't want to export - ByteString, Point -}
+
+instance ToSchema RawTransaction' where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "RawTransaction'") mempty
 
 instance ToJSON RawTransaction' where
     toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl (Just (Address ta)) val cod cid r s v md bn h o) next) =
@@ -89,7 +94,7 @@ instance FromJSON RawTransaction' where
       (tv :: Word8) <- parseHexStr (t .:? "v" .!= "0")
       md <- t .:? "metadata"
       bn <- t .:? "blockNumber" .!= (-1)
-      h <- (t .:? "hash" .!= (SHA $ fromIntegral tr)) -- when transaction is PrivateHashTX
+      h <- (t .:? "hash" .!= (unsafeCreateSHAFromWord256 $ fromIntegral tr)) -- when transaction is PrivateHashTX
       -- Unfortunately, time is rendered with `show` in ToJSON for RawTransaction'
       -- instead of using the ToJSON instance for UTCTime, and so it fails
       -- to parse in FromJSON for UTCTime.
@@ -164,8 +169,8 @@ instance ToJSON Transaction' where
                  ++ (("chainId" .=) <$> (maybeToList tcid))
                  ++ (("metadata" .=) <$> maybeToList md)
     toJSON (Transaction' tx@(PrivateHashTX th tch)) =
-        object ["transactionHash" .= showHex th "",
-                "chainHash" .= showHex tch "",
+        object ["transactionHash" .= showHex (shaToWord256 th) "",
+                "chainHash" .= showHex (shaToWord256 tch) "",
                 "transactionType" .= (show $ transactionSemantics $ tx)]
 
 
@@ -174,7 +179,7 @@ instance FromJSON Transaction' where
       th <- (t .:? "transactionHash")
       tch <- (t .:? "chainHash")
       case (th, tch) of
-        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (readHexStr h) (readHexStr ch)))
+        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (unsafeCreateSHAFromWord256 $ readHexStr h) (unsafeCreateSHAFromWord256 $ readHexStr ch)))
         _ -> do
           tto <- (t .:? "to")
           tnon <- (t .:? "nonce" .!= 0)
@@ -191,7 +196,7 @@ instance FromJSON Transaction' where
             Nothing -> do
               (mti :: Maybe Code) <- (t .:? "init")
               case mti of
-                Nothing -> return . Transaction' $ PrivateHashTX (fromInteger tr) (fromInteger ts)
+                Nothing -> return . Transaction' $ PrivateHashTX (unsafeCreateSHAFromWord256 $ fromInteger tr) (unsafeCreateSHAFromWord256 $ fromInteger ts)
                 Just ti -> return . Transaction' $ ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv md
             (Just to') -> do
               td <- (t .: "data")
@@ -206,6 +211,10 @@ tPrimeToT :: Transaction' -> Transaction
 tPrimeToT (Transaction' tx) = tx
 
 data Block' = Block' Block String deriving (Eq, Show)
+
+instance ToSchema Block' where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Block'") mempty
 
 instance ToJSON Block' where
       toJSON (Block' (Block bd rt bu) next) =
@@ -305,6 +314,10 @@ bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
 bdrToBdrPrime = BlockDataRef'
 
 data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
+
+instance ToSchema AddressStateRef' where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "AddresStateRef'") mempty
 
 instance ToJSON AddressStateRef' where
     toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch cid bNum) next) =

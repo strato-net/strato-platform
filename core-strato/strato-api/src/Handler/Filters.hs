@@ -203,7 +203,7 @@ getStorageFilter (storage, addrStRef) (k, v) = case k of
 getLogFilter :: (E.Esqueleto query expr backend) => expr (Entity LogDB) -> (Text, Text) -> expr (E.Value Bool)
 getLogFilter _ ("index",_) = E.val True         -- indexes are intercepted in handlers. We should probably deal with them here in the future
 getLogFilter log' ("address",v) = log' E.^. LogDBAddress E.==. E.val (toAddr v)
-getLogFilter log' ("hash",v) = log' E.^. LogDBTransactionHash  E.==. E.val ( SHA . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v )
+getLogFilter log' ("hash",v) = log' E.^. LogDBTransactionHash  E.==. E.val ( unsafeCreateSHAFromWord256 . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v )
 getLogFilter _           _  = P.error ("no match in getLogFilter"::String)
 
 toAddrId :: Text -> Key AddressStateRef
@@ -226,7 +226,7 @@ toInteger' :: Text -> Integer
 toInteger' v = P.read $ T.unpack v
 
 toSHA :: Text -> SHA
-toSHA v = SHA . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v
+toSHA v = unsafeCreateSHAFromWord256 . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v
 
 toCode :: Text -> ByteString
 toCode v = fst $ B16.decode $ BS8.pack $ (T.unpack v)

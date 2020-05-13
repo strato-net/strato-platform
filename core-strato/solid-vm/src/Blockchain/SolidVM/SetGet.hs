@@ -38,7 +38,7 @@ import           Blockchain.DB.SolidStorageDB
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
-import           Blockchain.Strato.Model.Address (formatAddress)
+import           Blockchain.Strato.Model.Address (formatAddressWithoutColor)
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import           Text.Format
@@ -270,7 +270,7 @@ showSM (SString v) = return v
 showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) = return
     $ printf "%s.%s (= %x)" enumName valName num
-showSM (SAddress a) = return $ formatAddress a
+showSM (SAddress a) = return $ formatAddressWithoutColor a
 showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM

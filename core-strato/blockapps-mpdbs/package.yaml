@@ -11,7 +11,15 @@ github: blockapps/strato-platform/core-strato/blockapps-mpdbs
 
 dependencies:
   - base
-  - aeson
+
+
+
+ghc-options: -Wall -O2
+
+library:
+  source-dirs: src/
+  default-extensions: TemplateHaskell
+  dependencies:
   - ansi-wl-pprint
   - base16-bytestring
   - binary
@@ -29,32 +37,32 @@ dependencies:
   - monad-loops
   - mtl
   - nibblestring
-  - resourcet
   - solid-vm-model
   - strato-model
   - transformers
-
-ghc-options: -Wall -O2
-
-library:
-  source-dirs: src/
-  default-extensions: TemplateHaskell
 
 tests:
   blockapps-mpdbs-test:
     source-dirs: test/
     main: Main.hs
     dependencies:
-      - aeson-diff
       - blockapps-mpdbs
+      - blockapps-util
+      - bytestring
+      - containers
+      - deepseq
       - directory
       - hspec
       - hspec-expectations-lifted
       - lens
-      - HUnit
+      - leveldb-haskell
+      - merkle-patricia-db
+      - monad-alter
+      - nibblestring
+      - resourcet
+      - solid-vm-model
+      - strato-model
       - transformers
       - unix
-      - unordered-containers
       - unliftio
-      - vector
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N

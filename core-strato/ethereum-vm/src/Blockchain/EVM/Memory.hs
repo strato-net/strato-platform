@@ -8,7 +8,7 @@ module Blockchain.EVM.Memory (
   Memory(..),
   getSizeInBytes,
   getSizeInWords,
-  getShow,
+--  getShow,
   getMemAsByteString,
   mLoad,
   mLoadByteString,
@@ -23,7 +23,7 @@ import           Blockchain.Output
 import           Control.Monad.Trans
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Internal              as BI
-import qualified Data.ByteString.Base16       as B16
+--import qualified Data.ByteString.Base16       as B16
 import qualified Data.ByteString.Unsafe       as BU
 import qualified Data.Text                    as T
 import qualified Data.Vector                  as DV
@@ -104,11 +104,13 @@ setNewMaxSize newSize' = do
       vmstatePut $ state'{memory=(memory state'){mVector = arr'}}
     useGas gasCharge
 
+{-
 getShow::Memory->IO String
 getShow (Memory arr sizeRef) = do
   msize <- readIORef sizeRef
   --fmap (show . B16.encode . B.pack) $ sequence $ V.read arr <$> fromIntegral <$> [0..fromIntegral msize-1]
   fmap (show . B16.encode) $ safeReadRange arr 0 msize
+-}
 
 getMemAsByteString::Memory->IO B.ByteString
 getMemAsByteString (Memory arr sizeRef) = do

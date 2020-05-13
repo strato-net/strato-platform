@@ -78,6 +78,7 @@ import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.VM.VMException
 import           Blockchain.VMContext
 
@@ -202,8 +203,8 @@ instance Word256Storable Address where
   toWord256 (Address h) = fromIntegral h
 
 instance Word256Storable SHA where
-  fromWord256 h = SHA h
-  toWord256 (SHA h) = h
+  fromWord256 h = unsafeCreateSHAFromWord256 h
+  toWord256 = shaToWord256
 
 instance Word256Storable Int where
   fromWord256 = fromIntegral
@@ -213,7 +214,11 @@ instance Word256Storable Integer where
   fromWord256 = fromIntegral
   toWord256 = fromIntegral
 
-pop :: MonadIO m => Word256Storable a => VMM m a
+instance Word256Storable Gas where
+  fromWord256 = fromIntegral
+  toWord256 = fromIntegral
+
+pop :: (MonadIO m, Word256Storable a) => VMM m a
 pop = fromWord256 <$> do
   stack' <- gets stack
   v <- liftIO $ MS.pop stack'
@@ -281,10 +286,10 @@ incrementPC p = do
   pcref <- gets pc
   void . liftIO $ atomicAddCounter pcref p
 
-addToRefund :: MonadIO m => Int -> VMM m ()
-addToRefund val = do
+addToRefund :: MonadIO m => Gas -> VMM m ()
+addToRefund (Gas val) = do
   refundref <- gets refund
-  void . liftIO . atomicAddCounter refundref $ val
+  void . liftIO . atomicAddCounter refundref $ fromInteger val
 
 clearRefund :: MonadIO m => VMM m ()
 clearRefund = do
@@ -307,25 +312,25 @@ setReturnVal :: MonadIO m => Maybe B.ByteString -> VMM m ()
 setReturnVal returnVal' = modify $ \st -> st{returnVal=returnVal'}
 
 setGasRemaining :: MonadIO m => Gas -> VMM m ()
-setGasRemaining gasRemaining' = do
+setGasRemaining (Gas gasRemaining') = do
   gasref <- gets vmGasRemaining
-  liftIO $ writeIORefU gasref gasRemaining'
+  liftIO . writeIORefU gasref $ fromInteger gasRemaining'
 
 useGas :: MonadIO m => Gas -> VMM m ()
-useGas gas = do
+useGas (Gas gas) = do
   gasref <- gets vmGasRemaining
-  g <- liftIO $ atomicSubCounter gasref gas
+  g <- liftIO . atomicSubCounter gasref $ fromInteger gas
   when (g < 0) $ do
     liftIO $ writeIORefU gasref 0
     throwIO OutOfGasException
 
 addGas :: MonadIO m => Gas -> VMM m ()
-addGas gas = do
+addGas (Gas gas) = do
   gasref <- gets vmGasRemaining
-  currentGas <- liftIO $ readIORefU gasref
-  if currentGas + gas < 0
+  currentGas <- fmap toInteger . liftIO $ readIORefU gasref
+  if currentGas + fromInteger gas < 0
     then throwIO OutOfGasException
-    else void . liftIO $ atomicAddCounter gasref gas
+    else void . liftIO . atomicAddCounter gasref $ fromInteger gas
 
 pay' :: VMBase m => String -> Address -> Address -> Integer -> VMM m ()
 pay' reason from to val = do
@@ -357,11 +362,11 @@ downcastGas g = if g > fromIntegral (maxBound :: Int)
 
 {-# SPECIALIZE INLINE readGasRemaining :: VMState -> VMM ContextM Gas #-}
 readGasRemaining :: MonadIO m => VMState -> m Gas
-readGasRemaining = liftIO . readIORefU . vmGasRemaining
+readGasRemaining = fmap (Gas . toInteger) . liftIO . readIORefU . vmGasRemaining
 
 {-# SPECIALIZE INLINE readRefund :: VMState -> VMM ContextM Gas #-}
 readRefund :: MonadIO m => VMState -> m Gas
-readRefund = liftIO . readIORefU . refund
+readRefund = fmap (Gas . toInteger) . liftIO . readIORefU . refund
 
 {-# SPECIALIZE INLINE readPC :: VMState -> VMM ContextM Int #-}
 readPC :: MonadIO m => VMState -> m Int

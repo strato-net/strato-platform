@@ -36,6 +36,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.MilenaTools
+import           Blockchain.Output
 import           Blockchain.Stream.Raw
 import           Text.Format
 
@@ -70,7 +71,7 @@ vmEventToBytes = BL.toStrict . Binary.encode
 class HasVMEventsSink k where
   getVMEventsSink :: k ([VMEvent] -> k ())
 
-produceVMEventsM :: (Modifiable KafkaState m, MonadIO m) => [VMEvent] -> m Offset
+produceVMEventsM :: (Modifiable KafkaState m, MonadLogger m, MonadIO m) => [VMEvent] -> m Offset
 produceVMEventsM vmEvents = do
     x <- withKafkaRetry1s . produceMessages $
         map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents

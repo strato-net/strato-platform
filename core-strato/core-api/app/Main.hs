@@ -1,22 +1,43 @@
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeOperators     #-}
+
+
 
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Main where
 
-import           Control.Monad.Logger
+import           Blockchain.Output
+import           Control.Lens.Operators
+import           Data.Aeson
+import qualified Data.ByteString.Lazy.Char8      as BLC
+import qualified Data.HashMap.Strict.InsOrd           as H
 import           Data.Proxy
-import qualified Data.Text                   as T
+import           Data.Swagger
 import           Database.Persist.Postgresql
+import           HFlags
+import           Network.HTTP.Types.Status
+import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
+import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
+import           Servant.Multipart
+import           Servant.Swagger
+import           Servant.Swagger.UI
 
+
+
+
+import           BlockApps.Init
 import           Blockchain.EthConf
-import           Blockchain.Data.Address
+
+import           Text.Tools
 
 import qualified Handlers.AccountInfo            as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
@@ -82,24 +103,52 @@ coreServer pool =
 
 ----------------
 
-instance FromHttpApiData Address where
-  parseQueryParam x =
-    case stringAddress $ T.unpack x of
-      Just address -> Right address
-      _ -> Left $ T.pack $ "Could not parse address: " ++ show x
-  
 
 coreAPI :: Proxy CoreAPI
 coreAPI = Proxy
 
 main :: IO ()
 main = do
+  _ <- $initHFlags "Core API"
+  let theDoc = toSwagger (Proxy :: Proxy CoreAPI)
+               & info.title .~ "Strato API"
+               & info.description ?~
+               "This is the great Strato API, which let's \
+               \ you query the blockchain."
+               & info.version .~ "1.2"
+
+  --print theDoc
+  blockappsInit "core-api"
   pool <- runNoLoggingT $ createPostgresqlPool connStr 20
-  run 3000 $ app pool
+  run 3000 $ app pool theDoc
 
-app :: ConnectionPool -> Application
-app pool = 
-  logStdoutDev
+app :: ConnectionPool -> Swagger -> Application
+app pool theDoc = 
+  prometheus def{prometheusInstrumentApp = False}
+  $ instrumentApp "core-api"
+  $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
-  $ serve coreAPI $ coreServer pool
+--  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
+  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw)) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404)
 
+
+
+serveCustom404 :: Application
+serveCustom404 x respond =
+  respond $ responseLBS notFound404 [("Content-Type", "text/plain")] $ BLC.pack
+  $ "There is no content at: " ++ show (rawPathInfo x)
+  ++ "\nHere are the available routes:" ++ tab ("\n" ++ unlines allPaths) ++ "\n"
+  where
+    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy CoreAPI)
+
+
+----------
+
+--Temporary location for a couple of instance definitions needed for toSwagger, we need to find a better place
+
+instance HasSwagger a => HasSwagger (MultipartForm Mem (MultipartData Mem) :> a) where
+  toSwagger _ = toSwagger (Proxy :: Proxy a)
+
+instance ToSchema Value where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "JSON Value") mempty

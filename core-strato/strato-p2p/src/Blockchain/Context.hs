@@ -104,8 +104,8 @@ data Context = Context
   { contextRedisBlockDB   :: RBDB.RedisConnection
   , contextKafkaState     :: K.KafkaState
   , vmTrace               :: [String]
-  , unseqSink             :: forall m . (MonadIO m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
-  , vmEventsSink          :: forall m . (MonadIO m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
+  , unseqSink             :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
+  , vmEventsSink          :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
   , blockHeaders          :: [BlockData]
   , remainingBlockHeaders :: RemainingBlockHeaders
   , actionTimestamp       :: ActionTimestamp
@@ -132,7 +132,7 @@ instance MonadIO m => (SHA `A.Alters` BlockData) (StateT Context m) where
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (StateT Context m) where
   get _ = RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
-    Nothing -> WorldBestBlock $ BestBlock (SHA 0) (-1) 0
+    Nothing -> WorldBestBlock $ BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> WorldBestBlock $ BestBlock s n d
   put _ (WorldBestBlock (BestBlock s n d)) =
     RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n d) >>= \case
@@ -142,7 +142,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (StateT Con
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (StateT Context m) where
   get _ = RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
-    Nothing -> BestBlock (SHA 0) (-1) 0
+    Nothing -> BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> BestBlock s n d
   put _ (BestBlock s n d) =
     RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n d) >>= \case
@@ -245,10 +245,10 @@ instance MonadIO m => Mod.Accessible RBDB.RedisConnection (StateT Context m) whe
 instance MonadReader Config m => Mod.Accessible SQLDB m where
   access _ = asks configSQLDB
 
-instance MonadIO m => Mod.Accessible (UnseqSink (StateT Context m)) (StateT Context m) where
+instance (MonadIO m, MonadLogger m) => Mod.Accessible (UnseqSink (StateT Context m)) (StateT Context m) where
   access _ = gets unseqSink
 
-instance MonadIO m => HasVMEventsSink (StateT Context m) where
+instance (MonadIO m, MonadLogger m) => HasVMEventsSink (StateT Context m) where
   getVMEventsSink = gets vmEventsSink
 
 -- dummy newtype wrapper to avoid overlapping instance

@@ -2,47 +2,48 @@ name:                core-api
 
 dependencies:
 - base >= 4.7 && < 5
-- aeson
-- base16-bytestring
-- base64-bytestring
-- binary
-- blockapps-data
-- blockapps-datadefs
-- blockapps-haskoin
-- blockapps-util
-- bytestring
-- clock
-- containers
-- deepseq
-- directory
-- esqueleto
-- ethereum-discovery
-- extra
-- filepath
-- format
-- http-api-data
-- monad-alter
-- monad-logger
-- mtl
 - persistent
 - persistent-postgresql
-- process
-- servant-multipart
 - servant-server
-- seqevents
 - strato-conf
-- strato-model
-- template-haskell
-- text
-- transformers
-- wai-cors
-- wai-extra
-- warp
-- yaml
 
 
 library:
   source-dirs: src
+  dependencies:
+  - aeson
+  - base16-bytestring
+  - base64-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-haskoin
+  - blockapps-util
+  - bytestring
+  - clock
+  - containers
+  - deepseq
+  - directory
+  - esqueleto
+  - ethereum-discovery
+  - extra
+  - filepath
+  - format
+  - hflags
+  - http-api-data
+  - lens
+  - monad-alter
+  - monad-logger
+  - mtl
+  - process
+  - seqevents
+  - servant-multipart
+  - servant-swagger-tags
+  - strato-model
+  - swagger2
+  - template-haskell
+  - text
+  - transformers
 
 executables:
   core-api:
@@ -53,4 +54,23 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - aeson
+    - bytestring
+    - blockapps-init
+    - blockapps-util
     - core-api
+    - format
+    - hflags
+    - http-types
+    - insert-ordered-containers
+    - lens
+    - monad-logger
+    - servant-multipart
+    - servant-swagger
+    - servant-swagger-ui
+    - swagger2
+    - wai
+    - wai-cors
+    - wai-extra
+    - wai-middleware-prometheus
+    - warp

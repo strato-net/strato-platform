@@ -15,7 +15,6 @@ module Handlers.Faucet (
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import           Data.Aeson
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Lazy.Char8            as BLC
@@ -40,6 +39,7 @@ import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf             (runKafkaConfigured)
+import           Blockchain.Output
 import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.Class
@@ -50,9 +50,6 @@ import           Text.Format
 
 import           FaucetKey
 import           SQLM
-
-import Web.FormUrlEncoded
-
   
 type API = 
   "faucet" :> ReqBody '[FormUrlEncoded] Address
@@ -81,12 +78,8 @@ appFaucetNonce = unsafePerformIO (newIORef 0)
 
 ---------------
 
-instance FromForm Address where
-  fromForm v = Address <$> parseUnique "address" v
-
-
 postFaucet :: ConnectionPool -> Address -> Handler Value
-postFaucet pool addressParam = runStdoutLoggingT $ do
+postFaucet pool addressParam = runLoggingT $ do
 
   let addresses = [addressParam]
   
@@ -124,7 +117,7 @@ toAddr v =
 
 
 postDataFaucet :: ConnectionPool -> Maybe Int -> Maybe Int -> Handler Value
-postDataFaucet pool mSize mCountOf = runStdoutLoggingT $ do
+postDataFaucet pool mSize mCountOf = runLoggingT $ do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
   minNonce <- lookupNonce pool $ prvKey2Address key
   let size = fromMaybe 4096 mSize

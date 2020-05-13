@@ -20,8 +20,8 @@ import           Blockchain.Strato.Model.SHA hiding (hash)
 import           SQLM
 
 type API = 
-  "account" :> Capture "txHash" SHA
-            :> Get '[JSON] [TransactionResult]
+  "transactionResult" :> Capture "txHash" SHA
+                      :> Get '[JSON] [TransactionResult]
 
 server :: ConnectionPool -> Server API
 server pool = getTransactionResult pool

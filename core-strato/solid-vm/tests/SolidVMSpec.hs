@@ -142,8 +142,8 @@ runArgs args bs = do
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = BlockData { blockDataParentHash = SHA 0x0
-                            , blockDataUnclesHash = SHA 0x0
+      blockData = BlockData { blockDataParentHash = unsafeCreateSHAFromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateSHAFromWord256 0x0
                             , blockDataCoinbase = Address 0x0
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
@@ -155,13 +155,13 @@ runArgs args bs = do
                             , blockDataGasUsed = 10000
                             , blockDataExtraData = ""
                             , blockDataNonce = 22
-                            , blockDataMixHash = SHA 0x0
+                            , blockDataMixHash = unsafeCreateSHAFromWord256 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = SHA 0x776622233444
+      txHash = unsafeCreateSHAFromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
@@ -178,8 +178,8 @@ runCall funcName callArgs bs = do
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = BlockData { blockDataParentHash = SHA 0x0
-                            , blockDataUnclesHash = SHA 0x0
+      blockData = BlockData { blockDataParentHash = unsafeCreateSHAFromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateSHAFromWord256 0x0
                             , blockDataCoinbase = Address 0x0
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
@@ -191,13 +191,13 @@ runCall funcName callArgs bs = do
                             , blockDataGasUsed = 10000
                             , blockDataExtraData = ""
                             , blockDataNonce = 22
-                            , blockDataMixHash = SHA 0x0
+                            , blockDataMixHash = unsafeCreateSHAFromWord256 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = SHA 0x234962
+      txHash = unsafeCreateSHAFromWord256 0x234962
       chainId = Nothing
       createMetadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
       noValueTransfer = error "TODO: noValueTransfer"
@@ -222,8 +222,8 @@ call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = BlockData { blockDataParentHash = SHA 0x0
-                            , blockDataUnclesHash = SHA 0x0
+      blockData = BlockData { blockDataParentHash = unsafeCreateSHAFromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateSHAFromWord256 0x0
                             , blockDataCoinbase = Address 0x0
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
@@ -235,13 +235,13 @@ call2 funcName callArgs contractAddress = do
                             , blockDataGasUsed = 10000
                             , blockDataExtraData = ""
                             , blockDataNonce = 22
-                            , blockDataMixHash = SHA 0x0
+                            , blockDataMixHash = unsafeCreateSHAFromWord256 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = SHA 0xddba11
+      txHash = unsafeCreateSHAFromWord256 0xddba11
       chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
@@ -1773,14 +1773,35 @@ contract qq {
     getFields ["is_a", "is_b", "is_c", "is_d"] `shouldReturn`
       map BBool [False, True, False, False]
 
-  it "can return textual bytes32" . runTest $ do
+
+
+  it "can return single strings" . runTest $ do
     runCall "txt" "()" [r|
 contract qq {
-  function txt() public returns (bytes32) {
-    bytes32 ret = "Ticket ID already exists";
+  function txt() public returns (string) {
+    string ret = "Ticket ID already exists";
     return ret;
   }
-}|] `shouldReturn` Just "Ticket ID already exists\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL \NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\CANTicket ID already exists"
+
+
+  it "can return tuples of strings" . runTest $ do
+    runCall "txt" "()" [r|
+contract qq {
+  function txt() public returns (string, string, string) {
+    return ("hey", "yo", "how are you?");
+  }
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL`\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\131\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\165\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXhey\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STXyo\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\fhow are you?" 
+
+
+  it "can return tuples of mixed simple types and strings" . runTest $ do
+    runCall "txt" "()" [r|
+contract qq {
+  function txt() public returns (string, uint, string, uint) {
+    return ("hey", 42, "yo", 100);
+  }
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\128\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL*\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\163\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXhey\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STXyo" 
+
 
   it "can return numeric bytes32" . runTest $ do
     runCall "num" "()" [r|

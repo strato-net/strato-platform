@@ -9,9 +9,9 @@ import ClassyPrelude hiding (Handle, (.))
 import Database.Persist.Sql
 import qualified Data.Aeson as Ae
 
-import BlockApps.Ethereum
 import BlockApps.Solidity.Value
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainId
 
 data QueueElem = PreStorageEntry Address (Maybe ChainId) [(Text, Value)]
                | SyncFlush

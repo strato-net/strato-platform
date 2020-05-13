@@ -28,6 +28,7 @@ import qualified Data.Binary                             as BIN
 import qualified Data.ByteString                         as BS
 import qualified Data.ByteString.Short                   as BSS
 import           Data.Data
+import           Data.Swagger
 import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
@@ -111,3 +112,12 @@ instance NFData RawTransaction
 instance NFData TransactionResult
 instance NFData LogDB
 instance NFData EventDB
+
+
+instance ToSchema LogDB where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "LogDB") mempty
+
+instance ToSchema TransactionResult where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "TransactionResult") mempty

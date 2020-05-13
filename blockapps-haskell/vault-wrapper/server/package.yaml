@@ -20,66 +20,36 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/server#readme>
 
 dependencies:
-- aeson
-- ansi-wl-pprint
 - base
-- base16-bytestring
-- binary
-- blockapps-ethereum
-- blockapps-init
-- bytestring
-- byteable
-- common-log
-- conduit
-- containers
-- cryptonite
-- deepseq
-- ethereum-rlp
-- haskoin-shim
-- hflags
-- http-client
-- lens
-- lifted-base
-- memory
-- monad-control >=1.0 && <1.1
-- mtl
-- murmur3
-- network
-- nibblestring
-- opaleye
-- path-pieces
-- pbkdf
-- postgresql-simple
-- product-profunctors
-- profunctors
-- QuickCheck
-- resource-pool
-- saltine
-- servant
-- servant-client
-- servant-client-core
-- servant-options
-- servant-server
-- servant-swagger
-- split
-- strato-model
-- swagger2
-- text
-- time
-- transformers
-- transformers-base
-- unliftio
-- unordered-containers
 - blockapps-vault-wrapper-api
-- wai
-- wai-cors
-- wai-extra
-- wai-middleware-prometheus
-- wai-middleware-static
-- warp
+- common-log
+- postgresql-simple
 
 library:
   source-dirs: src
+  dependencies:
+    - blockapps-ethereum
+    - bytestring
+    - cache
+    - clock
+    - haskoin-shim
+    - http-client
+    - lens
+    - monad-control >=1.0 && <1.1
+    - mtl
+    - opaleye
+    - product-profunctors
+    - profunctors
+    - saltine
+    - servant-swagger
+    - strato-model
+    - swagger2
+    - transformers
+    - unliftio
+    - resource-pool
+    - servant
+    - servant-server
+    - text
 
 executables:
   blockapps-vault-wrapper-server:
@@ -88,22 +58,31 @@ executables:
     other-modules: [Options]
     dependencies:
       - blockapps-vault-wrapper-server
-
+      - blockapps-init
+      - cache
+      - clock
+      - hflags
+      - http-client
+      - resource-pool
+      - servant
+      - servant-options
+      - servant-server
+      - wai
+      - wai-cors
+      - wai-extra
+      - wai-middleware-prometheus
+      - warp
+      
   migrate-keys:
     source-dirs: app
     main: MigrateKeys.hs
     other-modules: [Options]
     dependencies:
-      - csv
       - blockapps-vault-wrapper-server
+      - bytestring
+      - csv
+      - hflags
+      - lens
+      - opaleye
+      - text
 
-tests:
-  server-test:
-    main:                Spec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - blockapps-vault-wrapper-server

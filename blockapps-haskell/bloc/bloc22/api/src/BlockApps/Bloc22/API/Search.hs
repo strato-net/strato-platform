@@ -19,9 +19,9 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances        ()
 
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
 
 --------------------------------------------------------------------------------
 -- | Routes and Types

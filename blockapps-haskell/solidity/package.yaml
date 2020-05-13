@@ -15,15 +15,27 @@ ghc-options: -Wall -Werror
 
 dependencies:
   - base
-  - blockapps-ethereum
   - aeson
-  - aeson-casing
   - base16-bytestring
   - bimap
-  - binary
   - bytestring
-  - classy-prelude
   - containers
+  - ordered-containers
+  - parsec
+  - QuickCheck
+  - solid-vm-model
+  - strato-model
+  - text
+  - unordered-containers
+  - vector
+
+library:
+  source-dirs: src/
+  dependencies:
+  - aeson-casing
+  - binary
+  - blockapps-ethereum
+  - classy-prelude
   - cryptonite
   - deepseq
   - extra
@@ -33,24 +45,12 @@ dependencies:
   - lens
   - memory
   - mtl
-  - ordered-containers
-  - parsec
-  - parsec3-numbers
-  - QuickCheck
   - quickcheck-instances
-  - raw-strings-qq
   - semver-range
   - servant
   - servant-docs
-  - solid-vm-model
-  - strato-model
   - swagger2
-  - text
-  - unordered-containers
-  - vector
-
-library:
-  source-dirs: src/
+  
 
 tests:
   blockapps-solidity-test:
@@ -61,3 +61,4 @@ tests:
      - blockapps-solidity
      - blockapps-strato-api
      - hspec
+     - raw-strings-qq

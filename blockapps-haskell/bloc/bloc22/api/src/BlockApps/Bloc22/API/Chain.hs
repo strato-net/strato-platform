@@ -28,23 +28,25 @@ import           Servant.Docs
 import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Ethereum
+import           BlockApps.Ethereum                 ()
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.TypeLits
 
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
 
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
 data ChainInput  = ChainInput
-  { chaininputSrc      :: Text
+  { chaininputSrc      :: Maybe Text
   , chaininputContract :: Maybe Text
   , chaininputLabel    :: Text
   , chaininputBalances :: NamedMap "address" Address "balance" Integer
   , chaininputArgs     :: Map Text ArgValue
   , chaininputMembers  :: NamedMap "address" Address "enode" Text
   , chaininputMetadata :: Maybe (Map Text Text)
+  , chaininputAsync    :: Maybe Bool
   } deriving (Eq, Show, Generic)
 
 instance ToSchema (NamedTuple "address" Address "balance" Integer) where
@@ -77,7 +79,7 @@ exampleEnode2 = "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d8
 
 exChainInput :: ChainInput
 exChainInput = ChainInput
-    { chaininputSrc = exampleSrc
+    { chaininputSrc = Just exampleSrc
     , chaininputContract = Just "Governance"
     , chaininputLabel = "my chain"
     , chaininputBalances = map fromTuple [
@@ -93,6 +95,7 @@ exChainInput = ChainInput
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
        ]
     , chaininputMetadata = Just $ Map.fromList [("history","Governance")]
+    , chaininputAsync = Nothing
     }
 
 instance ToSample ChainInput where

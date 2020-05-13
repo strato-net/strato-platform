@@ -79,14 +79,14 @@ spec = do
                     availableGas
                     newAddress
                     txInit
-                    (SHA 0)
+                    (unsafeCreateSHAFromWord256 0)
                     Nothing
                     Nothing
         addressState <- A.lookupWithDefault A.Proxy newAddress
         addressState `L.shouldBe` AddressState
            { addressStateNonce = 0
            , addressStateBalance = 0
-           , addressStateCodeHash = EVMCode (SHA 0x1b2d3c7f0269f98c8e9b627cc564b7d23a2c0c0501518d83e757c518135b7e51)
+           , addressStateCodeHash = EVMCode (unsafeCreateSHAFromWord256 0x1b2d3c7f0269f98c8e9b627cc564b7d23a2c0c0501518d83e757c518135b7e51)
            , addressStateContractRoot = MP.StateRoot $ word256ToBytes 0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421
            , addressStateChainId = Nothing
            }
@@ -110,7 +110,7 @@ spec = do
              (fst $ B16.decode "ec630643")
              availableGas
              tAddr
-             (SHA 0)
+             (unsafeCreateSHAFromWord256 0)
              Nothing
              Nothing
       erException execResults `shouldSatisfy` isNothing
@@ -129,29 +129,29 @@ spec = do
     let toRoot = MP.StateRoot . word256ToBytes
         base = toRoot 0
         costForN :: Int -> Word256 -> (MP.StateRoot, SHA, Integer, Int)
-        costForN c n = (toRoot n, SHA n, fromIntegral n, c)
+        costForN c n = (toRoot n, unsafeCreateSHAFromWord256 n, fromIntegral n, c)
 
     it "will leave a single block alone, no matter the cost" $ do
-      let want = [(base, toRoot 1, SHA 1, 1)]
+      let want = [(base, toRoot 1, unsafeCreateSHAFromWord256 1, 1)]
       compactDiffs base [costForN 0 1] `shouldBe` want
       compactDiffs base [costForN 10000 1] `shouldBe` want
 
     it "will group small blocks together" $ do
       compactDiffs base (map (costForN 1) [1..50]) `shouldBe`
-        [(base, toRoot 50, SHA 50, 50)]
+        [(base, toRoot 50, unsafeCreateSHAFromWord256 50, 50)]
 
     it "will separate huge blocks" $ do
       compactDiffs base [costForN 10000 1, costForN 10000 2] `shouldBe`
-        [ (base, toRoot 1, SHA 1, 1)
-        , (toRoot 1, toRoot 2, SHA 2, 2)]
+        [ (base, toRoot 1, unsafeCreateSHAFromWord256 1, 1)
+        , (toRoot 1, toRoot 2, unsafeCreateSHAFromWord256 2, 2)]
 
     it "will combine moderately sized blocks" $ do
       -- Assume that maxCost is 500, so 10 blocks per diff
       let input = map (costForN 50) [1..30]
       compactDiffs base input `shouldBe`
-        [(base, toRoot 10, SHA 10, 10)
-        ,(toRoot 10, toRoot 20, SHA 20, 20)
-        ,(toRoot 20, toRoot 30, SHA 30, 30)
+        [(base, toRoot 10, unsafeCreateSHAFromWord256 10, 10)
+        ,(toRoot 10, toRoot 20, unsafeCreateSHAFromWord256 20, 20)
+        ,(toRoot 20, toRoot 30, unsafeCreateSHAFromWord256 30, 30)
         ]
 
   describe "Mutable Stack" $ do

@@ -155,7 +155,7 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
            let address = Ad.Address $ parseHex a
            $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
              "adding account: " ++ format address
-           A.insert A.Proxy address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ SHA $ parseHex c}
+           A.insert A.Proxy address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ unsafeCreateSHAFromWord256 $ parseHex c}
          _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
 
       $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
@@ -269,7 +269,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
   let diff = StateDiff {
       StateDiff.chainId   = Just chainId,
       blockNumber         = 0,
-      StateDiff.blockHash = SHA 0,
+      StateDiff.blockHash = unsafeCreateSHAFromWord256 0,
       StateDiff.stateRoot = sRoot,
       createdAccounts     = accountDiffs,
       deletedAccounts     = Map.empty,
@@ -285,7 +285,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
         { A._actionBlockHash = creationBlock
         , A._actionBlockTimestamp = posixSecondsToUTCTime 0
         , A._actionBlockNumber = 0
-        , A._actionTransactionHash = SHA chainId
+        , A._actionTransactionHash = unsafeCreateSHAFromWord256 chainId
         , A._actionTransactionChainId = Just chainId
         , A._actionTransactionSender = Ad.Address 0
         , A._actionData = Map.singleton a $

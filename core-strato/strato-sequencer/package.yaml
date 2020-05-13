@@ -9,84 +9,99 @@ build-type:          Simple
 
 
 dependencies:
-  - aeson
-  - alarmclock
-  - async
   - base >=4.8 && <4.12
-  - base16-bytestring
-  - base64-bytestring
-  - bimap
-  - binary
-  - blockapps-data
-  - blockapps-datadefs
-  - blockapps-haskoin
-  - blockapps-init
-  - blockapps-milena
-  - blockapps-privacy
-  - blockapps-util
-  - blockstanbul
-  - bytestring
-  - classy-prelude
-  - clock
-  - conduit
-  - conduit-combinators
-  - containers
-  - cross-monitoring
-  - data-default
-  - deepseq
-  - directory
-  - ethereum-rlp
-  - exceptions
-  - extra
-  - format
-  - lens
-  - leveldb-haskell
-  - lifted-async
-  - monad-alter
-  - monad-control
-  - mtl
-  - prometheus-client
-  - resourcet
-  - seqevents
-  - servant-client
-  - stm
-  - stm-chans
-  - stm-conduit
-  - strato-conf
-  - strato-genesis
-  - strato-model
-  - text
-  - time
-  - transformers
-  - unliftio
-  - wai-extra
-  - wai-middleware-prometheus
-  - warp
 
 ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 library:
   source-dirs:     src
+  dependencies:
+    - alarmclock
+    - base16-bytestring
+    - binary
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-haskoin
+    - blockapps-milena
+    - blockapps-privacy
+    - blockstanbul
+    - bytestring
+    - clock
+    - conduit
+    - data-default
+    - directory
+    - ethereum-rlp
+    - extra
+    - format
+    - lens
+    - leveldb-haskell
+    - lifted-async
+    - monad-alter
+    - prometheus-client
+    - seqevents
+    - stm
+    - stm-conduit
+    - strato-conf
+    - strato-model
+    - text
+    - time
+    - blockapps-util
+    - classy-prelude
+    - containers
+    - mtl
+    - resourcet
+    - stm-chans
+    - transformers
+    - unliftio
 
 executables:
   strato-sequencer:
     source-dirs:      exec-src
     main:             Main.hs
     dependencies:
+      - aeson
+      - async
+      - base64-bytestring
+      - blockapps-data
+      - blockapps-haskoin
+      - blockapps-init
+      - blockapps-milena
+      - blockapps-util
+      - blockstanbul
+      - bytestring
+      - extra
       - hflags
+      - prometheus-client
       - safe
+      - seqevents
+      - stm
+      - stm-chans
+      - strato-conf
+      - strato-model
       - strato-sequencer
+      - text
+      - wai-middleware-prometheus
+      - warp
     other-modules: [Flags]
 
   keygen:
     source-dirs: exec-src/
     main: KeyGen.hs
     dependencies:
-      - strato-sequencer
+      - aeson
       - aeson-pretty
+      - base16-bytestring
+      - base64-bytestring
+      - blockapps-data
+      - blockapps-haskoin
+      - bytestring
       - entropy
       - haskoin-shim
       - hflags
+      - prometheus-client
+      - seqevents
+      - strato-model
+      - text
     other-modules: [Flags]
 
   forced-config-change:
@@ -94,8 +109,11 @@ executables:
     main: ForcedConfigChange.hs
     other-modules: []
     dependencies:
+      - blockapps-milena
+      - blockstanbul
       - hflags
       - seqevents
+      - strato-conf
 
 tests:
   strato-sequencer-spec:
@@ -103,17 +121,41 @@ tests:
     main:          Main.hs
     ghc-options: -threaded
     dependencies:
-      - HUnit
-      - QuickCheck
-      - derive
+      - async
+      - base16-bytestring
+      - blockapps-data
+      - blockapps-datadefs
+      - blockapps-haskoin
+      - blockapps-util
+      - blockstanbul
+      - bytestring
+      - classy-prelude
+      - conduit
+      - containers
+      - directory
       - entropy
       - ethereum-rlp
+      - format
       - hflags
       - hspec
-      - hspec-core
       - hspec-contrib
-      - strato-sequencer
+      - hspec-core
       - hspec-expectations-lifted
+      - HUnit
+      - mtl
+      - QuickCheck
+      - seqevents
+      - servant-client
+      - stm
+      - stm-chans
+      - strato-model
+      - strato-sequencer
+      - time
+      - transformers
+      - unliftio
+      - wai-extra
+      - wai-middleware-prometheus
+      - warp
 
 benchmarks:
   send-to-blockstanbul:
@@ -123,4 +165,12 @@ benchmarks:
       - blockstanbul
       - strato-sequencer
       - criterion
-      - parallel
+      - blockapps-data
+      - blockapps-util
+      - classy-prelude
+      - containers
+      - mtl
+      - resourcet
+      - stm-chans
+      - transformers
+      - unliftio

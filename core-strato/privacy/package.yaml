@@ -2,33 +2,29 @@ name: blockapps-privacy
 ghc-options: -Wall -Werror
 
 dependencies:
-  - aeson
   - base
-  - binary
-  - blockapps-data
-  - blockapps-util
-  - containers
-  - data-default
-  - ethereum-rlp
-  - format
-  - lens
-  - monad-alter
-  - prometheus-client
-  - QuickCheck
-  - resourcet
-  - seqevents
-  - strato-model
-  - text
-  - transformers
 
 library:
   source-dirs: src/
+  dependencies:
+    - aeson
+    - binary
+    - blockapps-data
+    - blockapps-util
+    - containers
+    - data-default
+    - ethereum-rlp
+    - format
+    - lens
+    - monad-alter
+    - prometheus-client
+    - seqevents
+    - strato-model
+    - text
 
 tests:
   privacy-test:
     main: Main.hs
     source-dirs: test/
     dependencies:
-      - blockapps-privacy
       - hspec
-      - hspec-expectations-lifted

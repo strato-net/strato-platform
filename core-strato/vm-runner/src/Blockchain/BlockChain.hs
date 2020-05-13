@@ -175,7 +175,7 @@ instance Bagger.MonadBagger ContextM where
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
             $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
             void $ putTransactionResult
-              TransactionResult { transactionResultBlockHash        = SHA 0
+              TransactionResult { transactionResultBlockHash        = unsafeCreateSHAFromWord256 0
                                 , transactionResultTransactionHash  = theHash
                                 , transactionResultMessage          = message
                                 , transactionResultResponse         = BSS.empty
@@ -683,8 +683,8 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
                              , transactionResultTrace            = theTrace'
                              , transactionResultGasUsed          = gasUsed
                              , transactionResultEtherUsed        = etherUsed
-                             , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
-                             , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
+                             , transactionResultContractsCreated = intercalate "," $ map formatAddressWithoutColor newAddresses
+                             , transactionResultContractsDeleted = intercalate "," $ map formatAddressWithoutColor $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
                              , transactionResultStateDiff        = ""
                              , transactionResultTime             = realToFrac deltaT
                              , transactionResultNewStorage       = ""
@@ -793,7 +793,7 @@ calculateAndEmitStateDiffs srLog oldHeader = do
 calculateAndEmitChainDiffs :: VMBase m => M.Map Word256 (Integer, SHA) -> ConduitT a VmOutEvent m ()
 calculateAndEmitChainDiffs chainMap = do
   let chainList = M.toList chainMap
-      chainIds = format . SHA . fst <$> chainList
+      chainIds = format . unsafeCreateSHAFromWord256 . fst <$> chainList
   $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
   runConduit $ yieldMany chainList
             .| mapMC (\(cId, (newNumber, newHash)) -> SD.chainDiff cId newNumber newHash)

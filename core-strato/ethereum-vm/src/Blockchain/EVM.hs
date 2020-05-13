@@ -257,8 +257,8 @@ runOperation SHA3 = do
   p <- pop
   size <- pop
   theData <- unsafeSliceByteString p size
-  let SHA theHash = hash theData
-  push $ theHash
+  let theHash = hash theData
+  push $ shaToWord256 theHash
 
 runOperation ADDRESS = pushEnvVar envOwner
 
@@ -360,8 +360,8 @@ runOperation BLOCKHASH = do
            Nothing           -> push (0::Word256)
            Just theBlockHash -> push theBlockHash
    (True, True) -> do
-          let SHA h = hash $ BC.pack $ show $ toInteger number
-          push h
+          let h = hash $ BC.pack $ show $ toInteger number
+          push $ shaToWord256 h
 
 runOperation COINBASE = pushEnvVar (blockDataCoinbase . envBlockHeader)
 runOperation TIMESTAMP = do
@@ -1019,7 +1019,7 @@ runVMM :: EVMBase m
        -> m ExecResults
 runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGas f = force <$> do
   mdbs <- Mod.get (Mod.Proxy @MemDBs)
-  gasref <- liftIO $ newCounter availableGas
+  gasref <- liftIO . newCounter $ fromIntegral availableGas
   let fillIn v = v
         { callDepth=cDepth
         , vmGasRemaining=gasref
@@ -1027,6 +1027,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
         }
   vmStateRef <- liftIO $ newIORef . fillIn =<< startingState isRunningTests' isHomestead env mdbs
   res <- try $ runReaderT f vmStateRef
+
   case res of
     Left (e :: VMException) -> do
       $logInfoS "runVMM/Left" . T.pack $ CL.red $ "Exception caught (" ++ show e ++ "), reverting state"
@@ -1132,7 +1133,7 @@ create' :: EVMBase m => VMM m Code
 create' = do
 
   owner <- getEnvVar envOwner
-  vmstateModify $ action . actionData %~ M.insert owner (ActionData (EVMCode $ SHA 0) EVM (ActionEVMDiff M.empty) [])
+  vmstateModify $ action . actionData %~ M.insert owner (ActionData (EVMCode $ unsafeCreateSHAFromWord256 0) EVM (ActionEVMDiff M.empty) [])
 
   runCodeFromStart
 
@@ -1275,7 +1276,7 @@ callPrecompiled' noValueTransfer precompiled = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  vmstateModify $ action . actionData %~ M.insert receiveAddress (ActionData (EVMCode (SHA 0)) EVM (ActionEVMDiff M.empty) [])
+  vmstateModify $ action . actionData %~ M.insert receiveAddress (ActionData (EVMCode (unsafeCreateSHAFromWord256 0)) EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do

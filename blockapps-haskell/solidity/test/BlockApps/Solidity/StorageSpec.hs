@@ -6,7 +6,6 @@ import qualified Data.ByteString.Base16 as Base16
 import Data.Maybe (isJust, fromJust)
 import Test.Hspec
 
-import BlockApps.Ethereum
 import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Type
