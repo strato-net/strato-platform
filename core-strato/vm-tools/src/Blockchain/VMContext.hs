@@ -177,11 +177,11 @@ type VMBase m = ( MonadIO m
                 , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Address `A.Alters` AddressState) m
-                , (SHA `A.Alters` DBCode) m
+                , (Keccak256 `A.Alters` DBCode) m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
-                , (SHA `A.Alters` BlockSummary) m
+                , (Keccak256 `A.Alters` BlockSummary) m
                 , Mod.Accessible (Maybe WorldBestBlock) m
                 )
 
