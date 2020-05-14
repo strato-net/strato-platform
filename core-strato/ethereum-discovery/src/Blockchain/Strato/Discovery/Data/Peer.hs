@@ -30,7 +30,7 @@ import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB          (withGlobalSQLPool)
 import           Blockchain.MiscJSON          ()
 import           Blockchain.Strato.Discovery.Metrics
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 PPeer
@@ -44,7 +44,7 @@ PPeer
     enableTime UTCTime
     udpEnableTime UTCTime
     lastTotalDifficulty Integer
-    lastBestBlockHash SHA
+    lastBestBlockHash Keccak256
     bondState Int
     activeState Int
     version T.Text
@@ -77,7 +77,7 @@ buildPeer (pubkeyMaybe, ip, _) =
         pPeerLastMsgTime = jamshidBirth,
         pPeerEnableTime = jamshidBirth,
         pPeerUdpEnableTime = jamshidBirth,
-        pPeerLastBestBlockHash = unsafeCreateSHAFromWord256 0,
+        pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0,
         pPeerBondState=0,
         pPeerActiveState = 0,
         pPeerVersion = T.pack "61", -- fix

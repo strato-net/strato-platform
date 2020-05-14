@@ -22,7 +22,7 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.SolidVM.Model
 
 import           Control.Monad
@@ -38,7 +38,7 @@ import           Blockchain.Strato.StateDiff
 type SqlDbM m = SQL.SqlPersistT m
 
 sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m)=>
-           Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m ()
+           Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m ()
 sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
   commitSqlDiffs stateDiffs

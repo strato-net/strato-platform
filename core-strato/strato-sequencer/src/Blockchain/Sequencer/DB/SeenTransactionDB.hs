@@ -7,7 +7,7 @@
 module Blockchain.Sequencer.DB.SeenTransactionDB where
 
 import           Blockchain.Sequencer.DB.Witnessable
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Control.Applicative
 import           Control.Lens
 import           Control.Monad.Change.Alter
@@ -24,13 +24,13 @@ toBool = maybe False $ const True
 
 -- TODO: Although this is correct, it looks and feels a little awkward.
 --       Perhaps there could be a better class for Set-like contexts.
-type HasSeenTransactionDB = SHA `Alters` ()
+type HasSeenTransactionDB = Keccak256 `Alters` ()
 
 data SeenTransactionDB = SeenTransactionDB
   { _size       :: Int
   , _operations :: Int -- track number of pushes to start popping after `size`
-  , _clearQueue :: Q.Seq SHA
-  , _seen       :: S.Set SHA
+  , _clearQueue :: Q.Seq Keccak256
+  , _seen       :: S.Set Keccak256
   }
 makeLenses ''SeenTransactionDB
 
@@ -42,16 +42,16 @@ mkSeenTxDB dbSize = SeenTransactionDB
   , _seen       = S.empty
   }
 
-genericLookupSeenTransactionDB :: Modifiable SeenTransactionDB m => SHA -> m (Maybe ())
+genericLookupSeenTransactionDB :: Modifiable SeenTransactionDB m => Keccak256 -> m (Maybe ())
 genericLookupSeenTransactionDB sha = fromBool . S.member sha . _seen <$> get Proxy
 
-genericInsertSeenTransactionDB :: Modifiable SeenTransactionDB m => SHA -> () -> m ()
+genericInsertSeenTransactionDB :: Modifiable SeenTransactionDB m => Keccak256 -> () -> m ()
 genericInsertSeenTransactionDB sha = const $ modify_ Proxy $ pure . witnessTransactionHash' sha
 
-genericDeleteSeenTransactionDB :: Modifiable SeenTransactionDB m => SHA -> m ()
+genericDeleteSeenTransactionDB :: Modifiable SeenTransactionDB m => Keccak256 -> m ()
 genericDeleteSeenTransactionDB sha = modify_ Proxy $ pure . (seen %~ S.delete sha)
 
-wasTransactionHashWitnessed :: HasSeenTransactionDB m => SHA -> m Bool
+wasTransactionHashWitnessed :: HasSeenTransactionDB m => Keccak256 -> m Bool
 wasTransactionHashWitnessed = fmap toBool . lookup Proxy
 
 wasTransactionWitnessed :: (Witnessable t, HasSeenTransactionDB m) => t -> m Bool
@@ -60,10 +60,10 @@ wasTransactionWitnessed = fmap toBool . lookup Proxy . witnessableHash
 witnessTransaction :: (Witnessable t, HasSeenTransactionDB m) => t -> m ()
 witnessTransaction t = insert Proxy (witnessableHash t) ()
 
-witnessTransactionHash :: HasSeenTransactionDB m => SHA -> m ()
+witnessTransactionHash :: HasSeenTransactionDB m => Keccak256 -> m ()
 witnessTransactionHash sha = insert Proxy sha ()
 
-witnessTransactionHash' :: SHA -> SeenTransactionDB -> SeenTransactionDB
+witnessTransactionHash' :: Keccak256 -> SeenTransactionDB -> SeenTransactionDB
 witnessTransactionHash' sha stxdb =
   let withClear = stxdb
         & operations +~ 1

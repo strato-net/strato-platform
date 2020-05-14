@@ -41,7 +41,7 @@ import Blockchain.Strato.Model.Action
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
@@ -142,8 +142,8 @@ runArgs args bs = do
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = BlockData { blockDataParentHash = unsafeCreateSHAFromWord256 0x0
-                            , blockDataUnclesHash = unsafeCreateSHAFromWord256 0x0
+      blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataCoinbase = Address 0x0
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
@@ -155,13 +155,13 @@ runArgs args bs = do
                             , blockDataGasUsed = 10000
                             , blockDataExtraData = ""
                             , blockDataNonce = 22
-                            , blockDataMixHash = unsafeCreateSHAFromWord256 0x0
+                            , blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = unsafeCreateSHAFromWord256 0x776622233444
+      txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
@@ -178,8 +178,8 @@ runCall funcName callArgs bs = do
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = BlockData { blockDataParentHash = unsafeCreateSHAFromWord256 0x0
-                            , blockDataUnclesHash = unsafeCreateSHAFromWord256 0x0
+      blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataCoinbase = Address 0x0
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
@@ -191,13 +191,13 @@ runCall funcName callArgs bs = do
                             , blockDataGasUsed = 10000
                             , blockDataExtraData = ""
                             , blockDataNonce = 22
-                            , blockDataMixHash = unsafeCreateSHAFromWord256 0x0
+                            , blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = unsafeCreateSHAFromWord256 0x234962
+      txHash = unsafeCreateKeccak256FromWord256 0x234962
       chainId = Nothing
       createMetadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
       noValueTransfer = error "TODO: noValueTransfer"
@@ -218,8 +218,8 @@ call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = BlockData { blockDataParentHash = unsafeCreateSHAFromWord256 0x0
-                            , blockDataUnclesHash = unsafeCreateSHAFromWord256 0x0
+      blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataCoinbase = Address 0x0
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
@@ -231,13 +231,13 @@ call2 funcName callArgs contractAddress = do
                             , blockDataGasUsed = 10000
                             , blockDataExtraData = ""
                             , blockDataNonce = 22
-                            , blockDataMixHash = unsafeCreateSHAFromWord256 0x0
+                            , blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = unsafeCreateSHAFromWord256 0xddba11
+      txHash = unsafeCreateKeccak256FromWord256 0xddba11
       chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"

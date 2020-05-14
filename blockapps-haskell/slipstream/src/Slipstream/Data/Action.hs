@@ -31,13 +31,13 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 data AggregateAction = AggregateAction
-  { actionBlockHash      :: SHA
+  { actionBlockHash      :: Keccak256
   , actionBlockTimestamp :: UTCTime
   , actionBlockNumber    :: Integer
-  , actionTxHash         :: SHA
+  , actionTxHash         :: Keccak256
   , actionTxChainId      :: Maybe ChainId
   , actionTxSender       :: Address
   , actionAddress        :: Address

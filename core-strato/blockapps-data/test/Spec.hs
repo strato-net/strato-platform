@@ -28,7 +28,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 
@@ -261,7 +261,7 @@ matchingHash = it "doesnt mutate the hash" $ do
                    Just (String hs) -> hs
                    _ -> undefined
   jsonHash `shouldBe` ( T.pack
-                      .  shaToHex
+                      .  keccak256ToHex
                       .  transactionHash
                       . tPrimeToT $ tx)
 

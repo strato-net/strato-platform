@@ -52,8 +52,8 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
-import qualified Blockchain.Strato.Model.SHA         as SHA
+import           Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import qualified Data.ByteString.Char8               as C8
 import qualified Data.Set                            as S
 import qualified Network.Haskoin.Crypto     as HK
@@ -96,7 +96,7 @@ runPBFTTestM m = do
   gb <- makeGenesisBlock
   void $ withTemporaryDepBlockDB True gb m
 
-runPBFTTestMWithGenesis :: (SHA -> SequencerM a) -> IO ()
+runPBFTTestMWithGenesis :: (Keccak256 -> SequencerM a) -> IO ()
 runPBFTTestMWithGenesis m = do
   gb <- makeGenesisBlock
   let hsh = blockHash . ingestBlockToBlock $ gb
@@ -383,26 +383,26 @@ spec = do
 
       -- chain 1
       let cInfo1 = ChainInfo
-                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (unsafeCreateSHAFromWord256 0) 0 M.empty)
+                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
                     Nothing
-          chainId1 = SHA.rlpHash cInfo1
-          chainHash1 = SHA.rlpHash cInfo1
-          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (shaToWord256 chainId1, cInfo1))
+          chainId1 = Keccak256.rlpHash cInfo1
+          chainHash1 = Keccak256.rlpHash cInfo1
+          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId1, cInfo1))
       tx1 <- runIO . HK.withSource HK.devURandom $ do
         pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ shaToWord256 chainId1) Nothing pk
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId1) Nothing pk
       let hashTx1 = PrivateHashTX (txHash tx1) chainHash1
 
       -- chain 2
       let cInfo2 = ChainInfo
-                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (unsafeCreateSHAFromWord256 0) 0 M.empty)
+                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
                     Nothing
-          chainId2 = SHA.rlpHash cInfo2
-          chainHash2 = SHA.rlpHash cInfo2
-          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (shaToWord256 chainId2, cInfo2))
+          chainId2 = Keccak256.rlpHash cInfo2
+          chainHash2 = Keccak256.rlpHash cInfo2
+          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId2, cInfo2))
       tx2 <- runIO . HK.withSource HK.devURandom $ do
         pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ shaToWord256 chainId2) Nothing pk
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId2) Nothing pk
       let hashTx2 = PrivateHashTX (txHash tx2) chainHash2
 
       let b1' = makeBlockWithTransactions [hashTx1]
@@ -421,8 +421,8 @@ spec = do
           iev2' = IEBlock . blockToIngestBlock TO.Morphism . blk2'
 
       it "should forward a private transaction hash" . runTestM $ do
-        th <- fmap SHA.hash . liftIO $ getEntropy 32
-        ch <- fmap SHA.hash . liftIO $ getEntropy 32
+        th <- fmap Keccak256.hash . liftIO $ getEntropy 32
+        ch <- fmap Keccak256.hash . liftIO $ getEntropy 32
         let hashTx = PrivateHashTX th ch
         BatchSeqEvent{..} <- runBatch $ checkForUnseq [IETx 0 (IngestTx TO.Morphism hashTx)]
         let txs = [tx | VmTx _ tx <- _toVm]
@@ -431,8 +431,8 @@ spec = do
         map txType txs' `shouldBe` [PrivateHash]
 
       it "should forward a private transaction hash only once" . runTestM $ do
-        th <- fmap SHA.hash . liftIO $ getEntropy 32
-        ch <- fmap SHA.hash . liftIO $ getEntropy 32
+        th <- fmap Keccak256.hash . liftIO $ getEntropy 32
+        ch <- fmap Keccak256.hash . liftIO $ getEntropy 32
         let hashTx = PrivateHashTX th ch
             ietx = IETx 0 (IngestTx TO.Morphism hashTx)
         BatchSeqEvent{..} <- runBatch $ checkForUnseq [ietx,ietx]

@@ -22,15 +22,15 @@ import           Blockchain.Data.Address
 import qualified Blockchain.Data.DataDefs           as DD
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 {-# NOINLINE upsertPT #-}
 
 type ATL = M.Map Address TransactionList
 
-data MiningCache = MiningCache { bestBlockSHA          :: SHA
+data MiningCache = MiningCache { bestBlockSHA          :: Keccak256
                                , bestBlockHeader       :: DD.BlockData
-                               , bestBlockTxHashes     :: [SHA]
+                               , bestBlockTxHashes     :: [Keccak256]
                                , lastExecutedStateRoot :: StateRoot
                                , remainingGas          :: Integer
                                , lastExecutedTxs       :: [TxRunResult]
@@ -44,7 +44,7 @@ instance NFData MiningCache
 data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , pending               :: ATL -- TXs that are going in the next block
                                , queued                :: ATL -- TXs that are lingering in the pool
-                               , seen                  :: S.Set SHA
+                               , seen                  :: S.Set Keccak256
                                , calculateIntrinsicGas :: Integer -> OutputTx -> Integer -- fn that calculates intrinsic
                                                                                          -- gas cost for a given Tx and
                                                                                          -- block number
@@ -69,13 +69,13 @@ defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache
                                   }
 
 defaultMiningCache :: MiningCache
-defaultMiningCache  = MiningCache { bestBlockSHA          = unsafeCreateSHAFromWord256 0
+defaultMiningCache  = MiningCache { bestBlockSHA          = unsafeCreateKeccak256FromWord256 0
                                   , bestBlockHeader       = (DD.BlockData
-                                      (unsafeCreateSHAFromWord256 0) (unsafeCreateSHAFromWord256 0) (Address 0x7777)
+                                      (unsafeCreateKeccak256FromWord256 0) (unsafeCreateKeccak256FromWord256 0) (Address 0x7777)
                                       blankStateRoot blankStateRoot blankStateRoot
                                       "" 100 100 100 100
                                       (posixSecondsToUTCTime 0)
-                                      "" 137 (unsafeCreateSHAFromWord256 30))
+                                      "" 137 (unsafeCreateKeccak256FromWord256 30))
 
                                   , bestBlockTxHashes     = []
                                   , lastExecutedStateRoot = blankStateRoot

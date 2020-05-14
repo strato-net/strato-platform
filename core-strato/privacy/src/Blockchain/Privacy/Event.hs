@@ -33,7 +33,7 @@ import           Blockchain.Output
 import           Blockchain.Privacy.Monad
 import           Blockchain.Privacy.Metrics
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Class
 import           Control.Lens
 import           Control.Monad
@@ -66,17 +66,17 @@ logFF str = $logInfoS str . T.pack
 lookupSeenChain :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m Bool
 lookupSeenChain chainId = isJust <$> lookup (Proxy @ChainIdEntry) chainId
 
-insertTransaction :: (MonadLogger m, (SHA `Alters` OutputTx) m) => OutputTx -> m ()
+insertTransaction :: (MonadLogger m, (Keccak256 `Alters` OutputTx) m) => OutputTx -> m ()
 insertTransaction otx = do
   let tHash = txHash $ otBaseTx otx
   logFF "insertTransaction" $ "Inserting transaction " ++ format tHash
   insert (Proxy @OutputTx) tHash otx
 
 findChainHashUses :: ( MonadLogger m
-                     , (SHA `Alters` ChainHashEntry) m
+                     , (Keccak256 `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
                      )
-                  => Word256 -> [SHA] -> m ()
+                  => Word256 -> [Keccak256] -> m ()
 findChainHashUses chainId cHashes = do
   infos <- S.unions
           . map (maybe S.empty _inBlocks)
@@ -86,7 +86,7 @@ findChainHashUses chainId cHashes = do
 
 insertPrivateHash :: ( MonadLogger m
                      , MonadMonitor m
-                     , (SHA `Alters` ChainHashEntry) m
+                     , (Keccak256 `Alters` ChainHashEntry) m
                      , (Word256 `Alters` ChainIdEntry) m
                      )
                   => BlockInfo -> OutputTx -> m ()
@@ -144,7 +144,7 @@ insertPrivateHash bInfo tx = case txChainId tx of
     logFF "insertPrivateHash" $ "findChainHashUses for chainId: " ++ format chainId ++ ", and cHashes': " ++ format cHashes'
     findChainHashUses chainId cHashes'
 
-lookupChainIdFromChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m (Maybe Word256)
+lookupChainIdFromChainHash :: (Keccak256 `Alters` ChainHashEntry) m => Keccak256 -> m (Maybe Word256)
 lookupChainIdFromChainHash ch = join . fmap _onChainId <$> lookup (Proxy @ChainHashEntry) ch
 
 data InsertChainHashResult = Inserted
@@ -152,9 +152,9 @@ data InsertChainHashResult = Inserted
                            | SeenPreviouslyOnUnknownChain BlockInfo
                            | WrongChainId Word256
 
-insertChainHash :: (SHA `Alters` ChainHashEntry) m
+insertChainHash :: (Keccak256 `Alters` ChainHashEntry) m
                 => BlockInfo
-                -> SHA
+                -> Keccak256
                 -> Word256
                 -> m InsertChainHashResult
 insertChainHash obi cHash chainId = lookup Proxy cHash >>= \case
@@ -167,19 +167,19 @@ insertChainHash obi cHash chainId = lookup Proxy cHash >>= \case
       Just bi | bi <= obi -> return $ SeenPreviouslyOnUnknownChain bi
       _ -> Inserted <$ adjustStatefully_ Proxy cHash (onChainId .= Just chainId)
 
-useChainHash :: (SHA `Alters` ChainHashEntry) m => SHA -> m ()
+useChainHash :: (Keccak256 `Alters` ChainHashEntry) m => Keccak256 -> m ()
 useChainHash cHash = adjustWithDefaultStatefully_ Proxy cHash $ used .= True
 
-getChainBuffer :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m (CircularBuffer SHA)
+getChainBuffer :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m (CircularBuffer Keccak256)
 getChainBuffer chainId = maybe emptyCircularBuffer _chainHashes <$> lookup Proxy chainId
 
-lookupChainBuffer :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m (CircularBuffer SHA)
+lookupChainBuffer :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m (CircularBuffer Keccak256)
 lookupChainBuffer = getChainBuffer
 
 insertChainBufferEntry :: ( MonadMonitor m
                           , (Word256 `Alters` ChainIdEntry) m
                           )
-                       => Word256 -> SHA -> m ()
+                       => Word256 -> Keccak256 -> m ()
 insertChainBufferEntry chainId cHash = adjustStatefully_ Proxy chainId $ do
   CircularBuffer cap sz q <- use chainHashes
   withLabel chainBuffer (fromString (show chainId)) (flip setGauge (fromIntegral sz))
@@ -191,10 +191,10 @@ insertChainBufferEntry chainId cHash = adjustStatefully_ Proxy chainId $ do
 
 getNewChainHash :: ( MonadLogger m
                    , HasPrivateHashDB m
-                   , (SHA `Alters` ChainHashEntry) m
+                   , (Keccak256 `Alters` ChainHashEntry) m
                    , (Word256 `Alters` ChainIdEntry) m
                    )
-                => Word256 -> m (Maybe SHA)
+                => Word256 -> m (Maybe Keccak256)
 getNewChainHash chainId = do
   CircularBuffer cap sz q <- getChainBuffer chainId
   case Q.viewl q of
@@ -211,9 +211,9 @@ getNewChainHash chainId = do
 
 checkIfIsMissingTX :: ( MonadLogger m
                       , HasPrivateHashDB m
-                      , (SHA `Alters` ChainHashEntry) m
+                      , (Keccak256 `Alters` ChainHashEntry) m
                       )
-                   => SHA -> SHA -> m ()
+                   => Keccak256 -> Keccak256 -> m ()
 checkIfIsMissingTX th ch = do
   let logF = logFF "checkIfIsMissingTX"
   mChainId <- join . fmap _onChainId <$> lookup Proxy ch
@@ -230,9 +230,9 @@ checkIfIsMissingTX th ch = do
 
 runPrivateHashTX :: ( MonadLogger m
                     , HasPrivateHashDB m
-                    , (SHA `Alters` ChainHashEntry) m
+                    , (Keccak256 `Alters` ChainHashEntry) m
                     )
-                 => SHA -> SHA -> m ()
+                 => Keccak256 -> Keccak256 -> m ()
 runPrivateHashTX tHash cHash = do
   let logF = logFF "runPrivateHashTX"
   logF . concat $

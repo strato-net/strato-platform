@@ -51,7 +51,7 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Kafka
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 newtype IConfig = IConfig { contextSQLDB :: SQLDB }
 
@@ -81,9 +81,9 @@ data IndexerException = Lookup String String String
                       | Delete String String String
                       deriving (Eq, Show, Exception)
 
-instance (SHA `A.Alters` API OutputTx) IContextM where
-  lookup _ _                    = liftIO . throwIO $ Lookup "API" "SHA" "OutputTx"
-  delete _ _                    = liftIO . throwIO $ Delete "API" "SHA" "OutputTx"
+instance (Keccak256 `A.Alters` API OutputTx) IContextM where
+  lookup _ _                    = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputTx"
+  delete _ _                    = liftIO . throwIO $ Delete "API" "Keccak256" "OutputTx"
   insert _ _ (API OutputTx{..}) = void . lift $ insertTX Log otOrigin Nothing [otBaseTx]
 
 instance (Word256 `A.Alters` API ChainInfo) IContextM where
@@ -91,9 +91,9 @@ instance (Word256 `A.Alters` API ChainInfo) IContextM where
   delete _ _               = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
   insert _ cId (API cInfo) = void . lift $ putChainInfo cId cInfo
 
-instance (SHA `A.Alters` API OutputBlock) IContextM where
-  lookup     _ _          = liftIO . throwIO $ Lookup "API" "SHA" "OutputBlock"
-  delete     _ _          = liftIO . throwIO $ Delete "API" "SHA" "OutputBlock"
+instance (Keccak256 `A.Alters` API OutputBlock) IContextM where
+  lookup     _ _          = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
+  delete     _ _          = liftIO . throwIO $ Delete "API" "Keccak256" "OutputBlock"
   insert     _ _ (API ob) = void . lift $ putBlocks [(outputBlockToBlock ob, obTotalDifficulty ob)] False
   insertMany _            = void
                           . lift
@@ -101,9 +101,9 @@ instance (SHA `A.Alters` API OutputBlock) IContextM where
                           . map ((outputBlockToBlock &&& obTotalDifficulty) . unAPI)
                           . M.elems
 
-instance (SHA `A.Alters` P2P (Private (Word256, OutputTx))) IContextM where
-  lookup     _ _ = liftIO . throwIO $ Lookup "P2P" "SHA" "Private (Word256, OutputTx)"
-  delete     _ _ = liftIO . throwIO $ Delete "P2P" "SHA" "Private (Word256, OutputTx)"
+instance (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) IContextM where
+  lookup     _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "Private (Word256, OutputTx)"
+  delete     _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "Private (Word256, OutputTx)"
   insert   p k v = A.insertMany p $ M.fromList [(k,v)]
   insertMany _   = void
                  . RBDB.withRedisBlockDB
@@ -111,9 +111,9 @@ instance (SHA `A.Alters` P2P (Private (Word256, OutputTx))) IContextM where
                  . map (fmap $ unPrivate . unP2P)
                  . M.toList
 
-instance (SHA `A.Alters` P2P OutputBlock) IContextM where
-  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "SHA" "OutputBlock"
-  delete _ _ = liftIO . throwIO $ Delete "P2P" "SHA" "OutputBlock"
+instance (Keccak256 `A.Alters` P2P OutputBlock) IContextM where
+  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
+  delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
   insert _ _ = void
              . RBDB.withRedisBlockDB
              . RBDB.putBlock

@@ -55,7 +55,7 @@ import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified Blockchain.Data.RLP                       as RL
 
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           Blockchain.Util
 import qualified Text.Colors                               as CL
@@ -309,7 +309,7 @@ blockstanbulSend' msg = do
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   yieldMany $ ToVm <$> vmevs
 
-privateWitnessableHash :: SHA -> SHA -> SHA
+privateWitnessableHash :: Keccak256 -> Keccak256 -> Keccak256
 privateWitnessableHash tHash cHash =
   hash
   . RL.rlpSerialize

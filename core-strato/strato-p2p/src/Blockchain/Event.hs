@@ -69,7 +69,7 @@ import           Blockchain.EventException
 import           Blockchain.ExtWord
 import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Verification
 
@@ -166,14 +166,14 @@ handleEvents :: ( HasVMEventsSink m
                     '[ '(Integer, Canonical BlockData)
                      , '(IPAddress, IPChains)
                      , '(OrgId, OrgIdChains)
-                     , '(SHA, ChainTxsInBlock)
+                     , '(Keccak256, ChainTxsInBlock)
                      , '(Word256, ChainMembers)
                      , '(Word256, ChainInfo)
-                     , '(SHA, Private (Word256, OutputTx))
+                     , '(Keccak256, Private (Word256, OutputTx))
                      ] m
                 , All2 '[Alters]
-                    '[ '(SHA, BlockData)
-                     , '(SHA, OutputBlock)
+                    '[ '(Keccak256, BlockData)
+                     , '(Keccak256, OutputBlock)
                      ] m
                 ) => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
@@ -317,11 +317,11 @@ handleEvents peer = awaitForever $ \case
           yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
           ptxs <- fmap M.elems . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) pshas
           unless (null ptxs) . yieldR . Transactions $ morphTx  . snd . unPrivate <$> ptxs
-        where getUntilMissing :: ( (SHA `Selectable` ChainTxsInBlock) m
+        where getUntilMissing :: ( (Keccak256 `Selectable` ChainTxsInBlock) m
                                  , (Word256 `Selectable` ChainMembers) m
-                                 , (SHA `Alters` OutputBlock) m
+                                 , (Keccak256 `Alters` OutputBlock) m
                                  )
-                              => [SHA] -> DL.DList OutputBlock -> DL.DList SHA -> m ([OutputBlock],[SHA])
+                              => [Keccak256] -> DL.DList OutputBlock -> DL.DList Keccak256 -> m ([OutputBlock],[Keccak256])
               getUntilMissing []     bodies pshas = return (DL.toList bodies, DL.toList pshas)
               getUntilMissing (h:hs) bodies pshas = lookup (Proxy @OutputBlock) h >>= \case
                   Nothing   -> return (DL.toList bodies, DL.toList pshas)

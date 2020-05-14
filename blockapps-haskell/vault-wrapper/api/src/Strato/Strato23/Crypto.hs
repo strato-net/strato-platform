@@ -15,7 +15,6 @@ import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import           Crypto.HaskoinShim
 import           Data.ByteString                   (ByteString)
-import qualified Data.ByteString                   as BS
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
@@ -98,7 +97,7 @@ reencryptKey oldPass newPass salt nonce oldKey givenAddress=
                           else Right $ encrypt newPass salt nonce (getSecKey plainKey)
 
 deriveAddress :: SecKey -> Address
-deriveAddress = keccak256Address . BS.drop 1 . exportPubKey False . derivePubKey
+deriveAddress (SecKey val) = prvKey2Address val
 
 newSaltAndNonce :: MonadIO m => m (ByteString, SecretBox.Nonce)
 newSaltAndNonce = liftIO $ do

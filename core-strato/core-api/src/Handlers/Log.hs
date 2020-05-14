@@ -18,7 +18,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json          ()
 import           Blockchain.DB.SQLDB
-import           Blockchain.Strato.Model.SHA   hiding (hash)
+import           Blockchain.Strato.Model.Keccak256   hiding (hash)
 
 import           Settings
 import           SortDirection
@@ -26,7 +26,7 @@ import           SQLM
 
 type API = 
   "log" :> QueryParam "address" Address
-        :> QueryParam "hash" SHA
+        :> QueryParam "hash" Keccak256
         :> QueryParam "sortby" Sortby
         :> Get '[JSON] [LogDB]
 
@@ -37,7 +37,7 @@ server pool = getLog pool
 ---------------------
 
 
-getLog :: ConnectionPool -> Maybe Address -> Maybe SHA -> Maybe Sortby -> Handler [LogDB]
+getLog :: ConnectionPool -> Maybe Address -> Maybe Keccak256 -> Maybe Sortby -> Handler [LogDB]
 getLog pool address hash sortParam = liftIO $ runSQLM pool $ do
   logs <- sqlQuery $ E.select $ E.from $ \lg -> do
     let criteria = catMaybes

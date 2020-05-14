@@ -23,7 +23,7 @@ import GHC.Generics
 
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Transaction
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 
 data Block =
   Block{
@@ -41,7 +41,7 @@ setBlockNo :: Integer -> Block -> Block
 setBlockNo n blk = blk{blockBlockData = (blockBlockData blk){blockDataNumber = n}}
 
 data BestBlock = BestBlock
-  { bestBlockHash            :: SHA
+  { bestBlockHash            :: Keccak256
   , bestBlockNumber          :: Integer
   , bestBlockTotalDifficulty :: Integer
   } deriving (Eq, Show)
