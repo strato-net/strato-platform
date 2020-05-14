@@ -42,6 +42,7 @@ library:
   - prometheus-client
   - seqevents
   - solid-vm
+  - split
   - strato-adit
   - strato-conf
   - strato-genesis

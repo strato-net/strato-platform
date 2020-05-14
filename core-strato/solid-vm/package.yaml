@@ -91,6 +91,7 @@ library:
   - text
   - time
   - transformers
+  - unliftio
   - unordered-containers
   - vector
   - vm-tools

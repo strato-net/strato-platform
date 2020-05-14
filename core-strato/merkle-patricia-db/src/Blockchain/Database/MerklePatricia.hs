@@ -26,7 +26,7 @@
 
 module Blockchain.Database.MerklePatricia (
   genericLookupDB, genericInsertDB, genericDeleteDB,
-  Key, Val, MPDB(..), StateRoot(..), NodeData(..),
+  Key, Val, StateDB(..), StateRoot(..), NodeData(..),
   openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
   putKeyVal, getKeyVal, deleteKey, keyExists,
   initializeBlank, blankStateRoot
@@ -85,7 +85,7 @@ getKeyVal sr key = fmap snd . listToMaybe <$> unsafeGetKeyVals sr (keyToSafeKey 
 -- | Deletes a key (and its corresponding data) from the database.
 --
 -- Note that the key/value pair will still be present in the history, and
--- can be accessed by using an older 'MPDB' object.
+-- can be accessed by using an older state root.
 deleteKey :: (StateRoot `Alters` NodeData) m
           => StateRoot -- ^ The object containing the current stateRoot.
           -> Key -- ^ The key to be deleted.

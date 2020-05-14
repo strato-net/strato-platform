@@ -40,11 +40,11 @@ module Blockchain.SolidVM.SM (
   ) where
 
 import           Control.Applicative ((<|>))
-import           Control.Exception
-import           Control.Lens
+import           Control.Lens hiding (Context)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
@@ -64,10 +64,8 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
-import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.StateDB
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
@@ -85,22 +83,18 @@ import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
+import           UnliftIO
+
 import CodeCollection
 
-
-
-
-
-
-data CallInfo =
-  CallInfo {
-    currentFunctionName :: String,
-    currentAddress :: Address,
-    currentContract :: Contract,
-    codeCollection :: CodeCollection,
-    collectionHash :: Keccak256,
-    localVariables :: Map String (Xabi.Type, Variable)
-    } deriving (Show)
+data CallInfo = CallInfo
+  { currentFunctionName :: String
+  , currentAddress      :: Address
+  , currentContract     :: Contract
+  , codeCollection      :: CodeCollection
+  , collectionHash      :: Keccak256
+  , localVariables      :: Map String (Xabi.Type, Variable)
+  } deriving (Show)
 
 {-
 BlockData
@@ -122,29 +116,24 @@ BlockData
     deriving Eq Read Show Generic
 -}
 
-data SState =
-  SState {
-    env :: Env.Environment,
-    callStack :: [CallInfo],
-    codeDB                 :: CodeDB,
-    hashDB                 :: HashDB,
-    stateDB                :: MP.MPDB,
-    ssEvents               :: Q.Seq Event,
-    addressStateTxDBMap    :: M.Map Address AddressStateModification,
-    addressStateBlockDBMap :: M.Map Address AddressStateModification,
-    storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
-    storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString,
-    _action                :: Action
+data SState = SState
+  { env             :: Env.Environment
+  , callStack       :: [CallInfo]
+  , ssEvents        :: Q.Seq Event
+  , _ssMemDBs       :: MemDBs
+  , _action         :: Action
   }
-
 makeLenses ''SState
 
-type SM = StateT SState IO
+type SM m = StateT SState m
 
 type MonadSM m = ( (Address `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` DBCode) m
                  , HasRawStorageDB m
+                 , HasMemAddressStateDB m
+                 , HasMemRawStorageDB m
                  , Mod.Accessible Env.Environment m
+                 , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
                  , Mod.Modifiable Action m
@@ -152,78 +141,74 @@ type MonadSM m = ( (Address `A.Alters` AddressState) m
                  , MonadIO m --todo: remove
                  )
 
-instance HasMemAddressStateDB SM where
-  getAddressStateTxDBMap = addressStateTxDBMap <$> get
-  putAddressStateTxDBMap theMap = do
-    sstate <- get
-    put $ sstate{addressStateTxDBMap=theMap}
-  getAddressStateBlockDBMap = addressStateBlockDBMap <$> get
-  putAddressStateBlockDBMap theMap = do
-    sstate <- get
-    put $ sstate{addressStateBlockDBMap=theMap}
+instance Monad m => HasMemAddressStateDB (SM m) where
+  getAddressStateTxDBMap      = gets $ _stateTxMap . _ssMemDBs
+  putAddressStateTxDBMap    m = modify $ ssMemDBs . stateTxMap .~ m
+  getAddressStateBlockDBMap   = gets $ _stateBlockMap . _ssMemDBs
+  putAddressStateBlockDBMap m = modify $ ssMemDBs . stateBlockMap .~ m
 
-instance HasMemRawStorageDB SM where
-  getMemRawStorageTxDB = do
-    cxt <- get
-    return (MP.ldb $ stateDB cxt, --storage and states use the same database!
-            storageTxMap cxt)
-  putMemRawStorageTxMap theMap = do
-    cxt <- get
-    put cxt{storageTxMap=theMap}
-  getMemRawStorageBlockDB = do
-    cxt <- get
-    return (MP.ldb $ stateDB cxt, --storage and states use the same database!
-            storageBlockMap cxt)
-  putMemRawStorageBlockMap theMap = do
-    cxt <- get
-    put cxt{storageBlockMap=theMap}
+instance Monad m => HasMemRawStorageDB (SM m) where
+  getMemRawStorageTxDB       = gets $ _storageTxMap . _ssMemDBs
+  putMemRawStorageTxMap    m = modify $ ssMemDBs . storageTxMap .~ m
+  getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
+  putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
-instance (RawStorageKey `A.Alters` RawStorageValue) SM where
+instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (N.NibbleString `A.Alters` N.NibbleString) m
+         , Mod.Modifiable MP.StateRoot m
+         ) => (RawStorageKey `A.Alters` RawStorageValue) (SM m) where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance Mod.Modifiable MP.StateRoot SM where
-  get _    = gets (MP.stateRoot . stateDB)
-  put _ sr = get >>= \c -> put c{stateDB = (stateDB c){MP.stateRoot = sr}}
+instance Monad m => Mod.Modifiable MP.StateRoot (SM m) where
+  get _    = gets $ _stateRoot . _ssMemDBs
+  put _ sr = modify $ ssMemDBs . stateRoot .~ sr
 
-instance (Address `A.Alters` AddressState) SM where
+instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (N.NibbleString `A.Alters` N.NibbleString) m
+         , Mod.Modifiable MP.StateRoot m
+         ) => (Address `A.Alters` AddressState) (SM m) where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MP.StateRoot `A.Alters` MP.NodeData) SM where
-  lookup _ = MP.genericLookupDB $ gets (MP.ldb . stateDB)
-  insert _ = MP.genericInsertDB $ gets (MP.ldb . stateDB)
-  delete _ = MP.genericDeleteDB $ gets (MP.ldb . stateDB)
+instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.NodeData) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
 
-instance (Keccak256 `A.Alters` DBCode) SM where
-  lookup _ = genericLookupCodeDB $ gets codeDB
-  insert _ = genericInsertCodeDB $ gets codeDB
-  delete _ = genericDeleteCodeDB $ gets codeDB
+instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
 
-instance (N.NibbleString `A.Alters` N.NibbleString) SM where
-  lookup _ = genericLookupHashDB $ gets hashDB
-  insert _ = genericInsertHashDB $ gets hashDB
-  delete _ = genericDeleteHashDB $ gets hashDB
+instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
 
-instance Mod.Accessible Env.Environment SM where
+instance Monad m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
 
-instance Mod.Modifiable Env.Sender SM where
+instance Monad m => Mod.Modifiable Env.Sender (SM m) where
   get _ = Env.Sender . Env.sender <$> gets env
   put _ (Env.Sender s) = modify $ \ss@SState{env=e} -> ss{env = e{Env.sender = s}}
 
-instance Mod.Modifiable [CallInfo] SM where
+instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
   get _ = gets callStack
   put _ cs = modify $ \ss -> ss{callStack = cs}
 
-instance Mod.Modifiable Action SM where
+instance Monad m => Mod.Modifiable MemDBs (SM m) where
+  get _    = gets $ _ssMemDBs
+  put _ md = modify $ ssMemDBs .~ md
+
+instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
   put _ = assign action
 
-instance Mod.Modifiable (Q.Seq Event) SM where
+instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
   -- adding events to the action so that slipstream gets them,
   --   and also to the events field of the sstate, so that they get sent to
   --    TxrIndexer for governance updates
@@ -232,26 +217,28 @@ instance Mod.Modifiable (Q.Seq Event) SM where
     action . actionEvents .= q
     modify $ \sstate -> sstate { ssEvents = q }
 
-runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
+runSM :: ( MonadIO m
+         , MonadUnliftIO m
+         , MonadLogger m
+         , Mod.Modifiable ContextState m
+         )
+      => (Maybe ByteString)
+      -> Env.Environment
+      -> SM m a
+      -> m (Either SolidException a)
 runSM maybeCode env f = do
-  vmcontext <- get
+  csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
 
   let startingState =
         SState {
         env = env,
         callStack = [],
-        codeDB = contextCodeDB vmcontext,
-        hashDB = contextHashDB vmcontext,
-        stateDB = contextStateDB vmcontext,
         ssEvents = Q.empty,
-        addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
-        addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
-        storageTxMap = contextStorageTxMap vmcontext,
-        storageBlockMap = contextStorageBlockMap vmcontext,
+        _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env
         }
 
-  eValState <- liftIO . try $ runStateT f startingState
+  eValState <- try $ runStateT f startingState
   case eValState of
     -- NO errors will crash the VM.
     -- InternalError should *never* happen.
@@ -263,17 +250,10 @@ runSM maybeCode env f = do
       if flags_svmDev
         then do
           $logErrorLS "runSM/error_code" maybeCode
-          throw se
+          throwIO se
         else return $ Left se
     Right (value, sstateAfter) -> do
-      vmcontext' <- get
-      put vmcontext'{
-        contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
-        contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
-        contextStorageTxMap = storageTxMap sstateAfter,
-        contextStorageBlockMap = storageBlockMap sstateAfter
-        }
-      setStateDBStateRoot $ MP.stateRoot $ stateDB sstateAfter
+      Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
       return $ Right value
 
 
@@ -444,12 +424,9 @@ addCallInfo a c fn hsh cc initialLocalVariables = do
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
 
 popCallInfo :: MonadSM m => m ()
-popCallInfo = do
-  cs <- Mod.get (Mod.Proxy @[CallInfo])
-  case cs of
-    [] -> internalError "popCallInfo was called on an already empty stack" ()
-    (_:rest) -> Mod.put (Mod.Proxy @[CallInfo]) rest
-
+popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> internalError "popCallInfo was called on an already empty stack" ()
+  (_:rest) -> pure rest
 
 getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do

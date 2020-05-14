@@ -31,7 +31,6 @@ import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State
 import qualified Data.Map.Strict                 as M
 import qualified Data.Text                       as T
-import qualified Database.Persist.Postgresql     as SQL
 
 import           Blockchain.Data.Block           (BestBlock(..), Private(..))
 import           Blockchain.Data.BlockDB
@@ -149,7 +148,7 @@ targetTopicName = indexEventsTopicName
 runIContextM :: KafkaClientId -> IContextM a -> LoggingT IO a
 runIContextM cid f = do
     $logInfoS "runIContextM" . T.pack $ "Creating PG connection pool of size " ++ show pgPoolSize
-    sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr pgPoolSize
+    sqldb <- runNoLoggingT  $ createPostgresqlPool connStr pgPoolSize
     redis <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
     ret <- fmap fst
          . runResourceT

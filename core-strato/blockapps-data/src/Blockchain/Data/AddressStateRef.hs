@@ -21,7 +21,7 @@ import Blockchain.Strato.Model.ExtendedWord
 updateSQLBalanceAndNonce :: HasSQLDB m =>
                             [((Address, Maybe Word256), (Integer, Integer))] -> m ()
 updateSQLBalanceAndNonce vals = do
-  pool <- access (Proxy @SQLDB)
+  pool <- unSQLDB <$> access (Proxy @SQLDB)
   flip SQL.runSqlPool pool $ do
     forM_ vals $ \((a, c), (v, n)) -> do
       let asr =
