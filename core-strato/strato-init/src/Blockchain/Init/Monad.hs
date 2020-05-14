@@ -30,7 +30,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.EthConf (lookupRedisBlockDBConfig, connStr)
 import           Blockchain.Output
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
 
@@ -112,7 +112,7 @@ instance (Address `A.Alters` AddressState) SetupDBM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (SHA `A.Alters` DBCode) SetupDBM where
+instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   lookup _ = genericLookupCodeDB $ asks codeDB
   insert _ = genericInsertCodeDB $ asks codeDB
   delete _ = genericDeleteCodeDB $ asks codeDB

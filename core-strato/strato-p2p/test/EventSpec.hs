@@ -44,7 +44,7 @@ import           Blockchain.Options                    (AuthorizationMode(..))
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
-import           Blockchain.Strato.Model.SHA           (SHA, unsafeCreateSHAFromWord256)
+import           Blockchain.Strato.Model.Keccak256           (Keccak256, unsafeCreateKeccak256FromWord256)
 
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
@@ -80,17 +80,17 @@ data TestContext = TestContext
   , _connectionTimeout     :: ConnectionTimeout
   , _maxReturnedHeaders    :: MaxReturnedHeaders
   , _peerAddr              :: PeerAddress
-  , _shaBlockDataMap       :: Map SHA DataDefs.BlockData
+  , _shaBlockDataMap       :: Map Keccak256 DataDefs.BlockData
   , _worldBestBlock        :: WorldBestBlock
   , _bestBlock             :: BestBlock
   , _canonicalBlockDataMap :: Map Integer (Canonical DataDefs.BlockData)
   , _ipAddressIpChainsMap  :: Map IPAddress IPChains
   , _orgIdChainsMap        :: Map OrgId OrgIdChains
-  , _shaChainTxsInBlockMap :: Map SHA ChainTxsInBlock
+  , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
   , _chainMembersMap       :: Map Word256 ChainMembers
   , _chainInfoMap          :: Map Word256 ChainInfo
-  , _privateTxMap          :: Map SHA (Private (Word256, OutputTx))
-  , _shaOutputBlockMap     :: Map SHA OutputBlock
+  , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
+  , _shaOutputBlockMap     :: Map Keccak256 OutputBlock
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String DataPeer.PPeer
@@ -112,7 +112,7 @@ instance MonadIO m => Stacks Block (ReaderT (IORef TestContext) m) where
     bestBlockNumber %= (\(BestBlockNumber n) -> BestBlockNumber $ max maxNum n)
     blocks %= (bs ++)
 
-instance MonadIO m => (SHA `A.Alters` DataDefs.BlockData) (ReaderT (IORef TestContext) m) where
+instance MonadIO m => (Keccak256 `A.Alters` DataDefs.BlockData) (ReaderT (IORef TestContext) m) where
   lookup _ k   = M.lookup k <$> use shaBlockDataMap
   insert _ k v = shaBlockDataMap %= M.insert k v
   delete _ k   = shaBlockDataMap %= M.delete k
@@ -134,7 +134,7 @@ instance MonadIO m => A.Selectable IPAddress IPChains (ReaderT (IORef TestContex
 instance MonadIO m => A.Selectable OrgId OrgIdChains (ReaderT (IORef TestContext) m) where
   select _ ip = M.lookup ip <$> use orgIdChainsMap
 
-instance MonadIO m => A.Selectable SHA ChainTxsInBlock (ReaderT (IORef TestContext) m) where
+instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT (IORef TestContext) m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
 instance MonadIO m => A.Selectable Word256 ChainMembers (ReaderT (IORef TestContext) m) where
@@ -143,10 +143,10 @@ instance MonadIO m => A.Selectable Word256 ChainMembers (ReaderT (IORef TestCont
 instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT (IORef TestContext) m) where
   select _ cid = M.lookup cid <$> use chainInfoMap
 
-instance MonadIO m => A.Selectable SHA (Private (Word256, OutputTx)) (ReaderT (IORef TestContext) m) where
+instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT (IORef TestContext) m) where
   select _ tx = M.lookup tx <$> use privateTxMap
 
-instance MonadIO m => (SHA `A.Alters` OutputBlock) (ReaderT (IORef TestContext) m) where
+instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT (IORef TestContext) m) where
   lookup _ k   = M.lookup k <$> use shaOutputBlockMap
   insert _ k v = shaOutputBlockMap %= M.insert k v
   delete _ k   = shaOutputBlockMap %= M.delete k
@@ -206,8 +206,8 @@ testContext = TestContext
   , _maxReturnedHeaders    = MaxReturnedHeaders 1000
   , _peerAddr              = PeerAddress Nothing
   , _shaBlockDataMap       = M.empty
-  , _worldBestBlock        = WorldBestBlock (BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0)
-  , _bestBlock             = BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
+  , _worldBestBlock        = WorldBestBlock (BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0)
+  , _bestBlock             = BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
   , _canonicalBlockDataMap = M.empty
   , _ipAddressIpChainsMap  = M.empty
   , _orgIdChainsMap        = M.empty
@@ -216,7 +216,7 @@ testContext = TestContext
   , _chainInfoMap          = M.empty
   , _privateTxMap          = M.empty
   , _shaOutputBlockMap     = M.empty
-  , _genesisBlockHash      = GenesisBlockHash (unsafeCreateSHAFromWord256 0)
+  , _genesisBlockHash      = GenesisBlockHash (unsafeCreateKeccak256FromWord256 0)
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.empty
   , _unseqEvents           = []

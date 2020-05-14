@@ -81,7 +81,7 @@ import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.VMEvent             ( HasVMEventsSink(..)
                                                        , VMEvent(..)
                                                        , fetchLastVMEvents
@@ -157,12 +157,12 @@ data Context = Context
 
 makeLenses ''Context
 
-newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: SHA }
+newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: Keccak256 }
 newtype BestBlockNumber = BestBlockNumber { unBestBlockNumber :: Integer }
 
 type ContextM = ReaderT Config (ResourceT (LoggingT IO))
 
-instance MonadIO m => (SHA `A.Alters` BlockData) (ReaderT Config m) where
+instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
   delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
@@ -173,7 +173,7 @@ instance MonadIO m => (SHA `A.Alters` BlockData) (ReaderT Config m) where
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Config m) where
   get _ = RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
-    Nothing -> WorldBestBlock $ BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
+    Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> WorldBestBlock $ BestBlock s n d
   put _ (WorldBestBlock (BestBlock s n d)) =
     RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n d) >>= \case
@@ -183,7 +183,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Co
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config m) where
   get _ = RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
-    Nothing -> BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
+    Nothing -> BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> BestBlock s n d
   put _ (BestBlock s n d) =
     RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n d) >>= \case
@@ -206,7 +206,7 @@ instance MonadIO m => A.Selectable OrgId OrgIdChains (ReaderT Config m) where
                       . RBDB.getOrgIdChains
                       . unOrgId
 
-instance MonadIO m => A.Selectable SHA ChainTxsInBlock (ReaderT Config m) where
+instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) where
   select p sha = A.selectWithDefault p sha <&> toMaybe def
   selectWithDefault _ = fmap ChainTxsInBlock
                       . RBDB.withRedisBlockDB
@@ -221,10 +221,10 @@ instance MonadIO m => A.Selectable Word256 ChainMembers (ReaderT Config m) where
 instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
 
-instance MonadIO m => A.Selectable SHA (Private (Word256, OutputTx)) (ReaderT Config m) where
+instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
 
-instance MonadIO m => (SHA `A.Alters` OutputBlock) (ReaderT Config m) where
+instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
   delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteBlock
@@ -338,14 +338,14 @@ type MonadP2P m = ( MonadIO m
                       '[ '(Integer, Canonical BlockData)
                        , '(IPAddress, IPChains)
                        , '(OrgId, OrgIdChains)
-                       , '(SHA, ChainTxsInBlock)
+                       , '(Keccak256, ChainTxsInBlock)
                        , '(Word256, ChainMembers)
                        , '(Word256, ChainInfo)
-                       , '(SHA, Private (Word256, OutputTx))
+                       , '(Keccak256, Private (Word256, OutputTx))
                        ] m
                   , All2 '[A.Alters]
-                      '[ '(SHA, BlockData)
-                       , '(SHA, OutputBlock)
+                      '[ '(Keccak256, BlockData)
+                       , '(Keccak256, OutputBlock)
                        ] m
                   )
 

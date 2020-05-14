@@ -32,7 +32,7 @@ import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import Slipstream.Data.Action
 import Slipstream.Events
@@ -249,7 +249,7 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 insertContractTableQuery :: ProcessedContract -> Text
 insertContractTableQuery ProcessedContract{..} =
   let conVals = wrapAndEscape . map escapeQuotes $
-        [ T.pack $ shaToHex $ codePtrToSHA codehash
+        [ T.pack $ keccak256ToHex $ codePtrToSHA codehash
         , contractName
         , abi
         , chain
@@ -306,10 +306,10 @@ insertIndexTableQuery contracts@(x:_) =
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
-                 , T.pack . shaToHex . blockHash
+                 , T.pack . keccak256ToHex . blockHash
                  , tshow . blockTimestamp
                  , tshow . blockNumber
-                 , T.pack . shaToHex . transactionHash
+                 , T.pack . keccak256ToHex . transactionHash
                  , tshow . transactionSender
                  ]
       tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
@@ -350,10 +350,10 @@ insertHistoryTableQuery contracts@(x:_) =
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
-                 , T.pack . shaToHex . blockHash
+                 , T.pack . keccak256ToHex . blockHash
                  , tshow . blockTimestamp
                  , tshow . blockNumber
-                 , T.pack . shaToHex . transactionHash
+                 , T.pack . keccak256ToHex . transactionHash
                  , tshow . transactionSender
                  ]
       tableVals = baseVals ++ [escapeQuotes . transactionFuncName]

@@ -93,7 +93,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
 import qualified Blockchain.Strato.Indexer.Kafka    as IK
 import qualified Blockchain.Strato.Indexer.Model    as IM
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 import qualified Blockchain.TxRunResultCache        as TRC
@@ -105,7 +105,7 @@ import           Executable.EVMFlags
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
-data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (Keccak256, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show, Generic, NFData)
 
 newtype Config = Config { configSQLDB :: SQLDB } deriving (Show)
@@ -237,7 +237,7 @@ instance (Address `A.Alters` AddressState) ContextM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (SHA `A.Alters` DBCode) ContextM where
+instance (Keccak256 `A.Alters` DBCode) ContextM where
   lookup _ = genericLookupCodeDB $ gets contextCodeDB
   insert _ = genericInsertCodeDB $ gets contextCodeDB
   delete _ = genericDeleteCodeDB $ gets contextCodeDB
@@ -259,7 +259,7 @@ instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance (SHA `A.Alters` BlockSummary) ContextM where
+instance (Keccak256 `A.Alters` BlockSummary) ContextM where
   lookup _ = genericLookupBlockSummaryDB $ gets contextBlockSummaryDB
   insert _ = genericInsertBlockSummaryDB $ gets contextBlockSummaryDB
   delete _ = genericDeleteBlockSummaryDB $ gets contextBlockSummaryDB

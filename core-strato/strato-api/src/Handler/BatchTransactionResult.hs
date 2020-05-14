@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Handler.BatchTransactionResult where
 
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Data.Aeson
 import           Data.Aeson.Encoding
 import qualified Data.Map.Strict     as M
@@ -13,21 +13,21 @@ import           Import
 import           Numeric             (readHex)
 import qualified Prelude             as P
 
-data StrungSHA = StrungSHA { unStrungSHA :: SHA }
+data StrungSHA = StrungSHA { unStrungSHA :: Keccak256 }
     deriving (Eq, Ord, Read, Show)
 
 instance FromJSON StrungSHA where
     parseJSON (String s) = case readHex $ T.unpack s of
-        [(x, "")] -> return . StrungSHA $ unsafeCreateSHAFromWord256 x
+        [(x, "")] -> return . StrungSHA $ unsafeCreateKeccak256FromWord256 x
         _         -> fail "Expected a hex string of 32 bytes"
-    parseJSON _ = fail "Expected a String containing a SHA"
+    parseJSON _ = fail "Expected a String containing a Keccak256"
 
 instance ToJSON StrungSHA where
-    toJSON = String . T.pack . formatSHAWithoutColor . unStrungSHA
+    toJSON = String . T.pack . formatKeccak256WithoutColor . unStrungSHA
 
 instance ToJSONKey StrungSHA where
     toJSONKey = ToJSONKeyText f (text . f)
-      where f = T.pack . formatSHAWithoutColor . unStrungSHA
+      where f = T.pack . formatKeccak256WithoutColor . unStrungSHA
 
 postBatchTransactionResultR :: HandlerFor App Value
 postBatchTransactionResultR = do

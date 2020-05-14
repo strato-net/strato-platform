@@ -27,7 +27,6 @@ import           Control.Monad.Except
 import           Data.Bifunctor                   (bimap)
 import qualified Data.Bimap                       as Bimap
 import           Data.Bits
-import qualified Data.ByteArray                   as ByteArray
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Base16           as B16
@@ -102,7 +101,7 @@ getArrayStartingKey :: Word256 -> Word256
 getArrayStartingKey = getArrayStartingKeyBS . word256ToByteString
 
 getArrayStartingKeyBS :: ByteString -> Word256
-getArrayStartingKeyBS = byteStringToWord256 . ByteArray.convert . digestKeccak256 . keccak256
+getArrayStartingKeyBS = keccak256ToWord256 . hash
 
 decodeStorageKeySimple :: SimpleType -> Word256 -> Integer -> Integer -> [(Word256, Word256)]
 decodeStorageKeySimple TypeString          o ofs cnt = let sk = toInteger $ getArrayStartingKey o

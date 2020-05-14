@@ -21,7 +21,7 @@ import           Blockchain.Data.ArbitraryInstances        ()
 import           Blockchain.Data.BlockDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB            as RDB
 import           Blockchain.Strato.RedisBlockDB.Models
 import           Blockchain.Strato.RedisBlockDB.Test.Chain
@@ -65,13 +65,13 @@ specTest = around (withConn 1) $ do
 
     flushDB
 
-    it "Should not have a header for SHA 0" $ \c -> do
-      r <- runRedis c (RDB.getHeader $ unsafeCreateSHAFromWord256 0)
-      HUnit.assertBool "Found header for SHA 0" $ isNothing r
+    it "Should not have a header for Keccak256 0" $ \c -> do
+      r <- runRedis c (RDB.getHeader $ unsafeCreateKeccak256FromWord256 0)
+      HUnit.assertBool "Found header for Keccak256 0" $ isNothing r
 
-    it "Should not have a block for SHA 0" $ \c -> do
-      r <- runRedis c (RDB.getBlock $ unsafeCreateSHAFromWord256 0)
-      HUnit.assertBool "Found block for SHA 0" $ isNothing r
+    it "Should not have a block for Keccak256 0" $ \c -> do
+      r <- runRedis c (RDB.getBlock $ unsafeCreateKeccak256FromWord256 0)
+      HUnit.assertBool "Found block for Keccak256 0" $ isNothing r
 
     it "Should put and get a header" $ \c -> do
       b <- generate arbitrary
@@ -91,7 +91,7 @@ specTest = around (withConn 1) $ do
       p' <- runRedis conn $ do
           void $ RDB.putHeader p
           void $ RDB.putHeader c'
-          RDB.getParent (blockHeaderHash c') :: Redis (Maybe SHA)
+          RDB.getParent (blockHeaderHash c') :: Redis (Maybe Keccak256)
       HUnit.assertEqual
           ("Couldn' match parent hash for child " ++ format cHash ++ " and parent " ++ format pHash)
           (Just pHash) p'
@@ -142,7 +142,7 @@ specTest = around (withConn 1) $ do
       r <- runRedis conn $ do
           void $ RDB.putBlock p
           void $ RDB.putBlock c'
-          cph <- RDB.getParent cHash :: Redis (Maybe SHA)
+          cph <- RDB.getParent cHash :: Redis (Maybe Keccak256)
           case cph of
               Nothing -> pure Nothing
               Just pp -> RDB.getBlock pp
@@ -240,7 +240,7 @@ specTest = around (withConn 1) $ do
           workChain RDB.putBestBlockInfo $ head chains -- insert shortest best chain
           workChain RDB.putBestBlockInfo $ last chains -- insert longest best chain
           let maxN = fromIntegral . blockDataNumber . head . last $ chains
-          RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
+          RDB.getCanonicalHeaderChain 0 maxN :: Redis [(Keccak256, BlockData)]
 
       HUnit.assertEqual
           "Couldn't get the longest best chain"
@@ -271,7 +271,7 @@ specTest = around (withConn 1) $ do
 
           validated <- runRedis conn $ do
             let maxN = fromIntegral . blockDataNumber . head . last $ chains
-            canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis[(SHA, BlockData)]
+            canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis[(Keccak256, BlockData)]
             return . validateChain . map snd $ canon
 
           HUnit.assertBool
@@ -283,7 +283,7 @@ specTest = around (withConn 1) $ do
       chain <- createChain 10
       validated <- runRedis conn $ do
         let maxN = fromIntegral . blockDataNumber . last $ chain
-        canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis[(SHA, BlockData)]
+        canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis[(Keccak256, BlockData)]
         return . validateChain . map snd $ canon
 
       HUnit.assertBool
@@ -303,7 +303,7 @@ specTest = around (withConn 1) $ do
           forM_ newChain RDB.putHeader
           workChain RDB.putBestBlockInfo newChain
           let maxN = (+1) . fromIntegral . blockDataNumber . last $ newChain
-          canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
+          canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(Keccak256, BlockData)]
           return $ map snd canon
 
       HUnit.assertEqual
@@ -319,7 +319,7 @@ specTest = around (withConn 1) $ do
         forM_ chain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
         _ <- putBestBlockInfo (last chain)
         let maxN = (+1) . fromIntegral . blockDataNumber . last $ chain
-        canonical <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
+        canonical <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(Keccak256, BlockData)]
         return $ map snd canonical
 
       HUnit.assertBool ("Could not verify canonical chain") (validateChain canon)
@@ -398,7 +398,7 @@ specTest = around (withConn 1) $ do
         forM_ newChain RDB.putHeader
         _ <- putBestBlockInfo (last newChain)
         let maxN = (+1) . fromIntegral . blockDataNumber . last $ newChain
-        canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
+        canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(Keccak256, BlockData)]
         return (map snd canon)
       HUnit.assertEqual ("Modifications and deletions share common entries")
        newChain newCanon
@@ -414,7 +414,7 @@ putBestBlockInfo b =
 prettyBlock :: Monad m => BlockData -> m (Integer, String, String)
 prettyBlock b = return (blockDataNumber b, showHash . blockDataParentHash $ b, showHash . blockHeaderHash $ b)
 
-callCommonAncestor :: [BlockData] -> [BlockData] -> Redis (Either Reply ([(SHA, Integer)], [Integer])) -- ([Updates], [Deletions])
+callCommonAncestor :: [BlockData] -> [BlockData] -> Redis (Either Reply ([(Keccak256, Integer)], [Integer])) -- ([Updates], [Deletions])
 
 callCommonAncestor old new =
   let
@@ -424,7 +424,7 @@ callCommonAncestor old new =
     newSha = (blockHeaderHash . last) new
   in RDB.commonAncestorHelper oldNumber newNumber oldSha newSha
 
-insertAndUpdateChain :: BlockData -> [BlockData] -> [BlockData] -> Redis [(SHA, BlockData)]
+insertAndUpdateChain :: BlockData -> [BlockData] -> [BlockData] -> Redis [(Keccak256, BlockData)]
 insertAndUpdateChain g oldChain newChain = do
         void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
         forM_ oldChain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
@@ -434,15 +434,15 @@ insertAndUpdateChain g oldChain newChain = do
         forM_ mods $ \(sha, num) -> set (RDB.inNamespace Canonical $ num) (toValue sha)
         unless (null dels) . void . del $ RDB.inNamespace Canonical . toKey <$> dels
         let maxN = (+1) . fromIntegral . blockDataNumber . last $ newChain
-        RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
+        RDB.getCanonicalHeaderChain 0 maxN :: Redis [(Keccak256, BlockData)]
 
-workChain :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()
+workChain :: (Keccak256 -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()
 workChain g chain = forM_ zC f
     where
         f (b, i) = g (blockHeaderHash b) (blockDataNumber b) i
         zC       = zip (reverse chain) [1..]
 
-workChain' :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()
+workChain' :: (Keccak256 -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()
 workChain' g = foldM_ f 0
     where
         f d b = do

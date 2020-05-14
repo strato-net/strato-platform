@@ -11,7 +11,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t b | b -> h t where
     blockHeader       :: b -> h
@@ -24,7 +24,7 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     blockOrdering :: b -> Integer
     blockOrdering = blockHeaderOrdering . blockHeader
 
-    blockHash :: b -> SHA
+    blockHash :: b -> Keccak256
     blockHash = blockHeaderHash . blockHeader
 
     buildBlock' :: (BlockHeaderLike h2, TransactionLike t2) => h2 -> [t2] -> [h2] -> b
@@ -36,8 +36,8 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
 
 class RLPSerializable h => BlockHeaderLike h where
     blockHeaderBlockNumber      :: h -> Integer
-    blockHeaderParentHash       :: h -> SHA
-    blockHeaderOmmersHash       :: h -> SHA
+    blockHeaderParentHash       :: h -> Keccak256
+    blockHeaderOmmersHash       :: h -> Keccak256
     blockHeaderBeneficiary      :: h -> Address
     blockHeaderStateRoot        :: h -> B.ByteString -- todo: "StateRoot" thats not the MPDB StateRoot
     blockHeaderTransactionsRoot :: h -> B.ByteString -- todo: ditto
@@ -49,7 +49,7 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderNonce            :: h -> Word64 -- todo: nonce newtype
     blockHeaderExtraData        :: h -> B.ByteString -- todo: extradata newtype
     blockHeaderTimestamp        :: h -> UTCTime
-    blockHeaderMixHash          :: h -> SHA
+    blockHeaderMixHash          :: h -> Keccak256
 
     -- This should be Lens' h B.ByteString, except that the RedisHeader cannot
     -- derive it.
@@ -62,14 +62,14 @@ class RLPSerializable h => BlockHeaderLike h where
                 blockHeaderDifficulty, blockHeaderNonce, blockHeaderExtraData, blockHeaderTimestamp,
                 blockHeaderMixHash, blockHeaderModifyExtra, morphBlockHeader #-}
 
-    blockHeaderHash :: h -> SHA
+    blockHeaderHash :: h -> Keccak256
     blockHeaderHash = hash
                     . rlpSerialize
                     . rlpEncode
                     . blockHeaderModifyExtra scrubCommitmentSeals
 
     -- This is a PBFT style partial hash. PoW style partial hash should remove the nonce instead.
-    blockHeaderPartialHash :: h -> SHA
+    blockHeaderPartialHash :: h -> Keccak256
     blockHeaderPartialHash = blockHeaderHash . blockHeaderModifyExtra scrubConsensus
 
     blockHeaderOrdering :: h -> Integer
@@ -79,9 +79,9 @@ data TransactionType = ContractCreation | Message | PrivateHash deriving (Eq, Or
 
 -- todo: newtype all these vague Integers
 class (RLPSerializable t) => TransactionLike t where
-    txHash        :: t -> SHA
-    txPartialHash :: t -> SHA
-    txChainHash   :: t -> SHA
+    txHash        :: t -> Keccak256
+    txPartialHash :: t -> Keccak256
+    txChainHash   :: t -> Keccak256
     txSigner      :: t -> Maybe Address
     txNonce       :: t -> Integer
     txType        :: t -> TransactionType

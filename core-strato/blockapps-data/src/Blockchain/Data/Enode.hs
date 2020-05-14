@@ -39,7 +39,7 @@ import           Network.Socket.Internal
 import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 
 newtype IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
@@ -62,7 +62,7 @@ data Enode = Enode
   } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
 newtype ChainMembers = ChainMembers { unChainMembers :: M.Map Address Enode } deriving (Eq)
-newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [SHA] } deriving (Eq)
+newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [Keccak256] } deriving (Eq)
 newtype IPChains = IPChains { unIPChains :: S.Set Word256 } deriving (Eq)
 newtype OrgIdChains = OrgIdChains { unOrgIdChains :: S.Set Word256 } deriving (Eq)
 

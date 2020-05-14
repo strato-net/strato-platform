@@ -45,7 +45,6 @@ import           BlockApps.XAbiConverter
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.Keccak256
 
 getContracts :: Maybe ChainId -> Bloc GetContractsResponse
 getContracts chainId = blocTransaction $ do
@@ -323,8 +322,8 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
           Right _ -> do
             let ptr = contractdetailsCodeHash details
             case ptr of
-              EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) (shaKeccak256 hsh)
-              SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) (shaKeccak256 hsh)
+              EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) hsh
+              SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) hsh
 
 postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =

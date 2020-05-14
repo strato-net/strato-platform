@@ -23,7 +23,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 
 import           Blockchain.Strato.Model.Class
@@ -33,8 +33,8 @@ import           Text.Format
 
 data BlockHeader =
   BlockHeader {
-    parentHash       :: SHA,
-    ommersHash       :: SHA,
+    parentHash       :: Keccak256,
+    ommersHash       :: Keccak256,
     beneficiary      :: Address,
     stateRoot        :: MP.StateRoot,
     transactionsRoot :: MP.StateRoot,
@@ -46,7 +46,7 @@ data BlockHeader =
     gasUsed          :: Integer,
     timestamp        :: UTCTime,
     extraData        :: B.ByteString,
-    mixHash          :: SHA,
+    mixHash          :: Keccak256,
     nonce            :: Word64
     } deriving (Eq, Read, Show)
 
@@ -142,7 +142,7 @@ instance BlockHeaderLike BlockHeader where
                                               , mixHash          = blockHeaderMixHash b
                                               }
 
-headerHash :: BlockHeader->SHA
+headerHash :: BlockHeader->Keccak256
 headerHash = blockHeaderHash
 
 blockToBlockHeader::Block->BlockHeader

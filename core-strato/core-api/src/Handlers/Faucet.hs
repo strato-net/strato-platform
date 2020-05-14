@@ -43,7 +43,7 @@ import           Blockchain.Output
 import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util                (getCurrentMicrotime)
 
 import           Text.Format
@@ -167,7 +167,7 @@ emitKafkaTransactions txs = do
         Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
     return ()
 
-emitTransaction :: (MonadIO m, MonadLogger m) => Transaction -> m SHA
+emitTransaction :: (MonadIO m, MonadLogger m) => Transaction -> m Keccak256
 emitTransaction tx = do
   emitKafkaTransactions [tx]
   return $ txHash tx

@@ -65,7 +65,7 @@ import           Blockchain.EventException
 import           Blockchain.ExtWord
 import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.Verification
 
@@ -244,7 +244,7 @@ handleEvents peer = awaitForever $ \case
             lift stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
-    -- todo: e.g. if they have bodies for SHAs [1, 2, 4, 7, 8, 9] and you request [1..10] you'll get
+    -- todo: e.g. if they have bodies for Keccak256s [1, 2, 4, 7, 8, 9] and you request [1..10] you'll get
     -- todo: bodies [1, 2, 4, 7, 8, 9] and have to correlate the bodies to the headers yourself
     -- todo: it doesn't seem like we support that behavior very well yet, so we'll just stop sending
     -- todo: blocks once we can't find one. this way we can always correlate header to body in
@@ -264,11 +264,11 @@ handleEvents peer = awaitForever $ \case
           yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
           ptxs <- fmap M.elems . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) pshas
           unless (null ptxs) . yieldR . Transactions $ morphTx  . snd . unPrivate <$> ptxs
-        where getUntilMissing :: ( (SHA `Selectable` ChainTxsInBlock) m
+        where getUntilMissing :: ( (Keccak256 `Selectable` ChainTxsInBlock) m
                                  , (Word256 `Selectable` ChainMembers) m
-                                 , (SHA `Alters` OutputBlock) m
+                                 , (Keccak256 `Alters` OutputBlock) m
                                  )
-                              => [SHA] -> DL.DList OutputBlock -> DL.DList SHA -> m ([OutputBlock],[SHA])
+                              => [Keccak256] -> DL.DList OutputBlock -> DL.DList Keccak256 -> m ([OutputBlock],[Keccak256])
               getUntilMissing []     bodies pshas = return (DL.toList bodies, DL.toList pshas)
               getUntilMissing (h:hs) bodies pshas = lookup (Proxy @OutputBlock) h >>= \case
                   Nothing   -> return (DL.toList bodies, DL.toList pshas)

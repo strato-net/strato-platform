@@ -23,11 +23,11 @@ import              Test.QuickCheck
 
 import              Blockchain.Data.RLP
 import              Blockchain.SolidVM.Model             (CodeKind(..))
-import              Blockchain.Strato.Model.SHA
+import              Blockchain.Strato.Model.Keccak256
 import              Text.Format
 
 
-data CodePtr = EVMCode SHA | SolidVMCode String SHA
+data CodePtr = EVMCode Keccak256 | SolidVMCode String Keccak256
              deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable, Data)
 
 
@@ -78,7 +78,7 @@ instance Format CodePtr where
   format (EVMCode ch) = format ch
   format (SolidVMCode n ch) = "<" ++ n ++ ", " ++ format ch ++ ">"
 
-codePtrToSHA :: CodePtr -> SHA
+codePtrToSHA :: CodePtr -> Keccak256
 codePtrToSHA (EVMCode hsh) = hsh
 codePtrToSHA (SolidVMCode _ hsh) = hsh
 

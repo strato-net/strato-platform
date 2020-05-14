@@ -6,7 +6,7 @@ import System.Exit
 import Text.Printf
 
 import Blockchain.Data.ChainInfo
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Text.Format
 
 chainHash :: IO ()

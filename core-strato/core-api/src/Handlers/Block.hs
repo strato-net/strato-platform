@@ -22,7 +22,7 @@ import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.Strato.Model.SHA hiding (hash)
+import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 import           SQLM
 
@@ -34,7 +34,7 @@ type API =
           :> QueryParam "coinbase" Address
           :> QueryParam "address" Address
           :> QueryParam "blockid" Text
-          :> QueryParam "hash" SHA
+          :> QueryParam "hash" Keccak256
           :> QueryParam "mindiff" Integer
           :> QueryParam "maxdiff" Integer
           :> QueryParam "diff" Integer
@@ -48,7 +48,7 @@ type API =
           :> QueryParam "minnumber" Integer
           :> QueryParam "maxnumber" Integer
           :> QueryParam "index" Int
-          :> QueryParam "chainid" SHA
+          :> QueryParam "chainid" Keccak256
           :> QueryParam "sortby" Sortby :> Get '[JSON] [Block']
 
 
@@ -59,10 +59,10 @@ server pool = getBlockInfo pool
 
 getBlockInfo :: ConnectionPool ->
                  Maybe Address -> Maybe Address -> Maybe Address -> Maybe Text ->
-                 Maybe SHA -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
+                 Maybe Keccak256 -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
                  Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
                  Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
-                 Maybe Integer -> Maybe Int -> Maybe SHA -> Maybe Sortby ->
+                 Maybe Integer -> Maybe Int -> Maybe Keccak256 -> Maybe Sortby ->
                  Handler [Block']
 getBlockInfo pool
   txaddress coinbase address blockid hash mindiff maxdiff diff

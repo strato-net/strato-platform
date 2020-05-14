@@ -25,7 +25,7 @@ import           Servant
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           SQLM
 
@@ -40,21 +40,21 @@ server connStr = postBatchTransactionResult connStr
 
 ---------------------------
 
-data StrungSHA = StrungSHA { unStrungSHA :: SHA }
+data StrungSHA = StrungSHA { unStrungSHA :: Keccak256 }
     deriving (Eq, Ord, Read, Show)
 
 instance FromJSON StrungSHA where
     parseJSON (String s) = case readHex $ T.unpack s of
-        [(x, "")] -> return . StrungSHA $ unsafeCreateSHAFromWord256 x
+        [(x, "")] -> return . StrungSHA $ unsafeCreateKeccak256FromWord256 x
         _         -> fail "Expected a hex string of 32 bytes"
-    parseJSON _ = fail "Expected a String containing a SHA"
+    parseJSON _ = fail "Expected a String containing a Keccak256"
 
 instance ToJSON StrungSHA where
-    toJSON = String . T.pack . formatSHAWithoutColor . unStrungSHA
+    toJSON = String . T.pack . formatKeccak256WithoutColor . unStrungSHA
 
 instance ToJSONKey StrungSHA where
     toJSONKey = ToJSONKeyText f (text . f)
-      where f = T.pack . formatSHAWithoutColor . unStrungSHA
+      where f = T.pack . formatKeccak256WithoutColor . unStrungSHA
 
 instance MimeUnrender PlainText [StrungSHA] where
   mimeUnrender _ = maybe (Left "Couldn't decode [Keccak256]") Right . decode

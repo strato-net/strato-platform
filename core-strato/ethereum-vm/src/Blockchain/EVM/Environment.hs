@@ -8,7 +8,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Data.Map.Strict            (Map)
 import qualified Data.IntSet                as I
 import           Data.Text                  (Text)
@@ -24,7 +24,7 @@ data Environment =
       envCode        :: Code,
       envJumpDests   :: I.IntSet,
       envBlockHeader :: BlockData,
-      envTxHash      :: SHA,
+      envTxHash      :: Keccak256,
       envChainId     :: Maybe Word256,
       envMetadata    :: Maybe (Map Text Text)
     } deriving (Show, Generic, NFData)
