@@ -5,10 +5,10 @@
 module Blockchain.Sequencer.Event where
 
 import           Control.DeepSeq
+import           Control.Lens
 import           Data.Aeson                                hiding (encode)
 import           Data.Binary
 import           Data.Data
-import           Data.Functor.Identity
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust, isNothing)
 import           Data.DeriveTH
@@ -542,3 +542,22 @@ instance FromJSON OutputTx' where
 -- just end me fam
 instance Arbitrary JsonRpcCommand where
    arbitrary = JRCGetBalance <$> arbitrary <*> arbitrary <*> arbitrary
+
+-- has to go down here because of Lens TH shenanigans
+data BatchSeqLoopEvent = BatchSeqLoopEvent
+  { _timerFires  :: [PBFT.RoundNumber]
+  , _votesMade   :: [PBFT.CandidateReceived]
+  , _ingestEvents :: [IngestEvent]
+  }
+makeLenses ''BatchSeqLoopEvent
+
+emptyBatchSeqLoopEvent :: BatchSeqLoopEvent
+emptyBatchSeqLoopEvent = BatchSeqLoopEvent [] [] []
+
+batchSeqLoopEvents :: [SeqLoopEvent] -> BatchSeqLoopEvent
+batchSeqLoopEvents = foldr f emptyBatchSeqLoopEvent
+  where f s b = case s of
+          TimerFire r -> (timerFires %~ (r:)) b
+          VoteMade r -> (votesMade %~ (r:)) b
+          UnseqEvent r -> (ingestEvents %~ (r:)) b
+          WaitTerminated -> b
