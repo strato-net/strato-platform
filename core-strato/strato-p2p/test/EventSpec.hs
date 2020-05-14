@@ -13,37 +13,67 @@ import           Conduit
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Reader
 import           Control.Monad.State
+import           Crypto.PubKey.ECC.DH
+import           Crypto.PubKey.ECC.Types
+import           Data.Bits                             (shiftR)
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Base16                as B16
+import qualified Data.ByteString.Char8                 as BC
+import           Data.Conduit.TQueue                   hiding (newTQueueIO)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
+import           Data.Word                             (Word8)
 import           Text.Printf
 
 import           Blockchain.Blockstanbul               (blockstanbulSender)
-import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders, maxReturnedHeaders, connectionTimeout, unseqSink, vmEventsSink)
+import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Block                 hiding (bestBlockNumber)
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Control
 import qualified Blockchain.Data.DataDefs              as DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.Data.TransactionDef
+import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.Event
 import           Blockchain.ExtWord
 import           Blockchain.Options                    (AuthorizationMode(..))
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
-import           Blockchain.Sequencer.Kafka
-import           Blockchain.Stream.VMEvent
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 import           Blockchain.Strato.Model.Keccak256           (Keccak256, unsafeCreateKeccak256FromWord256)
+
+import           Executable.StratoP2PClient
+import           Executable.StratoP2PServer
 
 import           Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted        as L
 import           Test.QuickCheck
 
+import           UnliftIO
+import           UnliftIO.Concurrent                   (threadDelay)
+
+-- TODO: these were imported from ethereum-encryption, which is still using
+--       crypto-pubkey and crypto-random. Remove these once ethereum-encryption
+--       switches over to cryptonite
+theCurve :: Curve
+theCurve = getCurveByName SEC_p256k1
+
+pointToString :: Point -> String
+pointToString = BC.unpack . B16.encode . pointToBytes
+
+pointToBytes :: Point -> B.ByteString
+pointToBytes (Point x y) = B.pack $ intToBytes x ++ intToBytes y
+pointToBytes PointO      = error "pointToBytes got value PointO, I don't know what to do here"
+
+intToBytes :: Integer -> [Word8]
+intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
+
 data TestContext = TestContext
-  { _unseqSink             :: [[IngestEvent]]
-  , _vmEventsSink          :: [[VMEvent]]
+  { _blocks                :: [Block]
   , _blockHeaders          :: [DataDefs.BlockData]
   , _remainingBlockHeaders :: RemainingBlockHeaders
   , _actionTimestamp       :: ActionTimestamp
@@ -64,106 +94,111 @@ data TestContext = TestContext
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String DataPeer.PPeer
+  , _unseqEvents           :: [IngestEvent]
   }
 
 makeLenses ''TestContext
 
-type TestContextM = StateT TestContext (ResourceT (LoggingT IO))
+type TestContextM = ReaderT (IORef TestContext) (ResourceT (LoggingT IO))
 
-instance Monad m => (Keccak256 `A.Alters` DataDefs.BlockData) (StateT TestContext m) where
+instance {-# OVERLAPPING #-} MonadIO m => MonadState TestContext (ReaderT (IORef TestContext) m) where
+  state f = ask >>= liftIO . flip atomicModifyIORef' (swap . f)
+    where swap ~(a,b) = (b,a)
+
+instance MonadIO m => Stacks Block (ReaderT (IORef TestContext) m) where
+  takeStack _ n = take n <$> use blocks
+  pushStack bs  = do
+    let maxNum = maximum $ DataDefs.blockDataNumber . blockBlockData <$> bs
+    bestBlockNumber %= (\(BestBlockNumber n) -> BestBlockNumber $ max maxNum n)
+    blocks %= (bs ++)
+
+instance MonadIO m => (Keccak256 `A.Alters` DataDefs.BlockData) (ReaderT (IORef TestContext) m) where
   lookup _ k   = M.lookup k <$> use shaBlockDataMap
   insert _ k v = shaBlockDataMap %= M.insert k v
   delete _ k   = shaBlockDataMap %= M.delete k
 
-instance Monad m => Mod.Modifiable WorldBestBlock (StateT TestContext m) where
+instance MonadIO m => Mod.Modifiable WorldBestBlock (ReaderT (IORef TestContext) m) where
   get _ = use worldBestBlock
   put _ = assign worldBestBlock
 
-instance Monad m => Mod.Modifiable BestBlock (StateT TestContext m) where
+instance MonadIO m => Mod.Modifiable BestBlock (ReaderT (IORef TestContext) m) where
   get _ = use bestBlock
   put _ = assign bestBlock
 
-instance Monad m => A.Selectable Integer (Canonical DataDefs.BlockData) (StateT TestContext m) where
+instance MonadIO m => A.Selectable Integer (Canonical DataDefs.BlockData) (ReaderT (IORef TestContext) m) where
   select _ i = M.lookup i <$> use canonicalBlockDataMap
 
-instance Monad m => A.Selectable IPAddress IPChains (StateT TestContext m) where
+instance MonadIO m => A.Selectable IPAddress IPChains (ReaderT (IORef TestContext) m) where
   select _ ip = M.lookup ip <$> use ipAddressIpChainsMap
 
-instance Monad m => A.Selectable OrgId OrgIdChains (StateT TestContext m) where
+instance MonadIO m => A.Selectable OrgId OrgIdChains (ReaderT (IORef TestContext) m) where
   select _ ip = M.lookup ip <$> use orgIdChainsMap
 
-instance Monad m => A.Selectable Keccak256 ChainTxsInBlock (StateT TestContext m) where
+instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT (IORef TestContext) m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
-instance Monad m => A.Selectable Word256 ChainMembers (StateT TestContext m) where
+instance MonadIO m => A.Selectable Word256 ChainMembers (ReaderT (IORef TestContext) m) where
   select _ cid = M.lookup cid <$> use chainMembersMap
 
-instance Monad m => A.Selectable Word256 ChainInfo (StateT TestContext m) where
+instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT (IORef TestContext) m) where
   select _ cid = M.lookup cid <$> use chainInfoMap
 
-instance Monad m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (StateT TestContext m) where
+instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT (IORef TestContext) m) where
   select _ tx = M.lookup tx <$> use privateTxMap
 
-instance Monad m => (Keccak256 `A.Alters` OutputBlock) (StateT TestContext m) where
+instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT (IORef TestContext) m) where
   lookup _ k   = M.lookup k <$> use shaOutputBlockMap
   insert _ k v = shaOutputBlockMap %= M.insert k v
   delete _ k   = shaOutputBlockMap %= M.delete k
 
-instance Monad m => Mod.Accessible GenesisBlockHash (StateT TestContext m) where
+instance MonadIO m => Mod.Accessible GenesisBlockHash (ReaderT (IORef TestContext) m) where
   access _ = use genesisBlockHash
 
-instance Monad m => Mod.Accessible BestBlockNumber (StateT TestContext m) where
+instance MonadIO m => Mod.Accessible BestBlockNumber (ReaderT (IORef TestContext) m) where
   access _ = use bestBlockNumber
 
-instance Monad m => Mod.Modifiable ActionTimestamp (StateT TestContext m) where
+instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT (IORef TestContext) m) where
   get _ = use actionTimestamp
   put _ = assign actionTimestamp
 
-instance Monad m => Mod.Accessible ActionTimestamp (StateT TestContext m) where
+instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT (IORef TestContext) m) where
   access _ = Mod.get (Mod.Proxy @ActionTimestamp)
 
-instance Monad m => Mod.Modifiable [DataDefs.BlockData] (StateT TestContext m) where
+instance MonadIO m => Mod.Modifiable [DataDefs.BlockData] (ReaderT (IORef TestContext) m) where
   get _ = use blockHeaders
   put _ = assign blockHeaders
 
-instance Monad m => Mod.Accessible [DataDefs.BlockData] (StateT TestContext m) where
+instance MonadIO m => Mod.Accessible [DataDefs.BlockData] (ReaderT (IORef TestContext) m) where
   access _ = Mod.get (Mod.Proxy @[DataDefs.BlockData])
 
-instance Monad m => Mod.Modifiable RemainingBlockHeaders (StateT TestContext m) where
+instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT (IORef TestContext) m) where
   get _ = use remainingBlockHeaders
   put _ = assign remainingBlockHeaders
 
-instance Monad m => Mod.Accessible RemainingBlockHeaders (StateT TestContext m) where
+instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT (IORef TestContext) m) where
   access _ = Mod.get (Mod.Proxy @RemainingBlockHeaders)
 
-instance Monad m => Mod.Accessible MaxReturnedHeaders (StateT TestContext m) where
+instance MonadIO m => Mod.Accessible MaxReturnedHeaders (ReaderT (IORef TestContext) m) where
   access _ = use maxReturnedHeaders
 
-instance Monad m => Mod.Modifiable PeerAddress (StateT TestContext m) where
+instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT (IORef TestContext) m) where
   get _ = use peerAddr
   put _ = assign peerAddr
 
-instance Monad m => Mod.Accessible PeerAddress (StateT TestContext m) where
+instance MonadIO m => Mod.Accessible PeerAddress (ReaderT (IORef TestContext) m) where
   access _ = Mod.get (Mod.Proxy @PeerAddress)
 
-instance Monad m => Mod.Accessible ConnectionTimeout (StateT TestContext m) where
+instance MonadIO m => Mod.Accessible ConnectionTimeout (ReaderT (IORef TestContext) m) where
   access _ = use connectionTimeout
 
-instance Monad m => Mod.Accessible (UnseqSink (StateT TestContext m)) (StateT TestContext m) where
-  access _ = return $ \e -> unseqSink %= (e:)
-
-instance Monad m => HasVMEventsSink (StateT TestContext m) where
-  getVMEventsSink = return $ \v -> vmEventsSink %= (v:)
-
-instance Monad m => A.Selectable String DataPeer.PPeer (StateT TestContext m) where
+instance MonadIO m => A.Selectable String DataPeer.PPeer (ReaderT (IORef TestContext) m) where
   select _ tx = M.lookup tx <$> use stringPPeerMap
 
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
 testContext :: TestContext
 testContext = TestContext
-  { _unseqSink             = []
-  , _vmEventsSink          = []
+  { _blocks                = []
   , _blockHeaders          = []
   , _remainingBlockHeaders = RemainingBlockHeaders []
   , _actionTimestamp       = emptyActionTimestamp
@@ -184,21 +219,65 @@ testContext = TestContext
   , _genesisBlockHash      = GenesisBlockHash (unsafeCreateKeccak256FromWord256 0)
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.empty
+  , _unseqEvents           = []
   }
 
 testPeer :: DataPeer.PPeer
 testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)
 
 runTestPeer :: TestContextM a -> IO ()
-runTestPeer = void . runNoLoggingT . runResourceT . flip runStateT testContext
+runTestPeer f = do
+  ctx <- newIORef testContext
+  void . runNoLoggingT . runResourceT $ runReaderT f ctx
+
+execTestPeer :: TestContextM a -> IO (a, TestContext)
+execTestPeer f = do
+  ctx <- newIORef testContext
+  a <- runNoLoggingT . runResourceT $ runReaderT f ctx
+  ctx' <- readIORef ctx
+  return (a, ctx')
 
 spec :: Spec
 spec = do
-  describe "environment sanity checks" $ do
-    it "can pretend to write to kafka" $ do
-      quickCheck . once $ \ori txs -> runTestPeer $ emitKafkaTransactions ori txs
-      quickCheck . once $ \ori blk -> runTestPeer $ emitKafkaBlock ori blk
-
+  describe "network simulation" $ do
+    it "should send a transaction from server to client" $ do
+      serverPriv <- generatePrivate theCurve
+      let serverPub = calculatePublic theCurve serverPriv
+          serverPeer = DataPeer.buildPeer (Just $ pointToString serverPub, "1.2.3.4", 30303)
+      clientPriv <- generatePrivate theCurve
+      let clientPub = calculatePublic theCurve clientPriv
+          clientPeer = DataPeer.buildPeer (Just $ pointToString clientPub, "5.6.7.8", 30303)
+          clearChainId tx = case tx of
+            MessageTX{} -> tx{transactionChainId = Nothing}
+            ContractCreationTX{} -> tx{transactionChainId = Nothing}
+            PrivateHashTX{} -> tx
+          unseqSink ies = unseqEvents %= (++ ies)
+      serverToClient <- newTQueueIO
+      clientToServer <- newTQueueIO
+      serverSeqSource <- newTQueueIO
+      clientSeqSource <- newTQueueIO
+      otx <- (\o -> o{otBaseTx = clearChainId (otBaseTx o), otOrigin = Origin.API}) <$> liftIO (generate arbitrary)
+      let runServer = execTestPeer . timeout 2000000 $
+            runEthServerConduit serverPriv
+                                clientPeer
+                                (sourceTQueue clientToServer)
+                                (sinkTQueue serverToClient)
+                                (sourceTQueue serverSeqSource)
+                                unseqSink
+                                "server"
+          runClient = execTestPeer . timeout 2000000 $
+            runEthClientConduit clientPriv
+                                serverPeer
+                                (sourceTQueue serverToClient)
+                                (sinkTQueue clientToServer)
+                                (sourceTQueue clientSeqSource)
+                                unseqSink
+                                "client"
+          postTx = threadDelay 500000 >> (atomically $ writeTQueue serverSeqSource (P2pTx otx))
+      ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently (concurrently runServer runClient) postTx
+      _unseqEvents serverCtx `shouldBe` []
+      let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]
+      clientTxs `shouldBe` [otBaseTx otx]
   describe "handleEvents" $ do
     it "should pong a ping" $
       runTestPeer $ do
@@ -216,9 +295,7 @@ spec = do
         runConduit $ yield (MsgEvt (Blockstanbul wm))
                            .| handleEvents testPeer
                            .| sinkList
-           `L.shouldReturn` []
-        unseqEvents <- use unseqSink
-        unseqEvents `L.shouldBe` [[IEBlockstanbul wm]]
+           `L.shouldReturn` [Left $ ToUnseq [IEBlockstanbul wm]]
         -- Now that the peer is known to be addr, we should only send if they are designated
         shouldSendToPeer addr `L.shouldReturn` True
         shouldSendToPeer 0xa `L.shouldReturn` False

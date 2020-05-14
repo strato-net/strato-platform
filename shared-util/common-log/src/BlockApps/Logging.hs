@@ -7,6 +7,7 @@ module BlockApps.Logging
  ( flags_minLogLevel
  , LoggingT
  , runLoggingT
+ , runLoggingTWithLevel 
  , runNoLoggingT
  , module Control.Monad.Logger
  , logDebugLS
@@ -39,7 +40,10 @@ defineEQFlag "minLogLevel" [| ML.LevelInfo :: LogLevel |] "MINLOGLEVEL"  "Minimu
 type LoggingT = ML.LoggingT
 
 runLoggingT :: LoggingT m a -> m a
-runLoggingT = flip ML.runLoggingT commonLog
+runLoggingT = runLoggingTWithLevel flags_minLogLevel
+
+runLoggingTWithLevel :: LogLevel -> LoggingT m a -> m a
+runLoggingTWithLevel level = flip ML.runLoggingT (commonLog level)
 
 runNoLoggingT :: LoggingT m a -> m a
 runNoLoggingT = flip ML.runLoggingT devNull
@@ -49,9 +53,9 @@ runNoLoggingT = flip ML.runLoggingT devNull
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
 
-commonLog :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
-commonLog loc logSource level msg = do
-  when (level >= flags_minLogLevel) $ do
+commonLog :: LogLevel -> Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+commonLog minLogLevel loc logSource level msg = do
+  when (level >= minLogLevel) $ do
     myTID <- myThreadId
     timestamp <- getCurrentTime
     lock $ formatLogOutput timestamp myTID loc logSource level msg
