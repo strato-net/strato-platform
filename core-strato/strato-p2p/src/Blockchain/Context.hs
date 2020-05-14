@@ -70,7 +70,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents, UnseqSink)
 
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.VMEvent             ( HasVMEventsSink(..)
                                                        , VMEvent
                                                        , getBestKafkaBlockNumber
@@ -116,12 +116,12 @@ data Context = Context
 
 makeLenses ''Context
 
-newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: SHA }
+newtype GenesisBlockHash = GenesisBlockHash { unGenesisBlockHash :: Keccak256 }
 newtype BestBlockNumber = BestBlockNumber { unBestBlockNumber :: Integer }
 
 type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
 
-instance MonadIO m => (SHA `A.Alters` BlockData) (StateT Context m) where
+instance MonadIO m => (Keccak256 `A.Alters` BlockData) (StateT Context m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
   delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
@@ -132,7 +132,7 @@ instance MonadIO m => (SHA `A.Alters` BlockData) (StateT Context m) where
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (StateT Context m) where
   get _ = RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
-    Nothing -> WorldBestBlock $ BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
+    Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> WorldBestBlock $ BestBlock s n d
   put _ (WorldBestBlock (BestBlock s n d)) =
     RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n d) >>= \case
@@ -142,7 +142,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (StateT Con
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (StateT Context m) where
   get _ = RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
-    Nothing -> BestBlock (unsafeCreateSHAFromWord256 0) (-1) 0
+    Nothing -> BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> BestBlock s n d
   put _ (BestBlock s n d) =
     RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n d) >>= \case
@@ -165,7 +165,7 @@ instance MonadIO m => A.Selectable OrgId OrgIdChains (StateT Context m) where
                       . RBDB.getOrgIdChains
                       . unOrgId
 
-instance MonadIO m => A.Selectable SHA ChainTxsInBlock (StateT Context m) where
+instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (StateT Context m) where
   select p sha = A.selectWithDefault p sha <&> toMaybe def
   selectWithDefault _ = fmap ChainTxsInBlock
                       . RBDB.withRedisBlockDB
@@ -180,10 +180,10 @@ instance MonadIO m => A.Selectable Word256 ChainMembers (StateT Context m) where
 instance MonadIO m => A.Selectable Word256 ChainInfo (StateT Context m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
 
-instance MonadIO m => A.Selectable SHA (Private (Word256, OutputTx)) (StateT Context m) where
+instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (StateT Context m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
 
-instance MonadIO m => (SHA `A.Alters` OutputBlock) (StateT Context m) where
+instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (StateT Context m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
   delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteBlock

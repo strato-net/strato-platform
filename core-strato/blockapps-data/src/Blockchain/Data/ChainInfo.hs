@@ -26,7 +26,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON()
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.TypeLits
 import           Blockchain.Util
 
@@ -229,7 +229,7 @@ data UnsignedChainInfo = UnsignedChainInfo
   , codeInfo       :: [CodeInfo]
   , members        :: (M.Map Address Enode)
   , parentChain    :: (Maybe Word256)
-  , creationBlock  :: SHA
+  , creationBlock  :: Keccak256
   , chainNonce     :: Word256
   , chainMetadata  :: (M.Map T.Text T.Text)
   } deriving (Eq, Show, GHCG.Generic, Data)

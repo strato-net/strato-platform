@@ -56,7 +56,7 @@ import           Blockchain.EVM.VMM (readGasRemaining)
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
@@ -125,12 +125,12 @@ getNumber "" = 0
 getNumber x  = read x
 
 --Just a cheap trick to enable the display of nearly all storage keys in the tests
-someHashes::M.Map SHA Int
+someHashes::M.Map Keccak256 Int
 someHashes = M.fromList $ map (\x -> (hash (word256ToBytes x), fromIntegral x)) [0..255]
 
 showHash::Integer->String
 showHash val =
-  case M.lookup (unsafeCreateSHAFromWord256 (fromIntegral val)) someHashes of
+  case M.lookup (unsafeCreateKeccak256FromWord256 (fromIntegral val)) someHashes of
    Nothing -> showHexInt val ++ "[#ed]"
    Just x  -> show x
 
@@ -173,11 +173,11 @@ runTest test = do
   let block =
         Block {
           blockBlockData = BlockData {
-             blockDataParentHash = fromMaybe (unsafeCreateSHAFromWord256 0x0) . previousHash . env $ test,
+             blockDataParentHash = fromMaybe (unsafeCreateKeccak256FromWord256 0x0) . previousHash . env $ test,
              blockDataNumber = read . currentNumber . env $ test,
              blockDataCoinbase = currentCoinbase . env $ test,
              blockDataDifficulty = read . currentDifficulty . env $ test,
-             blockDataUnclesHash = unsafeCreateSHAFromWord256 0, --error "unclesHash not set",
+             blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0, --error "unclesHash not set",
              blockDataStateRoot = StateRoot "", -- error "bStateRoot not set",
              blockDataTransactionsRoot = StateRoot "", -- error "transactionsRoot not set",
              blockDataReceiptsRoot = StateRoot "", -- error "receiptsRoot not set", -- StateRoot ""
@@ -188,7 +188,7 @@ runTest test = do
              --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
              blockDataExtraData = "", --error "extraData not set",
              blockDataNonce = 0, --error "nonce not set",
-             blockDataMixHash=unsafeCreateSHAFromWord256 0 --error "mixHash not set"
+             blockDataMixHash=unsafeCreateKeccak256FromWord256 0 --error "mixHash not set"
              },
           blockReceiptTransactions = [], --error "receiptTransactions not set",
           blockBlockUncles = [] --error "blockUncles not set"
@@ -209,7 +209,7 @@ runTest test = do
                 envValue = getNumber $ value' exec,
                 envCode = code exec,
                 envJumpDests = getValidJUMPDESTs $ code exec,
-                envTxHash = unsafeCreateSHAFromWord256 0,
+                envTxHash = unsafeCreateKeccak256FromWord256 0,
                 envChainId = Nothing,
                 envMetadata = Nothing
                 }
@@ -284,7 +284,7 @@ runTest test = do
 
   afterAddressStates <- addressStates
 
-  let hashInteger = fromIntegral . bytesToWord256 . shaToByteString . hash . word256ToBytes . fromIntegral
+  let hashInteger = fromIntegral . bytesToWord256 . keccak256ToByteString . hash . word256ToBytes . fromIntegral
   let postTest = M.toList $
                  flip M.map (post test) $
                  \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')}

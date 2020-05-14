@@ -29,7 +29,7 @@ import Blockchain.ExtendedECDSA
 import Blockchain.FastECRecover
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import qualified Network.Haskoin.Crypto as HK
 
 instance Arbitrary IstanbulExtra where
@@ -80,7 +80,7 @@ scrubAllSeals = uncookRawExtra
 
 proposalMessage :: Block -> HK.Word256
 -- TODO(tim): Clear everything out of extraData except vanity and validators
-proposalMessage = shaToWord256
+proposalMessage = keccak256ToWord256
                 . hash
                 . rlpSerialize
                 . rlpEncode
@@ -98,20 +98,20 @@ verifyProposerSeal blk sig =
   let msg = proposalMessage blk
   in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
 
-commitmentMessage :: SHA -> HK.Word256
-commitmentMessage dig = shaToWord256 . hash . (<> B.singleton 2) . shaToByteString $ dig
+commitmentMessage :: Keccak256 -> HK.Word256
+commitmentMessage dig = keccak256ToWord256 . hash . (<> B.singleton 2) . keccak256ToByteString $ dig
 
-commitmentSeal :: SHA -> HK.PrvKey -> ExtendedSignature
+commitmentSeal :: Keccak256 -> HK.PrvKey -> ExtendedSignature
 commitmentSeal sha pk =
   let msg = commitmentMessage sha
   in detExtSignMsg msg pk
 
-verifyCommitmentSeal :: SHA -> ExtendedSignature -> Maybe Address
+verifyCommitmentSeal :: Keccak256 -> ExtendedSignature -> Maybe Address
 verifyCommitmentSeal sha sig =
   let msg = commitmentMessage sha
   in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
 
-finalHash :: Block -> SHA
+finalHash :: Block -> Keccak256
 finalHash = hash
           . rlpSerialize
           . rlpEncode
@@ -120,13 +120,13 @@ finalHash = hash
 
 signBenfInfo  :: HK.PrvKey -> (Address, Bool, Int) -> ExtendedSignature
 signBenfInfo pk bnf =
-  let msg = shaToWord256 . hash . BL.toStrict $ encode (bnf)
+  let msg = keccak256ToWord256 . hash . BL.toStrict $ encode (bnf)
       -- addr = prvKey2Address pk
   in detExtSignMsg msg pk
 
 verifyBenfInfo :: (Address, Bool, Int) -> ExtendedSignature -> Maybe Address
 verifyBenfInfo bnf sign =
-  let msg = shaToWord256 . hash . BL.toStrict $ encode (bnf)
+  let msg = keccak256ToWord256 . hash . BL.toStrict $ encode (bnf)
   in pubKey2Address <$> getPubKeyFromSignature_fast sign msg
 
 signMessage :: HK.PrvKey -> TrustedMessage -> OutEvent

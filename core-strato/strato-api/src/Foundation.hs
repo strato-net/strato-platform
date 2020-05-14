@@ -19,8 +19,8 @@ import qualified Prelude                  as P
 import           Yesod.Core.Types         (Logger)
 
 import           Network.Haskoin.Crypto   as HK
-import           Blockchain.DB.SQLDB      hiding (runSqlPool, )
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.DB.SQLDB      hiding (runSqlPool)
+import           Blockchain.Strato.Model.Keccak256
 
 timeFormat :: String
 timeFormat = "%Y-%m-%dT%T.%q"

@@ -11,7 +11,7 @@ import qualified Data.Map.Strict            as Map
 import           Blockchain.Data.BlockDB    (blockHeaderHash)
 import           Blockchain.Data.DataDefs
 import qualified Blockchain.Sequencer.Event as SE
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           Blockchain.Util            (tab)
 
@@ -19,11 +19,11 @@ import qualified Text.Colors                as CL
 import           Text.Format
 
 class Show t => OrderValidateable t where
-    getBlockHash   :: t -> SHA
-    getParentHash  :: t -> SHA
+    getBlockHash   :: t -> Keccak256
+    getParentHash  :: t -> Keccak256
     getBlockNumber :: t -> Integer
 
-data OrderValidateable t => ValidationResult t = InvalidOrder { ioParentSHA :: SHA
+data OrderValidateable t => ValidationResult t = InvalidOrder { ioParentSHA :: Keccak256
                                                               , ioParentNum :: Integer
                                                               , ioCulprit   :: t
                                                               , ioMessage   :: String
@@ -38,7 +38,7 @@ isValid' Valid = True
 isValid' _     = False
 
 data OrderValidateable t => OrderValidatorState t =
-    OrderValidatorState { seenBlocks   :: Map.Map SHA Integer
+    OrderValidatorState { seenBlocks   :: Map.Map Keccak256 Integer
                         , unseenBlocks :: [t]
                         , runState     :: ValidationResult t
                         } deriving (Show)

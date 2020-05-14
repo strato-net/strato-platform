@@ -72,7 +72,7 @@ import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
 import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
 import           Blockchain.Timing
@@ -194,7 +194,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
         case theVM of
           "SolidVM" -> runChainConstructor cId maybeSource
           _ -> return (sr', Nothing)
-      Just (cId, cInfo, sr, mAction) <$ putChainGenesisInfo cId (unsafeCreateSHAFromWord256 0) sr
+      Just (cId, cInfo, sr, mAction) <$ putChainGenesisInfo cId (unsafeCreateKeccak256FromWord256 0) sr
 
 outputNewChains :: [(Word256, ChainInfo, MP.StateRoot, Maybe Action)] -> ConduitT a VmOutEvent ContextM ()
 outputNewChains = traverse_ $ \(cId, cInfo, sr, mAction) -> do
@@ -275,8 +275,8 @@ runChainConstructor cId maybeSource = do
          False --noValueTransfer
          S.empty --pre-existing suicide list
          (BlockData
-            (unsafeCreateSHAFromWord256 0)
-            (unsafeCreateSHAFromWord256 0)
+            (unsafeCreateKeccak256FromWord256 0)
+            (unsafeCreateKeccak256FromWord256 0)
             (Address 0)
             MP.emptyTriePtr
             MP.emptyTriePtr
@@ -289,7 +289,7 @@ runChainConstructor cId maybeSource = do
             (posixSecondsToUTCTime 0)
             ""
             0
-            (unsafeCreateSHAFromWord256 0))
+            (unsafeCreateKeccak256FromWord256 0))
          0 --callDepth
          (Address 0) --receiveAddress
          (Address 0x100) --codeAddress
@@ -299,7 +299,7 @@ runChainConstructor cId maybeSource = do
          ""
          1000000000000 --availableGas
          (Address 0)
-         (unsafeCreateSHAFromWord256 0)
+         (unsafeCreateKeccak256FromWord256 0)
          (Just cId)
          (Just $ M.fromList $
            [("args", "()"), ("funcName", "<constructor>")]

@@ -64,7 +64,7 @@ import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.VMEvent
 import           Blockchain.TimerSource
 import           Blockchain.Util
@@ -168,14 +168,14 @@ handleMsgClientConduit :: ( HasVMEventsSink m
                               '[ '(Integer, Canonical BlockData)
                                , '(IPAddress, IPChains)
                                , '(OrgId, OrgIdChains)
-                               , '(SHA, ChainTxsInBlock)
+                               , '(Keccak256, ChainTxsInBlock)
                                , '(Word256, ChainMembers)
                                , '(Word256, ChainInfo)
-                               , '(SHA, Private (Word256, OutputTx))
+                               , '(Keccak256, Private (Word256, OutputTx))
                                ] m
                           , All2 '[A.Alters]
-                              '[ '(SHA, BlockData)
-                               , '(SHA, OutputBlock)
+                              '[ '(Keccak256, BlockData)
+                               , '(Keccak256, OutputBlock)
                                ] m
                           )
                        => Point
@@ -245,14 +245,14 @@ handleMsgServerConduit :: ( HasVMEventsSink m
                               '[ '(Integer, Canonical BlockData)
                                , '(IPAddress, IPChains)
                                , '(OrgId, OrgIdChains)
-                               , '(SHA, ChainTxsInBlock)
+                               , '(Keccak256, ChainTxsInBlock)
                                , '(Word256, ChainMembers)
                                , '(Word256, ChainInfo)
-                               , '(SHA, Private (Word256, OutputTx))
+                               , '(Keccak256, Private (Word256, OutputTx))
                                ] m
                           , All2 '[A.Alters]
-                              '[ '(SHA, BlockData)
-                               , '(SHA, OutputBlock)
+                              '[ '(Keccak256, BlockData)
+                               , '(Keccak256, OutputBlock)
                                ] m
                           )
                  => Point

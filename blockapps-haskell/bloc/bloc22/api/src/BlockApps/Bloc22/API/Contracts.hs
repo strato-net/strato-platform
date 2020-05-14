@@ -386,7 +386,7 @@ instance ToSchema PostCompileResponse where
       ex :: PostCompileResponse
       ex = PostCompileResponse
         { postcompileresponseContractName = "MySampleContract"
-        , postcompileresponseCodeHash = keccak256 "codeHash"
+        , postcompileresponseCodeHash = hash "codeHash"
         }
 
 type PostContractsXabi = "contracts"

@@ -61,7 +61,7 @@ import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
@@ -101,7 +101,7 @@ create :: SolidVMBase m
        -> Gas
        -> Address
        -> Code
-       -> SHA
+       -> Keccak256
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
        -> m ExecResults
@@ -129,7 +129,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash
     (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' newAddress hsh cc contractName' args
 
-create' :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
+create' :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
 create' creator newAddress ch cc contractName' argExps = do
   initializeAction newAddress contractName' ch
 
@@ -201,7 +201,7 @@ call :: SolidVMBase m
      -> B.ByteString
      -> Gas
      -> Address
-     -> SHA
+     -> Keccak256
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
      -> m ExecResults
@@ -248,7 +248,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       }
 
 
-getCodeAndCollection :: MonadSM m => Address -> m (Contract, SHA, CodeCollection)
+getCodeAndCollection :: MonadSM m => Address -> m (Contract, Keccak256, CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
@@ -1190,7 +1190,7 @@ callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
 callBuiltin "keccak256" [SString buf] Nothing = do
-  return . SString . BC.unpack . shaToByteString . hash . BC.pack $ buf
+  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ buf
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing
@@ -1240,7 +1240,7 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ()
+runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
@@ -1347,7 +1347,7 @@ runTheCall :: MonadSM m
            => Address
            -> Contract
            -> String
-           -> SHA
+           -> Keccak256
            -> CodeCollection
            -> Xabi.Func
            -> ValList

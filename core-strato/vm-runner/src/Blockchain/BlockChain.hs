@@ -94,7 +94,7 @@ import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.StateDiff             as SD
 
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
@@ -175,7 +175,7 @@ instance Bagger.MonadBagger ContextM where
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
             $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
             void $ putTransactionResult
-              TransactionResult { transactionResultBlockHash        = unsafeCreateSHAFromWord256 0
+              TransactionResult { transactionResultBlockHash        = unsafeCreateKeccak256FromWord256 0
                                 , transactionResultTransactionHash  = theHash
                                 , transactionResultMessage          = message
                                 , transactionResultResponse         = BSS.empty
@@ -222,7 +222,7 @@ instance Bagger.MonadBagger ContextM where
               let trrs' = map (rewriteBlockHash (blockHeaderHash bd)) trrs
               return $ Just (sr, gasRemaining, trrs')
 
-baggerRejectionToTransactionResultBits :: TxRejection -> (String, SHA) -- pretty, txHash
+baggerRejectionToTransactionResultBits :: TxRejection -> (String, Keccak256) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
     WrongChainId   s q OutputTx{otHash=hsh, otBaseTx=bt} ->
         (p' s q ++ "chainId (expected: main, actual: " ++ formatChainId (txChainId bt) ++ ")", hsh)
@@ -233,7 +233,7 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     GasLimitTooLow s q _ OutputTx{otHash=hsh} ->
         (p' s q ++ "tx gas limit", hsh)
     LessLucrative  s q OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
-        (p s q ++ formatSHAWithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
+        (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "
@@ -644,7 +644,7 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
 
 outputTransactionResult :: VMBase m
                         => BlockData
-                        -> (BlockData -> SHA)
+                        -> (BlockData -> Keccak256)
                         -> TxRunResult
                         -> ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t} result deltaT beforeMap afterMap newAddresses) = do
@@ -739,7 +739,7 @@ indexMaybe (_:rest) i = indexMaybe rest (i-1)
 
 ----------------
 
-replaceBestIfBetter :: (VMBase m, Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, SHA), (SHA, Integer, Integer))
+replaceBestIfBetter :: (VMBase m, Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     bbi <- getContextBestBlockInfo
 
@@ -780,7 +780,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
         return (shouldReplace, ranPriv, bbi')
 
 calculateAndEmitStateDiffs :: VMBase m
-                           => [(MP.StateRoot, SHA, Integer, Int)]
+                           => [(MP.StateRoot, Keccak256, Integer, Int)]
                            -> BlockData
                            -> ConduitT a VmOutEvent m ()
 calculateAndEmitStateDiffs srLog oldHeader = do
@@ -790,10 +790,10 @@ calculateAndEmitStateDiffs srLog oldHeader = do
             .| mapMC completeDiff
             .| mapM_C (yield . OutStateDiff)
 
-calculateAndEmitChainDiffs :: VMBase m => M.Map Word256 (Integer, SHA) -> ConduitT a VmOutEvent m ()
+calculateAndEmitChainDiffs :: VMBase m => M.Map Word256 (Integer, Keccak256) -> ConduitT a VmOutEvent m ()
 calculateAndEmitChainDiffs chainMap = do
   let chainList = M.toList chainMap
-      chainIds = format . unsafeCreateSHAFromWord256 . fst <$> chainList
+      chainIds = format . unsafeCreateKeccak256FromWord256 . fst <$> chainList
   $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
   runConduit $ yieldMany chainList
             .| mapMC (\(cId, (newNumber, newHash)) -> SD.chainDiff cId newNumber newHash)
@@ -802,8 +802,8 @@ calculateAndEmitChainDiffs chainMap = do
 diffMaxCost :: Int
 diffMaxCost = 500
 
-type PreDiff = (MP.StateRoot, SHA, Integer, Int)
-type ToDiff = (MP.StateRoot, MP.StateRoot, SHA, Integer)
+type PreDiff = (MP.StateRoot, Keccak256, Integer, Int)
+type ToDiff = (MP.StateRoot, MP.StateRoot, Keccak256, Integer)
 
 promote :: MP.StateRoot -> PreDiff -> ToDiff
 promote base (next, hsh, num, _) = (base, next, hsh, num)

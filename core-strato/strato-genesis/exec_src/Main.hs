@@ -18,7 +18,7 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Generation (insertContractsCount, insertContractsJSON, insertContractsJSONHashMaps)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 
 
 defineFlag "g:genesis_file" ("" :: String) "Filename containing pre-modifications genesis block"
@@ -95,8 +95,8 @@ showAccountInfo (ContractWithStorage (Address address) balance code storage) =
   "a " ++ addressString ++ " " ++ show balance ++ " " ++ showCodeHash code "" ++ "\n"
   ++ unlines (map (\(k, v) -> "s " ++ addressString ++ " " ++ showHex k "" ++ " " ++ showHex v "") storage)
   where addressString = showHex address ""
-        showCodeHash (EVMCode c) = showHex $ shaToWord256 c
-        showCodeHash (SolidVMCode _ c) = showHex $ shaToWord256 c
+        showCodeHash (EVMCode c) = showHex $ keccak256ToWord256 c
+        showCodeHash (SolidVMCode _ c) = showHex $ keccak256ToWord256 c
 
 
 

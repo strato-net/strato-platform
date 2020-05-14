@@ -9,7 +9,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.ExtWord            (Word256)
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Control.Lens
 import           Data.Aeson
@@ -53,7 +53,7 @@ instance Format a => Format (CircularBuffer a) where
     ]
 
 data BlockInfo = BlockInfo
-  { _bhash     :: SHA
+  { _bhash     :: Keccak256
   , _bordering :: Integer
   } deriving (Eq, Show, Generic, Binary)
 makeLenses ''BlockInfo
@@ -108,7 +108,7 @@ chainHashEntryInBlock bInfo = ChainHashEntry True Nothing (S.singleton bInfo)
 
 data ChainIdEntry = ChainIdEntry
   { _chainIdInfo :: ChainInfo
-  , _chainHashes :: CircularBuffer SHA
+  , _chainHashes :: CircularBuffer Keccak256
   , _blocksToRun :: Set BlockInfo
   } deriving (Show, Generic, Binary)
 makeLenses ''ChainIdEntry
@@ -131,16 +131,16 @@ instance Format ChainIdEntry where
 
 class HasPrivateHashDB m where
   requestChain             :: Word256 -> m ()
-  requestTransaction       :: SHA -> m ()
+  requestTransaction       :: Keccak256 -> m ()
 
-getChainId :: ChainInfo -> SHA
+getChainId :: ChainInfo -> Keccak256
 getChainId = hash . rlpSerialize . rlpEncode
 
-generateInitialChainHash :: ChainInfo -> SHA
+generateInitialChainHash :: ChainInfo -> Keccak256
 generateInitialChainHash = hash . rlpSerialize . rlpEncode
 
 -- Point-free with permutations is less readable, but more fun
-generateChainHashes :: OutputTx -> [SHA]
+generateChainHashes :: OutputTx -> [Keccak256]
 generateChainHashes tx =
   let r = txSigR tx
       s = txSigS tx

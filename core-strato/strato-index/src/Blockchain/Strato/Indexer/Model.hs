@@ -8,14 +8,14 @@ import           Blockchain.Data.DataDefs                (LogDB, EventDB, Transa
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.ExtWord                      (Word256)
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Data.Binary
 
 data IndexEvent = RanBlock OutputBlock
-                | NewBestBlock (SHA, Integer, Integer)
+                | NewBestBlock (Keccak256, Integer, Integer)
                 | LogDBEntry LogDB
                 | TxResult TransactionResult
-                | UpdateTxResult (SHA, SHA, SHA, Bool) -- Deprecated
+                | UpdateTxResult (Keccak256, Keccak256, Keccak256, Bool) -- Deprecated
                 | NewChainInfo Word256 ChainInfo
                 | IndexTransaction Timestamp OutputTx
                 | EventDBEntry EventDB

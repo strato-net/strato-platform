@@ -45,7 +45,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Util
 
@@ -87,7 +87,7 @@ readSupplementaryAccounts genesisBlockName = do
                                   [] -> []
                                   "s":_ -> []
                                   ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ unsafeCreateSHAFromWord256 (parseHex c))]
+                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ unsafeCreateKeccak256FromWord256 (parseHex c))]
                                   _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
@@ -158,7 +158,7 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
 
 --------------------------------------
 populateStorageDBs::(MonadLogger m, HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
-                    (SHA -> Maybe (Map Text Text)) -> Block -> Maybe Word256 -> m ()
+                    (Keccak256 -> Maybe (Map Text Text)) -> Block -> Maybe Word256 -> m ()
 populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
     sr <- getStateRoot
@@ -188,7 +188,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             { A._actionBlockHash = blockHeaderHash $ blockHeader genesisBlock
             , A._actionBlockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
             , A._actionBlockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
-            , A._actionTransactionHash = unsafeCreateSHAFromWord256 $ fromMaybe 0 genesisChainId
+            , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId
             , A._actionTransactionChainId = genesisChainId
             , A._actionTransactionSender = Ad.Address 0
             , A._actionData = Map.singleton a $

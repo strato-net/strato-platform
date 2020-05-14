@@ -65,7 +65,7 @@ import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 
 
 import Slipstream.Data.Action
@@ -106,7 +106,7 @@ enterBloc2 env x = do
    Right v -> return v
 
 {-# NOINLINE emptyHash #-}
-emptyHash :: SHA
+emptyHash :: Keccak256
 emptyHash = hash B.empty
 
 matters :: AggregateAction -> Bool

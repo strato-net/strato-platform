@@ -70,7 +70,7 @@ import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
@@ -92,15 +92,14 @@ data CallInfo = CallInfo
   , currentAddress      :: Address
   , currentContract     :: Contract
   , codeCollection      :: CodeCollection
-  , collectionHash      :: SHA
+  , collectionHash      :: Keccak256
   , localVariables      :: Map String (Xabi.Type, Variable)
   } deriving (Show)
-makeLenses ''CallInfo
 
 {-
 BlockData
-    parentHash SHA
-    unclesHash SHA
+    parentHash Keccak256
+    unclesHash Keccak256
     coinbase Address
     stateRoot StateRoot
     transactionsRoot StateRoot
@@ -113,7 +112,7 @@ BlockData
     timestamp UTCTime
     extraData BS.ByteString
     nonce Word64
-    mixHash SHA
+    mixHash Keccak256
     deriving Eq Read Show Generic
 -}
 
@@ -129,7 +128,7 @@ makeLenses ''SState
 type SM m = StateT SState m
 
 type MonadSM m = ( (Address `A.Alters` AddressState) m
-                 , (SHA `A.Alters` DBCode) m
+                 , (Keccak256 `A.Alters` DBCode) m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
@@ -180,7 +179,7 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance (SHA `A.Alters` DBCode) m => (SHA `A.Alters` DBCode) (SM m) where
+instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m) where
   lookup p   = lift . A.lookup p
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
@@ -407,7 +406,7 @@ addCallInfo :: MonadSM m
             => Address
             -> Contract
             -> String
-            -> SHA
+            -> Keccak256
             -> CodeCollection
             -> Map String (Xabi.Type, Variable)
             -> m ()
@@ -477,7 +476,7 @@ setLocal name val = do
   Mod.put (Mod.Proxy @[CallInfo]) $ info{localVariables=newVariables} : rest
 
 
-getCurrentCodeCollection :: MonadSM m => m (SHA, CodeCollection)
+getCurrentCodeCollection :: MonadSM m => m (Keccak256, CodeCollection)
 getCurrentCodeCollection = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
@@ -564,7 +563,7 @@ getXabiValueType (AddressedPath loc path) = do
 getValueType :: MonadSM m => AddressedPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeAction :: Mod.Modifiable Action m => Address -> String -> SHA -> m ()
+initializeAction :: Mod.Modifiable Action m => Address -> String -> Keccak256 -> m ()
 initializeAction addr name hsh = do
   let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
