@@ -50,9 +50,9 @@ import           Prometheus
 import qualified Text.Colors                   as CL
 import           Text.Format
 
-type HasPrivacyRegistries m = ( (SHA `Alters` OutputBlock) m
-                              , (SHA `Alters` OutputTx) m
-                              , (SHA `Alters` ChainHashEntry) m
+type HasPrivacyRegistries m = ( (Keccak256 `Alters` OutputBlock) m
+                              , (Keccak256 `Alters` OutputTx) m
+                              , (Keccak256 `Alters` ChainHashEntry) m
                               , (Word256 `Alters` ChainIdEntry) m
                               )
 

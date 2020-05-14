@@ -183,8 +183,8 @@ runSequencerBatch :: ( MonadLogger m
                      , MonadMonitor m
                      , MonadBlockstanbul m
                      , HasFullPrivacy m
-                     , (SHA `A.Alters` DependentBlockEntry) m
-                     , (SHA `A.Alters` ()) m
+                     , (Keccak256 `A.Alters` DependentBlockEntry) m
+                     , (Keccak256 `A.Alters` ()) m
                      )
                   => [SeqLoopEvent]
                   -> m BatchSeqEvent
@@ -198,7 +198,7 @@ checkForVotes :: ( MonadLogger m
                  , MonadMonitor m
                  , MonadBlockstanbul m
                  , HasFullPrivacy m
-                 , (SHA `A.Alters` DependentBlockEntry) m
+                 , (Keccak256 `A.Alters` DependentBlockEntry) m
                  )
               => [CandidateReceived]
               -> ConduitT a SeqEvent m ()
@@ -220,7 +220,7 @@ checkForTimeouts :: ( MonadLogger m
                     , MonadMonitor m
                     , MonadBlockstanbul m
                     , HasFullPrivacy m
-                    , (SHA `A.Alters` DependentBlockEntry) m
+                    , (Keccak256 `A.Alters` DependentBlockEntry) m
                     )
                  => [RoundNumber]
                  -> ConduitT a SeqEvent m ()
@@ -232,8 +232,8 @@ checkForUnseq :: ( MonadLogger m
                  , MonadMonitor m
                  , MonadBlockstanbul m
                  , HasFullPrivacy m
-                 , (SHA `A.Alters` DependentBlockEntry) m
-                 , (SHA `A.Alters` ()) m
+                 , (Keccak256 `A.Alters` DependentBlockEntry) m
+                 , (Keccak256 `A.Alters` ()) m
                  )
               => [IngestEvent]
               -> ConduitT a SeqEvent m ()
@@ -250,7 +250,7 @@ blockstanbulSend :: ( MonadLogger m
                     , MonadMonitor m
                     , MonadBlockstanbul m
                     , HasFullPrivacy m
-                    , (SHA `A.Alters` DependentBlockEntry) m
+                    , (Keccak256 `A.Alters` DependentBlockEntry) m
                     )
                  => [InEvent]
                  -> ConduitT a SeqEvent m ()
@@ -262,8 +262,8 @@ blockstanbulSend = mapM_ $ \ie -> do
 
 blockstanbulSend' :: ( MonadLogger m
                      , MonadBlockstanbul m
-                     , (SHA `A.Alters` ChainHashEntry) m
-                     , (SHA `A.Alters` DependentBlockEntry) m
+                     , (Keccak256 `A.Alters` ChainHashEntry) m
+                     , (Keccak256 `A.Alters` DependentBlockEntry) m
                      )
                   => InEvent
                   -> ConduitT a SeqEvent m ()
@@ -317,8 +317,8 @@ privateWitnessableHash tHash cHash =
 
 transformPrivateHashTXs :: ( MonadLogger m
                            , HasPrivateHashDB m
-                           , (SHA `A.Alters` ChainHashEntry) m
-                           , (SHA `A.Alters` ()) m
+                           , (Keccak256 `A.Alters` ChainHashEntry) m
+                           , (Keccak256 `A.Alters` ()) m
                            )
                         => [(Timestamp, IngestTx)]
                         -> ConduitT a SeqEvent m ()
@@ -336,7 +336,7 @@ transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHas
 transformFullTransactions :: ( MonadLogger m
                              , MonadMonitor m
                              , HasFullPrivacy m
-                             , (SHA `A.Alters` ()) m
+                             , (Keccak256 `A.Alters` ()) m
                              )
                           => [(Timestamp, IngestTx)]
                           -> ConduitT a SeqEvent m ()
@@ -426,7 +426,7 @@ transformFullTransactions pairs = do
 transformTransactions :: ( MonadLogger m
                          , MonadMonitor m
                          , HasFullPrivacy m
-                         , (SHA `A.Alters` ()) m
+                         , (Keccak256 `A.Alters` ()) m
                          )
                       => [(Timestamp, IngestTx)]
                       -> ConduitT a SeqEvent m ()
@@ -439,7 +439,7 @@ runBlockWithConsensus :: ( MonadLogger m
                          , MonadMonitor m
                          , MonadBlockstanbul m
                          , HasFullPrivacy m
-                         , (SHA `A.Alters` DependentBlockEntry) m
+                         , (Keccak256 `A.Alters` DependentBlockEntry) m
                          )
                       => SequencedBlock
                       -> ConduitT a SeqEvent m ()
@@ -454,7 +454,7 @@ runBlockWithConsensus sb = do
 
 expandBlock :: ( MonadLogger m
                , MonadMonitor m
-               , (SHA `A.Alters` DependentBlockEntry) m
+               , (Keccak256 `A.Alters` DependentBlockEntry) m
                )
             => SequencedBlock
             -> m [OutputBlock]
@@ -479,8 +479,8 @@ expandBlock sb = do
 runConsensus :: ( MonadLogger m
                 , MonadMonitor m
                 , MonadBlockstanbul m
-                , (SHA `A.Alters` ChainHashEntry) m
-                , (SHA `A.Alters` DependentBlockEntry) m
+                , (Keccak256 `A.Alters` ChainHashEntry) m
+                , (Keccak256 `A.Alters` DependentBlockEntry) m
                 )
              => ConduitT SequencedBlock SeqEvent m ()
 runConsensus = awaitForever $ \sb -> do
@@ -516,7 +516,7 @@ transformBlocks :: ( MonadLogger m
                    , MonadMonitor m
                    , MonadBlockstanbul m
                    , HasFullPrivacy m
-                   , (SHA `A.Alters` DependentBlockEntry) m
+                   , (Keccak256 `A.Alters` DependentBlockEntry) m
                    )
                 => [IngestBlock]
                 -> ConduitT a SeqEvent m ()
@@ -551,8 +551,8 @@ splitEvents :: ( MonadLogger m
                , MonadMonitor m
                , MonadBlockstanbul m
                , HasFullPrivacy m
-               , (SHA `A.Alters` DependentBlockEntry) m
-               , (SHA `A.Alters` ()) m
+               , (Keccak256 `A.Alters` DependentBlockEntry) m
+               , (Keccak256 `A.Alters` ()) m
                )
             => [IngestEvent]
             -> ConduitT a SeqEvent m ()
