@@ -5,7 +5,7 @@
 module Blockchain.Database.MerklePatricia.Internal (
   Key,
   Val,
-  MPDB(..),
+  StateDB(..),
   StateRoot(..),
   NodeData(..),
   openMPDB,

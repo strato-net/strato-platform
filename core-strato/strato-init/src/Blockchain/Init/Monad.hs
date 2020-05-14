@@ -17,7 +17,6 @@ import qualified Data.Map                           as M
 import qualified Data.NibbleString                  as N
 import qualified Database.Redis                     as Redis
 import qualified Database.LevelDB                   as DB
-import           Database.Persist.Postgresql        (createPostgresqlPool)
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
@@ -77,17 +76,11 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
   delete _ = MP.genericDeleteDB $ asks stateDB
 
 instance HasMemRawStorageDB SetupDBM where
-  getMemRawStorageTxDB = do
-    cxt <- ask
-    lst <- liftIO . readIORef .localStorageTx $ cxt
-    return (stateDB cxt, lst)
+  getMemRawStorageTxDB = liftIO . readIORef .localStorageTx =<< ask
   putMemRawStorageTxMap theMap = do
     lstref <- asks localStorageTx
     liftIO $ atomicWriteIORef lstref theMap
-  getMemRawStorageBlockDB = do
-    cxt <- ask
-    lsb <- liftIO . readIORef . localStorageBlock $ cxt
-    return (stateDB cxt, lsb)
+  getMemRawStorageBlockDB = liftIO . readIORef . localStorageBlock =<< ask
   putMemRawStorageBlockMap theMap = do
     lsbref <- asks localStorageBlock
     liftIO $ atomicWriteIORef lsbref theMap

@@ -71,6 +71,7 @@ library:
     - temporary
     - time
     - transformers
+    - unliftio
     - unliftio-core
 
 

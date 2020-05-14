@@ -58,9 +58,9 @@ makeLenses ''CachedStorage
 type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
 
 instance HasMemRawStorageDB StorM where
-  getMemRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
+  getMemRawStorageTxDB = use stx
   putMemRawStorageTxMap = assign stx
-  getMemRawStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
+  getMemRawStorageBlockDB = use sbs
   putMemRawStorageBlockMap = assign sbs
 
 instance HasMemAddressStateDB StorM where
