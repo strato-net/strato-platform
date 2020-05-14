@@ -64,7 +64,7 @@ import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.EVM.Code
 import           Blockchain.EVM.Environment
@@ -170,7 +170,7 @@ accountCreationHack address = do
 
 
 
-getBlockHashWithNumber::Integer->SHA->VMM (Maybe SHA)
+getBlockHashWithNumber::Integer->Keccak256->VMM (Maybe Keccak256)
 getBlockHashWithNumber num h = do
   lift $ $logInfoS "getBlockHashWithNumber" . T.pack $ "calling getBSum with " ++ format h
   bSum <- getBSum h
@@ -255,7 +255,7 @@ runOperation SHA3 = do
   size <- pop
   theData <- unsafeSliceByteString p size
   let theHash = hash theData
-  push $ shaToWord256 theHash
+  push $ keccak256ToWord256 theHash
 
 runOperation ADDRESS = pushEnvVar envOwner
 
@@ -358,7 +358,7 @@ runOperation BLOCKHASH = do
            Just theBlockHash -> push theBlockHash
    (True, True) -> do
           let h = hash $ BC.pack $ show $ toInteger number
-          push $ shaToWord256 h
+          push $ keccak256ToWord256 h
 
 runOperation COINBASE = pushEnvVar (blockDataCoinbase . envBlockHeader)
 runOperation TIMESTAMP = do
@@ -1058,7 +1058,7 @@ create :: Bool
        -> Gas
        -> Address
        -> Code
-       -> SHA
+       -> Keccak256
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
        -> ContextM ExecResults
@@ -1121,7 +1121,7 @@ create' :: VMM Code
 create' = do
 
   owner <- getEnvVar envOwner
-  action . actionData %= M.insert owner (ActionData (EVMCode $ unsafeCreateSHAFromWord256 0) EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert owner (ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) EVM (ActionEVMDiff M.empty) [])
 
   runCodeFromStart
 
@@ -1188,7 +1188,7 @@ call :: Bool
      -> B.ByteString
      -> Gas
      -> Address
-     -> SHA
+     -> Keccak256
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
      -> ContextM ExecResults
@@ -1265,7 +1265,7 @@ callPrecompiled' noValueTransfer precompiled = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  action . actionData %= M.insert receiveAddress (ActionData (EVMCode (unsafeCreateSHAFromWord256 0)) EVM (ActionEVMDiff M.empty) [])
+  action . actionData %= M.insert receiveAddress (ActionData (EVMCode (unsafeCreateKeccak256FromWord256 0)) EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do

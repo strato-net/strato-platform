@@ -30,7 +30,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util                      (toMaybe)
 import           Text.Format
 
@@ -94,7 +94,7 @@ instance FromJSON RawTransaction' where
       (tv :: Word8) <- parseHexStr (t .:? "v" .!= "0")
       md <- t .:? "metadata"
       bn <- t .:? "blockNumber" .!= (-1)
-      h <- (t .:? "hash" .!= (unsafeCreateSHAFromWord256 $ fromIntegral tr)) -- when transaction is PrivateHashTX
+      h <- (t .:? "hash" .!= (unsafeCreateKeccak256FromWord256 $ fromIntegral tr)) -- when transaction is PrivateHashTX
       -- Unfortunately, time is rendered with `show` in ToJSON for RawTransaction'
       -- instead of using the ToJSON instance for UTCTime, and so it fails
       -- to parse in FromJSON for UTCTime.
@@ -169,8 +169,8 @@ instance ToJSON Transaction' where
                  ++ (("chainId" .=) <$> (maybeToList tcid))
                  ++ (("metadata" .=) <$> maybeToList md)
     toJSON (Transaction' tx@(PrivateHashTX th tch)) =
-        object ["transactionHash" .= showHex (shaToWord256 th) "",
-                "chainHash" .= showHex (shaToWord256 tch) "",
+        object ["transactionHash" .= showHex (keccak256ToWord256 th) "",
+                "chainHash" .= showHex (keccak256ToWord256 tch) "",
                 "transactionType" .= (show $ transactionSemantics $ tx)]
 
 
@@ -179,7 +179,7 @@ instance FromJSON Transaction' where
       th <- (t .:? "transactionHash")
       tch <- (t .:? "chainHash")
       case (th, tch) of
-        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (unsafeCreateSHAFromWord256 $ readHexStr h) (unsafeCreateSHAFromWord256 $ readHexStr ch)))
+        (Just h, Just ch) -> return (Transaction' (PrivateHashTX (unsafeCreateKeccak256FromWord256 $ readHexStr h) (unsafeCreateKeccak256FromWord256 $ readHexStr ch)))
         _ -> do
           tto <- (t .:? "to")
           tnon <- (t .:? "nonce" .!= 0)
@@ -196,7 +196,7 @@ instance FromJSON Transaction' where
             Nothing -> do
               (mti :: Maybe Code) <- (t .:? "init")
               case mti of
-                Nothing -> return . Transaction' $ PrivateHashTX (unsafeCreateSHAFromWord256 $ fromInteger tr) (unsafeCreateSHAFromWord256 $ fromInteger ts)
+                Nothing -> return . Transaction' $ PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger tr) (unsafeCreateKeccak256FromWord256 $ fromInteger ts)
                 Just ti -> return . Transaction' $ ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv md
             (Just to') -> do
               td <- (t .: "data")

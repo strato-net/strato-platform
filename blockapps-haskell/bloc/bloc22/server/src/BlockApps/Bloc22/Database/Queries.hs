@@ -13,12 +13,10 @@ module BlockApps.Bloc22.Database.Queries where
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Reader            (asks)
-import           Crypto.Hash
 import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON, decode, encode)
-import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Char8           as Char8
@@ -715,7 +713,7 @@ insertContractSourceQuery
   :: Text
   -> Bloc (Int32, Keccak256)
 insertContractSourceQuery src = do
-  let srcHash = (keccak256 $ Text.encodeUtf8 src)
+  let srcHash = (hash $ Text.encodeUtf8 src)
   blocModify1 $ \ conn ->
     runInsertManyReturning conn contractsSourceTable [
       ( Nothing
@@ -762,7 +760,7 @@ insertContractMetaDataBatchQuery srcHash details = blocModify $ \ conn ->
         , constant (Text.encodeUtf8 contractdetailsBin)
         , constant (Text.encodeUtf8 contractdetailsBinRuntime)
         , constant contractdetailsCodeHash
-        , constant $ keccak256 (Text.encodeUtf8 contractdetailsBin)
+        , constant $ hash (Text.encodeUtf8 contractdetailsBin)
         , constant srcHash
         , constant (serializeXabi contractdetailsXabi)
         )
@@ -809,15 +807,10 @@ instance QueryRunnerColumnDefault PGBytea Keccak256 where
     where
       toKecc :: ByteString -> Keccak256
       toKecc
-        = Keccak256
-        . fromMaybe (error "could not decode hash")
-        . digestFromByteString
+        = unsafeCreateKeccak256FromByteString
 
 instance Default Constant Keccak256 (Column PGBytea) where
-  def = lmap fromKecc def
-    where
-      fromKecc :: Keccak256 -> ByteString
-      fromKecc (Keccak256 digest) = ByteArray.convert digest
+  def = lmap keccak256ToByteString def
 
 instance QueryRunnerColumnDefault PGBytea CodePtr where
   queryRunnerColumnDefault =
@@ -916,7 +909,7 @@ sourceToContractDetails shouldCompile source = do
         case shouldCompile of
           Do Compile -> compileContract
           Don't Compile -> createMetadataNoCompile
-  details <- blocQuery . contractBySourceHash . keccak256 $ Text.encodeUtf8 source
+  details <- blocQuery . contractBySourceHash . hash $ Text.encodeUtf8 source
   if null details
     then createContractDetails source
     else fmap Map.fromList . forM details $
@@ -954,7 +947,7 @@ compileContract source = do
         { contractdetailsBin = bin
         , contractdetailsAddress = Just (Named "Latest")
         , contractdetailsBinRuntime = binRuntime
-        , contractdetailsCodeHash =  EVMCode . keccak256SHA $ binRuntimeToCodeHash binRuntime
+        , contractdetailsCodeHash =  EVMCode $ binRuntimeToCodeHash binRuntime
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi
@@ -981,7 +974,7 @@ createMetadataNoCompile source = do
         { contractdetailsBin = source
         , contractdetailsAddress = Just (Named "Latest")
         , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ keccak256SHA $ keccak256 (Char8.pack $ Text.unpack source)
+        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ hash (Char8.pack $ Text.unpack source)
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi

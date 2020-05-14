@@ -9,7 +9,7 @@ import           Blockchain.Data.TXOrigin    ()
 import           GHC.Generics                ()
 
 import           Blockchain.ExtWord          ()
-import           Blockchain.Strato.Model.SHA ()
+import           Blockchain.Strato.Model.Keccak256 ()
 
 import           Data.ByteString             ()
 

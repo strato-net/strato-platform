@@ -19,7 +19,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA        hiding (hash)
+import           Blockchain.Strato.Model.Keccak256        hiding (hash)
 
 import           Text.Format
 
@@ -32,7 +32,7 @@ data TxRunResult = TxRunResult { trrTransaction :: OutputTx
                                } deriving (Show, Eq, Generic)
 
 -- When we use a cached TxRunResult, the blockHash does not account for consensus values added.
-rewriteBlockHash :: SHA -> TxRunResult -> TxRunResult
+rewriteBlockHash :: Keccak256 -> TxRunResult -> TxRunResult
 rewriteBlockHash hsh (TxRunResult otx res t before after new) =
   TxRunResult otx{otOrigin = BlockHash hsh} res' t before after new
   where res' = case res of
@@ -116,7 +116,7 @@ txRejectionToAPIFailureCause (BalanceTooLow  stage queue needed actual _) =
 txRejectionToAPIFailureCause (GasLimitTooLow stage queue needed tx) =
     Failure (show stage) (Just $ show queue) IntrinsicGasExceedsLimit (Just needed) (Just . TD.transactionGasLimit $ otBaseTx tx) Nothing
 txRejectionToAPIFailureCause (LessLucrative  stage queue newTx _) =
-    Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatSHAWithoutColor (otHash newTx))
+    Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatKeccak256WithoutColor (otHash newTx))
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx

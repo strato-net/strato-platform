@@ -9,12 +9,12 @@ import           Data.Data
 import           Database.Persist.TH
 
 import           Blockchain.Data.PersistTypes ()
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Text.Format
 
 import           GHC.Generics
 
-data TXOrigin = Direct | API | Quarry | BlockHash SHA | PeerString String | Morphism | Blockstanbul
+data TXOrigin = Direct | API | Quarry | BlockHash Keccak256 | PeerString String | Morphism | Blockstanbul
               deriving (Show, Read, Eq, Generic, Data)
 
 derivePersistField "TXOrigin"
@@ -43,6 +43,6 @@ instance Binary TXOrigin where
             _ -> error "the impossible happened in get of Binary instance of TXOrigin"
 
 instance Format TXOrigin where
-    format (BlockHash sha) = "BlockHash " ++ shaToHex sha
+    format (BlockHash sha) = "BlockHash " ++ keccak256ToHex sha
     format (PeerString p ) = "Peer " ++ show p
     format               x = show x

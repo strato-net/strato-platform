@@ -86,7 +86,7 @@ import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
 import           Text.Format
@@ -98,10 +98,10 @@ data Modification a = Modification a | Deletion
 data SequencerContext = SequencerContext
   { _dependentBlockDB    :: DependentBlockDB
   , _seenTransactionDB   :: SeenTransactionDB
-  , _dbeRegistry         :: Map SHA DependentBlockEntry
-  , _blockHashRegistry   :: Map SHA (Modification OutputBlock)
-  , _txHashRegistry      :: Map SHA (Modification OutputTx)
-  , _chainHashRegistry   :: Map SHA (Modification ChainHashEntry)
+  , _dbeRegistry         :: Map Keccak256 DependentBlockEntry
+  , _blockHashRegistry   :: Map Keccak256 (Modification OutputBlock)
+  , _txHashRegistry      :: Map Keccak256 (Modification OutputTx)
+  , _chainHashRegistry   :: Map Keccak256 (Modification ChainHashEntry)
   , _chainIdRegistry     :: Map Word256 (Modification ChainIdEntry)
   , _getChainsDB         :: GetChainsDB
   , _getTransactionsDB   :: GetTransactionsDB
@@ -169,15 +169,15 @@ fromNamespace p bs = if isInNamespace p bs
   else Nothing
 
 instance HasNamespace OutputBlock where
-  type NSKey OutputBlock = SHA
+  type NSKey OutputBlock = Keccak256
   namespace _ = "bh:"
 
 instance HasNamespace OutputTx where
-  type NSKey OutputTx = SHA
+  type NSKey OutputTx = Keccak256
   namespace _ = "th:"
 
 instance HasNamespace ChainHashEntry where
-  type NSKey ChainHashEntry = SHA
+  type NSKey ChainHashEntry = Keccak256
   namespace _ = "ch:"
 
 instance HasNamespace ChainIdEntry where
@@ -239,7 +239,7 @@ genericDeleteSequencer registry p k = do
   registry . at k ?= Deletion
   addLdbBatchOps . (:[]) $ batchDeleteInLDB p k
 
-instance (SHA `A.Alters` OutputBlock) SequencerM where
+instance (Keccak256 `A.Alters` OutputBlock) SequencerM where
   lookup = genericLookupSequencer blockHashRegistry
   insert p k v = do
     genericInsertSequencer blockHashRegistry p k v
@@ -250,7 +250,7 @@ instance (SHA `A.Alters` OutputBlock) SequencerM where
     sz <- M.size <$> use blockHashRegistry
     liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
 
-instance (SHA `A.Alters` OutputTx) SequencerM where
+instance (Keccak256 `A.Alters` OutputTx) SequencerM where
   lookup = genericLookupSequencer txHashRegistry
   insert p k v = do
     genericInsertSequencer txHashRegistry p k v
@@ -261,7 +261,7 @@ instance (SHA `A.Alters` OutputTx) SequencerM where
     sz <- M.size <$> use txHashRegistry
     liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
 
-instance (SHA `A.Alters` ChainHashEntry) SequencerM where
+instance (Keccak256 `A.Alters` ChainHashEntry) SequencerM where
   lookup = genericLookupSequencer chainHashRegistry
   insert p k v = do
     genericInsertSequencer chainHashRegistry p k v
@@ -283,7 +283,7 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
 
-instance (SHA `A.Alters` DependentBlockEntry) SequencerM where
+instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   lookup _ k = do
     mv <- use $ dbeRegistry . at k
     case mv of
@@ -300,7 +300,7 @@ instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = assign seenTransactionDB
 
-instance (SHA `A.Alters` ()) SequencerM where
+instance (Keccak256 `A.Alters` ()) SequencerM where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
   delete _ = genericDeleteSeenTransactionDB

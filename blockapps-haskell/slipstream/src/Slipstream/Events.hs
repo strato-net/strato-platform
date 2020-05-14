@@ -14,7 +14,7 @@ import           Data.Time
 import qualified BlockApps.Solidity.Value as V
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.SolidityValue
 
 type StateRoot = Text
@@ -33,10 +33,10 @@ data ProcessedContract = ProcessedContract
   , abi               :: Text
   , contractName      :: Text
   , chain             :: Text
-  , blockHash         :: SHA
+  , blockHash         :: Keccak256
   , blockTimestamp    :: UTCTime
   , blockNumber       :: Integer
-  , transactionHash   :: SHA
+  , transactionHash   :: Keccak256
   , transactionSender :: Address
   , functionCallData  :: Maybe FunctionCallData
   , contractData      :: Map Text V.Value

@@ -17,7 +17,7 @@ import           Test.QuickCheck.Instances ()
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Client
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Keccak256  hiding (hash)
 
 
 data TestConfig = TestConfig

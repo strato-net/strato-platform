@@ -286,7 +286,7 @@ instance Arbitrary BlocChainOrTransactionResult where
 instance ToSample BlocChainOrTransactionResult where
   toSamples _ = singleSample . BlocTxResult $ BlocTransactionResult
     { blocTransactionStatus = Success
-    , blocTransactionHash = keccak256 "foo"
+    , blocTransactionHash = hash "foo"
     , blocTransactionTxResult = Nothing
     , blocTransactionData = Nothing
     }
@@ -299,7 +299,7 @@ instance ToSchema BlocChainOrTransactionResult where
       ex :: BlocChainOrTransactionResult
       ex = BlocTxResult $ BlocTransactionResult
         { blocTransactionStatus = Success
-        , blocTransactionHash = keccak256 "foo"
+        , blocTransactionHash = hash "foo"
         , blocTransactionTxResult = Nothing
         , blocTransactionData = Nothing
         }

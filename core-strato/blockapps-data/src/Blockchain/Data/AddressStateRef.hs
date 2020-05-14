@@ -14,7 +14,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.SQLDB
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import Blockchain.Strato.Model.ExtendedWord
 

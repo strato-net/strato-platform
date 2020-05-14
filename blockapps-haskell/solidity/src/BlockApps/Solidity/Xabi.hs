@@ -33,7 +33,7 @@ import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 data XabiKind = ContractKind
               | InterfaceKind
@@ -376,7 +376,7 @@ instance ToSchema ContractDetails where
         { contractdetailsBin = "ContractBin"
         , contractdetailsAddress = Just (Unnamed (Address 0xdeadbeef))
         , contractdetailsBinRuntime = "ContractRuntime"
-        , contractdetailsCodeHash = EVMCode $ unsafeCreateSHAFromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
+        , contractdetailsCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
         , contractdetailsName = "DetailsName"
         , contractdetailsSrc = "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi

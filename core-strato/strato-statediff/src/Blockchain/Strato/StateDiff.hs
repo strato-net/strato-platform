@@ -23,7 +23,7 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
@@ -47,7 +47,7 @@ data StateDiff =
   StateDiff {
     chainId         :: Maybe Word256,
     blockNumber     :: Integer,
-    blockHash       :: SHA,
+    blockHash       :: Keccak256,
     stateRoot       :: StateRoot,
     -- | The 'Eventual value is the initial state of the contract
     createdAccounts :: Map Address (AccountDiff 'Eventual),
@@ -91,7 +91,7 @@ data AccountDiff (v :: Detail) =
     code         :: Maybe (Diff ByteString v),
     -- | Since we want to always be able to identify account-type
     codeHash     :: CodePtr, -- Maybe
-    sourceCodeHash     :: Maybe (SHA, Text),
+    sourceCodeHash     :: Maybe (Keccak256, Text),
     -- | This is necessary for when we commit an AddressStateRef to SQL.
     -- It changes if and only if the storage changes at all
     contractRoot :: Maybe (Diff StateRoot v),
@@ -148,7 +148,7 @@ instance Detailed (Diff ByteString) where
   incrementalToEventual Delete{} = Value $ fromString ""
   incrementalToEventual x        = Value $ newValue x
 
-instance Detailed (Diff SHA) where
+instance Detailed (Diff Keccak256) where
   incrementalToEventual Delete{} = Value $ hash ""
   incrementalToEventual x        = Value $ newValue x
 
@@ -163,10 +163,10 @@ chainDiff :: ( HasStateDB m
              , Modifiable GenesisRoot m
              , Modifiable BestBlockRoot m
              )
-          => Word256 -> Integer -> SHA -> m (Maybe StateDiff)
+          => Word256 -> Integer -> Keccak256 -> m (Maybe StateDiff)
 chainDiff chainId newBlockNum newBlockHash = do
   newSR <- fromMaybe emptyTriePtr <$> getChainStateRoot chainId newBlockHash
-  ~(bHash, bNum) <- fromMaybe (unsafeCreateSHAFromWord256 0, 0) <$> getChainBestBlock chainId
+  ~(bHash, bNum) <- fromMaybe (unsafeCreateKeccak256FromWord256 0, 0) <$> getChainBestBlock chainId
   if newBlockNum < bNum
     then return Nothing
     else do
@@ -176,7 +176,7 @@ chainDiff chainId newBlockNum newBlockHash = do
       Just <$> stateDiff (Just chainId) newBlockNum newBlockHash sr newSR
 
 stateDiff :: (HasCodeDB m, HasHashDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
-             Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
+             Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m StateDiff
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   diffs <- Diff.dbDiff oldRoot newRoot
   collectModes diffs $

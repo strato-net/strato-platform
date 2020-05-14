@@ -73,7 +73,7 @@ import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Output
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VM.VMException
 import           Blockchain.VMContext
@@ -135,12 +135,12 @@ instance (RawStorageKey `A.Alters` RawStorageValue) VMM where
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance (SHA `A.Alters` DBCode) VMM where
+instance (Keccak256 `A.Alters` DBCode) VMM where
   lookup _ = genericLookupCodeDB $ lift $ gets $ contextCodeDB . dbs
   insert _ = genericInsertCodeDB $ lift $ gets $ contextCodeDB . dbs
   delete _ = genericDeleteCodeDB $ lift $ gets $ contextCodeDB . dbs
 
-instance (SHA `A.Alters` BlockSummary) VMM where
+instance (Keccak256 `A.Alters` BlockSummary) VMM where
   lookup _ = genericLookupBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
   insert _ = genericInsertBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
   delete _ = genericDeleteBlockSummaryDB $ lift $ gets (contextBlockSummaryDB . dbs)
@@ -157,9 +157,9 @@ instance Word256Storable Address where
   fromWord256 h = Address $ fromIntegral (h `mod` (2^(160::Integer))::Word256)
   toWord256 (Address h) = fromIntegral h
 
-instance Word256Storable SHA where
-  fromWord256 h = unsafeCreateSHAFromWord256 h
-  toWord256 = shaToWord256
+instance Word256Storable Keccak256 where
+  fromWord256 h = unsafeCreateKeccak256FromWord256 h
+  toWord256 = keccak256ToWord256
 
 instance Word256Storable Int where
   fromWord256 = fromIntegral
