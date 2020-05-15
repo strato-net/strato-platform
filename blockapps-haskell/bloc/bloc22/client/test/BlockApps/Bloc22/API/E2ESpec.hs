@@ -583,6 +583,45 @@ spec =
       postUsersContractEither <- getResolvedTx testConfig $ runClientM (postUsersContract userName1 addr1 Nothing True postUsersContractRequest) (ClientEnv mgr blocUrl Nothing)
       postUsersContractEither `shouldSatisfy` isRight
 
+
+    it "should disambiguate contracts with the same name using address" $ \ testConfig@TestConfig {..} -> do	
+      pendingWith "Not yet supported for metadata compile"	
+      sameName1Src <- readSolFile "SameName1.sol"	
+      sameName2Src <- readSolFile "SameName2.sol"	
+      let	
+        sameName1ContractRequest = PostUsersContractRequest	
+          { postuserscontractrequestSrc = sameName1Src	
+          , postuserscontractrequestPassword = pw	
+          , postuserscontractrequestContract = Just "SameName"	
+          , postuserscontractrequestArgs = Nothing	
+          , postuserscontractrequestTxParams = testTxParams	
+          , postuserscontractrequestValue = Nothing	
+          , postuserscontractrequestMetadata = Nothing	
+          }	
+        sameName2ContractRequest = PostUsersContractRequest	
+          { postuserscontractrequestSrc = sameName2Src	
+          , postuserscontractrequestPassword = pw	
+          , postuserscontractrequestContract = Just "SameName"	
+          , postuserscontractrequestArgs = Nothing	
+          , postuserscontractrequestTxParams = testTxParams	
+          , postuserscontractrequestValue = Nothing	
+          , postuserscontractrequestMetadata = Nothing	
+          }	
+      Right (BlocTransactionResult _ _ _ (Just (Upload sameName1Details))) <- getResolvedTx testConfig $ runClientM	
+        (postUsersContract userName userAddress Nothing True sameName1ContractRequest)	
+        (ClientEnv mgr blocUrl Nothing)	
+      Right (BlocTransactionResult _ _ _ (Just (Upload sameName2Details))) <- getResolvedTx testConfig $ runClientM	
+        (postUsersContract userName userAddress Nothing True sameName2ContractRequest)	
+        (ClientEnv mgr blocUrl Nothing)	
+      Right sameName1Symbols <- runClientM	
+        (getContractsSymbols "SameName" (fromJust $ contractdetailsAddress sameName1Details) Nothing)	
+        (ClientEnv mgr blocUrl Nothing)	
+      Right sameName2Symbols <- runClientM	
+        (getContractsSymbols "SameName" (fromJust $ contractdetailsAddress sameName2Details) Nothing)	
+        (ClientEnv mgr blocUrl Nothing)	
+      sameName1Symbols `shouldBe` [SymbolName "myString"]	
+      sameName2Symbols `shouldBe` [SymbolName "myInt"]	
+
     it "should create SimpleConstructor contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
       pendingWith "Not yet supported for metadata compile"
       let
