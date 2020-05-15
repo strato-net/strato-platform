@@ -603,7 +603,12 @@ getContractDetailsAndMetadataId (ContractName contractName) addr chainId = do
           })
     tuple <- fmap listToMaybe . blocQuery $
       getContractsContractByAddressQuery contractName addr chainId
-    for tuple $ detailsWith (Just addr) chainId
+    case tuple of
+      Just t -> Just <$> detailsWith (Just addr) chainId t
+      Nothing -> do
+        tuple' <- blocQueryMaybe $
+          getContractsContractLatestQuery contractName
+        for tuple' $ detailsWith (Just addr) chainId
 
 getContractDetailsByCodeHash :: CodePtr -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeHash codeHash = do
