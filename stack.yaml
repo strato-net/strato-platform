@@ -1,5 +1,6 @@
 flags: {}
 packages:
+- api/strato-api2
 - blockapps-haskell/bloc/bloc22/api
 - blockapps-haskell/bloc/bloc22/client
 - blockapps-haskell/bloc/bloc22/server
