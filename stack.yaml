@@ -96,7 +96,7 @@ extra-deps:
 - git: https://github.com/ababkin/semver-range
   commit: fc56a310eaac1d2dbbd7a7ef2ee94cf05f4464f5
 
-resolver: lts-12.4 #also duplicated in docker section below
+resolver: lts-12.26 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -113,6 +113,6 @@ ghc-options:
 
 docker:
   enable: true
-  image: "strato-buildbase:lts-12.4"
+  image: "strato-buildbase:lts-12.26"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
