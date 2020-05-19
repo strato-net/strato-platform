@@ -22,11 +22,10 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.SolidVM.Model
 
 import           Control.Monad
-import           Control.Monad.Change.Modify                 (Accessible(..), Proxy(..))
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (for_)
@@ -38,15 +37,14 @@ import           Blockchain.Strato.StateDiff
 type SqlDbM m = SQL.SqlPersistT m
 
 sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m)=>
-           Maybe Word256 -> Integer -> SHA -> StateRoot -> StateRoot -> m ()
+           Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m ()
 sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
   commitSqlDiffs stateDiffs
 
 commitSqlDiffs :: HasSQLDB m => StateDiff -> m ()
 commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
-  pool <- access (Proxy @SQLDB)
-  flip SQL.runSqlPool pool $ do
+  sqlQuery $ do
     createAccount chainId blockNumber $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount chainId) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount chainId blockNumber) updatedAccounts

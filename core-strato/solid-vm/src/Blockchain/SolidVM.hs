@@ -1,6 +1,7 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
@@ -8,12 +9,12 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.SolidVM
-    (
-      call
-    , create
-    ) where
+  ( SolidVMBase
+  , call
+  , create
+  ) where
 
-import           Control.Lens hiding (assign, from, to)
+import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
@@ -24,7 +25,6 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
-import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
@@ -47,6 +47,7 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
+import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
@@ -54,14 +55,13 @@ import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Metrics
-import           Blockchain.SolidVM.Model
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
@@ -78,14 +78,18 @@ import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
+import           UnliftIO                             hiding (assert)
+
 import           CodeCollection
 
+type SolidVMBase m = VMBase m
 
 onTraced :: Monad m => m () -> m ()
 onTraced = when flags_svmTrace
 
 
-create :: Bool
+create :: SolidVMBase m
+       => Bool
        -> Bool
        -> S.Set Address
        -> BlockData
@@ -97,10 +101,10 @@ create :: Bool
        -> Gas
        -> Address
        -> Code
-       -> SHA
+       -> Keccak256
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
-       -> ContextM ExecResults
+       -> m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash' chainId' metadata = do
@@ -125,7 +129,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash
     (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' newAddress hsh cc contractName' args
 
-create' :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
+create' :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
 create' creator newAddress ch cc contractName' argExps = do
   initializeAction newAddress contractName' ch
 
@@ -182,7 +186,8 @@ initializeStorage root value = do
      x -> setVar root x
 -}
 
-call :: Bool
+call :: SolidVMBase m
+     => Bool
      -> Bool
      -> Bool
      -> S.Set Address
@@ -196,10 +201,10 @@ call :: Bool
      -> B.ByteString
      -> Gas
      -> Address
-     -> SHA
+     -> Keccak256
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
-     -> ContextM ExecResults
+     -> m ExecResults
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
@@ -243,7 +248,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       }
 
 
-getCodeAndCollection :: MonadSM m => Address -> m (Contract, SHA, CodeCollection)
+getCodeAndCollection :: MonadSM m => Address -> m (Contract, Keccak256, CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
@@ -260,13 +265,13 @@ getCodeAndCollection address' = do
     return (c', hsh, cc')
     else do
     codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
-    
+
     (contractName', ch, cc) <-
       case codeHash of
         SolidVMCode cn ch' -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')
-        ch -> internalError "SolidVM for non-solidvm code" ch
+        ch -> internalError "SolidVM for non-solidvm code" (format ch)
 
 
     let contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
@@ -280,11 +285,11 @@ logFunctionCall args address contract functionName f = do
       case args of
         OrderedVals argList -> fmap (intercalate ", ") $ forM argList showSM
         NamedVals argMap ->
-          fmap (intercalate ", ") $ 
+          fmap (intercalate ", ") $
           forM argMap $ \(n, v) -> do
             valString <- showSM v
             return $ n ++ ": " ++ valString
-        
+
     let shownFunc = functionName ++ "(" ++ argStrings ++ ")"
     liftIO $ putStrLn $ box $ concat $ map (wrap 150)
       ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ shownFunc]
@@ -1185,7 +1190,7 @@ callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
 callBuiltin "keccak256" [SString buf] Nothing = do
-  return . SString . BC.unpack . shaToByteString . hash . BC.pack $ buf
+  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ buf
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing
@@ -1235,7 +1240,7 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ()
+runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
@@ -1342,7 +1347,7 @@ runTheCall :: MonadSM m
            => Address
            -> Contract
            -> String
-           -> SHA
+           -> Keccak256
            -> CodeCollection
            -> Xabi.Func
            -> ValList

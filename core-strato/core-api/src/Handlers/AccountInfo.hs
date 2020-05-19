@@ -27,7 +27,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA hiding (hash)
+import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 
 import           Settings
@@ -43,7 +43,7 @@ type API = Tags "section1" :> Summary "get user accounts" :> Description "Get in
             :> QueryParam "maxnonce" Integer
             :> QueryParam "maxnumber" Integer
             :> QueryParam "code" Text
-            :> QueryParam "codeHash" SHA
+            :> QueryParam "codeHash" Keccak256
             :> QueryParam "chainid" Text
             :> Get '[JSON] [AddressStateRef']
 
@@ -55,7 +55,7 @@ server pool = getAccount pool
 getAccount :: ConnectionPool ->
                   Maybe Address -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
                   Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
-                  Maybe Text -> Maybe SHA -> Maybe Text ->
+                  Maybe Text -> Maybe Keccak256 -> Maybe Text ->
                   Handler [AddressStateRef']
 
 getAccount pool 

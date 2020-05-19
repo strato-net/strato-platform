@@ -31,7 +31,7 @@ import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), Ingest
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util
 import           Blockchain.TypeLits
 import           SQLM
@@ -119,5 +119,5 @@ processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Us
       s | s /= S.empty -> Left (i, "Each contract code hash in accountInfo must match a corresponding code hash in codeInfo.")
         | otherwise -> do
           let cid = rlpHash gen
-          return $ shaToWord256 cid
+          return $ keccak256ToWord256 cid
 

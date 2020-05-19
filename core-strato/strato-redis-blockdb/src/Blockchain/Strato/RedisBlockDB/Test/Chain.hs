@@ -15,7 +15,7 @@ import           Test.QuickCheck
 
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Data.BlockDB
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 ------------------------------------------------------------------------------
 -- Lenses
@@ -25,7 +25,7 @@ $(makeLensesBy (\n -> Just ("_" ++ n)) ''Block)
 
 makeGenesisBlock :: IO BlockData
 makeGenesisBlock = do
-    startBlock <-  ( (over _blockDataParentHash (const . unsafeCreateSHAFromWord256 $ 0))
+    startBlock <-  ( (over _blockDataParentHash (const . unsafeCreateKeccak256FromWord256 $ 0))
 --                   . (over _blockDataUnclesHash (const (ommersVerificationValue [])))
                    . (over _blockDataNumber     (const 0))
                    . (over _blockDataGasUsed    (const 0))
@@ -190,5 +190,5 @@ showTree = drawTree . prettyTree
 prettyTree' :: Tree BlockData -> Tree String
 prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
 
-showHash :: SHA -> String
-showHash = take 8 . shaToHex
+showHash :: Keccak256 -> String
+showHash = take 8 . keccak256ToHex

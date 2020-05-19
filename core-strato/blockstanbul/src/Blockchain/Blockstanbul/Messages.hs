@@ -28,7 +28,7 @@ import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.ExtendedECDSA
 import Blockchain.Output
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Text.Colors as CL
 import Text.Format
@@ -56,8 +56,8 @@ data MsgAuth = MsgAuth {
 } deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 data TrustedMessage = Preprepare View Block
-                    | Prepare View SHA
-                    | Commit View SHA ExtendedSignature
+                    | Prepare View Keccak256
+                    | Commit View Keccak256 ExtendedSignature
                     | RoundChange {roundchangeView :: View }
                     deriving (Eq, Show, Generic, Binary, NFData, Data)
 
@@ -111,7 +111,7 @@ roundchangeCode = 3
 data InEvent = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
              | Timeout RoundNumber
              -- TODO(tim): CommitResult should have the digest
-             | CommitResult (Either Text SHA)
+             | CommitResult (Either Text Keccak256)
              | UnannouncedBlock Block
              | PreviousBlock Block
              | NewBeneficiary {bAuth :: MsgAuth, beneficiary :: (Address, Bool,Int)}
@@ -196,10 +196,10 @@ getHash :: TrustedMessage -> Word256
 -- will have the same signature despite being different messages.
 -- It also needs a code for the message type.
 getHash = \case
-              (Preprepare _ blk) -> shaToWord256 . blockHash $ blk
-              (Prepare _ di) -> shaToWord256 di
-              (Commit _ di _) -> shaToWord256 di
-              (RoundChange _) -> shaToWord256 $ hash "TODO(tim): this signature is predictable"
+              (Preprepare _ blk) -> keccak256ToWord256 . blockHash $ blk
+              (Prepare _ di) -> keccak256ToWord256 di
+              (Commit _ di _) -> keccak256ToWord256 di
+              (RoundChange _) -> keccak256ToWord256 $ hash "TODO(tim): this signature is predictable"
 
 instance RLPSerializable View where
   rlpEncode (View r s) = RLPArray [rlpEncode r, rlpEncode s]
@@ -235,7 +235,7 @@ instance RLPSerializable WireMessage where
       [ rlpEncode roundchangeCode
       , RLPString . rlpSerialize . RLPArray $
         [ rlpEncode vw,
-          rlpEncode $ unsafeCreateSHAFromWord256 0]
+          rlpEncode $ unsafeCreateKeccak256FromWord256 0]
       , rlpEncode addr
       , rlpEncode sig
       , RLPString ""]

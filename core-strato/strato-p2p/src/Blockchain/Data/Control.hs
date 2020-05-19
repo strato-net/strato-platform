@@ -2,4 +2,8 @@ module Blockchain.Data.Control (
   P2PCNC(..)
 ) where
 
-data P2PCNC = TXQueueTimeout deriving (Show, Eq)
+import Blockchain.Sequencer.Event
+
+data P2PCNC = TXQueueTimeout
+            | ToUnseq [IngestEvent]
+            deriving (Show, Eq)

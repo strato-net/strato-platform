@@ -27,6 +27,7 @@ library:
   dependencies:
   - aeson-casing
   - binary
+  - bytestring
   - containers
   - http-api-data
   - lens

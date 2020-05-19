@@ -50,7 +50,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.FastECRecover
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 
 import           Blockchain.ExtendedECDSA
@@ -79,7 +79,7 @@ instance TransactionLike Transaction where
                        PrivateHashTX{} -> 0
                        t -> transactionNonce t
     txSignature   = \case
-                       PrivateHashTX{..} -> (fromIntegral $ shaToWord256 transactionTxHash, fromIntegral $ shaToWord256 transactionChainHash, 0)
+                       PrivateHashTX{..} -> (fromIntegral $ keccak256ToWord256 transactionTxHash, fromIntegral $ keccak256ToWord256 transactionChainHash, 0)
                        t -> (transactionR t, transactionS t, transactionV t)
     txValue       = \case
                        PrivateHashTX{} -> 0
@@ -117,7 +117,7 @@ instance TransactionLike Transaction where
     morphTx t = case type' of
         Message          -> MessageTX n gp gl dest val dat chainId r s v md
         ContractCreation -> ContractCreationTX n gp gl val code chainId r s v md
-        PrivateHash      -> PrivateHashTX (unsafeCreateSHAFromWord256 $ fromInteger r) (unsafeCreateSHAFromWord256 $ fromInteger s)
+        PrivateHash      -> PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger r) (unsafeCreateKeccak256FromWord256 $ fromInteger s)
         where type'     = txType t
               n         = txNonce t
               gp        = txGasPrice t
@@ -134,7 +134,7 @@ rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat cid r s v md _ _ _) =
   MessageTX nonce' gp gl to' val dat (toMaybe 0 cid) r s v (M.fromList <$> md)
 rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _) | init' == B.empty =
-  PrivateHashTX (unsafeCreateSHAFromWord256 $ fromInteger h) (unsafeCreateSHAFromWord256 $ fromInteger ch)
+  PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger h) (unsafeCreateKeccak256FromWord256 $ fromInteger ch)
 rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) =
   ContractCreationTX nonce' gp gl val (Code init') (toMaybe 0 cid) r s v (M.fromList <$> md)
 
@@ -146,7 +146,7 @@ txAndTime2RawTX origin tx blkNum time =
     (ContractCreationTX nonce' gp gl val (Code init') cid r s v md) ->
         RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (PrivateHashTX h ch) ->
-        RawTransaction time signer 0 0 0 Nothing 0 B.empty 0 (fromIntegral $ shaToWord256 h) (fromIntegral $ shaToWord256 ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
+        RawTransaction time signer 0 0 0 Nothing 0 B.empty 0 (fromIntegral $ keccak256ToWord256 h) (fromIntegral $ keccak256ToWord256 ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -212,7 +212,7 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
                      transactionMetadata = md
                    }
   let theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature yIsOdd <- extSignMsg (shaToWord256 theHash) prvKey
+  ExtendedSignature signature yIsOdd <- extSignMsg (keccak256ToWord256 theHash) prvKey
   return
     unsignedTX {
       transactionR =
@@ -254,7 +254,7 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
                    }
 
   let theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature yIsOdd <- extSignMsg (shaToWord256 theHash) prvKey
+  ExtendedSignature signature yIsOdd <- extSignMsg (keccak256ToWord256 theHash) prvKey
   return
     unsignedTX {
       transactionR =
@@ -275,7 +275,7 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction tx = case tx of
   PrivateHashTX{} -> Just (Address 0)
-  t -> pubKey2Address <$> getPubKeyFromSignature_fast xSignature (shaToWord256 theHash)
+  t -> pubKey2Address <$> getPubKeyFromSignature_fast xSignature (keccak256ToWord256 theHash)
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           theHash = partialTransactionHash t
@@ -284,12 +284,12 @@ isContractCreationTX::Transaction->Bool
 isContractCreationTX ContractCreationTX{} = True
 isContractCreationTX _                    = False
 
-transactionHash::Transaction->SHA
+transactionHash::Transaction->Keccak256
 transactionHash = \case
                      PrivateHashTX{..} -> transactionTxHash
                      t -> hash . rlpSerialize $ rlpEncode t
 
-partialTransactionHash::Transaction->SHA
+partialTransactionHash::Transaction->Keccak256
 partialTransactionHash = \case
                             PrivateHashTX{..} -> transactionTxHash -- TODO: Should this be an error instead?
                             t -> hash . rlpSerialize $ partialRLPEncode t

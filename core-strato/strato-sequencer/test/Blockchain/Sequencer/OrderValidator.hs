@@ -11,7 +11,7 @@ import qualified Data.Map.Strict            as Map
 import           Blockchain.Data.BlockDB    (blockHeaderHash)
 import           Blockchain.Data.DataDefs
 import qualified Blockchain.Sequencer.Event as SE
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           Blockchain.Util            (tab)
 
@@ -19,26 +19,26 @@ import qualified Text.Colors                as CL
 import           Text.Format
 
 class Show t => OrderValidateable t where
-    getBlockHash   :: t -> SHA
-    getParentHash  :: t -> SHA
+    getBlockHash   :: t -> Keccak256
+    getParentHash  :: t -> Keccak256
     getBlockNumber :: t -> Integer
 
-data OrderValidateable t => ValidationResult t = InvalidOrder { ioParentSHA :: SHA
-                                                              , ioParentNum :: Integer
-                                                              , ioCulprit   :: t
-                                                              , ioMessage   :: String
-                                                              }
-                                               | Valid deriving (Show)
+data ValidationResult t = InvalidOrder { ioParentSHA :: Keccak256
+                                       , ioParentNum :: Integer
+                                       , ioCulprit   :: t
+                                       , ioMessage   :: String
+                                       }
+                        | Valid deriving (Show)
 
-isValid :: OrderValidateable t => OrderValidatorState t -> Bool
+isValid :: OrderValidatorState t -> Bool
 isValid = isValid' . runState
 
 isValid' :: ValidationResult t -> Bool
 isValid' Valid = True
 isValid' _     = False
 
-data OrderValidateable t => OrderValidatorState t =
-    OrderValidatorState { seenBlocks   :: Map.Map SHA Integer
+data OrderValidatorState t =
+    OrderValidatorState { seenBlocks   :: Map.Map Keccak256 Integer
                         , unseenBlocks :: [t]
                         , runState     :: ValidationResult t
                         } deriving (Show)
@@ -52,7 +52,7 @@ instance (OrderValidateable t) => Format (OrderValidatorState t) where
                          ++ tab ("seenBlocks   -> " ++ (show sb)  ++ "\n"
                              ++  "unseenBlocks -> " ++ (show usb) ++ "\n")
 
-runValidatorM :: (OrderValidateable gb, OrderValidateable ts) => OrderValidatorM ts a -> gb -> [ts] -> IO (OrderValidatorState ts)
+runValidatorM :: OrderValidateable gb => OrderValidatorM ts a -> gb -> [ts] -> IO (OrderValidatorState ts)
 runValidatorM monad root validateables = do
     seedSeen <- return $ Map.singleton (getBlockHash root) (getBlockNumber root)
     state'   <- return $ OrderValidatorState { seenBlocks = seedSeen, unseenBlocks = validateables, runState = Valid }

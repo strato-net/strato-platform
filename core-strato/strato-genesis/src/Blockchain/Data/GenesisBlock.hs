@@ -47,7 +47,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf                   (runKafkaConfigured)
 import           Blockchain.Output
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
@@ -155,7 +155,7 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
            let address = Ad.Address $ parseHex a
            $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
              "adding account: " ++ format address
-           A.insert A.Proxy address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ unsafeCreateSHAFromWord256 $ parseHex c}
+           A.insert A.Proxy address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ unsafeCreateKeccak256FromWord256 $ parseHex c}
          _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
 
       $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
@@ -253,29 +253,32 @@ genesisInfoToGenesisBlock gi gn as = do
         blockBlockUncles         = []
     })
 
-initializeChainDBs :: ( HasCodeDB (t m)
-                      , HasHashDB (t m)
-                      , WrapsSQLDB t m
-                      , HasStateDB (t m)
-                      , MonadIO (t m)
+initializeChainDBs :: ( MonadLogger m
+                      , HasCodeDB m
+                      , HasHashDB m
+                      , HasSQLDB m
+                      , HasStateDB m
                       )
                    => Ext.Word256
                    -> ChainInfo
                    -> StateRoot
-                   -> t m ()
+                   -> m ()
 initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
+  existingSR <- get (Proxy @StateRoot)
+  put (Proxy @StateRoot) sRoot
   genAddrStates <- getAllAddressStates
+  put (Proxy @StateRoot) existingSR
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
   let diff = StateDiff {
       StateDiff.chainId   = Just chainId,
       blockNumber         = 0,
-      StateDiff.blockHash = unsafeCreateSHAFromWord256 0,
+      StateDiff.blockHash = unsafeCreateKeccak256FromWord256 0,
       StateDiff.stateRoot = sRoot,
       createdAccounts     = accountDiffs,
       deletedAccounts     = Map.empty,
       updatedAccounts     = Map.empty
   }
-  runWithSQL $ commitSqlDiffs diff
+  commitSqlDiffs diff
   let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
         let cHash = hash $ codeInfoCode ci
             md    = Map.fromList [("src",codeInfoSource ci),("name",codeInfoName ci)]
@@ -285,7 +288,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
         { A._actionBlockHash = creationBlock
         , A._actionBlockTimestamp = posixSecondsToUTCTime 0
         , A._actionBlockNumber = 0
-        , A._actionTransactionHash = unsafeCreateSHAFromWord256 chainId
+        , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 chainId
         , A._actionTransactionChainId = Just chainId
         , A._actionTransactionSender = Ad.Address 0
         , A._actionData = Map.singleton a $

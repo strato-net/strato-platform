@@ -29,7 +29,7 @@ import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           Text.Format
 
@@ -43,8 +43,8 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
     setKafkaCheckpoint nextOffset'
 
 indexP2P :: ( MonadLogger m
-            , (SHA `A.Alters` P2P (Private (Word256, OutputTx))) m
-            , (SHA `A.Alters` P2P OutputBlock) m
+            , (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) m
+            , (Keccak256 `A.Alters` P2P OutputBlock) m
             , Mod.Modifiable (P2P BestBlock) m
             , (Word256 `A.Alters` P2P ChainInfo) m
             , (Word256 `A.Alters` P2P ChainMembers) m

@@ -43,7 +43,7 @@ import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.SHA hiding (hash)
+import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 data Options = State{root::String, db::String}
              | Block{hash::String, db::String}
@@ -429,7 +429,7 @@ run Checkpoints{..}            = case operation of
 run AskForBlocks{..}           = insertP2P (P2pAskForBlocks startBlock endBlock peer)
 run PushBlocks{..}             = insertP2P (P2pPushBlocks startBlock endBlock peer)
 run AskForTxs                  = insertP2P . P2pGetTx
-                                           . map (unsafeCreateSHAFromByteString . fst . B16.decode)
+                                           . map (unsafeCreateKeccak256FromByteString . fst . B16.decode)
                                            . filter (not . B.null)
                                            . BC.split '\n' =<< B.getContents
 run RSVP{..}                   = rsvp chainId memberId address

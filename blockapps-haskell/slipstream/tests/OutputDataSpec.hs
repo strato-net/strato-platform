@@ -19,7 +19,7 @@ import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.SHA (hash)
+import Blockchain.Strato.Model.Keccak256 (hash)
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)

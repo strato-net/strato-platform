@@ -142,6 +142,7 @@ tests:
       - hspec-core
       - hspec-expectations-lifted
       - HUnit
+      - monad-alter
       - mtl
       - QuickCheck
       - seqevents

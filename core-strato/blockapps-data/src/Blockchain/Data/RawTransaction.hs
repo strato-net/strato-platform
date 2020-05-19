@@ -18,11 +18,9 @@ module Blockchain.Data.RawTransaction (
 
 import           UnliftIO.Exception
 import           Control.Monad
-import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Resource
 import qualified Database.Persist.Postgresql  as SQL
 
 import           Blockchain.Data.DataDefs
@@ -31,10 +29,7 @@ import           Blockchain.DBM
 
 
 insertRawTX :: HasSQLDB m => DebugMode -> [RawTransaction] -> m ()
-insertRawTX m rawTXs = do
-  db <- access Proxy
-  runResourceT $ SQL.runSqlPool (insertRawTX' m rawTXs) db
-
+insertRawTX m rawTXs = sqlQuery $ insertRawTX' m rawTXs
 
 insertRawTX' :: MonadUnliftIO m =>
              DebugMode -> [RawTransaction] -> ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
