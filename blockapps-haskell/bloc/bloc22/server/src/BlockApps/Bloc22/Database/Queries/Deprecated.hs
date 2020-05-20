@@ -260,7 +260,7 @@ getXabiTypeDefs metadataId = do
         "Invalid type def. Expected Struct or Enum, saw " <> ty
 
 getContractXabiDeprecated ::
-                   ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc Xabi
+                   ContractName -> Address -> Maybe ChainId -> Bloc Xabi
 getContractXabiDeprecated (ContractName contractName) contractId chainId = do
   mCmId <- getContractsMetaDataId contractName contractId chainId
   case mCmId of
