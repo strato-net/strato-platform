@@ -11,6 +11,10 @@ import           Servant
 
 data Sortby = ASC | DESC deriving (Show)
 
+instance ToHttpApiData Sortby where
+  toUrlPiece ASC = "asc"
+  toUrlPiece DESC = "desc"
+
 instance FromHttpApiData Sortby where
   parseQueryParam x =
     case x of

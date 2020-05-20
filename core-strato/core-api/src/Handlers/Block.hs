@@ -1,8 +1,15 @@
-{-# LANGUAGE DataKinds, OverloadedStrings, TypeOperators #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 
-module Handlers.Block (
-  API,
-  server
+module Handlers.Block
+  ( API
+  , BlocksFilterParams(..)
+  , blocksFilterParams
+  , getBlocksFilter
+  , server
   ) where
 
 import           Control.Monad
@@ -15,13 +22,16 @@ import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import qualified Database.Esqueleto as E
 import           Database.Persist.Postgresql
+import           Numeric.Natural
 import           Servant
+import           Servant.Client
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 import           SQLM
@@ -35,22 +45,60 @@ type API =
           :> QueryParam "address" Address
           :> QueryParam "blockid" Text
           :> QueryParam "hash" Keccak256
-          :> QueryParam "mindiff" Integer
-          :> QueryParam "maxdiff" Integer
-          :> QueryParam "diff" Integer
-          :> QueryParam "gasused" Integer
-          :> QueryParam "mingasused" Integer
-          :> QueryParam "maxgasused" Integer
-          :> QueryParam "gaslim" Integer
-          :> QueryParam "mingaslim" Integer
-          :> QueryParam "maxgaslim" Integer
-          :> QueryParam "number" Integer
-          :> QueryParam "minnumber" Integer
-          :> QueryParam "maxnumber" Integer
+          :> QueryParam "mindiff" Natural
+          :> QueryParam "maxdiff" Natural
+          :> QueryParam "diff" Natural
+          :> QueryParam "gasused" Natural
+          :> QueryParam "mingasused" Natural
+          :> QueryParam "maxgasused" Natural
+          :> QueryParam "gaslim" Natural
+          :> QueryParam "mingaslim" Natural
+          :> QueryParam "maxgaslim" Natural
+          :> QueryParam "number" Natural
+          :> QueryParam "minnumber" Natural
+          :> QueryParam "maxnumber" Natural
           :> QueryParam "index" Int
-          :> QueryParam "chainid" Keccak256
+          :> QueryParam "chainid" ChainId
           :> QueryParam "sortby" Sortby :> Get '[JSON] [Block']
 
+data BlocksFilterParams = BlocksFilterParams
+  { qbTxAddress  :: Maybe Address
+  , qbCoinbase   :: Maybe Address
+  , qbAddress    :: Maybe Address
+  , qbBlockId    :: Maybe Text
+  , qbHash       :: Maybe Keccak256
+  , qbMinDiff    :: Maybe Natural
+  , qbMaxDiff    :: Maybe Natural
+  , qbDiff       :: Maybe Natural
+  , qbGasUsed    :: Maybe Natural
+  , qbMinGasUsed :: Maybe Natural
+  , qbMaxGasUsed :: Maybe Natural
+  , qbGasLim     :: Maybe Natural
+  , qbMinGasLim  :: Maybe Natural
+  , qbMaxGasLim  :: Maybe Natural
+  , qbNumber     :: Maybe Natural
+  , qbMinNumber  :: Maybe Natural
+  , qbMaxNumber  :: Maybe Natural
+  , qbIndex      :: Maybe Int
+  , qbChainId    :: Maybe ChainId
+  , qbSortby     :: Maybe Sortby
+  }
+
+blocksFilterParams :: BlocksFilterParams
+blocksFilterParams = BlocksFilterParams
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing
+
+getBlocksFilter :: BlocksFilterParams -> ClientM [Block']
+getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
+  where
+    getBlocksFilter' = client (Proxy @API)
+    uncurryBlocksFilterParams f BlocksFilterParams{..} = f
+      qbTxAddress qbCoinbase qbAddress qbBlockId qbHash qbMinDiff
+      qbMaxDiff qbDiff qbGasUsed qbMinGasUsed qbMaxGasUsed qbGasLim
+      qbMinGasLim qbMaxGasLim qbNumber qbMinNumber qbMaxNumber
+      qbIndex qbChainId qbSortby
 
 server :: ConnectionPool -> Server API
 server pool = getBlockInfo pool
@@ -59,10 +107,10 @@ server pool = getBlockInfo pool
 
 getBlockInfo :: ConnectionPool ->
                  Maybe Address -> Maybe Address -> Maybe Address -> Maybe Text ->
-                 Maybe Keccak256 -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
-                 Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
-                 Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer ->
-                 Maybe Integer -> Maybe Int -> Maybe Keccak256 -> Maybe Sortby ->
+                 Maybe Keccak256 -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+                 Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+                 Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+                 Maybe Natural -> Maybe Int -> Maybe ChainId -> Maybe Sortby ->
                  Handler [Block']
 getBlockInfo pool
   txaddress coinbase address blockid hash mindiff maxdiff diff
@@ -89,18 +137,18 @@ getBlockInfo pool
 
           let criteria = catMaybes
                 [
-                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) number,
-                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.>=. E.val v) minnumber,
-                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.<=. E.val v) maxnumber,
-                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.==. E.val v) gaslim,
-                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.>=. E.val v) mingaslim,
-                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.<=. E.val v) maxgaslim,
-                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.==. E.val v) gasused,
-                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.>=. E.val v) mingasused,
-                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.<=. E.val v) maxgasused,
-                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.==. E.val v) diff,
-                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.>=. E.val v) mindiff,
-                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.<=. E.val v) maxdiff,
+                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) (fromIntegral <$> number),
+                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.>=. E.val v) (fromIntegral <$> minnumber),
+                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.<=. E.val v) (fromIntegral <$> maxnumber),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.==. E.val v) (fromIntegral <$> gaslim),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.>=. E.val v) (fromIntegral <$> mingaslim),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.<=. E.val v) (fromIntegral <$> maxgaslim),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.==. E.val v) (fromIntegral <$> gasused),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.>=. E.val v) (fromIntegral <$> mingasused),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.<=. E.val v) (fromIntegral <$> maxgasused),
+                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.==. E.val v) (fromIntegral <$> diff),
+                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.>=. E.val v) (fromIntegral <$> mindiff),
+                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.<=. E.val v) (fromIntegral <$> maxdiff),
                   fmap (\v -> bdRef E.^. BlockDataRefCoinbase E.==. E.val v) coinbase,
                   fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) address,
 --                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) ntx,

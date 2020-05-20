@@ -37,7 +37,7 @@ import           Blockchain.TypeLits
 import           SQLM
 
 type API = 
-  "chain" :> QueryParam "chainid" ChainId  :> Get '[JSON] (NamedMap "id" Word256 "info" ChainInfo)
+  "chain" :> QueryParams "chainid" ChainId  :> Get '[JSON] (NamedMap "id" Word256 "info" ChainInfo)
   :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] Text
   :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [Text]
 
@@ -50,11 +50,8 @@ instance ToSchema (NamedTuple "id" Word256 "info" ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
-getChain :: ConnectionPool -> Maybe ChainId -> Handler (NamedMap "id" Word256 "info" ChainInfo)
-getChain pool mChainId = liftIO $ runSQLM pool $ 
-  case mChainId of
-    Nothing -> getChainInfos []
-    Just (ChainId chainid) -> getChainInfos [chainid]
+getChain :: ConnectionPool -> [ChainId] -> Handler (NamedMap "id" Word256 "info" ChainInfo)
+getChain pool = liftIO . runSQLM pool . getChainInfos . map unChainId
     
 postChain :: ChainInfo -> Handler Text
 postChain ci = runLoggingT $ do

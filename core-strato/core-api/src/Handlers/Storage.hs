@@ -1,28 +1,35 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Handlers.Storage (
-  API,
-  server
+module Handlers.Storage
+  ( API
+  , StorageFilterParams(..)
+  , storageFilterParams
+  , storageClient
+  , server
   ) where
 
 import           Control.Monad.IO.Class
 import           Data.Aeson
+import qualified Data.ByteString.Lazy.Char8  as BLC
 import           Data.Maybe
-import           Data.Text               (Text)
+import           Data.Swagger            hiding (name)
 import qualified Data.Text               as T
 import qualified Database.Esqueleto      as E
 import           Database.Persist.Postgresql
 import           GHC.Generics
-import           Numeric
+import           MaybeNamed
 import           Servant
+import           Servant.Client
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.ExtWord
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.ChainId
 
 import           Settings
 import           SQLM
@@ -35,9 +42,34 @@ type API =
             :> QueryParam "minvalue" HexStorage
             :> QueryParam "maxvalue" HexStorage
             :> QueryParam "address" Address
-            :> QueryParam "chainid" Text
-            :> QueryParams "chainids" Text
-            :> Get '[JSON] Value
+            :> QueryParam "chainid" (MaybeNamed ChainId)
+            :> QueryParams "chainids" ChainId
+            :> Get '[JSON] [StorageAddress]
+
+data StorageFilterParams = StorageFilterParams
+  { qsKey      :: Maybe HexStorage
+  , qsMinKey   :: Maybe HexStorage
+  , qsMaxKey   :: Maybe HexStorage
+  , qsValue    :: Maybe HexStorage
+  , qsMinValue :: Maybe HexStorage
+  , qsMaxValue :: Maybe HexStorage
+  , qsAddress  :: Maybe Address
+  , qsChainId  :: Maybe (MaybeNamed ChainId)
+  , qsChainIds :: [ChainId]
+  }
+
+storageFilterParams :: StorageFilterParams
+storageFilterParams = StorageFilterParams
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  []
+
+storageClient :: StorageFilterParams -> ClientM [StorageAddress]
+storageClient = uncurryStorageFilterParams storageClient'
+  where
+    storageClient' = client (Proxy @API)
+    uncurryStorageFilterParams f StorageFilterParams{..} = f
+      qsKey qsMinKey qsMaxKey qsValue qsMinValue qsMaxValue
+      qsAddress qsChainId qsChainIds
 
 server :: ConnectionPool -> Server API
 server connStr = getStorage connStr
@@ -54,41 +86,46 @@ data StorageAddress = StorageAddress {
 } deriving (Show, Read, Eq, Generic)
 
 instance ToJSON StorageAddress
+instance FromJSON StorageAddress
+instance ToSchema StorageAddress
 
 storage2StorageAddress :: Storage -> Address -> StorageAddress
 storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) (storageKind stor) addr)
 
+data NamedChainId = UnnamedChainIds [ChainId]
+                  | MainChain
+                  | AllChains
+
 getStorage :: ConnectionPool ->
               Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage ->
               Maybe HexStorage -> Maybe HexStorage -> Maybe Address ->
-              Maybe Text -> [Text] -> Handler Value
+              Maybe (MaybeNamed ChainId) -> [ChainId] -> Handler [StorageAddress]
 getStorage pool
   theKey minkey maxkey theValue
   minvalue maxvalue theAddress
   chainidParam chainidsParam
   = do
-  chainIds <-
+  chainids <-
     case (chainidParam, chainidsParam) of
-      (Nothing, []) -> return []
-      (Nothing, c) -> return c
-      (Just c, []) -> return [c]
-      _ -> throwError err400{ errBody = "You can't use both the chainid and chainids parameters at the same time" }
-          
+      (Nothing, v) -> case v of
+        [] -> pure MainChain
+        cids -> pure $ UnnamedChainIds cids
+      (Just c, []) -> case c of
+        Unnamed cid -> pure $ UnnamedChainIds [cid]
+        Named "main" -> pure MainChain
+        Named "all" -> pure AllChains
+        Named name -> throwError err400{errBody = BLC.pack . T.unpack $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'." }
+      _ -> throwError err400{ errBody = "You can not use both the chainid and chainids parameters togther." }
+
   addrs <- liftIO $ runSQLM pool $ sqlQuery $ E.select . E.distinct $
 
            E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
-           let matchChainId cid = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.val $ fromHexText cid))
-
-           let chainCriteria =
-                 case chainIds of
-                   [] -> [(addrStRef E.^. AddressStateRefChainId) E.==. E.val 0]
-                   [cid] -> if (T.unpack cid == "main")
-                            then  [(addrStRef E.^. AddressStateRefChainId) E.==. E.val 0]
-                            else if (T.unpack cid == "all")
-                                 then [E.val True]
-                                 else [matchChainId cid]
-                   cids -> map matchChainId cids
+           let matchChainId (ChainId cid) = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.val cid))
+               chainCriteria = case chainids of
+                                 MainChain -> [addrStRef E.^. AddressStateRefChainId E.==. E.val 0]
+                                 UnnamedChainIds cids -> matchChainId <$> cids
+                                 AllChains -> [E.val True]
 
            let criteria = (storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId)
 
@@ -117,7 +154,7 @@ getStorage pool
   let storageRecords = map (entityVal . fst) addrs
       storageAddresses = zipWith (storage2StorageAddress) storageRecords (map (E.unValue . snd) addrs)
 
-  return . toJSON $ storageAddresses
+  return storageAddresses
 
 
 
@@ -132,10 +169,6 @@ getStorage pool
 toHex :: Text -> HexStorage
 toHex = word256ToHexStorage . read . T.unpack
 -}
-
-fromHexText :: T.Text -> Word256
-fromHexText v = res
-  where ((res,_):_) = readHex $ T.unpack $ v :: [(Word256,String)]
 
 {-
 

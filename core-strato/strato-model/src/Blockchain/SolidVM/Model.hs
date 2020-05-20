@@ -33,8 +33,13 @@ instance ToParamSchema HexStorage where
 word256ToHexStorage :: Word256 -> HexStorage
 word256ToHexStorage = HexStorage . word256ToBytes
 
+instance ToHttpApiData HexStorage where
+  toUrlPiece (HexStorage hs) = decodeUtf8 (B16.encode hs)
+
 instance FromHttpApiData HexStorage where
-  parseQueryParam = Right . word256ToHexStorage . read . T.unpack
+  parseQueryParam t = case B16.decode (encodeUtf8 t) of
+    (hs, "") -> pure $ HexStorage hs
+    _ -> fail $ "non-hex string passed off as hex: " ++ T.unpack t
 
 instance ToSchema HexStorage where
   declareNamedSchema _ = return $ named "solidvm hex storage"  binarySchema

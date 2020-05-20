@@ -1,14 +1,22 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
 
-module Handlers.Transaction (
-  API,
-  server
+module Handlers.Transaction
+  ( TxsFilterParams (..)
+  , txsFilterParams
+  , API
+  , getTxsFilter
+  , postTx
+  , postTxList
+  , server
   ) where
 
 import           Control.DeepSeq
@@ -18,24 +26,22 @@ import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8  as BLC
 import           Data.List
 import           Data.Maybe
-import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import qualified Database.Esqueleto          as E
 import           Database.Persist.Postgresql
-import           Numeric
+import           MaybeNamed
+import           Numeric.Natural
 import           Servant
+import           Servant.Client
 import           System.Clock
+import           Text.Format
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.ExtWord
 import           Blockchain.Output
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
-import           Text.Format
-
-
-
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
@@ -44,36 +50,74 @@ import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
 import           Blockchain.Util             (getCurrentMicrotime)
 
-
-
-
 import           Settings
 import           SortDirection
 import           SQLM
-
-
 
 type API = 
   "transaction" :> QueryParam "address" Address
                 :> QueryParam "from" Address
                 :> QueryParam "to" Address
                 :> QueryParam "hash" Keccak256
-                :> QueryParam "gasprice" Integer
-                :> QueryParam "mingasprice" Integer
-                :> QueryParam "maxgasprice" Integer
-                :> QueryParam "gaslimit" Integer
-                :> QueryParam "mingaslimit" Integer
-                :> QueryParam "maxgaslimit" Integer
-                :> QueryParam "value" Integer
-                :> QueryParam "minvalue" Integer
-                :> QueryParam "maxvalue" Integer
-                :> QueryParam "blocknumber" Int
-                :> QueryParam "chainid" Text
-                :> QueryParams "chainids" Text
+                :> QueryParam "gasprice" Natural
+                :> QueryParam "mingasprice" Natural
+                :> QueryParam "maxgasprice" Natural
+                :> QueryParam "gaslimit" Natural
+                :> QueryParam "mingaslimit" Natural
+                :> QueryParam "maxgaslimit" Natural
+                :> QueryParam "value" Natural
+                :> QueryParam "minvalue" Natural
+                :> QueryParam "maxvalue" Natural
+                :> QueryParam "blocknumber" Natural
+                :> QueryParam "chainid" (MaybeNamed ChainId)
+                :> QueryParams "chainids" ChainId
                 :> QueryParam "sortby" Sortby
                 :> Get '[JSON] [RawTransaction']
        :<|> "transaction" :> ReqBody '[JSON] RawTransaction' :> Post '[JSON,PlainText]  Keccak256
-       :<|> "transactionList" :> ReqBody '[JSON] [RawTransaction'] :> Post '[JSON] Value
+       :<|> "transactionList" :> ReqBody '[JSON] [RawTransaction'] :> Post '[JSON] [Keccak256]
+
+data TxsFilterParams = TxsFilterParams
+  { qtAddress     :: Maybe Address
+  , qtFrom        :: Maybe Address
+  , qtTo          :: Maybe Address
+  , qtHash        :: Maybe Keccak256
+  , qtGasPrice    :: Maybe Natural
+  , qtMinGasPrice :: Maybe Natural
+  , qtMaxGasPrice :: Maybe Natural
+  , qtGasLimit    :: Maybe Natural
+  , qtMinGasLimit :: Maybe Natural
+  , qtMaxGasLimit :: Maybe Natural
+  , qtValue       :: Maybe Natural
+  , qtMinValue    :: Maybe Natural
+  , qtMaxValue    :: Maybe Natural
+  , qtBlockNumber :: Maybe Natural
+  , qtChainId     :: Maybe (MaybeNamed ChainId)
+  , qtChainIds    :: [ChainId]
+  , qtSortby      :: Maybe Sortby
+  }
+
+txsFilterParams :: TxsFilterParams
+txsFilterParams = TxsFilterParams
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing []
+  Nothing
+
+getTxsFilter :: TxsFilterParams -> ClientM [RawTransaction']
+postTx :: RawTransaction' -> ClientM Keccak256
+postTxList :: [RawTransaction'] -> ClientM [Keccak256]
+getTxsFilter :<|> postTx :<|> postTxList =
+  uncurryTxsFilterParams getTxsFilter'
+    :<|> postTx'
+    :<|> postTxList'
+  where
+    getTxsFilter'
+      :<|> postTx'
+      :<|> postTxList' = client (Proxy @API)
+    uncurryTxsFilterParams f TxsFilterParams{..} = f
+      qtAddress qtFrom qtTo qtHash qtGasPrice qtMinGasPrice
+      qtMaxGasPrice qtGasLimit qtMinGasLimit qtMaxGasLimit
+      qtValue qtMinValue qtMaxValue qtBlockNumber qtChainId
+      qtChainIds qtSortby
 
 server :: ConnectionPool -> Server API
 server connStr = getTransaction connStr :<|> postTransaction :<|> postTransactionList
@@ -93,7 +137,7 @@ postTransaction _ =
   throwError $ err400{ errBody = "The 'next' parameter is no longer supported" }
 
 
-postTransactionList :: [RawTransaction'] -> Handler Value
+postTransactionList :: [RawTransaction'] -> Handler [Keccak256]
 postTransactionList raws = runLoggingT $ do
    handlerStart <- liftIO $ getTime Realtime
 
@@ -117,7 +161,7 @@ postTransactionList raws = runLoggingT $ do
                         ]
                       ) -- ++ [ecRecoverTime]
    $logDebug $ T.pack $ "Timings in nanoseconds: " ++ show times
-   return $ toJSON (fmap transactionHash txs) -- hs --times -- This is for debugging
+   return $ transactionHash <$> txs -- hs --times -- This is for debugging
 
           
     where
@@ -125,12 +169,15 @@ postTransactionList raws = runLoggingT $ do
         case a of String _ -> True
                   _        -> False
 
+data NamedChainId = UnnamedChainIds [ChainId]
+                  | MainChain
+                  | AllChains
 
 getTransaction :: ConnectionPool
                -> Maybe Address -> Maybe Address -> Maybe Address -> Maybe Keccak256
-               -> Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer 
-               -> Maybe Integer -> Maybe Integer -> Maybe Integer -> Maybe Integer 
-               -> Maybe Integer -> Maybe Int -> Maybe Text -> [Text]
+               -> Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural
+               -> Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural
+               -> Maybe Natural -> Maybe Natural -> Maybe (MaybeNamed ChainId) -> [ChainId]
                -> Maybe Sortby -> Handler [RawTransaction']
 getTransaction pool
   address from to hash
@@ -140,8 +187,14 @@ getTransaction pool
 
   chainids <-
     case (chainidparam, chainidsparam) of
-      (Nothing, v) -> return v
-      (Just c, []) -> return [c]
+      (Nothing, v) -> case v of
+        [] -> pure MainChain
+        cids -> pure $ UnnamedChainIds cids
+      (Just c, []) -> case c of
+        Unnamed cid -> pure $ UnnamedChainIds [cid]
+        Named "main" -> pure MainChain
+        Named "all" -> pure AllChains
+        Named name -> throwError err400{errBody = BLC.pack . T.unpack $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'." }
       _ -> throwError err400{ errBody = "You can not use both the chainid and chainids parameters togther." }
           
   
@@ -166,19 +219,19 @@ getTransaction pool
               fmap (\v -> rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) to,
               fmap (\v -> rawTx E.^. RawTransactionTxHash  E.==. E.val v) hash,
 
-              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.==. E.val v) gasprice,
-              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.>=. E.val v) mingasprice,
-              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.<=. E.val v) maxgasprice,
+              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.==. E.val v) (fromIntegral <$> gasprice),
+              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.>=. E.val v) (fromIntegral <$> mingasprice),
+              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.<=. E.val v) (fromIntegral <$> maxgasprice),
 
-              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.==. E.val v) gaslimit,
-              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.>=. E.val v) mingaslimit,
-              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.<=. E.val v) maxgaslimit,
+              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.==. E.val v) (fromIntegral <$> gaslimit),
+              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.>=. E.val v) (fromIntegral <$> mingaslimit),
+              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.<=. E.val v) (fromIntegral <$> maxgaslimit),
 
-              fmap (\v -> rawTx E.^. RawTransactionValue E.==. E.val v) value,
-              fmap (\v -> rawTx E.^. RawTransactionValue E.>=. E.val v) minvalue,
-              fmap (\v -> rawTx E.^. RawTransactionValue E.<=. E.val v) maxvalue,
+              fmap (\v -> rawTx E.^. RawTransactionValue E.==. E.val v) (fromIntegral <$> value),
+              fmap (\v -> rawTx E.^. RawTransactionValue E.>=. E.val v) (fromIntegral <$> minvalue),
+              fmap (\v -> rawTx E.^. RawTransactionValue E.<=. E.val v) (fromIntegral <$> maxvalue),
 
-              fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) blocknumber
+              fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> blocknumber)
             ]
 
 
@@ -186,15 +239,11 @@ getTransaction pool
       
       E.where_ ((foldl1 (E.&&.) criteria)) -- map (getTransFilter rawTx) $ getParameters ))
 
-      let matchChainId cid = ((rawTx E.^. RawTransactionChainId) E.==. (E.val $ fromHexText cid))
+      let matchChainId (ChainId cid) = ((rawTx E.^. RawTransactionChainId) E.==. (E.val cid))
           chainCriteria = case chainids of
-                            [] -> [rawTx E.^. RawTransactionChainId E.==. E.val 0]
-                            [cid] -> if (T.unpack cid == "main")
-                                        then [rawTx E.^. RawTransactionChainId E.==. E.val 0]
-                                        else if (T.unpack cid == "all")
-                                             then []
-                                             else [matchChainId cid]
-                            cids -> map matchChainId cids
+                            MainChain -> [rawTx E.^. RawTransactionChainId E.==. E.val 0]
+                            UnnamedChainIds cids -> matchChainId <$> cids
+                            AllChains -> []
           allCriteria = case chainCriteria of
                           [] -> [criteria]
                           _ -> map (\cc -> cc : criteria) chainCriteria
@@ -246,9 +295,3 @@ emitKafkaTransactions txs = do
         Left e      -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
         Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
     return ()
-
-
-
-fromHexText :: T.Text -> Word256
-fromHexText v = res
-  where ((res,_):_) = readHex $ T.unpack $ v :: [(Word256,String)]
