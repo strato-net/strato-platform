@@ -4,17 +4,20 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
 
+{-# OPTIONS -fno-warn-redundant-constraints #-}
+
 module Blockchain.MilenaTools where
 
 import           Blockchain.Output
 import           Control.Concurrent     (threadDelay)
-import           Control.Lens
+--import           Control.Lens
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
-import           Control.Monad.Except        (ExceptT (..), runExceptT, throwError)
+import           Control.Monad.Except        (ExceptT (..), runExceptT) --, throwError)
 import           Control.Monad.Trans.State
 import qualified Data.Text                   as T
-import           Network.Kafka
+import           Network.Kafka               hiding (fetchOffset, commitOffset)
+import qualified Network.Kafka               as MILENA
 import           Network.Kafka.Protocol
 import           Prelude
 
@@ -23,16 +26,36 @@ _kMetadata::Metadata->KafkaString
 _kMetadata (Metadata x) = x
 
 fetchOffsets :: Kafka m => OffsetFetchRequest -> m OffsetFetchResponse
+fetchOffsets = MILENA.fetchOffset
+{-
 fetchOffsets req@(OffsetFetchReq (group, _)) = do
     coordinator <- getConsumerGroupCoordinator group
     withBrokerHandle coordinator . flip makeRequest $ CGOffsetFetchRR req
+-}
 
 commitOffsets :: Kafka m => OffsetCommitRequest -> m OffsetCommitResponse
+commitOffsets = MILENA.commitOffset
+{-
 commitOffsets req@(OffsetCommitReq (group, _, _, _, _)) = do
     coordinator <- getConsumerGroupCoordinator group
     withBrokerHandle coordinator . flip makeRequest $ CGOffsetCommitRR req
+-}
 
 fetchSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> m (Either KafkaError (Offset, Metadata))
+fetchSingleOffset groupName topic partition = do
+  let retry = fetchSingleOffset groupName topic partition
+  (OffsetFetchResp [(_, [(_, ofs, md, err)])]) <-
+    MILENA.fetchOffset $ OffsetFetchReq (groupName, [(topic, [partition])])
+    
+  case (err, ofs) of
+    (NoError, -1)                            -> return $ Left UnknownTopicOrPartition -- todo: stop simulating ZK behavior!
+    (NoError, _)                             -> return $ Right (ofs, md)
+    (NotCoordinatorForConsumerCode, _)       -> retry
+    (ConsumerCoordinatorNotAvailableCode, _) -> retry
+    (OffsetsLoadInProgressCode, _)           -> retry
+    (err', _)                                -> return $ Left err'
+
+{-
 fetchSingleOffset groupName topic partition = do
     let req   = OffsetFetchReq (groupName, [(topic, [partition])])
         retry = fetchSingleOffset groupName topic partition
@@ -44,13 +67,22 @@ fetchSingleOffset groupName topic partition = do
         (ConsumerCoordinatorNotAvailableCode, _) -> retry
         (OffsetsLoadInProgressCode, _)           -> retry
         (err', _)                                -> return $ Left err'
+-}
 
 commitSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> Offset -> Metadata -> m (Either KafkaError ())
+commitSingleOffset groupName topic partition offset ofsMetadata = do
+  (OffsetCommitResp [(_, [(_, err)])]) <- MILENA.commitOffset $ OffsetCommitReq (groupName, [(topic, [(partition, offset, 0, ofsMetadata)])]) -- todo: handle the empty response (though that probably indicates protocol error)
+  return $ if err /= NoError then Left err else Right ()
+
+
+{-
 commitSingleOffset groupName topic partition offset ofsMetadata = do
     let req = OffsetCommitReq (groupName, -1, "", -1, [(topic, [(partition, offset, ofsMetadata)])])
     (OffsetCommitResp [(_, [(_, err)])]) <- commitOffsets req -- todo: handle the empty response (though that probably indicates protocol error)
     return $ if err /= NoError then Left err else Right ()
+-}
 
+{-
 {-# NOINLINE getConsumerGroupCoordinator #-}
 getConsumerGroupCoordinator :: Kafka m => ConsumerGroup -> m Broker
 getConsumerGroupCoordinator group = do
@@ -62,6 +94,7 @@ getConsumerGroupCoordinator group = do
             getConsumerGroupCoordinator group
         NoError -> return broker
         other   -> throwError $ KafkaFailedToFetchGroupCoordinator other
+-}
 
 withKafkaRetry :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry t k = do
