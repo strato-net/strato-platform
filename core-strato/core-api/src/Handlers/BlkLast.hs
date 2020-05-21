@@ -1,9 +1,11 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Handlers.BlkLast (
-  API,
-  server
+module Handlers.BlkLast
+  ( API
+  , getBlkLastClient
+  , server
   ) where
 
 import           Control.Monad.IO.Class
@@ -12,6 +14,7 @@ import qualified Data.Map as Map
 import qualified Database.Esqueleto as E
 import           Database.Persist.Postgresql
 import           Servant
+import           Servant.Client
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
@@ -27,6 +30,8 @@ type API =
           :> Capture "num" Integer
           :> Get '[JSON] [Block']
 
+getBlkLastClient :: Integer -> ClientM [Block']
+getBlkLastClient = client (Proxy @API)
 
 server :: ConnectionPool -> Server API
 server pool = getBlkLast pool

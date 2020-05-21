@@ -1,9 +1,11 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Handlers.TxLast (
-  API,
-  server
+module Handlers.TxLast
+  ( API
+  , getTxLastClient
+  , server
   ) where
 
 import           Control.Monad.IO.Class
@@ -12,6 +14,7 @@ import           Data.Maybe
 import qualified Database.Esqueleto as E
 import           Database.Persist.Postgresql
 import           Servant
+import           Servant.Client
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
@@ -28,6 +31,8 @@ type API =
                 :> QueryParam "chainId" ChainId
                 :> Get '[JSON] [RawTransaction']
 
+getTxLastClient :: Integer -> Maybe ChainId -> ClientM [RawTransaction']
+getTxLastClient = client (Proxy @API)
 
 server :: ConnectionPool -> Server API
 server pool = getTxLast pool

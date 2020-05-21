@@ -1,10 +1,13 @@
-{-# LANGUAGE DataKinds, FlexibleInstances, OverloadedStrings, RecordWildCards, TemplateHaskell, TypeOperators #-}
+{-# LANGUAGE DataKinds, FlexibleInstances, OverloadedStrings, RecordWildCards, TemplateHaskell, TypeApplications, TypeOperators #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
-module Handlers.Chain (
-  API,
-  server
+module Handlers.Chain
+  ( API
+  , getChainClient
+  , postChainClient
+  , postChainsClient
+  , server
   ) where
 
 import           Control.Monad
@@ -15,11 +18,10 @@ import qualified Data.Map                       as M
 import           Data.Maybe
 import qualified Data.Set                       as S
 import           Data.Swagger
-import           Data.Text                      (Text)
 import qualified Data.Text                      as T
 import           Database.Persist.Postgresql
-import           Numeric
 import           Servant
+import           Servant.Client
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
@@ -32,14 +34,18 @@ import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Util
 import           Blockchain.TypeLits
 import           SQLM
 
 type API = 
   "chain" :> QueryParams "chainid" ChainId  :> Get '[JSON] (NamedMap "id" Word256 "info" ChainInfo)
-  :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] Text
-  :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [Text]
+  :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] ChainId
+  :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [ChainId]
+
+getChainClient :: [ChainId] -> ClientM (NamedMap "id" Word256 "info" ChainInfo)
+postChainClient :: ChainInfo -> ClientM ChainId
+postChainsClient :: [ChainInfo] -> ClientM [ChainId]
+getChainClient :<|> postChainClient :<|> postChainsClient = client (Proxy @API)
 
 server :: ConnectionPool -> Server API
 server connStr = getChain connStr :<|> postChain :<|> postChains
@@ -53,28 +59,26 @@ instance ToSchema (NamedTuple "id" Word256 "info" ChainInfo) where
 getChain :: ConnectionPool -> [ChainId] -> Handler (NamedMap "id" Word256 "info" ChainInfo)
 getChain pool = liftIO . runSQLM pool . getChainInfos . map unChainId
     
-postChain :: ChainInfo -> Handler Text
+postChain :: ChainInfo -> Handler ChainId
 postChain ci = runLoggingT $ do
     case processChainInfos [ci] of
       Left (_, err) -> throwError $ err400{ errBody=BLC.pack $ "invalid args: " ++ err }
       Right [] -> error "postChainR: The impossible happened. processChainInfos succeeded, but returned an empty list"
       Right (cid:_) -> do
-        let hexCid = T.pack $ padZeros 64 $ showHex cid ""
         $logDebugS "postChainR" . T.pack $ show ci
-        $logInfoS "postChainR" hexCid
+        $logInfoS "postChainR" (T.pack $ show cid)
         emitKafkaTransactions $ [(cid,ci)]
-        return hexCid
+        return cid
 
-postChains :: [ChainInfo] -> Handler [Text]
+postChains :: [ChainInfo] -> Handler [ChainId]
 postChains cis = runLoggingT $ do
   case processChainInfos cis of
       Left (i, err) -> throwError err400{ errBody=BLC.pack $ "invalid args at index " ++ show i ++ ": " ++ err }
       Right cids -> do
-        let hexCids = map (T.pack . padZeros 64 . flip showHex "") cids
         $logDebugS "postChainsR" . T.pack $ show cis
-        $logInfoS "postChainsR" $ T.intercalate ", " hexCids
+        $logInfoS "postChainsR" $ T.intercalate ", " (T.pack . show <$> cids)
         emitKafkaTransactions $ zip cids cis
-        return hexCids
+        return cids
 
 
 
@@ -83,9 +87,9 @@ postChains cis = runLoggingT $ do
 ---------------------------------------
 
 
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [(Word256, ChainInfo)] -> m ()
+emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [(ChainId, ChainInfo)] -> m ()
 emitKafkaTransactions gs = do
-    let ingestGeneses = (\(cid,g) -> IEGenesis (IngestGenesis API (cid,g))) <$> gs
+    let ingestGeneses = (\(ChainId cid,g) -> IEGenesis (IngestGenesis API (cid,g))) <$> gs
     $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ (show $ length ingestGeneses) ++ " genesis info(s) to unseqevents"
     rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestGeneses
     case rets of
@@ -94,7 +98,7 @@ emitKafkaTransactions gs = do
     return ()
 
 
-processChainInfos :: [ChainInfo] -> Either (Int, String) [Word256]
+processChainInfos :: [ChainInfo] -> Either (Int, String) [ChainId]
 processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Use post-incrementing state
   \(i, gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ mmd) _)) -> do
     -- add more checks?
@@ -116,5 +120,5 @@ processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Us
       s | s /= S.empty -> Left (i, "Each contract code hash in accountInfo must match a corresponding code hash in codeInfo.")
         | otherwise -> do
           let cid = rlpHash gen
-          return $ keccak256ToWord256 cid
+          return . ChainId $ keccak256ToWord256 cid
 

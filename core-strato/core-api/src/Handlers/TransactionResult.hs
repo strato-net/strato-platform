@@ -1,16 +1,19 @@
 
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Handlers.TransactionResult (
-  API,
-  server
+module Handlers.TransactionResult
+  ( API
+  , getTransactionResultClient
+  , server
   ) where
 
 import           Control.Monad.IO.Class
 import qualified Database.Esqueleto          as E
 import           Database.Persist.Postgresql
 import           Servant
+import           Servant.Client
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
@@ -22,6 +25,9 @@ import           SQLM
 type API = 
   "transactionResult" :> Capture "txHash" Keccak256
                       :> Get '[JSON] [TransactionResult]
+
+getTransactionResultClient :: Keccak256 -> ClientM [TransactionResult]
+getTransactionResultClient = client (Proxy @API)
 
 server :: ConnectionPool -> Server API
 server pool = getTransactionResult pool

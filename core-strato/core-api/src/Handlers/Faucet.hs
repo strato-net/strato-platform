@@ -1,22 +1,29 @@
 
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
-module Handlers.Faucet (
-  API,
-  server
+module Handlers.Faucet
+  ( API
+  , postFaucetClient
+  , postFaucetMultipartClient
+  , postDataFaucetClient
+  , server
   ) where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Data.Aeson
 import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Lazy                  as LBS
 import qualified Data.ByteString.Lazy.Char8            as BLC
 import           Data.IORef
 import           Data.Maybe
@@ -27,6 +34,7 @@ import           Database.Persist.Postgresql
 import qualified Network.Haskoin.Crypto                as H
 import           Numeric
 import           Servant
+import           Servant.Client
 import           Servant.Multipart
 import           System.IO.Unsafe
 import           Text.Printf
@@ -53,14 +61,29 @@ import           SQLM
   
 type API = 
   "faucet" :> ReqBody '[FormUrlEncoded] Address
-           :> Post '[JSON] Value
+           :> Post '[JSON] [Keccak256]
   :<|>
   "faucet" :> MultipartForm Mem (MultipartData Mem)
-           :> Post '[JSON] Value
+           :> Post '[JSON] [Keccak256]
   :<|>
   "dataFaucet" :> QueryParam "size" Int
                :> QueryParam "count" Int
-               :> Get '[JSON] Value
+               :> Get '[JSON] [Keccak256]
+
+instance HasClient m api => HasClient m (MultipartForm tag a :> api) where
+  type Client m (MultipartForm tag a :> api) =
+    (LBS.ByteString, a) -> Client m api
+  clientWithRoute =
+    error "MultipartForm clientWithRoute: Unsupported version, please use >=servant-multipart-0.11.5"
+  hoistClientMonad pm _ f cl = \a ->
+      hoistClientMonad pm (Proxy @api) f (cl a)
+
+postFaucetClient :: Address -> ClientM [Keccak256]
+postFaucetMultipartClient :: (LBS.ByteString, MultipartData Mem) -> ClientM [Keccak256]
+postDataFaucetClient :: Maybe Int -> Maybe Int -> ClientM [Keccak256]
+postFaucetClient
+  :<|> postFaucetMultipartClient
+  :<|> postDataFaucetClient = client (Proxy @API)
 
 server :: ConnectionPool -> Server API
 server pool =
@@ -78,7 +101,7 @@ appFaucetNonce = unsafePerformIO (newIORef 0)
 
 ---------------
 
-postFaucet :: ConnectionPool -> Address -> Handler Value
+postFaucet :: ConnectionPool -> Address -> Handler [Keccak256]
 postFaucet pool addressParam = runLoggingT $ do
 
   let addresses = [addressParam]
@@ -86,7 +109,7 @@ postFaucet pool addressParam = runLoggingT $ do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
   minNonce <- lookupNonce pool $ prvKey2Address key
 
-  toJSON <$> case addresses of
+  case addresses of
     [target] -> do
       maxNonce <- acquireNewMaxNonce minNonce
       $logInfoS "postFaucet" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
@@ -100,7 +123,7 @@ postFaucet pool addressParam = runLoggingT $ do
     where
       putTX maxN k a = emitTransaction <=< makeSendTX maxN k a
 
-postFaucetMultipart :: ConnectionPool -> MultipartData Mem -> Handler Value
+postFaucetMultipart :: ConnectionPool -> MultipartData Mem -> Handler [Keccak256]
 postFaucetMultipart pool multipartData = do
   case lookupInput "address" multipartData of
     Just a ->
@@ -116,13 +139,13 @@ toAddr v =
     _ -> Left $ "Can't convert text to Address: " ++ show v
 
 
-postDataFaucet :: ConnectionPool -> Maybe Int -> Maybe Int -> Handler Value
+postDataFaucet :: ConnectionPool -> Maybe Int -> Maybe Int -> Handler [Keccak256]
 postDataFaucet pool mSize mCountOf = runLoggingT $ do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
   minNonce <- lookupNonce pool $ prvKey2Address key
   let size = fromMaybe 4096 mSize
       countOf = fromMaybe 1 mCountOf
-  fmap toJSON . replicateM countOf $ do
+  replicateM countOf $ do
     maxN <- acquireNewMaxNonce minNonce
     tx <- makeSizedTX maxN size key
     emitTransaction tx

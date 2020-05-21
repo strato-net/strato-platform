@@ -2,11 +2,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Handlers.BatchTransactionResult (
-  API,
-  server
+module Handlers.BatchTransactionResult
+  ( API
+  , batchTransactionResultClient
+  , server
   ) where
 
 
@@ -21,6 +23,7 @@ import qualified Database.Esqueleto  as E
 import           Database.Persist.Postgresql
 import           Numeric             (readHex)
 import           Servant
+import           Servant.Client
 
 
 import           Blockchain.Data.DataDefs
@@ -33,7 +36,10 @@ import           SQLM
 
 type API = 
   "transactionResult" :> "batch" :> ReqBody '[JSON,PlainText] [StrungSHA]
-                                 :> Post '[JSON] Value
+                                 :> Post '[JSON] (M.Map StrungSHA [TransactionResult])
+
+batchTransactionResultClient :: [StrungSHA] -> ClientM (M.Map StrungSHA [TransactionResult])
+batchTransactionResultClient = client (Proxy @API)
 
 server :: ConnectionPool -> Server API
 server connStr = postBatchTransactionResult connStr
@@ -56,6 +62,9 @@ instance ToJSONKey StrungSHA where
     toJSONKey = ToJSONKeyText f (text . f)
       where f = T.pack . formatKeccak256WithoutColor . unStrungSHA
 
+instance FromJSONKey StrungSHA where
+  fromJSONKey = FromJSONKeyValue parseJSON
+
 instance MimeUnrender PlainText [StrungSHA] where
   mimeUnrender _ = maybe (Left "Couldn't decode [Keccak256]") Right . decode
 
@@ -63,7 +72,7 @@ instance ToSchema StrungSHA where
   declareNamedSchema _ = return $
     NamedSchema (Just "StrungSHA") mempty
 
-postBatchTransactionResult :: ConnectionPool -> [StrungSHA] -> Handler Value
+postBatchTransactionResult :: ConnectionPool -> [StrungSHA] -> Handler (M.Map StrungSHA [TransactionResult])
 postBatchTransactionResult pool hashes = do
 
   when (null hashes) $ throwError err400{ errBody="missing parameter: hashes" }
@@ -79,7 +88,7 @@ postBatchTransactionResult pool hashes = do
       theFold m v = mmUpsert (StrungSHA $ transactionResultTransactionHash v) v m
       baseMap = foldl (\m k -> M.insert k [] m) M.empty hashes
       grouped = foldl theFold baseMap (E.entityVal <$> txrs)
-  return . toJSON $ grouped
+  return grouped
 
 
 

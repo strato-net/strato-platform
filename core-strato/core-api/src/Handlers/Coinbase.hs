@@ -1,18 +1,24 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Handlers.Coinbase (
-  API,
-  server
+module Handlers.Coinbase
+  ( API
+  , coinbaseClient
+  , server
   ) where
 
 import           Data.Aeson
 import           Servant
+import           Servant.Client
 
 import           Blockchain.EthConf
 
 type API = "coinbase" :> Get '[JSON] Value
+
+coinbaseClient :: ClientM Value
+coinbaseClient = client (Proxy @API)
 
 server :: Server API
 server = getCoinbase
