@@ -8,8 +8,11 @@ module Handlers.Storage
   ( API
   , StorageFilterParams(..)
   , storageFilterParams
-  , storageClient
+  , getStorageClient
   , server
+  , StorageAddress(..)
+  , HexStorage(..)
+  , CodeKind(..)
   ) where
 
 import           Control.Monad.IO.Class
@@ -63,10 +66,10 @@ storageFilterParams = StorageFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
   []
 
-storageClient :: StorageFilterParams -> ClientM [StorageAddress]
-storageClient = uncurryStorageFilterParams storageClient'
+getStorageClient :: StorageFilterParams -> ClientM [StorageAddress]
+getStorageClient = uncurryStorageFilterParams getStorageClient'
   where
-    storageClient' = client (Proxy @API)
+    getStorageClient' = client (Proxy @API)
     uncurryStorageFilterParams f StorageFilterParams{..} = f
       qsKey qsMinKey qsMaxKey qsValue qsMinValue qsMaxValue
       qsAddress qsChainId qsChainIds

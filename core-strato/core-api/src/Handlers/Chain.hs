@@ -8,6 +8,9 @@ module Handlers.Chain
   , postChainClient
   , postChainsClient
   , server
+  , ChainInfo(..)
+  , ChainId(..)
+  , NamedTuple(..)
   ) where
 
 import           Control.Monad
@@ -27,7 +30,6 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf             (runKafkaConfigured)
-import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
@@ -38,11 +40,11 @@ import           Blockchain.TypeLits
 import           SQLM
 
 type API = 
-  "chain" :> QueryParams "chainid" ChainId  :> Get '[JSON] (NamedMap "id" Word256 "info" ChainInfo)
+  "chain" :> QueryParams "chainid" ChainId  :> Get '[JSON] (NamedMap "id" "info" ChainId ChainInfo)
   :<|> "chain" :> ReqBody '[JSON] ChainInfo :> Post '[JSON] ChainId
   :<|> "chains" :> ReqBody '[JSON] [ChainInfo] :> Post '[JSON] [ChainId]
 
-getChainClient :: [ChainId] -> ClientM (NamedMap "id" Word256 "info" ChainInfo)
+getChainClient :: [ChainId] -> ClientM (NamedMap "id" "info" ChainId ChainInfo)
 postChainClient :: ChainInfo -> ClientM ChainId
 postChainsClient :: [ChainInfo] -> ClientM [ChainId]
 getChainClient :<|> postChainClient :<|> postChainsClient = client (Proxy @API)
@@ -52,12 +54,12 @@ server connStr = getChain connStr :<|> postChain :<|> postChains
 
 -----------------------
 
-instance ToSchema (NamedTuple "id" Word256 "info" ChainInfo) where
+instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
-getChain :: ConnectionPool -> [ChainId] -> Handler (NamedMap "id" Word256 "info" ChainInfo)
-getChain pool = liftIO . runSQLM pool . getChainInfos . map unChainId
+getChain :: ConnectionPool -> [ChainId] -> Handler (NamedMap "id" "info" ChainId ChainInfo)
+getChain pool = liftIO . runSQLM pool . getChainInfos
     
 postChain :: ChainInfo -> Handler ChainId
 postChain ci = runLoggingT $ do

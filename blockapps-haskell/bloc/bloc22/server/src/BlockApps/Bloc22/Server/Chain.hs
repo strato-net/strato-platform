@@ -17,14 +17,14 @@ import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromMaybe)
+import           Data.Maybe                        (catMaybes, fromJust, fromMaybe)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
+import           Data.Text.Encoding                (encodeUtf8)
 import qualified Data.Vector                       as V
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum               
 import           BlockApps.Logging
 import           BlockApps.SolidityVarReader
 import           BlockApps.Solidity.ArgValue
@@ -32,14 +32,15 @@ import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
-import           BlockApps.Strato.Client           as Strato
-import           BlockApps.Strato.TypeLits
-import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
+import           Blockchain.Data.ChainInfo
+import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Keccak256
+import           Handlers.Chain
 
 import           UnliftIO
 
@@ -78,12 +79,12 @@ createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _
                             (mainStruct contract)
                             (nmap1' members)
                             chaininputArgs
-          storage <- either (throwIO . UserError) return $ encodeValues
+          storage <- fmap Map.toList . either (throwIO . UserError) return $ encodeValues
                        (typeDefs contract)
                        (mainStruct contract)
                        0
                        (Map.toList argValues)
-          let balMap = Map.fromList $ map toTuple balances
+          let balMap = Map.fromList $ map (unNamedTuple @"address" @"balance") balances
               govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
 
           (contractHash, b, s) <-
@@ -94,7 +95,7 @@ createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _
               _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
-              codeInfo' = CodeInfo b s contractdetailsName
+              codeInfo' = CodeInfo (encodeUtf8 b) s contractdetailsName
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let maybeNonContract a b | a == governanceAddress = Nothing
@@ -105,7 +106,7 @@ createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _
         (UnsignedChainInfo lbl
                            acctInfo
                            codeInfo
-                           members
+                           (Map.fromList $ unNamedTuple @"address" @"enode" <$> members)
                            Nothing
                            creationBlockHash
                            nonce
@@ -114,10 +115,14 @@ createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _
         Nothing
   return (fst <$> mContract, chainInfo)
 
+creationBlockHash :: Keccak256
+creationBlockHash = fromJust $
+  stringKeccak256 "0000000000000000000000000000000000000000000000000000000000000000"
+
 postChainInfo :: ChainInput -> Bloc ChainId
 postChainInfo chainInput = do
   (mCmId, chainInfo) <- createChainInfo chainInput
-  chainId <- blocStrato $ Strato.postChain chainInfo
+  chainId <- blocStrato $ postChainClient chainInfo
   let isAsync = fromMaybe False $ chaininputAsync chainInput
   unless isAsync $ waitForChainInfo chainId
   for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
@@ -126,7 +131,7 @@ postChainInfo chainInput = do
 postChainInfos :: [ChainInput] -> Bloc [ChainId]
 postChainInfos chainInputs = do
   chainInfos <- traverse createChainInfo chainInputs
-  chainIds <- blocStrato . Strato.postChains $ map snd chainInfos
+  chainIds <- blocStrato . postChainsClient $ map snd chainInfos
   let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
       asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
   unless (null asyncChains) $ waitForChainInfos asyncChains
@@ -149,16 +154,17 @@ waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
 
 getChainInfo :: [ChainId] -> Bloc [ChainIdChainOutput]
 getChainInfo chainIds = do
-  chainIdChainInfos::[ChainIdChainInfo] <- blocStrato $ Strato.getChain chainIds
+  chainIdChainInfos <- blocStrato $ getChainClient chainIds
   return $ map convertChainInfo chainIdChainInfos
     where
-      convertChainInfo :: ChainIdChainInfo -> ChainIdChainOutput
+      convertChainInfo :: NamedTuple "id" "info" ChainId ChainInfo -> ChainIdChainOutput
       convertChainInfo chp = do
-        let chtup = (toTuple chp :: (ChainId, ChainInfo))
+        let chtup = unNamedTuple @"id" @"info" chp
         let chinfo =  chainInfo $ snd chtup
         let getAddrBalance acct = case acct of
                                     NonContract a b -> (a, b)
                                     ContractNoStorage a b _ -> (a, b)
                                     ContractWithStorage a b _ _ -> (a, b)
-        let acctInfo = map (fromTuple . getAddrBalance) $ accountInfo chinfo
-        NamedTuple (fst chtup, ChainOutput (chainLabel chinfo) acctInfo (members chinfo)) :: ChainIdChainOutput
+        let acctInfo = map (NamedTuple @"address" @"balance" . getAddrBalance) $ accountInfo chinfo
+            mems = map (NamedTuple @"address" @"enode") . Map.toList $ members chinfo
+        NamedTuple (fst chtup, ChainOutput (chainLabel chinfo) acctInfo mems) :: ChainIdChainOutput

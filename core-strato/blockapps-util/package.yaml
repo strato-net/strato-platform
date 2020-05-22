@@ -11,14 +11,17 @@ library:
   dependencies:
     - base
     - aeson
+    - bifunctors
     - binary
     - blockapps-milena
     - bytestring
     - common-log
+    - comonad
     - containers
     - lens
     - monad-alter
     - mtl
+    - QuickCheck
     - transformers
     - text
     - unix

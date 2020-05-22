@@ -131,7 +131,7 @@ postTransaction (RawTransaction' raw "") = runLoggingT $ do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
   emitKafkaTransactions [tx']
-  $logDebug $ T.pack $ "Successfully inserted tx: " ++ format h
+  $logInfoS "postTransaction" . T.pack $ "Successfully inserted tx: " ++ format h
   return h
 postTransaction _ =
   throwError $ err400{ errBody = "The 'next' parameter is no longer supported" }

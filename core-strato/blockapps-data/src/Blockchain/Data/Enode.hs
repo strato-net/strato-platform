@@ -1,7 +1,7 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Data.Enode
@@ -86,7 +86,6 @@ instance FromJSON Enode where
 
 instance ToJSON Enode where
   toJSON enode = String (T.pack $ showEnode enode)
-
 
 -- replacements for show/read for IPAddress and Enode, because implementing read is a nightmare
 showIP :: IPAddress -> String

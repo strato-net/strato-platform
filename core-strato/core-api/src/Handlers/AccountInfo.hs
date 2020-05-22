@@ -28,7 +28,6 @@ import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import qualified Database.Esqueleto          as E
 import           Database.Persist.Postgresql
-import           MaybeNamed
 import           Numeric.Natural
 import           Servant
 import           Servant.Client
@@ -63,7 +62,7 @@ type API = Tags "section1" :> Summary "get user accounts" :> Description "Get in
             :> QueryParam "maxnumber" Natural
             :> QueryParam "code" Text
             :> QueryParam "codeHash" Keccak256 -- TODO: Should be CodePtr
-            :> QueryParam "chainid" (MaybeNamed ChainId)
+            :> QueryParams "chainid" ChainId
             :> Get '[JSON] [AddressStateRef']
 
 data AccountsFilterParams = AccountsFilterParams
@@ -77,13 +76,13 @@ data AccountsFilterParams = AccountsFilterParams
   , qaMaxNumber  :: Maybe Natural
   , qaCode       :: Maybe Text
   , qaCodeHash   :: Maybe Keccak256
-  , qaChainId    :: Maybe (MaybeNamed ChainId)
-  }
+  , qaChainId    :: [ChainId]
+  } deriving (Eq, Show)
 
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Nothing Nothing Nothing
+  Nothing Nothing []
 
 getAccountsFilter :: AccountsFilterParams -> ClientM [AddressStateRef']
 getAccountsFilter = uncurryAccountsFilterParams getAccountsFilter'
@@ -99,14 +98,13 @@ server pool = getAccount pool
 
 ---------------------------
 
-data NamedChainId = UnnamedChainId ChainId
+data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
-                  | AllChains
 
 getAccount :: ConnectionPool ->
                   Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
                   Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-                  Maybe Text -> Maybe Keccak256 -> Maybe (MaybeNamed ChainId) ->
+                  Maybe Text -> Maybe Keccak256 -> [ChainId] ->
                   Handler [AddressStateRef']
 
 getAccount pool 
@@ -123,12 +121,8 @@ getAccount pool
       throwError err400{ errBody = BLC.pack $ "Need one of: " ++ intercalate ", " accountQueryParams }
 
     chainid <- case chainidparam of
-      Nothing -> pure MainChain
-      Just maybeNamed -> case maybeNamed of
-        Unnamed cid -> pure $ UnnamedChainId cid
-        Named "main" -> pure MainChain
-        Named "all" -> pure AllChains
-        Named name -> throwError err400{errBody = BLC.pack . T.unpack $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'." }
+      [] -> pure MainChain
+      cids -> pure $ UnnamedChainIds cids
 
     addrs <-
       liftIO $ runSQLM pool $ sqlQuery $ E.select . E.distinct $
@@ -152,8 +146,7 @@ getAccount pool
               let matchChainId (ChainId cid) = (accStateRef E.^. AddressStateRefChainId) E.==. (E.val cid)
               let chainCriteria = case chainid of
                     MainChain -> [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
-                    AllChains -> []
-                    UnnamedChainId cid -> [matchChainId cid]
+                    UnnamedChainIds cids -> matchChainId <$> cids
               let allCriteria = case chainCriteria of
                      [] -> [criteria]
                      _ -> map (\cc -> cc : criteria) chainCriteria
