@@ -16,13 +16,11 @@ module Handlers.Chain
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8          as BC
-import qualified Data.ByteString.Lazy.Char8     as BLC
 import qualified Data.Map                       as M
 import           Data.Maybe
 import qualified Data.Set                       as S
 import           Data.Swagger
 import qualified Data.Text                      as T
-import           Database.Persist.Postgresql
 import           Servant
 import           Servant.Client
 
@@ -38,6 +36,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.TypeLits
 import           SQLM
+import           UnliftIO
 
 type API = 
   "chain" :> QueryParams "chainid" ChainId  :> Get '[JSON] (NamedMap "id" "info" ChainId ChainInfo)
@@ -49,8 +48,8 @@ postChainClient :: ChainInfo -> ClientM ChainId
 postChainsClient :: [ChainInfo] -> ClientM [ChainId]
 getChainClient :<|> postChainClient :<|> postChainsClient = client (Proxy @API)
 
-server :: ConnectionPool -> Server API
-server connStr = getChain connStr :<|> postChain :<|> postChains
+server :: ServerT API SQLM
+server = getChain :<|> postChain :<|> postChains
 
 -----------------------
 
@@ -58,13 +57,13 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
-getChain :: ConnectionPool -> [ChainId] -> Handler (NamedMap "id" "info" ChainId ChainInfo)
-getChain pool = liftIO . runSQLM pool . getChainInfos
+getChain :: [ChainId] -> SQLM (NamedMap "id" "info" ChainId ChainInfo)
+getChain = getChainInfos
     
-postChain :: ChainInfo -> Handler ChainId
-postChain ci = runLoggingT $ do
+postChain :: ChainInfo -> SQLM ChainId
+postChain ci = do
     case processChainInfos [ci] of
-      Left (_, err) -> throwError $ err400{ errBody=BLC.pack $ "invalid args: " ++ err }
+      Left (_, err) -> throwIO . InvalidArgs $ "invalid args: " ++ err
       Right [] -> error "postChainR: The impossible happened. processChainInfos succeeded, but returned an empty list"
       Right (cid:_) -> do
         $logDebugS "postChainR" . T.pack $ show ci
@@ -72,10 +71,10 @@ postChain ci = runLoggingT $ do
         emitKafkaTransactions $ [(cid,ci)]
         return cid
 
-postChains :: [ChainInfo] -> Handler [ChainId]
-postChains cis = runLoggingT $ do
+postChains :: [ChainInfo] -> SQLM [ChainId]
+postChains cis = do
   case processChainInfos cis of
-      Left (i, err) -> throwError err400{ errBody=BLC.pack $ "invalid args at index " ++ show i ++ ": " ++ err }
+      Left (i, err) -> throwIO . InvalidArgs $ "invalid args at index " ++ show i ++ ": " ++ err
       Right cids -> do
         $logDebugS "postChainsR" . T.pack $ show cis
         $logInfoS "postChainsR" $ T.intercalate ", " (T.pack . show <$> cids)

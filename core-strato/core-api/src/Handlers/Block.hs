@@ -12,9 +12,7 @@ module Handlers.Block
   , server
   ) where
 
-import           Control.Monad
-import           Control.Monad.IO.Class
-import qualified Data.ByteString.Lazy.Char8  as BLC
+import           Control.Arrow               ((&&&), (***))
 import           Data.List
 import qualified Data.Map                    as Map
 import           Data.Maybe
@@ -38,6 +36,7 @@ import           SQLM
 
 import           Settings
 import           SortDirection
+import           UnliftIO
 
 type API = 
   "block" :> QueryParam "txaddress" Address
@@ -82,7 +81,7 @@ data BlocksFilterParams = BlocksFilterParams
   , qbIndex      :: Maybe Int
   , qbChainId    :: Maybe ChainId
   , qbSortby     :: Maybe Sortby
-  }
+  } deriving (Eq)
 
 blocksFilterParams :: BlocksFilterParams
 blocksFilterParams = BlocksFilterParams
@@ -100,34 +99,26 @@ getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
       qbMinGasLim qbMaxGasLim qbNumber qbMinNumber qbMaxNumber
       qbIndex qbChainId qbSortby
 
-server :: ConnectionPool -> Server API
-server pool = getBlockInfo pool
+server :: ServerT API SQLM
+server = getBlockInfo
 
 ---------------------
 
-getBlockInfo :: ConnectionPool ->
-                 Maybe Address -> Maybe Address -> Maybe Address -> Maybe Text ->
-                 Maybe Keccak256 -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-                 Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-                 Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-                 Maybe Natural -> Maybe Int -> Maybe ChainId -> Maybe Sortby ->
-                 Handler [Block']
-getBlockInfo pool
-  txaddress coinbase address blockid hash mindiff maxdiff diff
-  gasused mingasused maxgasused gaslim mingaslim maxgaslim number minnumber
-  maxnumber index chainid sortby = do
+getBlockInfo ::
+  Maybe Address -> Maybe Address -> Maybe Address -> Maybe Text ->
+  Maybe Keccak256 -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+  Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+  Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+  Maybe Natural -> Maybe Int -> Maybe ChainId -> Maybe Sortby ->
+  SQLM [Block']
+getBlockInfo a b c d e f g h i j k l m n o p q r s t =
+  getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t)
 
-  when (and
-        [null txaddress, null coinbase, null address, null blockid, null hash, null mindiff,
-         null maxdiff, null diff, null gasused, null mingasused, null maxgasused, null gaslim,
-         null mingaslim, null maxgaslim, null number, null minnumber, null maxnumber, null index,
-         null chainid]) $
-    throwError (err400{ errBody = BLC.pack ("Need one of: " ++ intercalate ", " (map T.unpack blockQueryParams)) })
-
-
-  
-  blks <- liftIO $ runSQLM pool $
-    sqlQuery $
+getBlockInfo' :: BlocksFilterParams -> SQLM [Block']
+getBlockInfo' b@BlocksFilterParams{..} | b == blocksFilterParams{qbSortby = qbSortby} =
+  throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " (map T.unpack blockQueryParams)
+                                       | otherwise = do
+  blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $
     E.select $
     E.from $ \(bdRef `E.LeftOuterJoin` btx `E.FullOuterJoin` rawTX `E.LeftOuterJoin` accStateRef) -> do
 
@@ -137,26 +128,26 @@ getBlockInfo pool
 
           let criteria = catMaybes
                 [
-                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) (fromIntegral <$> number),
-                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.>=. E.val v) (fromIntegral <$> minnumber),
-                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.<=. E.val v) (fromIntegral <$> maxnumber),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.==. E.val v) (fromIntegral <$> gaslim),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.>=. E.val v) (fromIntegral <$> mingaslim),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.<=. E.val v) (fromIntegral <$> maxgaslim),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.==. E.val v) (fromIntegral <$> gasused),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.>=. E.val v) (fromIntegral <$> mingasused),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.<=. E.val v) (fromIntegral <$> maxgasused),
-                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.==. E.val v) (fromIntegral <$> diff),
-                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.>=. E.val v) (fromIntegral <$> mindiff),
-                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.<=. E.val v) (fromIntegral <$> maxdiff),
-                  fmap (\v -> bdRef E.^. BlockDataRefCoinbase E.==. E.val v) coinbase,
-                  fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) address,
+                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) (fromIntegral <$> qbNumber),
+                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.>=. E.val v) (fromIntegral <$> qbMinNumber),
+                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.<=. E.val v) (fromIntegral <$> qbMaxNumber),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.==. E.val v) (fromIntegral <$> qbGasLim),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.>=. E.val v) (fromIntegral <$> qbMinGasLim),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.<=. E.val v) (fromIntegral <$> qbMaxGasLim),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.==. E.val v) (fromIntegral <$> qbGasUsed),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.>=. E.val v) (fromIntegral <$> qbMinGasUsed),
+                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.<=. E.val v) (fromIntegral <$> qbMaxGasUsed),
+                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.==. E.val v) (fromIntegral <$> qbDiff),
+                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.>=. E.val v) (fromIntegral <$> qbMinDiff),
+                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.<=. E.val v) (fromIntegral <$> qbMaxDiff),
+                  fmap (\v -> bdRef E.^. BlockDataRefCoinbase E.==. E.val v) qbCoinbase,
+                  fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) qbAddress,
 --                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) ntx,
                   fmap (\v -> (rawTX E.^. RawTransactionFromAddress E.==. E.val v)
                               E.||.
-                              (rawTX E.^. RawTransactionToAddress E.==. E.val (Just v))) txaddress,
-                  fmap (\v -> bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)) blockid,
-                  fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) hash
+                              (rawTX E.^. RawTransactionToAddress E.==. E.val (Just v))) qbTxAddress,
+                  fmap (\v -> bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)) qbBlockId,
+                  fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) qbHash
                 ] 
 
           
@@ -164,13 +155,12 @@ getBlockInfo pool
 
           E.limit $ appFetchLimit
 
-          E.distinctOnOrderBy [sortToOrderBy sortby $ bdRef E.^. BlockDataRefNumber] (return bdRef)
+          E.distinctOnOrderBy [sortToOrderBy qbSortby $ bdRef E.^. BlockDataRefNumber] (return bdRef)
 
 
-  let blockIds = map entityKey blks
+  let blockIds = map fst blks
 
-  txs <- liftIO $ runSQLM pool $ 
-         sqlQuery $ E.select $
+  txs <- fmap (map (E.entityVal *** E.entityVal)) . sqlQuery $ E.select $
                      E.from $ \(btx `E.InnerJoin` rawTX) -> do
                        E.on ( rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction )
                        E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList blockIds
@@ -178,12 +168,12 @@ getBlockInfo pool
                        return (btx, rawTX)
 
   let getTXLists = flip (Map.findWithDefault []) $
-                               Map.fromListWith (flip (++)) $ map (fmap (:[])) $ map (\(x, y) -> (blockTransactionBlockDataRefId $ E.entityVal x, rawTX2TX $ E.entityVal y)) txs::(Key BlockDataRef->[Transaction])
+        Map.fromListWith (flip (++)) $ map (blockTransactionBlockDataRefId *** ((:[]) . rawTX2TX)) txs
 
 
-  let modBlocks = map (\x -> (E.entityVal x, E.entityKey x)) (blks::[E.Entity BlockDataRef])
+  let modBlocks = map (\(k,v) -> (v, getTXLists k)) blks
 
-  return $ map (uncurry (bToBPrime "")) $ map (fmap getTXLists) modBlocks
+  return $ map (uncurry (bToBPrime "")) modBlocks
 
 
 blockQueryParams:: [Text]

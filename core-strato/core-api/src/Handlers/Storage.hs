@@ -15,12 +15,10 @@ module Handlers.Storage
   , CodeKind(..)
   ) where
 
-import           Control.Monad.IO.Class
+import           Control.Arrow               ((***))
 import           Data.Aeson
-import qualified Data.ByteString.Lazy.Char8  as BLC
 import           Data.Maybe
 import           Data.Swagger            hiding (name)
-import qualified Data.Text               as T
 import qualified Database.Esqueleto      as E
 import           Database.Persist.Postgresql
 import           GHC.Generics
@@ -36,6 +34,7 @@ import           Blockchain.Strato.Model.ChainId
 
 import           Settings
 import           SQLM
+import           UnliftIO
 
 type API = 
   "storage" :> QueryParam "key" HexStorage
@@ -74,8 +73,8 @@ getStorageClient = uncurryStorageFilterParams getStorageClient'
       qsKey qsMinKey qsMaxKey qsValue qsMinValue qsMaxValue
       qsAddress qsChainId qsChainIds
 
-server :: ConnectionPool -> Server API
-server connStr = getStorage connStr
+server :: ServerT API SQLM
+server = getStorage
 
 
 -----------------------
@@ -99,17 +98,16 @@ data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
                   | AllChains
 
-getStorage :: ConnectionPool ->
-              Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage ->
+getStorage :: Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage ->
               Maybe HexStorage -> Maybe HexStorage -> Maybe Address ->
-              Maybe (MaybeNamed ChainId) -> [ChainId] -> Handler [StorageAddress]
-getStorage pool
-  theKey minkey maxkey theValue
-  minvalue maxvalue theAddress
-  chainidParam chainidsParam
-  = do
+              Maybe (MaybeNamed ChainId) -> [ChainId] -> SQLM [StorageAddress]
+getStorage a b c d e f g h i =
+  getStorage' (StorageFilterParams a b c d e f g h i)
+
+getStorage' :: StorageFilterParams -> SQLM [StorageAddress]
+getStorage' StorageFilterParams{..} = do
   chainids <-
-    case (chainidParam, chainidsParam) of
+    case (qsChainId, qsChainIds) of
       (Nothing, v) -> case v of
         [] -> pure MainChain
         cids -> pure $ UnnamedChainIds cids
@@ -117,10 +115,10 @@ getStorage pool
         Unnamed cid -> pure $ UnnamedChainIds [cid]
         Named "main" -> pure MainChain
         Named "all" -> pure AllChains
-        Named name -> throwError err400{errBody = BLC.pack . T.unpack $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'." }
-      _ -> throwError err400{ errBody = "You can not use both the chainid and chainids parameters togther." }
+        Named name -> throwIO . NamedChainError $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'."
+      _ -> throwIO $ AmbiguousChainError "You can not use both the chainid and chainids parameters togther."
 
-  addrs <- liftIO $ runSQLM pool $ sqlQuery $ E.select . E.distinct $
+  addrs <- fmap (map (entityVal *** E.unValue)) . sqlQuery $ E.select . E.distinct $
 
            E.from $ \(storage `E.InnerJoin` addrStRef) -> do
 
@@ -136,14 +134,14 @@ getStorage pool
 
            let criteria2 = catMaybes
                  [
-                   fmap (\v -> storage E.^. StorageKey E.==. E.val v) theKey,
-                   fmap (\v -> storage E.^. StorageKey E.>=. E.val v) minkey,
-                   fmap (\v -> storage E.^. StorageKey E.<=. E.val v) maxkey,
-                   fmap (\v -> storage E.^. StorageValue E.==. E.val v) theValue,
-                   fmap (\v -> storage E.^. StorageValue E.>=. E.val v) minvalue,
-                   fmap (\v -> storage E.^. StorageValue E.<=. E.val v) maxvalue,
+                   fmap (\v -> storage E.^. StorageKey E.==. E.val v) qsKey,
+                   fmap (\v -> storage E.^. StorageKey E.>=. E.val v) qsMinKey,
+                   fmap (\v -> storage E.^. StorageKey E.<=. E.val v) qsMaxKey,
+                   fmap (\v -> storage E.^. StorageValue E.==. E.val v) qsValue,
+                   fmap (\v -> storage E.^. StorageValue E.>=. E.val v) qsMinValue,
+                   fmap (\v -> storage E.^. StorageValue E.<=. E.val v) qsMaxValue,
                    -- Note: a join is done in StorageInfo
-                   fmap (\v -> addrStRef E.^. AddressStateRefAddress E.==. E.val v) theAddress
+                   fmap (\v -> addrStRef E.^. AddressStateRefAddress E.==. E.val v) qsAddress
                  ]
 
            E.where_ (foldl1 (E.&&.) criteria2)
@@ -154,10 +152,7 @@ getStorage pool
 
            return (storage, addrStRef E.^. AddressStateRefAddress)
 
-  let storageRecords = map (entityVal . fst) addrs
-      storageAddresses = zipWith (storage2StorageAddress) storageRecords (map (E.unValue . snd) addrs)
-
-  return storageAddresses
+  pure $ uncurry storage2StorageAddress <$> addrs
 
 
 

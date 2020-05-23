@@ -9,9 +9,7 @@ module Handlers.TransactionResult
   , server
   ) where
 
-import           Control.Monad.IO.Class
 import qualified Database.Esqueleto          as E
-import           Database.Persist.Postgresql
 import           Servant
 import           Servant.Client
 
@@ -29,19 +27,18 @@ type API =
 getTransactionResultClient :: Keccak256 -> ClientM [TransactionResult]
 getTransactionResultClient = client (Proxy @API)
 
-server :: ConnectionPool -> Server API
-server pool = getTransactionResult pool
+server :: ServerT API SQLM
+server = getTransactionResult
 
 ---------------------------
 
 
-getTransactionResult :: ConnectionPool -> Keccak256 -> Handler [TransactionResult]
+getTransactionResult :: Keccak256 -> SQLM [TransactionResult]
 
-getTransactionResult pool txHash = liftIO $ runSQLM pool $ do
-  rs <- sqlQuery $ E.select $
+getTransactionResult txHash = do
+  fmap (map E.entityVal) . sqlQuery $ E.select $
     E.from $ \(txr) -> do
     let matchHash = (txr E.^. TransactionResultTransactionHash) E.==. (E.val txHash)
     E.where_ matchHash
     return txr
-  return $ map E.entityVal rs
 

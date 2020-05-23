@@ -12,11 +12,8 @@ module Handlers.BatchTransactionResult
   ) where
 
 
-import           Control.Monad
-import           Control.Monad.IO.Class
 import qualified Data.Map.Strict     as M
 import qualified Database.Esqueleto  as E
-import           Database.Persist.Postgresql
 import           Servant
 import           Servant.Client
 
@@ -26,6 +23,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.Keccak256
 
 import           SQLM
+import           UnliftIO
 
 
 
@@ -36,16 +34,13 @@ type API =
 batchTransactionResultClient :: [Keccak256] -> ClientM (M.Map Keccak256 [TransactionResult])
 batchTransactionResultClient = client (Proxy @API)
 
-server :: ConnectionPool -> Server API
-server connStr = postBatchTransactionResult connStr
+server :: ServerT API SQLM
+server = postBatchTransactionResult
 
-postBatchTransactionResult :: ConnectionPool -> [Keccak256] -> Handler (M.Map Keccak256 [TransactionResult])
-postBatchTransactionResult pool hashes = do
-
-  when (null hashes) $ throwError err400{ errBody="missing parameter: hashes" }
-  
---  hashesR <- parseJsonBody :: HandlerFor App (Result [StrungSHA])
-  txrs <- liftIO $ runSQLM pool $ sqlQuery . E.select . E.from $ \txr -> do
+postBatchTransactionResult :: [Keccak256] -> SQLM (M.Map Keccak256 [TransactionResult])
+postBatchTransactionResult [] = throwIO $ MissingParameterError "missing parameter: hashes"
+postBatchTransactionResult hashes = do
+  txrs <- sqlQuery . E.select . E.from $ \txr -> do
     let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList hashes
     E.where_ matchHashes
     return txr

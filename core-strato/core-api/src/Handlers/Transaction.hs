@@ -20,15 +20,12 @@ module Handlers.Transaction
   ) where
 
 import           Control.DeepSeq
-import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.Aeson
-import qualified Data.ByteString.Lazy.Char8  as BLC
 import           Data.List
 import           Data.Maybe
 import qualified Data.Text                   as T
 import qualified Database.Esqueleto          as E
-import           Database.Persist.Postgresql
 import           MaybeNamed
 import           Numeric.Natural
 import           Servant
@@ -53,6 +50,7 @@ import           Blockchain.Util             (getCurrentMicrotime)
 import           Settings
 import           SortDirection
 import           SQLM
+import           UnliftIO
 
 type API = 
   "transaction" :> QueryParam "address" Address
@@ -94,7 +92,7 @@ data TxsFilterParams = TxsFilterParams
   , qtChainId     :: Maybe (MaybeNamed ChainId)
   , qtChainIds    :: [ChainId]
   , qtSortby      :: Maybe Sortby
-  }
+  } deriving (Eq)
 
 txsFilterParams :: TxsFilterParams
 txsFilterParams = TxsFilterParams
@@ -119,14 +117,14 @@ getTxsFilter :<|> postTx :<|> postTxList =
       qtValue qtMinValue qtMaxValue qtBlockNumber qtChainId
       qtChainIds qtSortby
 
-server :: ConnectionPool -> Server API
-server connStr = getTransaction connStr :<|> postTransaction :<|> postTransactionList
+server :: ServerT API SQLM
+server = getTransaction :<|> postTransaction :<|> postTransactionList
 
 ---------------------------
 
 instance NFData RawTransaction'
 
-postTransaction :: RawTransaction' -> Handler Keccak256
+postTransaction :: RawTransaction' -> SQLM Keccak256
 postTransaction (RawTransaction' raw "") = runLoggingT $ do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
@@ -134,11 +132,11 @@ postTransaction (RawTransaction' raw "") = runLoggingT $ do
   $logInfoS "postTransaction" . T.pack $ "Successfully inserted tx: " ++ format h
   return h
 postTransaction _ =
-  throwError $ err400{ errBody = "The 'next' parameter is no longer supported" }
+  throwIO $ DeprecatedError "The 'next' parameter is no longer supported"
 
 
-postTransactionList :: [RawTransaction'] -> Handler [Keccak256]
-postTransactionList raws = runLoggingT $ do
+postTransactionList :: [RawTransaction'] -> SQLM [Keccak256]
+postTransactionList raws = do
    handlerStart <- liftIO $ getTime Realtime
 
    parserStart <- liftIO $ getTime Realtime
@@ -173,20 +171,23 @@ data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
                   | AllChains
 
-getTransaction :: ConnectionPool
-               -> Maybe Address -> Maybe Address -> Maybe Address -> Maybe Keccak256
+getTransaction :: Maybe Address -> Maybe Address -> Maybe Address -> Maybe Keccak256
                -> Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural
                -> Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural
                -> Maybe Natural -> Maybe Natural -> Maybe (MaybeNamed ChainId) -> [ChainId]
-               -> Maybe Sortby -> Handler [RawTransaction']
-getTransaction pool
-  address from to hash
-  gasprice mingasprice maxgasprice gaslimit
-  mingaslimit maxgaslimit value minvalue
-  maxvalue blocknumber chainidparam chainidsparam sortby = runLoggingT $ do
+               -> Maybe Sortby -> SQLM [RawTransaction']
+getTransaction a b c d e f g h i j k l m n o p q =
+  getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q)
 
+getTransaction' :: TxsFilterParams -> SQLM [RawTransaction']
+getTransaction' t@TxsFilterParams{..} | t == txsFilterParams{ qtChainId = qtChainId
+                                                            , qtChainIds = qtChainIds
+                                                            , qtSortby = qtSortby
+                                                            } =
+  throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
+                                      | otherwise = do
   chainids <-
-    case (chainidparam, chainidsparam) of
+    case (qtChainId, qtChainIds) of
       (Nothing, v) -> case v of
         [] -> pure MainChain
         cids -> pure $ UnnamedChainIds cids
@@ -194,44 +195,30 @@ getTransaction pool
         Unnamed cid -> pure $ UnnamedChainIds [cid]
         Named "main" -> pure MainChain
         Named "all" -> pure AllChains
-        Named name -> throwError err400{errBody = BLC.pack . T.unpack $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'." }
-      _ -> throwError err400{ errBody = "You can not use both the chainid and chainids parameters togther." }
-          
-  
-  --let offset = (fromIntegral $ (maybe 0 id $ extractPage "page" getParameters)  :: Int64)
+        Named name -> throwIO . NamedChainError $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'."
+      _ -> throwIO $ AmbiguousChainError "You can not use both the chainid and chainids parameters togther."
 
-  when (and
-        [
-          null address, null  from, null  to, null  hash, 
-          null gasprice, null  mingasprice, null  maxgasprice, null  gaslimit, 
-          null mingaslimit, null  maxgaslimit, null  value, null  minvalue, 
-          null maxvalue, null  blocknumber
-        ]) $
-    throwError err400{ errBody = BLC.pack $ "Need one of: " ++ intercalate ", " transactionQueryParams }
-
-
-  txs <- liftIO $ runSQLM pool $
-    sqlQuery $ E.select $ E.from $ \(rawTx) -> do
+  txs <- fmap (map E.entityVal) . sqlQuery $ E.select $ E.from $ \(rawTx) -> do
       let criteria = catMaybes
             [
-              fmap (\v -> rawTx E.^. RawTransactionFromAddress E.==. E.val v E.||. rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) address,
-              fmap (\v -> rawTx E.^. RawTransactionFromAddress E.==. E.val v) from,
-              fmap (\v -> rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) to,
-              fmap (\v -> rawTx E.^. RawTransactionTxHash  E.==. E.val v) hash,
+              fmap (\v -> rawTx E.^. RawTransactionFromAddress E.==. E.val v E.||. rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) qtAddress,
+              fmap (\v -> rawTx E.^. RawTransactionFromAddress E.==. E.val v) qtFrom,
+              fmap (\v -> rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) qtTo,
+              fmap (\v -> rawTx E.^. RawTransactionTxHash  E.==. E.val v) qtHash,
 
-              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.==. E.val v) (fromIntegral <$> gasprice),
-              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.>=. E.val v) (fromIntegral <$> mingasprice),
-              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.<=. E.val v) (fromIntegral <$> maxgasprice),
+              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.==. E.val v) (fromIntegral <$> qtGasPrice),
+              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.>=. E.val v) (fromIntegral <$> qtMinGasPrice),
+              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.<=. E.val v) (fromIntegral <$> qtMaxGasPrice),
 
-              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.==. E.val v) (fromIntegral <$> gaslimit),
-              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.>=. E.val v) (fromIntegral <$> mingaslimit),
-              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.<=. E.val v) (fromIntegral <$> maxgaslimit),
+              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.==. E.val v) (fromIntegral <$> qtGasLimit),
+              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.>=. E.val v) (fromIntegral <$> qtMinGasLimit),
+              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.<=. E.val v) (fromIntegral <$> qtMaxGasLimit),
 
-              fmap (\v -> rawTx E.^. RawTransactionValue E.==. E.val v) (fromIntegral <$> value),
-              fmap (\v -> rawTx E.^. RawTransactionValue E.>=. E.val v) (fromIntegral <$> minvalue),
-              fmap (\v -> rawTx E.^. RawTransactionValue E.<=. E.val v) (fromIntegral <$> maxvalue),
+              fmap (\v -> rawTx E.^. RawTransactionValue E.==. E.val v) (fromIntegral <$> qtValue),
+              fmap (\v -> rawTx E.^. RawTransactionValue E.>=. E.val v) (fromIntegral <$> qtMinValue),
+              fmap (\v -> rawTx E.^. RawTransactionValue E.<=. E.val v) (fromIntegral <$> qtMaxValue),
 
-              fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> blocknumber)
+              fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber)
             ]
 
 
@@ -252,13 +239,12 @@ getTransaction pool
 
       -- E.offset $ (limit * offset)
       E.limit $ appFetchLimit
-      E.orderBy $ [(sortToOrderBy sortby) $ (rawTx E.^. RawTransactionBlockNumber),
-                    (sortToOrderBy sortby) $ (rawTx E.^. RawTransactionNonce)]
+      E.orderBy $ [(sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionBlockNumber),
+                    (sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionNonce)]
 
       return rawTx
 
-  let modTxs = nub $ txs :: [Entity RawTransaction]
-  return . map rtToRtPrime . zip (repeat "") $ map E.entityVal modTxs
+  return . map rtToRtPrime . zip (repeat "") $ nub txs
 
 
 

@@ -8,11 +8,9 @@ module Handlers.Stats (
   server
   ) where
 
-import           Control.Monad.IO.Class
 import           Data.Aeson
 import           Data.Text                     (Text)
 import qualified Database.Esqueleto            as E
-import           Database.Persist.Postgresql
 import           GHC.Generics
 import           Servant
 
@@ -27,8 +25,8 @@ type API =
   "stats" :> "totaltx" :> Get '[JSON] Value
   :<|> "stats" :> "difficulty" :> Get '[JSON] Value
 
-server :: ConnectionPool -> Server API
-server connectionString = getStatTx connectionString :<|> getStatDiff connectionString
+server :: ServerT API SQLM
+server = getStatTx :<|> getStatDiff
 
 ---------------------
 
@@ -41,14 +39,14 @@ data Stats = Stats
 instance ToJSON Stats
 
 
-getStatDiff :: ConnectionPool -> Handler Value
-getStatDiff connectionString = liftIO $ runSQLM connectionString $ do
+getStatDiff :: SQLM Value
+getStatDiff = do
   bestBlock <- getBestBlock
   return $ object ["difficulty" .= blockDataRefTotalDifficulty bestBlock]
 
 
-getStatTx :: ConnectionPool -> Handler Value
-getStatTx pool = liftIO $ runSQLM pool $ do
+getStatTx :: SQLM Value
+getStatTx = do
   tx <- sqlQuery $ E.select $ E.from $ \(_ :: E.SqlExpr (E.Entity RawTransaction)) -> return E.countRows
   return $ myval (tx :: [E.Value Integer])
     where

@@ -47,6 +47,7 @@ library:
   - template-haskell
   - text
   - transformers
+  - unliftio
 
 executables:
   core-api:
@@ -72,6 +73,8 @@ executables:
     - servant-swagger
     - servant-swagger-ui
     - swagger2
+    - transformers
+    - unliftio
     - wai
     - wai-cors
     - wai-extra

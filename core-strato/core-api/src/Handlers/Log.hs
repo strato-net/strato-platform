@@ -6,12 +6,9 @@ module Handlers.Log (
   server
   ) where
 
-
-import           Control.Monad.IO.Class
 import           Data.List
 import           Data.Maybe
 import qualified Database.Esqueleto            as E
-import           Database.Persist.Postgresql
 import           Servant
 
 import           Blockchain.Data.Address
@@ -31,15 +28,15 @@ type API =
         :> Get '[JSON] [LogDB]
 
 
-server :: ConnectionPool -> Server API
-server pool = getLog pool
+server :: ServerT API SQLM
+server = getLog
 
 ---------------------
 
 
-getLog :: ConnectionPool -> Maybe Address -> Maybe Keccak256 -> Maybe Sortby -> Handler [LogDB]
-getLog pool address hash sortParam = liftIO $ runSQLM pool $ do
-  logs <- sqlQuery $ E.select $ E.from $ \lg -> do
+getLog :: Maybe Address -> Maybe Keccak256 -> Maybe Sortby -> SQLM [LogDB]
+getLog address hash sortParam = do
+  logs <- fmap (map E.entityVal) . sqlQuery $ E.select $ E.from $ \lg -> do
     let criteria = catMaybes
                    [
                      fmap (\v -> lg E.^. LogDBAddress E.==. E.val v) address,
@@ -54,7 +51,7 @@ getLog pool address hash sortParam = liftIO $ runSQLM pool $ do
 
   --let modLogs = (nub (map entityVal (logs :: [Entity LogDB])))
 
-  return $ nub $ map E.entityVal logs
+  return $ nub logs
 
 
 

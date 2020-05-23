@@ -14,17 +14,18 @@ import           Servant
 import           Servant.Client
 
 import           Blockchain.EthConf
+import           SQLM
 
 type API = "coinbase" :> Get '[JSON] Value
 
 coinbaseClient :: ClientM Value
 coinbaseClient = client (Proxy @API)
 
-server :: Server API
+server :: ServerT API SQLM
 server = getCoinbase
 
 -------------------------
 
-getCoinbase :: Handler Value
+getCoinbase :: SQLM Value
 getCoinbase = do
   return $ object ["coinbase" .= coinbaseAddress (quarryConfig ethConf)]

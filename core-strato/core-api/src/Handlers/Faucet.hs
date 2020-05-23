@@ -24,13 +24,10 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Lazy                  as LBS
-import qualified Data.ByteString.Lazy.Char8            as BLC
-import           Data.IORef
 import           Data.Maybe
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import qualified Database.Esqueleto                    as E
-import           Database.Persist.Postgresql
 import qualified Network.Haskoin.Crypto                as H
 import           Numeric
 import           Servant
@@ -58,6 +55,7 @@ import           Text.Format
 
 import           FaucetKey
 import           SQLM
+import           UnliftIO
   
 type API = 
   "faucet" :> ReqBody '[FormUrlEncoded] Address
@@ -85,11 +83,11 @@ postFaucetClient
   :<|> postFaucetMultipartClient
   :<|> postDataFaucetClient = client (Proxy @API)
 
-server :: ConnectionPool -> Server API
-server pool =
-  postFaucet pool
-  :<|> postFaucetMultipart pool
-  :<|> postDataFaucet pool
+server :: ServerT API SQLM
+server  =
+  postFaucet
+  :<|> postFaucetMultipart
+  :<|> postDataFaucet
 
 -----------------------------------------
 
@@ -101,13 +99,13 @@ appFaucetNonce = unsafePerformIO (newIORef 0)
 
 ---------------
 
-postFaucet :: ConnectionPool -> Address -> Handler [Keccak256]
-postFaucet pool addressParam = runLoggingT $ do
+postFaucet :: Address -> SQLM [Keccak256]
+postFaucet addressParam = do
 
   let addresses = [addressParam]
   
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lookupNonce pool $ prvKey2Address key
+  minNonce <- lookupNonce $ prvKey2Address key
 
   case addresses of
     [target] -> do
@@ -123,14 +121,14 @@ postFaucet pool addressParam = runLoggingT $ do
     where
       putTX maxN k a = emitTransaction <=< makeSendTX maxN k a
 
-postFaucetMultipart :: ConnectionPool -> MultipartData Mem -> Handler [Keccak256]
-postFaucetMultipart pool multipartData = do
+postFaucetMultipart :: MultipartData Mem -> SQLM [Keccak256]
+postFaucetMultipart multipartData = do
   case lookupInput "address" multipartData of
     Just a ->
       case toAddr a of
-        Right address -> postFaucet pool address
-        Left e -> throwError err400{ errBody = BLC.pack e }
-    Nothing -> throwError err400{ errBody = "You need to provide the 'address' parameter" }
+        Right address -> postFaucet address
+        Left e -> throwIO $ InvalidArgs e
+    Nothing -> throwIO $ MissingParameterError "You need to provide the 'address' parameter"
 
 toAddr :: Text -> Either String Address
 toAddr v =
@@ -139,10 +137,10 @@ toAddr v =
     _ -> Left $ "Can't convert text to Address: " ++ show v
 
 
-postDataFaucet :: ConnectionPool -> Maybe Int -> Maybe Int -> Handler [Keccak256]
-postDataFaucet pool mSize mCountOf = runLoggingT $ do
+postDataFaucet :: Maybe Int -> Maybe Int -> SQLM [Keccak256]
+postDataFaucet mSize mCountOf = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lookupNonce pool $ prvKey2Address key
+  minNonce <- lookupNonce $ prvKey2Address key
   let size = fromMaybe 4096 mSize
       countOf = fromMaybe 1 mCountOf
   replicateM countOf $ do
@@ -168,8 +166,8 @@ acquireNewMaxNonce minNonce = do
 
 
 
-lookupNonce :: MonadIO m => ConnectionPool -> Address -> m Integer
-lookupNonce pool addr' = liftIO $ runSQLM pool $ do
+lookupNonce :: Address -> SQLM Integer
+lookupNonce addr' = do
   addrSt <- sqlQuery $ E.select $
                       E.from $ \accStateRef -> do
                       E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0

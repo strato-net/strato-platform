@@ -8,11 +8,10 @@ module Handlers.BlkLast
   , server
   ) where
 
-import           Control.Monad.IO.Class
+import           Control.Arrow                ((&&&), (***))
 import           Data.Int
 import qualified Data.Map as Map
 import qualified Database.Esqueleto as E
-import           Database.Persist.Postgresql
 import           Servant
 import           Servant.Client
 
@@ -33,23 +32,23 @@ type API =
 getBlkLastClient :: Integer -> ClientM [Block']
 getBlkLastClient = client (Proxy @API)
 
-server :: ConnectionPool -> Server API
-server pool = getBlkLast pool
+server :: ServerT API SQLM
+server = getBlkLast
 
 ---------------------
 
-getBlkLast :: ConnectionPool -> Integer -> Handler [Block']
-getBlkLast pool n =  liftIO $ runSQLM pool $ do
-  blks <- sqlQuery $ E.select $
+getBlkLast :: Integer -> SQLM [Block']
+getBlkLast n = do
+  blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $ E.select $
           E.from $ \a -> do
             E.limit $ max 1 $ min (fromIntegral n :: Int64) appFetchLimit
             E.orderBy [E.desc (a E.^. BlockDataRefNumber)]
             return a
 
 
-  let blockIds = map E.entityKey blks
+  let blockIds = map fst blks
 
-  txs <- sqlQuery $ E.select $
+  txs <- fmap (map (E.entityVal *** E.entityVal)) . sqlQuery $ E.select $
          E.from $ \(btx `E.InnerJoin` rawTX) -> do
            E.on ( rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction )
            E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList blockIds
@@ -57,7 +56,7 @@ getBlkLast pool n =  liftIO $ runSQLM pool $ do
            return (btx, rawTX)
 
   let getTXLists = flip (Map.findWithDefault []) $
-                   Map.fromListWith (flip (++)) $ map (fmap (:[])) $ map (\(x, y) -> (blockTransactionBlockDataRefId $ E.entityVal x, rawTX2TX $ E.entityVal y)) txs::(Key BlockDataRef->[Transaction])
+        Map.fromListWith (flip (++)) $ map (blockTransactionBlockDataRefId *** ((:[]) . rawTX2TX)) txs
 
-  return $ map (uncurry bToBPrime') $ map (\b -> (E.entityVal b, getTXLists $ E.entityKey b)) blks
+  return $ map (uncurry bToBPrime') $ map (\(k,v) -> (v, getTXLists k)) blks
 

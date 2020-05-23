@@ -8,11 +8,9 @@ module Handlers.TxLast
   , server
   ) where
 
-import           Control.Monad.IO.Class
 import           Data.Int
 import           Data.Maybe
 import qualified Database.Esqueleto as E
-import           Database.Persist.Postgresql
 import           Servant
 import           Servant.Client
 
@@ -34,14 +32,14 @@ type API =
 getTxLastClient :: Integer -> Maybe ChainId -> ClientM [RawTransaction']
 getTxLastClient = client (Proxy @API)
 
-server :: ConnectionPool -> Server API
-server pool = getTxLast pool
+server :: ServerT API SQLM
+server = getTxLast
 
 ---------------------
 
-getTxLast :: ConnectionPool -> Integer -> Maybe ChainId -> Handler [RawTransaction']
-getTxLast pool num mChainId =  liftIO $ runSQLM pool $ do
-  tx <- sqlQuery $ E.select $
+getTxLast :: Integer -> Maybe ChainId -> SQLM [RawTransaction']
+getTxLast num mChainId =  do
+  tx <- fmap (map E.entityVal) . sqlQuery $ E.select $
         E.from $ \(rawTX `E.InnerJoin` btx `E.InnerJoin` b) -> do
           E.on (b E.^. BlockDataRefId E.==. btx E.^. BlockTransactionBlockDataRefId)
           E.on (btx E.^. BlockTransactionTransaction E.==. rawTX E.^. RawTransactionId)
@@ -49,7 +47,7 @@ getTxLast pool num mChainId =  liftIO $ runSQLM pool $ do
           E.limit $ max 1 $ min (fromIntegral num :: Int64) appFetchLimit
           E.orderBy [E.desc $ b E.^. BlockDataRefId]
           return rawTX
-  return $ map (rtToRtPrime' . E.entityVal) tx
+  return $ map rtToRtPrime' tx
 
 chainIdToWord256 :: ChainId -> Word256
 chainIdToWord256 (ChainId x) = x

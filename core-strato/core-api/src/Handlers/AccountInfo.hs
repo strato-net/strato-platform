@@ -17,17 +17,14 @@ module Handlers.AccountInfo
   , server
   ) where
 
-import           Control.Monad
-import           Control.Monad.IO.Class
+import           Control.Monad.Change.Alter
 import           Data.ByteString.Base16      as B16
 import qualified Data.ByteString.Char8       as BC
-import qualified Data.ByteString.Lazy.Char8  as BLC
 import           Data.List
 import           Data.Maybe
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import qualified Database.Esqueleto          as E
-import           Database.Persist.Postgresql
 import           Numeric.Natural
 import           Servant
 import           Servant.Client
@@ -44,6 +41,7 @@ import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
 import           Settings
 import           SQLM
+import           UnliftIO
 
 -- TODO: Remove once https://github.com/nakaji-dayo/servant-swagger-tags/pull/1 is merged
 instance HasClient m api => HasClient m (Tags tags :> api) where
@@ -85,82 +83,86 @@ accountsFilterParams = AccountsFilterParams
   Nothing Nothing []
 
 getAccountsFilter :: AccountsFilterParams -> ClientM [AddressStateRef']
-getAccountsFilter = uncurryAccountsFilterParams getAccountsFilter'
-  where
-    getAccountsFilter' = client (Proxy @API)
-    uncurryAccountsFilterParams f AccountsFilterParams{..} = f
-      qaAddress qaBalance qaMinBalance qaMaxBalance qaNonce
-      qaMinNonce qaMaxNonce qaMaxNumber qaCode qaCodeHash
-      qaChainId
+getAccountsFilter = uncurryAccountsFilterParams (client $ Proxy @API)
 
-server :: ConnectionPool -> Server API
-server pool = getAccount pool
+uncurryAccountsFilterParams :: ( Maybe Address
+                              -> Maybe Natural
+                              -> Maybe Natural
+                              -> Maybe Natural
+                              -> Maybe Natural
+                              -> Maybe Natural
+                              -> Maybe Natural
+                              -> Maybe Natural
+                              -> Maybe Text
+                              -> Maybe Keccak256
+                              -> [ChainId]
+                              -> r
+                               )
+                            -> AccountsFilterParams
+                            -> r
+uncurryAccountsFilterParams f AccountsFilterParams{..} = f
+  qaAddress qaBalance qaMinBalance qaMaxBalance qaNonce
+  qaMinNonce qaMaxNonce qaMaxNumber qaCode qaCodeHash
+  qaChainId
+
+server :: ServerT API SQLM
+server = getAccount
 
 ---------------------------
 
 data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
 
-getAccount :: ConnectionPool ->
-                  Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-                  Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-                  Maybe Text -> Maybe Keccak256 -> [ChainId] ->
-                  Handler [AddressStateRef']
+getAccount :: Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+              Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+              Maybe Text -> Maybe Keccak256 -> [ChainId] ->
+              SQLM [AddressStateRef']
 
-getAccount pool 
-  address balance minbalance maxbalance
-  nonce minnonce maxnonce maxnumber
-  code codeHash chainidparam
-  = do
-    when (and
-        [
-          null address, null balance, null minbalance, null maxbalance,
-          null nonce, null minnonce, null maxnonce, null maxnumber,
-          null code, null codeHash, null chainidparam
-        ]) $
-      throwError err400{ errBody = BLC.pack $ "Need one of: " ++ intercalate ", " accountQueryParams }
-
-    chainid <- case chainidparam of
+getAccount a b c d e f g h i j k
+  = getAccount' (AccountsFilterParams a b c d e f g h i j k)
+    
+getAccount' :: AccountsFilterParams -> SQLM [AddressStateRef']
+getAccount' a@AccountsFilterParams{..} | a == accountsFilterParams =
+  throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
+                                       | otherwise = do
+    chainid <- case qaChainId of
       [] -> pure MainChain
       cids -> pure $ UnnamedChainIds cids
 
-    addrs <-
-      liftIO $ runSQLM pool $ sqlQuery $ E.select . E.distinct $
-              E.from $ \(accStateRef) -> do
+    addrs <- fmap (map E.entityVal) . sqlQuery $ E.select . E.distinct $
+      E.from $ \(accStateRef) -> do
 
-              let
-                criteria =
-                  catMaybes
-                  [
-                    fmap (\v -> accStateRef E.^. AddressStateRefBalance E.==. E.val v) (fromIntegral <$> balance),
-                    fmap (\v -> accStateRef E.^. AddressStateRefBalance E.>=. E.val v) (fromIntegral <$> minbalance),
-                    fmap (\v -> accStateRef E.^. AddressStateRefBalance E.<=. E.val v) (fromIntegral <$> maxbalance),
-                    fmap (\v -> accStateRef E.^. AddressStateRefNonce E.==. E.val v) (fromIntegral <$> nonce),
-                    fmap (\v -> accStateRef E.^. AddressStateRefNonce E.>=. E.val v) (fromIntegral <$> minnonce),
-                    fmap (\v -> accStateRef E.^. AddressStateRefNonce E.<=. E.val v) (fromIntegral <$> maxnonce),
-                    fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) address,
-                    fmap (\v -> accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)) code,
-                    fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val v) codeHash
-                  ] 
-              
-              let matchChainId (ChainId cid) = (accStateRef E.^. AddressStateRefChainId) E.==. (E.val cid)
-              let chainCriteria = case chainid of
-                    MainChain -> [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
-                    UnnamedChainIds cids -> matchChainId <$> cids
-              let allCriteria = case chainCriteria of
-                     [] -> [criteria]
-                     _ -> map (\cc -> cc : criteria) chainCriteria
+      let
+        criteria =
+          catMaybes
+          [
+            fmap (\v -> accStateRef E.^. AddressStateRefBalance E.==. E.val v) (fromIntegral <$> qaBalance),
+            fmap (\v -> accStateRef E.^. AddressStateRefBalance E.>=. E.val v) (fromIntegral <$> qaMinBalance),
+            fmap (\v -> accStateRef E.^. AddressStateRefBalance E.<=. E.val v) (fromIntegral <$> qaMaxBalance),
+            fmap (\v -> accStateRef E.^. AddressStateRefNonce E.==. E.val v) (fromIntegral <$> qaNonce),
+            fmap (\v -> accStateRef E.^. AddressStateRefNonce E.>=. E.val v) (fromIntegral <$> qaMinNonce),
+            fmap (\v -> accStateRef E.^. AddressStateRefNonce E.<=. E.val v) (fromIntegral <$> qaMaxNonce),
+            fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) qaAddress,
+            fmap (\v -> accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)) qaCode,
+            fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val v) qaCodeHash
+          ] 
+      
+      let matchChainId (ChainId cid) = (accStateRef E.^. AddressStateRefChainId) E.==. (E.val cid)
+      let chainCriteria = case chainid of
+            MainChain -> [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
+            UnnamedChainIds cids -> matchChainId <$> cids
+      let allCriteria = case chainCriteria of
+              [] -> [criteria]
+              _ -> map (\cc -> cc : criteria) chainCriteria
 
-              E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
+      E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
 
-              E.limit $ appFetchLimit
+      E.limit $ appFetchLimit
 
-              E.orderBy [E.asc (accStateRef E.^. AddressStateRefAddress)]
-              return accStateRef
+      E.orderBy [E.asc (accStateRef E.^. AddressStateRefAddress)]
+      return accStateRef
 
-    let modAccounts = nub $ addrs :: [E.Entity AddressStateRef]
-
-    return . map asrToAsrPrime . zip (repeat "") $ (map E.entityVal modAccounts) 
+    return . map asrToAsrPrime . zip (repeat "") $ nub addrs
 
 
 

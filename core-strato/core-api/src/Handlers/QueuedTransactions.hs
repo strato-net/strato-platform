@@ -6,8 +6,6 @@ module Handlers.QueuedTransactions (
   server
   ) where
 
-import           Control.Monad.IO.Class
-import           Data.Aeson
 import           Database.Persist.Postgresql
 import           Servant
 
@@ -18,16 +16,16 @@ import           Blockchain.DB.SQLDB
 import           Settings
 import           SQLM
 
-type API = "transaction" :> "last" :> "queued" :> Get '[JSON] Value
+type API = "transaction" :> "last" :> "queued" :> Get '[JSON] [RawTransaction']
 
-server :: ConnectionPool -> Server API
-server pool = getQueuedTransactions pool
+server :: ServerT API SQLM
+server = getQueuedTransactions
 
 ---------------------
 
-getQueuedTransactions :: ConnectionPool -> Handler Value
-getQueuedTransactions pool =  liftIO $ runSQLM pool $ do
-   addr <- sqlQuery $ selectList [ RawTransactionBlockNumber ==. (-1) ]
+getQueuedTransactions :: SQLM [RawTransaction']
+getQueuedTransactions = do
+   addr <- fmap (map entityVal) . sqlQuery $ selectList [ RawTransactionBlockNumber ==. (-1) ]
            [ LimitTo (fromIntegral $ appFetchLimit :: Int), Desc RawTransactionNonce  ]
-   return . toJSON $ map rtToRtPrime' (map entityVal (addr :: [Entity RawTransaction]))
+   return $ map rtToRtPrime' addr
 

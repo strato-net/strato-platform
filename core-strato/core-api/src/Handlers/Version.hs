@@ -11,12 +11,12 @@ module Handlers.Version (
 import           Data.Aeson
 import           GHC.Generics
 import           Servant
-
+import           SQLM
 import           Versioning
 
 type API = "version" :> Get '[JSON] Value
 
-server :: Server API
+server :: ServerT API SQLM
 server = getVersion
 
 -------------------------
@@ -29,7 +29,7 @@ data Repo = Repo { name   :: String
 
 instance ToJSON Repo
 
-getVersion :: Handler Value
+getVersion :: SQLM Value
 getVersion = do
               return $ object ["monostrato" .= Repo "monostrato" "" $(gitHashMonostrato) $(gitBranchMonostrato)
                               --,"stack.yaml" .= ("stack" :: String, $(stackYaml) :: String) --(liftIO $ getStackInfo)
