@@ -235,15 +235,15 @@ commitOffset request = withAnyHandle $ flip commitOffset' request
 commitOffset' ::
      Kafka m => Handle -> OffsetCommitRequest -> m OffsetCommitResponse
 commitOffset' h request = makeRequest h $ OffsetCommitRR request
-{-
+
 commitOffsetRequest ::
      ConsumerGroup -> TopicName -> Partition -> Offset -> OffsetCommitRequest
 commitOffsetRequest consumerGroup topic partition offset =
   let time = -1
       metadata_ = Metadata "milena"
    in OffsetCommitReq
-        (consumerGroup, [(topic, [(partition, offset, time, metadata_)])])
--}
+        (consumerGroup, -1, "", time, [(topic, [(partition, offset, metadata_)])])
+
 getTopicPartitionLeader :: Kafka m => TopicName -> Partition -> m Broker
 getTopicPartitionLeader t p = do
   let s = stateTopicMetadata . at t
