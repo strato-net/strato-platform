@@ -1,8 +1,14 @@
 {-# LANGUAGE NoDeriveAnyClass #-}
+
+{-# OPTIONS -fno-warn-unused-imports #-}
+
 module Network.Kafka.Protocol
   ( module Network.Kafka.Protocol
   ) where
 
+import Prelude hiding ((.), id)
+
+--base
 import Control.Applicative
 import Control.Category (Category(..))
 import Control.Exception (Exception)
@@ -10,6 +16,14 @@ import Control.Lens
 import Control.Monad (replicateM, liftM2, liftM3, liftM4, liftM5, unless)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bits ((.&.))
+import Data.Int
+import GHC.Exts (IsString(..))
+import GHC.Generics (Generic)
+import System.IO
+
+-- Hackage
+import Control.Lens
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.ByteString.Char8 (ByteString)
 import Data.ByteString.Lens (unpackedChars)
 import Data.Digest.CRC32
@@ -20,7 +34,6 @@ import GHC.Exts (IsString(..))
 import GHC.Generics (Generic)
 import System.IO
 import Numeric.Lens
-import Prelude hiding ((.), id)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as LB (fromStrict, toStrict)
 import qualified Codec.Compression.GZip as GZip (compress, decompress)
@@ -32,6 +45,9 @@ data ReqResp a where
   FetchRR    :: MonadIO m => FetchRequest    -> ReqResp (m FetchResponse)
   OffsetRR   :: MonadIO m => OffsetRequest   -> ReqResp (m OffsetResponse)
   TopicsRR   :: MonadIO m => CreateTopicsRequest -> ReqResp (m CreateTopicsResponse)
+  DeleteTopicsRR :: MonadIO m => DeleteTopicsRequest -> ReqResp (m DeleteTopicsResponse)
+  OffsetCommitRR :: MonadIO m => OffsetCommitRequest -> ReqResp (m OffsetCommitResponse)
+  OffsetFetchRR :: MonadIO m => OffsetFetchRequest -> ReqResp (m OffsetFetchResponse)
   CGOffsetFetchRR  :: MonadIO m => OffsetFetchRequest      -> ReqResp (m OffsetFetchResponse)
   CGOffsetCommitRR :: MonadIO m => OffsetCommitRequest     -> ReqResp (m OffsetCommitResponse)
   CGCoordinatorRR  :: MonadIO m => GroupCoordinatorRequest -> ReqResp (m GroupCoordinatorResponse)
@@ -57,6 +73,9 @@ doRequest clientId correlationId h (ProduceRR req)  = doRequest' correlationId h
 doRequest clientId correlationId h (FetchRR req)    = doRequest' correlationId h $ Request (correlationId, clientId, FetchRequest req)
 doRequest clientId correlationId h (OffsetRR req)   = doRequest' correlationId h $ Request (correlationId, clientId, OffsetRequest req)
 doRequest clientId correlationId h (TopicsRR req)   = doRequest' correlationId h $ Request (correlationId, clientId, CreateTopicsRequest req)
+doRequest clientId correlationId h (DeleteTopicsRR req)   = doRequest' correlationId h $ Request (correlationId, clientId, DeleteTopicsRequest req)
+doRequest clientId correlationId h (OffsetCommitRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetCommitRequest req)
+doRequest clientId correlationId h (OffsetFetchRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetFetchRequest req)
 doRequest clientId correlationId h (CGOffsetFetchRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, OffsetFetchRequest req)
 doRequest clientId correlationId h (CGOffsetCommitRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetCommitRequest req)
 doRequest clientId correlationId h (CGCoordinatorRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, GroupCoordinatorRequest req)
@@ -82,6 +101,7 @@ data RequestMessage = MetadataRequest MetadataRequest
                     | OffsetFetchRequest OffsetFetchRequest
                     | GroupCoordinatorRequest GroupCoordinatorRequest
                     | CreateTopicsRequest CreateTopicsRequest
+                    | DeleteTopicsRequest DeleteTopicsRequest
                     deriving (Show, Generic, Eq)
 
 newtype MetadataRequest = MetadataReq [TopicName] deriving (Show, Eq, Serializable, Generic, Deserializable)
@@ -112,6 +132,10 @@ newtype FetchResponse =
 newtype CreateTopicsResponse =
    TopicsResp { _topicsResponseFields :: [(TopicName, KafkaError)] }
    deriving (Show, Eq, Deserializable, Serializable, Generic)
+
+newtype DeleteTopicsResponse =
+  DeleteTopicsResp { _deleteTopicsResponseFields :: [(TopicName, KafkaError)] }
+  deriving (Show, Eq, Deserializable, Serializable, Generic)
 
 newtype MetadataResponse = MetadataResp { _metadataResponseFields :: ([Broker], [TopicMetadata]) } deriving (Show, Eq, Deserializable, Generic)
 newtype Broker = Broker { _brokerFields :: (NodeId, Host, Port) } deriving (Show, Eq, Ord, Deserializable, Generic)
@@ -188,6 +212,8 @@ newtype ReplicationFactor = ReplicationFactor Int16 deriving (Show, Eq, Num, Int
 
 newtype GroupCoordinatorRequest = GroupCoordinatorReq ConsumerGroup deriving (Show, Eq, Serializable, Generic)
 newtype CreateTopicsRequest = CreateTopicsReq ([(TopicName, Partition, ReplicationFactor, [(Partition, Replicas)], [(KafkaString, Metadata)])], Timeout) deriving (Show, Eq, Serializable, Generic)
+newtype DeleteTopicsRequest = DeleteTopicsReq ([TopicName], Timeout) deriving (Show, Eq, Serializable, Generic)
+
 newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, ConsumerGroupGeneration, ConsumerId, Time, [(TopicName, [(Partition, Offset, Metadata)])]) deriving (Show, Eq, Serializable, Generic)
 newtype ConsumerGroupGeneration = ConsumerGroupGeneration Int32 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Enum)
 
@@ -299,6 +325,7 @@ apiKey OffsetCommitRequest{} = ApiKey 8
 apiKey OffsetFetchRequest{} = ApiKey 9
 apiKey GroupCoordinatorRequest{} = ApiKey 10
 apiKey CreateTopicsRequest{} = ApiKey 19
+apiKey DeleteTopicsRequest{} = ApiKey 20
 
 instance Serializable RequestMessage where
   serialize (ProduceRequest r) = serialize r
@@ -309,6 +336,7 @@ instance Serializable RequestMessage where
   serialize (OffsetFetchRequest r) = serialize r
   serialize (GroupCoordinatorRequest r) = serialize r
   serialize (CreateTopicsRequest r) = serialize r
+  serialize (DeleteTopicsRequest r) = serialize r
 
 instance Serializable Int64 where serialize = putWord64be . fromIntegral
 instance Serializable Int32 where serialize = putWord32be . fromIntegral
