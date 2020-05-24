@@ -1,4 +1,4 @@
-name: blockapps-milena
+name: milena
 version: '0.5.2.2'
 synopsis: A Kafka client for Haskell.
 description: ! 'A Kafka client for Haskell.
@@ -10,13 +10,13 @@ author: Tyler Holien
 maintainer: adam@adamflott.com
 copyright: 2014, Tyler Holien
 license: BSD3
-github: blockapps/strato-platform/core-strato/blockapps-milena
+github: adamflott/milena.git
 tested-with: GHC==7.10.3 GHC==8.0.1
 stability: alpha
 
 extra-source-files:
-  - README.md
   - CHANGELOG.md
+  - README.md
 
 ghc-options:
   - -Wall
@@ -26,6 +26,7 @@ ghc-options:
 
 default-extensions:
   - ConstraintKinds
+  - DeriveGeneric
   - FlexibleContexts
   - GADTs
   - GeneralizedNewtypeDeriving
@@ -56,6 +57,7 @@ library:
     - network >=2.4 && <2.8
     - random >=1.0 && <1.2
     - resource-pool >=0.2.3.2 && <0.3
+    - semigroups >=0.16.2.2 && <0.19
     - transformers >=0.3 && <0.6
     - zlib >=0.6.1.2 && <0.7
 
@@ -67,11 +69,14 @@ tests:
       - -threaded
       - -rtsopts
     dependencies:
+      - QuickCheck
       - base
       - bytestring
       - lens
       - milena
       - mtl
+      - network
+      - semigroups
       - tasty
       - tasty-hspec
       - tasty-quickcheck

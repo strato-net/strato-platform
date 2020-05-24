@@ -13,6 +13,7 @@ packages:
 - blockapps-haskell/vault-wrapper/api
 - blockapps-haskell/vault-wrapper/client
 - blockapps-haskell/vault-wrapper/server
+- core-strato/blockapps-milena/
 - core-strato/core-api
 - core-strato/strato-conf/
 - core-strato/miner-ethash/
@@ -60,7 +61,6 @@ packages:
 - clockwork
 - logserver
 
-
 extra-deps:
 - Crypto-4.2.5.1
 - bytestring-arbitrary-0.1.2
@@ -68,7 +68,7 @@ extra-deps:
 - global-lock-0.1
 - hflags-0.4.3
 - json-stream-0.4.2.3
-- milena-0.5.4.0
+#- milena-0.5.4.0
 - monadIO-0.11.0.0
 - murmur3-1.0.3
 - nibblestring-0.0.3
