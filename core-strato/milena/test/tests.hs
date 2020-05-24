@@ -11,7 +11,7 @@ import Control.Monad.Trans (liftIO)
 import Network.Kafka
 import Network.Kafka.Consumer
 import Network.Kafka.Producer
-import Network.Kafka.Protocol (ProduceResponse(..), KafkaError(..), CompressionCodec(..))
+import Network.Kafka.Protocol (ProduceResponse(..), KafkaError(..), CompressionCodec(..), CreateTopicsResponse(..))
 import Test.Tasty
 import Test.Tasty.Hspec
 import Test.Tasty.QuickCheck
@@ -128,6 +128,14 @@ specs = do
         updateMetadatas []
         use stateAddresses
       result `shouldBe` fmap NE.nub result
+
+  describe "create topics" $
+    it "create topics with multiple partitions" $ do
+      let t = "milena-test-13-partitions"
+      result <- run $ do
+        stateAddresses %= NE.cons ("localhost", 9092)
+        createTopic (createTopicsRequest t 13 1 [] [])
+      result `shouldBe` (Right $ TopicsResp [(t, NoError)])
 
 prop :: Testable prop => String -> prop -> SpecWith ()
 prop s = it s . property

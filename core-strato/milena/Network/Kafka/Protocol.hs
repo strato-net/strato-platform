@@ -31,6 +31,7 @@ data ReqResp a where
   ProduceRR  :: MonadIO m => ProduceRequest  -> ReqResp (m ProduceResponse)
   FetchRR    :: MonadIO m => FetchRequest    -> ReqResp (m FetchResponse)
   OffsetRR   :: MonadIO m => OffsetRequest   -> ReqResp (m OffsetResponse)
+  TopicsRR   :: MonadIO m => CreateTopicsRequest -> ReqResp (m CreateTopicsResponse)
   CGOffsetFetchRR  :: MonadIO m => OffsetFetchRequest      -> ReqResp (m OffsetFetchResponse)
   CGOffsetCommitRR :: MonadIO m => OffsetCommitRequest     -> ReqResp (m OffsetCommitResponse)
   CGCoordinatorRR  :: MonadIO m => GroupCoordinatorRequest -> ReqResp (m GroupCoordinatorResponse)
@@ -55,6 +56,7 @@ doRequest clientId correlationId h (MetadataRR req) = doRequest' correlationId h
 doRequest clientId correlationId h (ProduceRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, ProduceRequest req)
 doRequest clientId correlationId h (FetchRR req)    = doRequest' correlationId h $ Request (correlationId, clientId, FetchRequest req)
 doRequest clientId correlationId h (OffsetRR req)   = doRequest' correlationId h $ Request (correlationId, clientId, OffsetRequest req)
+doRequest clientId correlationId h (TopicsRR req)   = doRequest' correlationId h $ Request (correlationId, clientId, CreateTopicsRequest req)
 doRequest clientId correlationId h (CGOffsetFetchRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, OffsetFetchRequest req)
 doRequest clientId correlationId h (CGOffsetCommitRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetCommitRequest req)
 doRequest clientId correlationId h (CGCoordinatorRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, GroupCoordinatorRequest req)
@@ -79,6 +81,7 @@ data RequestMessage = MetadataRequest MetadataRequest
                     | OffsetCommitRequest OffsetCommitRequest
                     | OffsetFetchRequest OffsetFetchRequest
                     | GroupCoordinatorRequest GroupCoordinatorRequest
+                    | CreateTopicsRequest CreateTopicsRequest
                     deriving (Show, Generic, Eq)
 
 newtype MetadataRequest = MetadataReq [TopicName] deriving (Show, Eq, Serializable, Generic, Deserializable)
@@ -105,6 +108,10 @@ newtype PartitionOffsets =
 newtype FetchResponse =
   FetchResp { _fetchResponseFields :: [(TopicName, [(Partition, KafkaError, Offset, MessageSet)])] }
   deriving (Show, Eq, Serializable, Deserializable, Generic)
+
+newtype CreateTopicsResponse =
+   TopicsResp { _topicsResponseFields :: [(TopicName, KafkaError)] }
+   deriving (Show, Eq, Deserializable, Serializable, Generic)
 
 newtype MetadataResponse = MetadataResp { _metadataResponseFields :: ([Broker], [TopicMetadata]) } deriving (Show, Eq, Deserializable, Generic)
 newtype Broker = Broker { _brokerFields :: (NodeId, Host, Port) } deriving (Show, Eq, Ord, Deserializable, Generic)
@@ -174,15 +181,16 @@ data ResponseMessage = MetadataResponse MetadataResponse
                      | OffsetCommitResponse OffsetCommitResponse
                      | OffsetFetchResponse OffsetFetchResponse
                      | GroupCoordinatorResponse GroupCoordinatorResponse
+                     | CreateTopicsResponse CreateTopicsResponse
                      deriving (Show, Eq, Generic)
 
+newtype ReplicationFactor = ReplicationFactor Int16 deriving (Show, Eq, Num, Integral, Ord, Real, Enum, Serializable, Deserializable, Generic)
+
 newtype GroupCoordinatorRequest = GroupCoordinatorReq ConsumerGroup deriving (Show, Eq, Serializable, Generic)
-
-
-
+newtype CreateTopicsRequest = CreateTopicsReq ([(TopicName, Partition, ReplicationFactor, [(Partition, Replicas)], [(KafkaString, Metadata)])], Timeout) deriving (Show, Eq, Serializable, Generic)
 newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, ConsumerGroupGeneration, ConsumerId, Time, [(TopicName, [(Partition, Offset, Metadata)])]) deriving (Show, Eq, Serializable, Generic)
-
 newtype ConsumerGroupGeneration = ConsumerGroupGeneration Int32 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Enum)
+
 newtype ConsumerId = ConsumerId KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString)
 
 newtype OffsetFetchRequest = OffsetFetchReq (ConsumerGroup, [(TopicName, [Partition])]) deriving (Show, Eq, Serializable, Generic)
@@ -207,6 +215,8 @@ errorKafka OffsetMetadataTooLargeCode          = 12
 errorKafka OffsetsLoadInProgressCode           = 14
 errorKafka ConsumerCoordinatorNotAvailableCode = 15
 errorKafka NotCoordinatorForConsumerCode       = 16
+errorKafka TopicAlreadyExists                  = 36
+errorKafka UnsupportedCompressionType          = 76
 
 data KafkaError = NoError -- ^ @0@ No error--it worked!
                 | Unknown -- ^ @-1@ An unexpected server error
@@ -225,6 +235,8 @@ data KafkaError = NoError -- ^ @0@ No error--it worked!
                 | OffsetsLoadInProgressCode -- ^ @14@ The broker returns this error code for an offset fetch request if it is still loading offsets (after a leader change for that offsets topic partition).
                 | ConsumerCoordinatorNotAvailableCode -- ^ @15@ The broker returns this error code for consumer metadata requests or offset commit requests if the offsets topic has not yet been created.
                 | NotCoordinatorForConsumerCode -- ^ @16@ The broker returns this error code if it receives an offset fetch or commit request for a consumer group that it is not a coordinator for.
+                | TopicAlreadyExists -- ^@36@ Topic with this name already exists.
+                | UnsupportedCompressionType -- ^@76@ The requesting client does not support the compression type of given partition.
                 deriving (Bounded, Enum, Eq, Generic, Show)
 
 instance Serializable KafkaError where
@@ -251,6 +263,8 @@ instance Deserializable KafkaError where
       14   -> return OffsetsLoadInProgressCode
       15   -> return ConsumerCoordinatorNotAvailableCode
       16   -> return NotCoordinatorForConsumerCode
+      36   -> return TopicAlreadyExists
+      76   -> return UnsupportedCompressionType
       _    -> fail $ "invalid error code: " ++ show x
 
 instance Exception KafkaError
@@ -284,6 +298,7 @@ apiKey MetadataRequest{} = ApiKey 3
 apiKey OffsetCommitRequest{} = ApiKey 8
 apiKey OffsetFetchRequest{} = ApiKey 9
 apiKey GroupCoordinatorRequest{} = ApiKey 10
+apiKey CreateTopicsRequest{} = ApiKey 19
 
 instance Serializable RequestMessage where
   serialize (ProduceRequest r) = serialize r
@@ -293,6 +308,7 @@ instance Serializable RequestMessage where
   serialize (OffsetCommitRequest r) = serialize r
   serialize (OffsetFetchRequest r) = serialize r
   serialize (GroupCoordinatorRequest r) = serialize r
+  serialize (CreateTopicsRequest r) = serialize r
 
 instance Serializable Int64 where serialize = putWord64be . fromIntegral
 instance Serializable Int32 where serialize = putWord32be . fromIntegral
@@ -538,6 +554,8 @@ makeLenses ''Message
 
 makeLenses ''Key
 makeLenses ''Value
+
+makeLenses ''CreateTopicsResponse
 
 makePrisms ''ResponseMessage
 

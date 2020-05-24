@@ -188,6 +188,24 @@ metadata request = withAnyHandle $ flip metadata' request
 metadata' :: Kafka m => Handle -> MetadataRequest -> m MetadataResponse
 metadata' h request = makeRequest h $ MetadataRR request
 
+createTopic :: Kafka m => CreateTopicsRequest -> m CreateTopicsResponse
+createTopic request = withAnyHandle $ flip createTopic' request
+ 
+createTopic' ::
+       Kafka m => Handle -> CreateTopicsRequest -> m CreateTopicsResponse
+createTopic' h request = makeRequest h $ TopicsRR request
+
+createTopicsRequest ::
+       TopicName
+    -> Partition
+    -> ReplicationFactor
+    -> [(Partition, Replicas)]
+    -> [(KafkaString, Metadata)]
+    -> CreateTopicsRequest
+createTopicsRequest topic partition replication_factor replica_assignment config =
+    CreateTopicsReq
+        ([(topic, partition, replication_factor, replica_assignment, config)], defaultRequestTimeout)
+
 getTopicPartitionLeader :: Kafka m => TopicName -> Partition -> m Broker
 getTopicPartitionLeader t p = do
   let s = stateTopicMetadata . at t
