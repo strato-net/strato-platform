@@ -32,7 +32,7 @@ fetchOffsets = MILENA.fetchOffset
 -- {-
 fetchOffsets req@(OffsetFetchReq (group, _)) = do
     coordinator <- getConsumerGroupCoordinator group
-    withBrokerHandle coordinator . flip makeRequest $ CGOffsetFetchRR req
+    withBrokerHandle coordinator . flip makeRequest $ OffsetFetchRR req
 -- -}
 commitOffsets :: Kafka m => OffsetCommitRequest -> m OffsetCommitResponse
 {-
@@ -41,7 +41,7 @@ commitOffsets = MILENA.commitOffset
 -- {-
 commitOffsets req@(OffsetCommitReq (group, _, _, _, _)) = do
     coordinator <- getConsumerGroupCoordinator group
-    withBrokerHandle coordinator . flip makeRequest $ CGOffsetCommitRR req
+    withBrokerHandle coordinator . flip makeRequest $ OffsetCommitRR req
 -- -}
 
 fetchSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> m (Either KafkaError (Offset, Metadata))

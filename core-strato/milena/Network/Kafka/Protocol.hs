@@ -48,8 +48,6 @@ data ReqResp a where
   DeleteTopicsRR :: MonadIO m => DeleteTopicsRequest -> ReqResp (m DeleteTopicsResponse)
   OffsetCommitRR :: MonadIO m => OffsetCommitRequest -> ReqResp (m OffsetCommitResponse)
   OffsetFetchRR :: MonadIO m => OffsetFetchRequest -> ReqResp (m OffsetFetchResponse)
-  CGOffsetFetchRR  :: MonadIO m => OffsetFetchRequest      -> ReqResp (m OffsetFetchResponse)
-  CGOffsetCommitRR :: MonadIO m => OffsetCommitRequest     -> ReqResp (m OffsetCommitResponse)
   CGCoordinatorRR  :: MonadIO m => GroupCoordinatorRequest -> ReqResp (m GroupCoordinatorResponse)
 
 doRequest' :: (Deserializable a, MonadIO m) => CorrelationId -> Handle -> Request -> m (Either String a)
@@ -76,8 +74,6 @@ doRequest clientId correlationId h (TopicsRR req)   = doRequest' correlationId h
 doRequest clientId correlationId h (DeleteTopicsRR req)   = doRequest' correlationId h $ Request (correlationId, clientId, DeleteTopicsRequest req)
 doRequest clientId correlationId h (OffsetCommitRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetCommitRequest req)
 doRequest clientId correlationId h (OffsetFetchRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetFetchRequest req)
-doRequest clientId correlationId h (CGOffsetFetchRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, OffsetFetchRequest req)
-doRequest clientId correlationId h (CGOffsetCommitRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetCommitRequest req)
 doRequest clientId correlationId h (CGCoordinatorRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, GroupCoordinatorRequest req)
 
 class Serializable a where
