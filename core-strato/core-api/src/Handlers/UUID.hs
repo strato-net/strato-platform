@@ -21,8 +21,8 @@ server = getUUID
 
 -------------------------
 
-getUUID :: SQLM EthUniqueId
-getUUID = return $ ethUniqueId ethConf
+getUUID :: Applicative m => m EthUniqueId
+getUUID = pure $ ethUniqueId ethConf
 {-
 getUUIDR = selectRep
              . provideJson

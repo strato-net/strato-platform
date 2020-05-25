@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE OverloadedStrings      #-}
@@ -75,7 +76,7 @@ data AccountsFilterParams = AccountsFilterParams
   , qaCode       :: Maybe Text
   , qaCodeHash   :: Maybe Keccak256
   , qaChainId    :: [ChainId]
-  } deriving (Eq, Show)
+  } deriving (Eq, Ord, Show)
 
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
@@ -113,23 +114,15 @@ server = getAccount
 data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
 
-getAccount :: Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-              Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-              Maybe Text -> Maybe Keccak256 -> [ChainId] ->
-              SQLM [AddressStateRef']
-
-getAccount a b c d e f g h i j k
-  = getAccount' (AccountsFilterParams a b c d e f g h i j k)
-    
-getAccount' :: AccountsFilterParams -> SQLM [AddressStateRef']
-getAccount' a@AccountsFilterParams{..} | a == accountsFilterParams =
-  throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
-                                       | otherwise = do
+instance Selectable AccountsFilterParams [AddressStateRef] SQLM where
+  select _ a@AccountsFilterParams{..} | a == accountsFilterParams =
+    throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
+                                      | otherwise = do
     chainid <- case qaChainId of
       [] -> pure MainChain
       cids -> pure $ UnnamedChainIds cids
 
-    addrs <- fmap (map E.entityVal) . sqlQuery $ E.select . E.distinct $
+    fmap (Just . nub . map E.entityVal) . sqlQuery $ E.select . E.distinct $
       E.from $ \(accStateRef) -> do
 
       let
@@ -162,12 +155,18 @@ getAccount' a@AccountsFilterParams{..} | a == accountsFilterParams =
       E.orderBy [E.asc (accStateRef E.^. AddressStateRefAddress)]
       return accStateRef
 
-    return . map asrToAsrPrime . zip (repeat "") $ nub addrs
-
-
-
-
-
+getAccount :: Selectable AccountsFilterParams [AddressStateRef] m
+           => Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+              Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
+              Maybe Text -> Maybe Keccak256 -> [ChainId] ->
+              m [AddressStateRef']
+getAccount a b c d e f g h i j k
+  = getAccount' (AccountsFilterParams a b c d e f g h i j k)
+    
+getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
+getAccount' a = do
+  addrs <- fromMaybe [] <$> select (Proxy @[AddressStateRef]) a
+  return . map asrToAsrPrime $ zip (repeat "") addrs
 
 accountQueryParams:: [String]
 accountQueryParams = [ "address",

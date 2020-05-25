@@ -1,4 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
@@ -13,6 +16,7 @@ module Handlers.Block
   ) where
 
 import           Control.Arrow               ((&&&), (***))
+import           Control.Monad.Change.Alter
 import           Data.List
 import qualified Data.Map                    as Map
 import           Data.Maybe
@@ -25,6 +29,7 @@ import           Servant
 import           Servant.Client
 
 import           Blockchain.Data.Address
+import           Blockchain.Data.Block
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.DataDefs
@@ -81,7 +86,7 @@ data BlocksFilterParams = BlocksFilterParams
   , qbIndex      :: Maybe Int
   , qbChainId    :: Maybe ChainId
   , qbSortby     :: Maybe Sortby
-  } deriving (Eq)
+  } deriving (Eq, Ord)
 
 blocksFilterParams :: BlocksFilterParams
 blocksFilterParams = BlocksFilterParams
@@ -104,77 +109,79 @@ server = getBlockInfo
 
 ---------------------
 
-getBlockInfo ::
+instance Selectable BlocksFilterParams [Block] SQLM where
+  select _ b@BlocksFilterParams{..} | b == blocksFilterParams{qbSortby = qbSortby} =
+    throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " (map T.unpack blockQueryParams)
+                                    | otherwise = do
+    blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $
+      E.select $
+      E.from $ \(bdRef `E.LeftOuterJoin` btx `E.FullOuterJoin` rawTX `E.LeftOuterJoin` accStateRef) -> do
+
+            E.on ( accStateRef E.^. AddressStateRefAddress E.==. rawTX E.^. RawTransactionFromAddress )
+            E.on ( rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction )
+            E.on ( btx E.^. BlockTransactionBlockDataRefId E.==. bdRef E.^. BlockDataRefId )
+
+            let criteria = catMaybes
+                  [
+                    fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) (fromIntegral <$> qbNumber),
+                    fmap (\v -> bdRef E.^. BlockDataRefNumber E.>=. E.val v) (fromIntegral <$> qbMinNumber),
+                    fmap (\v -> bdRef E.^. BlockDataRefNumber E.<=. E.val v) (fromIntegral <$> qbMaxNumber),
+                    fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.==. E.val v) (fromIntegral <$> qbGasLim),
+                    fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.>=. E.val v) (fromIntegral <$> qbMinGasLim),
+                    fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.<=. E.val v) (fromIntegral <$> qbMaxGasLim),
+                    fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.==. E.val v) (fromIntegral <$> qbGasUsed),
+                    fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.>=. E.val v) (fromIntegral <$> qbMinGasUsed),
+                    fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.<=. E.val v) (fromIntegral <$> qbMaxGasUsed),
+                    fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.==. E.val v) (fromIntegral <$> qbDiff),
+                    fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.>=. E.val v) (fromIntegral <$> qbMinDiff),
+                    fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.<=. E.val v) (fromIntegral <$> qbMaxDiff),
+                    fmap (\v -> bdRef E.^. BlockDataRefCoinbase E.==. E.val v) qbCoinbase,
+                    fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) qbAddress,
+  --                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) ntx,
+                    fmap (\v -> (rawTX E.^. RawTransactionFromAddress E.==. E.val v)
+                                E.||.
+                                (rawTX E.^. RawTransactionToAddress E.==. E.val (Just v))) qbTxAddress,
+                    fmap (\v -> bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)) qbBlockId,
+                    fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) qbHash
+                  ] 
+
+            
+            E.where_ (foldl1 (E.&&.) criteria)
+
+            E.limit $ appFetchLimit
+
+            E.distinctOnOrderBy [sortToOrderBy qbSortby $ bdRef E.^. BlockDataRefNumber] (return bdRef)
+
+
+    let blockIds = map fst blks
+
+    txs <- fmap (map (E.entityVal *** E.entityVal)) . sqlQuery $ E.select $
+                      E.from $ \(btx `E.InnerJoin` rawTX) -> do
+                        E.on ( rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction )
+                        E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList blockIds
+                        E.orderBy [E.asc (btx E.^. BlockTransactionId)]
+                        return (btx, rawTX)
+
+    let getTXLists = flip (Map.findWithDefault []) $
+          Map.fromListWith (flip (++)) $ map (blockTransactionBlockDataRefId *** ((:[]) . rawTX2TX)) txs
+
+
+    let modBlocks = map (\(k,v) -> (v, getTXLists k)) blks
+
+    return . Just $ map (uncurry blockDataRefToBlock) modBlocks
+
+getBlockInfo :: Selectable BlocksFilterParams [Block] m =>
   Maybe Address -> Maybe Address -> Maybe Address -> Maybe Text ->
   Maybe Keccak256 -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Int -> Maybe ChainId -> Maybe Sortby ->
-  SQLM [Block']
+  m [Block']
 getBlockInfo a b c d e f g h i j k l m n o p q r s t =
   getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t)
 
-getBlockInfo' :: BlocksFilterParams -> SQLM [Block']
-getBlockInfo' b@BlocksFilterParams{..} | b == blocksFilterParams{qbSortby = qbSortby} =
-  throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " (map T.unpack blockQueryParams)
-                                       | otherwise = do
-  blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $
-    E.select $
-    E.from $ \(bdRef `E.LeftOuterJoin` btx `E.FullOuterJoin` rawTX `E.LeftOuterJoin` accStateRef) -> do
-
-          E.on ( accStateRef E.^. AddressStateRefAddress E.==. rawTX E.^. RawTransactionFromAddress )
-          E.on ( rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction )
-          E.on ( btx E.^. BlockTransactionBlockDataRefId E.==. bdRef E.^. BlockDataRefId )
-
-          let criteria = catMaybes
-                [
-                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) (fromIntegral <$> qbNumber),
-                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.>=. E.val v) (fromIntegral <$> qbMinNumber),
-                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.<=. E.val v) (fromIntegral <$> qbMaxNumber),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.==. E.val v) (fromIntegral <$> qbGasLim),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.>=. E.val v) (fromIntegral <$> qbMinGasLim),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasLimit E.<=. E.val v) (fromIntegral <$> qbMaxGasLim),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.==. E.val v) (fromIntegral <$> qbGasUsed),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.>=. E.val v) (fromIntegral <$> qbMinGasUsed),
-                  fmap (\v -> bdRef E.^. BlockDataRefGasUsed E.<=. E.val v) (fromIntegral <$> qbMaxGasUsed),
-                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.==. E.val v) (fromIntegral <$> qbDiff),
-                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.>=. E.val v) (fromIntegral <$> qbMinDiff),
-                  fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.<=. E.val v) (fromIntegral <$> qbMaxDiff),
-                  fmap (\v -> bdRef E.^. BlockDataRefCoinbase E.==. E.val v) qbCoinbase,
-                  fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) qbAddress,
---                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) ntx,
-                  fmap (\v -> (rawTX E.^. RawTransactionFromAddress E.==. E.val v)
-                              E.||.
-                              (rawTX E.^. RawTransactionToAddress E.==. E.val (Just v))) qbTxAddress,
-                  fmap (\v -> bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)) qbBlockId,
-                  fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) qbHash
-                ] 
-
-          
-          E.where_ (foldl1 (E.&&.) criteria)
-
-          E.limit $ appFetchLimit
-
-          E.distinctOnOrderBy [sortToOrderBy qbSortby $ bdRef E.^. BlockDataRefNumber] (return bdRef)
-
-
-  let blockIds = map fst blks
-
-  txs <- fmap (map (E.entityVal *** E.entityVal)) . sqlQuery $ E.select $
-                     E.from $ \(btx `E.InnerJoin` rawTX) -> do
-                       E.on ( rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction )
-                       E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList blockIds
-                       E.orderBy [E.asc (btx E.^. BlockTransactionId)]
-                       return (btx, rawTX)
-
-  let getTXLists = flip (Map.findWithDefault []) $
-        Map.fromListWith (flip (++)) $ map (blockTransactionBlockDataRefId *** ((:[]) . rawTX2TX)) txs
-
-
-  let modBlocks = map (\(k,v) -> (v, getTXLists k)) blks
-
-  return $ map (uncurry (bToBPrime "")) modBlocks
-
+getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
+getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select (Proxy @[Block]) b
 
 blockQueryParams:: [Text]
 blockQueryParams = [ "txaddress",
@@ -197,13 +204,5 @@ blockQueryParams = [ "txaddress",
                      "index",
                      "chainid"]
 
-
-
 toBlockDataRefId :: Text -> Key BlockDataRef
 toBlockDataRefId = toSqlKey . read . T.unpack
-
-{-
-runDB :: ConnectionPool -> SqlPersistT (LoggingT IO) a -> IO a
-runDB pool x =  runStdoutLoggingT $ withPostgresqlPool pool 10 $ \p -> do
-  runSqlPool x p
--}

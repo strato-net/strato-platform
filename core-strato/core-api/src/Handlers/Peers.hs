@@ -22,7 +22,7 @@ server = getPeers
 
 ---------------------
 
-getPeers :: SQLM Value
+getPeers :: MonadIO m => m Value
 getPeers = do
   eActivePeers <- liftIO getActivePeers
   case eActivePeers of

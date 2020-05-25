@@ -1,5 +1,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -20,8 +23,11 @@ module Handlers.Transaction
   ) where
 
 import           Control.DeepSeq
+import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
 import           Data.Aeson
+import           Data.Conduit
+import           Data.Conduit.Combinators    (yieldMany)
 import           Data.List
 import           Data.Maybe
 import qualified Data.Text                   as T
@@ -92,7 +98,7 @@ data TxsFilterParams = TxsFilterParams
   , qtChainId     :: Maybe (MaybeNamed ChainId)
   , qtChainIds    :: [ChainId]
   , qtSortby      :: Maybe Sortby
-  } deriving (Eq)
+  } deriving (Eq, Ord, Show)
 
 txsFilterParams :: TxsFilterParams
 txsFilterParams = TxsFilterParams
@@ -118,138 +124,140 @@ getTxsFilter :<|> postTx :<|> postTxList =
       qtChainIds qtSortby
 
 server :: ServerT API SQLM
-server = getTransaction :<|> postTransaction :<|> postTransactionList
+server = getTransaction :<|> postTransactionC :<|> postTransactionListC
+  where postTransactionC rt      = runConduit $ postTransaction rt `fuseUpstream` emitKafkaTransactions
+        postTransactionListC rts = runConduit $ postTransactionList rts `fuseUpstream` emitKafkaTransactions
 
 ---------------------------
 
 instance NFData RawTransaction'
 
-postTransaction :: RawTransaction' -> SQLM Keccak256
-postTransaction (RawTransaction' raw "") = runLoggingT $ do
+data NamedChainId = UnnamedChainIds [ChainId]
+                  | MainChain
+                  | AllChains
+
+instance Selectable TxsFilterParams [RawTransaction] SQLM where
+  select _ t@TxsFilterParams{..} | t == txsFilterParams { qtChainId = qtChainId
+                                                        , qtChainIds = qtChainIds
+                                                        , qtSortby = qtSortby
+                                                        } =
+    throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
+                                 | otherwise = do
+    chainids <-
+      case (qtChainId, qtChainIds) of
+        (Nothing, v) -> case v of
+          [] -> pure MainChain
+          cids -> pure $ UnnamedChainIds cids
+        (Just c, []) -> case c of
+          Unnamed cid -> pure $ UnnamedChainIds [cid]
+          Named "main" -> pure MainChain
+          Named "all" -> pure AllChains
+          Named name -> throwIO . NamedChainError $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'."
+        _ -> throwIO $ AmbiguousChainError "You can not use both the chainid and chainids parameters togther."
+
+    txs <- fmap (map E.entityVal) . sqlQuery $ E.select $ E.from $ \(rawTx) -> do
+        let criteria = catMaybes
+              [
+                fmap (\v -> rawTx E.^. RawTransactionFromAddress E.==. E.val v E.||. rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) qtAddress,
+                fmap (\v -> rawTx E.^. RawTransactionFromAddress E.==. E.val v) qtFrom,
+                fmap (\v -> rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) qtTo,
+                fmap (\v -> rawTx E.^. RawTransactionTxHash  E.==. E.val v) qtHash,
+
+                fmap (\v -> rawTx E.^. RawTransactionGasPrice E.==. E.val v) (fromIntegral <$> qtGasPrice),
+                fmap (\v -> rawTx E.^. RawTransactionGasPrice E.>=. E.val v) (fromIntegral <$> qtMinGasPrice),
+                fmap (\v -> rawTx E.^. RawTransactionGasPrice E.<=. E.val v) (fromIntegral <$> qtMaxGasPrice),
+
+                fmap (\v -> rawTx E.^. RawTransactionGasLimit E.==. E.val v) (fromIntegral <$> qtGasLimit),
+                fmap (\v -> rawTx E.^. RawTransactionGasLimit E.>=. E.val v) (fromIntegral <$> qtMinGasLimit),
+                fmap (\v -> rawTx E.^. RawTransactionGasLimit E.<=. E.val v) (fromIntegral <$> qtMaxGasLimit),
+
+                fmap (\v -> rawTx E.^. RawTransactionValue E.==. E.val v) (fromIntegral <$> qtValue),
+                fmap (\v -> rawTx E.^. RawTransactionValue E.>=. E.val v) (fromIntegral <$> qtMinValue),
+                fmap (\v -> rawTx E.^. RawTransactionValue E.<=. E.val v) (fromIntegral <$> qtMaxValue),
+
+                fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber)
+              ]
+
+
+
+        
+        E.where_ ((foldl1 (E.&&.) criteria)) -- map (getTransFilter rawTx) $ getParameters ))
+
+        let matchChainId (ChainId cid) = ((rawTx E.^. RawTransactionChainId) E.==. (E.val cid))
+            chainCriteria = case chainids of
+                              MainChain -> [rawTx E.^. RawTransactionChainId E.==. E.val 0]
+                              UnnamedChainIds cids -> matchChainId <$> cids
+                              AllChains -> []
+            allCriteria = case chainCriteria of
+                            [] -> [criteria]
+                            _ -> map (\cc -> cc : criteria) chainCriteria
+        -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
+        E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
+
+        -- E.offset $ (limit * offset)
+        E.limit $ appFetchLimit
+        E.orderBy $ [(sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionBlockNumber),
+                      (sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionNonce)]
+
+        return rawTx
+
+    return . Just $ nub txs
+
+postTransaction :: (MonadIO m, MonadLogger m) => RawTransaction' -> ConduitT a IngestEvent m Keccak256
+postTransaction (RawTransaction' raw "") = do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
-  emitKafkaTransactions [tx']
+  ts <- liftIO getCurrentMicrotime
+  yield . IETx ts $ IngestTx API tx'
   $logInfoS "postTransaction" . T.pack $ "Successfully inserted tx: " ++ format h
   return h
 postTransaction _ =
   throwIO $ DeprecatedError "The 'next' parameter is no longer supported"
 
 
-postTransactionList :: [RawTransaction'] -> SQLM [Keccak256]
+postTransactionList :: (MonadIO m, MonadLogger m) => [RawTransaction'] -> ConduitT a IngestEvent m [Keccak256]
 postTransactionList raws = do
-   handlerStart <- liftIO $ getTime Realtime
+  handlerStart <- liftIO $ getTime Realtime
 
-   parserStart <- liftIO $ getTime Realtime
-   
-   txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
-   let txs = fmap (\(RawTransaction' raw _) -> rawTX2TX $ raw) raws
-       hs = fmap (toJSON . transactionHash) txs
-       txr = filter success $ zip hs txs
-   let num = length txs
-   $logDebug $ T.pack $ show num ++ " incoming transactions..."
-   let num' = length $ filter (not . success) $ zip hs txs
-   $logDebug $ T.pack $ "Inserted " ++ (show (num - num')) ++ " of the transactions"
-   $logDebug $ T.pack $ "Kafkaing txs: \n" ++ (unlines $ format <$> ((transactionHash . snd) <$> txr))
-   emitKafkaTransactions $ snd <$> txr
-   sendResponseStart <- liftIO $ getTime Realtime
-   let times = (map toNanoSecs $
-                        [ parserStart - handlerStart
-                        , txHashStart - parserStart
-                        , sendResponseStart  - txHashStart
-                        ]
-                      ) -- ++ [ecRecoverTime]
-   $logDebug $ T.pack $ "Timings in nanoseconds: " ++ show times
-   return $ transactionHash <$> txs -- hs --times -- This is for debugging
+  parserStart <- liftIO $ getTime Realtime
+  
+  txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
+  let txs = fmap (\(RawTransaction' raw _) -> rawTX2TX $ raw) raws
+      hs = fmap (toJSON . transactionHash) txs
+      txr = filter success $ zip hs txs
+  let num = length txs
+  $logDebug $ T.pack $ show num ++ " incoming transactions..."
+  let num' = length $ filter (not . success) $ zip hs txs
+  $logDebug $ T.pack $ "Inserted " ++ (show (num - num')) ++ " of the transactions"
+  $logDebug $ T.pack $ "Kafkaing txs: \n" ++ (unlines $ format <$> ((transactionHash . snd) <$> txr))
+  ts <- liftIO getCurrentMicrotime
+  yieldMany $ IETx ts . IngestTx API . snd <$> txr
+  sendResponseStart <- liftIO $ getTime Realtime
+  let times = (map toNanoSecs $
+                      [ parserStart - handlerStart
+                      , txHashStart - parserStart
+                      , sendResponseStart  - txHashStart
+                      ]
+                    ) -- ++ [ecRecoverTime]
+  $logDebug $ T.pack $ "Timings in nanoseconds: " ++ show times
+  return $ transactionHash <$> txs -- hs --times -- This is for debugging
+  where
+    success (a, _) =
+      case a of String _ -> True
+                _        -> False
 
-          
-    where
-      success (a, _) =
-        case a of String _ -> True
-                  _        -> False
-
-data NamedChainId = UnnamedChainIds [ChainId]
-                  | MainChain
-                  | AllChains
-
-getTransaction :: Maybe Address -> Maybe Address -> Maybe Address -> Maybe Keccak256
+getTransaction :: Selectable TxsFilterParams [RawTransaction] m
+               => Maybe Address -> Maybe Address -> Maybe Address -> Maybe Keccak256
                -> Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural
                -> Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural
                -> Maybe Natural -> Maybe Natural -> Maybe (MaybeNamed ChainId) -> [ChainId]
-               -> Maybe Sortby -> SQLM [RawTransaction']
+               -> Maybe Sortby -> m [RawTransaction']
 getTransaction a b c d e f g h i j k l m n o p q =
   getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q)
 
-getTransaction' :: TxsFilterParams -> SQLM [RawTransaction']
-getTransaction' t@TxsFilterParams{..} | t == txsFilterParams{ qtChainId = qtChainId
-                                                            , qtChainIds = qtChainIds
-                                                            , qtSortby = qtSortby
-                                                            } =
-  throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
-                                      | otherwise = do
-  chainids <-
-    case (qtChainId, qtChainIds) of
-      (Nothing, v) -> case v of
-        [] -> pure MainChain
-        cids -> pure $ UnnamedChainIds cids
-      (Just c, []) -> case c of
-        Unnamed cid -> pure $ UnnamedChainIds [cid]
-        Named "main" -> pure MainChain
-        Named "all" -> pure AllChains
-        Named name -> throwIO . NamedChainError $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'."
-      _ -> throwIO $ AmbiguousChainError "You can not use both the chainid and chainids parameters togther."
-
-  txs <- fmap (map E.entityVal) . sqlQuery $ E.select $ E.from $ \(rawTx) -> do
-      let criteria = catMaybes
-            [
-              fmap (\v -> rawTx E.^. RawTransactionFromAddress E.==. E.val v E.||. rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) qtAddress,
-              fmap (\v -> rawTx E.^. RawTransactionFromAddress E.==. E.val v) qtFrom,
-              fmap (\v -> rawTx E.^. RawTransactionToAddress E.==. E.val (Just v)) qtTo,
-              fmap (\v -> rawTx E.^. RawTransactionTxHash  E.==. E.val v) qtHash,
-
-              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.==. E.val v) (fromIntegral <$> qtGasPrice),
-              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.>=. E.val v) (fromIntegral <$> qtMinGasPrice),
-              fmap (\v -> rawTx E.^. RawTransactionGasPrice E.<=. E.val v) (fromIntegral <$> qtMaxGasPrice),
-
-              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.==. E.val v) (fromIntegral <$> qtGasLimit),
-              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.>=. E.val v) (fromIntegral <$> qtMinGasLimit),
-              fmap (\v -> rawTx E.^. RawTransactionGasLimit E.<=. E.val v) (fromIntegral <$> qtMaxGasLimit),
-
-              fmap (\v -> rawTx E.^. RawTransactionValue E.==. E.val v) (fromIntegral <$> qtValue),
-              fmap (\v -> rawTx E.^. RawTransactionValue E.>=. E.val v) (fromIntegral <$> qtMinValue),
-              fmap (\v -> rawTx E.^. RawTransactionValue E.<=. E.val v) (fromIntegral <$> qtMaxValue),
-
-              fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber)
-            ]
-
-
-
-      
-      E.where_ ((foldl1 (E.&&.) criteria)) -- map (getTransFilter rawTx) $ getParameters ))
-
-      let matchChainId (ChainId cid) = ((rawTx E.^. RawTransactionChainId) E.==. (E.val cid))
-          chainCriteria = case chainids of
-                            MainChain -> [rawTx E.^. RawTransactionChainId E.==. E.val 0]
-                            UnnamedChainIds cids -> matchChainId <$> cids
-                            AllChains -> []
-          allCriteria = case chainCriteria of
-                          [] -> [criteria]
-                          _ -> map (\cc -> cc : criteria) chainCriteria
-      -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
-      E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
-
-      -- E.offset $ (limit * offset)
-      E.limit $ appFetchLimit
-      E.orderBy $ [(sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionBlockNumber),
-                    (sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionNonce)]
-
-      return rawTx
-
-  return . map rtToRtPrime . zip (repeat "") $ nub txs
-
-
-
-
-
+getTransaction' :: Selectable TxsFilterParams [RawTransaction] m
+                => TxsFilterParams -> m [RawTransaction']
+getTransaction' a = map rtToRtPrime . zip (repeat "") . fromMaybe [] <$> select (Proxy @[RawTransaction]) a
 
 transactionQueryParams:: [String]
 transactionQueryParams = [ "address",
@@ -270,14 +278,15 @@ transactionQueryParams = [ "address",
                            "rejected",
                            "chainid"]
 
-
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
-emitKafkaTransactions txs = do
-    ts <- liftIO $ getCurrentMicrotime
-    let ingestTxs = (\t -> (IETx ts (IngestTx API t))) <$> txs
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ (show $ length ingestTxs) ++ " tx(s) to unseqevents"
-    rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestTxs
-    case rets of
+emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()
+emitKafkaTransactions = loop id
+  where
+    -- this is essentially the same as sinkList,
+    -- except emitting to Kafka instead of returning the list
+    loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x:))
+    emit txs = do
+      $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
+      rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents txs
+      case rets of
         Left e      -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
         Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
-    return ()

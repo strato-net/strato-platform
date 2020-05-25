@@ -26,6 +26,5 @@ server = getCoinbase
 
 -------------------------
 
-getCoinbase :: SQLM Value
-getCoinbase = do
-  return $ object ["coinbase" .= coinbaseAddress (quarryConfig ethConf)]
+getCoinbase :: Applicative m => m Value
+getCoinbase = pure $ object ["coinbase" .= coinbaseAddress (quarryConfig ethConf)]

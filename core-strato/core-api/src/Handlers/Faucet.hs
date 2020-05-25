@@ -1,5 +1,5 @@
-
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -8,7 +8,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
@@ -21,9 +20,12 @@ module Handlers.Faucet
   ) where
 
 import           Control.Monad
+import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Lazy                  as LBS
+import           Data.Conduit
 import           Data.Maybe
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
@@ -85,9 +87,12 @@ postFaucetClient
 
 server :: ServerT API SQLM
 server  =
-  postFaucet
-  :<|> postFaucetMultipart
-  :<|> postDataFaucet
+  postFaucetC
+  :<|> postFaucetMultipartC
+  :<|> postDataFaucetC
+  where postFaucetC a = runConduit $ postFaucet a `fuseUpstream` emitKafkaTransactions
+        postFaucetMultipartC a = runConduit $ postFaucetMultipart a `fuseUpstream` emitKafkaTransactions
+        postDataFaucetC a b = runConduit $ postDataFaucet a b `fuseUpstream` emitKafkaTransactions
 
 -----------------------------------------
 
@@ -99,29 +104,24 @@ appFaucetNonce = unsafePerformIO (newIORef 0)
 
 ---------------
 
-postFaucet :: Address -> SQLM [Keccak256]
-postFaucet addressParam = do
-
-  let addresses = [addressParam]
-  
+postFaucet :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+           => Address -> ConduitT a IngestEvent m [Keccak256]
+postFaucet target = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lookupNonce $ prvKey2Address key
+  minNonce <- lift . lookupNonce $ prvKey2Address key
 
-  case addresses of
-    [target] -> do
-      maxNonce <- acquireNewMaxNonce minNonce
-      $logInfoS "postFaucet" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
-      mapM (putTX maxNonce key target) [maxNonce, minNonce]
-    addrTL -> do
-      liftIO $ putStrLn $ show addresses
-      -- TODO(tim): Find a multiple nonce strategy for multiple addresses
-      sequence . zipWith (putTX minNonce key) addrTL $ map (minNonce +) [0..]
+  maxNonce <- acquireNewMaxNonce minNonce
+  $logInfoS "postFaucet" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
+  mapM (putTX maxNonce key target) [maxNonce, minNonce]
+  where
+    putTX maxN k a n = do
+      ts <- liftIO getCurrentMicrotime
+      tx <- makeSendTX maxN k a n
+      yield . IETx ts $ IngestTx API tx
+      pure $ txHash tx
 
-        
-    where
-      putTX maxN k a = emitTransaction <=< makeSendTX maxN k a
-
-postFaucetMultipart :: MultipartData Mem -> SQLM [Keccak256]
+postFaucetMultipart :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+                    => MultipartData Mem -> ConduitT a IngestEvent m [Keccak256]
 postFaucetMultipart multipartData = do
   case lookupInput "address" multipartData of
     Just a ->
@@ -137,16 +137,19 @@ toAddr v =
     _ -> Left $ "Can't convert text to Address: " ++ show v
 
 
-postDataFaucet :: Maybe Int -> Maybe Int -> SQLM [Keccak256]
+postDataFaucet :: (MonadIO m, Selectable Address Integer m) 
+               => Maybe Int -> Maybe Int -> ConduitT a IngestEvent m [Keccak256]
 postDataFaucet mSize mCountOf = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lookupNonce $ prvKey2Address key
+  minNonce <- lift . lookupNonce $ prvKey2Address key
   let size = fromMaybe 4096 mSize
       countOf = fromMaybe 1 mCountOf
   replicateM countOf $ do
     maxN <- acquireNewMaxNonce minNonce
+    ts <- liftIO getCurrentMicrotime
     tx <- makeSizedTX maxN size key
-    emitTransaction tx
+    yield . IETx ts $ IngestTx API tx
+    pure $ txHash tx
 
 
 {-
@@ -164,35 +167,28 @@ acquireNewMaxNonce minNonce = do
         in (next, next)
   liftIO $ atomicModifyIORef' appFaucetNonce findNext
 
+instance Selectable Address Integer SQLM where
+  select _ addr = fmap (fmap (addressStateRefNonce . E.entityVal) . listToMaybe) . sqlQuery $ E.select $
+    E.from $ \accStateRef -> do
+    E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0
+        E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
+    return accStateRef
 
+lookupNonce :: Selectable Address Integer m => Address -> m Integer
+lookupNonce addr' = fromMaybe 0 <$> select (Proxy @Integer)  addr'
 
-lookupNonce :: Address -> SQLM Integer
-lookupNonce addr' = do
-  addrSt <- sqlQuery $ E.select $
-                      E.from $ \accStateRef -> do
-                      E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0
-                         E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr')
-                      return accStateRef
-  return $ case addrSt of
-    []      -> 0
-    n:_ -> addressStateRefNonce $ E.entityVal n
-
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
-emitKafkaTransactions txs = do
-    ts <- liftIO getCurrentMicrotime
-    let ingestTxs = (IETx ts . IngestTx API)  <$> txs
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length ingestTxs) ++ " faucet tx(s) to unseqevents"
-    rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestTxs
-    case rets of
-        Left e      -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
-        Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
-    return ()
-
-emitTransaction :: (MonadIO m, MonadLogger m) => Transaction -> m Keccak256
-emitTransaction tx = do
-  emitKafkaTransactions [tx]
-  return $ txHash tx
-
+emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()
+emitKafkaTransactions = loop id
+  where
+    -- this is essentially the same as sinkList,
+    -- except emitting to Kafka instead of returning the list
+    loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x:))
+    emit txs = do
+      $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
+      rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents txs
+      case rets of
+          Left e      -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
+          Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 
 makeSendTX :: MonadIO m => Integer -> H.PrvKey -> Address -> Integer -> m Transaction
 makeSendTX maxN k a n = do

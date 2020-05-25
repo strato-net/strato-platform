@@ -19,7 +19,7 @@ import           Servant
 import           Test.QuickCheck
 
 data MaybeNamed a = Named Text | Unnamed a
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 instance ToJSON a => ToJSON (MaybeNamed a) where
   toJSON (Named _name) = toJSON _name

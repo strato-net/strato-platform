@@ -21,6 +21,7 @@ library:
   - blockapps-util
   - bytestring
   - clock
+  - conduit
   - containers
   - deepseq
   - directory

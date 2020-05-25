@@ -24,7 +24,7 @@ import Data.Swagger
 import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
 newtype HexStorage = HexStorage B.ByteString
-                   deriving (Eq, Show, Read, Generic)
+                   deriving (Eq, Ord, Show, Read, Generic)
                    deriving anyclass (NFData)
 
 instance ToParamSchema HexStorage where
