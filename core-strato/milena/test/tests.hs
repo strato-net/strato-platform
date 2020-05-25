@@ -2,22 +2,41 @@
 
 module Main where
 
-import Data.Functor
+import Prelude
+
+-- base
 import Data.Either (isRight, isLeft)
 import qualified Data.List.NonEmpty as NE
+
+-- Hackage
 import Control.Lens
 import Control.Monad.Except (catchError, throwError)
 import Control.Monad.Trans (liftIO)
-import Network.Kafka
-import Network.Kafka.Consumer
-import Network.Kafka.Producer
-import Network.Kafka.Protocol (ProduceResponse(..), KafkaError(..), CompressionCodec(..), CreateTopicsResponse(..))
 import Test.Tasty
 import Test.Tasty.Hspec
 import Test.Tasty.QuickCheck
 import qualified Data.ByteString.Char8 as B
 
-import Prelude
+-- local
+import Network.Kafka
+import Network.Kafka.Consumer
+import Network.Kafka.Producer
+import Network.Kafka.Protocol (ProduceResponse(..),
+                               KafkaError(..),
+                               CompressionCodec(..),
+                               CreateTopicsResponse(..),
+                               DeleteTopicsResponse(..),
+                               Offset(..),
+                               OffsetCommitResponse(..),
+                               OffsetFetchResponse(..),
+                               ConsumerGroup(..),
+                               Partition(..),
+                               KafkaString(..),
+                               Metadata(..),
+                               TopicName(..),
+                              )
+
+
 
 main :: IO ()
 main = testSpec "the specs" specs >>= defaultMain
@@ -31,6 +50,13 @@ specs = do
         stateWaitSize .= 1
         stateWaitTime .= 1000
       byteMessages = fmap (TopicAndMessage topic . makeMessage . B.pack)
+
+  let cleanup :: TopicName -> IO ()
+      cleanup topicName = do
+          _ <- run $ do
+                   stateAddresses %= NE.cons ("localhost", 9092)
+                   deleteTopic (deleteTopicsRequest topicName)
+          pure ()
 
   describe "can talk to local Kafka server" $ do
     prop "can produce messages" $ \ms -> do
@@ -129,13 +155,76 @@ specs = do
         use stateAddresses
       result `shouldBe` fmap NE.nub result
 
-  describe "create topics" $
+
+  let newTopicName = "milena-test-13-partitions"
+  describe "create topics" $ do
     it "create topics with multiple partitions" $ do
-      let t = "milena-test-13-partitions"
       result <- run $ do
         stateAddresses %= NE.cons ("localhost", 9092)
-        createTopic (createTopicsRequest t 13 1 [] [])
-      result `shouldBe` (Right $ TopicsResp [(t, NoError)])
+        createTopic (createTopicsRequest newTopicName 13 1 [] [])
+      result `shouldBe` (Right $ TopicsResp [(newTopicName, NoError)])
+
+    it "create already existing topic" $ do
+      result <- run $ do
+        stateAddresses %= NE.cons ("localhost", 9092)
+        createTopic (createTopicsRequest newTopicName 13 1 [] [])
+      result `shouldBe` (Right $ TopicsResp [(newTopicName, TopicAlreadyExists)])
+
+  describe "delete topics" $
+    it "delete topics" $ do
+      result <- run $ do
+        stateAddresses %= NE.cons ("localhost", 9092)
+        deleteTopic (deleteTopicsRequest newTopicName)
+      result `shouldBe` (Right $ DeleteTopicsResp [(newTopicName, NoError)])
+
+
+  let commitOffsetTopicName = "commit-offset"
+      t = commitOffsetTopicName
+
+  Test.Tasty.Hspec.afterAll_ (cleanup commitOffsetTopicName) $ do
+    describe "can commit messages" $ do
+      it "create a topic" $ do
+        topicCreation <- run $ do
+          stateAddresses %= NE.cons ("localhost", 9092)
+          createTopic (createTopicsRequest t 3 1 [] [])
+        topicCreation `shouldBe` (Right $ TopicsResp [(t, NoError)])
+
+      it "commit offset 5 to partition 0 for consumer group \"group1\"" $ do
+        commitOff <- run $ do
+            stateAddresses %= NE.cons ("localhost", 9092)
+            commitOffset (commitOffsetRequest (ConsumerGroup "group1") t 0 (Offset 5))
+        commitOff `shouldBe` Right (OffsetCommitResp [(t,[(Partition 0,NoError)])])
+
+      it "commit offset 15 to partition 1 for consumer group \"group1\"" $ do
+        commitOff <- run $ do
+            stateAddresses %= NE.cons ("localhost", 9092)
+            commitOffset (commitOffsetRequest (ConsumerGroup "group1") t 1 (Offset 15))
+        commitOff `shouldBe` Right (OffsetCommitResp [(t,[(Partition 1,NoError)])])
+
+      it "commit offset 10 to partition 2 for consumer group \"group2\"" $ do
+        commitOff <- run $ do
+            stateAddresses %= NE.cons ("localhost", 9092)
+            commitOffset (commitOffsetRequest (ConsumerGroup "group2") t 2 10)
+        commitOff `shouldSatisfy` isRight
+
+      it "fetch offset from partition 0 for \"group1\"" $ do
+        fetchOff <- run $ do
+            stateAddresses %= NE.cons ("localhost", 9092)
+            fetchOffset (fetchOffsetRequest (ConsumerGroup "group1") t 0)
+        fetchOff `shouldBe` Right (OffsetFetchResp [(t,[(Partition 0, Offset 5,Metadata (KString {_kString = ""}),NoError)])])
+
+      it "fetch offset from partition 0 for \"group2\"" $ do
+        fetchOff <- run $ do
+            stateAddresses %= NE.cons ("localhost", 9092)
+            fetchOffset (fetchOffsetRequest (ConsumerGroup "group2") t 0)
+        fetchOff `shouldBe` Right (OffsetFetchResp [(t,[(Partition 0, Offset (-1),Metadata (KString {_kString = ""}),UnknownTopicOrPartition)])])
+
+      it "note that getLastOffset is unchanged" $ do
+        getLastOff <- run $ do
+            stateAddresses %= NE.cons ("localhost", 9092)
+            getLastOffset EarliestTime 0 t
+        getLastOff `shouldSatisfy` isRight
+        getLastOff `shouldBe` (Right $ Offset 0)
 
 prop :: Testable prop => String -> prop -> SpecWith ()
 prop s = it s . property

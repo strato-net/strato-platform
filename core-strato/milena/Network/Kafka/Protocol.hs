@@ -1,7 +1,5 @@
 {-# LANGUAGE NoDeriveAnyClass #-}
 
-{-# OPTIONS -fno-warn-unused-imports #-}
-
 module Network.Kafka.Protocol
   ( module Network.Kafka.Protocol
   ) where
@@ -12,9 +10,7 @@ import Prelude hiding ((.), id)
 import Control.Applicative
 import Control.Category (Category(..))
 import Control.Exception (Exception)
-import Control.Lens
 import Control.Monad (replicateM, liftM2, liftM3, liftM4, liftM5, unless)
-import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bits ((.&.))
 import Data.Int
 import GHC.Exts (IsString(..))
@@ -27,12 +23,8 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.ByteString.Char8 (ByteString)
 import Data.ByteString.Lens (unpackedChars)
 import Data.Digest.CRC32
-import Data.Int
 import Data.Serialize.Get
 import Data.Serialize.Put
-import GHC.Exts (IsString(..))
-import GHC.Generics (Generic)
-import System.IO
 import Numeric.Lens
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as LB (fromStrict, toStrict)
