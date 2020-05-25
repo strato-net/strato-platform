@@ -11,14 +11,18 @@ RUN apt-get -y update && apt-get install -y \
       libpq-dev \
       libsodium-dev \
       libstdc++6 \
+      libtool \
       locales \
       netbase \
       netcat-openbsd \
       postgresql-client \
+      git \
+      make \
+      libsecp256k1-dev 
   && apt-get autoremove \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get clean \
-  && locale-gen en_US.UTF-8
+  && locale-gen en_US.UTF-8 \ 
 
 ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
@@ -27,7 +31,6 @@ ENV LANG="en_US.UTF-8" \
 
 FROM deploy as built
 COPY ./usr/local/bin /usr/local/bin
-
 
 FROM built as strato
 COPY ./strato /strato

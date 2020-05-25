@@ -26,7 +26,6 @@ import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.ExtendedECDSA
-import Blockchain.FastECRecover
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -96,7 +95,7 @@ proposerSeal blk pk =
 verifyProposerSeal :: Block -> ExtendedSignature -> Maybe Address
 verifyProposerSeal blk sig =
   let msg = proposalMessage blk
-  in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
+  in pubKey2Address <$> getPubKeyFromSignature sig msg
 
 commitmentMessage :: Keccak256 -> HK.Word256
 commitmentMessage dig = keccak256ToWord256 . hash . (<> B.singleton 2) . keccak256ToByteString $ dig
@@ -109,7 +108,7 @@ commitmentSeal sha pk =
 verifyCommitmentSeal :: Keccak256 -> ExtendedSignature -> Maybe Address
 verifyCommitmentSeal sha sig =
   let msg = commitmentMessage sha
-  in pubKey2Address <$> getPubKeyFromSignature_fast sig msg
+  in pubKey2Address <$> getPubKeyFromSignature sig msg
 
 finalHash :: Block -> Keccak256
 finalHash = hash
@@ -127,7 +126,7 @@ signBenfInfo pk bnf =
 verifyBenfInfo :: (Address, Bool, Int) -> ExtendedSignature -> Maybe Address
 verifyBenfInfo bnf sign =
   let msg = keccak256ToWord256 . hash . BL.toStrict $ encode (bnf)
-  in pubKey2Address <$> getPubKeyFromSignature_fast sign msg
+  in pubKey2Address <$> getPubKeyFromSignature sign msg
 
 signMessage :: HK.PrvKey -> TrustedMessage -> OutEvent
 signMessage pk tm =

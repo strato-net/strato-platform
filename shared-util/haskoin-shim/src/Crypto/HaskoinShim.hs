@@ -41,7 +41,6 @@ import           Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Crypto    as HK
 import qualified Network.Haskoin.Internals as HK
 import           Blockchain.ExtendedECDSA
-import            Blockchain.FastECRecover
 
 -- Interface types
 
@@ -132,7 +131,7 @@ verifySig :: PubKey -> Sig -> Msg -> Bool
 verifySig pub sig word = HK.verifySig (coerce word) (coerce sig) (coerce pub)
 
 recover :: RecSig -> Msg -> Maybe PubKey
-recover rc word = coerce <$> getPubKeyFromSignature_fast (coerce rc) (coerce word)
+recover rc word = coerce <$> getPubKeyFromSignature (coerce rc) (coerce word)
 
 -- Misc
 instance Arbitrary PubKey where

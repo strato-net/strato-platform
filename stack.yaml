@@ -20,8 +20,8 @@ packages:
 - core-strato/blockapps-data/
 - core-strato/blockapps-datadefs/
 - core-strato/blockapps-mpdbs/
-- core-strato/ecrecover/
-- core-strato/fast-ecrecover/
+  #- core-strato/ecrecover/
+  # - core-strato/fast-ecrecover/
 - core-strato/fast-keccak256/
 - core-strato/strato-init/
 - core-strato/ethereum-discovery/
@@ -108,13 +108,14 @@ extra-include-dirs:
 extra-lib-dirs:
 - /usr/local/lib
 
-
 ghc-options:
   "$locals": -Wall -Werror -fwarn-redundant-constraints -XDeriveAnyClass -XDeriveGeneric -XLambdaCase -XDerivingStrategies
   strato-api: -Wall -Werror -fno-warn-orphans
   strato-p2p: -Wall -Werror  -XMonoLocalBinds
   strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing
   blockapps-haskoin: -Wall -Werror -fno-warn-overflowed-literals
+
+
 
 docker:
   enable: true
