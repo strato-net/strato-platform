@@ -88,7 +88,7 @@ commitSingleOffset groupName topic partition offset ofsMetadata = do
 {-# NOINLINE getConsumerGroupCoordinator #-}
 getConsumerGroupCoordinator :: Kafka m => ConsumerGroup -> m Broker
 getConsumerGroupCoordinator group = do
-    let theReq = CGCoordinatorRR $ GroupCoordinatorReq group
+    let theReq = GroupCoordinatorRR $ GroupCoordinatorReq group
     (GroupCoordinatorResp (err, broker)) <- withAnyHandle $ flip makeRequest theReq
     err & \case
         ConsumerCoordinatorNotAvailableCode -> do  -- coordinator not ready, must retry with backoff
