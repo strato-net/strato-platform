@@ -680,7 +680,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
     (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
       getContractDetailsAndMetadataId
         (ContractName contractName)
-        (Unnamed contractAddr)
+        contractAddr
         chainId
     contract' <- case xAbiToContract xabi of
       Left e -> throwIO . AnError $ Text.pack e
@@ -827,9 +827,9 @@ contractResult txHash mtxr cmId name = do
       let cn = ContractName name
       mdetails <- use $ contractDetailsMap . at cn
       details <- case mdetails of
-        Just details' -> return details'{contractdetailsAddress = Just (Unnamed addr')}
+        Just details' -> return details'{contractdetailsAddress = Just addr'}
         Nothing -> do
-          cds <- lift $ getContractDetailsByMetadataId cmId (Unnamed addr') (ChainId <$> chainId)
+          cds <- lift $ getContractDetailsByMetadataId cmId addr' (ChainId <$> chainId)
           contractDetailsMap . at cn <?= cds
       return $ BlocTransactionResult Success txHash mtxr (Just $ Upload details)
 
