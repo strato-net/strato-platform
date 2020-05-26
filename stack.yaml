@@ -96,7 +96,7 @@ extra-deps:
 - git: https://github.com/ababkin/semver-range
   commit: fc56a310eaac1d2dbbd7a7ef2ee94cf05f4464f5
 - git: https://github.com/blockapps/milena
-  commit: 2efa48d2a10456a46da24090ffb6e92e28eabf04
+  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
 
 resolver: lts-12.26 #also duplicated in docker section below
 compiler-check: newer-minor
