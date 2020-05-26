@@ -15,11 +15,9 @@ import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Except        (ExceptT (..), runExceptT)
 import           Control.Monad.Trans.State
 import qualified Data.Text                   as T
-import           Network.Kafka               -- hiding (fetchOffset, commitOffset)
---import qualified Network.Kafka               as MILENA
+import           Network.Kafka
 import           Network.Kafka.Protocol
 import           Prelude
-
 
 _kMetadata::Metadata->KafkaString
 _kMetadata (Metadata x) = x
@@ -38,31 +36,14 @@ fetchSingleOffset groupName topic partition = do
     (OffsetsLoadInProgressCode, _)           -> retry
     (err', _)                                -> return $ Left err'
 
-{-
-fetchSingleOffset groupName topic partition = do
-    let req   = OffsetFetchReq (groupName, [(topic, [partition])])
-        retry = fetchSingleOffset groupName topic partition
-    (OffsetFetchResp [(_, [(_, ofs, md, err)])]) <- fetchOffsets req
-    case (err, ofs) of
-        (NoError, -1)                            -> return $ Left UnknownTopicOrPartition -- todo: stop simulating ZK behavior!
-        (NoError, _)                             -> return $ Right (ofs, md)
-        (NotCoordinatorForConsumerCode, _)       -> retry
-        (ConsumerCoordinatorNotAvailableCode, _) -> retry
-        (OffsetsLoadInProgressCode, _)           -> retry
-        (err', _)                                -> return $ Left err'
--}
-
 commitSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> Offset -> Metadata -> m (Either KafkaError ())
 commitSingleOffset groupName topic partition offset ofsMetadata = do
-  (OffsetCommitResp [(_, [(_, err)])]) <- commitOffset $ OffsetCommitReq (groupName, -1, "", -1, [(topic, [(partition, offset, ofsMetadata)])]) -- todo: handle the empty response (though that probably indicates protocol error)
+  (OffsetCommitResp [(_, [(_, err)])]) <-
+    commitOffset $  -- todo: handle the empty response (though that probably indicates protocol error)
+      OffsetCommitReq (groupName, -1, "", -1, [(topic, [(partition, offset, ofsMetadata)])])
   return $ if err /= NoError then Left err else Right ()
 
-{-
-commitSingleOffset groupName topic partition offset ofsMetadata = do
-    let req = OffsetCommitReq (groupName, -1, "", -1, [(topic, [(partition, offset, ofsMetadata)])])
-    (OffsetCommitResp [(_, [(_, err)])]) <- commitOffsets req -- todo: handle the empty response (though that probably indicates protocol error)
-    return $ if err /= NoError then Left err else Right ()
--}
+
 
 withKafkaRetry :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry t k = do
