@@ -54,7 +54,7 @@ describe("rest_7", function () {
           config,
           isAsync: true
         });
-      }, RestStatus.BAD_REQUEST, /Need one of: address , balance , minbalance , maxbalance , nonce , minnonce , maxnonce , maxnumber , code , index , codeHash , chainid/);
+      }, RestStatus.BAD_REQUEST, /Need one of: address, balance, minbalance, maxbalance, nonce, minnonce, maxnonce, maxnumber, code, index, codeHash, chainid/);
     });
 
   });
