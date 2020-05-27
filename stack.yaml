@@ -100,7 +100,7 @@ flags:
   secp256k1-haskell:
     recovery: true
 
-resolver: lts-12.4 #also duplicated in docker section below
+resolver: lts-12.26 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -119,6 +119,6 @@ ghc-options:
 
 docker:
   enable: true
-  image: "strato-buildbase:lts-12.4"
+  image: "strato-buildbase:lts-12.26"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]

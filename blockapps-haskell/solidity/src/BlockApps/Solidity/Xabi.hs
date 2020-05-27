@@ -6,9 +6,8 @@
 
 module BlockApps.Solidity.Xabi where
 
-import           Control.Applicative
 import           Control.DeepSeq
-import           Control.Lens                 (mapped, (&), (?~), (.~))
+import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (camelCase, dropFPrefix)
@@ -17,13 +16,11 @@ import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (listToMaybe, maybeToList)
-import           Data.Proxy
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Generic.Random               as GR
 import           GHC.Generics
-import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
@@ -327,7 +324,7 @@ instance ToSchema Using where
 
 data ContractDetails = ContractDetails
   { contractdetailsBin        :: Text
-  , contractdetailsAddress    :: Maybe (MaybeNamed Address)
+  , contractdetailsAddress    :: Maybe Address
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: CodePtr
   , contractdetailsName       :: Text
@@ -374,7 +371,7 @@ instance ToSchema ContractDetails where
       ex :: ContractDetails
       ex = ContractDetails
         { contractdetailsBin = "ContractBin"
-        , contractdetailsAddress = Just (Unnamed (Address 0xdeadbeef))
+        , contractdetailsAddress = Just (Address 0xdeadbeef)
         , contractdetailsBinRuntime = "ContractRuntime"
         , contractdetailsCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
         , contractdetailsName = "DetailsName"
@@ -384,46 +381,6 @@ instance ToSchema ContractDetails where
         }
 
 --------------------------------------------------------------------------------
-
-data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic,NFData)
-
-instance ToJSON a => ToJSON (MaybeNamed a) where
-  toJSON (Named _name) = toJSON _name
-  toJSON (Unnamed a)   = toJSON a
-
-instance FromJSON a => FromJSON (MaybeNamed a) where
-  parseJSON x = Unnamed <$> parseJSON x <|> Named <$> parseJSON x
-
-instance Arbitrary a => Arbitrary (MaybeNamed a) where
-  arbitrary = oneof
-    [ elements [Named "name1", Named "name2", Named "name3"]
-    , Unnamed <$> arbitrary
-    ]
-
-instance ToHttpApiData (MaybeNamed Address) where
-  toUrlPiece (Named _name)  = _name
-  toUrlPiece (Unnamed addr) = Text.pack . formatAddressWithoutColor $ addr
-
-instance FromHttpApiData (MaybeNamed Address) where
-  parseUrlPiece txt = case stringAddress (Text.unpack txt) of
-    Nothing   -> Right $ Named txt
-    Just addr -> Right $ Unnamed addr
-
-instance ToSample (MaybeNamed Address) where
-  toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
-
-instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
-  toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
-
-instance ToParamSchema (MaybeNamed Address) where
-  toParamSchema _ = toParamSchema (Proxy :: Proxy Address)
-
-instance ToSchema (MaybeNamed Address) where
-  declareNamedSchema _ = return $ NamedSchema (Just "Contract Name, \"Latest\", Or Address")
-      ( mempty
-        & type_ .~ SwaggerString
-        & example ?~ toJSON (Unnamed (Address 0xdeadbeef))
-        & description ?~ "Contract Name, \"Latest\", Or Address" )
 
 soliditySchemaOptions :: SchemaOptions
 soliditySchemaOptions = SchemaOptions

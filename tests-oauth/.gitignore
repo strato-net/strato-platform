@@ -7,3 +7,6 @@ yarn.lock
 
 # dotenv environment variables file
 .env
+
+result.json
+result.txt

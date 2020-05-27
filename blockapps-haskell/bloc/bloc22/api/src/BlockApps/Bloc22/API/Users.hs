@@ -113,7 +113,7 @@ instance ToSample BlocTransactionData where
       }
     , Upload ContractDetails {
         contractdetailsBin        = "Contract Bin"
-      , contractdetailsAddress    = Just (Named "Latest")
+      , contractdetailsAddress    = Just (Address 0xdeadbeef)
       , contractdetailsBinRuntime = "Contract Bin Runtime"
       , contractdetailsCodeHash   = EVMCode $ hash "Contract Code Hash"
       , contractdetailsName       = "Example"

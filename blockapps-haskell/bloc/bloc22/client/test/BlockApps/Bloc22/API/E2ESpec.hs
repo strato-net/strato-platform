@@ -123,13 +123,13 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleStorageContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -187,7 +187,7 @@ spec =
       contractStateEither' <- runClientM
         (getContractsState
           (ContractName simpleStorageContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -247,13 +247,13 @@ spec =
                         (ClientEnv mgr blocUrl Nothing)
                       )
             let Just (Upload contractDetails) = blocTransactionData result
-                Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+                Just (contractAddr) = contractdetailsAddress contractDetails
             return contractAddr
       let contractState ctName addr = fromEither =<<
                                       runClientM
                                       ( getContractsState
                                         (ContractName ctName)
-                                        (Unnamed addr)
+                                        (addr)
                                         Nothing
                                         Nothing
                                         Nothing
@@ -329,14 +329,14 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleStorageAddressContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -391,7 +391,7 @@ spec =
       -- get state and verify
 
       contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing Nothing False)
+        (getContractsState contractName (contractAddr) Nothing Nothing Nothing Nothing False)
         (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
 
@@ -447,14 +447,14 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleStorageBytes32ArrayContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -516,7 +516,7 @@ spec =
       -- get state and verify
 
       contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing Nothing False)
+        (getContractsState contractName (contractAddr) Nothing Nothing Nothing Nothing False)
         (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
 
@@ -584,8 +584,7 @@ spec =
       postUsersContractEither `shouldSatisfy` isRight
 
 
-
-    it "should disambiguate contracts with the same name using latest and address" $ \ testConfig@TestConfig {..} -> do
+    it "should disambiguate contracts with the same name using address" $ \ testConfig@TestConfig {..} -> do
       pendingWith "Not yet supported for metadata compile"
       sameName1Src <- readSolFile "SameName1.sol"
       sameName2Src <- readSolFile "SameName2.sol"
@@ -620,12 +619,8 @@ spec =
       Right sameName2Symbols <- runClientM
         (getContractsSymbols "SameName" (fromJust $ contractdetailsAddress sameName2Details) Nothing)
         (ClientEnv mgr blocUrl Nothing)
-      Right sameNameLatestSymbols <- runClientM
-        (getContractsSymbols "SameName" (Named "Latest") Nothing)
-        (ClientEnv mgr blocUrl Nothing)
       sameName1Symbols `shouldBe` [SymbolName "myString"]
       sameName2Symbols `shouldBe` [SymbolName "myInt"]
-      sameNameLatestSymbols `shouldBe` [SymbolName "myInt"]
 
     it "should create SimpleConstructor contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
       pendingWith "Not yet supported for metadata compile"
@@ -664,14 +659,14 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleConstructorName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -925,14 +920,14 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleTupleContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -993,7 +988,7 @@ spec =
       -- get state and verify
 
       contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing Nothing False)
+        (getContractsState contractName (contractAddr) Nothing Nothing Nothing Nothing False)
         (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
 
@@ -1047,7 +1042,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
 
       -- -- call contract store value
@@ -1138,7 +1133,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- call get value and verify
 
@@ -1234,7 +1229,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed iamAddr) = contractdetailsAddress contractDetails
+        Just (iamAddr) = contractdetailsAddress contractDetails
         bobName = UserName "bob"
       postBobEither <- runClientM (postUsersUser bobName pw) (ClientEnv mgr blocUrl Nothing)
       postBobEither `shouldSatisfy` isRight
@@ -1313,7 +1308,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- call get value and verify
 

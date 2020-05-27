@@ -327,7 +327,7 @@ createContractOnMulti src cn args config@TestConfig{..} = do
   result `shouldSatisfy` isJust . blocTransactionTxResult
   result `shouldSatisfy` isJust . blocTransactionData
   let (Upload details) = fromJust $ blocTransactionData result
-      (Unnamed caddr) = fromJust $ contractdetailsAddress details
+      caddr = fromJust $ contractdetailsAddress details
   return caddr
 
 callMethodLocal :: Text
@@ -402,7 +402,7 @@ getStateLocal addr cn TestConfig{..} =
   runClientM
   ( getContractsState
     (ContractName cn)
-    (Unnamed addr)
+    addr
     Nothing
     Nothing
     Nothing
