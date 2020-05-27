@@ -837,8 +837,9 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
         ty <- getValueType apt
         case ty of
           TString -> do
-            let SString s = val
-            return . Constant . SInteger . fromIntegral $ length s
+            let getInnerString (SString s) = s
+                getInnerString _ = error "impossible match in SolidVM.hs"
+            return . Constant . SInteger . fromIntegral $ length $ getInnerString val
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
