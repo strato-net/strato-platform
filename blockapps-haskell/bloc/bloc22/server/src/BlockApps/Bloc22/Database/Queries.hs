@@ -342,39 +342,6 @@ getContractsAddressesQuery chainId = proc () -> do
 
 {- |
 SELECT
-   C.name
- , C2.name as address
- , CI.timestamp
-FROM contracts C
-JOIN contracts_metadata CM
-  ON CM.contract_id = C.id
-JOIN contracts_lookup CL
-  ON CL.contract_metadata_id = CM.id
-JOIN contracts_metadata CM2
-  ON CM2.id = CL.linked_metadata_id
-JOIN contracts C2
-  ON C2.id = CM2.contract_id
-JOIN contracts_instance CI
-  ON CI.contract_metadata_id = CM2.id;
--}
-getContractsNamesAsAddressesQuery :: Maybe ChainId -> Query
-  ( Column PGText
-  , Column PGText
-  , Column PGTimestamptz
-  , Column PGBytea
-  )
-getContractsNamesAsAddressesQuery chainId = proc () -> do
-  (n1,n2,ts,cid) <- limit 100 $ joinF
-    (\ (_,_,_,timestamp,cid) (_,_,_,_,name,name2,_,_,_) -> (name,name2,timestamp,cid))
-    (\ (_,contractmetadataId,_,_,_) (_,_,_,_,_,_,_,cm2Id,_) -> contractmetadataId .== cm2Id)
-    (queryTable contractsInstanceTable)
-    linkedContractsJoinTable
-    -< ()
-  restrict -< cid .== constant chainId
-  returnA -< (n1,n2,ts,cid)
-
-{- |
-SELECT
   CI.address
 FROM contracts C
 JOIN contracts_metadata CM
@@ -428,13 +395,13 @@ getContractsDataNamesQuery contractName =
       restrict -< name .== constant contractName
       returnA -< constant ("Latest"::Text)
 
-getContractsMetaDataId :: Text -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Int32)
+getContractsMetaDataId :: Text -> Address -> Maybe ChainId -> Bloc (Maybe Int32)
 getContractsMetaDataId name contractId = fmap (fmap fst) . getContractDetailsAndMetadataId (ContractName name) contractId
 
 getContractDetailsByAddressOnly :: Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
 getContractDetailsByAddressOnly contractAddr chainId = do
   mName <- fmap listToMaybe . blocQuery $ contractNameFromAddress contractAddr chainId
-  fmap join . for mName $ \name -> getContractDetails (ContractName name) (Unnamed contractAddr) chainId
+  fmap join . for mName $ \name -> getContractDetails (ContractName name) contractAddr chainId
 
 {- |
 SELECT
@@ -600,7 +567,7 @@ decodeXabiJSON xabi' = case decode (fromStrict xabi') of
   Nothing -> throwIO $ DBError "Corrupted Xabi stored in database"
   Just x -> return x
 
-getContractDetailsByMetadataId :: Int32 -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
+getContractDetailsByMetadataId :: Int32 -> Address -> Maybe ChainId -> Bloc ContractDetails
 getContractDetailsByMetadataId cmId addr chainId = do
   (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src,_ :: Int32,xabi') <-
     blocQuery1 "getContractDetailsByMetadataId" $ contractByMetadataId cmId
@@ -616,11 +583,11 @@ getContractDetailsByMetadataId cmId addr chainId = do
     , contractdetailsChainId = chainId
     }
 
-getContractDetails :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
+getContractDetails :: ContractName -> Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
 getContractDetails name contractId = fmap (fmap snd) . getContractDetailsAndMetadataId name contractId
 
-getContractDetailsAndMetadataId :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe (Int32, ContractDetails))
-getContractDetailsAndMetadataId (ContractName contractName) contractId chainId = do
+getContractDetailsAndMetadataId :: ContractName -> Address -> Maybe ChainId -> Bloc (Maybe (Int32, ContractDetails))
+getContractDetailsAndMetadataId (ContractName contractName) addr chainId = do
     let
       detailsWith detailsAddr cid (bin,binRuntime,codeHash,_ :: ByteString,name,src,cmId,xabi') = do
         xabi <- deserializeXabi xabi'
@@ -634,29 +601,14 @@ getContractDetailsAndMetadataId (ContractName contractName) contractId chainId =
           , contractdetailsXabi = xabi
           , contractdetailsChainId = cid
           })
-    case contractId of
-      Named "Latest" -> do
-        tuple <- blocQueryMaybe $
+    tuple <- fmap listToMaybe . blocQuery $
+      getContractsContractByAddressQuery contractName addr chainId
+    case tuple of
+      Just t -> Just <$> detailsWith (Just addr) chainId t
+      Nothing -> do
+        tuple' <- blocQueryMaybe $
           getContractsContractLatestQuery contractName
-        for tuple $ detailsWith Nothing chainId
-      Unnamed addr -> do
-        tuple <- fmap listToMaybe . blocQuery $
-          getContractsContractByAddressQuery contractName addr chainId
-        case tuple of
-          Just t -> Just <$> detailsWith (Just (Unnamed addr)) chainId t
-          Nothing -> do
-            tuple' <- blocQueryMaybe $
-              getContractsContractLatestQuery contractName
-            for tuple' $ detailsWith (Just (Unnamed addr)) chainId
-      Named name -> if contractName == name
-        then do
-          tuple <- fmap listToMaybe . blocQuery $
-            getContractsContractBySameNameQuery name
-          for tuple $ detailsWith (Just (Named name)) chainId
-        else do
-          tuple <- fmap listToMaybe . blocQuery $
-            getContractsContractByNameQuery contractName name
-          for tuple $ detailsWith (Just (Named name)) chainId
+        for tuple' $ detailsWith (Just addr) chainId
 
 getContractDetailsByCodeHash :: CodePtr -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeHash codeHash = do
@@ -945,7 +897,7 @@ compileContract source = do
       details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
         ContractDetails
         { contractdetailsBin = bin
-        , contractdetailsAddress = Just (Named "Latest")
+        , contractdetailsAddress = Nothing
         , contractdetailsBinRuntime = binRuntime
         , contractdetailsCodeHash =  EVMCode $ binRuntimeToCodeHash binRuntime
         , contractdetailsName = contrName
@@ -972,7 +924,7 @@ createMetadataNoCompile source = do
       details = flip Map.mapWithKey contracts $ \ contrName (xabi) ->
         ContractDetails
         { contractdetailsBin = source
-        , contractdetailsAddress = Just (Named "Latest")
+        , contractdetailsAddress = Nothing
         , contractdetailsBinRuntime = contrName `Text.append` source
         , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ hash (Char8.pack $ Text.unpack source)
         , contractdetailsName = contrName
@@ -995,6 +947,6 @@ getContractXabiByMetadataId cmId = do
   deserializeXabi xabi'
   where ninth (_,_,_,_,_,_,_,_,x) = x
 
-getContractXabi :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Xabi)
+getContractXabi :: ContractName -> Address -> Maybe ChainId -> Bloc (Maybe Xabi)
 getContractXabi contractName contractId =
   fmap (fmap contractdetailsXabi) . getContractDetails contractName contractId

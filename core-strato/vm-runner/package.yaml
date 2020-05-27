@@ -23,7 +23,6 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
@@ -37,6 +36,7 @@ library:
   - format
   - lens
   - merkle-patricia-db
+  - milena
   - monad-alter
   - mtl
   - prometheus-client

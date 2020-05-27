@@ -1,7 +1,6 @@
 module Network.Kafka where
 
 import Control.Applicative
-import Control.DeepSeq
 import Control.Exception (Exception, IOException)
 import Control.Exception.Lifted (catch)
 import Control.Lens
@@ -52,9 +51,6 @@ data KafkaState = KafkaState { -- | Name to use as a client ID.
                              } deriving (Generic, Show)
 
 makeLenses ''KafkaState
-
-instance NFData KafkaState where
-  rnf ks = ks `seq` () -- TODO(tim): Supply a real deepseq
 
 -- | The core Kafka monad.
 type Kafka m = (MonadState KafkaState m, MonadError KafkaClientError m, MonadIO m, MonadBaseControl IO m)
@@ -150,10 +146,11 @@ mkKafkaState cid addy =
                M.empty
                (addy :| [])
 
-addKafkaAddress :: KafkaAddress -> KafkaState -> KafkaState -- todo: lensify this
-addKafkaAddress a s = s {_stateAddresses = consed}
-  where consed = NE.nub (a NE.<| addrs)
-        addrs  = _stateAddresses s
+addKafkaAddress :: KafkaAddress -> KafkaState -> KafkaState
+addKafkaAddress = over stateAddresses . NE.nub .: NE.cons
+   where infixr 9 .:
+         (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+         (.:) = (.).(.)
 
 -- | Run the underlying Kafka monad.
 runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
@@ -186,6 +183,62 @@ metadata request = withAnyHandle $ flip metadata' request
 -- | Send a metadata request.
 metadata' :: Kafka m => Handle -> MetadataRequest -> m MetadataResponse
 metadata' h request = makeRequest h $ MetadataRR request
+
+createTopic :: Kafka m => CreateTopicsRequest -> m CreateTopicsResponse
+createTopic request = withAnyHandle $ flip createTopic' request
+ 
+createTopic' ::
+       Kafka m => Handle -> CreateTopicsRequest -> m CreateTopicsResponse
+createTopic' h request = makeRequest h $ TopicsRR request
+
+createTopicsRequest ::
+       TopicName
+    -> Partition
+    -> ReplicationFactor
+    -> [(Partition, Replicas)]
+    -> [(KafkaString, Metadata)]
+    -> CreateTopicsRequest
+createTopicsRequest topic partition replication_factor replica_assignment config =
+    CreateTopicsReq
+        ([(topic, partition, replication_factor, replica_assignment, config)], defaultRequestTimeout)
+
+deleteTopic :: Kafka m => DeleteTopicsRequest -> m DeleteTopicsResponse
+deleteTopic request = withAnyHandle $ flip deleteTopic' request
+
+deleteTopic' :: Kafka m => Handle -> DeleteTopicsRequest -> m DeleteTopicsResponse
+deleteTopic' h request = makeRequest h $ DeleteTopicsRR request
+
+deleteTopicsRequest :: TopicName -> DeleteTopicsRequest
+deleteTopicsRequest topic = DeleteTopicsReq ([topic], defaultRequestTimeout)
+
+
+fetchOffset :: Kafka m => OffsetFetchRequest -> m OffsetFetchResponse
+fetchOffset request = withAnyHandle $ flip fetchOffset' request
+
+fetchOffset' :: Kafka m => Handle -> OffsetFetchRequest -> m OffsetFetchResponse
+fetchOffset' h request = makeRequest h $ OffsetFetchRR request
+
+fetchOffsetRequest ::
+     ConsumerGroup -> TopicName -> Partition -> OffsetFetchRequest
+fetchOffsetRequest consumerGroup topic partition =
+  OffsetFetchReq
+        (consumerGroup, [(topic, [partition])])
+
+
+commitOffset :: Kafka m => OffsetCommitRequest -> m OffsetCommitResponse
+commitOffset request = withAnyHandle $ flip commitOffset' request
+
+commitOffset' ::
+     Kafka m => Handle -> OffsetCommitRequest -> m OffsetCommitResponse
+commitOffset' h request = makeRequest h $ OffsetCommitRR request
+
+commitOffsetRequest ::
+     ConsumerGroup -> TopicName -> Partition -> Offset -> OffsetCommitRequest
+commitOffsetRequest consumerGroup topic partition offset =
+  let time = -1
+      metadata_ = Metadata "milena"
+   in OffsetCommitReq
+        (consumerGroup, -1, "", time, [(topic, [(partition, offset, metadata_)])])
 
 getTopicPartitionLeader :: Kafka m => TopicName -> Partition -> m Broker
 getTopicPartitionLeader t p = do
