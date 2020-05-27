@@ -837,7 +837,7 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
         ty <- getValueType apt
         case ty of
           TString -> do
-            SString s <- return val
+            let SString s = val
             return . Constant . SInteger . fromIntegral $ length s
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 

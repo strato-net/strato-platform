@@ -119,8 +119,11 @@ setup = do
       _ <- postUsersFill (userName testConfig) addr2 True
       _ <- postContractsCompile [postCompileRequest1]
       unresolvedResults <- postUsersUploadList (userName testConfig) addr1 Nothing True uploadListRequest
-      simpleStorageResult
-        : _ <- sequence $ map resolveBlocTx unresolvedResults
+      val <- sequence $ map resolveBlocTx unresolvedResults
+      simpleStorageResult <-
+        case val of
+          x : _ -> return x
+          _ -> error "result from call to 'sequence $ map resolveBlocTx unresolvedResults' was the incorrect format"
       let
         Just (Upload simpleStorageDetails) = blocTransactionData simpleStorageResult
         Just sscAddr = contractdetailsAddress simpleStorageDetails
