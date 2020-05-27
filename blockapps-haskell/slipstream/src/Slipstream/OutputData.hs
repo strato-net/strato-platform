@@ -24,8 +24,8 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
 import           Database.PostgreSQL.Typed
+import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
-import           Network
 import           Text.RawString.QQ
 import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, SomeException)
@@ -105,8 +105,8 @@ tableUpsert = csv . map go
 
 cirrusInfo :: PGDatabase
 cirrusInfo = PGDatabase
-  { pgDBHost = flags_pghost :: HostName
-  , pgDBPort = PortNumber . fromIntegral $ flags_pgport
+  { pgDBAddr = Left (flags_pghost, show flags_pgport)
+  , pgDBTLS = TlsDisabled
   , pgDBUser = BC.pack flags_pguser :: B.ByteString
   , pgDBPass = BC.pack flags_password :: B.ByteString
   , pgDBName = BC.pack flags_database :: B.ByteString
