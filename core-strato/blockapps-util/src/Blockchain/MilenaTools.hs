@@ -25,23 +25,31 @@ _kMetadata (Metadata x) = x
 fetchSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> m (Either KafkaError (Offset, Metadata))
 fetchSingleOffset groupName topic partition = do
   let retry = fetchSingleOffset groupName topic partition
-  (OffsetFetchResp [(_, [(_, ofs, md, err)])]) <-
-    fetchOffset $ OffsetFetchReq (groupName, [(topic, [partition])])
-    
-  case (err, ofs) of
-    (NoError, -1)                            -> return $ Left UnknownTopicOrPartition -- todo: stop simulating ZK behavior!
-    (NoError, _)                             -> return $ Right (ofs, md)
-    (NotCoordinatorForConsumerCode, _)       -> retry
-    (ConsumerCoordinatorNotAvailableCode, _) -> retry
-    (OffsetsLoadInProgressCode, _)           -> retry
-    (err', _)                                -> return $ Left err'
+
+  ret <- fetchOffset $ OffsetFetchReq (groupName, [(topic, [partition])])
+  case ret of
+    (OffsetFetchResp [(_, [(_, ofs, md, err)])]) ->
+      case (err, ofs) of
+        (NoError, -1)                            -> return $ Left UnknownTopicOrPartition -- todo: stop simulating ZK behavior!
+        (NoError, _)                             -> return $ Right (ofs, md)
+        (NotCoordinatorForConsumerCode, _)       -> retry
+        (ConsumerCoordinatorNotAvailableCode, _) -> retry
+        (OffsetsLoadInProgressCode, _)           -> retry
+        (err', _)                                -> return $ Left err'
+        
+    _ -> error "unexpected response from fetchOffset in call to fetchSingleOffset"
+
 
 commitSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> Offset -> Metadata -> m (Either KafkaError ())
 commitSingleOffset groupName topic partition offset ofsMetadata = do
-  (OffsetCommitResp [(_, [(_, err)])]) <-
-    commitOffset $  -- todo: handle the empty response (though that probably indicates protocol error)
-      OffsetCommitReq (groupName, -1, "", -1, [(topic, [(partition, offset, ofsMetadata)])])
-  return $ if err /= NoError then Left err else Right ()
+  ret <- commitOffset $
+    OffsetCommitReq (groupName, -1, "", -1, [(topic, [(partition, offset, ofsMetadata)])])
+    
+  case ret of 
+    (OffsetCommitResp [(_, [(_, err)])]) -> do
+      return $ if err /= NoError then Left err else Right ()
+      
+    _ -> error "unexpected response from commitOffset in call to commitSingleOffset"
 
 
 
