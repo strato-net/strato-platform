@@ -34,6 +34,7 @@ import Network.Kafka.Protocol (ProduceResponse(..),
                                KafkaString(..),
                                Metadata(..),
                                TopicName(..),
+                               HeartbeatResponse(..),
                               )
 
 
@@ -177,6 +178,12 @@ specs = do
         deleteTopic (deleteTopicsRequest newTopicName)
       result `shouldBe` (Right $ DeleteTopicsResp [(newTopicName, NoError)])
 
+  describe "heartbeat" $
+    it "heart response" $ do
+      result <- run $ do
+        stateAddresses %= NE.cons ("localhost", 9092)
+        heartbeat (heartbeatRequest "non-existent-group-id" 143 "fake-member-id")
+      result `shouldBe` (Right $ HeartbeatResp UnknownMemberId)
 
   let commitOffsetTopicName = "commit-offset"
       t = commitOffsetTopicName
