@@ -621,7 +621,9 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               helper oldShaChain newShaChain seen = do
                 let oldSha = head oldShaChain
                     newSha = head newShaChain
-                ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
+                newParent <- (\x -> fromMaybe x <$> getParent x) newSha
+                oldParent <- (\x -> fromMaybe x <$> getParent x) oldSha
+                let ps = [newParent, oldParent]
                 let seen' = foldl' (flip S.insert) seen (filter (/= (unsafeCreateKeccak256FromWord256 0)) ps) -- todo double S.insert is probably more optimal
                 if newParent `S.member` seen
                 then complete newParent (mkParentChain newParent newShaChain)
