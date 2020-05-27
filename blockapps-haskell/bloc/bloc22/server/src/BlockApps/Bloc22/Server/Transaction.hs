@@ -29,7 +29,6 @@ import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Logging
 import           BlockApps.Solidity.Contract()
-import           BlockApps.SolidityVarReader       (byteStringToWord256) -- TODO: Find a better module for this function
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
@@ -198,8 +197,8 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
 
 callSignature :: Text -> UnsignedTransaction -> Bloc Transaction
 callSignature userName unsigned@UnsignedTransaction{..} = do
-  let msgHash = byteStringToWord256 $ rlpHash unsigned
-  SignatureDetails{..} <- blocVaultWrapper $ postSignature userName (UserData $ Hex msgHash)
+  let msgHash = rlpHash unsigned
+  SignatureDetails{..} <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
   return $ Transaction
     unsignedTransactionNonce
     unsignedTransactionGasPrice

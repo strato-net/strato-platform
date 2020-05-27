@@ -27,7 +27,7 @@ getUsers = client (Proxy @ GetUsers)
 postKey :: Text -> ClientM AddressAndKey
 postKey = client (Proxy @ PostKey)
 
-postSignature :: Text -> UserData -> ClientM SignatureDetails
+postSignature :: Text -> MsgHash -> ClientM SignatureDetails
 postSignature = client (Proxy @ PostSignature)
 
 postPassword :: Text -> ClientM ()

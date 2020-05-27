@@ -13,15 +13,18 @@ import           Crypto.Random.Entropy
 import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
-import           Crypto.HaskoinShim
 import           Data.ByteString                   (ByteString)
+import qualified Data.ByteString                   as B
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
 import           Text.Printf
 
-import           BlockApps.Ethereum                hiding (deriveAddress)
 import           Blockchain.Strato.Model.Address
+import qualified Blockchain.Strato.Model.Keccak256 as SHA
+import           Crypto.Secp256k1
+
+
 
 newtype Password = Password ByteString
   deriving (Eq,Show)
@@ -97,8 +100,12 @@ reencryptKey oldPass newPass salt nonce oldKey givenAddress=
                                              (show givenAddress)
                           else Right $ encrypt newPass salt nonce (getSecKey plainKey)
 
+
+
+-- first byte of serialized pubkey is metdata, so we drop it
 deriveAddress :: SecKey -> Address
-deriveAddress (SecKey val) = prvKey2Address val
+deriveAddress = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPubKey False . derivePubKey 
+
 
 newSaltAndNonce :: MonadIO m => m (ByteString, SecretBox.Nonce)
 newSaltAndNonce = liftIO $ do
@@ -124,3 +131,9 @@ newKeyStore pw = liftIO $ do
     , keystoreAcctAddress = acctAddr
     , keystoreAcctPubKey = acctPubKey
     }
+
+newSecKey :: IO SecKey
+newSecKey = fromMaybe err . secKey <$> getEntropy 32
+  where
+    err = error "could not generate secret key"
+

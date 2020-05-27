@@ -8,14 +8,14 @@ import qualified Data.ByteString.Char8              as C8
 import Data.Coerce
 import Data.Maybe
 import Data.Either.Extra
-import qualified Data.Text as T
+--import qualified Data.Text as T
 import System.Entropy
 import System.Environment
 
-import Servant.Client
-import Network.HTTP.Client (newManager, defaultManagerSettings)
+--import Servant.Client
+--import Network.HTTP.Client (newManager, defaultManagerSettings)
 
-import Strato.Strato23.Client
+--import Strato.Strato23.Client
 
 import Blockchain.EthConf
 import Blockchain.Init.Options
@@ -126,12 +126,14 @@ genEthConf = do
 
   bytes <- getEntropy 20
   
-  mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
-  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
-  (AddressAndKey _ pub) <- runClientM (postPassword $ T.pack "sTrAtOSeCrEtPaSsWoRd") clientEnv >> runClientM (postKey $ T.pack "_nodekey") clientEnv 
+--  mgr <- newManager defaultManagerSettings
+--  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
+--  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+--  pub <- do 
+--    _ <- runClientM (postPassword $ T.pack "sTrAtOSeCrEtPaSsWoRd") clientEnv 
+--    runClientM (postKey $ T.pack "_nodekey") clientEnv 
   
-  putStrLn $ "generated node public key: " ++ (show pub)
+--  putStrLn $ "generated node public key: " ++ (show pub)
 
   -- TODO: what to do with the pubkey, privkey in ethconf file?
   --       and what about existing nodekeys? errors?

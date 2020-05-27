@@ -4,13 +4,13 @@
 
 module Strato.Strato23.Server.Key where
 
-import           Crypto.HaskoinShim               (derivePubKey)
 import           Data.Maybe                       (fromMaybe, isJust)
 import           Data.Text                        (Text)
 import           Strato.Strato23.API
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Monad
 import           Strato.Strato23.Database.Queries
+
 
 getKey :: Text -> Maybe Text -> VaultM AddressAndKey
 getKey headerUserName queryParamUserName = withPassword $ \pw -> do
@@ -21,7 +21,7 @@ getKey headerUserName queryParamUserName = withPassword $ \pw -> do
     then return $ AddressAndKey addr pub -- not specified, to guarantee correctness
     else case decryptSecKey pw salt nonce encKey of
       Nothing -> vaultWrapperError IncorrectPasswordError
-      Just pKey -> return $ AddressAndKey (deriveAddress pKey) $ derivePubKey pKey
+      Just pKey -> return $ AddressAndKey (deriveAddress pKey) pub
 
 postKey :: Text -> VaultM AddressAndKey
 postKey userName = withPassword $ \pw -> do

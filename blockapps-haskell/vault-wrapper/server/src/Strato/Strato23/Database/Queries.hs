@@ -12,16 +12,17 @@ module Strato.Strato23.Database.Queries where
 
 import           Control.Arrow
 import           Control.Monad                   (void)
-import           Crypto.HaskoinShim              (PubKey(..), importPubKey, exportPubKey)
+import           Crypto.Secp256k1               
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as C8
+import qualified Data.ByteString.Base16          as B16
 import           Data.Int                        (Int32)
 import           Data.Maybe                      (fromMaybe, listToMaybe)
 import           Data.Profunctor
 import           Data.Profunctor.Product.Default
-import           Data.Text                       (Text)
+import qualified Data.Text                       as T
 import           Database.PostgreSQL.Simple      (Connection)
 import           Opaleye                         hiding (not, null, index)
 
@@ -31,13 +32,13 @@ import           Strato.Strato23.Database.Tables
 import           Blockchain.Strato.Model.Address
 
 
-countUsers :: Text -> Query (Column PGInt8)
+countUsers :: T.Text -> Query (Column PGInt8)
 countUsers username = aggregate countStar $ proc () -> do
   (_, name, _, _, _, _, _, _) <- queryTable usersTable -< ()
   restrict -< name .== constant username
 
 
-getUserKeyQuery :: Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
+getUserKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserKeyQuery username = proc () -> do
   (_, name, salt, nonce, _, encSecPrvKey, address, pub) <- queryTable usersTable -< ()
   restrict -< name .== constant username
@@ -56,7 +57,7 @@ getUserAddresses mOffset mLimit = maybe id limit mLimit
   (_, name, _, _, _, _, addr, _) <- selectTable usersTable -< ()
   returnA -< (name, addr)
 
-postUserKeyQuery :: Text -> KeyStore -> Connection -> IO Bool
+postUserKeyQuery :: T.Text -> KeyStore -> Connection -> IO Bool
 postUserKeyQuery userName KeyStore{..} conn = do
   (userIds :: [Int32]) <- runQuery conn $ proc () -> do
     (userId,name,_,_,_,_,_, _) <- queryTable usersTable -< ()
@@ -89,8 +90,8 @@ postMessageQuery :: ByteString
                  -> Connection
                  -> IO Bool
 postMessageQuery salt nonce message conn = do
-  (msg :: [(ByteString, SecretBox.Nonce, ByteString)]) <- runQuery conn getMessageQuery
-  case msg of
+  (mesg :: [(ByteString, SecretBox.Nonce, ByteString)]) <- runQuery conn getMessageQuery
+  case mesg of
     (_:_) -> return False
     [] -> True <$ runInsertMany conn messageTable [
                     ( Nothing
@@ -115,7 +116,7 @@ instance Default Constant SecretBox.Nonce (Column PGBytea) where
 
 instance QueryRunnerColumnDefault PGBytea PubKey where
   queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode public key") . importPubKey)
+    (fromMaybe (error "could not decode public key") . importPubKey . fst . B16.decode)
     queryRunnerColumnDefault
 instance Default Constant PubKey (Column PGBytea) where
-  def = lmap (exportPubKey False) def
+  def = lmap (B16.encode . exportPubKey False) def
