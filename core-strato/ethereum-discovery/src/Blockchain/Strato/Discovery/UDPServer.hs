@@ -3,6 +3,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# OPTIONS -fno-warn-deprecations #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.Discovery.UDPServer
      ( runEthUDPServer
