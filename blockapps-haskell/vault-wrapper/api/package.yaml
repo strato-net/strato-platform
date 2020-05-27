@@ -27,6 +27,7 @@ library:
   dependencies:
   - aeson
   - aeson-casing
+  - base16-bytestring
   - blockapps-ethereum
   - bytestring
   - cryptonite
