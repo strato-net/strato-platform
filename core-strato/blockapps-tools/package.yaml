@@ -11,7 +11,7 @@ description:
               Tool to query the ethereum databases
 
 dependencies:
-  - base >= 4 && < 5
+  - base
 
 
 library:
@@ -83,7 +83,7 @@ executables:
     source-dirs: exec_src/
     main: B16Decode.hs
     dependencies:
-      - base >= 4 && < 5
+      - base
       - base16-bytestring
       - bytestring
     other-modules: []
@@ -92,7 +92,7 @@ executables:
     source-dirs: exec_src/
     main: ModifyDate.hs
     dependencies:
-      - base >=4 && <5
+      - base
       - hflags
       - time
     other-modules: []

@@ -9,7 +9,7 @@ build-type:          Simple
 
 
 dependencies:
-  - base >=4.8 && <4.12
+  - base
 
 ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 

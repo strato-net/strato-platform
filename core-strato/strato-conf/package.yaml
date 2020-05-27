@@ -10,7 +10,7 @@ github:              blockapps/strato-platform/core-strato/strato-conf
 library:
   source-dirs:      src
   dependencies:
-    - base >= 4.7 && < 5
+    - base
     - bytestring
     - directory
     - filepath

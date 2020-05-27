@@ -20,7 +20,7 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/client#readme>
 
 dependencies:
-- base >= 4.7 && < 5
+- base
 - servant-client
 - text
 - blockapps-vault-wrapper-api
