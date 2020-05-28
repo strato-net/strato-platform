@@ -1,3 +1,6 @@
+
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Network.Kafka where
 
 import Prelude

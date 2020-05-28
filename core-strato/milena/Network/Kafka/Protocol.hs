@@ -1,5 +1,7 @@
 {-# LANGUAGE NoDeriveAnyClass #-}
 
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Network.Kafka.Protocol
   ( module Network.Kafka.Protocol
   ) where
