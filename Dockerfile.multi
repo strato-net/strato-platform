@@ -16,8 +16,6 @@ RUN apt-get -y update && apt-get install -y \
       netbase \
       netcat-openbsd \
       postgresql-client \
-      git \
-      make \
       libsecp256k1-dev \ 
   && apt-get autoremove \
   && rm -rf /var/lib/apt/lists/* \

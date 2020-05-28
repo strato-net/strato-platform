@@ -103,6 +103,8 @@ reencryptKey oldPass newPass salt nonce oldKey givenAddress=
 
 
 -- first byte of serialized pubkey is metdata, so we drop it
+-- TODO: add a test against sample pubkey/address values to ensure this, maybe once
+-- this code is moved to strato-model/Address.hs
 deriveAddress :: SecKey -> Address
 deriveAddress = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPubKey False . derivePubKey 
 

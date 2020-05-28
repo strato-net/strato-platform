@@ -50,7 +50,7 @@ secp256k1_haskell_spec =
   describe "Vault Wrapper Utils Spec" $ do
     it "create secp256k1 private keys" $ do
       let oldEnc = B16.encode $ HKI.encodePrvKey $ coerce oldPriv
-      show oldEnc `shouldBe` show newPriv
+      show oldEnc `shouldBe` show newPriv -- the newPriv show instance does base 16 encoding
     it "create secp256k1 public keys" $ do
       let oldPubBS = HK.exportPubKey False $ HK.derivePubKey oldPriv
           newPubBS = SEC.exportPubKey False $ SEC.derivePubKey newPriv
