@@ -53,6 +53,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 
 import           Blockchain.ExtendedECDSA
+import           Blockchain.FastECRecover
 import           Network.Haskoin.Internals      hiding (Address, txHash, txSignature)
 
 import           Control.DeepSeq

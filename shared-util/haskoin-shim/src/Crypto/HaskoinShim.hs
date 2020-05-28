@@ -41,7 +41,10 @@ import           Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Crypto    as HK
 import qualified Network.Haskoin.Internals as HK
 
+import           Blockchain.ExtendedECDSA
 import           Blockchain.FastECRecover
+
+
 -- Interface types
 
 data CompactSig = CompactSig

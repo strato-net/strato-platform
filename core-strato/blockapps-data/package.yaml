@@ -40,6 +40,7 @@ library:
   - esqueleto
   - ethereum-encryption
   - ethereum-rlp
+  - fast-ecrecover
   - filepath
   - format
   - http-api-data
