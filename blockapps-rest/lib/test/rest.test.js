@@ -206,15 +206,14 @@ describe("rest_7", function () {
         await rest.compileContracts(admin, contracts, { config });
       }, RestStatus.BAD_REQUEST);
     });
-    
+
     it("create contract list - async - VM: EVM", async () => {
-      const count = 1;
       const count = 5;
       const contracts = factory.createContractListArgs(count);
       // compile contracts
       await rest.compileContracts(admin, contracts, { config });
       const pendingResults = await rest.createContractList(admin, contracts, {
-        config,
+        config: { ...options.config, VM: "EVM" },
         isAsync: true
       });
       const verifyHashes = pendingResults.reduce(
@@ -231,12 +230,12 @@ describe("rest_7", function () {
     });
 
     it("create contracts list - sync - VM: EVM", async () => {
-      const count = 1;
+      const count = 5;
       const contracts = factory.createContractListArgs(count);
       // compile contracts
       await rest.compileContracts(admin, contracts, { config });
       const results = await rest.createContractList(admin, contracts, {
-        config
+        config: { ...options.config, VM: "EVM" },
       });
       const verifyContracts = results.reduce(
         (a, r, i) =>
