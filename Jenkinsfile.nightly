@@ -212,7 +212,7 @@ pipeline {
               }
           },
 
-          'BA-Rest Tests:' {
+          'BA-Rest Tests': {
             sh '''#!/bin/bash -le
               set -x
               echo "Running ba-rest E2E tests"
@@ -362,7 +362,7 @@ pipeline {
             }
           },
 
-          'BA-Rest Tests:' {
+          'BA-Rest Tests': {
             sh '''#!/bin/bash -le
               set -x
               echo "Running ba-rest E2E tests"
