@@ -123,7 +123,7 @@ setup = do
         : _ <- sequence $ map resolveBlocTx unresolvedResults
       let
         Just (Upload simpleStorageDetails) = blocTransactionData simpleStorageResult
-        Just (Unnamed sscAddr) = contractdetailsAddress simpleStorageDetails
+        Just sscAddr = contractdetailsAddress simpleStorageDetails
         config = testConfig
           { userAddress = addr1
           , toUserAddress = addr2

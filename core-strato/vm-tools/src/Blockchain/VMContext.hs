@@ -1,9 +1,11 @@
+{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
@@ -12,10 +14,39 @@
 
 
 module Blockchain.VMContext
-    ( Context(..)
-    , Config(..)
+    ( VMBase
+    , ContextDBs(..)
+    , MemDBs(..)
+    , ContextState(..)
+    , Context(..)
     , ContextBestBlockInfo(..)
     , ContextM
+    , stateDB
+    , hashDB
+    , codeDB
+    , blockSummaryDB
+    , kafkaState
+    , redisPool
+    , sqldb
+    , stateTxMap
+    , stateBlockMap
+    , storageTxMap
+    , storageBlockMap
+    , stateRoot
+    , memDBs
+    , baggerState
+    , bestBlockInfo
+    , hasBlockstanbul
+    , blockRequested
+    , coinbaseQueue
+    , txRunResultsCache
+    , dbs
+    , state
+    , contextGet
+    , contextGets
+    , contextPut
+    , contextModify
+    , contextModify'
     , runTestContextM
     , runContextM
     , evalContextM
@@ -25,29 +56,22 @@ module Blockchain.VMContext
     , purgeStorageMap
     , getContextBestBlockInfo
     , putContextBestBlockInfo
-    , contextBlockRequested
     , queuePendingVote
     , peekPendingVote
     , clearPendingVote
     , compactContextM
     ) where
 
-import           Control.Arrow                      ((&&&))
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
-import           Control.Monad.Catch
 import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
 import           Blockchain.Output
 import           Control.Monad.Reader
-import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
 import           Data.Default                       (def)
-import           Data.Foldable                      (toList)
-import           Data.List.Split                    (chunksOf)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
@@ -56,15 +80,12 @@ import           Data.Word
 import qualified Data.Text                          as T
 import           Data.Traversable                   (for)
 import qualified Database.LevelDB                   as DB
-import qualified Database.Persist.Postgresql        as PSQL
 import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
 import           GHC.Generics
 import qualified Network.Kafka                      as K
 import qualified Network.Kafka.Protocol             as K
-import qualified Blockchain.MilenaTools             as K
 import           System.Directory
-import           System.IO.Temp
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 import           Prometheus
 
@@ -76,10 +97,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
-import           Blockchain.Data.DataDefs           (LogDB, EventDB, TransactionResult)
-import           Blockchain.Data.LogDB
-import           Blockchain.Data.EventDB
-import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
@@ -91,98 +108,158 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
-import qualified Blockchain.Strato.Indexer.Kafka    as IK
-import qualified Blockchain.Strato.Indexer.Model    as IM
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 import qualified Blockchain.TxRunResultCache        as TRC
-import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 
+import           UnliftIO
+
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
-data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (Keccak256, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show, Generic, NFData)
 
-newtype Config = Config { configSQLDB :: SQLDB } deriving (Show)
+data ContextDBs = ContextDBs
+  { _stateDB        :: MP.StateDB
+  , _hashDB         :: HashDB
+  , _codeDB         :: CodeDB
+  , _blockSummaryDB :: BlockSummaryDB
+  , _kafkaState     :: IORef K.KafkaState
+  , _redisPool      :: RBDB.RedisConnection
+  , _sqldb          :: SQLDB
+  } deriving (Generic, NFData)
+makeLenses ''ContextDBs
 
-instance NFData Config where
-  rnf = const ()
+data MemDBs = MemDBs
+  { _stateTxMap      :: M.Map Address AddressStateModification
+  , _stateBlockMap   :: M.Map Address AddressStateModification
+  , _storageTxMap    :: M.Map (Address, B.ByteString) B.ByteString
+  , _storageBlockMap :: M.Map (Address, B.ByteString) B.ByteString
+  , _stateRoot       :: MP.StateRoot
+  } deriving (Generic, NFData, Show)
+makeLenses ''MemDBs
 
-data Context = Context { contextStateDB                :: MP.MPDB
-                       , contextHashDB                 :: HashDB
-                       , contextCodeDB                 :: CodeDB
-                       , contextBlockSummaryDB         :: BlockSummaryDB
-                       , contextAddressStateTxDBMap    :: M.Map Address AddressStateModification
-                       , contextAddressStateBlockDBMap :: M.Map Address AddressStateModification
-                       , contextStorageTxMap           :: M.Map (Address, B.ByteString) B.ByteString
-                       , contextStorageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString
-                       , contextBaggerState            :: !BaggerState
-                       , contextKafkaState             :: K.KafkaState
-                       , contextBestBlockInfo          :: ContextBestBlockInfo
-                       , contextRedisPool              :: RBDB.RedisConnection
-                       , contextTxResultQueue          :: Q.Seq TransactionResult
-                       , contextLogDBQueue             :: [LogDB]
-                       , contextEventDBQueue           :: [EventDB]
-                       , contextHasBlockstanbul        :: Bool
-                       , _contextBlockRequested        :: Bool
-                       , contextCoinbaseQueue          :: Q.Seq ((Address,Word64), Address)
-                       , contextTxRunResultsCache      :: TRC.Cache
-                       } deriving (Generic, NFData)
+data ContextState = ContextState
+  { _memDBs            :: MemDBs
+  , _baggerState       :: !BaggerState
+  , _bestBlockInfo     :: ContextBestBlockInfo
+  , _hasBlockstanbul   :: Bool
+  , _blockRequested    :: Bool
+  , _coinbaseQueue     :: Q.Seq ((Address,Word64), Address)
+  , _txRunResultsCache :: TRC.Cache
+  } deriving (Generic, NFData)
+makeLenses ''ContextState
+
+data Context = Context
+  { _dbs   :: ContextDBs
+  , _state :: IORef ContextState
+  } deriving (Generic, NFData)
 makeLenses ''Context
 
+type ContextM = ReaderT Context (ResourceT (LoggingT IO))
 
-type ContextM = StateT Context (ReaderT Config (ResourceT (LoggingT IO)))
+type VMBase m = ( MonadIO m
+                , MonadUnliftIO m
+                , MonadLogger m
+                , Mod.Modifiable ContextState m
+                , Mod.Accessible ContextState m
+                , Mod.Modifiable MemDBs m
+                , Mod.Accessible MemDBs m
+                , Mod.Modifiable MP.StateRoot m
+                , Mod.Modifiable BlockHashRoot m
+                , Mod.Modifiable GenesisRoot m
+                , Mod.Modifiable BestBlockRoot m
+                , HasMemAddressStateDB m
+                , (MP.StateRoot `A.Alters` MP.NodeData) m
+                , (Address `A.Alters` AddressState) m
+                , (Keccak256 `A.Alters` DBCode) m
+                , (N.NibbleString `A.Alters` N.NibbleString) m
+                , HasMemRawStorageDB m
+                , (RawStorageKey `A.Alters` RawStorageValue) m
+                , (Keccak256 `A.Alters` BlockSummary) m
+                , Mod.Accessible (Maybe WorldBestBlock) m
+                )
+
+getStateDB :: ContextM DB.DB
+getStateDB = fmap MP.unStateDB . view $ dbs . stateDB
+
+getHashDB :: ContextM HashDB
+getHashDB = view $ dbs . hashDB
+
+getCodeDB :: ContextM CodeDB
+getCodeDB = view $ dbs . codeDB
+
+getBlockSummaryDB :: ContextM BlockSummaryDB
+getBlockSummaryDB = view $ dbs . blockSummaryDB
+
+get :: ContextM ContextState
+get = readIORef =<< view state
+{-# INLINE get #-}
+
+gets :: (ContextState -> a) -> ContextM a
+gets f = f <$> get
+{-# INLINE gets #-}
+
+put :: ContextState -> ContextM ()
+put c = view state >>= \i -> atomicWriteIORef i c
+{-# INLINE put #-}
+
+modify :: (ContextState -> ContextState) -> ContextM ()
+modify f = view state >>= \i -> atomicModifyIORef i (\a -> (f a, ()))
+{-# INLINE modify #-}
+
+modify' :: (ContextState -> ContextState) -> ContextM ()
+modify' f = view state >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
+{-# INLINE modify' #-}
+
+contextGet :: ContextM ContextState
+contextGet = get
+{-# INLINE contextGet #-}
+
+contextGets :: (ContextState -> a) -> ContextM a
+contextGets = gets
+{-# INLINE contextGets #-}
+
+contextPut :: ContextState -> ContextM ()
+contextPut = put
+{-# INLINE contextPut #-}
+
+contextModify :: (ContextState -> ContextState) -> ContextM ()
+contextModify = modify
+{-# INLINE contextModify #-}
+
+contextModify' :: (ContextState -> ContextState) -> ContextM ()
+contextModify' = modify'
+{-# INLINE contextModify' #-}
 
 instance Show Context where
   show = const "<context>"
 
-instance HasMemTXResultDB ContextM where
-  enqueueTransactionResults txrs = do
-    ctx <- get
-    let q = contextTxResultQueue ctx
-    recordTxrEnqueue $ length txrs
-    put $ ctx { contextTxResultQueue = q Q.>< Q.fromList txrs }
+instance Mod.Modifiable ContextState ContextM where
+  get _ = get
+  put _ = put
 
-  flushTransactionResults = do
-    ctx <- get
-    let q = contextTxResultQueue ctx
-        toWrite = chunksOf 2000 $ map IM.TxResult $ toList q
-    recordTxrFlush $ Q.length q
-    mapM_ (K.withKafkaRetry1s . IK.writeIndexEvents) toWrite
-    put $ ctx { contextTxResultQueue = Q.empty }
+instance Mod.Accessible Context ContextM where
+  access _ = ask
 
-instance HasMemLogDB ContextM where
-  enqueueLogEntries ls = do
-    ctx <- get
-    let q = contextLogDBQueue ctx
-    put $ ctx { contextLogDBQueue = (q ++ ls) }
-
-  flushLogEntries = do
-    ctx <- get
-    let toWrite = contextLogDBQueue ctx
-    _ <- K.withKafkaRetry1s $ IK.writeIndexEvents (IM.LogDBEntry <$> toWrite)
-    put $ ctx { contextLogDBQueue = [] }
-
-instance HasMemEventDB ContextM where
-  enqueueEventEntries es = do
-    ctx <- get
-    let q = contextEventDBQueue ctx
-    put $ ctx { contextEventDBQueue = (q ++ es) }
-
-  flushEventEntries = do
-    ctx <- get
-    let toWrite = contextEventDBQueue ctx
-    _ <- K.withKafkaRetry1s $ IK.writeIndexEvents (IM.EventDBEntry <$> toWrite)
-    put $ ctx { contextEventDBQueue = [] }
+instance Mod.Accessible ContextState ContextM where
+  access _ = get
 
 instance Mod.Modifiable MP.StateRoot ContextM where
-  get _    = gets (MP.stateRoot . contextStateDB)
-  put _ sr = modify $ \c -> c{contextStateDB = (contextStateDB c){MP.stateRoot = sr}}
+  get _    = gets . view $ memDBs . stateRoot
+  put _ sr = modify $ memDBs . stateRoot .~ sr
+
+instance Mod.Accessible MemDBs ContextM where
+  access _ = gets $ view memDBs
+
+instance Mod.Modifiable MemDBs ContextM where
+  get _    = gets $ view memDBs
+  put _ md = modify $ memDBs .~ md
 
 vmBlockHashRootKey :: B.ByteString
 vmBlockHashRootKey = "block_hash_root"
@@ -195,63 +272,63 @@ vmBestBlockRootKey = "best_block_root"
 
 instance Mod.Modifiable BlockHashRoot ContextM where
   get _ = do
-    db <- gets (MP.ldb . contextStateDB)
+    db <- getStateDB
     BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
   put _ (BlockHashRoot (MP.StateRoot sr)) = do
-    db <- gets (MP.ldb . contextStateDB)
+    db <- getStateDB
     DB.put db def vmBlockHashRootKey sr
 
 instance Mod.Modifiable GenesisRoot ContextM where
   get _ = do
-    db <- gets (MP.ldb . contextStateDB)
+    db <- getStateDB
     GenesisRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmGenesisRootKey
   put _ (GenesisRoot (MP.StateRoot sr)) = do
-    db <- gets (MP.ldb . contextStateDB)
+    db <- getStateDB
     DB.put db def vmGenesisRootKey sr
 
 instance Mod.Modifiable BestBlockRoot ContextM where
   get _ = do
-    db <- gets (MP.ldb . contextStateDB)
+    db <- getStateDB
     BestBlockRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBestBlockRootKey
   put _ (BestBlockRoot (MP.StateRoot sr)) = do
-    db <- gets (MP.ldb . contextStateDB)
+    db <- getStateDB
     DB.put db def vmBestBlockRootKey sr
 
 instance Mod.Modifiable K.KafkaState ContextM where
-  get _    = gets contextKafkaState
-  put _ ks = modify $ \c -> c{contextKafkaState = ks}
+  get _    = readIORef =<< view (dbs . kafkaState)
+  put _ ks = view (dbs . kafkaState) >>= flip writeIORef ks
 
 instance HasMemAddressStateDB ContextM where
-  getAddressStateTxDBMap = gets contextAddressStateTxDBMap
-  putAddressStateTxDBMap theMap = modify $ \c -> c{contextAddressStateTxDBMap=theMap}
-  getAddressStateBlockDBMap = gets contextAddressStateBlockDBMap
-  putAddressStateBlockDBMap theMap = modify $ \c -> c{contextAddressStateBlockDBMap=theMap}
+  getAddressStateTxDBMap = gets $ view $ memDBs . stateTxMap
+  putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
+  getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
+  putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
-  lookup _ = MP.genericLookupDB $ gets (MP.ldb . contextStateDB)
-  insert _ = MP.genericInsertDB $ gets (MP.ldb . contextStateDB)
-  delete _ = MP.genericDeleteDB $ gets (MP.ldb . contextStateDB)
+  lookup _ = MP.genericLookupDB $ getStateDB
+  insert _ = MP.genericInsertDB $ getStateDB
+  delete _ = MP.genericDeleteDB $ getStateDB
 
 instance (Address `A.Alters` AddressState) ContextM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (SHA `A.Alters` DBCode) ContextM where
-  lookup _ = genericLookupCodeDB $ gets contextCodeDB
-  insert _ = genericInsertCodeDB $ gets contextCodeDB
-  delete _ = genericDeleteCodeDB $ gets contextCodeDB
+instance (Keccak256 `A.Alters` DBCode) ContextM where
+  lookup _ = genericLookupCodeDB $ getCodeDB
+  insert _ = genericInsertCodeDB $ getCodeDB
+  delete _ = genericDeleteCodeDB $ getCodeDB
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
-  lookup _ = genericLookupHashDB $ gets contextHashDB
-  insert _ = genericInsertHashDB $ gets contextHashDB
-  delete _ = genericDeleteHashDB $ gets contextHashDB
+  lookup _ = genericLookupHashDB $ getHashDB
+  insert _ = genericInsertHashDB $ getHashDB
+  delete _ = genericDeleteHashDB $ getHashDB
 
 instance HasMemRawStorageDB ContextM where
-  getMemRawStorageTxDB = gets $ MP.ldb . contextStateDB &&& contextStorageTxMap
-  putMemRawStorageTxMap theMap = modify $ \c -> c{contextStorageTxMap=theMap}
-  getMemRawStorageBlockDB = gets $ MP.ldb . contextStateDB &&& contextStorageBlockMap
-  putMemRawStorageBlockMap theMap = modify $ \c -> c{contextStorageBlockMap=theMap}
+  getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
+  putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
+  getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
+  putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 
 instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
   lookup _ = genericLookupRawStorageDB
@@ -259,19 +336,16 @@ instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance (SHA `A.Alters` BlockSummary) ContextM where
-  lookup _ = genericLookupBlockSummaryDB $ gets contextBlockSummaryDB
-  insert _ = genericInsertBlockSummaryDB $ gets contextBlockSummaryDB
-  delete _ = genericDeleteBlockSummaryDB $ gets contextBlockSummaryDB
+instance (Keccak256 `A.Alters` BlockSummary) ContextM where
+  lookup _ = genericLookupBlockSummaryDB $ getBlockSummaryDB
+  insert _ = genericInsertBlockSummaryDB $ getBlockSummaryDB
+  delete _ = genericDeleteBlockSummaryDB $ getBlockSummaryDB
 
-instance MonadReader Config m => Mod.Accessible SQLDB m where
-  access _ = asks configSQLDB
-
-instance HasSQLDB m => WrapsSQLDB (StateT Context) m where
-  runWithSQL = lift
+instance MonadReader Context m => Mod.Accessible SQLDB m where
+  access _ = view $ dbs . sqldb
 
 instance Mod.Accessible RBDB.RedisConnection ContextM where
-  access _ = gets contextRedisPool
+  access _ = view $ dbs . redisPool
 
 instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
   access _ = do
@@ -282,101 +356,135 @@ instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
-runTestContextM :: (MonadIO m, MonadUnliftIO m, MonadMask m,
-                    HasStateDB (StateT Context (ReaderT Config (ResourceT m)))) =>
-                   StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
+runTestContextM :: ( MonadIO m
+                   , MonadUnliftIO m
+                   , HasStateDB (ReaderT Context (ResourceT m))
+                   )
+                => ReaderT Context (ResourceT m) a
+                -> m (a, ContextState)
 runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
   withTempFile tmpdir "evm.sqlite" $ \filepath _ ->
     runResourceT $ do
       conn <- runNoLoggingT $ Lite.createSqlitePool (T.pack filepath) 20
-      flip runReaderT (Config conn) $ do
-        let ldbOptions = DB.defaultOptions {
-          DB.createIfMissing = True,
-          DB.cacheSize = flags_ldbCacheSize,
-          DB.blockSize = flags_ldbBlockSize
-        }
-        let openDB base = DB.open (tmpdir ++ base) ldbOptions
-        sdb <- openDB stateDBPath
-        hdb <- openDB hashDBPath
-        cdb <- openDB codeDBPath
-        blksumdb <- openDB blockSummaryCacheDBPath
-        redisPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
-          Redis.connectHost = "localhost",
-          Redis.connectPort = Redis.PortNumber 2023,
-          Redis.connectDatabase = 0
-        }
-        let initialKafkaState = K.mkKafkaState (K.KString "fake_client")
-                                               (K.Host (K.KString "localhost"), K.Port 1234132)
-        cache <- liftIO $ TRC.new 64
-        flip runStateT (Context
-                     MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "must set stateroot for test context"}
-                     (HashDB hdb)
-                     (CodeDB cdb)
-                     (BlockSummaryDB blksumdb)
-                     M.empty
-                     M.empty
-                     M.empty
-                     M.empty
-                     defaultBaggerState
-                     initialKafkaState
-                     Unspecified
-                     (RBDB.RedisConnection redisPool)
-                     Q.empty 
-                     []
-                     []
-                     False
-                     False
-                     Q.empty
-                     cache) $ do
-          MP.initializeBlank
-          setStateDBStateRoot MP.emptyTriePtr
-          f
+      let ldbOptions = DB.defaultOptions {
+        DB.createIfMissing = True,
+        DB.cacheSize = flags_ldbCacheSize,
+        DB.blockSize = flags_ldbBlockSize
+      }
+      let openDB base = DB.open (tmpdir ++ base) ldbOptions
+      sdb <- openDB stateDBPath
+      hdb <- openDB hashDBPath
+      cdb <- openDB codeDBPath
+      blksumdb <- openDB blockSummaryCacheDBPath
+      rPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
+        Redis.connectHost = "localhost",
+        Redis.connectPort = Redis.PortNumber 2023,
+        Redis.connectDatabase = 0
+      }
+      initialKafkaState <- newIORef $ K.mkKafkaState
+                                        (K.KString "fake_client")
+                                        (K.Host (K.KString "localhost"), K.Port 1234132)
+      cache <- liftIO $ TRC.new 64
 
-runContextM :: (MonadIO m, MonadUnliftIO m) =>
-                StateT Context (ReaderT Config (ResourceT m)) a -> m (a, Context)
+      let cdbs = ContextDBs
+            { _stateDB        = MP.StateDB sdb
+            , _hashDB         = HashDB hdb
+            , _codeDB         = CodeDB cdb
+            , _blockSummaryDB = BlockSummaryDB blksumdb
+            , _kafkaState     = initialKafkaState
+            , _redisPool      = RBDB.RedisConnection rPool
+            , _sqldb          = SQLDB conn
+            }
+
+      let cmemDBs = MemDBs
+            { _stateTxMap      = M.empty
+            , _stateBlockMap   = M.empty
+            , _storageTxMap    = M.empty
+            , _storageBlockMap = M.empty
+            , _stateRoot       = error "must set stateroot for test context"
+            }
+
+      cstate <- newIORef $ ContextState
+            { _memDBs            = cmemDBs
+            , _baggerState       = defaultBaggerState
+            , _bestBlockInfo     = Unspecified
+            , _hasBlockstanbul   = False
+            , _blockRequested    = False
+            , _coinbaseQueue     = Q.empty
+            , _txRunResultsCache = cache
+            }
+
+      let ctx = Context
+            { _dbs   = cdbs
+            , _state = cstate
+            }
+      a <- flip runReaderT ctx $ do
+        MP.initializeBlank
+        setStateDBStateRoot MP.emptyTriePtr
+        f
+      cstate' <- readIORef cstate
+      return (a, cstate')
+
+runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
+                ReaderT Context (ResourceT m) a -> m (a, ContextState)
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
-        conn <- liftIO $ runNoLoggingT  $ PSQL.createPostgresqlPool connStr 20
-        flip runReaderT (Config conn) $ do
-          let ldbOptions = DB.defaultOptions {
-              DB.createIfMissing = True,
-              DB.cacheSize       = flags_ldbCacheSize,
-              DB.blockSize       = flags_ldbBlockSize
-          }
-          sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
-          hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
-          cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-          blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
-          redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-          let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
-          cache <- liftIO $ TRC.new 64
-          runStateT f (Context
-                       MP.MPDB{MP.ldb=sdb, MP.stateRoot=MP.emptyTriePtr}
-                       (HashDB hdb)
-                       (CodeDB cdb)
-                       (BlockSummaryDB blksumdb)
-                       M.empty
-                       M.empty
-                       M.empty
-                       M.empty
-                       defaultBaggerState
-                       initialKafkaState
-                       Unspecified
-                       (RBDB.RedisConnection redisPool)
-                       Q.empty
-                       []
-                       []
-                       flags_blockstanbul
-                       False
-                       Q.empty
-                       cache)
+      conn <- createPostgresqlPool connStr 20
+      let ldbOptions = DB.defaultOptions
+            { DB.createIfMissing = True
+            , DB.cacheSize       = flags_ldbCacheSize
+            , DB.blockSize       = flags_ldbBlockSize
+            }
+      sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
+      hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
+      cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
+      blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
+      rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
+      kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
+      cache <- liftIO $ TRC.new 64
+
+      let cdbs = ContextDBs
+            { _stateDB        = MP.StateDB sdb
+            , _hashDB         = HashDB hdb
+            , _codeDB         = CodeDB cdb
+            , _blockSummaryDB = BlockSummaryDB blksumdb
+            , _kafkaState     = kafkaStateRef
+            , _redisPool      = RBDB.RedisConnection rPool
+            , _sqldb          = conn
+            }
+
+      let cmemDBs = MemDBs
+            { _stateTxMap      = M.empty
+            , _stateBlockMap   = M.empty
+            , _storageTxMap    = M.empty
+            , _storageBlockMap = M.empty
+            , _stateRoot       = MP.emptyTriePtr
+            }
+
+      cstate <- newIORef $ ContextState
+            { _memDBs            = cmemDBs
+            , _baggerState       = defaultBaggerState
+            , _bestBlockInfo     = Unspecified
+            , _hasBlockstanbul   = flags_blockstanbul
+            , _blockRequested    = False
+            , _coinbaseQueue     = Q.empty
+            , _txRunResultsCache = cache
+            }
+
+      let ctx = Context
+            { _dbs   = cdbs
+            , _state = cstate
+            }
+      a <- runReaderT f ctx
+      cstate' <- readIORef cstate
+      return (a, cstate')
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m a
+evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) => ReaderT Context (ResourceT m) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadUnliftIO m) => StateT Context (ReaderT Config (ResourceT m)) a -> m Context
+execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) => ReaderT Context (ResourceT m) a -> m ContextState
 execContextM f = snd <$> runContextM f
 
 incrementNonce :: (Address `A.Alters` AddressState) f => Address -> f ()
@@ -393,33 +501,36 @@ getNewAddress address = do
 
 purgeStorageMap :: HasMemStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  storageMap <- snd <$> getMemRawStorageTxDB
+  storageMap <- getMemRawStorageTxDB
   putMemRawStorageTxMap $ M.filterWithKey (const . (/= address) . fst) storageMap
 
-getContextBestBlockInfo :: ContextM ContextBestBlockInfo
-getContextBestBlockInfo = contextBestBlockInfo <$> get
+getContextBestBlockInfo :: (Functor m, Mod.Accessible ContextState m) => m ContextBestBlockInfo
+getContextBestBlockInfo = _bestBlockInfo <$> Mod.access Mod.Proxy
 
-putContextBestBlockInfo :: ContextBestBlockInfo -> ContextM ()
-putContextBestBlockInfo new = do
-    ctx <- get
-    put ctx { contextBestBlockInfo = new }
+putContextBestBlockInfo :: Mod.Modifiable ContextState m => ContextBestBlockInfo -> m ()
+putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlockInfo new
 
-queuePendingVote :: Address -> Bool -> Address -> ContextM ()
-queuePendingVote a r s= do
+queuePendingVote :: ( MonadLogger m
+                    , Mod.Modifiable ContextState m
+                    )
+                 => Address -> Bool -> Address -> m ()
+queuePendingVote a r s = do
   let nonce = case r of
         True -> maxBound
         False -> 0
-  let newVote = ((a, nonce), s)
+      newVote = ((a, nonce), s)
   $logInfoLS "queuePendingVote" newVote
-  ctx <- get
-  put ctx { contextCoinbaseQueue = newVote Q.<| (contextCoinbaseQueue ctx)}
+  Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ coinbaseQueue %= (newVote Q.<|)
 
 -- (Coinbase, Nonce) to be applied on a constructed block
 -- When no pending votes are available, supplies the default coinbase (0x0)
-peekPendingVote :: ContextM (Address, Word64)
+peekPendingVote :: ( MonadLogger m
+                   , Mod.Accessible ContextState m
+                   )
+                => m (Address, Word64)
 peekPendingVote = do
-  ctx <- get
-  case Q.viewl $ contextCoinbaseQueue ctx of
+  ctx <- Mod.access (Mod.Proxy @ContextState)
+  case Q.viewl $ _coinbaseQueue ctx of
     Q.EmptyL -> return (0,0)
     ( v Q.:< _) -> do
       $logInfoLS "peekPendingVote" v
@@ -427,18 +538,20 @@ peekPendingVote = do
 
 -- If the Block was sent out by us and contains our vote,
 -- mark the vote as committed and remove it from the queue.
-clearPendingVote :: Block -> ContextM ()
-clearPendingVote b = do
+clearPendingVote :: ( MonadLogger m
+                    , Mod.Modifiable ContextState m
+                    )
+                 => Block -> m ()
+clearPendingVote b = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ do
   let bd = blockBlockData b
       currentBlockData = (blockDataCoinbase bd, blockDataNonce bd)
-  $logInfoLS "clearPendingVote" currentBlockData
-  ctx <- get
-  let sender = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
-  let ctxCoinbaseQ = contextCoinbaseQueue ctx
+      sender = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
+  ctxCoinbaseQ <- use coinbaseQueue
   let newCoinbaseQ = case Q.elemIndexL (currentBlockData, sender) ctxCoinbaseQ of
         Just i -> Q.deleteAt i ctxCoinbaseQ
         Nothing -> ctxCoinbaseQ
-  put ctx { contextCoinbaseQueue = newCoinbaseQ}
+  $logInfoLS "clearPendingVote" currentBlockData
+  assign coinbaseQueue newCoinbaseQ
 
 compactContextM :: ContextM ()
 compactContextM = modify' force

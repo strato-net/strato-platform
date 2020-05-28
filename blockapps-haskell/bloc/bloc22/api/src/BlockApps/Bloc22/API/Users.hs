@@ -97,7 +97,7 @@ instance FromJSON BlocTransactionData where
 instance ToSample BlocTransactionData where
   toSamples _ = samples
     [ Send PostTransaction {
-        posttransactionHash       = keccak256 "foo"
+        posttransactionHash       = hash "foo"
       , posttransactionGasLimit   = 100000
       , posttransactionCodeOrData = "Code or Data"
       , posttransactionGasPrice   = 1
@@ -113,9 +113,9 @@ instance ToSample BlocTransactionData where
       }
     , Upload ContractDetails {
         contractdetailsBin        = "Contract Bin"
-      , contractdetailsAddress    = Just (Named "Latest")
+      , contractdetailsAddress    = Just (Address 0xdeadbeef)
       , contractdetailsBinRuntime = "Contract Bin Runtime"
-      , contractdetailsCodeHash   = EVMCode $ keccak256SHA $ keccak256 "Contract Code Hash"
+      , contractdetailsCodeHash   = EVMCode $ hash "Contract Code Hash"
       , contractdetailsName       = "Example"
       , contractdetailsSrc        = "contract Example { }"
       , contractdetailsXabi       = sampleXabi
@@ -152,7 +152,7 @@ instance FromJSON BlocTransactionResult where
 instance ToSample BlocTransactionResult where
   toSamples _ = singleSample BlocTransactionResult
     { blocTransactionStatus = Success
-    , blocTransactionHash = keccak256 "foo"
+    , blocTransactionHash = hash "foo"
     , blocTransactionTxResult = Nothing
     , blocTransactionData = Nothing
     }
@@ -165,7 +165,7 @@ instance ToSchema BlocTransactionResult where
       ex :: BlocTransactionResult
       ex = BlocTransactionResult
         { blocTransactionStatus = Success
-        , blocTransactionHash = keccak256 "foo"
+        , blocTransactionHash = hash "foo"
         , blocTransactionTxResult = Nothing
         , blocTransactionData = Nothing
         }
@@ -780,7 +780,7 @@ instance FromJSON PostUsersContractMethodListResponse where
 
 instance ToSample PostUsersContractMethodListResponse where
   toSamples _ = samples
-    [ MethodHash (keccak256 "foo")
+    [ MethodHash (hash "foo")
     , MethodResolved $ Right
        [ SolidityValueAsString "1"
        , SolidityValueAsString "two"

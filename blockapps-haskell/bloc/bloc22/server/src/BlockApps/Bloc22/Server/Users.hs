@@ -76,7 +76,7 @@ import           BlockApps.XAbiConverter
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
-import           Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
 
@@ -494,7 +494,7 @@ ensureMostRecentSuccessfulTx results = blocMaybe err . listToMaybe $
   where
     hash = transactionresultTransactionHash (head results)
     err = "Transaction with hash "
-      <> Text.pack (keccak256String hash)
+      <> Text.pack (KECCAK256.formatKeccak256WithoutColor hash)
       <> " never ran successfully."
 
 postUsersContractMethodList
@@ -675,7 +675,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
     (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
       getContractDetailsAndMetadataId
         (ContractName contractName)
-        (Unnamed contractAddr)
+        contractAddr
         chainId
     contract' <- case xAbiToContract xabi of
       Left e -> throwIO . AnError $ Text.pack e
@@ -822,9 +822,9 @@ contractResult hash mtxr cmId name = do
       let cn = ContractName name
       mdetails <- use $ contractDetailsMap . at cn
       details <- case mdetails of
-        Just details' -> return details'{contractdetailsAddress = Just (Unnamed addr')}
+        Just details' -> return details'{contractdetailsAddress = Just addr'}
         Nothing -> do
-          cds <- lift $ getContractDetailsByMetadataId cmId (Unnamed addr') chainId
+          cds <- lift $ getContractDetailsByMetadataId cmId addr' chainId
           contractDetailsMap . at cn <?= cds
       return $ BlocTransactionResult Success hash mtxr (Just $ Upload details)
 
@@ -1037,7 +1037,7 @@ preparePostTx from tx = PostTransaction
   , posttransactionMetadata = metadata
   }
   where
-    kecc = keccak256 (rlpSerialize tx)
+    kecc = KECCAK256.hash (rlpSerialize tx)
     r = transactionR tx
     s = transactionS tx
     v = transactionV tx

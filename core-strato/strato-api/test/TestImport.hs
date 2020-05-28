@@ -22,7 +22,7 @@ import qualified Blockchain.DB.SQLDB as SQL
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 
 instance Accessible SQL.SQLDB (YesodExample App) where
-  access _ = appConnPool <$> getTestYesod
+  access _ = SQL.SQLDB . appConnPool <$> getTestYesod
 
 runDB :: SqlPersistM a -> YesodExample App a
 runDB query = do

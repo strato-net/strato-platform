@@ -42,7 +42,7 @@ import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Blockchain.Util                       (partitionWith)
 
@@ -192,16 +192,16 @@ removeChainMember cId address = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
-getChainTxsInBlock :: SHA
-                   -> Redis (M.Map Word256 [SHA])
+getChainTxsInBlock :: Keccak256
+                   -> Redis (M.Map Word256 [Keccak256])
 getChainTxsInBlock bHash = getInNamespace PrivateTxsInBlocks bHash >>= \case
     Left _             -> return M.empty
     Right Nothing      -> return M.empty
     Right (Just rmems) -> let RedisChainTxsInBlocks mems = fromValue rmems
                            in return mems
 
-putChainTxsInBlock :: SHA
-                   -> M.Map Word256 [SHA]
+putChainTxsInBlock :: Keccak256
+                   -> M.Map Word256 [Keccak256]
                    -> Redis (Either Reply Status)
 putChainTxsInBlock bHash chainIdTxHashMap = do
     let rmems    = RedisChainTxsInBlocks chainIdTxHashMap
@@ -212,9 +212,9 @@ putChainTxsInBlock bHash chainIdTxHashMap = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Error" ++ e)
 
-addChainTxsInBlock :: SHA
+addChainTxsInBlock :: Keccak256
                    -> Word256
-                   -> [SHA]
+                   -> [Keccak256]
                    -> Redis (Either Reply Status)
 addChainTxsInBlock bHash cId shas = do
     mems <- getChainTxsInBlock bHash
@@ -291,7 +291,7 @@ bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
 {-# INLINE bestBlockInfoKey #-}
 
-getGenesisHash :: Redis (Maybe SHA)
+getGenesisHash :: Redis (Maybe Keccak256)
 getGenesisHash = getCanonical 0
 
 getInNamespace :: (RedisDBKeyable key)
@@ -307,13 +307,13 @@ getMembersInNamespace :: (RedisDBKeyable key)
 getMembersInNamespace ns = smembers . inNamespace ns
 
 getSHAsByNumber :: Integer
-                -> Redis (Maybe [SHA])
+                -> Redis (Maybe [Keccak256])
 getSHAsByNumber n = getMembersInNamespace Numbers n >>= \case
     Left _   -> return Nothing
     Right hs -> let hashes = fromValue <$> hs in
         return (Just hashes)
 
-getHeader :: SHA
+getHeader :: Keccak256
           -> Redis (Maybe BlockData)
 getHeader sha = getInNamespace Headers sha >>= \case
     Left _             -> return Nothing
@@ -321,21 +321,21 @@ getHeader sha = getInNamespace Headers sha >>= \case
     Right (Just rhead) -> let (RedisHeader h) = fromValue rhead in
         return . Just $ morphBlockHeader h
 
-getHeaders :: [SHA]
-           -> Redis [(SHA, Maybe BlockData)]
+getHeaders :: [Keccak256]
+           -> Redis [(Keccak256, Maybe BlockData)]
 getHeaders = zipMapM getHeader
 
 getHeadersByNumber :: Integer
-                   -> Redis [(SHA, Maybe BlockData)]
+                   -> Redis [(Keccak256, Maybe BlockData)]
 getHeadersByNumber n = getMembersInNamespace Numbers n >>= \case
     Left _       -> return []
     Right hashes -> getHeaders (fromValue <$> hashes)
 
 getHeadersByNumbers :: [Integer]
-                    -> Redis [(Integer, [(SHA, Maybe BlockData)])]
+                    -> Redis [(Integer, [(Keccak256, Maybe BlockData)])]
 getHeadersByNumbers = zipMapM getHeadersByNumber
 
-getTransactions :: SHA
+getTransactions :: Keccak256
                 -> Redis (Maybe [OutputTx])
 getTransactions sha = getInNamespace Transactions sha >>= \case
     Left _            -> return Nothing
@@ -343,7 +343,7 @@ getTransactions sha = getInNamespace Transactions sha >>= \case
     Right (Just rtxs) -> let (RedisTxs txs) = fromValue rtxs in
         return . Just $ morphTx <$> txs
 
-getPrivateTransactions :: SHA
+getPrivateTransactions :: Keccak256
                        -> Redis (Maybe (Word256, OutputTx))
 getPrivateTransactions sha = getInNamespace PrivateTransactions sha >>= \case
     Left _            -> return Nothing
@@ -351,7 +351,7 @@ getPrivateTransactions sha = getInNamespace PrivateTransactions sha >>= \case
     Right (Just rtx) -> let (anchor, RedisTx tx) = fromValue rtx in
         return . Just $ (anchor, morphTx tx)
 
-addPrivateTransactions :: [(SHA, (Word256, OutputTx))]
+addPrivateTransactions :: [(Keccak256, (Word256, OutputTx))]
                        -> Redis (Either Reply Status)
 addPrivateTransactions ptxs = do
   res <- multiExec
@@ -362,7 +362,7 @@ addPrivateTransactions ptxs = do
       TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Aborted")
       TxError e   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Error" ++ e)
 
-getUncles :: SHA
+getUncles :: Keccak256
           -> Redis (Maybe [BlockData])
 getUncles sha = getInNamespace Uncles sha >>= \case
     Left _           -> return Nothing
@@ -370,16 +370,16 @@ getUncles sha = getInNamespace Uncles sha >>= \case
     Right (Just rus) -> let (RedisUncles uncles) = fromValue rus in
         return . Just $ morphBlockHeader <$> uncles
 
-getParent :: SHA
-          -> Redis (Maybe SHA)
+getParent :: Keccak256
+          -> Redis (Maybe Keccak256)
 getParent sha = getInNamespace Parent sha >>= \case
     Left _           -> return Nothing
     Right Nothing    -> return Nothing
     Right (Just rps) -> return . Just $ fromValue rps
 
 getParents :: (Traversable f)
-           => f SHA
-           -> Redis (f (SHA, Maybe SHA))
+           => f Keccak256
+           -> Redis (f (Keccak256, Maybe Keccak256))
 getParents = zipMapM getParent
 
 getChain :: (a -> Redis (Maybe a))
@@ -391,32 +391,32 @@ getChain getNext start limit = (start:) <$> helper start limit
                      | otherwise = getNext h >>= maybe (return []) chainDown
           chainDown next = (next:) <$> helper next (limit - 1)
 
-getParentChain :: SHA
+getParentChain :: Keccak256
                -> Int
-               -> Redis [SHA]
+               -> Redis [Keccak256]
 getParentChain = getChain getParent
 
-getZippedParentChain :: (SHA -> Redis (Maybe t))
-                     -> SHA
+getZippedParentChain :: (Keccak256 -> Redis (Maybe t))
+                     -> Keccak256
                      -> Int
-                     -> Redis [(SHA, t)]
+                     -> Redis [(Keccak256, t)]
 getZippedParentChain mapper start limit = do
     shaChain <- getParentChain start limit
     mapChain <- zipMapM mapper shaChain
     return $ second fromJust <$> takeWhile (isJust . snd) mapChain
 
-getHeaderChain :: SHA
+getHeaderChain :: Keccak256
                -> Int
-               -> Redis [(SHA, BlockData)]
+               -> Redis [(Keccak256, BlockData)]
 getHeaderChain = getZippedParentChain getHeader
 
-getBlockChain :: SHA
+getBlockChain :: Keccak256
               -> Int
-              -> Redis [(SHA, OutputBlock)]
+              -> Redis [(Keccak256, OutputBlock)]
 getBlockChain = getZippedParentChain getBlock
 
 getCanonical :: Integer
-             -> Redis (Maybe SHA)
+             -> Redis (Maybe Keccak256)
 getCanonical n = getInNamespace Canonical n >>= \case
     Left _           -> return Nothing
     Right Nothing    -> return Nothing
@@ -430,15 +430,15 @@ getCanonicalHeader n = getCanonical n >>= \case
 
 getCanonicalChain :: Integer
                   -> Int
-                  -> Redis [SHA]
+                  -> Redis [Keccak256]
 getCanonicalChain start limit = do
     let chain = forM (take (limit) [start..]) getCanonical
     catMaybes <$> chain
 
-getZippedCanonicalChain :: (SHA -> Redis (Maybe t))
+getZippedCanonicalChain :: (Keccak256 -> Redis (Maybe t))
                         -> Integer
                         -> Int
-                        -> Redis [(SHA, t)]
+                        -> Redis [(Keccak256, t)]
 getZippedCanonicalChain mapper start limit = do
     shaChain <- getCanonicalChain start limit
     mapChain <- zipMapM mapper shaChain
@@ -446,16 +446,16 @@ getZippedCanonicalChain mapper start limit = do
 
 getCanonicalHeaderChain :: Integer
                         -> Int
-                        -> Redis [(SHA, BlockData)]
+                        -> Redis [(Keccak256, BlockData)]
 getCanonicalHeaderChain = getZippedCanonicalChain getHeader
 
-getChildren :: SHA
-            -> Redis (Maybe [SHA])
+getChildren :: Keccak256
+            -> Redis (Maybe [Keccak256])
 getChildren sha = getMembersInNamespace Children sha >>= \case
     Left _    -> return Nothing
     Right chs -> return . Just $ fromValue <$> chs
 
-getBlock :: SHA
+getBlock :: Keccak256
          -> Redis (Maybe OutputBlock)
 getBlock sha = do
     mybHeader <- getHeader sha
@@ -474,18 +474,18 @@ getBlock sha = do
                      uncles = fromJust mybUncles
                  in return . Just $ buildBlock header txs uncles
 
-getBlocks :: [SHA]
-          -> Redis [(SHA, Maybe OutputBlock)]
+getBlocks :: [Keccak256]
+          -> Redis [(Keccak256, Maybe OutputBlock)]
 getBlocks = zipMapM getBlock
 
 getBlocksByNumber :: Integer
-                  -> Redis [(SHA, Maybe OutputBlock)]
+                  -> Redis [(Keccak256, Maybe OutputBlock)]
 getBlocksByNumber n = getMembersInNamespace Numbers n >>= \case
     Left _       -> return []
     Right hashes -> getBlocks (fromValue <$> hashes)
 
 getBlocksByNumbers :: [Integer]
-                   -> Redis [(Integer, [(SHA, Maybe OutputBlock)])]
+                   -> Redis [(Integer, [(Keccak256, Maybe OutputBlock)])]
 getBlocksByNumbers = zipMapM getBlocksByNumber
 
 putHeader :: BlockData
@@ -497,7 +497,7 @@ putHeaders :: Traversable t
            -> Redis (t (Either Reply Status))
 putHeaders = mapM putHeader
 
-insertHeader :: SHA
+insertHeader :: Keccak256
              -> BlockData
              -> Redis (Either Reply Status)
 insertHeader sha h = do
@@ -516,16 +516,16 @@ insertHeader sha h = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Error" ++ e)
 
-insertHeaders :: M.Map SHA BlockData
-              -> Redis (M.Map SHA (Either Reply Status))
+insertHeaders :: M.Map Keccak256 BlockData
+              -> Redis (M.Map Keccak256 (Either Reply Status))
 insertHeaders = sequenceA . M.mapWithKey insertHeader
 
-deleteHeader :: SHA
+deleteHeader :: Keccak256
              -> Redis (Either Reply Status)
 deleteHeader _ = pure . Left $ SingleLine (S8.pack $ "deleteHeader - Not Implemented")
 
 deleteHeaders :: Traversable t
-              => t SHA
+              => t Keccak256
               -> Redis (t (Either Reply Status))
 deleteHeaders = mapM deleteHeader
 
@@ -540,7 +540,7 @@ putBlocks :: Traversable t
           -> Redis (t (Either Reply Status))
 putBlocks = mapM putBlock
 
-insertBlock :: SHA
+insertBlock :: Keccak256
             -> OutputBlock
             -> Redis (Either Reply Status)
 insertBlock sha b = do
@@ -573,35 +573,35 @@ insertBlock sha b = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack e)
 
-insertBlocks :: M.Map SHA OutputBlock
-             -> Redis (M.Map SHA (Either Reply Status))
+insertBlocks :: M.Map Keccak256 OutputBlock
+             -> Redis (M.Map Keccak256 (Either Reply Status))
 insertBlocks = sequenceA . M.mapWithKey insertBlock
 
-deleteBlock :: SHA
+deleteBlock :: Keccak256
             -> Redis (Either Reply Status)
 deleteBlock _ = pure . Left $ SingleLine (S8.pack $ "deleteBlock - Not Implemented")
 
 deleteBlocks :: Traversable t
-             => t SHA
+             => t Keccak256
              -> Redis (t (Either Reply Status))
 deleteBlocks = mapM deleteBlock
 
-putBestBlockInfo :: SHA
+putBestBlockInfo :: Keccak256
                  -> Integer
                  -> Integer
                  -> Redis (Either Reply Status)
 putBestBlockInfo newSha newNumber newTDiff = do
-    --liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
+    --liftIO . putStrLn . ("New args" ++) $ show (keccak256ToHex newSha, newNumber, newTDiff)
     oldBBI' <- getBestBlockInfo
     case oldBBI' of
         Nothing      -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
         Just (RedisBestBlock oldSha oldNumber _) -> do
-            --liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
+            --liftIO . putStrLn . ("Old args" ++) $ show (keccak256ToHex oldSha, oldNumber, oldTDiff)
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
                 Left err -> error $ "god save the queen! " ++ show err
                 Right (updates, deletions) -> do
-                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
+                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (keccak256ToHex x, y)) <$> updates)
                     --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                   res <- multiExec $ do
                       forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
@@ -613,8 +613,8 @@ putBestBlockInfo newSha newNumber newTDiff = do
                       TxError e   -> return . Left $ SingleLine (S8.pack e)
 
 commonAncestorHelper :: Integer -> Integer
-                     -> SHA     -> SHA
-                     -> Redis (Either Reply ([(SHA, Integer)], [Integer])) -- ([Updates], [Deletions])
+                     -> Keccak256     -> Keccak256
+                     -> Redis (Either Reply ([(Keccak256, Integer)], [Integer])) -- ([Updates], [Deletions])
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (S.fromList [oldSha', newSha'])
         where helper (oldSha:[]) (newSha:[]) _ | oldSha == newSha = return $ Right ([], [])
               helper (_:(oldSha'':_)) (_:(newSha'':ns)) _ | oldSha'' == newSha'' = complete oldSha'' (mkParentChain newSha'' ns)
@@ -622,7 +622,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                 let oldSha = head oldShaChain
                     newSha = head newShaChain
                 ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
-                let seen' = foldl' (flip S.insert) seen (filter (/= (unsafeCreateSHAFromWord256 0)) ps) -- todo double S.insert is probably more optimal
+                let seen' = foldl' (flip S.insert) seen (filter (/= (unsafeCreateKeccak256FromWord256 0)) ps) -- todo double S.insert is probably more optimal
                 if newParent `S.member` seen
                 then complete newParent (mkParentChain newParent newShaChain)
                 else if oldParent `S.member` seen
@@ -636,19 +636,19 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               --
               -- the second case is impossible because `helper`, which calls mkParentChain,
               -- always gets called with a list of at least length 1
-              mkParentChain :: SHA -> [SHA] -> [SHA]
-              mkParentChain h xs | shaToWord256 h == 0 = xs
+              mkParentChain :: Keccak256 -> [Keccak256] -> [Keccak256]
+              mkParentChain h xs | keccak256ToWord256 h == 0 = xs
               mkParentChain y xs@(x:_) = if x == y then xs else y:xs
               mkParentChain _ []       = error "the impossible happened, somehow called (mkParentChain _ [])"
 
-              complete :: SHA -> [SHA] -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
+              complete :: Keccak256 -> [Keccak256] -> Redis (Either Reply ([(Keccak256, Integer)], [Integer]))
               complete lca newShaChain = getHeader lca >>= \case
-                      Nothing -> if lca /= (unsafeCreateSHAFromWord256 0) -- genesis block is sha 0
+                      Nothing -> if lca /= (unsafeCreateKeccak256FromWord256 0) -- genesis block is sha 0
                                      then return . Left . SingleLine . S8.pack $
-                                              "Could not get ancestor header for SHA " ++ shaToHex lca
+                                              "Could not get ancestor header for Keccak256 " ++ keccak256ToHex lca
                                      else complete (head newShaChain) newShaChain
                       Just ancestor -> do
-                          --liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
+                          --liftIO . putStrLn $ show (keccak256ToHex lca, keccak256ToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
                               updates        = flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
@@ -658,19 +658,19 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               -- safeTail [] = []
               -- safeTail xs = tail xs
 
---validateLink :: (SHA,RedisHeader) -> (SHA, RedisHeader) -> Bool
+--validateLink :: (Keccak256,RedisHeader) -> (Keccak256, RedisHeader) -> Bool
 --validateLink (psha,RedisHeader parentHeader) (_,RedisHeader childHeader) =
 --  (psha == (parentHash childHeader))
 --  &&
 --  (((number parentHeader) + 1) == (number childHeader))
 --
---validateChain :: [(SHA,RedisHeader)] -> Bool
+--validateChain :: [(Keccak256,RedisHeader)] -> Bool
 --validateChain [] = True
 --validateChain [_] = True
 --validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
-forceBestBlockInfo :: RedisCtx m f => SHA -> Integer -> Integer -> m (f Status)
+forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
         forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
@@ -740,7 +740,7 @@ worldBestBlockKey = "<worldbest>"
 getWorldBestBlockInfo :: Redis (Maybe RedisBestBlock)
 getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
 
-updateWorldBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Bool)
+updateWorldBestBlockInfo :: Keccak256 -> Integer -> Integer -> Redis (Either Reply Bool)
 updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
     where withRetryCount :: Int -> Redis (Either Reply Bool)
           withRetryCount theRetryCount = do

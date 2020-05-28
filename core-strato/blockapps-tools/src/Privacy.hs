@@ -36,7 +36,7 @@ import           Blockchain.Constants
 import           Blockchain.Privacy.Monad
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 minBoundP :: Bounded a => Proxy a -> a
 minBoundP _ = minBound
@@ -170,9 +170,9 @@ doit f = DB.runResourceT $ do
 
 getPrivacy :: String -> String -> Bool -> IO String
 getPrivacy registry key js = case registry of
-  'b':_ -> maybe "Not found" (if js then jsEncode Proxy . obToObPrime else format) <$> handleGet (Proxy @OutputBlock) (unsafeCreateSHAFromWord256 $ read key)
-  't':_ -> maybe "Not found" (if js then jsEncode Proxy . otxToOtxPrime else format) <$> handleGet (Proxy @OutputTx) (unsafeCreateSHAFromWord256 $ read key)
-  'h':_ -> maybe "Not found" (if js then jsEncode Proxy else format) <$> handleGet (Proxy @ChainHashEntry) (unsafeCreateSHAFromWord256 $ read key)
+  'b':_ -> maybe "Not found" (if js then jsEncode Proxy . obToObPrime else format) <$> handleGet (Proxy @OutputBlock) (unsafeCreateKeccak256FromWord256 $ read key)
+  't':_ -> maybe "Not found" (if js then jsEncode Proxy . otxToOtxPrime else format) <$> handleGet (Proxy @OutputTx) (unsafeCreateKeccak256FromWord256 $ read key)
+  'h':_ -> maybe "Not found" (if js then jsEncode Proxy else format) <$> handleGet (Proxy @ChainHashEntry) (unsafeCreateKeccak256FromWord256 $ read key)
   'i':_ -> maybe "Not found" (if js then jsEncode Proxy else format) <$> handleGet (Proxy @ChainIdEntry) (read key)
   _ -> return "Registry not found. Expected one of: block, tx, hash, id"
   where jsEncode _ = T.unpack . decodeUtf8 . BL.toStrict . Ae.encode
