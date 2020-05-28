@@ -17,10 +17,10 @@ import           Data.Time.Clock.POSIX
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 data BlockSummary = BlockSummary {
-                      bSumParentHash      :: SHA,
+                      bSumParentHash      :: Keccak256,
                       bSumDifficulty      :: Difficulty,
                       bSumTotalDifficulty :: Difficulty,
                       bSumStateRoot       :: MP.StateRoot,

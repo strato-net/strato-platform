@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -11,6 +12,7 @@
 
 module BlockApps.Bloc22.API.Transaction where
 
+import           Control.Applicative                ((<|>))
 import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
@@ -23,20 +25,26 @@ import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API                        as S
 import           Servant.Docs
-import           Test.QuickCheck
+import           Test.QuickCheck                    hiding (Success)
 
+import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.Types
+
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.Wei
 
 --------------------------------------------------------------------------------
 ---- Routes and Types
 --------------------------------------------------------------------------------
 
-data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION deriving (Eq, Ord, Show, Generic)
+data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION | GENESIS
+  deriving (Eq, Ord, Show, Generic)
 
 instance ToJSON BlocTransactionType where
 instance FromJSON BlocTransactionType where
@@ -45,18 +53,33 @@ transactionType :: BlocTransactionPayload -> BlocTransactionType
 transactionType (BlocTransfer _) = TRANSFER
 transactionType (BlocContract _) = CONTRACT
 transactionType (BlocFunction _) = FUNCTION
+transactionType (BlocGenesis _)  = GENESIS
+
+instance ToParam (QueryFlag "queue") where
+  toParam _ =
+    DocQueryParam "queue" ["true","false",""] "flag for queueing a transaction request" Flag
+
+type PostBlocTransactionParallel = "transaction"
+  :> "parallel"
+  :> S.Header "X-USER-UNIQUE-NAME" Text
+  :> QueryParam "chainid" ChainId
+  :> QueryFlag "resolve"
+  :> QueryFlag "queue"
+  :> ReqBody '[JSON] PostBlocTransactionRequest
+  :> Post '[JSON] [BlocChainOrTransactionResult]
 
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest
-  :> Post '[JSON] [BlocTransactionResult]
+  :> Post '[JSON] [BlocChainOrTransactionResult]
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Maybe Address
   , postbloctransactionrequestTxs      :: [BlocTransactionPayload]
   , postbloctransactionrequestTxParams :: Maybe TxParams
+  , postbloctransactionrequestSrcs     :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary PostBlocTransactionRequest where
@@ -75,9 +98,12 @@ instance ToSample PostBlocTransactionRequest where
       [BlocTransfer $ TransferPayload
         (Address 0x12345678)
         (Strung 600)
+        Nothing
+        Nothing
         (Just $ Map.fromList [("purpose","groceries")])
       ]
       (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
+      Nothing
 
 instance ToSchema PostBlocTransactionRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -91,13 +117,17 @@ instance ToSchema PostBlocTransactionRequest where
                  [BlocTransfer $ TransferPayload
                    (Address 0x12345678)
                    (Strung 600)
+                   Nothing
+                   Nothing
                    (Just $ Map.fromList [("purpose","groceries")])
                  ]
                  (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
+                 Nothing
 
 data BlocTransactionPayload = BlocTransfer TransferPayload
                             | BlocContract ContractPayload
                             | BlocFunction FunctionPayload
+                            | BlocGenesis  ChainInput
                             deriving (Eq, Show, Generic)
 
 instance Arbitrary BlocTransactionPayload where
@@ -108,6 +138,7 @@ instance ToJSON BlocTransactionPayload where
   toJSON (BlocTransfer t) = object ["type" .= TRANSFER, "payload" .= t]
   toJSON (BlocContract c) = object ["type" .= CONTRACT, "payload" .= c]
   toJSON (BlocFunction f) = object ["type" .= FUNCTION, "payload" .= f]
+  toJSON (BlocGenesis  g) = object ["type" .= GENESIS,  "payload" .= g]
 
 instance FromJSON BlocTransactionPayload where
   parseJSON (Object o) = do
@@ -116,19 +147,24 @@ instance FromJSON BlocTransactionPayload where
       TRANSFER -> BlocTransfer <$> (o .: "payload")
       CONTRACT -> BlocContract <$> (o .: "payload")
       FUNCTION -> BlocFunction <$> (o .: "payload")
+      GENESIS  -> BlocGenesis  <$> (o .: "payload")
   parseJSON o = error $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload
-  { contractpayloadSrc      :: Text
+  { contractpayloadSrc      :: Maybe Text
   , contractpayloadContract :: Maybe Text
   , contractpayloadArgs     :: Maybe (Map Text ArgValue)
   , contractpayloadValue    :: Maybe (Strung Natural)
+  , contractpayloadTxParams :: Maybe TxParams
+  , contractpayloadChainid  :: Maybe ChainId
   , contractpayloadMetadata :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
 data TransferPayload = TransferPayload
   { transferpayloadToAddress :: Address
   , transferpayloadValue     :: Strung Natural
+  , transferpayloadTxParams  :: Maybe TxParams
+  , transferpayloadChainid   :: Maybe ChainId
   , transferpayloadMetadata  :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
@@ -138,6 +174,8 @@ data FunctionPayload = FunctionPayload
   , functionpayloadMethod          :: Text
   , functionpayloadArgs            :: Map Text ArgValue
   , functionpayloadValue           :: Maybe (Strung Natural)
+  , functionpayloadTxParams        :: Maybe TxParams
+  , functionpayloadChainid         :: Maybe ChainId
   , functionpayloadMetadata        :: Maybe (Map Text Text)
   } deriving (Eq, Show, Generic)
 
@@ -170,10 +208,12 @@ instance ToSchema BlocTransactionPayload where
     where
       ex :: BlocTransactionPayload
       ex = BlocContract $ ContractPayload
-        { contractpayloadSrc      = "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        { contractpayloadSrc      = Just "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
+        , contractpayloadTxParams = Nothing
+        , contractpayloadChainid  = Nothing
         , contractpayloadMetadata = Nothing
         }
 
@@ -185,10 +225,12 @@ instance ToSchema ContractPayload where
     where
       ex :: ContractPayload
       ex = ContractPayload
-        { contractpayloadSrc      = "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        { contractpayloadSrc      = Just "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
+        , contractpayloadTxParams = Nothing
+        , contractpayloadChainid  = Nothing
         , contractpayloadMetadata = Nothing
         }
 
@@ -201,8 +243,10 @@ instance ToSchema TransferPayload where
       ex :: TransferPayload
       ex = TransferPayload
         { transferpayloadToAddress = Address (0xdeadbeef)
-        , transferpayloadValue = Strung 1000000
-        , transferpayloadMetadata = Nothing
+        , transferpayloadValue     = Strung 1000000
+        , transferpayloadTxParams  = Nothing
+        , transferpayloadChainid   = Nothing
+        , transferpayloadMetadata  = Nothing
         }
 
 instance ToSchema FunctionPayload where
@@ -218,5 +262,44 @@ instance ToSchema FunctionPayload where
         , functionpayloadMethod          = "set"
         , functionpayloadArgs            = Map.fromList [("_x", ArgInt 5)]
         , functionpayloadValue           = Nothing
-        , functionpayloadMetadata = Nothing
+        , functionpayloadTxParams        = Nothing
+        , functionpayloadChainid         = Nothing
+        , functionpayloadMetadata        = Nothing
+        }
+
+data BlocChainOrTransactionResult = BlocChainResult ChainId
+                                  | BlocTxResult BlocTransactionResult
+                                  deriving (Eq, Show, Generic)
+
+instance ToJSON BlocChainOrTransactionResult where
+  toJSON (BlocChainResult cid) = toJSON cid
+  toJSON (BlocTxResult btr) = toJSON btr
+
+instance FromJSON BlocChainOrTransactionResult where
+  parseJSON o = (BlocTxResult <$> parseJSON o)
+            <|> (BlocChainResult <$> parseJSON o)
+            <|> pure (error $ "fromJSON BlocChainOrTransactionResult: Expected Object or hex-encoded string, but got " ++ show o)
+
+instance Arbitrary BlocChainOrTransactionResult where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToSample BlocChainOrTransactionResult where
+  toSamples _ = singleSample . BlocTxResult $ BlocTransactionResult
+    { blocTransactionStatus = Success
+    , blocTransactionHash = hash "foo"
+    , blocTransactionTxResult = Nothing
+    , blocTransactionData = Nothing
+    }
+
+instance ToSchema BlocChainOrTransactionResult where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Bloc Chain or Transaction Result"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: BlocChainOrTransactionResult
+      ex = BlocTxResult $ BlocTransactionResult
+        { blocTransactionStatus = Success
+        , blocTransactionHash = hash "foo"
+        , blocTransactionTxResult = Nothing
+        , blocTransactionData = Nothing
         }

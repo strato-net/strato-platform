@@ -12,18 +12,18 @@ module BlockApps.Bloc22.Database.Queries where
 
 import           Control.Arrow
 import           Control.Monad
-import           Control.Monad.Except
-import           Crypto.Hash
+import           Control.Monad.Reader            (asks)
 import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON, decode, encode)
-import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
 import qualified Data.ByteString.Char8           as Char8
 import           Data.ByteString.Lazy            (fromStrict, toStrict)
+import qualified Data.Cache                      as Cache
 import           Data.Either                     (fromRight)
+import           Data.Foldable                   (for_)
 import           Data.Int                        (Int32)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
@@ -39,6 +39,8 @@ import           Data.Tuple                      (swap)
 import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
+import           System.Clock
+import           UnliftIO
 
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Crypto
@@ -46,17 +48,16 @@ import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
-import           BlockApps.Ethereum
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
 
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
-
-data Should a = Don't a | Do a
-data Compile = Compile
 
 {- |
 SELECT address from key_store;
@@ -335,42 +336,9 @@ getContractsAddressesQuery :: Maybe ChainId -> Query
   , Column PGBytea
   )
 getContractsAddressesQuery chainId = proc () -> do
-  (_,name,_,addr,timestamp,_,_,_,_,cid,_) <- contractsJoinTable -< ()
+  (_,name,_,addr,timestamp,_,_,_,_,cid,_) <- limit 100 $ contractsJoinTable -< ()
   restrict -< cid .== constant chainId
   returnA -< (name,addr,timestamp,cid)
-
-{- |
-SELECT
-   C.name
- , C2.name as address
- , CI.timestamp
-FROM contracts C
-JOIN contracts_metadata CM
-  ON CM.contract_id = C.id
-JOIN contracts_lookup CL
-  ON CL.contract_metadata_id = CM.id
-JOIN contracts_metadata CM2
-  ON CM2.id = CL.linked_metadata_id
-JOIN contracts C2
-  ON C2.id = CM2.contract_id
-JOIN contracts_instance CI
-  ON CI.contract_metadata_id = CM2.id;
--}
-getContractsNamesAsAddressesQuery :: Maybe ChainId -> Query
-  ( Column PGText
-  , Column PGText
-  , Column PGTimestamptz
-  , Column PGBytea
-  )
-getContractsNamesAsAddressesQuery chainId = proc () -> do
-  (n1,n2,ts,cid) <- joinF
-    (\ (_,_,_,timestamp,cid) (_,_,_,_,name,name2,_,_,_) -> (name,name2,timestamp,cid))
-    (\ (_,contractmetadataId,_,_,_) (_,_,_,_,_,_,_,cm2Id,_) -> contractmetadataId .== cm2Id)
-    (queryTable contractsInstanceTable)
-    linkedContractsJoinTable
-    -< ()
-  restrict -< cid .== constant chainId
-  returnA -< (n1,n2,ts,cid)
 
 {- |
 SELECT
@@ -427,13 +395,13 @@ getContractsDataNamesQuery contractName =
       restrict -< name .== constant contractName
       returnA -< constant ("Latest"::Text)
 
-getContractsMetaDataId :: Text -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Int32)
+getContractsMetaDataId :: Text -> Address -> Maybe ChainId -> Bloc (Maybe Int32)
 getContractsMetaDataId name contractId = fmap (fmap fst) . getContractDetailsAndMetadataId (ContractName name) contractId
 
 getContractDetailsByAddressOnly :: Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
 getContractDetailsByAddressOnly contractAddr chainId = do
   mName <- fmap listToMaybe . blocQuery $ contractNameFromAddress contractAddr chainId
-  fmap join . for mName $ \name -> getContractDetails (ContractName name) (Unnamed contractAddr) chainId
+  fmap join . for mName $ \name -> getContractDetails (ContractName name) contractAddr chainId
 
 {- |
 SELECT
@@ -596,10 +564,10 @@ deserializeXabi = decodeXabiJSON
 
 decodeXabiJSON :: ByteString -> Bloc Xabi
 decodeXabiJSON xabi' = case decode (fromStrict xabi') of
-  Nothing -> throwError $ DBError "Corrupted Xabi stored in database"
+  Nothing -> throwIO $ DBError "Corrupted Xabi stored in database"
   Just x -> return x
 
-getContractDetailsByMetadataId :: Int32 -> MaybeNamed Address -> Maybe ChainId -> Bloc ContractDetails
+getContractDetailsByMetadataId :: Int32 -> Address -> Maybe ChainId -> Bloc ContractDetails
 getContractDetailsByMetadataId cmId addr chainId = do
   (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src,_ :: Int32,xabi') <-
     blocQuery1 "getContractDetailsByMetadataId" $ contractByMetadataId cmId
@@ -615,11 +583,11 @@ getContractDetailsByMetadataId cmId addr chainId = do
     , contractdetailsChainId = chainId
     }
 
-getContractDetails :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
+getContractDetails :: ContractName -> Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
 getContractDetails name contractId = fmap (fmap snd) . getContractDetailsAndMetadataId name contractId
 
-getContractDetailsAndMetadataId :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe (Int32, ContractDetails))
-getContractDetailsAndMetadataId (ContractName contractName) contractId chainId = do
+getContractDetailsAndMetadataId :: ContractName -> Address -> Maybe ChainId -> Bloc (Maybe (Int32, ContractDetails))
+getContractDetailsAndMetadataId (ContractName contractName) addr chainId = do
     let
       detailsWith detailsAddr cid (bin,binRuntime,codeHash,_ :: ByteString,name,src,cmId,xabi') = do
         xabi <- deserializeXabi xabi'
@@ -633,29 +601,14 @@ getContractDetailsAndMetadataId (ContractName contractName) contractId chainId =
           , contractdetailsXabi = xabi
           , contractdetailsChainId = cid
           })
-    case contractId of
-      Named "Latest" -> do
-        tuple <- blocQueryMaybe $
+    tuple <- fmap listToMaybe . blocQuery $
+      getContractsContractByAddressQuery contractName addr chainId
+    case tuple of
+      Just t -> Just <$> detailsWith (Just addr) chainId t
+      Nothing -> do
+        tuple' <- blocQueryMaybe $
           getContractsContractLatestQuery contractName
-        for tuple $ detailsWith Nothing chainId
-      Unnamed addr -> do
-        tuple <- fmap listToMaybe . blocQuery $
-          getContractsContractByAddressQuery contractName addr chainId
-        case tuple of
-          Just t -> Just <$> detailsWith (Just (Unnamed addr)) chainId t
-          Nothing -> do
-            tuple' <- blocQueryMaybe $
-              getContractsContractLatestQuery contractName
-            for tuple' $ detailsWith (Just (Unnamed addr)) chainId
-      Named name -> if contractName == name
-        then do
-          tuple <- fmap listToMaybe . blocQuery $
-            getContractsContractBySameNameQuery name
-          for tuple $ detailsWith (Just (Named name)) chainId
-        else do
-          tuple <- fmap listToMaybe . blocQuery $
-            getContractsContractByNameQuery contractName name
-          for tuple $ detailsWith (Just (Named name)) chainId
+        for tuple' $ detailsWith (Just addr) chainId
 
 getContractDetailsByCodeHash :: CodePtr -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeHash codeHash = do
@@ -712,7 +665,7 @@ insertContractSourceQuery
   :: Text
   -> Bloc (Int32, Keccak256)
 insertContractSourceQuery src = do
-  let srcHash = (keccak256 $ Text.encodeUtf8 src)
+  let srcHash = (hash $ Text.encodeUtf8 src)
   blocModify1 $ \ conn ->
     runInsertManyReturning conn contractsSourceTable [
       ( Nothing
@@ -759,7 +712,7 @@ insertContractMetaDataBatchQuery srcHash details = blocModify $ \ conn ->
         , constant (Text.encodeUtf8 contractdetailsBin)
         , constant (Text.encodeUtf8 contractdetailsBinRuntime)
         , constant contractdetailsCodeHash
-        , constant $ keccak256 (Text.encodeUtf8 contractdetailsBin)
+        , constant $ hash (Text.encodeUtf8 contractdetailsBin)
         , constant srcHash
         , constant (serializeXabi contractdetailsXabi)
         )
@@ -771,7 +724,7 @@ instance QueryRunnerColumnDefault PGBytea Address where
     (fromMaybe (error "could not decode address") . stringAddress . Char8.unpack)
     queryRunnerColumnDefault
 instance Default Constant Address (Column PGBytea) where
-  def = lmap (Char8.pack . addressString) def
+  def = lmap (Char8.pack . formatAddressWithoutColor) def
 
 instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
   queryRunnerColumnDefault = queryRunnerColumn id
@@ -806,15 +759,10 @@ instance QueryRunnerColumnDefault PGBytea Keccak256 where
     where
       toKecc :: ByteString -> Keccak256
       toKecc
-        = Keccak256
-        . fromMaybe (error "could not decode hash")
-        . digestFromByteString
+        = unsafeCreateKeccak256FromByteString
 
 instance Default Constant Keccak256 (Column PGBytea) where
-  def = lmap fromKecc def
-    where
-      fromKecc :: Keccak256 -> ByteString
-      fromKecc (Keccak256 digest) = ByteArray.convert digest
+  def = lmap keccak256ToByteString def
 
 instance QueryRunnerColumnDefault PGBytea CodePtr where
   queryRunnerColumnDefault =
@@ -863,13 +811,57 @@ insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertMa
   ]
   (\ (contractInstanceId,_,_,_,_) -> contractInstanceId)
 
+evmContractSolidVMError :: Text
+evmContractSolidVMError = Text.concat
+  [ "Upload Contract (EVM): The given contracts were previously uploaded for "
+  , "SolidVM. Please retry your request specifying SolidVM as the VM type. "
+  , "If you are intending to use EVM, please modify your contracts and try again."
+  ]
+
+getContractDetailsForContract :: Text -> Text -> Maybe Text -> Bloc (Maybe (Text, (Int32, ContractDetails)))
+getContractDetailsForContract theVM src mContract = do
+  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
+      cacheKey = (theVM, src)
+  srcCache <- asks globalSourceCache
+  now <- liftIO $ getTime Monotonic
+  let later = (now +) <$> Cache.defaultExpiration srcCache
+  mCachedDetails <- atomically $ do
+    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
+                                       --       but we need this to prevent the cache growing unboundedly
+    r <- Cache.lookupSTM True cacheKey srcCache now
+    for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
+    pure r
+
+  idsAndDetails <- case mCachedDetails of
+    Just cachedDetails -> pure cachedDetails
+    Nothing -> do
+      details <- if (Text.null src)
+                   then return Map.empty
+                   else sourceToContractDetails shouldCompile src
+      liftIO $ Cache.insert srcCache cacheKey details
+      pure details
+  case mContract of
+    Nothing ->
+      case Map.toList idsAndDetails of
+        [] -> pure Nothing
+        [x] -> Just <$> checkCodeHash x
+        _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
+    Just contract -> do
+      x <- blocMaybe ("Could not find global contract metadataId for " <> contract <> " in source " <> src)  (Map.lookup contract idsAndDetails)
+      Just <$> checkCodeHash (contract, x)
+  where checkCodeHash x@(_,(_,cd)) = case contractdetailsCodeHash cd of
+          (EVMCode _) -> pure x
+          (SolidVMCode _ _) -> case theVM of
+            "EVM" -> throwIO $ UserError evmContractSolidVMError
+            _ -> pure x
+
 sourceToContractDetails :: Should Compile -> Text -> Bloc (Map Text (Int32, ContractDetails))
 sourceToContractDetails shouldCompile source = do
   let createContractDetails =
         case shouldCompile of
           Do Compile -> compileContract
           Don't Compile -> createMetadataNoCompile
-  details <- blocQuery . contractBySourceHash . keccak256 $ Text.encodeUtf8 source
+  details <- blocQuery . contractBySourceHash . hash $ Text.encodeUtf8 source
   if null details
     then createContractDetails source
     else fmap Map.fromList . forM details $
@@ -905,9 +897,9 @@ compileContract source = do
       details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
         ContractDetails
         { contractdetailsBin = bin
-        , contractdetailsAddress = Just (Named "Latest")
+        , contractdetailsAddress = Nothing
         , contractdetailsBinRuntime = binRuntime
-        , contractdetailsCodeHash =  EVMCode . keccak256SHA $ binRuntimeToCodeHash binRuntime
+        , contractdetailsCodeHash =  EVMCode $ binRuntimeToCodeHash binRuntime
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi
@@ -932,9 +924,9 @@ createMetadataNoCompile source = do
       details = flip Map.mapWithKey contracts $ \ contrName (xabi) ->
         ContractDetails
         { contractdetailsBin = source
-        , contractdetailsAddress = Just (Named "Latest")
+        , contractdetailsAddress = Nothing
         , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ keccak256SHA $ keccak256 (Char8.pack $ Text.unpack source)
+        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ hash (Char8.pack $ Text.unpack source)
         , contractdetailsName = contrName
         , contractdetailsSrc = source
         , contractdetailsXabi = xabi
@@ -955,6 +947,6 @@ getContractXabiByMetadataId cmId = do
   deserializeXabi xabi'
   where ninth (_,_,_,_,_,_,_,_,x) = x
 
-getContractXabi :: ContractName -> MaybeNamed Address -> Maybe ChainId -> Bloc (Maybe Xabi)
+getContractXabi :: ContractName -> Address -> Maybe ChainId -> Bloc (Maybe Xabi)
 getContractXabi contractName contractId =
   fmap (fmap contractdetailsXabi) . getContractDetails contractName contractId

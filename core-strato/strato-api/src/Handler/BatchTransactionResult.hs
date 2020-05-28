@@ -2,47 +2,42 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Handler.BatchTransactionResult where
 
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Data.Aeson
 import           Data.Aeson.Encoding
 import qualified Data.Map.Strict     as M
 import qualified Data.Text           as T
 import qualified Database.Esqueleto  as E
 import           Handler.Common
-import           Handler.Filters              (fromHexText)
 import           Import
 import           Numeric             (readHex)
 import qualified Prelude             as P
 
-data StrungSHA = StrungSHA { unStrungSHA :: SHA }
+data StrungSHA = StrungSHA { unStrungSHA :: Keccak256 }
     deriving (Eq, Ord, Read, Show)
 
 instance FromJSON StrungSHA where
     parseJSON (String s) = case readHex $ T.unpack s of
-        [(x, "")] -> return . StrungSHA $ SHA x
+        [(x, "")] -> return . StrungSHA $ unsafeCreateKeccak256FromWord256 x
         _         -> fail "Expected a hex string of 32 bytes"
-    parseJSON _ = fail "Expected a String containing a SHA"
+    parseJSON _ = fail "Expected a String containing a Keccak256"
 
 instance ToJSON StrungSHA where
-    toJSON = String . T.pack . formatSHAWithoutColor . unStrungSHA
+    toJSON = String . T.pack . formatKeccak256WithoutColor . unStrungSHA
 
 instance ToJSONKey StrungSHA where
     toJSONKey = ToJSONKeyText f (text . f)
-      where f = T.pack . formatSHAWithoutColor . unStrungSHA
+      where f = T.pack . formatKeccak256WithoutColor . unStrungSHA
 
 postBatchTransactionResultR :: HandlerFor App Value
 postBatchTransactionResultR = do
   addHeader "Access-Control-Allow-Origin" "*"
-  chainId <- fmap (fmap fromHexText) $ lookupGetParam "chainid"
   hashesR <- parseJsonBody :: HandlerFor App (Result [StrungSHA])
   case hashesR of
     Success hashes -> do
         txrs <- runDB . E.select . E.from $ \txr -> do
           let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList (unStrungSHA <$> hashes)
-              matchChainId = case chainId of
-                Nothing -> (E.isNothing $ txr E.^. TransactionResultChainId)
-                Just cid -> (txr E.^. TransactionResultChainId) E.==. (E.just $ E.val cid)
-          E.where_ (matchHashes E.&&. matchChainId)
+          E.where_ matchHashes
           return txr
         let mmUpsert k v m = case M.lookup k m of
                 Nothing -> M.insert k [v] m
@@ -52,6 +47,3 @@ postBatchTransactionResultR = do
             grouped = P.foldl theFold baseMap (E.entityVal <$> txrs)
         returnJson grouped
     x -> invalidArgs [T.pack $ "couldn't decode array of transaction hashes " ++ show x]
-
-
-

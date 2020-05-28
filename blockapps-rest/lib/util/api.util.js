@@ -7,6 +7,7 @@ const blocUrl = "/bloc/v2.2";
 const strato12Url = "/strato-api/eth/v1.2";
 const strato23Url = "/strato/v2.3";
 const cirrusUrl = "/cirrus/search";
+const externalStorageUrl = "/apex-api/bloc/file";
 
 const Endpoint = {
   ACCOUNT: `${strato12Url}/account`,
@@ -14,11 +15,20 @@ const Endpoint = {
   USER: `${blocUrl}/users/:username`,
   FILL: `${blocUrl}/users/:username/:address/fill`,
   STATE: `${blocUrl}/contracts/:name/:address/state`,
+  STATES: `${blocUrl}/contracts/states`,
   TXRESULTS: `${blocUrl}/transactions/results`,
   SEND: `${strato23Url}/transaction`,
+  SEND_PARALLEL: `${strato23Url}/transaction/parallel`,
   KEY: `${strato23Url}/key`,
   SEARCH: `${cirrusUrl}/:name`,
-  CHAIN: `${blocUrl}/chain`
+  CHAIN: `${blocUrl}/chain`,
+  CHAINS: `${blocUrl}/chains`,
+  COMPILE: `${blocUrl}/contracts/compile`,
+  EXT_UPLOAD: `${externalStorageUrl}/upload`,
+  EXT_ATTEST: `${externalStorageUrl}/attest`,
+  EXT_VERIFY: `${externalStorageUrl}/verify`,
+  EXT_DOWNLOAD: `${externalStorageUrl}/download`,
+  EXT_LIST: `${externalStorageUrl}/list`,
 };
 
 function constructEndpoint(endpointTemplate, options = {}, params = {}) {

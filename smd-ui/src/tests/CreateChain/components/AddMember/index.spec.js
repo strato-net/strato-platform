@@ -13,7 +13,7 @@ describe('CreateChain: index', () => {
     store = createStore(combineReducers({ form: formReducer }))
   });
 
-  describe('render component (enterprise mode)', () => {
+  describe('render component (non Oauth mode)', () => {
 
     beforeAll(() => {
       checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
@@ -124,7 +124,7 @@ describe('CreateChain: index', () => {
 
   });
 
-  describe('render component (public mode)', () => {
+  describe('render component (Oauth mode)', () => {
 
     beforeAll(() => {
       checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);

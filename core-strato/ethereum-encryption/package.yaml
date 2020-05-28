@@ -8,38 +8,40 @@ license:             Apache-2.0
 
 dependencies:
   - base
-  - base16-bytestring
-  - binary
-  - blockapps-util
-  - bytestring
-  - cipher-aes
-  - conduit
-  - conduit-extra
-  - Crypto
-  - cryptohash
-  - cryptonite
-  - crypto-pubkey
-  - crypto-pubkey-types
-  - crypto-random
-  - entropy
   - ethereum-rlp
-  - format
-  - blockapps-haskoin
-  - memory
-  - lifted-base
-  - mtl
   - strato-model
-  - QuickCheck
 
 library:
   other-extensions:    OverloadedStrings
   source-dirs: src
   ghc-options: -Wall -O2
+  dependencies:
+  - Crypto
+  - base16-bytestring
+  - binary
+  - blockapps-haskoin
+  - blockapps-util
+  - bytestring
+  - cipher-aes
+  - conduit
+  - conduit-extra
+  - crypto-pubkey
+  - crypto-pubkey-types
+  - crypto-random
+  - cryptohash
+  - cryptonite
+  - entropy
+  - format
+  - lifted-base
+  - memory
+  - mtl
+
 
 tests:
   encryption-tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
+      - QuickCheck
       - ethereum-encryption
       - hspec

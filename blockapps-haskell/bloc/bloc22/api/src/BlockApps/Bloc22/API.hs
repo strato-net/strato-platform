@@ -52,6 +52,7 @@ type BlocAPI =
   :<|> GetAddresses
   -- /contracts endpoints
   :<|> GetContracts
+  :<|> PostContractsBatchStates
   :<|> GetContractsData
   :<|> GetContractsContract
   :<|> GetContractsState
@@ -70,7 +71,10 @@ type BlocAPI =
   -- /chain endpoints
   :<|> PostChainInfo
   :<|> GetChainInfo
+  -- /chains endpoints
+  :<|> PostChainInfos
   -- /transaction endpoints
+  :<|> PostBlocTransactionParallel
   :<|> PostBlocTransaction
 
 markdownBloc :: String

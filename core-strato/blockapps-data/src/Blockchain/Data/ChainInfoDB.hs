@@ -13,17 +13,14 @@ module Blockchain.Data.ChainInfoDB where
 
 import           Control.Arrow                      ((&&&))
 import           Control.Monad                      (when)
-import           Control.Monad.Change.Modify        (Accessible(..), Proxy(..))
 import           Blockchain.Output
-import           Control.Monad.Trans.Resource
 import           Data.Foldable                      (traverse_)
 import qualified Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
 import qualified Data.Text                          as T
 
 import qualified Database.Esqueleto                 as E
-import           Database.Persist                               hiding (get)
-import qualified Database.Persist.Postgresql        as SQL
+import           Database.Persist                   hiding (get)
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord                 (Word256)
@@ -35,8 +32,7 @@ import           Blockchain.Strato.Model.Address
 
 getChainInfo :: HasSQLDB m => Word256 -> m (Maybe (NamedTuple "id" Word256 "info" ChainInfo))
 getChainInfo chainId = do
-  db <- access (Proxy @SQLDB)
-  runResourceT . flip SQL.runSqlPool db $ do
+  sqlQuery $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
       E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
       return cRef
@@ -117,8 +113,7 @@ getChainInfos :: HasSQLDB m => [Word256] -> m (NamedMap "id" Word256 "info" Chai
 getChainInfos chainIds = do
   cids <- case chainIds of
               [] -> do
-                  db <- access (Proxy @SQLDB)
-                  runResourceT . flip SQL.runSqlPool db $ do
+                  sqlQuery $ do
                       chains <- E.select . E.from $ \cRef -> do
                           return cRef
                       case chains of
@@ -133,8 +128,7 @@ getChainInfos chainIds = do
 
 putChainInfo :: HasSQLDB m => Word256 -> ChainInfo -> m (Key ChainInfoRef)
 putChainInfo chainId (ChainInfo UnsignedChainInfo{..} csig) = do
-  db <- access (Proxy @SQLDB)
-  runResourceT . flip SQL.runSqlPool db $ do
+  sqlQuery $ do
     let chainInfoRef = ChainInfoRef chainId
                                     (T.unpack chainLabel)
                                     parentChain
@@ -168,8 +162,7 @@ putChainInfo chainId (ChainInfo UnsignedChainInfo{..} csig) = do
 
 addMember :: HasSQLDB m => Word256 -> Address -> String -> m ()
 addMember chainId address enode = do
-  db <- access (Proxy @SQLDB)
-  runResourceT . flip SQL.runSqlPool db $ do
+  sqlQuery $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
       E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
       return cRef
@@ -186,8 +179,7 @@ addMember chainId address enode = do
 
 removeMember :: HasSQLDB m => Word256 -> Address -> m ()
 removeMember chainId address = do
-  db <- access (Proxy @SQLDB)
-  runResourceT . flip SQL.runSqlPool db $ do
+  sqlQuery $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
       E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
       return cRef
@@ -203,7 +195,5 @@ removeMember chainId address = do
           when (not $ null member) $ do
             delete . entityKey $ head member
 
-terminateChain :: (MonadLogger m, HasSQLDB m) => Word256 -> m ()
-terminateChain _ = do
-  db <- access (Proxy @SQLDB)
-  db `seq` $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"
+terminateChain :: MonadLogger m => Word256 -> m ()
+terminateChain _ = $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"

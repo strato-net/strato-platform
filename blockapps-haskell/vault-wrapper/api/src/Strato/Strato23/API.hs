@@ -32,3 +32,4 @@ type VaultWrapperAPI = GetPing
                   :<|> PostKey
                   :<|> PostSignature
                   :<|> PostPassword
+                  :<|> VerifyPassword

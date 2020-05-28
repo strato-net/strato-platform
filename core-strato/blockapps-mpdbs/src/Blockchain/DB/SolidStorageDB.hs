@@ -48,11 +48,11 @@ toVal = rlpSerialize  . rlpEncode
 fromVal :: RawStorageValue -> BasicValue
 fromVal = rlpDecode . rlpDeserialize
 
-putSolidStorageKeyVal' :: FullSolidStorage m => Address -> StoragePath -> BasicValue -> m ()
+putSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> BasicValue -> m ()
 putSolidStorageKeyVal' addr key val = do
   putRawStorageKeyVal' (toKey addr key) (toVal val)
 
-getSolidStorageKeyVal' :: FullSolidStorage m => Address -> StoragePath -> m BasicValue
+getSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> m BasicValue
 getSolidStorageKeyVal' addr key = do
   v' <- fromVal <$> getRawStorageKeyVal' (toKey addr key)
   return v'

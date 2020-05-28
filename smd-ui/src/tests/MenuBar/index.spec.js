@@ -17,10 +17,10 @@ describe('MenuBar: index', () => {
 
   let store = createStore(combineReducers({ form: formReducer }));
 
-  describe('renders public mode', () => {
+  describe('renders Oauth mode', () => {
 
     beforeEach(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     });
 
     test('component with values', () => {
@@ -70,33 +70,6 @@ describe('MenuBar: index', () => {
     });
 
     describe('button', () => {
-
-      test('execute for developer', () => {
-        const props = {
-          currentUser: { username: 'tanuj44' },
-          isLoggedIn: false,
-          chainIds: [
-            { id: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9", label: "airline cartel 1" },
-            { id: "558d611a3defd0bea21bb48a0fba099f63f8f5a088258526a4f81e68ada0379e", label: "airline cartel 2" },
-            { id: "0353fd6fd7ef4b44fa5d1be0325fe312a5929f691e845dda132987ed74971a6f", label: "airline cartel 3" }],
-          selectChain: jest.fn(),
-          fetchChainIds: jest.fn(),
-          openLoginOverlay: jest.fn(),
-          openWalkThroughOverlay: jest.fn(),
-          location: {
-            search: "?developer"
-          },
-          store: store
-        }
-
-        let wrapper = shallow(
-          <MenuBar.WrappedComponent {...props} />
-        ).dive().dive().dive();
-
-        wrapper.find('Button').last().simulate('click');
-        expect(wrapper.find('Button').get(1)).toMatchSnapshot();
-        expect(props.openWalkThroughOverlay).toHaveBeenCalled();
-      });
 
       describe('chain', () => {
 
@@ -159,10 +132,10 @@ describe('MenuBar: index', () => {
 
   });
 
-  describe('renders enterprise mode', () => {
+  describe('renders non Oauth mode', () => {
 
     beforeEach(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     });
 
     test('component with values', () => {
@@ -214,17 +187,7 @@ describe('MenuBar: index', () => {
   test('mapStateToProps', () => {
     const state = {
       user: {
-        "username": null,
-        "currentUser": {
-          "id": 6,
-          "username": "tanuj41",
-          "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
-        },
-        "isLoggedIn": true,
-        "error": null,
-        "isOpen": false,
-        "spinning": false,
-        "oauthUser": oauthAccounts[0]
+        oauthUser: oauthAccounts[0]
       },
       chains: {
         chainIds: [

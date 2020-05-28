@@ -1,18 +1,18 @@
-import {isModeOauth} from "../../../lib/checkMode";
+import { isOauthEnabled } from "../../../lib/checkMode";
 
 export function validate(values) {
 
   const errors = {};
 
-  if (!isModeOauth() && !values.username) {
+  if (!isOauthEnabled() && !values.username) {
     errors.username = 'Select username';
   }
 
-  if (!isModeOauth() && !values.address) {
+  if (!isOauthEnabled() && !values.address) {
     errors.address = 'Address required';
   }
 
-  if (!isModeOauth() && !values.password) {
+  if (!isOauthEnabled() && !values.password) {
     errors.password = 'Password required';
   }
 

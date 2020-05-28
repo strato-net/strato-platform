@@ -28,9 +28,13 @@
    ```
     (this is the list of vars passed to apex docker container in docker-compose.yml + the vars added with set-aux-env-vars.sh in prod / tests)
 
+  You might need additional steps to comment out line `yield registerAppMetadata();` of bin/www to prevent server crashing.
+  
+  You might also want to temporary (don't push!) comment out lines `sockets.init(server);` and `const sockets = require('../sockets/init');` to turn off websocket server and stop getting `ECONNREFUSED 127.0.0.1:5432` errors from it (todo: find the way to run in dev mode too)
+  
 ### Run Apex tests locally (development mode):
 (have prep steps 1 and 2 done)
-3. ```
+5. ```
     NODE_ENV=development \
         OAUTH_ENABLED=true \ # if STRATO is OAUTH_ENABLED=true
         stratoHost=localhost:3333 \

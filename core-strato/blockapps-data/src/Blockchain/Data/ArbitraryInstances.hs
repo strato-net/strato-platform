@@ -18,7 +18,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
-import           Blockchain.Database.MerklePatricia hiding (stateRoot)
+import           Blockchain.Database.MerklePatricia
 import           Blockchain.MiscArbitrary()
 import           Blockchain.Util
 
@@ -100,8 +100,8 @@ instance Arbitrary Transaction where
       isPrivHash <- arbitrary :: Gen Bool
       if isPrivHash
         then do
-          tHash <- arbitrary `suchThat` (/= 0)
-          cHash <- arbitrary `suchThat` (/= 0)
+          tHash <- arbitrary
+          cHash <- arbitrary
           return $ PrivateHashTX tHash cHash
         else do
           nonce     <- unboxPI <$> arbitrary
@@ -136,7 +136,7 @@ instance Arbitrary IPAddress where
 
 instance Arbitrary Enode where
   arbitrary = Enode
-          <$> (B.pack <$> vectorOf 64 arbitrary)
+          <$> (OrgId . B.pack <$> vectorOf 64 arbitrary)
           <*> arbitrary
           <*> arbitrary `suchThat` (>=0)
           <*> (arbitrary `suchThat` maybe True (>=0))

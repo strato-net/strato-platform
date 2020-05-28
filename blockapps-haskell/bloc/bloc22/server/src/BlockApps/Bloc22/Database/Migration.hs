@@ -21,8 +21,9 @@ import           BlockApps.Bloc22.Database.Create
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Queries.Deprecated
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum
 import           BlockApps.Logging
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
 
 data Migration = MigrationAction (Bloc ())
                | MigrationQuery (MigrationErrorBehavior, Query)
@@ -69,6 +70,7 @@ migrations = [ ("Create tables"               , MigrationQuery (Throw, createTab
              , ("Migrate Xabi"                , MigrationAction migrateXabi)
              , ("Drop Xabi Tables"            , MigrationQuery (Throw, dropXabiTables))
              , ("Migrate code hash to CodePtr", MigrationAction migrateCodeHashToCodePtr)
+             , ("Alter hash name data column" , MigrationQuery (Throw, alterDataColumn))
              ]
 
 getSchemaVersion :: Query
@@ -140,8 +142,8 @@ migrateCodeHashToCodePtr = do
   idsAndCodeHashes <- blocModify $ flip query_ idQuery
   $logInfoS "migrateCodeHashToCodePtr" "Migrating code hashes to CodePtrs"
   forM_ idsAndCodeHashes $ \(i :: Integer, bs) ->
-    for_ (byteStringKeccak256 bs) $ \kecc -> do
-      let codePtrBS = Binary . rlpSerialize . EVMCode $ keccak256SHA kecc
+    for_ (Just $ unsafeCreateKeccak256FromByteString bs) $ \kecc -> do
+      let codePtrBS = Binary . rlpSerialize . EVMCode $ kecc
       $logInfoS "migrateCodeHashToCodePtr" . T.pack $ concat
         [ "Processing ID "
         , show i
@@ -149,3 +151,6 @@ migrateCodeHashToCodePtr = do
         , show codePtrBS
         ]
       void . blocModify $ \conn -> execute conn xabiQuery (i, codePtrBS)
+
+alterDataColumn :: Query
+alterDataColumn = [sql| ALTER TABLE IF EXISTS hash_name ALTER COLUMN data_string TYPE text; |]

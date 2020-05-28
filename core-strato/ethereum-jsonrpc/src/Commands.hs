@@ -27,7 +27,7 @@ import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
-import           Blockchain.Strato.Model.SHA (keccak256)
+import           Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import           Blockchain.Stream.Raw
 
 import qualified APIProxy                    as API
@@ -132,7 +132,7 @@ web3_sha3 = toMethod "web3_sha3" f (Required "value" :+: ())
           case strToByteString val of
            Left err -> throwError $ rpcError (-32602) $ T.pack err
            Right bytes ->
-             return $ "0x" ++ BC.unpack (B16.encode $ keccak256 bytes)
+             return $ "0x" ++ BC.unpack (B16.encode $ keccak256ToByteString $ hash bytes)
 
 net_peerCount::Method Server
 net_peerCount = toMethod "net_peerCount" f ()

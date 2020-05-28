@@ -16,9 +16,9 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
-import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad
 import           Data.Set
@@ -131,7 +131,7 @@ getAccFilter (accStateRef) ("address", v)    = accStateRef E.^. AddressStateRefA
 
 getAccFilter (accStateRef) ("code", v)       = accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)
 getAccFilter (accStateRef) ("codeHash", v)   = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (toSHA v)
-getAccFilter (accStateRef) ("chainid", v)    = ((accStateRef E.^. AddressStateRefChainId) E.==. (E.val (fromHexText v)))
+getAccFilter _             ("chainid", _)    = E.val True
 
 getAccFilter _             _                 = P.error ("no match in getAccFilter"::String)
 
@@ -184,7 +184,7 @@ getTransFilter (rawTx)     ("minvalue", v)     = rawTx E.^. RawTransactionValue 
 getTransFilter (rawTx)     ("maxvalue", v)     = rawTx E.^. RawTransactionValue E.<=. E.val (toInteger' v)
 
 getTransFilter (rawTx)     ("blocknumber", v)  = rawTx E.^. RawTransactionBlockNumber E.==. E.val (P.read $ T.unpack v :: Int)
-getTransFilter (rawTx)     ("chainid", v)      = ((rawTx E.^. RawTransactionChainId) E.==. E.val (fromHexText v))
+getTransFilter _           ("chainid", _)      = E.val True
 getTransFilter _           _                   = P.error ("no match in getTransFilter"::String)
 
 getStorageFilter :: (E.Esqueleto query expr backend) => (expr (Entity Storage), expr (Entity AddressStateRef)) -> (Text, Text) -> expr (E.Value Bool)
@@ -197,13 +197,13 @@ getStorageFilter (storage, addrStRef) (k, v) = case k of
   "maxvalue" -> storage E.^. StorageValue E.<=. E.val (toHex v)
   -- Note: a join is done in StorageInfo
   "address" -> addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
-  "chainid" -> ((addrStRef E.^. AddressStateRefChainId) E.==. (E.val (fromHexText v)))
+  "chainid" -> E.val True
   _ -> P.error ("no match in getStorageFilter"::String)
 
 getLogFilter :: (E.Esqueleto query expr backend) => expr (Entity LogDB) -> (Text, Text) -> expr (E.Value Bool)
 getLogFilter _ ("index",_) = E.val True         -- indexes are intercepted in handlers. We should probably deal with them here in the future
 getLogFilter log' ("address",v) = log' E.^. LogDBAddress E.==. E.val (toAddr v)
-getLogFilter log' ("hash",v) = log' E.^. LogDBTransactionHash  E.==. E.val ( SHA . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v )
+getLogFilter log' ("hash",v) = log' E.^. LogDBTransactionHash  E.==. E.val ( unsafeCreateKeccak256FromWord256 . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v )
 getLogFilter _           _  = P.error ("no match in getLogFilter"::String)
 
 toAddrId :: Text -> Key AddressStateRef
@@ -225,8 +225,8 @@ toHex = word256ToHexStorage . P.read . T.unpack
 toInteger' :: Text -> Integer
 toInteger' v = P.read $ T.unpack v
 
-toSHA :: Text -> SHA
-toSHA v = SHA . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v
+toSHA :: Text -> Keccak256
+toSHA v = unsafeCreateKeccak256FromWord256 . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v
 
 toCode :: Text -> ByteString
 toCode v = fst $ B16.decode $ BS8.pack $ (T.unpack v)

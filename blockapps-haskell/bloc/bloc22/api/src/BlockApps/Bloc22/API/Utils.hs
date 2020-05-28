@@ -24,7 +24,9 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances        ()
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.Wei
 
 newtype ContractName = ContractName Text deriving (Eq,Ord,Show,Generic)
 
@@ -78,7 +80,7 @@ instance FromJSON UserName where
 
 instance ToSample UserName where
   toSamples _ = samples
-    [ UserName uname | uname <- ["samrit", "eitan", "ilya", "ilir"]]
+    [ UserName uname | uname <- ["samrit", "dustin", "yunfan", "daniel"]]
 
 instance ToCapture (Capture "user" UserName) where
   toCapture _ = DocCapture "user" "a user name"
@@ -92,7 +94,7 @@ instance ToSchema UserName where
   declareNamedSchema _ = return $ NamedSchema (Just "User Name")
       ( mempty
         & type_ .~ SwaggerString
-        & example ?~ toJSON (UserName "Martin")
+        & example ?~ toJSON (UserName "Nikita")
         & description ?~ "User Name" )
 
 --------------------------------------------------------------------------------

@@ -1,9 +1,11 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Blockchain.SolidVM.TraceTools where
 
 import           Control.Monad
+import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.State
 import qualified Data.Map                       as M
 
 import           Blockchain.SolidVM.SM
@@ -13,7 +15,7 @@ import           Text.Tools
 
 
 
-showVariables :: CallInfo -> SM [String]
+showVariables :: MonadSM m => CallInfo -> m [String]
 showVariables ci = do
   forM (M.toList $ localVariables ci) $ \(name, (_, var)) -> do
     val <- getVar var
@@ -21,7 +23,7 @@ showVariables ci = do
     return $ "    \"" ++ name ++ "\": " ++ valueString
 
   
-getFullStackTrace :: [CallInfo] -> SM [String]
+getFullStackTrace :: MonadSM m => [CallInfo] -> m [String]
 getFullStackTrace theCallStack = do
   sliceStrings <- 
     forM theCallStack $ \slice -> do
@@ -32,8 +34,8 @@ getFullStackTrace theCallStack = do
 
   return $ concat sliceStrings
   
-printFullStackTrace :: SM ()
+printFullStackTrace :: MonadSM m => m ()
 printFullStackTrace = do
-  theCallStack <- gets callStack
+  theCallStack <- get (Proxy @[CallInfo])
   fullStackTrace <- getFullStackTrace theCallStack
   liftIO $ putStrLn $ grayBox $ concat $ map (wrap 150) fullStackTrace

@@ -15,29 +15,27 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - blockapps-ethereum
-  - binary
-  - bytestring
   - aeson
-  - aeson-casing
-  - containers
-  - derive
   - generic-random
-  - http-api-data
-  - http-client
-  - lens
   - QuickCheck
   - quickcheck-instances
-  - servant
-  - servant-client
-  - servant-docs
   - strato-model
-  - swagger2
   - text
-  - time
-  - unordered-containers
 
 library:
   source-dirs: src/
+  dependencies:
+  - aeson-casing
+  - binary
+  - bytestring
+  - containers
+  - http-api-data
+  - lens
+  - servant
+  - servant-docs
+  - swagger2
+  - time
+  - unordered-containers
 
 tests:
   blockapps-strato-api-test:

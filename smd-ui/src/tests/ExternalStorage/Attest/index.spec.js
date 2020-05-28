@@ -13,9 +13,9 @@ describe('Verify: index', () => {
     store = createStore(combineReducers({ form: formReducer }));
   });
 
-  describe('render component (enterprise mode)', () => {
+  describe('render component (non Oauth mode)', () => {
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     })
 
     test('without values', () => {
@@ -79,9 +79,9 @@ describe('Verify: index', () => {
 
   });
 
-  describe('render component (public mode)', () => {
+  describe('render component (Oauth mode)', () => {
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(true);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(true);
     })
 
     test('without values', () => {
@@ -145,10 +145,10 @@ describe('Verify: index', () => {
 
   });
 
-  describe('enterprise mode', () => {
+  describe('Non Oauth mode', () => {
 
     beforeAll(() => {
-      checkMode.isModePublic = jest.fn().mockReturnValue(false);
+      checkMode.isOauthEnabled = jest.fn().mockReturnValue(false);
     })
 
     test('on dialog close', () => {
@@ -390,9 +390,9 @@ describe('Verify: index', () => {
         accounts: accountsMock
       },
       user: {
-        currentUser: {
+        oauthUser: {
           username: 'tanuj1000',
-          accountAddress: '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
+          address: '6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad'
         }
       }
 

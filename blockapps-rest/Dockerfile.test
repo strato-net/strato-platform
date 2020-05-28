@@ -1,13 +1,12 @@
 FROM node:10-slim
 
-RUN npm install -g yarn &&\
-    mkdir blockapps-rest
+RUN mkdir blockapps-rest
 
 WORKDIR blockapps-rest
 
-COPY package.json ./
+COPY gulpfile.js package.json ./
 
-RUN npm i
+RUN yarn
 
 COPY . ./
 

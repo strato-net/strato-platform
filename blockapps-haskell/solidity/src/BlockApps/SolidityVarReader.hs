@@ -4,8 +4,10 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
 
 module BlockApps.SolidityVarReader (
+  contractFunctions,
   decodeStorageKey,
   decodeCacheValues,
   decodeValue,
@@ -25,7 +27,6 @@ import           Control.Monad.Except
 import           Data.Bifunctor                   (bimap)
 import qualified Data.Bimap                       as Bimap
 import           Data.Bits
-import qualified Data.ByteArray                   as ByteArray
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Base16           as B16
@@ -35,7 +36,7 @@ import           Data.List
 import           Data.Map.Strict                  (Map)
 import qualified Data.Map.Strict                  as Map
 import qualified Data.Map.Ordered                 as OMap
-import           Data.Maybe                       (fromJust, fromMaybe)
+import           Data.Maybe                       (fromJust, fromMaybe, mapMaybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -44,6 +45,7 @@ import           Text.Printf
 import           Text.Read
 
 import           BlockApps.Ethereum
+import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Struct
@@ -52,6 +54,9 @@ import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
 import           BlockApps.Storage                (Storage, Cache)
 import qualified BlockApps.Storage                as Storage
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Keccak256
 
 data SolidityDecodingException = EnumOutOfBounds Text Int
                                | MissingTypeStruct Text
@@ -96,7 +101,7 @@ getArrayStartingKey :: Word256 -> Word256
 getArrayStartingKey = getArrayStartingKeyBS . word256ToByteString
 
 getArrayStartingKeyBS :: ByteString -> Word256
-getArrayStartingKeyBS = byteStringToWord256 . ByteArray.convert . digestKeccak256 . keccak256
+getArrayStartingKeyBS = keccak256ToWord256 . hash
 
 decodeStorageKeySimple :: SimpleType -> Word256 -> Integer -> Integer -> [(Word256, Word256)]
 decodeStorageKeySimple TypeString          o ofs cnt = let sk = toInteger $ getArrayStartingKey o
@@ -299,6 +304,14 @@ structSort (Struct om _)  = sortBy omOrder
   where omOrder :: (Text, Value) -> (Text, Value) -> Ordering
         omOrder (k1, _) (k2, _) = OMap.findIndex k1 om `compare` OMap.findIndex k2 om
 
+contractFunctions
+  :: Struct
+  -> [(Text, SolidityValue)]
+contractFunctions = mapMaybe (uncurry getFunction) . map (fmap snd) . OMap.assocs . fields
+  where getFunction name = \case
+          TypeFunction sel args ret -> Just . (name,) . valueToSolidityValue $ ValueFunction sel args ret
+          _ -> Nothing
+
 decodeValues
   :: Integer
   -> TypeDefs
@@ -491,15 +504,16 @@ encodeValues
   :: TypeDefs
   -> Struct
   -> Word256
-  -> [(Text,Text)]
-  -> Map Word256 Word256
+  -> [(Text,ArgValue)]
+  -> Either Text (Map Word256 Word256)
 encodeValues typeDefs' struct'@Struct{..} offset vars =
   zipMapMaybe (uncurry $ encodeValue typeDefs' offset struct') vars Map.empty
   where
-    zipMapMaybe _ [] m = m
+    zipMapMaybe _ [] m = Right m
     zipMapMaybe f (a:as) m = case (f a) of
-      Nothing -> zipMapMaybe f as m
-      Just b -> zipMapMaybe f as $ foldl' (apply (.|.)) m b
+      Left t -> Left t
+      Right Nothing -> zipMapMaybe f as m
+      Right (Just b) -> zipMapMaybe f as $ foldl' (apply (.|.)) m b
     apply f m (a,b) = case Map.lookup a m of
       Nothing -> Map.insert a b m
       Just c -> Map.insert a (f c b) m
@@ -509,14 +523,15 @@ encodeValue
   -> Word256
   -> Struct
   -> Text
-  -> Text
-  -> Maybe [(Word256,Word256)]
-encodeValue typeDefs' offset Struct{..} varName val = case OMap.lookup varName fields of
-   Nothing -> Nothing
-   Just (Right position, theType) -> case (textToValue (Just typeDefs') val theType) of
-     Left err -> error $ "encodeValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
-     Right v -> Just $ encodeValue' typeDefs' (position `Storage.addOffset` fromIntegral offset) theType v
-   Just (Left _, _) -> error "decodeValue: cannot convert constant variable to storage"
+  -> ArgValue
+  -> Either Text (Maybe [(Word256,Word256)])
+encodeValue typeDefs' offset Struct{..} varName argVal = case OMap.lookup varName fields of
+   Nothing -> Right Nothing
+   Just (Right position, theType) -> do
+     val <- argValueToValue (Just typeDefs') theType argVal
+     return . Just $
+       encodeValue' typeDefs' (position `Storage.addOffset` fromIntegral offset) theType val
+   Just (Left _, _) -> Left "encodeValue: cannot convert constant variable to storage"
 
 encodeValue'
   :: TypeDefs

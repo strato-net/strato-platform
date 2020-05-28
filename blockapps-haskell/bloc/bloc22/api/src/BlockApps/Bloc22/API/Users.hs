@@ -39,6 +39,11 @@ import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.Wei
 
 --------------------------------------------------------------------------------
 -- | Routes and types
@@ -92,7 +97,7 @@ instance FromJSON BlocTransactionData where
 instance ToSample BlocTransactionData where
   toSamples _ = samples
     [ Send PostTransaction {
-        posttransactionHash       = keccak256 "foo"
+        posttransactionHash       = hash "foo"
       , posttransactionGasLimit   = 100000
       , posttransactionCodeOrData = "Code or Data"
       , posttransactionGasPrice   = 1
@@ -108,9 +113,9 @@ instance ToSample BlocTransactionData where
       }
     , Upload ContractDetails {
         contractdetailsBin        = "Contract Bin"
-      , contractdetailsAddress    = Just (Named "Latest")
+      , contractdetailsAddress    = Just (Address 0xdeadbeef)
       , contractdetailsBinRuntime = "Contract Bin Runtime"
-      , contractdetailsCodeHash   = EVMCode $ keccak256SHA $ keccak256 "Contract Code Hash"
+      , contractdetailsCodeHash   = EVMCode $ hash "Contract Code Hash"
       , contractdetailsName       = "Example"
       , contractdetailsSrc        = "contract Example { }"
       , contractdetailsXabi       = sampleXabi
@@ -147,7 +152,7 @@ instance FromJSON BlocTransactionResult where
 instance ToSample BlocTransactionResult where
   toSamples _ = singleSample BlocTransactionResult
     { blocTransactionStatus = Success
-    , blocTransactionHash = keccak256 "foo"
+    , blocTransactionHash = hash "foo"
     , blocTransactionTxResult = Nothing
     , blocTransactionData = Nothing
     }
@@ -160,7 +165,7 @@ instance ToSchema BlocTransactionResult where
       ex :: BlocTransactionResult
       ex = BlocTransactionResult
         { blocTransactionStatus = Success
-        , blocTransactionHash = keccak256 "foo"
+        , blocTransactionHash = hash "foo"
         , blocTransactionTxResult = Nothing
         , blocTransactionData = Nothing
         }
@@ -168,13 +173,11 @@ instance ToSchema BlocTransactionResult where
 type GetBlocTransactionResult = "transactions"
   :> Capture "hash" Keccak256
   :> "result"
-  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> Get '[JSON] BlocTransactionResult
 
 type PostBlocTransactionResults = "transactions"
   :> "results"
-  :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] [Keccak256]
   :> Post '[JSON] [BlocTransactionResult]
@@ -408,6 +411,7 @@ type PostUsersUploadList = "users"
 data UploadListRequest = UploadListRequest
   { uploadlistPassword  :: Password
   , uploadlistContracts :: [UploadListContract]
+  , uploadlistSrcs      :: Maybe (Map Text Text)
   , uploadlistResolve   :: Bool
   } deriving (Eq,Show,Generic)
 
@@ -430,19 +434,23 @@ instance ToSchema UploadListRequest where
       exContract1 :: UploadListContract
       exContract1 = UploadListContract
         { uploadlistcontractContractName = "AccountsContract"
+        , uploadlistcontractSrc = Nothing
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , _uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
+        , _uploadlistcontractChainid = Nothing
         , uploadlistcontractMetadata = Nothing
         }
       ex :: UploadListRequest
-      ex = UploadListRequest "SecretPassword" [exContract1] True
+      ex = UploadListRequest "SecretPassword" [exContract1] Nothing True
 
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
+  , uploadlistcontractSrc          :: Maybe Text
   , uploadlistcontractArgs         :: Map Text ArgValue
   , _uploadlistcontractTxParams    :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
+  , _uploadlistcontractChainid     :: Maybe ChainId
   , uploadlistcontractMetadata     :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 makeLenses ''UploadListContract
@@ -463,9 +471,11 @@ instance ToSchema UploadListContract where
       ex :: UploadListContract
       ex = UploadListContract
         { uploadlistcontractContractName = "SampleContract"
+        , uploadlistcontractSrc = Nothing
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
         , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing
+        , _uploadlistcontractChainid = Nothing
         , uploadlistcontractMetadata = Nothing
         }
 
@@ -647,6 +657,7 @@ instance ToSchema PostSendListRequest where
         , sendtransactionValue = Strung 1000000000000000
         , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
+        , _sendtransactionChainid = Nothing
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
 
@@ -654,6 +665,7 @@ data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue     :: Strung Natural
   , _sendtransactionTxParams :: Maybe TxParams
+  , _sendtransactionChainid  :: Maybe ChainId
   , sendtransactionMetadata  :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 makeLenses ''SendTransaction
@@ -706,6 +718,7 @@ instance ToSchema SendTransaction where
         , sendtransactionValue = Strung 100000000000000
         , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
+        , _sendtransactionChainid = Nothing
         , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
         }
 
@@ -767,7 +780,7 @@ instance FromJSON PostUsersContractMethodListResponse where
 
 instance ToSample PostUsersContractMethodListResponse where
   toSamples _ = samples
-    [ MethodHash (keccak256 "foo")
+    [ MethodHash (hash "foo")
     , MethodResolved $ Right
        [ SolidityValueAsString "1"
        , SolidityValueAsString "two"
@@ -815,6 +828,7 @@ methodErroredExample =
        , methodcallMethodName = "getHoroscope"
        , methodcallContractAddress = Address 0xdeadbeef
        , methodcallContractName = "HoroscopeApp"
+       , _methodcallChainid = Nothing
        , methodcallMetadata = Nothing
        }
 
@@ -865,6 +879,7 @@ instance ToSchema PostMethodListRequest where
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"
+        , _methodcallChainid = Nothing
         , methodcallMetadata = Nothing
         }
 
@@ -875,6 +890,7 @@ data MethodCall = MethodCall
   , methodcallArgs            :: Map Text ArgValue
   , methodcallValue           :: Strung Natural
   , _methodcallTxParams       :: Maybe TxParams
+  , _methodcallChainid        :: Maybe ChainId
   , methodcallMetadata        :: Maybe (Map Text Text)
   } deriving (Eq,Show,Generic)
 makeLenses ''MethodCall
@@ -901,6 +917,7 @@ instance ToSchema MethodCall where
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"
+        , _methodcallChainid = Nothing
         , methodcallMetadata = Nothing
         }
 

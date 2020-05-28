@@ -1,9 +1,0 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
-
-exports[`Faucet: validate with empty values 1`] = `
-Object {
-  "building": "Please tell us what are you building",
-}
-`;
-
-exports[`Faucet: validate with values 1`] = `Object {}`;

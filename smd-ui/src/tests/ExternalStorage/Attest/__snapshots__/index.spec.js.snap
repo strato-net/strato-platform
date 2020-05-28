@@ -1,12 +1,12 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Verify: index enterprise mode Form: submit with values 1`] = `
+exports[`Verify: index Non Oauth mode Form: submit with values 1`] = `
 Object {
   "errors": Object {},
 }
 `;
 
-exports[`Verify: index enterprise mode Form: submit without values 1`] = `
+exports[`Verify: index Non Oauth mode Form: submit without values 1`] = `
 Object {
   "errors": Object {
     "address": "Address required",
@@ -17,7 +17,7 @@ Object {
 }
 `;
 
-exports[`Verify: index enterprise mode Form: values in field 1`] = `
+exports[`Verify: index Non Oauth mode Form: values in field 1`] = `
 Object {
   "form": Object {
     "attest-document": Object {
@@ -82,7 +82,7 @@ Object {
 }
 `;
 
-exports[`Verify: index render component (enterprise mode) with values 1`] = `
+exports[`Verify: index render component (Oauth mode) with values 1`] = `
 "<div>
   <form>
     <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"saved\\" title=\\"Successfully Signed\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
@@ -123,205 +123,7 @@ exports[`Verify: index render component (enterprise mode) with values 1`] = `
 </div>"
 `;
 
-exports[`Verify: index render component (enterprise mode) without values 1`] = `
-"<div>
-  <form>
-    <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"pt-icon-tick\\" title=\\"Attest\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
-      <div className=\\"pt-dialog-body upload-form\\">
-        <div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-3 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Username
-              </label>
-            </div>
-            <div className=\\"col-sm-9 smd-pad-4\\">
-              <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={false}>
-                  <option value={{...}} />
-                  <option value=\\"0\\">
-                    0
-                  </option>
-                  <option value=\\"1\\">
-                    1
-                  </option>
-                  <option value=\\"2\\">
-                    2
-                  </option>
-                  <option value=\\"3\\">
-                    3
-                  </option>
-                  <option value=\\"4\\">
-                    4
-                  </option>
-                  <option value=\\"5\\">
-                    5
-                  </option>
-                  <option value=\\"6\\">
-                    6
-                  </option>
-                  <option value=\\"7\\">
-                    7
-                  </option>
-                  <option value=\\"8\\">
-                    8
-                  </option>
-                  <option value=\\"9\\">
-                    9
-                  </option>
-                  <option value=\\"10\\">
-                    10
-                  </option>
-                  <option value=\\"11\\">
-                    11
-                  </option>
-                  <option value=\\"12\\">
-                    12
-                  </option>
-                  <option value=\\"13\\">
-                    13
-                  </option>
-                  <option value=\\"14\\">
-                    14
-                  </option>
-                  <option value=\\"15\\">
-                    15
-                  </option>
-                  <option value=\\"16\\">
-                    16
-                  </option>
-                  <option value=\\"17\\">
-                    17
-                  </option>
-                  <option value=\\"18\\">
-                    18
-                  </option>
-                  <option value=\\"19\\">
-                    19
-                  </option>
-                  <option value=\\"20\\">
-                    20
-                  </option>
-                  <option value=\\"21\\">
-                    21
-                  </option>
-                  <option value=\\"22\\">
-                    22
-                  </option>
-                  <option value=\\"23\\">
-                    23
-                  </option>
-                  <option value=\\"24\\">
-                    24
-                  </option>
-                  <option value=\\"25\\">
-                    25
-                  </option>
-                  <option value=\\"length\\">
-                    length
-                  </option>
-                </Field>
-              </div>
-              <br />
-              <span className=\\"error-text\\" />
-            </div>
-          </div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-3 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Address
-              </label>
-            </div>
-            <div className=\\"col-sm-9 smd-pad-4\\">
-              <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"address\\" required={true} disabled={false}>
-                  <option value={{...}} />
-                </Field>
-              </div>
-              <br />
-               
-              <span className=\\"error-text\\" />
-            </div>
-          </div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-3 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Password
-              </label>
-            </div>
-            <div className=\\"col-sm-9 smd-pad-4\\">
-              <Field name=\\"password\\" component=\\"input\\" type=\\"password\\" placeholder=\\"Password\\" className=\\"pt-input form-width\\" tabIndex=\\"3\\" required={true} />
-               
-              <br />
-              <span className=\\"error-text\\" />
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Contract Address
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field name=\\"contractAddress\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Contract Address\\" className=\\"pt-input form-width\\" tabIndex=\\"4\\" required={true} />
-            <br />
-            <span className=\\"error-text\\" />
-          </div>
-        </div>
-        <div className=\\"pt-dialog-footer\\">
-          <div className=\\"pt-dialog-footer-actions button-center smd-margin-8\\">
-            <Blueprint.Button intent={0} onClick={[undefined]} disabled={false} text=\\"Attest\\" />
-          </div>
-        </div>
-      </div>
-    </Blueprint.Dialog>
-  </form>
-</div>"
-`;
-
-exports[`Verify: index render component (public mode) with values 1`] = `
-"<div>
-  <form>
-    <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"saved\\" title=\\"Successfully Signed\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
-      <div>
-        <div className=\\"pt-dialog-body attest-result\\">
-          <div className=\\"row content-margin signatures\\">
-            <div className=\\"col-sm-12\\">
-              <center>
-                <h4>
-                  <label>
-                     Signatures 
-                  </label>
-                </h4>
-                <ul>
-                  <li>
-                     
-                    6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad
-                     
-                  </li>
-                  <li>
-                     
-                    a51f27e78aef85a06631f0725f380001e0ae9fb6
-                     
-                  </li>
-                </ul>
-              </center>
-            </div>
-          </div>
-        </div>
-        <div className=\\"pt-dialog-footer\\">
-          <div className=\\"pt-dialog-footer-actions button-center\\">
-            <Blueprint.Button intent={0} onClick={[Function: onClick]} text=\\"Close\\" />
-          </div>
-        </div>
-      </div>
-    </Blueprint.Dialog>
-  </form>
-</div>"
-`;
-
-exports[`Verify: index render component (public mode) without values 1`] = `
+exports[`Verify: index render component (Oauth mode) without values 1`] = `
 "<div>
   <form>
     <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"pt-icon-tick\\" title=\\"Attest\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
@@ -433,6 +235,191 @@ exports[`Verify: index render component (public mode) without values 1`] = `
             <div className=\\"col-sm-9 smd-pad-4\\">
               <div className=\\"\\">
                 <Field className=\\"pt-input\\" component=\\"select\\" name=\\"address\\" required={true} disabled={true}>
+                  <option value={{...}} />
+                </Field>
+              </div>
+              <br />
+               
+              <span className=\\"error-text\\" />
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Contract Address
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Field name=\\"contractAddress\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Contract Address\\" className=\\"pt-input form-width\\" tabIndex=\\"4\\" required={true} />
+            <br />
+            <span className=\\"error-text\\" />
+          </div>
+        </div>
+        <div className=\\"pt-dialog-footer\\">
+          <div className=\\"pt-dialog-footer-actions button-center smd-margin-8\\">
+            <Blueprint.Button intent={0} onClick={[undefined]} disabled={false} text=\\"Attest\\" />
+          </div>
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;
+
+exports[`Verify: index render component (non Oauth mode) with values 1`] = `
+"<div>
+  <form>
+    <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"saved\\" title=\\"Successfully Signed\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+      <div>
+        <div className=\\"pt-dialog-body attest-result\\">
+          <div className=\\"row content-margin signatures\\">
+            <div className=\\"col-sm-12\\">
+              <center>
+                <h4>
+                  <label>
+                     Signatures 
+                  </label>
+                </h4>
+                <ul>
+                  <li>
+                     
+                    6e873015e8ff27d7c6d3ab5d1403a9df9ab420ad
+                     
+                  </li>
+                  <li>
+                     
+                    a51f27e78aef85a06631f0725f380001e0ae9fb6
+                     
+                  </li>
+                </ul>
+              </center>
+            </div>
+          </div>
+        </div>
+        <div className=\\"pt-dialog-footer\\">
+          <div className=\\"pt-dialog-footer-actions button-center\\">
+            <Blueprint.Button intent={0} onClick={[Function: onClick]} text=\\"Close\\" />
+          </div>
+        </div>
+      </div>
+    </Blueprint.Dialog>
+  </form>
+</div>"
+`;
+
+exports[`Verify: index render component (non Oauth mode) without values 1`] = `
+"<div>
+  <form>
+    <Blueprint.Dialog isOpen={false} onClose={[Function: onClose]} iconName=\\"pt-icon-tick\\" title=\\"Attest\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+      <div className=\\"pt-dialog-body upload-form\\">
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Username
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={false}>
+                  <option value={{...}} />
+                  <option value=\\"0\\">
+                    0
+                  </option>
+                  <option value=\\"1\\">
+                    1
+                  </option>
+                  <option value=\\"2\\">
+                    2
+                  </option>
+                  <option value=\\"3\\">
+                    3
+                  </option>
+                  <option value=\\"4\\">
+                    4
+                  </option>
+                  <option value=\\"5\\">
+                    5
+                  </option>
+                  <option value=\\"6\\">
+                    6
+                  </option>
+                  <option value=\\"7\\">
+                    7
+                  </option>
+                  <option value=\\"8\\">
+                    8
+                  </option>
+                  <option value=\\"9\\">
+                    9
+                  </option>
+                  <option value=\\"10\\">
+                    10
+                  </option>
+                  <option value=\\"11\\">
+                    11
+                  </option>
+                  <option value=\\"12\\">
+                    12
+                  </option>
+                  <option value=\\"13\\">
+                    13
+                  </option>
+                  <option value=\\"14\\">
+                    14
+                  </option>
+                  <option value=\\"15\\">
+                    15
+                  </option>
+                  <option value=\\"16\\">
+                    16
+                  </option>
+                  <option value=\\"17\\">
+                    17
+                  </option>
+                  <option value=\\"18\\">
+                    18
+                  </option>
+                  <option value=\\"19\\">
+                    19
+                  </option>
+                  <option value=\\"20\\">
+                    20
+                  </option>
+                  <option value=\\"21\\">
+                    21
+                  </option>
+                  <option value=\\"22\\">
+                    22
+                  </option>
+                  <option value=\\"23\\">
+                    23
+                  </option>
+                  <option value=\\"24\\">
+                    24
+                  </option>
+                  <option value=\\"25\\">
+                    25
+                  </option>
+                  <option value=\\"length\\">
+                    length
+                  </option>
+                </Field>
+              </div>
+              <br />
+              <span className=\\"error-text\\" />
+            </div>
+          </div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Address
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"address\\" required={true} disabled={false}>
                   <option value={{...}} />
                 </Field>
               </div>

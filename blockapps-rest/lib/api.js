@@ -49,39 +49,44 @@ async function fill(user, options) {
   return postue(url, endpoint, body, setAuthHeaders(user, options));
 }
 
-async function createContract(user, contract, options) {
+function getCreateArgs(contract, options) {
+  const src = options.config.VM === 'EVM' ? {} : { src: contract.source };
+
   const payload = {
+    ...src,
     contract: contract.name,
-    src: contract.source,
     args: contract.args,
-    metadata: constructMetadata(options, contract.name)
+    chainid: contract.chainid,
+    txParams: contract.txParams,
+    metadata: constructMetadata(options, contract.name),
   };
+
+  const tx = {
+    payload,
+    type: TxPayloadType.CONTRACT,
+  };
+  return tx;
+}
+
+async function compileContracts(user, contracts, options) {
+  const body = contracts.map(contract => ({ contractName: contract.name, source: contract.source }));
+
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.COMPILE, options);
+  return post(url, endpoint, body, setAuthHeaders(user, options));
+}
+
+async function createContract(user, contract, options) {
+  const tx = getCreateArgs(contract, options);
   const body = {
-    txs: [
-      {
-        payload,
-        type: TxPayloadType.CONTRACT
-      }
-    ]
+    txs: [tx]
   };
   const pendingTxResult = await sendTransactions(user, body, options);
   return pendingTxResult;
 }
 
 async function createContractList(user, contracts, options) {
-  const txs = contracts.map(contract => {
-    const payload = {
-      contract: contract.name,
-      src: contract.source,
-      args: contract.args,
-      metadata: constructMetadata(options, contract.name)
-    };
-    const tx = {
-      payload,
-      type: TxPayloadType.CONTRACT
-    };
-    return tx;
-  });
+  const txs = contracts.map(contract => getCreateArgs(contract, options));
   const body = {
     txs
   };
@@ -133,21 +138,35 @@ async function getState(user, contract, options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function call(user, callMethodArgs, options) {
-  const { contract, method, args, value } = callMethodArgs;
+async function getBatchStates(user, stateArgs, options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.STATES, options);
+  const body = stateArgs ? stateArgs : [];
+  return post(url, endpoint, body, setAuthHeaders(user, options));
+}
+
+function getCallArgs(callMethodArgs, options) {
+  const { contract, method, args, value, chainid, txParams } = callMethodArgs;
   const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
   const payload = {
-    contractName: contract.name,
-    contractAddress: contract.address,
-    value: valueFixed,
-    method,
-    args,
-    metadata: constructMetadata(options, contract.name)
+      contractName: contract.name,
+      contractAddress: contract.address,
+      chainid,
+      value: valueFixed,
+      method,
+      args,
+      txParams,
+      metadata: constructMetadata(options, contract.name)
   };
   const tx = {
-    payload,
-    type: TxPayloadType.FUNCTION
+      payload,
+      type: TxPayloadType.FUNCTION
   };
+  return tx;
+}
+
+async function call(user, callMethodArgs, options) {
+  const tx = getCallArgs(callMethodArgs, options);
   const body = {
     txs: [tx]
   };
@@ -156,23 +175,7 @@ async function call(user, callMethodArgs, options) {
 }
 
 async function callList(user, callListArgs, options) {
-  const txs = callListArgs.map(callArgs => {
-    const { contract, method, args, value } = callArgs;
-    const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
-    const payload = {
-      contractName: contract.name,
-      contractAddress: contract.address,
-      value: valueFixed,
-      method,
-      args,
-      metadata: constructMetadata(options, contract.name)
-    };
-    const tx = {
-      payload,
-      type: TxPayloadType.FUNCTION
-    };
-    return tx;
-  });
+  const txs = callListArgs.map(callArgs => getCallArgs(callArgs, options));
   const body = {
     txs
   };
@@ -182,18 +185,30 @@ async function callList(user, callListArgs, options) {
 
 async function sendTransactions(user, body, options) {
   const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.SEND, options);
-  return post(url, endpoint, body, setAuthHeaders(user, options));
+  const { cacheNonce, ...sendOptions } = options;
+
+  let endpoint;
+  if (cacheNonce) {
+    endpoint = constructEndpoint(Endpoint.SEND_PARALLEL, sendOptions);
+  } else {
+    endpoint = constructEndpoint(Endpoint.SEND, sendOptions);
+  }
+
+  return post(url, endpoint, body, setAuthHeaders(user, sendOptions));
+}
+
+function getSendArgs(sendTx, options) {
+  const tx = {
+    payload: sendTx,
+    type: TxPayloadType.TRANSFER
+  };
+  return tx;
 }
 
 async function send(user, sendTx, options) {
+  const tx = getSendArgs(sendTx, options);
   const body = {
-    txs: [
-      {
-        payload: sendTx,
-        type: TxPayloadType.TRANSFER
-      }
-    ]
+    txs: [tx]
   };
   return sendTransactions(user, body, options);
 }
@@ -220,6 +235,27 @@ async function search(user, contract, options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
+async function searchWithContentRange(user, contract, options) {
+  const url = getNodeUrl(options);
+  const urlParams = {
+      name: contract.name
+  };
+  const endpoint = constructEndpoint(Endpoint.SEARCH, options, urlParams);
+  const headersWithCount = { ...options.headers, Prefer: 'count=exact' };
+  const optionsWithCount = { ...options, headers: headersWithCount, getFullResponse: true };
+  const { data, headers } = await get(url, endpoint, setAuthHeaders(user, optionsWithCount));
+  const contentRangeStr = headers['content-range'];
+  const [range, countStr] = contentRangeStr.split('/');
+  const count = parseInt(countStr, 10);
+  if (range === "*") {
+    const contentRange = { count };
+    return { data, contentRange };
+  }
+  const [start, end] = range.split('-').map((s) => parseInt(s, 10));
+  const contentRange = { start, end, count };
+  return { data, contentRange };
+}
+
 // TODO: check options.params and options.headers in axoos wrapper.
 async function getChains(chainIds, options) {
   const url = getNodeUrl(options);
@@ -236,6 +272,53 @@ async function createChain(body, options) {
   return await post(url, endpoint, body, options);
 }
 
+async function createChains(body, options) {
+    const url = getNodeUrl(options);
+    const endpoint = constructEndpoint(Endpoint.CHAINS, options);
+    return await post(url, endpoint, body, options);
+}
+
+async function uploadExtStorage(body, options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.EXT_UPLOAD, options);
+  return await post(url, endpoint, body, options);
+}
+
+async function attestExtStorage(body, options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.EXT_ATTEST, options);
+  return await post(url, endpoint, body, options);
+}
+
+async function verifyExtStorage(user, contract, options) {
+  const url = getNodeUrl(options);
+  const params = {
+    contractAddress: contract.address
+  };
+  const endpoint = constructEndpoint(Endpoint.EXT_VERIFY, options, params);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function downloadExtStorage(user, contract, options) {
+  const url = getNodeUrl(options);
+  const params = {
+    contractAddress: contract.address
+  };
+  const endpoint = constructEndpoint(Endpoint.EXT_DOWNLOAD, options, params);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function listExtStorage(user, args, options) {
+  const url = getNodeUrl(options);
+  const { limit, offset } = args;
+  const params = {
+    limit,
+    offset
+  };
+  const endpoint = constructEndpoint(Endpoint.EXT_LIST, options, params);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
 async function pingOauth(user, options){
   const url = getNodeUrl(options)
   const endpoint = constructEndpoint(Endpoint.KEY, options)
@@ -249,19 +332,31 @@ export default {
   getUsers,
   getUser,
   createUser,
+  getCreateArgs,
+  compileContracts,
   createContract,
   createContractList,
   fill,
   blocResults,
   getState,
+  getBatchStates,
+  getCallArgs,
   call,
   callList,
+  getSendArgs,
   send,
   sendTransactions,
   getKey,
   createKey,
   search,
+  searchWithContentRange,
   getChains,
   createChain,
-  pingOauth
+  createChains,
+  uploadExtStorage,
+  attestExtStorage,
+  verifyExtStorage,
+  downloadExtStorage,
+  listExtStorage,
+  pingOauth,
 }

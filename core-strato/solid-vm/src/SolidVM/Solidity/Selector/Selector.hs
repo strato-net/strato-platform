@@ -16,6 +16,8 @@ import           Data.Text.Encoding
 
 import           SolidVM.Solidity.Selector.Type
 
+import           Blockchain.VM.SolidException
+
 -- | The 'selector' function is responsible for producing the 4-byte
 -- hash that Solidity uses to identify functions.  It's essentially the
 -- first 4 bytes of the Keccak hash of the signature with all the argument
@@ -52,8 +54,8 @@ formatArg enumSizes (TypeArrayDynamic x) = formatArg enumSizes x ++"[]"
 formatArg enumSizes (TypeMapping x y) = "mapping(" ++ formatArg enumSizes (SimpleType x) ++ "=>" ++ formatArg enumSizes y ++ ")"
 formatArg enumSizes (TypeEnum label) =
   case lookup label enumSizes of
-   Nothing -> error "you are using an enum not defined"
+   Nothing -> typeError "you are using an enum not defined" $ show label
    Just x | x < 256 -> formatArg enumSizes (SimpleType $ TypeInt False $ Just 1)
-   Just x -> error $ "undefined case in formatArg for enum with more than 255 items: size=" ++ show x
+   Just x -> internalError "undefined case in formatArg for enum with more than 255 items: size" $ show x
 
-formatArg _ x = error $ "undefined value in formatArg: " ++ show x
+formatArg _ x = internalError "undefined value in formatArg" $ show x

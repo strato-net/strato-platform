@@ -1,7 +1,8 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
 
 module Blockchain.VM.TestEthereum
     ( runAllTests
@@ -16,7 +17,6 @@ import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.State
 import           Data.Aeson
 import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Lazy                        as BL
@@ -56,16 +56,18 @@ import           Blockchain.EVM.VMM (readGasRemaining)
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.SHA                 (keccak256)
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.VMContext
+import           Blockchain.VM.VMException
 
 import           Blockchain.VM.TestDescriptions
 import           Blockchain.VM.TestFiles
 
 import qualified Text.Colors                                 as C
 import           Text.Format
+
+import           UnliftIO
 
 defineFlag "debugEnabled" False "enable debugging"
 defineFlag "debugEnabled2" False "enable debugging"
@@ -123,12 +125,12 @@ getNumber "" = 0
 getNumber x  = read x
 
 --Just a cheap trick to enable the display of nearly all storage keys in the tests
-someHashes::M.Map SHA Int
+someHashes::M.Map Keccak256 Int
 someHashes = M.fromList $ map (\x -> (hash (word256ToBytes x), fromIntegral x)) [0..255]
 
 showHash::Integer->String
 showHash val =
-  case M.lookup (SHA (fromIntegral val)) someHashes of
+  case M.lookup (unsafeCreateKeccak256FromWord256 (fromIntegral val)) someHashes of
    Nothing -> showHexInt val ++ "[#ed]"
    Just x  -> show x
 
@@ -152,7 +154,7 @@ addressStates = do
 txToOutputTx :: Transaction -> OutputTx
 txToOutputTx = fromJust . wrapTransactionUnanchored . IngestTx TO.Direct
 
-runTest::Test-> ContextM ()
+runTest :: Test-> ContextM ()
 runTest test = do
   when flags_debugEnabled $
     liftIO . print $ test
@@ -171,11 +173,11 @@ runTest test = do
   let block =
         Block {
           blockBlockData = BlockData {
-             blockDataParentHash = fromMaybe (SHA 0x0) . previousHash . env $ test,
+             blockDataParentHash = fromMaybe (unsafeCreateKeccak256FromWord256 0x0) . previousHash . env $ test,
              blockDataNumber = read . currentNumber . env $ test,
              blockDataCoinbase = currentCoinbase . env $ test,
              blockDataDifficulty = read . currentDifficulty . env $ test,
-             blockDataUnclesHash = SHA 0, --error "unclesHash not set",
+             blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0, --error "unclesHash not set",
              blockDataStateRoot = StateRoot "", -- error "bStateRoot not set",
              blockDataTransactionsRoot = StateRoot "", -- error "transactionsRoot not set",
              blockDataReceiptsRoot = StateRoot "", -- error "receiptsRoot not set", -- StateRoot ""
@@ -186,7 +188,7 @@ runTest test = do
              --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
              blockDataExtraData = "", --error "extraData not set",
              blockDataNonce = 0, --error "nonce not set",
-             blockDataMixHash=SHA 0 --error "mixHash not set"
+             blockDataMixHash=unsafeCreateKeccak256FromWord256 0 --error "mixHash not set"
              },
           blockReceiptTransactions = [], --error "receiptTransactions not set",
           blockBlockUncles = [] --error "blockUncles not set"
@@ -207,31 +209,31 @@ runTest test = do
                 envValue = getNumber $ value' exec,
                 envCode = code exec,
                 envJumpDests = getValidJUMPDESTs $ code exec,
-                envTxHash = SHA 0,
+                envTxHash = unsafeCreateKeccak256FromWord256 0,
                 envChainId = Nothing,
                 envMetadata = Nothing
                 }
 
-        cxt <- get
-        cfg <- ask
-        vmState0 <- liftIO $ startingState True False env' cfg cxt
+        mdbs <- contextGets _memDBs
+        vmState0 <- liftIO $ startingState True False env' mdbs
+        gasref <- liftIO . newCounter . fromIntegral . getNumber . gas' $ exec
+        vmStateRef <- newIORef $ vmState0{vmGasRemaining=gasref, debugCallCreates=Just []}
 
-        (result, vmState1) <- lift . lift $ do
-          gasref <- liftIO . newCounter . fromIntegral . getNumber . gas' $ exec
-          flip runStateT vmState0{vmGasRemaining=gasref, debugCallCreates=Just []} . runExceptT $ do
-            runCodeFromStart
+        result <- try . flip runReaderT vmStateRef $ do
+          runCodeFromStart
 
-            vmState2 <- lift get
-            when flags_debugEnabled $
-              liftIO $ putStrLn $ "Removing accounts in suicideList: " ++
-                                intercalate ", " (show . pretty <$> S.toList (suicideList vmState2))
+          vmState2 <- readIORef vmStateRef
+          when flags_debugEnabled $
+            liftIO $ putStrLn $ "Removing accounts in suicideList: " ++
+                              intercalate ", " (show . pretty <$> S.toList (suicideList vmState2))
 
-            forM_ (suicideList vmState2) deleteAddressState
+          forM_ (suicideList vmState2) deleteAddressState
+        vmState1 <- readIORef vmStateRef
         when flags_debugEnabled $ do
           liftIO . putStrLn . ("runCodeFromStart: " ++) . show $ result
           liftIO . putStrLn . ("runCodeFromStart: " ++) . show $ vmState1
 
-        put $ dbs vmState1
+        contextModify $ \st -> st{_memDBs = vmMemDBs vmState1}
 
         flushMemStorageDB
         flushMemAddressStateDB
@@ -240,7 +242,7 @@ runTest test = do
          Right _ -> do
           gr <- readGasRemaining vmState1
           return (result, returnVal vmState1, gr, logs vmState1, debugCallCreates vmState1, Just vmState1)
-         Left _ -> return (Right (), Nothing, 0, [], Just [], Nothing)
+         Left (_ :: VMException) -> return (Right (), Nothing, 0, [], Just [], Nothing)
 
       ITransaction transaction -> do
         let t = case tTo' transaction of
@@ -282,7 +284,7 @@ runTest test = do
 
   afterAddressStates <- addressStates
 
-  let hashInteger = fromIntegral . bytesToWord256 . keccak256 . word256ToBytes . fromIntegral
+  let hashInteger = fromIntegral . bytesToWord256 . keccak256ToByteString . hash . word256ToBytes . fromIntegral
   let postTest = M.toList $
                  flip M.map (post test) $
                  \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')}
@@ -298,7 +300,7 @@ runTest test = do
   RawData (fromMaybe B.empty retVal) `shouldBe` out test
   unless (null postTest && isLeft result) $
     afterAddressStates `shouldBe` postTest
-  mapM_ (gasRemaining `shouldBe`) $ remainingGas test
+  mapM_ (gasRemaining `shouldBe`) $ fmap fromIntegral $ remainingGas test
   if isNothing (callcreates test)
       then returnedCallCreates `shouldBe` Just []
       else fmap reverse returnedCallCreates `shouldBe` callcreates test

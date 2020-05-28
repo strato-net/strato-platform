@@ -10,7 +10,6 @@
 
 module Strato.Strato23.Database.Queries where
 
-import           BlockApps.Ethereum
 import           Control.Arrow
 import           Control.Monad                   (void)
 import qualified Crypto.Saltine.Class            as Saltine
@@ -27,6 +26,9 @@ import           Opaleye                         hiding (not, null, index)
 
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Tables
+
+import           Blockchain.Strato.Model.Address
+
 
 countUsers :: Text -> Query (Column PGInt8)
 countUsers username = aggregate countStar $ proc () -> do
@@ -100,7 +102,7 @@ instance QueryRunnerColumnDefault PGBytea Address where
     (fromMaybe (error "could not decode address") . stringAddress . C8.unpack)
     queryRunnerColumnDefault
 instance Default Constant Address (Column PGBytea) where
-  def = lmap (C8.pack . addressString) def
+  def = lmap (C8.pack . formatAddressWithoutColor) def
 
 instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
   queryRunnerColumnDefault = queryRunnerColumn id

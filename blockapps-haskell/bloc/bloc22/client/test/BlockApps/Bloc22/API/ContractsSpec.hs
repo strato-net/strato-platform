@@ -15,7 +15,6 @@ import           BlockApps.Bloc22.API.SpecUtils
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Client
 import           BlockApps.Solidity.SolidityValue
-import           BlockApps.Solidity.Xabi
 
 spec :: SpecWith TestConfig
 spec = do
@@ -25,6 +24,7 @@ spec = do
         postCompileRequest = PostCompileRequest
           (Just simpleStorageContractName)
           simpleStorageSrc
+          Nothing
       Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl Nothing)
       contracts `shouldSatisfy` any
         (\ (PostCompileResponse name _) -> name == simpleStorageContractName)
@@ -33,6 +33,7 @@ spec = do
         postCompileRequest = PostCompileRequest
           (Just twoContractsContractName)
           twoContractsSrc
+          Nothing
       Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl Nothing)
       liftIO . putStrLn $ show contracts
       contracts `shouldSatisfy` (== 2) . length
@@ -41,17 +42,17 @@ spec = do
       Right (GetContractsResponse contracts) <- runClientM (getContracts Nothing) (ClientEnv mgr blocUrl Nothing)
       let Just addressesCreatedAt1 = Map.lookup simpleStorageContractName contracts
       addressesCreatedAt1 `shouldSatisfy` any
-        (\ (AddressCreatedAt _ addr Nothing) -> addr == Unnamed simpleStorageContractAddress)
+        (\ (AddressCreatedAt _ addr Nothing) -> addr == simpleStorageContractAddress)
   describe "getContractsData" $
     it "gets a list of addresses created under the contract name" $ \ TestConfig {..} -> do
       Right addrs <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr blocUrl Nothing)
-      addrs `shouldContain` [Unnamed simpleStorageContractAddress]
+      addrs `shouldContain` [simpleStorageContractAddress]
   describe "getContractsContract" $ do
     it "get xabi data for an uploaded contracted at a specific address" $ \ TestConfig {..} -> do
       contractsEither <- runClientM
         (getContractsContract
           (ContractName simpleStorageContractName)
-          (Unnamed simpleStorageContractAddress)
+          (simpleStorageContractAddress)
           Nothing
         )
         (ClientEnv mgr blocUrl Nothing)
@@ -63,7 +64,7 @@ spec = do
       Right functionNames <- runClientM
         (getContractsFunctions
           (ContractName simpleStorageContractName)
-          (Unnamed simpleStorageContractAddress)
+          (simpleStorageContractAddress)
           Nothing
         )
         (ClientEnv mgr blocUrl Nothing)
@@ -77,7 +78,7 @@ spec = do
       Right symbols <- runClientM
         (getContractsSymbols
           (ContractName simpleStorageContractName)
-          (Unnamed simpleStorageContractAddress)
+          (simpleStorageContractAddress)
           Nothing
         )
         (ClientEnv mgr blocUrl Nothing)
@@ -87,7 +88,7 @@ spec = do
       Right contracts <- runClientM
         (getContractsState
           (ContractName simpleStorageContractName)
-          (Unnamed simpleStorageContractAddress)
+          simpleStorageContractAddress
           Nothing
           Nothing
           Nothing

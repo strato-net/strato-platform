@@ -61,8 +61,7 @@ whileStatement = do
   reserved "while"
   e <- parens expression
   s <- fmap (:[]) statement <|> statements
-  elseStatement <- optionMaybe (reserved "else" >> (fmap (:[]) statement <|> statements))
-  return $ IfStatement e s elseStatement
+  return $ WhileStatement e s
 
 forStatement :: SolidityParser Statement
 forStatement = do
@@ -118,11 +117,11 @@ expression =
     [binary "^"],
     [binary "|"],
     [binary "==", binary "!="],
-    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
     [binary "<", binary ">", binary "<=", binary ">="],
+    [Postfix (do { reservedOp "?"; e1 <- expression; reservedOp ":"; e2 <- expression; return (\e -> Ternary e e1 e2)})],
+    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
     [binary "&&"],
-    [binary "||"],
-    [Postfix (do { reservedOp "?"; e1 <- expression; reservedOp ":"; e2 <- expression; return (\e -> Ternary e e1 e2)})]
+    [binary "||"]
   ]
   (tuple <|> array <|> primaryExpression)
 

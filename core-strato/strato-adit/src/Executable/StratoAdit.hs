@@ -70,7 +70,7 @@ doBlock minerNumber n newNonce = do
     $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"
         -- TODO update hash too!
         -- this used to happen through setting the matching blockDataRefHash to blockHash $ theMinedBlock
-    _ <- withKafkaViolently $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry theMinedBlock]
+    _ <- withKafkaRetry1s $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry theMinedBlock]
     $logDebugS "writeUnseqEventsEnd" . T.pack $ "Wrote block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"
     return ()
 
@@ -94,7 +94,7 @@ mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
 doConsume :: Offset -> TMVar Block -> AditM ()
 doConsume offset c = do
     $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
-    blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
+    blocks <- withKafkaRetry1s $ setDefaultKafkaState >> fetchUnminedBlocks offset
 
     ePeers <- liftIO getActivePeers
     case (length <$> ePeers, reverse blocks) of

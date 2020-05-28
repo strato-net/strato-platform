@@ -1,7 +1,11 @@
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE PolyKinds            #-}
 {-# LANGUAGE RankNTypes           #-}
 {-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TypeApplications     #-}
+{-# LANGUAGE TypeOperators        #-}
 
 module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
@@ -10,7 +14,7 @@ module Blockchain.CommunicationConduit
     , mkEthP2PEventConduit
     ) where
 
-import           Control.Monad.Change.Modify           (Accessible)
+import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -22,10 +26,10 @@ import           Conduit
 import qualified Data.Conduit.Binary                   as CB
 import           Data.Conduit.Combinators              (yieldMany)
 import qualified Data.Conduit.List                     as CL
-import           Data.Conduit.Network
 import           Data.Conduit.TQueue
 import           Data.List.Split
 import           Data.Maybe
+import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.Void
 import           Text.Printf
@@ -33,17 +37,12 @@ import           UnliftIO.Concurrent                   hiding (yield)
 import           UnliftIO.Exception
 import           UnliftIO.STM
 
-import           Network.Kafka                         as K
-
 import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context
 import           Blockchain.Data.Block
 import           Blockchain.Data.Control               (P2PCNC(..))
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire                  as W
-import           Blockchain.DB.DetailsDB               hiding (getBestBlockHash)
-import           Blockchain.DB.SQLDB
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
@@ -53,11 +52,8 @@ import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.Output
 import           Blockchain.Participation
-import           Blockchain.SeqEventNotify
+import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import qualified Blockchain.Strato.RedisBlockDB        as RBDB
-import           Blockchain.Strato.RedisBlockDB.Models
-import           Blockchain.Stream.VMEvent
 import           Blockchain.TimerSource
 import           Blockchain.Util
 import           Blockchain.Watchdog
@@ -73,23 +69,24 @@ mkEthP2PEventSource :: ( MonadResource m
                        , MonadLogger m
                        , MonadUnliftIO m
                        )
-                    => AppData
+                    => ConduitM () B.ByteString m ()
+                    -> ConduitM () P2pEvent m ()
+                    -> String
                     -> EthCryptState
-                    -> K.KafkaState
                     -> m (ConduitM () Event m ())
-mkEthP2PEventSource app inCtx ks = do
+mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
   tid <- myThreadId
   recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
-    [ appSource app
+    [ peerSource
         .| ethDecrypt inCtx
         .| CL.iterM (recordTraffic Inbound)
         .| bytesToMessages
-        .| CL.iterM (displayMessage Inbound (show $ appSockAddr app))
+        .| CL.iterM (displayMessage Inbound peerStr)
         .| CL.map MsgEvt
         .| CL.iterM (const $ petWatchdog recvWatchdog)
-    , seqEventNotificationSource ks
+    , seqEventSource
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
     , timerSource
@@ -110,11 +107,12 @@ mkCanarySource = do
 mkEthP2PEventConduit :: (MonadResource m, MonadLogger m, MonadUnliftIO m)
                      => String
                      -> EthCryptState
+                     -> ([IngestEvent] -> m ())
                      -> m (ConduitM (Either P2PCNC Message) BC.ByteString m ())
-mkEthP2PEventConduit str outCtx = do
+mkEthP2PEventConduit str outCtx unseqSink = do
   tid <- myThreadId
   sendWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  return $ debounceTxSends
+  return $ debounceTxSendsAndUnseq unseqSink
         .| CL.iterM recordMessage
         .| CL.iterM (displayMessage Outbound str)
         .| CL.iterM (const $ petWatchdog sendWatchdog)
@@ -122,8 +120,8 @@ mkEthP2PEventConduit str outCtx = do
         .| CL.iterM (recordTraffic Outbound)
         .| ethEncrypt outCtx
 
-debounceTxSends :: MonadIO m => ConduitT (Either P2PCNC Message) Message m ()
-debounceTxSends = do
+debounceTxSendsAndUnseq :: MonadIO m => ([IngestEvent] -> m ()) -> ConduitT (Either P2PCNC Message) Message m ()
+debounceTxSendsAndUnseq unseqSink = do
   txq <- atomically newTQueue
   awaitForever $ \case
     Right (W.Transactions txs) -> do
@@ -134,16 +132,12 @@ debounceTxSends = do
       txs <- atomically $ flushTQueue txq
       recordEmptyQueue
       yieldMany . map W.Transactions $ chunksOf 100 txs
+    Left (ToUnseq ie) -> lift $ unseqSink ie
 
-handleMsgClientConduit :: ( MonadIO (StateT Context m)
-                          , MonadResource m
-                          , Accessible RBDB.RedisConnection (StateT Context m)
-                          , WrapsSQLDB (StateT Context) m
-                          , MonadLogger (StateT Context m)
-                          )
+handleMsgClientConduit :: MonadP2P m
                        => Point
                        -> PPeer
-                       -> ConduitM Event (Either P2PCNC Message) (StateT Context m) ()
+                       -> ConduitM Event (Either P2PCNC Message) m ()
 handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
     yield $ Right Hello { version = 4
@@ -157,42 +151,35 @@ handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
         Just Hello{} ->
-            RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
-                Nothing -> error "we don't have a local BestBlock"
-                Just (RedisBestBlock hash _ tdiff) -> do
-                    genHash <- lift . runWithSQL $ getGenesisBlockHash
-                    yield $ Right Status {
-                        protocolVersion = fromIntegral ethVersion,
-                        networkID       = computeNetworkID,
-                        totalDifficulty = fromIntegral tdiff,
-                        latestHash      = hash,
-                        genesisHash     = genHash
-                    }
+            yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
+              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
+              return $ Right Status {
+                protocolVersion = fromIntegral ethVersion,
+                networkID       = computeNetworkID,
+                totalDifficulty = fromIntegral tdiff,
+                latestHash      = bHash,
+                genesisHash     = genHash
+              })
         other -> assertHandshake other
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
-                genHash <- lift . runWithSQL $ getGenesisBlockHash
+                (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-                void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
-                lastBlockNumber <- liftIO getBestKafkaBlockNumber
-                Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
-                mrh <- gets maxReturnedHeaders
-                yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) mrh 0 Forward
+                -- we set to 0 cause we dont necessarily know the number yet
+                lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+                (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+                mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
                 yield . Right $ GetChainDetails []
-                handleGetChainDetails peer []
-                stampActionTimestamp
+                handleGetChainDetails peer S.empty
+                lift stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
-handleMsgServerConduit :: (MonadIO (StateT Context m)
-                         , MonadResource m
-                         , Accessible RBDB.RedisConnection (StateT Context m)
-                         , WrapsSQLDB (StateT Context) m
-                         , MonadLogger (StateT Context m)
-                         )
-                 => Point
-                 -> PPeer
-                 -> ConduitM Event (Either P2PCNC Message) (StateT Context m) ()
+handleMsgServerConduit :: MonadP2P m
+                       => Point
+                       -> PPeer
+                       -> ConduitM Event (Either P2PCNC Message) m ()
 handleMsgServerConduit myPubkey peer = do
     $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
@@ -210,19 +197,18 @@ handleMsgServerConduit myPubkey peer = do
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
-            RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
-                Nothing -> error "we don't have a local BestBlock!"
-                Just (RedisBestBlock hash _ tdiff) -> do
-                    genHash <- lift . runWithSQL $ getGenesisBlockHash
-                    when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
-                    void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
-                    yield $ Right Status {
-                        protocolVersion=fromIntegral ethVersion,
-                        networkID=computeNetworkID,
-                        totalDifficulty= fromIntegral tdiff,
-                        latestHash=hash,
-                        genesisHash=genHash
-                    }
+            yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
+              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
+              when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
+              -- we set to 0 cause we dont necessarily know the number yet
+              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+              return $ Right Status {
+                  protocolVersion = fromIntegral ethVersion,
+                  networkID = computeNetworkID,
+                  totalDifficulty = fromIntegral tdiff,
+                  latestHash = bHash,
+                  genesisHash = genHash
+              })
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 

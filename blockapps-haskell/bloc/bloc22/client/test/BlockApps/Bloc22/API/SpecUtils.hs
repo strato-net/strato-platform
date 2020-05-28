@@ -6,17 +6,18 @@
 {-# LANGUAGE RecordWildCards       #-}
 module BlockApps.Bloc22.API.SpecUtils where
 
+import           Data.Either
 import           Data.Text                 (Text, pack)
-import           Test.Hspec
 import           GHC.Generics
-import Data.Either
+import           Network.HTTP.Client
 import           Servant.Client
+import           Test.Hspec
 import           Test.QuickCheck.Instances ()
 
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Client
-import           BlockApps.Ethereum
-import           Network.HTTP.Client
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Keccak256  hiding (hash)
 
 
 data TestConfig = TestConfig
@@ -60,7 +61,7 @@ readSolFile filename = do
 
 resolveTx :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
 resolveTx testConfig@TestConfig{..} hash = do
-  eResult <- runClientM (getBlocTransactionResult hash Nothing True) (ClientEnv mgr blocUrl Nothing)
+  eResult <- runClientM (getBlocTransactionResult hash True) (ClientEnv mgr blocUrl Nothing)
   case eResult of
     Left _ -> return eResult
     Right result ->
@@ -85,7 +86,7 @@ getResolvedBatchTx testConfig io = do
 resolveTxMulti :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
 resolveTxMulti testConfig@TestConfig{..} hash = do
   let Just blocclient = blocUrlMulti
-  eResult <- runClientM (getBlocTransactionResult hash Nothing True) (ClientEnv mgr blocclient Nothing)
+  eResult <- runClientM (getBlocTransactionResult hash True) (ClientEnv mgr blocclient Nothing)
   case eResult of
     Left _ -> return eResult
     Right result ->
@@ -102,7 +103,7 @@ getResolvedTxMulti testConfig io = do
 
 resolveBlocTx :: BlocTransactionResult -> ClientM BlocTransactionResult
 resolveBlocTx bloc = do
-  result <- getBlocTransactionResult (blocTransactionHash bloc) Nothing True
+  result <- getBlocTransactionResult (blocTransactionHash bloc) True
   case blocTransactionStatus result of
     Pending -> resolveBlocTx result
     _ -> return result

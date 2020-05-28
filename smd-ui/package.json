@@ -58,7 +58,7 @@
     "build": "npm run build-css && react-scripts build",
     "test": "jest",
     "test-watch": "jest --watch",
-    "update-snapshots": "echo \"\\033[0;31mRISK OF MISSING THE BUG: don't use 'jest -u' if tests fail unepectedly - instead update ONLYthe snapshots that failed on a known reason!\\033[0m\" # jest -u",
+    "update-snapshots": "echo \"\\033[0;31mRISK OF SKIPPING THE BUG: don't use 'jest -u' if tests fail unexpectedly - instead update ONLY the snapshots that failed on a known reason!\\033[0m\" # jest -u",
     "eject": "react-scripts eject"
   },
   "coveragePathIgnorePatterns": [

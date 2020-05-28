@@ -16,7 +16,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
 import qualified Network.Haskoin.Crypto as HK
 
@@ -24,8 +24,8 @@ testBlock :: Block
 testBlock =
   Block {
     blockBlockData = BlockData {
-      blockDataParentHash = SHA 0x0,
-      blockDataUnclesHash = SHA 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
+      blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
+      blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
       blockDataCoinbase = Address 0x0,
       blockDataStateRoot = StateRoot . fst . B16.decode $ "0000000000000000000000000000000000000000000000000000000000000000",
       blockDataTransactionsRoot = StateRoot . fst .B16.decode $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
@@ -61,7 +61,7 @@ spec :: Spec
 spec = do
   describe "Commitment seals" $ do
     it "verifies the signatures" $ do
-      let digest = SHA 0x1234
+      let digest = unsafeCreateKeccak256FromWord256 0x1234
           want = Just . prvKey2Address $ private
           sig = commitmentSeal digest private
       let got = verifyCommitmentSeal digest sig

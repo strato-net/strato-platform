@@ -1,12 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
 import Conduit
 import Control.Monad
-import Control.Monad.Trans.State
+import qualified Control.Monad.Change.Modify           as Mod
 import qualified Data.Text as T
+import qualified Network.Kafka                         as K
 import Prometheus
 
 import BlockApps.Logging
@@ -29,9 +31,9 @@ recordEvent lab = liftIO $ withLabel loopbackEvents lab incCounter
 stratoP2PLoopback :: LoggingT IO ()
 stratoP2PLoopback = do
   $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
-  ctx <- initContext flags_maxReturnedHeaders
-  void . runContextM ctx $ do
-    ks <- gets contextKafkaState
+  cfg <- initConfig flags_maxReturnedHeaders
+  void . runContextM cfg $ do
+    ks <- Mod.get (Mod.Proxy @K.KafkaState)
     let toWireMessage = \case
           P2pBlockstanbul wm -> Just wm
           _ -> Nothing

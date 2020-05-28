@@ -1,8 +1,10 @@
+{-# LANGUAGE ConstraintKinds               #-}
 {-# LANGUAGE DefaultSignatures             #-}
 {-# LANGUAGE FlexibleContexts              #-}
 {-# LANGUAGE FlexibleInstances             #-}
 {-# LANGUAGE MultiParamTypeClasses         #-}
 {-# LANGUAGE RankNTypes                    #-}
+{-# LANGUAGE RecordWildCards               #-}
 {-# LANGUAGE TemplateHaskell               #-}
 {-# LANGUAGE TypeFamilies                  #-}
 {-# LANGUAGE TypeApplications              #-}
@@ -10,11 +12,14 @@
 {-# LANGUAGE OverloadedStrings             #-}
 {-# OPTIONS_GHC -fno-warn-orphans          #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
-module Blockchain.Sequencer.Monad (
-    SequencerContext(..)
+module Blockchain.Sequencer.Monad
+  ( MonadBlockstanbul
+  , SequencerContext(..)
   , SequencerConfig(..)
   , SequencerM
   , HasNamespace(..)
+  , BlockPeriod(..)
+  , RoundPeriod(..)
   , isInNamespace
   , fromNamespace
   , lookupInLDB
@@ -30,12 +35,9 @@ module Blockchain.Sequencer.Monad (
   , prunePrivacyDBs
   , runSequencerM
   , pairToVmTx
-  , markForVM
-  , markForP2P
   , clearLdbBatchOps
+  , flushLdbBatchOps
   , addLdbBatchOps
-  , drainP2P
-  , drainVM
   , clearDBERegistry
   , createFirstTimer
   , createNewTimer
@@ -85,7 +87,7 @@ import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
 import           Text.Format
@@ -97,29 +99,39 @@ data Modification a = Modification a | Deletion
 data SequencerContext = SequencerContext
   { _dependentBlockDB    :: DependentBlockDB
   , _seenTransactionDB   :: SeenTransactionDB
-  , _dbeRegistry         :: Map SHA DependentBlockEntry
-  , _blockHashRegistry   :: Map SHA (Modification OutputBlock)
-  , _txHashRegistry      :: Map SHA (Modification OutputTx)
-  , _chainHashRegistry   :: Map SHA (Modification ChainHashEntry)
+  , _dbeRegistry         :: Map Keccak256 DependentBlockEntry
+  , _blockHashRegistry   :: Map Keccak256 (Modification OutputBlock)
+  , _txHashRegistry      :: Map Keccak256 (Modification OutputTx)
+  , _chainHashRegistry   :: Map Keccak256 (Modification ChainHashEntry)
   , _chainIdRegistry     :: Map Word256 (Modification ChainIdEntry)
   , _getChainsDB         :: GetChainsDB
   , _getTransactionsDB   :: GetTransactionsDB
   , _ldbBatchOps         :: Q.Seq LDB.BatchOp
-  , _vmEvents            :: Q.Seq VmEvent
-  , _p2pEvents           :: Q.Seq P2pEvent
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
   }
 makeLenses ''SequencerContext
 
+type MonadBlockstanbul m = ( MonadIO m
+                           , HasBlockstanbulContext m
+                           , Mod.Accessible (IORef RoundNumber) m
+                           , Mod.Accessible (TMChan RoundNumber) m
+                           , Mod.Accessible BlockPeriod m
+                           , Mod.Accessible RoundPeriod m
+                           , Mod.Accessible (TQueue VoteResult) m
+                           )
+
+newtype BlockPeriod = BlockPeriod { unBlockPeriod :: NominalDiffTime }
+newtype RoundPeriod = RoundPeriod { unRoundPeriod :: NominalDiffTime }
+
 data SequencerConfig = SequencerConfig
   { depBlockDBCacheSize     :: Int
   , depBlockDBPath          :: String
   , seenTransactionDBSize   :: Int
   , syncWrites              :: Bool
-  , blockstanbulBlockPeriod :: NominalDiffTime
-  , blockstanbulRoundPeriod :: NominalDiffTime
+  , blockstanbulBlockPeriod :: BlockPeriod
+  , blockstanbulRoundPeriod :: RoundPeriod
   , blockstanbulBeneficiary :: TQueue CandidateReceived
   , blockstanbulVoteResps   :: TQueue VoteResult
   , blockstanbulTimeouts    :: TMChan RoundNumber
@@ -168,15 +180,15 @@ fromNamespace p bs = if isInNamespace p bs
   else Nothing
 
 instance HasNamespace OutputBlock where
-  type NSKey OutputBlock = SHA
+  type NSKey OutputBlock = Keccak256
   namespace _ = "bh:"
 
 instance HasNamespace OutputTx where
-  type NSKey OutputTx = SHA
+  type NSKey OutputTx = Keccak256
   namespace _ = "th:"
 
 instance HasNamespace ChainHashEntry where
-  type NSKey ChainHashEntry = SHA
+  type NSKey ChainHashEntry = Keccak256
   namespace _ = "ch:"
 
 instance HasNamespace ChainIdEntry where
@@ -238,7 +250,7 @@ genericDeleteSequencer registry p k = do
   registry . at k ?= Deletion
   addLdbBatchOps . (:[]) $ batchDeleteInLDB p k
 
-instance (SHA `A.Alters` OutputBlock) SequencerM where
+instance (Keccak256 `A.Alters` OutputBlock) SequencerM where
   lookup = genericLookupSequencer blockHashRegistry
   insert p k v = do
     genericInsertSequencer blockHashRegistry p k v
@@ -249,7 +261,7 @@ instance (SHA `A.Alters` OutputBlock) SequencerM where
     sz <- M.size <$> use blockHashRegistry
     liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
 
-instance (SHA `A.Alters` OutputTx) SequencerM where
+instance (Keccak256 `A.Alters` OutputTx) SequencerM where
   lookup = genericLookupSequencer txHashRegistry
   insert p k v = do
     genericInsertSequencer txHashRegistry p k v
@@ -260,7 +272,7 @@ instance (SHA `A.Alters` OutputTx) SequencerM where
     sz <- M.size <$> use txHashRegistry
     liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
 
-instance (SHA `A.Alters` ChainHashEntry) SequencerM where
+instance (Keccak256 `A.Alters` ChainHashEntry) SequencerM where
   lookup = genericLookupSequencer chainHashRegistry
   insert p k v = do
     genericInsertSequencer chainHashRegistry p k v
@@ -282,7 +294,7 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
 
-instance (SHA `A.Alters` DependentBlockEntry) SequencerM where
+instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   lookup _ k = do
     mv <- use $ dbeRegistry . at k
     case mv of
@@ -299,7 +311,32 @@ instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = assign seenTransactionDB
 
-instance (SHA `A.Alters` ()) SequencerM where
+instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
+  get _ = use ldbBatchOps
+  put _ = assign ldbBatchOps
+
+instance Mod.Accessible (IORef RoundNumber) SequencerM where
+  access _ = use latestRoundNumber
+
+instance Mod.Accessible (TMChan RoundNumber) SequencerM where
+  access _ = asks blockstanbulTimeouts
+
+instance Mod.Accessible BlockPeriod SequencerM where
+  access _ = asks blockstanbulBlockPeriod
+
+instance Mod.Accessible RoundPeriod SequencerM where
+  access _ = asks blockstanbulRoundPeriod
+
+instance Mod.Accessible (TQueue CandidateReceived) SequencerM where
+  access _ = asks blockstanbulBeneficiary
+
+instance Mod.Accessible (TQueue VoteResult) SequencerM where
+  access _ = asks blockstanbulVoteResps
+
+instance Mod.Accessible View SequencerM where
+  access _ = currentView
+
+instance (Keccak256 `A.Alters` ()) SequencerM where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
   delete _ = genericDeleteSeenTransactionDB
@@ -339,8 +376,6 @@ runSequencerM c mbc m = do
             , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty
-            , _vmEvents            = Q.empty
-            , _p2pEvents           = Q.empty
             , _blockstanbulContext = mbc
             , _loopTimeout         = loopCh
             , _latestRoundNumber   = latestRound
@@ -350,32 +385,25 @@ runSequencerM c mbc m = do
 pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
 pairToVmTx = uncurry VmTx
 
-markForVM :: VmEvent -> SequencerM ()
-markForVM oe = vmEvents %= (Q.|> oe)
-
-markForP2P :: P2pEvent -> SequencerM ()
-markForP2P oe = p2pEvents %= (Q.|> oe)
-
-drainP2P :: SequencerM [P2pEvent]
-drainP2P = fmap toList $ p2pEvents <<.= Q.empty
-
-drainVM :: SequencerM [VmEvent]
-drainVM = fmap toList $ vmEvents <<.= Q.empty
-
 clearDBERegistry :: SequencerM ()
 clearDBERegistry = dbeRegistry .= M.empty
 
-createFirstTimer :: SequencerM ()
+createFirstTimer :: ( MonadBlockstanbul m
+                    , Mod.Accessible View m
+                    )
+                 => m ()
 createFirstTimer = do
-  v <- currentView
+  v <- Mod.access (Mod.Proxy @View)
   createNewTimer . _round $ v
 
-createNewTimer :: RoundNumber -> SequencerM ()
+createNewTimer :: MonadBlockstanbul m
+               => RoundNumber
+               -> m ()
 createNewTimer rn = do
-  rnref <- use latestRoundNumber
+  rnref <- Mod.access (Mod.Proxy @(IORef RoundNumber))
   liftIO $ atomicModifyIORef' rnref (\x -> (max rn x, ()))
-  ch <- asks blockstanbulTimeouts
-  dt <- asks blockstanbulRoundPeriod
+  ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
+  dt <- unRoundPeriod <$> Mod.access (Mod.Proxy @(RoundPeriod))
   let act :: AlarmClock UTCTime -> IO ()
       act this' = do
         atomically $ writeTMChan ch rn
@@ -403,14 +431,21 @@ drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
 drainVotes :: SequencerM [CandidateReceived]
 drainVotes = atomically . flushTQueue =<< asks blockstanbulBeneficiary
 
-clearLdbBatchOps :: SequencerM ()
-clearLdbBatchOps = modify (\st -> st{_ldbBatchOps = Q.empty})
+clearLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => m ()
+clearLdbBatchOps = Mod.put (Mod.Proxy @(Q.Seq LDB.BatchOp)) Q.empty
 
-addLdbBatchOps :: [LDB.BatchOp] -> SequencerM ()
-addLdbBatchOps ops = do
-  existingOps <- use ldbBatchOps
-  let newOps = foldl' (Q.|>) existingOps ops
-  ldbBatchOps .= newOps
+flushLdbBatchOps :: SequencerM ()
+flushLdbBatchOps = do
+  pendingLDBWrites <- use ldbBatchOps
+  applyLDBBatchWrites $ toList pendingLDBWrites
+  incCounter seqLdbBatchWrites
+  setGauge seqLdbBatchSize . fromIntegral $ length pendingLDBWrites
+  $logInfoS "flushLdbBatchOps" "Applied pending LDB writes"
+  clearLdbBatchOps
+
+addLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => [LDB.BatchOp] -> m ()
+addLdbBatchOps ops = Mod.modify_ (Mod.Proxy @(Q.Seq LDB.BatchOp)) $ \existingOps ->
+  pure $ foldl' (Q.|>) existingOps ops
 
 fuseChannels ::SequencerM (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do

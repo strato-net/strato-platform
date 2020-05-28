@@ -10,4 +10,4 @@ library:
     - base
     - base16-bytestring
     - bytestring
-    - nibblestring
+    - nibblestring    

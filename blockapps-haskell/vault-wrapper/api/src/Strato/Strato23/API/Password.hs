@@ -16,3 +16,6 @@ import           Servant.API
 type PostPassword = "password"
             :> ReqBody '[JSON] Text
             :> Post '[JSON] ()
+
+type VerifyPassword = "verify-password" 
+            :> Get '[JSON] Bool

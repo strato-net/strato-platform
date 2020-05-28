@@ -113,10 +113,10 @@ describe('CreateContract: saga', () => {
           .run().then((result) => { done() });
       });
 
-      test('failure', (done) => {
+      test.skip('failure', (done) => {
         fetch.mockReject(JSON.stringify(compileError));
         expectSaga(compileContract, payloadCompile)
-          .call.fn(compileContractApiCall, payloadCompile.name, payloadCompile.contract, payloadCompile.searchable).put.like({ action: { type: COMPILE_CONTRACT_FAILURE } })
+          .call.fn(compileContractApiCall, payloadCompile.name, payloadCompile.contract, payloadCompile.searchable).put.like({action: { type: COMPILE_CONTRACT_FAILURE }})
           .run().then((result) => { done() });
       });
 

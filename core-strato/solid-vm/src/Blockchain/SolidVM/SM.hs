@@ -1,9 +1,12 @@
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
@@ -12,6 +15,7 @@ module Blockchain.SolidVM.SM (
   CallInfo(..),
   SState(..),
   SM,
+  MonadSM,
   action,
   runSM,
   getCurrentAddress,
@@ -36,11 +40,11 @@ module Blockchain.SolidVM.SM (
   ) where
 
 import           Control.Applicative ((<|>))
-import           Control.Exception
-import           Control.Lens
+import           Control.Lens hiding (Context)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
@@ -51,7 +55,7 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.NibbleString as N
-import qualified Data.Sequence as S
+import qualified Data.Sequence as Q
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
@@ -60,15 +64,13 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
-import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.StateDB
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
@@ -81,27 +83,23 @@ import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
+import           UnliftIO
+
 import CodeCollection
 
-
-
-
-
-
-data CallInfo =
-  CallInfo {
-    currentFunctionName :: String,
-    currentAddress :: Address,
-    currentContract :: Contract,
-    codeCollection :: CodeCollection,
-    collectionHash :: SHA,
-    localVariables :: Map String (Xabi.Type, Variable)
-    } deriving (Show)
+data CallInfo = CallInfo
+  { currentFunctionName :: String
+  , currentAddress      :: Address
+  , currentContract     :: Contract
+  , codeCollection      :: CodeCollection
+  , collectionHash      :: Keccak256
+  , localVariables      :: Map String (Xabi.Type, Variable)
+  } deriving (Show)
 
 {-
 BlockData
-    parentHash SHA
-    unclesHash SHA
+    parentHash Keccak256
+    unclesHash Keccak256
     coinbase Address
     stateRoot StateRoot
     transactionsRoot StateRoot
@@ -114,145 +112,160 @@ BlockData
     timestamp UTCTime
     extraData BS.ByteString
     nonce Word64
-    mixHash SHA
+    mixHash Keccak256
     deriving Eq Read Show Generic
 -}
 
-data SState =
-  SState {
-    env :: Env.Environment,
-    callStack :: [CallInfo],
-    codeDB                 :: CodeDB,
-    hashDB                 :: HashDB,
-    stateDB                :: MP.MPDB,
-    ssEvents               :: S.Seq Event,
-    addressStateTxDBMap    :: M.Map Address AddressStateModification,
-    addressStateBlockDBMap :: M.Map Address AddressStateModification,
-    storageTxMap           :: M.Map (Address, B.ByteString) B.ByteString,
-    storageBlockMap        :: M.Map (Address, B.ByteString) B.ByteString,
-    _action                :: Action
+data SState = SState
+  { env             :: Env.Environment
+  , callStack       :: [CallInfo]
+  , ssEvents        :: Q.Seq Event
+  , _ssMemDBs       :: MemDBs
+  , _action         :: Action
   }
-
 makeLenses ''SState
 
-type SM = StateT SState IO
+type SM m = StateT SState m
 
-instance HasMemAddressStateDB SM where
-  getAddressStateTxDBMap = addressStateTxDBMap <$> get
-  putAddressStateTxDBMap theMap = do
-    sstate <- get
-    put $ sstate{addressStateTxDBMap=theMap}
-  getAddressStateBlockDBMap = addressStateBlockDBMap <$> get
-  putAddressStateBlockDBMap theMap = do
-    sstate <- get
-    put $ sstate{addressStateBlockDBMap=theMap}
+type MonadSM m = ( (Address `A.Alters` AddressState) m
+                 , (Keccak256 `A.Alters` DBCode) m
+                 , HasRawStorageDB m
+                 , HasMemAddressStateDB m
+                 , HasMemRawStorageDB m
+                 , Mod.Accessible Env.Environment m
+                 , Mod.Modifiable MemDBs m
+                 , Mod.Modifiable Env.Sender m
+                 , Mod.Modifiable [CallInfo] m
+                 , Mod.Modifiable Action m
+                 , Mod.Modifiable (Q.Seq Event) m
+                 , MonadIO m --todo: remove
+                 )
 
-instance HasMemRawStorageDB SM where
-  getMemRawStorageTxDB = do
-    cxt <- get
-    return (MP.ldb $ stateDB cxt, --storage and states use the same database!
-            storageTxMap cxt)
-  putMemRawStorageTxMap theMap = do
-    cxt <- get
-    put cxt{storageTxMap=theMap}
-  getMemRawStorageBlockDB = do
-    cxt <- get
-    return (MP.ldb $ stateDB cxt, --storage and states use the same database!
-            storageBlockMap cxt)
-  putMemRawStorageBlockMap theMap = do
-    cxt <- get
-    put cxt{storageBlockMap=theMap}
+instance Monad m => HasMemAddressStateDB (SM m) where
+  getAddressStateTxDBMap      = gets $ _stateTxMap . _ssMemDBs
+  putAddressStateTxDBMap    m = modify $ ssMemDBs . stateTxMap .~ m
+  getAddressStateBlockDBMap   = gets $ _stateBlockMap . _ssMemDBs
+  putAddressStateBlockDBMap m = modify $ ssMemDBs . stateBlockMap .~ m
 
-instance (RawStorageKey `A.Alters` RawStorageValue) SM where
+instance Monad m => HasMemRawStorageDB (SM m) where
+  getMemRawStorageTxDB       = gets $ _storageTxMap . _ssMemDBs
+  putMemRawStorageTxMap    m = modify $ ssMemDBs . storageTxMap .~ m
+  getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
+  putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
+
+instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (N.NibbleString `A.Alters` N.NibbleString) m
+         , Mod.Modifiable MP.StateRoot m
+         ) => (RawStorageKey `A.Alters` RawStorageValue) (SM m) where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance Mod.Modifiable MP.StateRoot SM where
-  get _    = gets (MP.stateRoot . stateDB)
-  put _ sr = get >>= \c -> put c{stateDB = (stateDB c){MP.stateRoot = sr}}
+instance Monad m => Mod.Modifiable MP.StateRoot (SM m) where
+  get _    = gets $ _stateRoot . _ssMemDBs
+  put _ sr = modify $ ssMemDBs . stateRoot .~ sr
 
-instance (Address `A.Alters` AddressState) SM where
+instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (N.NibbleString `A.Alters` N.NibbleString) m
+         , Mod.Modifiable MP.StateRoot m
+         ) => (Address `A.Alters` AddressState) (SM m) where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MP.StateRoot `A.Alters` MP.NodeData) SM where
-  lookup _ = MP.genericLookupDB $ gets (MP.ldb . stateDB)
-  insert _ = MP.genericInsertDB $ gets (MP.ldb . stateDB)
-  delete _ = MP.genericDeleteDB $ gets (MP.ldb . stateDB)
+instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.NodeData) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
 
-instance (SHA `A.Alters` DBCode) SM where
-  lookup _ = genericLookupCodeDB $ gets codeDB
-  insert _ = genericInsertCodeDB $ gets codeDB
-  delete _ = genericDeleteCodeDB $ gets codeDB
+instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
 
-instance (N.NibbleString `A.Alters` N.NibbleString) SM where
-  lookup _ = genericLookupHashDB $ gets hashDB
-  insert _ = genericInsertHashDB $ gets hashDB
-  delete _ = genericDeleteHashDB $ gets hashDB
+instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
 
-runSM :: (Maybe ByteString) -> Env.Environment -> SM a -> ContextM (Either SolidException a)
+instance Monad m => Mod.Accessible Env.Environment (SM m) where
+  access _ = gets env
+
+instance Monad m => Mod.Modifiable Env.Sender (SM m) where
+  get _ = Env.Sender . Env.sender <$> gets env
+  put _ (Env.Sender s) = modify $ \ss@SState{env=e} -> ss{env = e{Env.sender = s}}
+
+instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
+  get _ = gets callStack
+  put _ cs = modify $ \ss -> ss{callStack = cs}
+
+instance Monad m => Mod.Modifiable MemDBs (SM m) where
+  get _    = gets $ _ssMemDBs
+  put _ md = modify $ ssMemDBs .~ md
+
+instance Monad m => Mod.Modifiable Action (SM m) where
+  get _ = use action
+  put _ = assign action
+
+instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
+  -- adding events to the action so that slipstream gets them,
+  --   and also to the events field of the sstate, so that they get sent to
+  --    TxrIndexer for governance updates
+  get    _   = gets ssEvents
+  put    _ q = do
+    action . actionEvents .= q
+    modify $ \sstate -> sstate { ssEvents = q }
+
+runSM :: ( MonadIO m
+         , MonadUnliftIO m
+         , MonadLogger m
+         , Mod.Modifiable ContextState m
+         )
+      => (Maybe ByteString)
+      -> Env.Environment
+      -> SM m a
+      -> m (Either SolidException a)
 runSM maybeCode env f = do
-  vmcontext <- get
+  csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
 
   let startingState =
         SState {
         env = env,
         callStack = [],
-        codeDB = contextCodeDB vmcontext,
-        hashDB = contextHashDB vmcontext,
-        stateDB = contextStateDB vmcontext,
-        ssEvents = S.empty,
-        addressStateTxDBMap = contextAddressStateTxDBMap vmcontext,
-        addressStateBlockDBMap = contextAddressStateBlockDBMap vmcontext,
-        storageTxMap = contextStorageTxMap vmcontext,
-        storageBlockMap = contextStorageBlockMap vmcontext,
+        ssEvents = Q.empty,
+        _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env
         }
 
-  eValState <- liftIO . try $ runStateT f startingState
+  eValState <- try $ runStateT f startingState
   case eValState of
+    -- NO errors will crash the VM.
     -- InternalError should *never* happen.
     -- TODO should also not happen, but since this is a work in progress they
     -- are a fact of life and should be fixed on demand.
     -- The rest should always be a user error and handled safely
-    Left ie@InternalError{} -> do
-      $logErrorLS "runSM/internalError" ie
-      throw ie
     Left se -> do
       $logErrorLS "runSM/error" se
       if flags_svmDev
         then do
           $logErrorLS "runSM/error_code" maybeCode
-          throw se
+          throwIO se
         else return $ Left se
     Right (value, sstateAfter) -> do
-      vmcontext' <- get
-      put vmcontext'{
-        contextAddressStateTxDBMap = addressStateTxDBMap sstateAfter,
-        contextAddressStateBlockDBMap = addressStateBlockDBMap sstateAfter,
-        contextStorageTxMap = storageTxMap sstateAfter,
-        contextStorageBlockMap = storageBlockMap sstateAfter
-        }
-      setStateDBStateRoot $ MP.stateRoot $ stateDB sstateAfter
+      Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
       return $ Right value
 
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.
-pushSender :: Address -> SM a -> SM a
+pushSender :: MonadSM m => Address -> m a -> m a
 pushSender newSender mv = do
-  state0 <- get
-  let oldSender = Env.sender $ env state0
-  put $ state0{env=(env state0){Env.sender = newSender}}
+  oldSender <- Mod.get (Mod.Proxy @Env.Sender)
+  Mod.put (Mod.Proxy @Env.Sender) (Env.Sender newSender)
   ret <- mv
-  state1 <- get
-  put $ state1{env=(env state1){Env.sender = oldSender}}
+  Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
-
-
 
 startingAction :: Maybe ByteString -> Env.Environment -> Action
 startingAction maybeCode env' = Action
@@ -268,27 +281,25 @@ startingAction maybeCode env' = Action
         Just theCode ->
           Just $ M.insert "src" (T.pack $ BC.unpack theCode) $ fromMaybe M.empty $ Env.metadata env'
         Nothing -> Env.metadata env'
-  , _actionEvents             = S.empty
+  , _actionEvents             = Q.empty
   }
 
 
 
 
-getEnv :: SM Env.Environment
-getEnv = do
-  fmap env get
-
+getEnv :: MonadSM m => m Env.Environment
+getEnv = Mod.access (Mod.Proxy @Env.Environment)
 
 toMaybe :: Bool -> a -> Maybe a
 toMaybe True x = Just x
 toMaybe False _ = Nothing
 
 
-getVariableOfName :: String -> SM Variable
+getVariableOfName :: MonadSM m => String -> m Variable
 getVariableOfName name = do
-  sstate <- get
+  cStack <- Mod.get (Mod.Proxy @[CallInfo])
   let currentCallInfo =
-        case callStack sstate of
+        case cStack of
           [] -> internalError "getVariableValue called with an empty stack" name
           (x:_) -> x
       vars = localVariables currentCallInfo
@@ -374,26 +385,32 @@ getVariableOfName name = do
       , unknownVariable "getVariableOfName" name
       ]
 
-
-
-getTypeOfName :: String -> SM Typo
-getTypeOfName s = do
+getTypeOfName' :: String -> CodeCollection -> Typo
+getTypeOfName' s (CodeCollection ccs) =
   let lookInContract :: Contract -> [Typo]
       lookInContract (Contract{..}) = catMaybes
         [ fmap StructTypo (M.lookup s _structs)
         , fmap EnumTypo (M.lookup s _enums)
         ]
-  CodeCollection ccs <- fmap codeCollection getCurrentCallInfo
-  let ctrs = map ContractTypo $ M.keys ccs
-  case concatMap lookInContract ccs ++ ctrs of
-    [] -> internalError "getTypeOfName" s
-    (typo:_) -> return typo
+      ctrs = map ContractTypo $ M.keys ccs
+   in case concatMap lookInContract ccs ++ ctrs of
+        [] -> internalError "getTypeOfName" s
+        (typo:_) -> typo
+
+getTypeOfName :: MonadSM m => String -> m Typo
+getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 
 
-addCallInfo :: Address -> Contract -> String -> SHA -> CodeCollection -> Map String (Xabi.Type, Variable) -> SM ()
+addCallInfo :: MonadSM m
+            => Address
+            -> Contract
+            -> String
+            -> Keccak256
+            -> CodeCollection
+            -> Map String (Xabi.Type, Variable)
+            -> m ()
 addCallInfo a c fn hsh cc initialLocalVariables = do
-  sstate <- get
   let newCallInfo =
         CallInfo {
           currentFunctionName=fn,
@@ -404,73 +421,69 @@ addCallInfo a c fn hsh cc initialLocalVariables = do
           localVariables=initialLocalVariables
         }
 
-  put sstate{callStack = newCallInfo:callStack sstate}
+  Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
 
-popCallInfo :: SM ()
-popCallInfo = do
-  sstate <- get
-  case callStack sstate of
-    [] -> internalError "popCallInfo was called on an already empty stack" ()
-    (_:rest) -> put sstate{callStack = rest}
+popCallInfo :: MonadSM m => m ()
+popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> internalError "popCallInfo was called on an already empty stack" ()
+  (_:rest) -> pure rest
 
-
-getCurrentCallInfo :: SM CallInfo
+getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do
-  sstate <- get
-  case callStack sstate of
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
     [] -> internalError "getCurrentCallInfo called with an empty stack" ()
     (currentCallInfo:_) -> return currentCallInfo
 
-getCurrentContract :: SM Contract
+getCurrentContract :: MonadSM m => m Contract
 getCurrentContract = do
-  cs <- fmap callStack get
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo:_) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
 
-getCurrentAddress :: SM Address
+getCurrentAddress :: MonadSM m => m Address
 getCurrentAddress = do
-  cs <- fmap callStack get
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo:_) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentAddress called with an empty stack" ()
 
 
-getCurrentFunctionName :: SM String
+getCurrentFunctionName :: MonadSM m => m String
 getCurrentFunctionName = do
-  cs <- fmap callStack get
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo:_) -> return $ currentFunctionName currentCallInfo
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
 
 
-getLocal :: String -> SM (Maybe Variable)
+getLocal :: MonadSM m => String -> m (Maybe Variable)
 getLocal name = do
   currentCallInfo <- getCurrentCallInfo
   return $ fmap snd $ M.lookup name $ localVariables currentCallInfo
 
-setLocal :: String -> Variable -> SM ()
+setLocal :: MonadSM m => String -> Variable -> m ()
 setLocal name val = do
-  sstate <- get
-  let stack = callStack sstate
-      (info, rest) = case stack of
+  stack <- Mod.get (Mod.Proxy @[CallInfo])
+  let (info, rest) = case stack of
                 (ci:r) -> (ci,r)
                 [] -> internalError "setLocal stack underflow" ()
       locals = localVariables info
-      (theType, _) = fromMaybe (error $ "setLocal called for variable that doesn't exist: " ++ name)
+      (theType, _) = fromMaybe (unknownVariable "setLocal called for variable that doesn't exist" name)
                      $ M.lookup name locals
       newVariables = M.insert name (theType, val) locals
-  put sstate{callStack=info{localVariables=newVariables}:rest}
+  Mod.put (Mod.Proxy @[CallInfo]) $ info{localVariables=newVariables} : rest
 
 
-getCurrentCodeCollection :: SM (SHA, CodeCollection)
+getCurrentCodeCollection :: MonadSM m => m (Keccak256, CodeCollection)
 getCurrentCodeCollection = do
-  cs <- fmap callStack get
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo:_) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
     _ -> internalError "getCurrentContract called with an empty stack" ()
 
-hintFromType :: Xabi.Type -> SM BasicType
+hintFromType :: MonadSM m => Xabi.Type -> m BasicType
 hintFromType = \case
  Xabi.Address{} -> return TAddress
  Xabi.Bool{} -> return TBool
@@ -483,88 +496,88 @@ hintFromType = \case
      ContractTypo{} -> return $ TContract s
      EnumTypo{} -> return $ TEnumVal s
      StructTypo fs -> do
-       let upgrade :: (T.Text, Xabi.FieldType) -> SM (B.ByteString , BasicType)
+       let upgrade :: MonadSM m => (T.Text, Xabi.FieldType) -> m (B.ByteString , BasicType)
            upgrade = mapM (hintFromType . Xabi.fieldTypeType) . first encodeUtf8
        TStruct s <$> mapM upgrade fs
  Xabi.Array{} -> return TComplex
+ Xabi.Mapping{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
-getXabiType :: Address -> B.ByteString -> SM (Maybe Xabi.Type)
-getXabiType addr field = do
+getXabiType' :: B.ByteString -> CallInfo -> Maybe Xabi.Type
+getXabiType' field callInfo = M.lookup (BC.unpack field)
+                            . fmap Xabi.varType
+                            . _storageDefs
+                            . currentContract
+                            $ callInfo
+
+getCallInfoForAddress :: Mod.Modifiable [CallInfo] m => Address -> m CallInfo
+getCallInfoForAddress addr = do
   -- This field might have been defined in e.g. a caller contract.
   -- We search from the top down for the home of this data
-  stack <- gets callStack
+  stack <- Mod.get (Mod.Proxy @[CallInfo])
   case filter ((== addr) . currentAddress) stack of
     [] -> internalError "address not found in call stack" (addr, stack)
-    (callInfo:_) -> return
-                    . M.lookup (BC.unpack field)
-                    . fmap Xabi.varType
-                    . _storageDefs
-                    . currentContract
-                    $ callInfo
+    (callInfo:_) -> return callInfo
 
-getXabiValueType :: AddressedPath -> SM Xabi.Type
+getXabiType :: Mod.Modifiable [CallInfo] m => Address -> B.ByteString -> m (Maybe Xabi.Type)
+getXabiType addr field = getXabiType' field <$> getCallInfoForAddress addr
+
+getXabiValueType :: MonadSM m => AddressedPath -> m Xabi.Type
 getXabiValueType (AddressedPath loc path) = do
+  ccs' <- codeCollection <$> getCurrentCallInfo
   let field = MS.getField path
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> loop (tail $ MS.toList path) v
- where loop :: [MS.StoragePathPiece] -> Xabi.Type -> SM Xabi.Type
-       loop [] = return
-       loop [x] = \case
+    Just v -> return $ loop ccs' (tail $ MS.toList path) v
+ where loop :: CodeCollection -> [MS.StoragePathPiece] -> Xabi.Type -> Xabi.Type
+       loop _ [] = id
+       loop ccs [x] = \case
          Xabi.Mapping{Xabi.value=v} -> case x of
-           MS.MapIndex{} -> return v
+           MS.MapIndex{} -> v
            _ -> typeError "non map index attribute of mapping" x
          Xabi.Array{Xabi.entry=v} -> case x of
-           MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
-           MS.ArrayIndex{} -> return v
+           MS.Field "length" -> Xabi.Int{signed=Just True, bytes=Nothing}
+           MS.ArrayIndex{} -> v
            _ -> typeError "non-length or array index attribute of array" x
          Xabi.String{} -> case x of
-           MS.Field "length" -> return Xabi.Int{signed=Just True, bytes=Nothing}
+           MS.Field "length" -> Xabi.Int{signed=Just True, bytes=Nothing}
            _ -> typeError "non-length attribute of string" x
-         Xabi.Label s -> do
-           t' <- getTypeOfName s
-           case (x, t') of
-             (MS.Field n, StructTypo fs) -> do
-               let mt'' = lookup (decodeUtf8 n) fs
-               case mt'' of
-                Just t'' -> return $ Xabi.fieldTypeType t''
-                Nothing -> error $ "field not present in struct definition: " ++ show (n, fs)
-             (_, StructTypo{}) -> typeError "non field access to struct" x
-             (_, ContractTypo{}) -> todo "getValueType/contract access" t'
-             (_, EnumTypo{}) -> todo "getValueType/enum acess" t'
+         Xabi.Label s ->
+           let t' = getTypeOfName' s ccs
+            in case (x, t') of
+                 (MS.Field n, StructTypo fs) ->
+                   let mt'' = lookup (decodeUtf8 n) fs
+                    in case mt'' of
+                        Just t'' -> Xabi.fieldTypeType t''
+                        Nothing -> missingField "field not present in struct definition" $ show (n, fs)
+                 (_, StructTypo{}) -> typeError "non field access to struct" x
+                 (_, ContractTypo{}) -> todo "getValueType/contract access" t'
+                 (_, EnumTypo{}) -> todo "getValueType/enum acess" t'
          t'' -> todo "atomic type does not have value type" t''
-       loop (_:rs) = \case
-          Xabi.Mapping{Xabi.value=t'} -> loop rs t'
-          Xabi.Array{Xabi.entry=t'} -> loop rs t'
+       loop ccs (_:rs) = \case
+          Xabi.Mapping{Xabi.value=t'} -> loop ccs rs t'
+          Xabi.Array{Xabi.entry=t'} -> loop ccs rs t'
           t -> todo "getXabiValueType/loopnext unsupported type" t
 
-getValueType :: AddressedPath -> SM BasicType
+getValueType :: MonadSM m => AddressedPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeAction :: Address -> String -> SHA -> SM ()
+initializeAction :: Mod.Modifiable Action m => Address -> String -> Keccak256 -> m ()
 initializeAction addr name hsh = do
   let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
-  action . actionData %= M.insertWith mergeActionData addr newData
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    actionData %= M.insertWith mergeActionData addr newData
 
-markDiffForAction :: Address -> MS.StoragePath -> MS.BasicValue -> SM ()
+markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
   let key = MS.unparsePath key'
       val = rlpSerialize $ rlpEncode val'
       ins = \case
               ActionSolidVMDiff m -> ActionSolidVMDiff $ M.insert key val m
-              _ -> error "SolidVM Diff executing in EVM"
-  (action . actionData . at owner . mapped . actionDataStorageDiffs) %= ins
+              e -> internalError "SolidVM Diff executing in EVM" $ show e
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    actionData . at owner . mapped . actionDataStorageDiffs %= ins
 
-
-addEvent :: Event -> SM ()
-addEvent newEvent = do
-  -- adding events to the action so that slipstream gets them,
-  --   and also to the events field of the sstate, so that they get sent to
-  --    TxrIndexer for governance updates
-  action . actionEvents %= (|> newEvent) 
-  
-  sstate <- get 
-  put sstate { ssEvents = ssEvents sstate |> newEvent }
- 
+addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
+addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)

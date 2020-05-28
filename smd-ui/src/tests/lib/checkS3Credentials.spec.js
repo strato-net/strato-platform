@@ -3,12 +3,12 @@ import * as enviorment from "../../env";
 
 describe('Lib: checkS3Credentials', () => {
 
-  test('when mode is public', () => {
+  test('when s3 is unavailable', () => {
     enviorment.env.EXT_STORAGE_ENABLED = 'false';
     expect(isS3Available()).toMatchSnapshot();
   });
 
-  test('when mode is enterprise', () => {
+  test('when s3 is available', () => {
     enviorment.env.EXT_STORAGE_ENABLED = 'true';
     expect(isS3Available()).toMatchSnapshot();
   });

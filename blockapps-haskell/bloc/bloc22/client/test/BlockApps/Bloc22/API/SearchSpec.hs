@@ -9,7 +9,6 @@ import           Test.Hspec
 import           BlockApps.Bloc22.API.Search
 import           BlockApps.Bloc22.API.SpecUtils
 import           BlockApps.Bloc22.Client
-import           BlockApps.Solidity.Xabi
 
 spec :: SpecWith TestConfig
 spec = do
@@ -19,4 +18,4 @@ spec = do
       Right addrs <- runClientM
         (getSearchContract "SimpleStorage")
         (ClientEnv mgr blocUrl Nothing)
-      addrs `shouldContain` [One $ Unnamed simpleStorageContractAddress]
+      addrs `shouldContain` [One simpleStorageContractAddress]

@@ -1,5 +1,5 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Lib: checkMode when mode is enterprise 1`] = `false`;
+exports[`Lib: checkMode is oauth enabled 1`] = `false`;
 
-exports[`Lib: checkMode when mode is public 1`] = `true`;
+exports[`Lib: checkMode is oauth enabled 2`] = `true`;

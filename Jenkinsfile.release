@@ -42,12 +42,14 @@ pipeline {
     stage('Build') {
       steps {
         withEnv(["RELEASE_VERSION=${env.RELEASE_VERSION}"]) {
-          sh '''#!/bin/bash -le
-            set -x
-            cd strato-worktree
-            echo ${RELEASE_VERSION} > VERSION
-            REPO=public make all
-            '''
+          dir ('strato-worktree') {
+            sh 'echo ${RELEASE_VERSION} > VERSION'
+            sh 'REPO=public make all'
+            dir ('blockapps-rest') {
+              sh 'yarn'
+              sh 'yarn build'
+            }
+          }
         }
       }
     }
@@ -64,32 +66,45 @@ pipeline {
             cp strato-worktree/docker-compose.yml strato-getting-started/
             cd strato-getting-started
             export genesis=smokeTest
-            export NODE_HOST=localhost
+            export NODE_HOST=$(</host)
             export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
             export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
             export EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
             export PASSWORD=123
+            # old-style strato 4.2 semi-oauth mode for old t&t
+            export OAUTH_JWT_VALIDATION_ENABLED=true
+            export OAUTH_JWT_USERNAME_PROPERTY=email
+            export OAUTH_JWT_VALIDATION_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration
+            export OAUTH_STRATO42_FALLBACK=true
             ./strato -m 1 --single
             docker ps
-            counter=0
             # Few quick tests
-            until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
-            do
-              if [[ "$counter" -gt 120 ]]; then
-                echo "bloc took longer than 2 minutes to initialize! aborting."
-                exit 73
-              fi
-              echo "waiting for bloc to be available through nginx"
-              counter=$((counter+1))
-              sleep 1
-            done
-            echo "bloc is available through nginx - node is running"
+            check_availability() {
+              counter=0
+              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
+              do
+                if [[ "$counter" -gt 120 ]]; then
+                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
+                  exit 73
+                fi
+                echo "waiting for STRATO health endpoint to be available through nginx"
+                counter=$((counter+1))
+                sleep 1
+              done
+              echo "STRATO health endpoint is available through nginx - node is running"
+            }
+            check_availability
+            echo "Restarting docker containers to simulate computer restart..."
+            docker-compose -p strato --log-level ERROR stop
+            docker-compose -p strato --log-level ERROR start
+            PASSWORD=${PASSWORD} ./strato --set-password
+            check_availability
           '''
         }
       }
     }
 
-    stage('Some quick tests') {
+    stage('Some quick tests without OAuth') {
       steps {
         parallel(
           'Apex tests': {
@@ -116,16 +131,32 @@ pipeline {
                 rm -rf track-and-trace
                 git clone https://github.com/blockapps/track-and-trace.git
                 cd track-and-trace
-                git checkout oauth42style
+                git checkout oauth42style-test-fix
                 git submodule update --init --recursive
-                sed -i "s/localhost:8080/localhost/g" server/config/localhost.config.yaml
                 cd server
+                sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
+                # oauth42style-test-fix uses the old hardcoded ba-rest version
                 touch .env
                 yarn build
                 yarn install
                 yarn test
               '''
             }
+          },
+
+          'STRATO API Tests': {
+            withCredentials([
+               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+            ]) {
+                sh '''#!/bin/bash -le
+                  set -x
+                  rm -rf strato-api-tests
+                  git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                  cd strato-api-tests
+                  docker build --tag strato-api-tests .
+                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=false -e DEBUG_LOG=false strato-api-tests
+                '''
+              }
           },
         )
       }
@@ -166,7 +197,7 @@ pipeline {
             # Few quick tests
             check_availability() {
               counter=0
-              until curl --silent --output /dev/null --fail --location ${NODE_HOST}/health
+              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
               do
                 if [[ "$counter" -gt 120 ]]; then
                   echo "STRATO node took longer than 2 minutes to initialize! aborting."
@@ -215,15 +246,39 @@ pipeline {
               set -x
               rm -rf track-and-trace
               git clone https://github.com/blockapps/track-and-trace.git
-              cd track-and-trace
-              git submodule update --init --recursive
-              sed -i "s/localhost:8080/localhost/g" server/config/localhost.config.yaml
-              cd server
+              cd track-and-trace/server
+              git checkout test-fix
+              sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
+              # symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
+              cp -r ../../strato-worktree/blockapps-rest blockapps-rest
+              sed -i 's|.*blockapps-rest.*|"blockapps-rest": "file:./blockapps-rest",|' package.json
               touch .env
               yarn build
               yarn install
               yarn test
             '''
+              }
+            },
+
+            'STRATO API Tests': {
+              withCredentials([
+                usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+              ]) {
+
+                sh '''#!/bin/bash -le
+                  set -x
+                  # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
+                  rm -rf strato-api-tests
+                  git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                  cd strato-api-tests
+                  docker build --tag strato-api-tests .
+                  docker run -e OAUTH_CLIENT_ID=all-test-ci-blockapps-net-infinite \
+                  -e OAUTH_CLIENT_SECRET=a7f199dc-9f50-45fc-9f50-13b40727ba31 \
+                  -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration \
+                  -e STRATO_NODE_URL=http://172.17.0.1:80 \
+                  -e OAUTH_ENABLED=true \
+                  -e DEBUG_LOG=false strato-api-tests
+                  '''
               }
             },
         )

@@ -48,8 +48,8 @@ import qualified Data.NibbleString                           as N
 
 getAddressState :: HasStateDB m => Address -> m AddressState
 getAddressState address = do
-    db <- getStateDB
-    states <- MP.getKeyVal db $ addressAsNibbleString address
+    sr <- getStateRoot
+    states <- MP.getKeyVal sr $ addressAsNibbleString address
 
     case states of
       Nothing -> do
@@ -62,14 +62,14 @@ getAddressState address = do
 
 getAddressStateMaybe :: HasStateDB m => Address -> m (Maybe AddressState)
 getAddressStateMaybe address = do
-  db <- getStateDB
-  mState <- MP.getKeyVal db $ addressAsNibbleString address
+  sr <- getStateRoot
+  mState <- MP.getKeyVal sr $ addressAsNibbleString address
   return $ rlpDecode . rlpDeserialize . rlpDecode <$> mState
 
 getAllAddressStates::(HasHashDB m, HasStateDB m) => m [(Address, AddressState)]
 getAllAddressStates = do
-  sdb <- getStateDB
-  mapM convert =<<  MP.unsafeGetAllKeyVals sdb
+  sr <- getStateRoot
+  mapM convert =<<  MP.unsafeGetAllKeyVals sr
   where
     convert :: (HasHashDB m) => (N.NibbleString, RLPObject) -> m (Address, AddressState)
     convert (k, v) = do
@@ -89,18 +89,18 @@ getRawStorageKeyFromHash = fmap (fmap nibbleString2ByteString) . hashDBGet
 putAddressState :: (HasStateDB m, HasHashDB m) => Address -> AddressState -> m ()
 putAddressState address newState = do
   hashDBPut addrNibbles
-  db <- getStateDB
-  db' <- MP.putKeyVal db addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
-  setStateDBStateRoot db'
+  sr <- getStateRoot
+  sr' <- MP.putKeyVal sr addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
+  setStateDBStateRoot sr'
   where addrNibbles = addressAsNibbleString address
 
 deleteAddressState :: HasStateDB m => Address -> m ()
 deleteAddressState address = do
-  db <- getStateDB
-  db' <- MP.deleteKey db (addressAsNibbleString address)
-  setStateDBStateRoot db'
+  sr <- getStateRoot
+  sr' <- MP.deleteKey sr (addressAsNibbleString address)
+  setStateDBStateRoot sr'
 
 addressStateExists :: HasStateDB m => Address -> m Bool
 addressStateExists address = do
-  db <- getStateDB
-  MP.keyExists db (addressAsNibbleString address)
+  sr <- getStateRoot
+  MP.keyExists sr (addressAsNibbleString address)

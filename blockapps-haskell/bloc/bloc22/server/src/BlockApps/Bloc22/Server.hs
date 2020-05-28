@@ -39,6 +39,7 @@ bloc = return gitInfo
   :<|> postUsersContractMethodList
   :<|> getAddresses
   :<|> getContracts
+  :<|> postContractsBatchStates
   :<|> getContractsData
   :<|> getContractsContract
   :<|> getContractsState
@@ -55,6 +56,8 @@ bloc = return gitInfo
   :<|> postBlocTransactionResults
   :<|> postChainInfo
   :<|> getChainInfo
+  :<|> postChainInfos
+  :<|> postBlocTransactionParallel
   :<|> postBlocTransaction
 
 serveBloc :: BlocEnv -> Server BlocAPI

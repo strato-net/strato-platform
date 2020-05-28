@@ -14,26 +14,52 @@ if (!process.env.USER_TOKEN) {
 
 const config = factory.getTestConfig();
 const fixtures = factory.getTestFixtures();
-const logger = console;
 
-describe("rest_7", function() {
+describe("rest_7", function () {
   this.timeout(config.timeout);
   let admin;
-  const options = { config, logger };
+  const options = { config };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
     admin = await factory.createAdmin(userArgs, options);
   });
 
-  describe("oauthPing", function() {
+  describe("oauthPing", function () {
     it("ping - oauth authorized", async () => {
       const result = await rest.pingOauth(admin, options)
       assert.equal(result, "success")
     });
   });
 
-  describe("contract call", function() {
+  describe("getAccounts", function () {
+    this.timeout(config.timeout);
+
+    it("getAccounts - success", async () => {
+      const result = await rest.getAccounts(admin, {
+        config,
+        isAsync: true,
+        query: {
+          address: admin.address
+        }
+      })
+      assert.isArray(result, "should be array")
+      assert.equal(result.length, 1, "should be 1")
+      assert.equal(result[0].address, admin.address, "address")
+    });
+
+    it("getAccounts - missing query - BAD_REQUEST 400", async () => {
+      await assert.restStatus(async () => {
+        return await rest.getAccounts(admin, {
+          config,
+          isAsync: true
+        });
+      }, RestStatus.BAD_REQUEST, /Need one of: address, balance, minbalance, maxbalance, nonce, minnonce, maxnonce, maxnumber, code, index, codeHash, chainid/);
+    });
+
+  });
+
+  describe("contract call", function () {
     this.timeout(config.timeout);
     let contract;
     const var1 = 2;
@@ -147,12 +173,47 @@ describe("rest_7", function() {
       );
     });
 
-    // Skipped because of platform issue. https://blockapps.atlassian.net/browse/STRATO-1331
-    it.skip("create contract list - async - SKIPPED - STRATO-1331", async () => {
+    it("compile contract - single contract", async () => {
+      const count = 1;
+      const contracts = factory.createCompileContractsArgs(count);
+      const results = await rest.compileContracts(admin, contracts, { config });
+      assert.isArray(results, "should be array");
+      assert.equal(results.length, contracts.length, `should be ${count}`);
+      results.forEach((contract, index) => {
+        assert.equal(contract.contractName, contracts[index]['contractName'])
+      })
+    });
+
+    it("compile contract - multiple contracts", async () => {
+      const count = 4;
+      const contracts = factory.createCompileContractsArgs(count);
+      const results = await rest.compileContracts(admin, contracts, { config });
+      assert.isArray(results, "should be array");
+      assert.equal(results.length, contracts.length, `should be ${count}`);
+      results.forEach((contract, index) => {
+        assert.equal(contract.contractName, contracts[index]['contractName'])
+      })
+    });
+
+    it("compile contract - BAD_REQUEST 400", async () => {
+      const uid = util.uid();
+      const contractName = `TestContract_${uid}`;
+      // this contract does not have opening and closing brackets
+      const source = `contract ${contractName}`;
+
+      const contracts = [{ contractName, source }];
+      await assert.restStatus(async () => {
+        await rest.compileContracts(admin, contracts, { config });
+      }, RestStatus.BAD_REQUEST);
+    });
+
+    it("create contract list - async - VM: EVM", async () => {
       const count = 5;
       const contracts = factory.createContractListArgs(count);
+      // compile contracts
+      await rest.compileContracts(admin, contracts, { config });
       const pendingResults = await rest.createContractList(admin, contracts, {
-        config,
+        config: { ...options.config, VM: "EVM" },
         isAsync: true
       });
       const verifyHashes = pendingResults.reduce(
@@ -168,12 +229,13 @@ describe("rest_7", function() {
       assert.isOk(verifyStatus, "results");
     });
 
-    // Skipped because of platform issue. https://blockapps.atlassian.net/browse/STRATO-1331
-    it.skip("create contracts list - sync - SKIPPED - STRATO-1331", async () => {
+    it("create contracts list - sync - VM: EVM", async () => {
       const count = 5;
       const contracts = factory.createContractListArgs(count);
-      const results = await rest.createContractMany(admin, contracts, {
-        config
+      // compile contracts
+      await rest.compileContracts(admin, contracts, { config });
+      const results = await rest.createContractList(admin, contracts, {
+        config: { ...options.config, VM: "EVM" },
       });
       const verifyContracts = results.reduce(
         (a, r, i) =>
@@ -183,16 +245,53 @@ describe("rest_7", function() {
       assert.isOk(verifyContracts, "contracts");
     });
 
-    // when this test fails, the bug has been fixed and the above tests should be reactivated
-    it.skip("create contract list - INTERNAL_SERVER_ERROR 500 - when this test fails, STRATO-1331 was fixed", async () => {
+    it("create contract list - async - VM: SolidVM", async () => {
+      const count = 2;
+      const contracts = factory.createContractListArgs(count);
+      const pendingResults = await rest.createContractList(admin, contracts, {
+        config: { ...config, VM: "SolidVM" },
+        isAsync: true,
+      });
+      const verifyHashes = pendingResults.reduce(
+        (a, r) => a && util.isHash(r.hash),
+        true
+      );
+      assert.isOk(verifyHashes, "hash");
+      const results = await rest.resolveResults(admin, pendingResults, options);
+      const verifyStatus = results.reduce(
+        (a, r) => a && r.status !== TxResultStatus.PENDING,
+        true
+      );
+      assert.isOk(verifyStatus, "results");
+    });
+
+    it("create contracts list - sync - VM: SolidVM", async () => {
       const count = 5;
       const contracts = factory.createContractListArgs(count);
+      const results = await rest.createContractList(admin, contracts, {
+        config: { ...config, VM: "SolidVM" }
+      });
+      const verifyContracts = results.reduce(
+        (a, r, i) =>
+          a && util.isAddress(r.address) && r.name === contracts[i].name,
+        true
+      );
+      assert.isOk(verifyContracts, "contracts");
+    });
+
+    xit("create contract list - BAD_REQUEST 400 - EVM", async () => {
+      const count = 5;
+      const contracts = factory.createContractListArgs(count);
+
+      // compile contracts
+      await rest.compileContracts(admin, contracts, { config });
+
       await assert.restStatus(async () => {
         return rest.createContractList(admin, contracts, {
           config,
           isAsync: true
         });
-      }, RestStatus.INTERNAL_SERVER_ERROR);
+      }, RestStatus.BAD_REQUEST);
     });
     // VM
     it("call - option VM", async () => {
@@ -222,7 +321,7 @@ describe("rest_7", function() {
     });
   });
 
-  describe("send", function() {
+  describe("send", function () {
     this.timeout(config.timeout);
     let user2;
 
@@ -308,9 +407,9 @@ function stringValue(uid, index) {
   return `_${intValue(uid, index)}_`;
 }
 
-describe("search until", function() {
+describe("search until", function () {
   this.timeout(config.timeout);
-  const options = { config, logger };
+  const options = { config };
   let admin, contract;
 
   before(async () => {
@@ -346,7 +445,7 @@ describe("search until", function() {
 
   it("searchUntil - timeout error", async () => {
     // predicate is created: to wait until response is available otherwise throws the error
-    function predicate() {}
+    function predicate() { }
 
     try {
       await rest.searchUntil(admin, contract, predicate, options);
@@ -378,9 +477,9 @@ describe("search until", function() {
   });
 });
 
-describe("search query", function() {
+describe("search query", function () {
   this.timeout(config.timeout);
-  const options = { config, logger };
+  const options = { config };
   const count = 4;
   let admin;
 
@@ -417,6 +516,72 @@ describe("search query", function() {
       assert.equal(result.intValue, intValue(uid, index), "intValue");
       assert.equal(result.stringValue, stringValue(uid, index), "stringValue");
     });
+  });
+
+  it("search multiple with content range", async () => {
+    const uid = util.uid();
+    const contracts = [];
+
+    for (let i = 0; i < count; i++) {
+      const contract = await createSearchContract(admin, uid, i, options);
+      contracts.push(contract);
+    }
+
+    // wait for all contracts to be created
+    function predicate(response) {
+      return response.data.length >= count;
+    }
+
+    const results = await rest.searchWithContentRangeUntil(
+      admin,
+      contracts[0],
+      predicate,
+      options
+    );
+    const { data, contentRange } = results
+    assert.isDefined(contentRange, "contentRange should be defined");
+    assert.equal(contentRange.count, count, "contentRange.count should be equal to count");
+    assert.equal(contentRange.start, 0, "contentRange.start should be equal to 0");
+    assert.equal(contentRange.end, count - 1, "contentRange.end should be equal to count - 1");
+    assert.isArray(data, "should be array");
+    assert.lengthOf(data, count, `array has length of ${count}`);
+    // check all
+    data.forEach((result, index) => {
+      assert.equal(result.address, contracts[index].address, "address");
+      assert.equal(result.intValue, intValue(uid, index), "intValue");
+      assert.equal(result.stringValue, stringValue(uid, index), "stringValue");
+    });
+  });
+
+  it("search with content range - no results", async () => {
+    const uid = util.uid();
+    const contracts = [];
+
+    for (let i = 0; i < count; i++) {
+      const contract = await createSearchContract(admin, uid, i, options);
+      contracts.push(contract);
+    }
+
+    // wait for all contracts to be created
+    function predicate(response) {
+      return true;
+    }
+
+    const query = { stringValue: 'eq.ThIs Is NoT a ReAl VaLuE' }
+    const dummySearchOptions = { ...options, query }
+    const results = await rest.searchWithContentRangeUntil(
+      admin,
+      contracts[0],
+      predicate,
+      dummySearchOptions
+    );
+    const { data, contentRange } = results
+    assert.isDefined(contentRange, "contentRange should be defined");
+    assert.equal(contentRange.count, 0, "count should be 0");
+    assert.isUndefined(contentRange.start, "start should be undefined");
+    assert.isUndefined(contentRange.end, "end should be undefined");
+    assert.isArray(data, "should be array");
+    assert.lengthOf(data, 0, `array has length of ${count}`);
   });
 
   it("search by value", async () => {
@@ -550,7 +715,7 @@ describe("search query", function() {
   });
 });
 
-describe("chain", function() {
+describe("chain", function () {
   this.timeout(config.timeout);
   let admin, chainId, chainArgs;
   const options = { config };

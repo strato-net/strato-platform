@@ -50,3 +50,9 @@ postPassword password = do
             Just msg | msg == superSecretVaultWrapperMessage ->
               liftIO . atomicWriteIORef existingPassword $ Just password
             _ -> vaultWrapperError $ UserError "Could not validate password"
+
+verifyPassword :: VaultM Bool
+verifyPassword = do 
+  existingPassword <- asks superSecretPassword
+  doIAlreadyHaveAPassword <- liftIO $ readIORef existingPassword
+  return $ maybe False (const True) doIAlreadyHaveAPassword

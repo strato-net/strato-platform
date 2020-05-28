@@ -137,11 +137,7 @@ Object {
 }
 `;
 
-exports[`CreateChain: index render component (enterprise mode) errorMessageFor 1`] = `null`;
-
-exports[`CreateChain: index render component (enterprise mode) errorMessageFor 2`] = `"required"`;
-
-exports[`CreateChain: index render component (enterprise mode) form fields 1`] = `
+exports[`CreateChain: index render component (Oauth mode) form fields with values 1`] = `
 Object {
   "address": null,
   "balance": 0,
@@ -154,7 +150,197 @@ Object {
 }
 `;
 
-exports[`CreateChain: index render component (enterprise mode) form fields 2`] = `
+exports[`CreateChain: index render component (Oauth mode) form fields with values 2`] = `
+Object {
+  "address": null,
+  "balance": "500",
+  "enode": "enode://",
+  "errors": null,
+  "form": Object {
+    "userSelected": true,
+  },
+  "username": null,
+}
+`;
+
+exports[`CreateChain: index render component (Oauth mode) with empty values 1`] = `
+"<div>
+  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
+  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <form>
+      <div className=\\"pt-dialog-body\\">
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Username
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
+                  <option value={[undefined]} />
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
+            </div>
+          </div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Address
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
+                  <option value={{...}} />
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Enode
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"form-width\\">
+              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value={{...}} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
+              <br />
+              <span className=\\"error-text\\" />
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Balance
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"form-width\\">
+              <Field name=\\"value\\" component=\\"input\\" type=\\"number\\" placeholder=\\"Balance\\" value={0} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
+          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Add Member\\" />
+        </div>
+      </div>
+    </form>
+  </Blueprint.Dialog>
+</div>"
+`;
+
+exports[`CreateChain: index render component (Oauth mode) with values 1`] = `
+"<div>
+  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
+  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <form>
+      <div className=\\"pt-dialog-body\\">
+        <div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Username
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
+                  <option value=\\"Supplier1\\">
+                    Supplier1
+                  </option>
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
+            </div>
+          </div>
+          <div className=\\"row\\">
+            <div className=\\"col-sm-3 text-right\\">
+              <label className=\\"pt-label smd-pad-4\\">
+                Address
+              </label>
+            </div>
+            <div className=\\"col-sm-9 smd-pad-4\\">
+              <div className=\\"pt-select\\">
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
+                  <option value=\\"370adf114257cb0e0025eedf0a96261b51af23e3\\">
+                    370adf114257cb0e0025eedf0a96261b51af23e3
+                  </option>
+                </Field>
+                <br />
+                <span className=\\"error-text\\" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Enode
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"form-width\\">
+              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value={{...}} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
+              <br />
+              <span className=\\"error-text\\" />
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Balance
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <div className=\\"form-width\\">
+              <Field name=\\"value\\" component=\\"input\\" type=\\"number\\" placeholder=\\"Balance\\" value={0} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className=\\"pt-dialog-footer\\">
+        <div className=\\"pt-dialog-footer-actions\\">
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
+          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Add Member\\" />
+        </div>
+      </div>
+    </form>
+  </Blueprint.Dialog>
+</div>"
+`;
+
+exports[`CreateChain: index render component (non Oauth mode) errorMessageFor 1`] = `null`;
+
+exports[`CreateChain: index render component (non Oauth mode) errorMessageFor 2`] = `"required"`;
+
+exports[`CreateChain: index render component (non Oauth mode) form fields 1`] = `
+Object {
+  "address": null,
+  "balance": 0,
+  "enode": null,
+  "errors": null,
+  "form": Object {
+    "userSelected": true,
+  },
+  "username": null,
+}
+`;
+
+exports[`CreateChain: index render component (non Oauth mode) form fields 2`] = `
 Object {
   "address": "370adf114257cb0e0025eedf0a96261b51af23e3",
   "balance": "500",
@@ -167,7 +353,7 @@ Object {
 }
 `;
 
-exports[`CreateChain: index render component (enterprise mode) form fields 3`] = `
+exports[`CreateChain: index render component (non Oauth mode) form fields 3`] = `
 Object {
   "address": "d2263b71c14010ff03d8f786670aba691b22b158",
   "balance": "500",
@@ -180,7 +366,7 @@ Object {
 }
 `;
 
-exports[`CreateChain: index render component (enterprise mode) with empty values 1`] = `
+exports[`CreateChain: index render component (non Oauth mode) with empty values 1`] = `
 "<div>
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
   <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
@@ -270,7 +456,7 @@ exports[`CreateChain: index render component (enterprise mode) with empty values
 </div>"
 `;
 
-exports[`CreateChain: index render component (enterprise mode) with values 1`] = `
+exports[`CreateChain: index render component (non Oauth mode) with values 1`] = `
 "<div>
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
   <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
@@ -387,192 +573,6 @@ exports[`CreateChain: index render component (enterprise mode) with values 1`] =
               <div className=\\"pt-select\\">
                 <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={false}>
                   <option value={{...}} />
-                </Field>
-                <br />
-                <span className=\\"error-text\\" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Enode
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"form-width\\">
-              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value={{...}} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
-              <br />
-              <span className=\\"error-text\\" />
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Balance
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"form-width\\">
-              <Field name=\\"value\\" component=\\"input\\" type=\\"number\\" placeholder=\\"Balance\\" value={0} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className=\\"pt-dialog-footer\\">
-        <div className=\\"pt-dialog-footer-actions\\">
-          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Add Member\\" />
-        </div>
-      </div>
-    </form>
-  </Blueprint.Dialog>
-</div>"
-`;
-
-exports[`CreateChain: index render component (public mode) form fields with values 1`] = `
-Object {
-  "address": null,
-  "balance": 0,
-  "enode": null,
-  "errors": null,
-  "form": Object {
-    "userSelected": true,
-  },
-  "username": null,
-}
-`;
-
-exports[`CreateChain: index render component (public mode) form fields with values 2`] = `
-Object {
-  "address": null,
-  "balance": "500",
-  "enode": "enode://",
-  "errors": null,
-  "form": Object {
-    "userSelected": true,
-  },
-  "username": null,
-}
-`;
-
-exports[`CreateChain: index render component (public mode) with empty values 1`] = `
-"<div>
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
-  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
-    <form>
-      <div className=\\"pt-dialog-body\\">
-        <div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-3 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Username
-              </label>
-            </div>
-            <div className=\\"col-sm-9 smd-pad-4\\">
-              <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
-                  <option value={[undefined]} />
-                </Field>
-                <br />
-                <span className=\\"error-text\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-3 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Address
-              </label>
-            </div>
-            <div className=\\"col-sm-9 smd-pad-4\\">
-              <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
-                  <option value={{...}} />
-                </Field>
-                <br />
-                <span className=\\"error-text\\" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Enode
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"form-width\\">
-              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value={{...}} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
-              <br />
-              <span className=\\"error-text\\" />
-            </div>
-          </div>
-        </div>
-        <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label smd-pad-4\\">
-              Balance
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"form-width\\">
-              <Field name=\\"value\\" component=\\"input\\" type=\\"number\\" placeholder=\\"Balance\\" value={0} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className=\\"pt-dialog-footer\\">
-        <div className=\\"pt-dialog-footer-actions\\">
-          <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Add Member\\" />
-        </div>
-      </div>
-    </form>
-  </Blueprint.Dialog>
-</div>"
-`;
-
-exports[`CreateChain: index render component (public mode) with values 1`] = `
-"<div>
-  <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
-  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
-    <form>
-      <div className=\\"pt-dialog-body\\">
-        <div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-3 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Username
-              </label>
-            </div>
-            <div className=\\"col-sm-9 smd-pad-4\\">
-              <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"from\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
-                  <option value=\\"Supplier1\\">
-                    Supplier1
-                  </option>
-                </Field>
-                <br />
-                <span className=\\"error-text\\" />
-              </div>
-            </div>
-          </div>
-          <div className=\\"row\\">
-            <div className=\\"col-sm-3 text-right\\">
-              <label className=\\"pt-label smd-pad-4\\">
-                Address
-              </label>
-            </div>
-            <div className=\\"col-sm-9 smd-pad-4\\">
-              <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"fromAddress\\" value={{...}} onChange={[Function: onChange]} required={true} disabled={true}>
-                  <option value=\\"370adf114257cb0e0025eedf0a96261b51af23e3\\">
-                    370adf114257cb0e0025eedf0a96261b51af23e3
-                  </option>
                 </Field>
                 <br />
                 <span className=\\"error-text\\" />

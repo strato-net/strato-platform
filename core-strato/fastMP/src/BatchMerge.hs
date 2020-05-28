@@ -17,7 +17,7 @@ import           Blockchain.Output
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
-import           Blockchain.Strato.Model.SHA                  (keccak256)
+import           Blockchain.Strato.Model.Keccak256            (hash, keccak256ToByteString)
 
 import FastMP
 import KV
@@ -37,7 +37,7 @@ putManyKeyVal sr listOfInserts = do
   case nr of
     MP.PtrRef sr' -> return sr'
     MP.SmallRef v -> do -- The whole trie is too small to fit in a level db key, just create a stateroot from the full data....
-      let newSR = MP.StateRoot $ keccak256 v
+      let newSR = MP.StateRoot $ keccak256ToByteString $ hash v
       A.insert (A.Proxy @MP.NodeData) newSR finalNd
       return newSR
 

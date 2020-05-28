@@ -1,4 +1,5 @@
 /eth/v1.2/chain ChainR GET POST
+/eth/v1.2/chains ChainsR POST
 /eth/v1.2/dataFaucet DataFaucetR POST
 /eth/v1.2/faucet FaucetR POST
 /eth/v1.2/stats/difficulty StatDiffR GET
@@ -13,7 +14,7 @@
 !/eth/v1.2/transaction/last/queued QueuedTransactionsR GET
 /eth/v1.2/transactionList TransactionListR POST
 !/eth/v1.2/transactionResult/batch BatchTransactionResultR POST
-!/eth/v1.2/transactionResult/#SHA TransactionResultR GET
+!/eth/v1.2/transactionResult/#Keccak256 TransactionResultR GET
 /eth/v1.2/storage StorageInfoR GET
 /eth/v1.2/coinbase CoinbaseR GET
 /eth/v1.2/peers PeersR GET

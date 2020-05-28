@@ -5,7 +5,7 @@ import { Dialog } from '@blueprintjs/core';
 import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import { closeUploadModal, resetError } from './uploadFile.actions';
 import { toasts } from '../../Toasts';
-import { isModePublic } from '../../../lib/checkMode';
+import { isOauthEnabled } from '../../../lib/checkMode';
 import { fetchAccounts } from '../../Accounts/accounts.actions';
 import UploadForm from './UploadForm';
 import UploadData from './UploadData';
@@ -23,7 +23,7 @@ class UplaodFile extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track("external_storage_loaded");
-    !isModePublic() && this.props.fetchAccounts(true, false);
+    !isOauthEnabled() && this.props.fetchAccounts(true, false);
   }
 
   render() {

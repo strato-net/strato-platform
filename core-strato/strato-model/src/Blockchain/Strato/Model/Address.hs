@@ -1,55 +1,67 @@
+{-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedLists       #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TemplateHaskell            #-}
+
 module Blockchain.Strato.Model.Address
     ( Address(..),
       prvKey2Address, pubKey2Address,
-      formatAddress, formatAddressWithoutColor, stringAddress,
+      formatAddressWithoutColor,
+      stringAddress,
       getNewAddress_unsafe,
       addressAsNibbleString, addressFromNibbleString,
-      addressToHex, addressFromHex
+      addressToHex, addressFromHex,
+      unAddress
     ) where
 
 import           Control.DeepSeq
+import           Control.Lens.Operators
 import           Control.Monad
-import           Data.Data
-import           Data.Maybe                           (fromMaybe)
-import           Numeric
-import           Test.QuickCheck                      (Arbitrary(..))
-
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
-
 import           Data.Binary
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
+import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy                 as BL
-import qualified Data.NibbleString                    as N
-
+import           Data.Data
 import           Data.Hashable
+import           Data.Maybe                           (fromMaybe)
+import           Data.Swagger                         hiding (Format, format, get, put)
+import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
-import           Text.Read                            (readMaybe)
-
+import           Database.Persist.Sql                 hiding (get)
+import           GHC.Generics
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
+import           Numeric
+import           Servant.API
+import           Servant.Docs
 import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
 import           Text.Printf
+import           Test.QuickCheck                      (Arbitrary(..))
+import           Text.Read                            (readMaybe)
+import           Web.FormUrlEncoded
 import           Web.PathPieces
-import           Web.HttpApiData
+
+
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import qualified Blockchain.Strato.Model.SHA          as SHA (keccak256, hash)
+import qualified Blockchain.Strato.Model.Keccak256    as SHA (hash, keccak256ToWord256)
 import           Blockchain.Strato.Model.Util
+import qualified Data.NibbleString                    as N
+import qualified Data.RLP                             as RLP2
 import qualified Text.Colors       as CL
 import           Text.Format
 import           Text.ShortDescription
 import           Text.Tools                           (shorten)
 
-import           GHC.Generics
+
 
 instance RLPSerializable Address where
   rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
@@ -67,7 +79,7 @@ instance PrintfArg Address where
 
 prvKey2Address :: PrvKey -> Address
 prvKey2Address prvKey =
-  Address $ fromInteger $ byteString2Integer $ SHA.keccak256 $ BL.toStrict $ encode x `BL.append` encode y
+  Address $ fromIntegral $ SHA.keccak256ToWord256 $ SHA.hash $ BL.toStrict $ encode x `BL.append` encode y
   where
     point = pubKeyPoint $ derivePubKey prvKey
     x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
@@ -75,7 +87,7 @@ prvKey2Address prvKey =
 
 pubKey2Address :: PubKey -> Address
 pubKey2Address pubKey =
-  Address $ fromInteger $ byteString2Integer $ SHA.keccak256 $ BL.toStrict $ encode x `BL.append` encode y
+  Address $ fromIntegral $ SHA.keccak256ToWord256 $ SHA.hash $ BL.toStrict $ encode x `BL.append` encode y
   where
     x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
     y = fromMaybe (error "getY failed in prvKey2Address") $ getY point
@@ -91,19 +103,15 @@ instance PathPiece Address where
     where
       ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word160,String)]
 
-
-formatAddress :: Address -> String
-formatAddress (Address x) = padZeros 40 $ showHex x ""
-
 {-
  make into a string rather than an object
 -}
 instance AS.ToJSON Address where
-  toJSON = String . T.pack . formatAddress
+  toJSON = String . T.pack . formatAddressWithoutColor
 
 instance AS.ToJSONKey Address where
   toJSONKey = ToJSONKeyText f (Enc.text . f)
-          where f = T.pack . formatAddress
+          where f = T.pack . formatAddressWithoutColor
 
 instance AS.FromJSON Address where
   parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ drop0x $ T.unpack s
@@ -116,10 +124,10 @@ instance FromJSONKey Address where
   fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
 instance Lei.Pretty Address where
-  pretty = Lei.text . CL.yellow . formatAddress
+  pretty = Lei.text . CL.yellow . formatAddressWithoutColor
 
 instance Format Address where
-  format = CL.yellow . formatAddress
+  format = CL.yellow . formatAddressWithoutColor
 
 instance ShortDescription Address where
   shortDescription x = CL.yellow . shorten 12 . padZeros 40 $ showHex x ""
@@ -131,11 +139,90 @@ instance Binary Address where
     let byteString = B.pack bytes
     return (Address $ fromInteger $ byteString2Integer byteString)
 
+instance PersistField Address where
+  toPersistValue = PersistText . T.pack . formatAddressWithoutColor
+  fromPersistValue (PersistText t) = maybeToEither "could not decode address"
+                                   . stringAddress
+                                   . T.unpack $ t
+  fromPersistValue x = Left . T.pack $ "PersistField Address: expected PersistText: " ++ show x
+
+instance PersistFieldSql Address where
+  sqlType _ = SqlOther "text"
+--  sqlType _ = SqlOther "varchar(64)"
+
 stringAddress :: String -> Maybe Address
 stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
 
+
+
+
+------------------------------------
+
+instance FromHttpApiData Address where
+  parseQueryParam x =
+    case stringAddress $ T.unpack x of
+      Just address -> Right address
+      _ -> Left $ T.pack $ "Could not parse address: " ++ show x
+  
+instance ToForm Address where
+  toForm address = [("address", toQueryParam address)]
+
+instance FromForm Address where fromForm = parseUnique "address"
+
+instance ToSample Address where
+  toSamples _ = samples [Address 0xdeadbeef, Address 0x12345678]
+
+instance ToCapture (Capture "address" Address) where
+  toCapture _ = DocCapture "address" "an Ethereum address"
+
+instance ToCapture (Capture "contractAddress" Address) where
+  toCapture _ = DocCapture "contractAddress" "an Ethereum address"
+
+instance RLP2.RLPEncodable Address where
+  rlpEncode addr = RLP2.rlpEncode . fst . B16.decode . BC.pack $ formatAddressWithoutColor addr
+  rlpDecode obj = Address . fromInteger <$> RLP2.rlpDecode obj
+
+instance RLP2.RLPEncodable (Maybe Address) where
+  rlpEncode = maybe RLP2.rlp0 RLP2.rlpEncode
+  rlpDecode x = if x == RLP2.rlp0 then return Nothing else Just <$> RLP2.rlpDecode x
+
+instance ToCapture (Capture "userAddress" Address) where
+  toCapture _ = DocCapture "userAddress" "an Ethereum address"
+
+instance ToParamSchema Address where
+  toParamSchema _ = mempty
+    & type_ .~ SwaggerString
+    & minimum_ ?~ fromInteger (toInteger . unAddress $ (minBound :: Address))
+    & maximum_ ?~ fromInteger (toInteger . unAddress $ (maxBound :: Address))
+    & Sw.format ?~ "hex string"
+
+unAddress :: Address -> Word160
+unAddress (Address n) = n
+
+
+instance ToSchema Address where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Address")
+      ( mempty
+        & type_ .~ SwaggerString
+        & example ?~ "address=deadbeef" --toJSON (Address 0xdeadbeef) -- FIXME if causing troubles outside /faucet
+        & description ?~ "Ethereum Address, 20 byte hex encoded string" )
+
+
+
+-----------------------------
+
+
+
+
+
+
+
+
+
+
 instance ToHttpApiData Address where
-  toUrlPiece = T.pack . formatAddress
+  toUrlPiece = T.pack . formatAddressWithoutColor
 
 instance NFData Address
 
@@ -152,7 +239,7 @@ addressFromNibbleString::N.NibbleString->Address
 addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteString
 
 formatAddressWithoutColor::Address->String
-formatAddressWithoutColor = formatAddress
+formatAddressWithoutColor x = padZeros 40 $ showHex x ""
 
 addressToHex :: Address -> B.ByteString
 addressToHex = B16.encode . BL.toStrict . encode

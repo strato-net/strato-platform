@@ -11,49 +11,6 @@ description:
 
 dependencies:
   - base >= 4 && < 5
-  - aeson
-  - aeson-casing
-  - binary
-  - blockapps-data
-  - blockapps-datadefs
-  - blockapps-mpdbs
-  - ethereum-rlp
-  - base16-bytestring
-  - blockapps-util
-  - bytestring
-  - containers
-  - cryptonite
-  - data-default
-  - deepseq
-  - extra
-  - format
-  - generic-random
-  - hashable
-  - lens
-  - leveldb-haskell
-  - memory
-  - merkle-patricia-db
-  - monad-alter
-  - monad-control
-  - nibblestring
-  - parsec
-  - prometheus-client
-  - QuickCheck
-  - quickcheck-instances
-  - resourcet
-  - semver-range
-  - servant-docs
-  - solid-vm-model
-  - strato-model
-  - swagger2
-  - text
-  - time
-  - transformers
-  - transformers-base
-  - unordered-containers
-  - vector
-  - vm-tools
-
 
 #  - ethereum-vm
 #  - ansi-wl-pprint
@@ -100,6 +57,45 @@ library:
     - SolidVM.Solidity.Xabi.Type
     - CodeCollection
   ghc-options: -Wall -O2
+  dependencies:
+  - QuickCheck
+  - aeson
+  - aeson-casing
+  - base16-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-mpdbs
+  - blockapps-util
+  - bytestring
+  - containers
+  - cryptonite
+  - deepseq
+  - ethereum-rlp
+  - extra
+  - format
+  - generic-random
+  - lens
+  - memory
+  - merkle-patricia-db
+  - monad-alter
+  - nibblestring
+  - parsec
+  - prometheus-client
+  - quickcheck-instances
+  - semver-range
+  - servant-docs
+  - solid-vm-model
+  - strato-model
+  - swagger2
+  - text
+  - time
+  - transformers
+  - unliftio
+  - unordered-containers
+  - vector
+  - vm-tools
+
 
 executables:
   parse-solidvm:
@@ -107,7 +103,9 @@ executables:
     other-modules: []
     main: Parse.hs
     dependencies:
+      - parsec
       - solid-vm
+
     ghc-options: -Wall -O2 -threaded -rtsopts
 
   exprs-needed:
@@ -115,7 +113,10 @@ executables:
     other-modules: []
     main: ExprsNeeded.hs
     dependencies:
+      - containers
+      - parsec
       - solid-vm
+      - text
 
 tests:
   solid-vm-spec:
@@ -124,13 +125,26 @@ tests:
     dependencies:
       - async
       - base16-bytestring
+      - blockapps-datadefs
+      - blockapps-mpdbs
+      - blockapps-util
+      - bytestring
+      - containers
+      - deepseq
+      - ethereum-rlp
       - hflags
       - hspec
       - hspec-expectations-lifted
-      - lifted-base
       - HUnit
+      - merkle-patricia-db
+      - parsec
       - raw-strings-qq
       - solid-vm
+      - solid-vm-model
+      - strato-model
+      - text
+      - time
+      - vm-tools
 
 benchmarks:
     codebench:

@@ -30,7 +30,6 @@ import           System.Directory
 import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
@@ -46,7 +45,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Util
 
@@ -72,7 +71,6 @@ import qualified Blockchain.Strato.Indexer.Model      as IdxModel
 import qualified Blockchain.Strato.Model.Address      as Ad
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
-import qualified Database.Persist.Postgresql          as SQL
 
 import           Text.Format
 
@@ -89,7 +87,7 @@ readSupplementaryAccounts genesisBlockName = do
                                   [] -> []
                                   "s":_ -> []
                                   ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ SHA (parseHex c))]
+                                  ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ unsafeCreateKeccak256FromWord256 (parseHex c))]
                                   _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
@@ -139,7 +137,7 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
     obGB <- liftIO $ bootstrapSequencer genesisBlock
     putGenesisHash $ blockHash genesisBlock
     $logInfoS "initgen" "Initial merkle patricia tries successfully created"
-    [genBId] <- putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
+    void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
     $logInfoS "initgen" "Genesis Block put"
     $logInfoS "initgen" "State diff has been generated"
 
@@ -150,9 +148,9 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
         (blockDataNumber . blockBlockData $ genesisBlock)
         (blockDataDifficulty . blockBlockData $ genesisBlock)
     $logInfoS "initgen" "best block info inserted"
-    liftIO (bootstrapIndexer genBId obGB)
+    liftIO $ bootstrapIndexer obGB
     $logInfoS "initgen" "indexer has been bootstrapped"
-    let rewrite (_, CodeInfo bin src name) = (superProprietaryStratoSHAHash bin, Map.fromList [("src", src),("name",name)])
+    let rewrite (_, CodeInfo bin src name) = (hash bin, Map.fromList [("src", src),("name",name)])
         metadatas = Map.fromList . map rewrite $ srcInfo
         findMetadata = flip Map.lookup metadatas
     populateStorageDBs findMetadata genesisBlock genesisChainId
@@ -160,10 +158,10 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
 
 --------------------------------------
 populateStorageDBs::(MonadLogger m, HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
-                    (SHA -> Maybe (Map Text Text)) -> Block -> Maybe Word256 -> m ()
+                    (Keccak256 -> Maybe (Map Text Text)) -> Block -> Maybe Word256 -> m ()
 populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
-    accountDB <- getStateDB
+    sr <- getStateRoot
     res <- liftIO . runKafkaConfigured "strato-init" $ do
       assertTopicCreation
 
@@ -171,7 +169,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
      Right () -> return ()
      Left err -> error . show $ err
 
-    MP.forEach accountDB $ \keyHash value -> do
+    MP.forEach sr $ \keyHash value -> do
       address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ C8.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
 
       $logInfoS "initgen" $ T.pack $ "##################### writing to DBs: " ++ format address
@@ -190,7 +188,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             { A._actionBlockHash = blockHeaderHash $ blockHeader genesisBlock
             , A._actionBlockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
             , A._actionBlockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
-            , A._actionTransactionHash = SHA $ fromMaybe 0 genesisChainId
+            , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId
             , A._actionTransactionChainId = genesisChainId
             , A._actionTransactionSender = Ad.Address 0
             , A._actionData = Map.singleton a $
@@ -234,15 +232,14 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
        Right errs -> error . show $ errs
        Left err -> error . show $ err
 
-bootstrapIndexer :: SQL.Key BlockDataRef -> OutputBlock -> IO ()
-bootstrapIndexer key obGB =
+bootstrapIndexer :: OutputBlock -> IO ()
+bootstrapIndexer obGB =
     let clientId = fst ApiIndexer.kafkaClientIds
         consumer = snd ApiIndexer.kafkaClientIds
         topic    = IContext.targetTopicName
-        ibbi     = IContext.IndexerBestBlockInfo key
-        mkMeta   = KP.Metadata . KP.KString . C8.pack . show $ IContext.unIBBI ibbi
+        mkMeta   = KP.Metadata . KP.KString $ C8.empty
         commit   = do
-            putStrLn $ "Bootstrapping indexer with " ++ show ibbi
+            putStrLn $ "Bootstrapping indexer"
             runKafkaConfigured clientId $
                 commitSingleOffset consumer topic 0 0 mkMeta
         runner = commit >>= \case

@@ -15,7 +15,6 @@ import           Test.Hspec
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.API.SpecUtils
 import           BlockApps.Bloc22.Client
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
@@ -60,7 +59,7 @@ spec = do
       let
         Right result1 = postUsersFillEither1
         Right result2 = postUsersFillEither2
-      eResult1 <- runClientM (getBlocTransactionResult (blocTransactionHash result1) Nothing True) (ClientEnv mgr blocUrl Nothing)
+      eResult1 <- runClientM (getBlocTransactionResult (blocTransactionHash result1) True) (ClientEnv mgr blocUrl Nothing)
       eResult1 `shouldSatisfy` isRight
       let
         Right resolved1 = eResult1
@@ -117,15 +116,18 @@ spec = do
         uploadListContracts =
           [ UploadListContract
             { uploadlistcontractContractName = simpleStorageContractName
+            , uploadlistcontractSrc = Nothing
             , uploadlistcontractArgs = Map.empty
             , _uploadlistcontractTxParams = testTxParams
             , uploadlistcontractValue = Nothing
+            , _uploadlistcontractChainid = Nothing
             , uploadlistcontractMetadata = Nothing
             }
           ]
         uploadListRequest = UploadListRequest
           { uploadlistPassword = pw
           , uploadlistContracts = uploadListContracts
+          , uploadlistSrcs = Nothing
           , uploadlistResolve = False
           }
       eResults <- runClientM (postUsersUploadList userName userAddress Nothing False uploadListRequest) (ClientEnv mgr blocUrl Nothing)
@@ -164,6 +166,7 @@ spec = do
               { sendtransactionToAddress = toUserAddress
               , sendtransactionValue = Strung 100
               , _sendtransactionTxParams = testTxParams
+              , _sendtransactionChainid = Nothing
               , sendtransactionMetadata = Nothing
               }
           }
@@ -190,6 +193,7 @@ spec = do
               , methodcallArgs = Map.empty
               , methodcallValue = Strung 0
               , _methodcallTxParams = testTxParams
+              , _methodcallChainid = Nothing
               , methodcallMetadata = Nothing
               }
           }

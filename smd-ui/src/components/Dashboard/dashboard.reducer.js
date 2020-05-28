@@ -16,7 +16,8 @@ import {
   PRELOAD_HEALTH,
   UPDATE_HEALTH,
   PRELOAD_NODE_UPTIME,
-  UPDATE_NODE_UPTIME, PRELOAD_SYSTEM_INFO, UPDATE_SYSTEM_INFO
+  UPDATE_NODE_UPTIME, PRELOAD_SYSTEM_INFO, UPDATE_SYSTEM_INFO,
+  CHANGE_HEALTH_STATUS
 } from './dashboard.action'
 
 const initialState = {
@@ -156,6 +157,12 @@ const reducer = function (state = initialState, action) {
         systemWarnings: action.data.warnings
       }
 
+    case CHANGE_HEALTH_STATUS:
+      return {
+        ...state,
+        healthStatus: action.data,
+        systemStatus: action.data,
+      }
     default:
       return state;
   }

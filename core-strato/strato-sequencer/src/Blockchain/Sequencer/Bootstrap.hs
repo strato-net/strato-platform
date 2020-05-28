@@ -58,8 +58,8 @@ bootstrapSequencer Block{blockBlockData = bd,
             , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
             , seenTransactionDBSize = 10
             , syncWrites            = False
-            , blockstanbulBlockPeriod = 0
-            , blockstanbulRoundPeriod = 0
+            , blockstanbulBlockPeriod = BlockPeriod 0
+            , blockstanbulRoundPeriod = RoundPeriod 0
             , blockstanbulBeneficiary = vch
             , blockstanbulVoteResps = rch
             , blockstanbulTimeouts = tch
@@ -69,6 +69,7 @@ bootstrapSequencer Block{blockBlockData = bd,
             }
       runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty
+        flushLdbBatchOps
   initKafka :: CablePackage -> IO ()
   initKafka pkg = do
       let clientId = KP.KString $ C8.pack defaultKafkaClientId'

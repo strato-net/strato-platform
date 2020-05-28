@@ -17,7 +17,6 @@ import qualified Data.Map                           as M
 import qualified Data.NibbleString                  as N
 import qualified Database.Redis                     as Redis
 import qualified Database.LevelDB                   as DB
-import           Database.Persist.Postgresql        (createPostgresqlPool)
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
@@ -30,7 +29,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.EthConf (lookupRedisBlockDBConfig, connStr)
 import           Blockchain.Output
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Address
 
@@ -77,17 +76,11 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
   delete _ = MP.genericDeleteDB $ asks stateDB
 
 instance HasMemRawStorageDB SetupDBM where
-  getMemRawStorageTxDB = do
-    cxt <- ask
-    lst <- liftIO . readIORef .localStorageTx $ cxt
-    return (stateDB cxt, lst)
+  getMemRawStorageTxDB = liftIO . readIORef .localStorageTx =<< ask
   putMemRawStorageTxMap theMap = do
     lstref <- asks localStorageTx
     liftIO $ atomicWriteIORef lstref theMap
-  getMemRawStorageBlockDB = do
-    cxt <- ask
-    lsb <- liftIO . readIORef . localStorageBlock $ cxt
-    return (stateDB cxt, lsb)
+  getMemRawStorageBlockDB = liftIO . readIORef . localStorageBlock =<< ask
   putMemRawStorageBlockMap theMap = do
     lsbref <- asks localStorageBlock
     liftIO $ atomicWriteIORef lsbref theMap
@@ -112,7 +105,7 @@ instance (Address `A.Alters` AddressState) SetupDBM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (SHA `A.Alters` DBCode) SetupDBM where
+instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   lookup _ = genericLookupCodeDB $ asks codeDB
   insert _ = genericInsertCodeDB $ asks codeDB
   delete _ = genericDeleteCodeDB $ asks codeDB

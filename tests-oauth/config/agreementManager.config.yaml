@@ -1,0 +1,36 @@
+apiDebug: false
+VM: SolidVM
+timeout: 600000
+batchCount: 2
+batchSize: 10
+
+# NOTE: mention node excluding current node
+multinode:
+  runTest: false
+  nodes: 
+    - http://multinode201.ci.blockapps.net
+    - http://multinode202.ci.blockapps.net
+
+contract: 
+  name: 'AgreementManager'
+  filePath: './contracts/beanstalk/agreement/AgreementManager.sol'
+  args: 
+    _dappAddress: 2383914a2cffe7bb97e0b622481b945858e08188
+    _permissionManager: '2383914a2cffe7bb97e0b622481b945858e08188'
+    _programManager: '2383914a2cffe7bb97e0b622481b945858e08188'
+    _userManager: '2383914a2cffe7bb97e0b622481b945858e08188'
+
+nodes:
+  - id: 0
+    url: 'http://localhost'
+    publicKey: '6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0'
+    port: 30303
+    oauth:
+      appTokenCookieName: "oauth_tests"
+      scope: 'email openid'
+      appTokenCookieMaxAge: 7776000000 # 90 days: 90 * 24 * 60 * 60 * 1000
+      clientId: 'dev-infinite'
+      clientSecret: '091a22ec-3c81-4be4-83fb-d9f82084c3e8'
+      openIdDiscoveryUrl: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration"
+      redirectUri: "http://localhost/callback"
+      logoutRedirectUri: "http://localhost"

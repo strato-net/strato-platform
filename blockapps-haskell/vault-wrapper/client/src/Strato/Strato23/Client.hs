@@ -7,6 +7,7 @@ module Strato.Strato23.Client
   , postKey
   , postSignature
   , postPassword
+  , verifyPassword
   ) where
 
 import           Servant.Client
@@ -31,3 +32,6 @@ postSignature = client (Proxy @ PostSignature)
 
 postPassword :: Text -> ClientM ()
 postPassword = client (Proxy @ PostPassword)
+
+verifyPassword :: ClientM Bool
+verifyPassword = client (Proxy @ VerifyPassword)

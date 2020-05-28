@@ -25,7 +25,7 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.PubKey       ()
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.ExtWord
 import qualified Text.Colors                  as CL
@@ -99,7 +99,7 @@ terminationReasonToNumber ConnectedToSelf                = 0x0a
 terminationReasonToNumber PingTimeout                    = 0x0b
 terminationReasonToNumber OtherSubprotocolReason         = 0x10
 
-data BlockHashOrNumber = BlockHash SHA | BlockNumber Integer deriving (Eq,Show)
+data BlockHashOrNumber = BlockHash Keccak256 | BlockNumber Integer deriving (Eq,Show)
 
 instance Format BlockHashOrNumber where
   format (BlockHash x)   = format x
@@ -120,9 +120,9 @@ instance RLPSerializable Direction where
   rlpDecode _ = Reverse
 
 data TransactionRequest =
-  Explicit [SHA] |
+  Explicit [Keccak256] |
   Implicit {
-    trTransactionHash :: SHA
+    trTransactionHash :: Keccak256
   , trMaxTransactions :: Int
   , trSkip            :: Int
   , trDirection       :: Direction
@@ -157,12 +157,12 @@ data Message =
   Pong |
 
   --ethereum wire protocol
-  Status { protocolVersion::Int, networkID::Int, totalDifficulty::Integer, latestHash::SHA, genesisHash:: SHA } |
-  NewBlockHashes [(SHA, Int)] |
+  Status { protocolVersion::Int, networkID::Int, totalDifficulty::Integer, latestHash::Keccak256, genesisHash:: Keccak256 } |
+  NewBlockHashes [(Keccak256, Int)] |
   Transactions [Transaction] |
   GetBlockHeaders {block::BlockHashOrNumber, maxHeaders::Int, skip::Int, direction::Direction} |
   BlockHeaders [BlockHeader] |
-  GetBlockBodies [SHA] |
+  GetBlockBodies [Keccak256] |
   BlockBodies [([Transaction], [BlockHeader])] |
   NewBlock Block Integer |
 
@@ -171,7 +171,7 @@ data Message =
   -- private chains
   GetChainDetails [Word256] |
   ChainDetails [(Word256, ChainInfo)] |
-  GetTransactions [SHA] deriving (Eq,Show)
+  GetTransactions [Keccak256] deriving (Eq,Show)
 
 instance Format Message where
   format Hello{version=ver, clientId=c, capability=cap, port=p, nodeId=n} =

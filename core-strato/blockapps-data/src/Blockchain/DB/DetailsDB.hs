@@ -12,11 +12,11 @@ import qualified Database.Esqueleto       as E
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Text.Format
 
 getBestBlockHash::HasSQLDB m=>
-                  m SHA
+                  m Keccak256
 getBestBlockHash = do
   ret <- sqlQuery $
          E.select $ E.from $ \a -> do
@@ -29,7 +29,7 @@ getBestBlockHash = do
     _   -> error "getBestBlockHash can't handle a tie yet, yet that is what we have."
 
 getGenesisBlockHash::HasSQLDB m=>
-                     m SHA
+                     m Keccak256
 getGenesisBlockHash = do
   ret <- sqlQuery $
          E.select $ E.from $ \a -> do

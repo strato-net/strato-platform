@@ -7,10 +7,12 @@ module BlockApps.Bloc22.Client
   , getAddresses
   , postChainInfo
   , getChainInfo
+  , postChainInfos
   , getContracts
   , getContractsData
   , getContractsContract
   , getContractsState
+  , postContractsBatchStates
   , getContractsDetails
   , getContractsFunctions
   , getContractsSymbols
@@ -34,6 +36,7 @@ module BlockApps.Bloc22.Client
   , getBlocTransactionResult
   , postBlocTransactionResults
   , postBlocTransaction
+  , postBlocTransactionParallel
   ) where
 
 import           Data.Map.Strict                  (Map)
@@ -44,9 +47,11 @@ import           Servant.Client
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Keccak256
 
 getGitInfo :: ClientM GitInfo
 getGitInfo = client (Proxy @ GetGitInfo)
@@ -57,16 +62,16 @@ getAddresses = client (Proxy @ GetAddresses)
 getContracts :: Maybe ChainId -> ClientM GetContractsResponse
 getContracts = client (Proxy @ GetContracts)
 
-getContractsData :: ContractName -> ClientM [MaybeNamed Address]
+getContractsData :: ContractName -> ClientM [Address]
 getContractsData = client (Proxy @ GetContractsData)
 
 getContractsContract
-  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> ClientM ContractDetails
+  :: ContractName -> Address -> Maybe ChainId -> ClientM ContractDetails
 getContractsContract = client (Proxy @ GetContractsContract)
 
 getContractsState
   :: ContractName
-  -> MaybeNamed Address
+  -> Address
   -> Maybe ChainId
   -> Maybe Text
   -> Maybe Integer
@@ -75,25 +80,30 @@ getContractsState
   -> ClientM (Map Text SolidityValue)
 getContractsState = client (Proxy @ GetContractsState)
 
+postContractsBatchStates
+  :: [PostContractsBatchStatesRequest]
+  -> ClientM [Map Text SolidityValue]
+postContractsBatchStates = client (Proxy @ PostContractsBatchStates)
+
 getContractsDetails
   :: Address -> Maybe ChainId -> ClientM ContractDetails
 getContractsDetails = client (Proxy @ GetContractsDetails)
 
 getContractsFunctions
-  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> ClientM [FunctionName]
+  :: ContractName -> Address -> Maybe ChainId -> ClientM [FunctionName]
 getContractsFunctions = client (Proxy @ GetContractsFunctions)
 
 getContractsSymbols
-  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> ClientM [SymbolName]
+  :: ContractName -> Address -> Maybe ChainId -> ClientM [SymbolName]
 getContractsSymbols = client (Proxy @ GetContractsSymbols)
 
 -- getContractsEnum
---   :: ContractName -> MaybeNamed Address -> EnumName -> Maybe ChainId -> ClientM [EnumValue]
+--   :: ContractName -> Address -> EnumName -> Maybe ChainId -> ClientM [EnumValue]
 -- getContractsEnum = client (Proxy @ GetContractsEnum)
 
 getContractsStateMapping
   :: ContractName
-  -> MaybeNamed Address
+  -> Address
   -> SymbolName
   -> Text
   -> Maybe ChainId
@@ -109,7 +119,7 @@ postContractsCompile = client (Proxy @ PostContractsCompile)
 postContractsXabi :: PostXabiRequest -> ClientM PostXabiResponse
 postContractsXabi = client (Proxy @ PostContractsXabi)
 
-getSearchContract :: ContractName -> ClientM [Greedy (MaybeNamed Address) ChainId]
+getSearchContract :: ContractName -> ClientM [Greedy Address ChainId]
 getSearchContract = client (Proxy @ GetSearchContract)
 
 getUsers :: ClientM [UserName]
@@ -171,10 +181,10 @@ postUsersContractMethodList
   -> ClientM [BlocTransactionResult]
 postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 
-getBlocTransactionResult :: Keccak256 -> Maybe ChainId -> Bool -> ClientM BlocTransactionResult
+getBlocTransactionResult :: Keccak256 -> Bool -> ClientM BlocTransactionResult
 getBlocTransactionResult = client (Proxy @ GetBlocTransactionResult)
 
-postBlocTransactionResults :: Maybe ChainId -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResults :: Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @ PostBlocTransactionResults)
 
 postChainInfo :: ChainInput -> ClientM ChainId
@@ -183,10 +193,22 @@ postChainInfo = client (Proxy @ PostChainInfo)
 getChainInfo :: [ChainId] -> ClientM [ChainIdChainOutput]
 getChainInfo = client (Proxy @ GetChainInfo)
 
+postChainInfos :: [ChainInput] -> ClientM [ChainId]
+postChainInfos = client (Proxy @ PostChainInfos)
+
 postBlocTransaction
   :: Maybe Text
   -> Maybe ChainId
   -> Bool
   -> PostBlocTransactionRequest
-  -> ClientM [BlocTransactionResult]
+  -> ClientM [BlocChainOrTransactionResult]
 postBlocTransaction = client (Proxy @ PostBlocTransaction)
+
+postBlocTransactionParallel
+  :: Maybe Text
+  -> Maybe ChainId
+  -> Bool
+  -> Bool
+  -> PostBlocTransactionRequest
+  -> ClientM [BlocChainOrTransactionResult]
+postBlocTransactionParallel = client (Proxy @ PostBlocTransactionParallel)

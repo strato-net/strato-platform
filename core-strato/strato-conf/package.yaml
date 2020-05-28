@@ -16,7 +16,6 @@ library:
     - filepath
     - hflags
     - network
-    - hostname
     - yaml
     - postgresql-simple
     - containers
@@ -28,3 +27,4 @@ library:
     - mtl
     - transformers
     - hedis
+    - swagger2

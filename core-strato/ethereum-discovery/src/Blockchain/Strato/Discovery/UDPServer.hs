@@ -33,7 +33,7 @@ import           System.Timeout
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.P2PUtil
@@ -217,7 +217,7 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
                          , pPeerLastMsgTime = curTime
                          , pPeerEnableTime = curTime
                          , pPeerUdpEnableTime = curTime
-                         , pPeerLastBestBlockHash = SHA 0
+                         , pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0
                          , pPeerBondState = 0
                          , pPeerActiveState = 0
                          , pPeerVersion = T.pack "61" -- fix
@@ -241,7 +241,7 @@ handleValidPacket prv sock addr _ packet otherPubKey = let portNum = 30303 :: In
                           ,  pPeerLastMsgTime = curTime
                           ,  pPeerEnableTime = curTime
                           ,  pPeerUdpEnableTime = curTime
-                          ,  pPeerLastBestBlockHash = SHA 0
+                          ,  pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0
                           ,  pPeerBondState = 0
                           ,  pPeerActiveState = 0
                           ,  pPeerVersion = T.pack "61" -- fix

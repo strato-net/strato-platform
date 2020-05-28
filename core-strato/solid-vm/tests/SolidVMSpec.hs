@@ -41,7 +41,7 @@ import Blockchain.Strato.Model.Action
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.VMContext
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
@@ -64,6 +64,34 @@ anyParseError _ = False
 anyUnknownFunc :: Selector HandledException
 anyUnknownFunc (HE UnknownFunction{}) = True
 anyUnknownFunc _ = False
+
+anyTypeError :: Selector HandledException
+anyTypeError (HE Blockchain.SolidVM.Exception.TypeError{}) = True
+anyTypeError _ = False
+
+anyIndexOOBError :: Selector HandledException
+anyIndexOOBError (HE Blockchain.SolidVM.Exception.IndexOutOfBounds{}) = True
+anyIndexOOBError _ = False
+
+anyMissingFieldError :: Selector HandledException
+anyMissingFieldError (HE Blockchain.SolidVM.Exception.MissingField{}) = True
+anyMissingFieldError _ = False
+
+anyDivideByZeroError :: Selector HandledException
+anyDivideByZeroError (HE Blockchain.SolidVM.Exception.DivideByZero{}) = True
+anyDivideByZeroError _ = False
+
+failedRequirementMsg :: String -> Selector HandledException
+failedRequirementMsg str (HE (Require (Just msg))) = str == msg
+failedRequirementMsg _   _                         = False
+
+failedRequirementNoMsg :: Selector HandledException
+failedRequirementNoMsg (HE (Require Nothing)) = True
+failedRequirementNoMsg _                      = False
+
+failedAssertion :: Selector HandledException
+failedAssertion (HE Assert) = True
+failedAssertion _           = False
 
 sender :: Address
 sender = 0xdeadbeef
@@ -114,8 +142,8 @@ runArgs args bs = do
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = BlockData { blockDataParentHash = SHA 0x0
-                            , blockDataUnclesHash = SHA 0x0
+      blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataCoinbase = Address 0x0
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
@@ -127,13 +155,13 @@ runArgs args bs = do
                             , blockDataGasUsed = 10000
                             , blockDataExtraData = ""
                             , blockDataNonce = 22
-                            , blockDataMixHash = SHA 0x0
+                            , blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = SHA 0x776622233444
+      txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
@@ -150,8 +178,8 @@ runCall funcName callArgs bs = do
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = BlockData { blockDataParentHash = SHA 0x0
-                            , blockDataUnclesHash = SHA 0x0
+      blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataCoinbase = Address 0x0
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
@@ -163,13 +191,13 @@ runCall funcName callArgs bs = do
                             , blockDataGasUsed = 10000
                             , blockDataExtraData = ""
                             , blockDataNonce = 22
-                            , blockDataMixHash = SHA 0x0
+                            , blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = SHA 0x234962
+      txHash = unsafeCreateKeccak256FromWord256 0x234962
       chainId = Nothing
       createMetadata = Just $ M.fromList [("name",  "qq"), ("args", "()")]
       noValueTransfer = error "TODO: noValueTransfer"
@@ -177,11 +205,15 @@ runCall funcName callArgs bs = do
       theData = error "TODO: theData"
       callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   newAddress <- getNewAddress sender
+  $logErrorS "runCall" "Beginning create"
   er1 <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
     value gasPrice availableGas newAddress code txHash chainId createMetadata
+  $logErrorS "runCall" "Returned from create"
   rethrowEx er1
+  $logErrorS "runCall" "Beginning call"
   er2 <- SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
     newAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
+  $logErrorS "runCall" "Returned from call"
   rethrowEx er2
   return $ erReturnVal er2
 
@@ -190,8 +222,8 @@ call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
-      blockData = BlockData { blockDataParentHash = SHA 0x0
-                            , blockDataUnclesHash = SHA 0x0
+      blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataCoinbase = Address 0x0
                             , blockDataStateRoot = ""
                             , blockDataTransactionsRoot = ""
@@ -203,13 +235,13 @@ call2 funcName callArgs contractAddress = do
                             , blockDataGasUsed = 10000
                             , blockDataExtraData = ""
                             , blockDataNonce = 22
-                            , blockDataMixHash = SHA 0x0
+                            , blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
       callDepth = 0
       value = error "TODO: value"
       gasPrice = error "TODO: gasPrice"
       availableGas = error "TODO: availableGas"
-      txHash = SHA 0xddba11
+      txHash = unsafeCreateKeccak256FromWord256 0xddba11
       chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
@@ -337,6 +369,15 @@ spec = do
     it "can delete" . runTest $ do
       runFile "testdata/Delete.sol"
       getFields ["x"] `shouldReturn` [BDefault]
+
+    it "can delete arrays" . runTest $ do
+      runFile "testdata/DeleteArray.sol"
+      getAll
+        [ [Field "x", Field "length"]
+        , [Field "x", ArrayIndex 0]
+        , [Field "x", ArrayIndex 1]
+        , [Field "x", ArrayIndex 2]
+        ] `shouldReturn` replicate 4 BDefault
 
     it "can run complicated constructors" . runTest $ do
       runFile "testdata/Constructor.sol"
@@ -496,6 +537,22 @@ contract qq {
   }
 }|]
 
+    it "can handle failed requirement with message" $ runTest (do
+      runBS [r|
+contract qq {
+  constructor() {
+    require(3 == 4, "Who is John Galt?");
+  }
+}|]) `shouldThrow` failedRequirementMsg "SString \"Who is John Galt?\""
+
+    it "can handle failed requirement without message" $ runTest (do
+      runBS [r|
+contract qq {
+  constructor() {
+    require(3 == 4);
+  }
+}|]) `shouldThrow` failedRequirementNoMsg
+
     it "can multiline require" . runTest $ do
       runBS [r|
 contract qq {
@@ -503,6 +560,32 @@ contract qq {
     require(
       3 == 3,
       "Who is John Galt????"
+    );
+  }
+}|]
+
+    it "can assert" . runTest $ do
+      runBS [r|
+contract qq {
+  constructor() {
+    assert(3 == 3);
+  }
+}|]
+
+    it "can handle failed assertion" $ runTest (do
+      runBS [r|
+contract qq {
+  constructor() {
+    assert(3 == 4);
+  }
+}|]) `shouldThrow` failedAssertion
+
+    it "can multiline assert" . runTest $ do
+      runBS [r|
+contract qq {
+  constructor() public {
+    assert(
+      3 == 3
     );
   }
 }|]
@@ -723,6 +806,26 @@ contract qq {
   }
 }|]
     getFields ["found"] `shouldReturn` [BBool False]
+
+  it "supports boolean equality" . runTest $ do
+    runBS [r|
+contract qq {
+  bool x = true;
+  bool y = true;
+  constructor() {
+    assert(x == y);
+  }
+}|]
+
+  it "supports boolean inequality" . runTest $ do
+    runBS [r|
+contract qq {
+  bool x = true;
+  bool y = false;
+  constructor() {
+    assert(x != y);
+  }
+}|]
 
   it "compares equal againts default" . runTest $ do
     liftIO $ pendingWith "add static typing" --TODO- Jim
@@ -1670,14 +1773,35 @@ contract qq {
     getFields ["is_a", "is_b", "is_c", "is_d"] `shouldReturn`
       map BBool [False, True, False, False]
 
-  it "can return textual bytes32" . runTest $ do
+
+
+  it "can return single strings" . runTest $ do
     runCall "txt" "()" [r|
 contract qq {
-  function txt() public returns (bytes32) {
-    bytes32 ret = "Ticket ID already exists";
+  function txt() public returns (string) {
+    string ret = "Ticket ID already exists";
     return ret;
   }
-}|] `shouldReturn` Just "Ticket ID already exists\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL \NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\CANTicket ID already exists"
+
+
+  it "can return tuples of strings" . runTest $ do
+    runCall "txt" "()" [r|
+contract qq {
+  function txt() public returns (string, string, string) {
+    return ("hey", "yo", "how are you?");
+  }
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL`\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\131\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\165\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXhey\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STXyo\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\fhow are you?" 
+
+
+  it "can return tuples of mixed simple types and strings" . runTest $ do
+    runCall "txt" "()" [r|
+contract qq {
+  function txt() public returns (string, uint, string, uint) {
+    return ("hey", 42, "yo", 100);
+  }
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\128\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL*\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\163\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXhey\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STXyo" 
+
 
   it "can return numeric bytes32" . runTest $ do
     runCall "num" "()" [r|
@@ -2176,3 +2300,297 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 833]
+
+  it "rejects member access on primitives" $ (runTest (runBS [r|
+contract qq {
+  uint x = 0;
+  uint y = x.mem;
+}|])) `shouldThrow` anyTypeError
+
+  it "rejects index access on primitives" $ (runTest (runBS [r|
+contract qq {
+  uint x = 0;
+  uint y = x[1];
+}|])) `shouldThrow` anyTypeError
+
+  it "can emit events" . runTest $ do
+    runBS [r|
+contract qq {
+  event x(uint v);
+  constructor() {
+    emit x(5);
+  }
+}|]
+
+  it "can emit inherited events" . runTest $ do
+    runBS [r|
+contract parent {
+  event x(uint v);
+}
+
+contract qq is parent {
+  constructor() {
+    emit x(6);
+  }
+}|]
+
+  it "can assign directly to index of an array" . runTest $ do
+    runBS [r|
+contract qq {
+  uint[] arr;
+  uint x;
+
+  constructor() {
+    arr[0] = 42;
+    x = arr[0];
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 42]
+
+  it "can assign directly to index of a mapping" . runTest $ do
+    runBS [r|
+contract qq {
+  mapping(bool => uint) bs;
+  uint x;
+
+  constructor() {
+    bs[true] = 42;
+    x = bs[true];
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 42]
+
+  it "throws array index out of bounds exception" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+    
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      x = arr[5];
+   }
+}|])) `shouldThrow` anyIndexOOBError
+
+  it "type checks the index value in array index access" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      x = arr[true];
+   }
+}|])) `shouldThrow` anyTypeError
+ 
+  it "type checks the index value in array index assignment" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      arr[true] = 2112;
+   }
+}|])) `shouldThrow` anyTypeError
+ 
+  it "rejects empty index value on array index access" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      x = arr[];
+   }
+}|])) `shouldThrow` anyMissingFieldError
+ 
+  it "rejects empty index value on mapping index access" $ (runTest (runBS [r|
+contract qq {
+   mapping(bool => uint) bs;
+   uint x;
+
+   constructor()
+   {
+      x = bs[];
+   }
+}|])) `shouldThrow` anyMissingFieldError
+ 
+  it "rejects empty index value on array index assignment" $ (runTest (runBS [r|
+contract qq {
+   uint x;
+
+   constructor()
+   {
+      uint[] arr = [42, 2020];
+      arr[] = 2112;
+   }
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "rejects empty index value on mapping index assignment" $ (runTest (runBS [r|
+contract qq {
+   mapping(bool => uint) bs;
+   uint x;
+
+   constructor()
+   {
+      bs[] = 42;
+   }
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "supports while loops" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+
+  constructor() {
+    while ( x < 3 )
+    {
+          x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 3]
+
+  it "can handle all expr combinations for logical AND clause " . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic == 0 && x == 0) {
+      x++;
+    }
+    if (magic == 42 && x == 0) {
+      x++;
+    }
+    if (magic == 100 && x == 1) {
+      x++;
+    }
+    if (magic == 1000 && x == 0) {
+      x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 1]
+
+  it "RHS expr in an AND clause is not evaluated if the LHS expr evaluates to False" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic > 100 && ++x > 100)
+    {
+      return 0;
+    }
+    return 0;
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0]
+
+  it "can handle all expr combinations for logical OR clause " . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic == 0 || x == 0) {
+      x++;
+    }
+    if (magic == 42 || x == 0) {
+      x++;
+    }
+    if (magic == 100 || x == 2) {
+      x++;
+    }
+    if (magic == 1000 || x == 0) {
+      x++;
+    }
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 3]
+
+  it "RHS expr in an OR clause is not evaluated if the LHS expr evaluates to True" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 0;
+  uint magic = 42;
+
+  constructor() {
+    if (magic == 42 || ++x > 100)
+    {
+      return 0;
+    }
+    return 0;
+  }
+
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 0]
+
+  it "rejects declared but undefined constructor" $ (runTest (runBS [r|
+contract qq {
+   constructor();
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "rejects declared but undefined function" $ (runTest (runBS [r|
+contract qq {
+   function f();
+   
+   constructor()
+   {
+      f();
+   }
+}|])) `shouldThrow` anyMissingFieldError
+
+  it "should accept multiple named return values" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x;
+  string y;
+  address z;
+  function f() returns (uint _x, string _y, address _z) {
+    _x = 123;
+    _y = "456";
+    _z = address(0x789);
+  }
+  constructor() {
+    (x,y,z) = f();
+  }
+}|]
+    getFields ["x","y","z"] `shouldReturn` [BInteger 123, BString "456", BAddress 0x789]
+
+  it "catches division by zero error" $ (runTest (runBS [r|
+contract qq {
+  
+   uint x = 42;
+   uint y = 0;
+
+   constructor()
+   {
+      return 42/0;
+   }
+}|])) `shouldThrow` anyDivideByZeroError 
+
+  it "supports ternary operations" . runTest $ do
+    runBS [r|
+contract qq {
+  
+  uint x;
+  uint y;
+
+  constructor() {
+    x = true == true ? 100 : 42;
+    y = true == false ? 100 : 42;
+  
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 100, BInteger 42]

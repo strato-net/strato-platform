@@ -12,80 +12,13 @@ description:
 github: blockapps/strato-platform/core-strato/strato-p2p
 
 dependencies:
-  - alarmclock
-  - array
-  - async
   - base >= 4 && < 5
-  - base16-bytestring
-  - binary
-  - aeson
-  - blockapps-data
-  - blockapps-datadefs
-  - blockapps-init
   - blockapps-util
-  - bytestring
-  - classy-prelude
   - common-log
-  - conduit
-  - conduit-combinators
-  - conduit-extra
-  - containers
-  - cross-monitoring
-  - cryptohash
-  - crypto-pubkey
-  - crypto-pubkey-types
-  - dlist
-  - dns
-  - either
-  - esqueleto
   - ethereum-discovery
-  - ethereum-encryption
-  - ethereum-rlp
-  - exceptions
-  - format
-  - ghc
-  - blockapps-haskoin
   - hflags
-  - http-client
-  - iproute
-  - json-rpc-server
-  - json-rpc-client
-  - lens
-  - lifted-base
-  - monad-alter
-  - monad-control
-  - monadIO
-  - blockapps-milena
-  - mtl
-  - network
-  - persistent
-  - prometheus-client
-  - random
-  - resourcet
-  - SafeSemaphore
-  - servant-client
-  - servant-server
-  - split
-  - stm
-  - stm-conduit
-  - streaming-commons
-  - strato-conf
-  - text
-  - time
-  - transformers
-  - transformers-base
-  - wai-middleware-prometheus
-  - warp
-  - ansi-wl-pprint
-  - strato-conf
-  - seqevents
-  - strato-model
-  - strato-redis-blockdb
-  - hedis
-  - lifted-async
-  - blockstanbul
-  - unliftio-core
-  - unliftio
+
+
 
 ghc-options: -Wall -threaded
 
@@ -94,11 +27,74 @@ executables:
     source-dirs: exec_src/
     main: StratoP2PMain.hs
     dependencies:
+      - blockapps-init
+      - lifted-async
       - strato-p2p
-
+      - wai-middleware-prometheus
+      - warp
+      
 library:
   source-dirs: src
   ghc-options: -Wall -O2
+  dependencies:
+    - SafeSemaphore
+    - aeson
+    - alarmclock
+    - ansi-wl-pprint
+    - base16-bytestring
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-haskoin
+    - blockapps-milena
+    - blockstanbul
+    - bytestring
+    - conduit
+    - conduit-extra
+    - containers
+    - cross-monitoring
+    - data-default
+    - dlist
+    - dns
+    - either
+    - ethereum-encryption
+    - ethereum-rlp
+    - format
+    - ghc
+    - hedis
+    - crypto-pubkey
+    - crypto-pubkey-types
+    - http-client
+    - iproute
+    - json-rpc-server
+    - json-rpc-client
+    - lens
+    - lifted-base
+    - monad-alter
+    - monadIO
+    - mtl
+    - network
+    - persistent
+    - prometheus-client
+    - random
+    - resourcet
+    - seqevents
+    - servant-client
+    - servant-server
+    - split
+    - stm
+    - stm-conduit
+    - strato-conf
+    - strato-model
+    - strato-redis-blockdb
+    - streaming-commons
+    - text
+    - these
+    - time
+    - transformers
+    - unliftio-core
+    - unliftio
+    - warp
+
 
 tests:
   strato-p2p-client-test:
@@ -107,10 +103,26 @@ tests:
     main: Main.hs
     dependencies:
       - QuickCheck
+      - base16-bytestring
+      - blockapps-data
+      - blockapps-datadefs
+      - blockapps-haskoin
+      - blockstanbul
+      - bytestring
+      - conduit
+      - containers
+      - cryptonite
+      - ethereum-encryption
       - hspec
       - hspec-expectations-lifted
-      - persistent-postgresql
-      - stm-chans
+      - lens
+      - monad-alter
+      - mtl
+      - resourcet
+      - seqevents
       - stm-conduit
+      - strato-model
       - strato-p2p
-      - temporary
+      - transformers
+      - unliftio
+  

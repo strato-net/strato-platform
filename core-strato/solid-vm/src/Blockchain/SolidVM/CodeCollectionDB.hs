@@ -13,9 +13,9 @@ import           System.IO.Unsafe
 import           Text.Parsec                          (runParser)
 
 import           Blockchain.DB.CodeDB
-import           Blockchain.SHA
-import           Blockchain.SolidVM.Exception
+import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
+import           Blockchain.Strato.Model.Keccak256
 
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
@@ -23,7 +23,7 @@ import           SolidVM.Solidity.Parse.File
 import           CodeCollection
 
 {-# NOINLINE unsafeCodeMapIORef #-}
-unsafeCodeMapIORef :: IORef (Map SHA CodeCollection)
+unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
 compileSource :: B.ByteString -> CodeCollection
@@ -38,7 +38,7 @@ compileSource initCode =
             _contracts=M.fromList namedContracts
           }
 
-codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (SHA, CodeCollection)
+codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource initCode = do
   let hsh = hash initCode
   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
@@ -55,7 +55,7 @@ codeCollectionFromSource initCode = do
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
       return $ assert (hsh == hsh') (hsh, cc)
 
-codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => SHA -> m CodeCollection
+codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => Keccak256 -> m CodeCollection
 codeCollectionFromHash hsh = do
   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
   case M.lookup hsh codeMap of
