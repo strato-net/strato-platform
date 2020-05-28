@@ -211,12 +211,22 @@ pipeline {
                 '''
               }
           },
+
+          'BA-Rest Tests:' {
+            sh '''#!/bin/bash -le
+              set -x
+              echo "Running ba-rest E2E tests"
+              cd strato-worktree/blockapps-rest
+              DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
+              docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} .
+            '''
+          },
         )
       }
     }
-    
+
     stage('Redeploy with OAuth') {
-      
+
       steps {
         withCredentials([
             usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
@@ -294,7 +304,7 @@ pipeline {
               "REGULATOR_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiIyZWVlYzZkYy0yYjUzLTQ0ZGQtOWQ3Zi1hODFmYzNmNTIzZGEiLCJleHAiOjE5ODA5MzQyMzAsIm5iZiI6MCwiaWF0IjoxNTQ4OTM0MjMxLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImI0MGIzMGM3LTAwNjMtNDAyMC05NGY0LTdmNzI4ZjFmMGYyMCIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0ODkzNDIzMCwic2Vzc2lvbl9zdGF0ZSI6IjgwYTIyMDJjLTFlYzAtNDIxZC1hNzA3LTkxMmVkNWE5NmU2NCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgUmVndWxhdG9yIiwicHJlZmVycmVkX3VzZXJuYW1lIjoicmVndWxhdG9yQHR0LmFwcCIsImdpdmVuX25hbWUiOiJUcmFjayBhbmQgVHJhY2UiLCJmYW1pbHlfbmFtZSI6IlJlZ3VsYXRvciIsImVtYWlsIjoicmVndWxhdG9yQHR0LmFwcCJ9.Vw_0e9yw7LlNjOnyNsjfJwALKCtpgcipXPK8HcIr5GCdR4o8fD6CsbRXxFgtohyPgDZg1StYJSe63MZLAxHxbVCesf1c2FUxT1qLfFLb1HtrTtyyc6lojjSzSp3om6RGZi5dtSrDyX-0QYLN9Q-E6JBD2lA50P6bhJmV4sLgCMHB0845rV_xxp4slMAjIfnkxMBl9bt4sa60IMYLHWOYdbfcyI5OL_7AqxeFy6JnsUtj63aZhAZoNnB-BMUfRMCptKD_uq8aTk8sQwiunmJHnbUfL7w4osiOl3wYsjCN86F-v9maP9VRf0bmeUyJA5f3MAZ4v6Gd8tcS0scJOGOroQ",
               "RETAILER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiJjY2FlMzBiYS1lZGMxLTQ5MTMtOGI5Yi05NmM1YmVhZjllYWYiLCJleHAiOjE5ODE2MTM5NDUsIm5iZiI6MCwiaWF0IjoxNTQ5NjEzOTQ2LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjczYmQzZTRhLTRjYTktNDI4OS05ZWNiLTgwMGVhYWExYmY4MCIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0OTYxMzk0NSwic2Vzc2lvbl9zdGF0ZSI6IjI3MTQ3ZDczLWZjNTItNDkxNS1hYjZiLTgxOWM3MzQ2NTNmYiIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgUmV0YWlsZXIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJyZXRhaWxlckB0dC5hcHAiLCJnaXZlbl9uYW1lIjoiVHJhY2sgYW5kIFRyYWNlIiwiZmFtaWx5X25hbWUiOiJSZXRhaWxlciIsImVtYWlsIjoicmV0YWlsZXJAdHQuYXBwIn0.keWW5cWkvVdKlrHnbqlOrvW9anX6c6ssClLNVFNsMLqlvwg1a5U_j5sqNT3hTjqGo-fV6Y2yqRLbAAC5BNl7QnjQJtA0Rh3NBd3RsgGYftD6mw8TnqS3F0EWZaKx_rz12zOku0TPGrCYbKZ71GX7o1UdqRyXkFn_xQ31Mrc93em_nip7SlbvJ-wxX3r1nR8sJ1yaLG1-_NUx8Vrfkpv6nan8hkXNMNA_ODWAhd-wKjlCBae8qkR6yz850tNlavVbssY7PcZt3M3_-vy6YSznLCMlyqXRoPrdTZQlt6bjkOgaWnzKuibPlKTC4Q1SZGNRuJHROZfXF4clugB1S9Awdw"
             ]) {
-                  
+
               sh '''#!/bin/bash -le
                 set -x
                 rm -rf track-and-trace
@@ -351,6 +361,16 @@ pipeline {
                 '''
             }
           },
+
+          'BA-Rest Tests:' {
+            sh '''#!/bin/bash -le
+              set -x
+              echo "Running ba-rest E2E tests"
+              cd strato-worktree/blockapps-rest
+              DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
+              docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} .
+            '''
+          },
         )
       }
     }
@@ -393,6 +413,6 @@ pipeline {
           message: "Nightly develop build *is fixed after it was failing*: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
-    
+
   }
 }
