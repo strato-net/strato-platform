@@ -274,7 +274,7 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction tx = case tx of
   PrivateHashTX{} -> Just (Address 0)
-  t -> pubKey2Address <$> getPubKeyFromSignature xSignature (keccak256ToWord256 theHash)
+  t -> pubKey2Address <$> getPubKeyFromSignature_libsecp256k1 xSignature (keccak256ToWord256 theHash)
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           theHash = partialTransactionHash t

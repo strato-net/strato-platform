@@ -40,8 +40,8 @@ import           Test.QuickCheck
 import           Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Crypto    as HK
 import qualified Network.Haskoin.Internals as HK
-import           Blockchain.ExtendedECDSA
 
+import           Blockchain.FastECRecover
 -- Interface types
 
 data CompactSig = CompactSig
@@ -131,7 +131,7 @@ verifySig :: PubKey -> Sig -> Msg -> Bool
 verifySig pub sig word = HK.verifySig (coerce word) (coerce sig) (coerce pub)
 
 recover :: RecSig -> Msg -> Maybe PubKey
-recover rc word = coerce <$> getPubKeyFromSignature (coerce rc) (coerce word)
+recover rc word = coerce <$> getPubKeyFromSignature_libsecp256k1 (coerce rc) (coerce word)
 
 -- Misc
 instance Arbitrary PubKey where
