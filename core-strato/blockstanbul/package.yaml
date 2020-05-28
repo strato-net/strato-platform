@@ -25,6 +25,7 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - extra
+  - fast-ecrecover
   - format
   - http-client
   - lens

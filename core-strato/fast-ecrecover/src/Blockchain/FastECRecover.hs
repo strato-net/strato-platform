@@ -1,32 +1,34 @@
 module Blockchain.FastECRecover
 (
-  getPubKeyFromSignature_fast
+    getPubKeyFromSignature_libsecp256k1
 )
 where
 
-import qualified BlockApps.ECRecover.IntegerFormat as F
 import qualified Blockchain.ExtendedECDSA          as D
 import qualified Blockchain.ExtWord                as E
 import qualified Data.Binary                       as A
 import qualified Data.ByteString.Lazy              as G
+import qualified Data.ByteString.Short             as BSh
 import qualified Network.Haskoin.Internals         as C
 
 
-{-# INLINE getPubKeyFromSignature_fast #-}
-getPubKeyFromSignature_fast :: D.ExtendedSignature -> E.Word256 -> Maybe C.PubKey
-getPubKeyFromSignature_fast (D.ExtendedSignature sig yIsOdd) hashWord =
-  do
-    pubKeyBytes <- liftEither (F.recoverUncompressed sigR sigS recId hash)
-    (_, _, result) <- liftEither (A.decodeOrFail (G.fromStrict pubKeyBytes))
-    return result
-  where
-    liftEither =
-      either (const Nothing) Just
-    sigR =
-      C.getBigWordInteger (C.sigR sig)
-    sigS =
-      C.getBigWordInteger (C.sigS sig)
-    recId =
-        if yIsOdd then 1 else 0
-    hash =
-      C.getBigWordInteger hashWord
+import qualified Crypto.Secp256k1                  as S
+import           Blockchain.Strato.Model.ExtendedWord
+import           Data.Maybe
+
+
+getPubKeyFromSignature_libsecp256k1 :: D.ExtendedSignature -> E.Word256 -> Maybe C.PubKey
+getPubKeyFromSignature_libsecp256k1 (D.ExtendedSignature sig yIsOdd) hashWord = do
+  -- yes, R and S are flipped in secp256k1-haskell
+  let sigR = BSh.toShort $ word256ToBytes $ fromIntegral $ C.getBigWordInteger (C.sigS sig)
+      sigS = BSh.toShort $ word256ToBytes $ fromIntegral $ C.getBigWordInteger (C.sigR sig) 
+      sigV = if yIsOdd then 1 else 0
+      newSig = S.CompactRecSig sigR sigS (fromInteger sigV)
+      cRecSig = fromMaybe (error "could not get rec sig") (S.importCompactRecSig newSig)
+      mesg = fromMaybe (error "could not get message hash") (S.msg $ word256ToBytes hashWord)
+      pk = fromMaybe (error "could not recover public key") (S.recover cRecSig mesg)
+      pkBS = S.exportPubKey False pk
+  (_, _, result) <- either (const Nothing) (Just) (A.decodeOrFail $ G.fromStrict pkBS)
+  return result
+
+

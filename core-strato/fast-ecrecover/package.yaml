@@ -22,9 +22,10 @@ library:
   source-dirs: src/
   dependencies:
   - binary < 0.9
-  - blockapps-ecrecover == 0.4.*
   - blockapps-util
   - bytestring >= 0.10 && < 0.20
+  - secp256k1-haskell
+  - strato-model
 
 benchmarks:
   fast-ecrecover-benchmark:
