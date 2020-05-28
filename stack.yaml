@@ -13,7 +13,7 @@ packages:
 - blockapps-haskell/vault-wrapper/api
 - blockapps-haskell/vault-wrapper/client
 - blockapps-haskell/vault-wrapper/server
-#- core-strato/milena/
+- core-strato/milena/
 - core-strato/core-api
 - core-strato/strato-conf/
 - core-strato/miner-ethash/
@@ -94,8 +94,8 @@ extra-deps:
 - time-compat-1.9.3@sha256:a1a0a8b088be6a7be50c7c0bf156ce876151b1cbe14261736965e361c8073b2a,4349
 - unordered-containers-0.2.10.0@sha256:5e9b095a9283d9e2f064fec73a81a6b6ea0b7fda3f219a8175785d2d2a3de204,5199
 - wai-middleware-prometheus-1.0.0@sha256:1625792914fb2139f005685be8ce519111451cfb854816e430fbf54af46238b4,1314
-- git: https://github.com/blockapps/milena
-  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
+#- git: https://github.com/blockapps/milena
+#  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
 
 resolver: lts-13.30 #also duplicated in docker section below
 compiler-check: newer-minor
