@@ -50,17 +50,20 @@ async function fill(user, options) {
 }
 
 function getCreateArgs(contract, options) {
+  const src = options.config.VM === 'EVM' ? {} : { src: contract.source };
+
   const payload = {
-      contract: contract.name,
-      src: contract.source,
-      args: contract.args,
-      chainid: contract.chainid,
-      txParams: contract.txParams,
-      metadata: constructMetadata(options, contract.name)
+    ...src,
+    contract: contract.name,
+    args: contract.args,
+    chainid: contract.chainid,
+    txParams: contract.txParams,
+    metadata: constructMetadata(options, contract.name),
   };
+
   const tx = {
     payload,
-    type: TxPayloadType.CONTRACT
+    type: TxPayloadType.CONTRACT,
   };
   return tx;
 }
