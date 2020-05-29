@@ -3,7 +3,7 @@ import simpleOauth from "simple-oauth2";
 import unixTime from "unix-time";
 import request from "sync-request";
 import getPem from "rsa-pem-from-mod-exp";
-import '@babel/polyfill';
+import "@babel/polyfill";
 
 class OAuthUtil {
   constructor(oauthConfig) {
@@ -31,10 +31,10 @@ class OAuthUtil {
     const url_split = this.openIdDiscoveryUrl.split("/");
     this.tokenHost = url_split[0] + "//" + url_split[2];
   }
+
   /**
    * This function calls openIdConfigUrl to get openIdConfig and it also fetches
    * any public keys that maybe used to sign tokens
-   * @returns {()}
    */
   getOpenIdConfig() {
     try {
@@ -201,9 +201,7 @@ class OAuthUtil {
           let pemKey = "";
           // azure
           if (key.x5c) {
-            pemKey = `-----BEGIN CERTIFICATE-----\n${
-              key.x5c[0]
-            }\n-----END CERTIFICATE-----`;
+            pemKey = `-----BEGIN CERTIFICATE-----\n${key.x5c[0]}\n-----END CERTIFICATE-----`;
           }
           // keycloak
           if (key.n && key.e) {

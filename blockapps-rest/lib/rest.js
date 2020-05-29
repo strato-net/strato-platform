@@ -7,6 +7,11 @@ import { constructMetadata, setAuthHeaders } from "./util/api.util";
 import { RestError, response } from "./util/rest.util";
 import jwt from "jsonwebtoken";
 
+/**
+ * @module rest
+ * @memberof blockapps-rest
+ */
+
 // =====================================================================
 //   util
 // =====================================================================
@@ -54,7 +59,11 @@ async function resolveResults(user, pendingResults, _options = {}) {
   const predicate = results =>
     results.filter(r => r.status === TxResultStatus.PENDING).length === 0;
   const action = async () =>
-    getBlocResults(user, pendingResults.map(r => r.hash), options);
+    getBlocResults(
+      user,
+      pendingResults.map(r => r.hash),
+      options
+    );
   const resolvedResults = await util.until(predicate, action, options);
   return resolvedResults;
 }
@@ -63,10 +72,15 @@ async function resolveResults(user, pendingResults, _options = {}) {
 //   account details
 // =====================================================================
 
+/**
+ *
+ * @param {*} user
+ * @param {*} options
+ */
 async function getAccounts(user, options) {
   try {
     return await api.getAccounts(user, options);
-  } catch(err) {
+  } catch (err) {
     throw new RestError(
       RestStatus.BAD_REQUEST,
       err.response.statusText,
@@ -148,11 +162,7 @@ async function createContractResolve(user, pendingTxResult, options) {
 // =====================================================================
 
 async function createContractList(user, contract, options) {
-  const pendingTxResult = await api.createContractList(
-    user,
-    contract,
-    options
-  );
+  const pendingTxResult = await api.createContractList(user, contract, options);
   return createContractListResolve(user, pendingTxResult, options);
 }
 
@@ -314,7 +324,7 @@ async function sendMany(user, sendTxs, options) {
   const pendingTxResults = await api.sendTransactions(
     user,
     {
-        txs: sendTxs.map(tx => api.getSendArgs(tx, options)),
+      txs: sendTxs.map(tx => api.getSendArgs(tx, options))
     },
     options
   );
@@ -425,29 +435,17 @@ async function attestExtStorage(user, args, options) {
 }
 
 async function verifyExtStorage(user, contract, options) {
-  const result = await api.verifyExtStorage(
-    user,
-    contract,
-    options
-  );
+  const result = await api.verifyExtStorage(user, contract, options);
   return result;
 }
 
 async function downloadExtStorage(user, contract, options) {
-  const result = await api.downloadExtStorage(
-    user,
-    contract,
-    options
-  );
+  const result = await api.downloadExtStorage(user, contract, options);
   return result;
 }
 
 async function listExtStorage(user, args, options) {
-  const result = await api.listExtStorage(
-    user,
-    args,
-    options
-  );
+  const result = await api.listExtStorage(user, args, options);
   return result;
 }
 
@@ -459,7 +457,6 @@ async function pingOauth(user, options) {
   const response = await api.pingOauth(user, options);
   return response;
 }
-
 
 // =====================================================================
 //   Common patterns used in applications

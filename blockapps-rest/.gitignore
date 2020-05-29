@@ -43,6 +43,7 @@ jspm_packages
 # Build
 lib/build
 dist
+docs
 
 .vscode
 

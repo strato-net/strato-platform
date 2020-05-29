@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "node_modules/.bin/gulp",
+    "build:docs": "node_modules/.bin/gulp generateDocs",
     "test": "yarn test:lib && yarn test:util",
     "test:lib": "mocha --require=@babel/register lib/test/*.test.js -b",
     "test:util": "mocha --require=@babel/register lib/util/test/*.test.js -b",
@@ -66,6 +67,7 @@
     "gulp-clean": "^0.4.0",
     "gulp-cli": "^2.0.1",
     "gulp-sourcemaps": "^2.6.5",
+    "jsdoc": "^3.6.4",
     "mocha": "^6.0.2"
   }
 }

@@ -1,5 +1,3 @@
-# BlockApps-rest
-
 ## Introduction
 
 The Blockapps-Rest library is Node.js server-side SDK for BlockApps STRATO. It provides all the necessary abstractions and utility functions that can be used to interact with the STRATO platforms and perform the following operations:
