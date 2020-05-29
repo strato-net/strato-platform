@@ -97,6 +97,7 @@ tests:
       - blockapps-vault-wrapper-server
       - bytestring
       - hspec
+      - clockwork
       - cryptonite
       - secp256k1-haskell
       - haskoin-shim 
@@ -104,3 +105,4 @@ tests:
       - base16-bytestring
       - strato-model
       - blockapps-ethereum
+      - ethereum-encryption

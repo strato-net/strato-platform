@@ -11,7 +11,7 @@ main :: IO ()
 main =
   defaultMain $
   [
-    bench "" $ nf (uncurry N.getPubKeyFromSignature_fast) transaction
+    bench "" $ nf (uncurry N.getPubKeyFromSignature_libsecp256k1) transaction
   ]
 
 prvKey :: A.PrvKey

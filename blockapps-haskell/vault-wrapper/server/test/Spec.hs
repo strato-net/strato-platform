@@ -23,7 +23,7 @@ import           System.IO.Unsafe
 
 import           Blockchain.Strato.Model.ExtendedWord
 import qualified BlockApps.Ethereum                    as E
-
+import           Clockwork
 
 
 -- some dummy test values
@@ -43,11 +43,14 @@ newPriv = fromMaybe (error "couldn't get secp-haskell key") (SEC.secKey ent)
 
 
 main :: IO ()
-main = hspec secp256k1_haskell_spec
+main = do
+  hspec secp256k1_haskell_spec
+  timingTests
+
 
 secp256k1_haskell_spec :: Spec
 secp256k1_haskell_spec = 
-  describe "Vault Wrapper Utils Spec" $ do
+  describe "secp256k1-haskell can do crypto operations just like haskoin" $ do
     it "create secp256k1 private keys" $ do
       let oldEnc = B16.encode $ HKI.encodePrvKey $ coerce oldPriv
       show oldEnc `shouldBe` show newPriv -- the newPriv show instance does base 16 encoding
@@ -95,3 +98,102 @@ secp256k1_haskell_spec =
                        , toInteger $ SEC.getCompactRecSigV newSig
                        ]
       oldSigVals `shouldBe` newSigVals
+    
+    it "recover signatures" $ do
+      let mesg = E.rlpHash ("doodoodaadaa" :: String)
+          oldMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
+          newMsg = fromMaybe (error "couldn't get new messsage") (SEC.msg mesg)
+          oldSig = HK.signRecMsg oldPriv oldMsg
+          newSig = SEC.signRecMsg newPriv newMsg
+          oldRecPK = fromMaybe (error "couldn't recover haskoin pubkey") (HK.recover oldSig oldMsg)
+          newRecPK = fromMaybe (error "couldnt recover secp256k1 pubkey") (SEC.recover newSig newMsg)
+      (HK.exportPubKey False oldRecPK) `shouldBe` (SEC.exportPubKey False newRecPK)
+
+    it "compare slow and fast signature recovery" $ do
+      let mesg = E.rlpHash ("look! I'm helping!" :: String)
+          recMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
+          recSig = HK.signRecMsg oldPriv recMsg
+          slowPub = fromMaybe (error "couldn't recover slow") (HK.recover recSig recMsg)
+          fastPub = fromMaybe (error "couldn't recover fast") (HK.recover_fast recSig recMsg)
+      slowPub `shouldBe` fastPub
+        
+
+
+timingTests :: IO ()
+timingTests = do
+  
+
+  putStrLn "TIME IT! comparing secp256k1-haskell and haskoin for all things EC"
+  
+  putStrLn "\nPrivate Key Creation:"
+  putStrLn "Haskoin: "
+  cwPrintTime $ do
+    let _ = HK.secKey ent
+    return ()
+  
+  putStrLn "secp256k1-haskell: "
+  cwPrintTime $ do
+    let _ = SEC.secKey ent
+    return ()
+  
+  
+  putStrLn "\nPublic Key Creation:"
+  putStrLn "Haskoin: "
+  cwPrintTime $ do
+    let _ = HK.exportPubKey False $ HK.derivePubKey oldPriv
+    return ()
+
+  putStrLn "secp256k1-haskell: "
+  cwPrintTime $ do
+    let _ = SEC.exportPubKey False $ SEC.derivePubKey newPriv
+    return ()
+
+  
+  putStrLn "\nAddress derivation:"
+  putStrLn "Haskoin: "
+  cwPrintTime $ do
+    let _ = E.deriveAddress $ HK.derivePubKey oldPriv
+    return ()
+
+  putStrLn "secp256k1-haskell: "
+  cwPrintTime $ do
+    let _ = VWC.deriveAddress newPriv
+    return ()
+
+
+  let mesg = E.rlpHash ("doodoodaadaa yo yo yo" :: String)
+  putStrLn "\nECDSA Signatures:"
+  putStrLn "Haskoin: "
+  _ <- cwPrintTime $ do
+    let hMesg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
+    return $ HK.signRecMsg oldPriv hMesg
+
+  putStrLn "secp256k1-haskell: "
+  _ <- cwPrintTime $ do
+    let sMesg = fromMaybe (error "couldnt get new message") (SEC.msg mesg)
+    return $ SEC.signRecMsg newPriv sMesg
+
+  let recMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
+      recSig = HK.signRecMsg oldPriv recMsg
+  
+  putStrLn "\nSignature Recovery:"
+  putStrLn "Haskoin: (the ExtendedECDSA way)"
+  mHpk <- cwPrintTime $ return $ HK.recover recSig recMsg
+
+  putStrLn "fast-ecrecover: "
+  mFpk <- (cwPrintTime $ return $ HK.recover_fast recSig recMsg)
+
+  -- fail if these temp sig types aren't right
+  let hpk = fromMaybe (error "haskoin signature recovery failed") mHpk
+      fpk = fromMaybe (error "secp256k1 signature recovery failed") mFpk
+      hbs = C8.unpack $ B16.encode $ HK.exportPubKey False hpk
+      fbs = C8.unpack $ B16.encode $ HK.exportPubKey False fpk
+  putStrLn "the two:"
+  putStrLn hbs
+  putStrLn fbs
+  putStrLn "the original:"
+  putStrLn $ C8.unpack $ B16.encode $ HK.exportPubKey False $ HK.derivePubKey oldPriv
+  if (hpk == fpk) then 
+    putStrLn "\ndone"
+  else 
+    error "slow and fast recoveries don't recover the same public key"

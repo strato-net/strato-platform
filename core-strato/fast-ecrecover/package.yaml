@@ -27,6 +27,21 @@ library:
   - secp256k1-haskell
   - strato-model
 
+tests:
+  fast-ecrecover-spec:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - blockapps-haskoin
+      - bytestring
+      - base16-bytestring
+      - entropy
+      - ethereum-encryption
+      - fast-ecrecover
+      - hspec
+      - strato-model
+
+
 benchmarks:
   fast-ecrecover-benchmark:
     source-dirs: benchmark

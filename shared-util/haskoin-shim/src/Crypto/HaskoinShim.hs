@@ -19,6 +19,7 @@ module Crypto.HaskoinShim
   , secKey
   , convertRecSig
   , recover
+  , recover_fast
   , derivePubKey
   , verifySig
   , signRecMsg
@@ -134,7 +135,11 @@ verifySig :: PubKey -> Sig -> Msg -> Bool
 verifySig pub sig word = HK.verifySig (coerce word) (coerce sig) (coerce pub)
 
 recover :: RecSig -> Msg -> Maybe PubKey
-recover rc word = coerce <$> getPubKeyFromSignature_libsecp256k1 (coerce rc) (coerce word)
+recover rc word = coerce <$> getPubKeyFromSignature (coerce rc) (coerce word)
+
+recover_fast :: RecSig -> Msg -> Maybe PubKey
+recover_fast rc word = coerce <$> getPubKeyFromSignature_libsecp256k1 (coerce rc) (coerce word)
+
 
 -- Misc
 instance Arbitrary PubKey where
