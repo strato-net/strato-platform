@@ -41,7 +41,6 @@ newPriv = fromMaybe (error "couldn't get secp-haskell key") (SEC.secKey ent)
 
 
 
-
 main :: IO ()
 main = do
   hspec secp256k1_haskell_spec
@@ -83,7 +82,7 @@ secp256k1_haskell_spec =
    
 
    -- for some reason R and S values are swapped in secp256k1-haskell
-    it "get signatures" $ do
+    it "sign things" $ do
       let mesg = E.rlpHash ("doodoodaadaa" :: String)
           oldMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
           newMsg = fromMaybe (error "couldn't get new messsage") (SEC.msg mesg)
@@ -109,21 +108,31 @@ secp256k1_haskell_spec =
           newRecPK = fromMaybe (error "couldnt recover secp256k1 pubkey") (SEC.recover newSig newMsg)
       (HK.exportPubKey False oldRecPK) `shouldBe` (SEC.exportPubKey False newRecPK)
 
-    it "compare slow and fast signature recovery" $ do
+    it "verify signatures" $ do
+      let mesg = E.rlpHash ("doodoodaadaa" :: String)
+          oldMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
+          newMsg = fromMaybe (error "couldn't get new messsage") (SEC.msg mesg)
+          oldSig = HK.signRecMsg oldPriv oldMsg
+          newSig = SEC.signRecMsg newPriv newMsg
+
+          oldValid = HK.verifySig (HK.derivePubKey oldPriv) (HK.convertRecSig oldSig) oldMsg
+          newValid = SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig newSig) newMsg
+      [oldValid, newValid] `shouldBe` [True, True]
+
+    it "slow and fast signature recovery" $ do
       let mesg = E.rlpHash ("look! I'm helping!" :: String)
           recMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
           recSig = HK.signRecMsg oldPriv recMsg
           slowPub = fromMaybe (error "couldn't recover slow") (HK.recover recSig recMsg)
           fastPub = fromMaybe (error "couldn't recover fast") (HK.recover_fast recSig recMsg)
       slowPub `shouldBe` fastPub
-        
+
 
 
 timingTests :: IO ()
 timingTests = do
-  
 
-  putStrLn "TIME IT! comparing secp256k1-haskell and haskoin for all things EC"
+  putStrLn "\nTIME IT! comparing secp256k1-haskell and haskoin for all things EC"
   
   putStrLn "\nPrivate Key Creation:"
   putStrLn "Haskoin: "
@@ -180,19 +189,11 @@ timingTests = do
   putStrLn "Haskoin: (the ExtendedECDSA way)"
   mHpk <- cwPrintTime $ return $ HK.recover recSig recMsg
 
-  putStrLn "fast-ecrecover: "
+  putStrLn "fast-ecrecover: (not true secp256k1-haskell) "
   mFpk <- (cwPrintTime $ return $ HK.recover_fast recSig recMsg)
 
-  -- fail if these temp sig types aren't right
   let hpk = fromMaybe (error "haskoin signature recovery failed") mHpk
       fpk = fromMaybe (error "secp256k1 signature recovery failed") mFpk
-      hbs = C8.unpack $ B16.encode $ HK.exportPubKey False hpk
-      fbs = C8.unpack $ B16.encode $ HK.exportPubKey False fpk
-  putStrLn "the two:"
-  putStrLn hbs
-  putStrLn fbs
-  putStrLn "the original:"
-  putStrLn $ C8.unpack $ B16.encode $ HK.exportPubKey False $ HK.derivePubKey oldPriv
   if (hpk == fpk) then 
     putStrLn "\ndone"
   else 
