@@ -335,7 +335,7 @@ pipeline {
               set -x
               echo 'Running SMD tests'
               cd strato-worktree/smd-ui
-              docker build -f Dockerfile.test .
+              docker build -f Dockerfile.platformtest .
             '''
           },
 
