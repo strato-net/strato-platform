@@ -27,8 +27,6 @@ library:
   - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
-  - blockapps-vault-wrapper-client
-  - blockapps-vault-wrapper-api
   - bytestring
   - common-log
   - conduit
@@ -43,7 +41,6 @@ library:
   - filepath
   - format
   - hedis
-  - http-client
   - hflags
   - json-stream
   - lens
@@ -53,7 +50,6 @@ library:
   - nibblestring
   - persistent-postgresql
   - resourcet
-  - servant-client
   - seqevents
   - split
   - strato-conf
