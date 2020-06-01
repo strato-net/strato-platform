@@ -6,7 +6,6 @@
 
 module BlockApps.Bloc22.Crypto where
 
-import           Control.Lens.Operators            hiding ((.=))
 import           Control.Lens                      (mapped, (&), (?~))
 import           Control.Monad.IO.Class
 import           Crypto.HaskoinShim
@@ -49,7 +48,7 @@ instance ToParamSchema Password where
 instance ToSchema Password where
   declareNamedSchema _ = return $ NamedSchema (Just "Password")
     ( mempty
-      & type_ .~ SwaggerString
+      & type_ ?~ SwaggerString
       & example ?~ toJSON (Password "securePassword")
       & description ?~ "Password" )
 

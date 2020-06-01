@@ -31,7 +31,7 @@ instance ToSchema Wei where
   declareNamedSchema _ = return $
     NamedSchema (Just "Wei")
       ( mempty
-        & type_ .~ SwaggerInteger
+        & type_ ?~ SwaggerInteger
         & example ?~ toJSON (Wei 1000000)
         & description ?~ "Number of Wei currency units" )
 

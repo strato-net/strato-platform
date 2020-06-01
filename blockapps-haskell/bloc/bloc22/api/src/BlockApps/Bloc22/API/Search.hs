@@ -8,7 +8,7 @@
 module BlockApps.Bloc22.API.Search where
 
 import           Control.Applicative              (liftA2)
-import           Control.Lens                     ((&), (?~), (.~))
+import           Control.Lens                     ((&), (?~))
 import           Data.Aeson
 import           Data.Monoid                      ((<>))
 import           Data.Swagger
@@ -61,7 +61,7 @@ instance ToSample (Greedy Address ChainId) where
 instance ToSchema (Greedy Address ChainId) where
   declareNamedSchema _ = return $ NamedSchema (Just "Contract Name, \"Latest\", Or Address, along with ChainId")
       ( mempty
-        & type_ .~ SwaggerString
+        & type_ ?~ SwaggerString
         & example ?~ toJSON (Both (Address 0xdeadbeef)
                                   (ChainId 0x123456879abcdef0123456879abcdef0123456879abcdef0123456879abcdef0))
         & description ?~ "Contract Name, \"Latest\", Or Address, along with ChainId" )

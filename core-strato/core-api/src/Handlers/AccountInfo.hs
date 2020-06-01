@@ -19,7 +19,7 @@ import qualified Database.Esqueleto          as E
 import           Database.Persist.Postgresql
 import           Numeric
 import           Servant
-import           Servant.Swagger.Tags
+--import           Servant.Swagger.Tags
 
 
 import           Blockchain.Data.Address
@@ -33,7 +33,7 @@ import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 import           Settings
 import           SQLM
 
-type API = Tags "section1" :> Summary "get user accounts" :> Description "Get information about user accounts" :>
+type API = -- Tags "section1" :> Summary "get user accounts" :> Description "Get information about user accounts" :>
   "account" :> QueryParam "address" Address
             :> QueryParam "balance" Integer
             :> QueryParam "minbalance" Integer

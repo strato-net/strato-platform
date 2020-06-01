@@ -20,10 +20,10 @@ instance FromHttpApiData Sortby where
 
 
 instance ToParamSchema Sortby where
-  toParamSchema _ = mempty & type_ .~ SwaggerString
+  toParamSchema _ = mempty & type_ ?~ SwaggerString
 
-sortToOrderBy :: (E.Esqueleto query expr backend, PersistField a)
-            => Maybe Sortby -> expr (E.Value a) -> (expr E.OrderBy)
+sortToOrderBy :: PersistField a
+              => Maybe Sortby -> E.SqlExpr (E.Value a) -> E.SqlExpr E.OrderBy
 sortToOrderBy (Just ASC)  x = E.asc  x
 sortToOrderBy (Just DESC) x = E.desc x
 sortToOrderBy _             x = E.asc  x

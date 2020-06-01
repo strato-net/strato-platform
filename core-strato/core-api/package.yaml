@@ -38,7 +38,7 @@ library:
   - process
   - seqevents
   - servant-multipart
-  - servant-swagger-tags
+#  - servant-swagger-tags
   - strato-model
   - swagger2
   - template-haskell
