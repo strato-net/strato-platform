@@ -15,7 +15,6 @@ library:
     - bytestring
     - base16-bytestring
     - ethereum-encryption
-    - fast-ecrecover
     - strato-model
     - text
 

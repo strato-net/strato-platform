@@ -19,7 +19,6 @@ module Crypto.HaskoinShim
   , secKey
   , convertRecSig
   , recover
-  , recover_fast
   , derivePubKey
   , verifySig
   , signRecMsg
@@ -43,7 +42,6 @@ import qualified Network.Haskoin.Crypto    as HK
 import qualified Network.Haskoin.Internals as HK
 
 import           Blockchain.ExtendedECDSA
-import           Blockchain.FastECRecover
 
 
 -- Interface types
@@ -136,9 +134,6 @@ verifySig pub sig word = HK.verifySig (coerce word) (coerce sig) (coerce pub)
 
 recover :: RecSig -> Msg -> Maybe PubKey
 recover rc word = coerce <$> getPubKeyFromSignature (coerce rc) (coerce word)
-
-recover_fast :: RecSig -> Msg -> Maybe PubKey
-recover_fast rc word = coerce <$> getPubKeyFromSignature_libsecp256k1 (coerce rc) (coerce word)
 
 
 -- Misc
