@@ -9,6 +9,7 @@ RUN apt-get update && \
     apt-get clean && \ 
     git clone https://github.com/bitcoin-core/secp256k1 && \
     cd secp256k1/ && \
+    git checkout 05d315affe0acd02591c8db783ce1badb0c37a31 && \
     ./autogen.sh && \
     ./configure --enable-module-recovery --prefix=/usr/ && \
     make && \
