@@ -23,7 +23,6 @@ library:
     - ansi-wl-pprint
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-milena
     - bytestring
     - containers
     - cryptohash
@@ -31,6 +30,7 @@ library:
     - ethereum-rlp
     - format
     - lens
+    - milena
     - monad-alter
     - mtl
     - normaldistribution

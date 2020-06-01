@@ -1,8 +1,20 @@
+
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Network.Kafka where
 
-import Control.Applicative
-import Control.DeepSeq
+import Prelude
+
+-- base
+import Control.Concurrent     (threadDelay)
 import Control.Exception (Exception, IOException)
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
+import Data.Monoid ((<>))
+import GHC.Generics (Generic)
+import System.IO
+
+-- Hackage
 import Control.Exception.Lifted (catch)
 import Control.Lens
 import Control.Monad.Trans.Control (MonadBaseControl)
@@ -11,18 +23,13 @@ import Control.Monad.Except (ExceptT(..), runExceptT, MonadError(..))
 import Control.Monad.Trans.State
 import Control.Monad.State.Class (MonadState)
 import Data.ByteString.Char8 (ByteString)
-import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
-import Data.Monoid ((<>))
 import qualified Data.Pool as Pool
-import GHC.Generics (Generic)
-import System.IO
 import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Network
-import Prelude
 
+-- local
 import Network.Kafka.Protocol
 
 type KafkaAddress = (Host, Port)
@@ -52,9 +59,6 @@ data KafkaState = KafkaState { -- | Name to use as a client ID.
                              } deriving (Generic, Show)
 
 makeLenses ''KafkaState
-
-instance NFData KafkaState where
-  rnf ks = ks `seq` () -- TODO(tim): Supply a real deepseq
 
 -- | The core Kafka monad.
 type Kafka m = (MonadState KafkaState m, MonadError KafkaClientError m, MonadIO m, MonadBaseControl IO m)
@@ -150,10 +154,11 @@ mkKafkaState cid addy =
                M.empty
                (addy :| [])
 
-addKafkaAddress :: KafkaAddress -> KafkaState -> KafkaState -- todo: lensify this
-addKafkaAddress a s = s {_stateAddresses = consed}
-  where consed = NE.nub (a NE.<| addrs)
-        addrs  = _stateAddresses s
+addKafkaAddress :: KafkaAddress -> KafkaState -> KafkaState
+addKafkaAddress = over stateAddresses . NE.nub .: NE.cons
+  where infixr 9 .:
+        (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+        (.:) = (.).(.)
 
 -- | Run the underlying Kafka monad.
 runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
@@ -186,6 +191,88 @@ metadata request = withAnyHandle $ flip metadata' request
 -- | Send a metadata request.
 metadata' :: Kafka m => Handle -> MetadataRequest -> m MetadataResponse
 metadata' h request = makeRequest h $ MetadataRR request
+
+
+createTopic :: Kafka m => CreateTopicsRequest -> m CreateTopicsResponse
+createTopic request = withAnyHandle $ flip createTopic' request
+
+createTopic' ::
+       Kafka m => Handle -> CreateTopicsRequest -> m CreateTopicsResponse
+createTopic' h request = makeRequest h $ TopicsRR request
+
+createTopicsRequest ::
+       TopicName
+    -> Partition
+    -> ReplicationFactor
+    -> [(Partition, Replicas)]
+    -> [(KafkaString, Metadata)]
+    -> CreateTopicsRequest
+createTopicsRequest topic partition replication_factor replica_assignment config =
+    CreateTopicsReq
+        ([(topic, partition, replication_factor, replica_assignment, config)], defaultRequestTimeout)
+
+deleteTopic :: Kafka m => DeleteTopicsRequest -> m DeleteTopicsResponse
+deleteTopic request = withAnyHandle $ flip deleteTopic' request
+
+deleteTopic' :: Kafka m => Handle -> DeleteTopicsRequest -> m DeleteTopicsResponse
+deleteTopic' h request = makeRequest h $ DeleteTopicsRR request
+
+deleteTopicsRequest :: TopicName -> DeleteTopicsRequest
+deleteTopicsRequest topic = DeleteTopicsReq ([topic], defaultRequestTimeout)
+
+
+fetchOffset :: Kafka m => OffsetFetchRequest -> m OffsetFetchResponse
+fetchOffset request@(OffsetFetchReq (group, _)) = do
+  coordinator <- getConsumerGroupCoordinator group
+  withBrokerHandle coordinator $ flip fetchOffset' request
+
+fetchOffset' :: Kafka m => Handle -> OffsetFetchRequest -> m OffsetFetchResponse
+fetchOffset' h request = makeRequest h $ OffsetFetchRR request
+
+fetchOffsetRequest ::
+     ConsumerGroup -> TopicName -> Partition -> OffsetFetchRequest
+fetchOffsetRequest consumerGroup topic partition =
+  OffsetFetchReq
+        (consumerGroup, [(topic, [partition])])
+
+-- | Send a heartbeat request.
+heartbeat :: Kafka m => HeartbeatRequest -> m HeartbeatResponse
+heartbeat request = withAnyHandle $ flip heartbeat' request
+
+heartbeat' :: Kafka m => Handle -> HeartbeatRequest -> m HeartbeatResponse
+heartbeat' h request = makeRequest h $ HeartbeatRR request
+
+-- | Create a heartbeat request.
+heartbeatRequest :: GroupId -> GenerationId -> MemberId -> HeartbeatRequest
+heartbeatRequest genId gId memId = HeartbeatReq (genId, gId, memId)
+
+commitOffset :: Kafka m => OffsetCommitRequest -> m OffsetCommitResponse
+commitOffset request@(OffsetCommitReq (group, _, _, _, _)) = do
+  coordinator <- getConsumerGroupCoordinator group
+  withBrokerHandle coordinator $ flip commitOffset' request
+
+commitOffset' ::
+     Kafka m => Handle -> OffsetCommitRequest -> m OffsetCommitResponse
+commitOffset' h request = makeRequest h $ OffsetCommitRR request
+
+commitOffsetRequest ::
+     ConsumerGroup -> TopicName -> Partition -> Offset -> OffsetCommitRequest
+commitOffsetRequest consumerGroup topic partition offset =
+  let time = -1
+      metadata_ = Metadata "milena"
+   in OffsetCommitReq
+        (consumerGroup, -1, "", time, [(topic, [(partition, offset, metadata_)])])
+
+getConsumerGroupCoordinator :: Kafka m => ConsumerGroup -> m Broker
+getConsumerGroupCoordinator group = do
+  let theReq = GroupCoordinatorRR $ GroupCoordinatorReq group
+  (GroupCoordinatorResp (err, broker)) <- withAnyHandle $ flip makeRequest theReq
+  case err of
+    ConsumerCoordinatorNotAvailableCode -> do  -- coordinator not ready, must retry with backoff
+      liftIO $ threadDelay 100000 -- todo something better than threadDelay?
+      getConsumerGroupCoordinator group
+    NoError -> return broker
+    other   -> throwError $ KafkaFailedToFetchGroupCoordinator other
 
 getTopicPartitionLeader :: Kafka m => TopicName -> Partition -> m Broker
 getTopicPartitionLeader t p = do

@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 module DeriveEnode where
 
 import qualified Data.ByteString.Base16 as B16
