@@ -11,6 +11,11 @@ import Data.Either.Extra
 import System.Entropy
 import System.Environment
 
+import qualified Data.Text as T
+import Servant.Client
+import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Strato.Strato23.Client
+
 import Blockchain.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
@@ -119,9 +124,35 @@ genEthConf = do
          host' -> return host'
 
   bytes <- getEntropy 20
+
+
+
+  mgr <- newManager defaultManagerSettings
+  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
+  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+  
+  
+  pub <- do
+    resp <- runClientM (postPassword $ T.pack "sTrAtOSeCrEtPaSsWoRd") clientEnv
+    case resp of 
+      Left err -> error $ "could not set vault-wrapper password: " ++ (show err)
+      Right _ -> do 
+        ePub <- runClientM (postKey $ T.pack "_nodekey") clientEnv 
+        case ePub of 
+          Left err -> error $ "could not create nodekey: " ++ (show err)
+          Right pk -> return $ unPubKey pk
+
+  putStrLn $ "generated node public key: " ++ (show pub)
+
+  -- TODO: what to do with the pubkey, privkey in ethconf file?
+  --       and what about existing nodekeys? errors?
+ 
+  --       password should be set by config variable, and be able to reject invalid
+  --       password on restart
+  
   myPrivKey <-
     if flags_singlePrivateKey
-      then do
+      then do -- TODO: run migration code! or somewhere else, so we don't have this
         !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
         let !bs = fromRight (error $ "Invalid base64 NODEKEY: " ++ show skey) . B64.decode . C8.pack $ skey
         when (C8.length bs /= 32) $ error $ "The private key decoded from NODEKEY is the wrong length: NODEKEY: " ++ show skey ++ ", decoded: '" ++ C8.unpack (B16.encode bs) ++ "'"

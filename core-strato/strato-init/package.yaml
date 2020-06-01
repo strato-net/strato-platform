@@ -26,6 +26,7 @@ library:
   - blockapps-haskoin
   - blockapps-mpdbs
   - blockapps-util
+  - blockapps-vault-wrapper-client
   - bytestring
   - common-log
   - conduit
@@ -41,6 +42,7 @@ library:
   - format
   - hedis
   - hflags
+  - http-client
   - json-stream
   - lens
   - leveldb-haskell
@@ -51,6 +53,7 @@ library:
   - persistent-postgresql
   - resourcet
   - seqevents
+  - servant-client
   - split
   - strato-conf
   - strato-genesis
