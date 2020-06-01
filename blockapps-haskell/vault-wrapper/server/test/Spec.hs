@@ -83,7 +83,7 @@ secp256k1_haskell_spec =
 
    -- for some reason R and S values are swapped in secp256k1-haskell
     it "sign things" $ do
-      let mesg = E.rlpHash ("doodoodaadaa" :: String)
+      let mesg = E.rlpHash ("STRATO is a permissioned blockchain" :: String)
           oldMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
           newMsg = fromMaybe (error "couldn't get new messsage") (SEC.msg mesg)
           oldSig = HK.exportCompactRecSig $ HK.signRecMsg oldPriv oldMsg
@@ -99,7 +99,7 @@ secp256k1_haskell_spec =
       oldSigVals `shouldBe` newSigVals
     
     it "recover signatures" $ do
-      let mesg = E.rlpHash ("doodoodaadaa" :: String)
+      let mesg = E.rlpHash ("STRATO is a permissioned blockchain" :: String)
           oldMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
           newMsg = fromMaybe (error "couldn't get new messsage") (SEC.msg mesg)
           oldSig = HK.signRecMsg oldPriv oldMsg
@@ -109,7 +109,7 @@ secp256k1_haskell_spec =
       (HK.exportPubKey False oldRecPK) `shouldBe` (SEC.exportPubKey False newRecPK)
 
     it "verify signatures" $ do
-      let mesg = E.rlpHash ("doodoodaadaa" :: String)
+      let mesg = E.rlpHash ("STRATO is a permissioned blockchain" :: String)
           oldMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
           newMsg = fromMaybe (error "couldn't get new messsage") (SEC.msg mesg)
           oldSig = HK.signRecMsg oldPriv oldMsg
@@ -119,82 +119,61 @@ secp256k1_haskell_spec =
           newValid = SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig newSig) newMsg
       [oldValid, newValid] `shouldBe` [True, True]
 
-    it "slow and fast signature recovery" $ do
-      let mesg = E.rlpHash ("look! I'm helping!" :: String)
-          recMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
-          recSig = HK.signRecMsg oldPriv recMsg
-          slowPub = fromMaybe (error "couldn't recover slow") (HK.recover recSig recMsg)
-          fastPub = fromMaybe (error "couldn't recover fast") (HK.recover_fast recSig recMsg)
-      slowPub `shouldBe` fastPub
-
 
 
 timingTests :: IO ()
 timingTests = do
 
-  putStrLn "\nTIME IT! comparing secp256k1-haskell and haskoin for all things EC"
+  putStrLn "\nLET'S TIME IT! comparing secp256k1-haskell and haskoin for all things EC"
   
   putStrLn "\nPrivate Key Creation:"
   putStrLn "Haskoin: "
-  cwPrintTime $ do
-    let _ = HK.secKey ent
-    return ()
-  
+  _ <- cwPrintTime $ return $ HK.secKey ent
   putStrLn "secp256k1-haskell: "
-  cwPrintTime $ do
-    let _ = SEC.secKey ent
-    return ()
-  
-  
+  _ <- cwPrintTime $ return $ SEC.secKey ent
+ 
+
   putStrLn "\nPublic Key Creation:"
   putStrLn "Haskoin: "
-  cwPrintTime $ do
-    let _ = HK.exportPubKey False $ HK.derivePubKey oldPriv
-    return ()
-
+  _ <- cwPrintTime $ return $ HK.exportPubKey False $ HK.derivePubKey oldPriv
   putStrLn "secp256k1-haskell: "
-  cwPrintTime $ do
-    let _ = SEC.exportPubKey False $ SEC.derivePubKey newPriv
-    return ()
+  _ <- cwPrintTime $ return $ SEC.exportPubKey False $ SEC.derivePubKey newPriv
 
   
   putStrLn "\nAddress derivation:"
   putStrLn "Haskoin: "
-  cwPrintTime $ do
-    let _ = E.deriveAddress $ HK.derivePubKey oldPriv
-    return ()
-
+  _ <- cwPrintTime $ return $ E.deriveAddress $ HK.derivePubKey oldPriv
   putStrLn "secp256k1-haskell: "
-  cwPrintTime $ do
-    let _ = VWC.deriveAddress newPriv
-    return ()
+  _ <- cwPrintTime $ return $ VWC.deriveAddress newPriv
 
 
-  let mesg = E.rlpHash ("doodoodaadaa yo yo yo" :: String)
+  -- message hashes for signatures
+  let mesg = E.rlpHash ("A monad is like a burrito, or so the Glaswegians would have us believe" :: String)
+      hMesg = fromMaybe (error "couldn't get haskoin message hash") (HK.msg $ bytesToWord256 mesg)
+      sMesg = fromMaybe (error "couldnt get secp256k1 message hash") (SEC.msg mesg)
+  
   putStrLn "\nECDSA Signatures:"
   putStrLn "Haskoin: "
-  _ <- cwPrintTime $ do
-    let hMesg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
-    return $ HK.signRecMsg oldPriv hMesg
-
+  _ <- cwPrintTime $ return $ HK.signRecMsg oldPriv hMesg
   putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ do
-    let sMesg = fromMaybe (error "couldnt get new message") (SEC.msg mesg)
-    return $ SEC.signRecMsg newPriv sMesg
+  _ <- cwPrintTime $ return $ SEC.signRecMsg newPriv sMesg
 
-  let recMsg = fromMaybe (error "couldn't get old message") (HK.msg $ bytesToWord256 mesg)
-      recSig = HK.signRecMsg oldPriv recMsg
+
+  -- signatures to use for recovery
+  let hSig = HK.signRecMsg oldPriv hMesg
+      sSig = SEC.signRecMsg newPriv sMesg
+
+  putStrLn "\nPublic Key Signature Recovery:"
+  putStrLn "Haskoin:"
+  _ <- cwPrintTime $ return $ fromMaybe (error "couldn't recover haskoin pubkey") (HK.recover hSig hMesg)
+  putStrLn "secp256k1-haskell"
+  _ <- cwPrintTime $ return $ fromMaybe (error "couldnt recover secp256k1 pubkey") (SEC.recover sSig sMesg)
+
+          
+  putStrLn "\nSignature Verification:"
+  putStrLn "Haskoin:"
+  _ <- cwPrintTime $ return $ HK.verifySig (HK.derivePubKey oldPriv) (HK.convertRecSig hSig) hMesg
+  putStrLn "secp256k1-haskell:"
+  _ <- cwPrintTime $ return $ SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig sSig) sMesg
   
-  putStrLn "\nSignature Recovery:"
-  putStrLn "Haskoin: (the ExtendedECDSA way)"
-  mHpk <- cwPrintTime $ return $ HK.recover recSig recMsg
-
-  putStrLn "fast-ecrecover: (not true secp256k1-haskell) "
-  mFpk <- (cwPrintTime $ return $ HK.recover_fast recSig recMsg)
-
-  let hpk = fromMaybe (error "haskoin signature recovery failed") mHpk
-      fpk = fromMaybe (error "secp256k1 signature recovery failed") mFpk
-  if (hpk == fpk) then 
-    putStrLn "\ndone"
-  else 
-    error "slow and fast recoveries don't recover the same public key"
+  putStrLn "\nDone"
