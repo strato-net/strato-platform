@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-missing-signatures #-}
+{-# OPTIONS -fno-warn-deprecations #-}
 module Main where
 import           Control.Exception                         (bracket)
 import           Control.Monad
@@ -430,7 +431,9 @@ insertAndUpdateChain g oldChain newChain = do
         forM_ oldChain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
         forM_ newChain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
         forM_ oldChain $ \b -> set (RDB.inNamespace Canonical $ blockDataNumber b) (toValue $ blockHeaderHash b)
-        Right (mods, dels) <- callCommonAncestor oldChain newChain
+        value <- callCommonAncestor oldChain newChain
+        let (mods, dels) = either (error "wrong format in call to callCommonAncestor") id value
+        _ <- callCommonAncestor oldChain newChain
         forM_ mods $ \(sha, num) -> set (RDB.inNamespace Canonical $ num) (toValue sha)
         unless (null dels) . void . del $ RDB.inNamespace Canonical . toKey <$> dels
         let maxN = (+1) . fromIntegral . blockDataNumber . last $ newChain

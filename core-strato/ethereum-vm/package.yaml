@@ -10,7 +10,7 @@ description:
     The client described in the Ethereum Yellowpaper
 
 dependencies:
-  - base >= 4 && < 5
+  - base
   - ansi-wl-pprint
   - binary
   - blockapps-data

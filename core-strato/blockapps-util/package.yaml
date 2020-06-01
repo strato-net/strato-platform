@@ -12,7 +12,7 @@ library:
     - base
     - aeson
     - binary
-    - blockapps-milena
+    - milena
     - bytestring
     - common-log
     - containers

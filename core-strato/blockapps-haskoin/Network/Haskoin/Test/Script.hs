@@ -428,7 +428,8 @@ newtype ArbitraryMulSigSHCInput = ArbitraryMulSigSHCInput ScriptInput
 
 instance Arbitrary ArbitraryMulSigSHCInput where
     arbitrary = do
-        ArbitraryMSCOutput rdm@(PayMulSig _ m) <- arbitrary
+        value <- arbitrary
+        let ArbitraryMSCOutput rdm@(PayMulSig _ m) = value
         sigs <- vectorOf m f
         return $ ArbitraryMulSigSHCInput $ ScriptHashInput (SpendMulSig sigs) rdm
       where

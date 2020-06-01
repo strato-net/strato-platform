@@ -13,7 +13,7 @@ github: blockapps/strato-platform/core-strato/strato-init
 ghc-options: -Wall -O2 -threaded
 
 dependencies:
-  - base >= 4 && < 5
+  - base
 
 library:
   source-dirs: src/
@@ -24,7 +24,6 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
-  - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
@@ -46,6 +45,7 @@ library:
   - lens
   - leveldb-haskell
   - merkle-patricia-db
+  - milena
   - monad-alter
   - nibblestring
   - persistent-postgresql

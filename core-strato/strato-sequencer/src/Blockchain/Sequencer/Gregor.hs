@@ -183,7 +183,7 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
   P.withLabel gregorLoop "unseq_events" P.incCounter
   $logInfoS "gregor" . T.pack $ "Fetched " ++ show (length inEvents) ++ " unseq events"
   ch <- use gregorUnseq
-  forM_ (chunksOf (queueDepth `div` 4) inEvents) $ \chnk -> do
+  forM_ (chunksOf (fromIntegral queueDepth `div` 4) inEvents) $ \chnk -> do
     atomically . forM_ chnk $ writeTBQueue ch
     P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length chnk))
   hd <- atomically $ tryPeekTBQueue ch

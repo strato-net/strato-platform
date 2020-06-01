@@ -21,10 +21,10 @@ dependencies:
 library:
   source-dirs: src/
   dependencies:
-  - binary < 0.9
-  - blockapps-ecrecover == 0.4.*
+  - binary
+  - blockapps-ecrecover
   - blockapps-util
-  - bytestring >= 0.10 && < 0.20
+  - bytestring
 
 benchmarks:
   fast-ecrecover-benchmark:

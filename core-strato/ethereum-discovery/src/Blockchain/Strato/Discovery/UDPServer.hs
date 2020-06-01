@@ -3,6 +3,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# OPTIONS -fno-warn-deprecations #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.Discovery.UDPServer
      ( runEthUDPServer
@@ -11,6 +12,7 @@ module Blockchain.Strato.Discovery.UDPServer
 
 import           ClassyPrelude                           ((<>))
 import           Control.Monad.Catch
+import           Control.Monad.Fail
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
@@ -45,6 +47,7 @@ import           Text.Format
 import qualified Network.Haskoin.Internals               as H
 
 runEthUDPServer :: ( MonadIO m
+                   , MonadFail m
                    , MonadCatch m
                    , MonadThrow m
                    , MonadLogger m
@@ -59,7 +62,7 @@ runEthUDPServer ctx myPriv _ sock =
   void . runResourceT $ runReaderT (udpHandshakeServer myPriv sock portNum) ctx
      where portNum = 30303 -- TODO(tim): Reenable port selection
 
-connectMe :: (MonadIO m, MonadLogger m)
+connectMe :: (MonadIO m, MonadFail m, MonadLogger m)
           => Int
           -> m Socket
 connectMe _ = do
@@ -72,7 +75,7 @@ connectMe _ = do
 
   return sock
 
-addPeersIfNeeded :: (MonadIO m, MonadLogger m)
+addPeersIfNeeded :: (MonadIO m, MonadFail m, MonadLogger m)
                  => H.PrvKey
                  -> Socket
                  -> m ()
@@ -95,7 +98,7 @@ addPeersIfNeeded prv sock= do
         eErr <- liftIO $ disableUDPPeerForSeconds thePeer 10
         whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
-attemptBond :: (MonadIO m, MonadLogger m)
+attemptBond :: (MonadIO m, MonadFail m, MonadLogger m)
             => H.PrvKey
             -> Socket
             -> Int
@@ -128,6 +131,7 @@ attemptBond prv sock _ = do
                    (time+50)
 
 udpHandshakeServer :: ( HasSQLDB m
+                      , MonadFail m
                       , MonadCatch m
                       , MonadThrow m
                       , MonadLogger m
