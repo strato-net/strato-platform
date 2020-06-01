@@ -35,7 +35,7 @@ library:
     - haskoin-shim
     - http-client
     - lens
-    - monad-control >=1.0 && <1.1
+    - monad-control
     - mtl
     - opaleye
     - product-profunctors

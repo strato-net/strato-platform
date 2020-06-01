@@ -32,18 +32,22 @@ library:
   - strato-model
   - text
   
-executables:
-  strato-redis-viz:
-    main: Viz.hs
-    source-dirs:
-      - exec_src/
-    dependencies:
-      - diagrams-contrib
-      - diagrams-html5
-      - diagrams-lib
-      - optparse-applicative
-      - strato-redis-blockdb
-    ghc-options: -threaded -Wall -Werror
+# I am removing this executable because the package `diagrams-html5` has not been upgraded, and
+# won't work with newer stack lts' versions.
+# I don't think anyone uses this package (I asked on slack, no one knew what it is)....  If I
+# am wrong, uncomment this and find a replacement for `diagrams-html5`
+#executables:
+#  strato-redis-viz:
+#    main: Viz.hs
+#    source-dirs:
+#      - exec_src/
+#    dependencies:
+#      - diagrams-contrib
+#      - diagrams-html5
+#      - diagrams-lib
+#      - optparse-applicative
+#      - strato-redis-blockdb
+#    ghc-options: -threaded -Wall -Werror
 
 
 tests:

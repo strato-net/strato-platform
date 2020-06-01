@@ -2,7 +2,7 @@ name:                fastMP
 version:             0.1.0.0
 
 dependencies:
-- base >= 4.7 && < 5
+- base
 - base16-bytestring
 - bytestring
 - ethereum-rlp

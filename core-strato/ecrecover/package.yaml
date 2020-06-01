@@ -101,4 +101,4 @@ benchmarks:
     dependencies:
       - blockapps-ecrecover
       - criterion
-      - parallel == 3.*
+      - parallel

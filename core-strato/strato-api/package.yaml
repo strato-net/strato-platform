@@ -46,7 +46,7 @@ library:
           ghc-options:   -Wall -fwarn-tabs -O2
     extra-libraries: pthread
     dependencies:
-      - aeson                         >= 0.6
+      - aeson
       - base16-bytestring
       - base64-bytestring
       - binary
@@ -55,41 +55,41 @@ library:
       - blockapps-datadefs
       - blockapps-haskoin
       - blockapps-util
-      - bytestring                    >= 0.9
-      - classy-prelude-yesod          >= 0.10.2
+      - bytestring
+      - classy-prelude-yesod
       - clock
-      - conduit                       >= 1.0
+      - conduit
       - containers
       - directory
       - esqueleto
       - ethereum-discovery
       - extra
-      - fast-logger                   >= 2.2
+      - fast-logger
       - file-embed
       - filepath
       - format
       - monad-alter
       - mtl
-      - persistent                    >= 2.0
-      - persistent-postgresql         >= 2.1.1
+      - persistent
+      - persistent-postgresql
       - postgresql-simple
       - process
       - seqevents
-      - shakespeare                   >= 2.0
+      - shakespeare
       - strato-conf
       - strato-model
       - template-haskell
-      - text                          >= 0.11
+      - text
       - time
       - unliftio-core
       - wai
-      - wai-extra                     >= 3.0
+      - wai-extra
       - wai-middleware-prometheus
-      - warp                          >= 3.0
+      - warp
       - warp-tls
-      - yaml                          >= 0.8
-      - yesod                         >= 1.4.1
-      - yesod-core                    >= 1.4.6
+      - yaml
+      - yesod
+      - yesod-core
 
 executables:
   strato-api:
@@ -111,30 +111,30 @@ tests:
     ghc-options:    -Wall
     extra-libraries: pthread
     dependencies:
-      - aeson                         >= 0.6
+      - aeson
       - blockapps-data
       - blockapps-datadefs
       - blockapps-util
-      - bytestring                    >= 0.9
+      - bytestring
       - case-insensitive
       - classy-prelude
       - containers
       - ethereum-discovery
-      - hspec >= 2.0.0
+      - hspec
       - hspec-expectations
       - HUnit
       - monad-alter
       - mtl
-      - persistent                    >= 2.0
+      - persistent
       - QuickCheck
       - strato-api
-      - text                          >= 0.11
+      - text
       - time
       - unliftio-core
-      - wai-extra                     >= 3.0
-      - yaml                          >= 0.8
-      - yesod                         >= 1.4.1
-      - yesod-core                    >= 1.4.6
+      - wai-extra
+      - yaml
+      - yesod
+      - yesod-core
       - yesod-test
 
   unittests:

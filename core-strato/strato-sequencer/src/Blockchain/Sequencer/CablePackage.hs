@@ -1,6 +1,8 @@
 module Blockchain.Sequencer.CablePackage where
 
 import ClassyPrelude
+import Numeric.Natural
+
 import Blockchain.Blockstanbul (Checkpoint)
 import Blockchain.Sequencer.Event
 
@@ -12,7 +14,7 @@ data CablePackage = CablePackage
                   , seqVMEvents :: TQueue VmEvent
                   }
 
-queueDepth :: Int
+queueDepth :: Natural
 queueDepth = 4096
 
 newCablePackage :: STM CablePackage
