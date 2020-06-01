@@ -13,6 +13,7 @@ module BlockApps.Bloc22.Server.Chain where
 import           Control.Applicative               (liftA2)
 import           Control.Monad                     (when, unless)
 import           Crypto.Random.Entropy
+import qualified Data.ByteString.Base16            as B16
 import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
@@ -95,7 +96,8 @@ createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _
               _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
-              codeInfo' = CodeInfo (encodeUtf8 b) s contractdetailsName
+              b' = fst . B16.decode $ encodeUtf8 b
+              codeInfo' = CodeInfo b' s contractdetailsName
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let maybeNonContract a b | a == governanceAddress = Nothing
