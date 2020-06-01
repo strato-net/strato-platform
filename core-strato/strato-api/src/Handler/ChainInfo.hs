@@ -3,6 +3,8 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Handler.ChainInfo where
 
 import           Data.Aeson

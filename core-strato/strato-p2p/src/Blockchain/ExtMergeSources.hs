@@ -32,7 +32,7 @@ mergeSourcesByForce sx bound = do
     st <- lift $ askUnliftIO
     regs <- forM sx $ \s -> do
       register . killThread =<< do
-        (liftIO $ forkWithUnmask $ \unmask ->
+        (liftIO $ forkIOWithUnmask $ \unmask ->
           (unmask $ unliftIO st $
             runConduit $ s .| sinkTBMChan c)
           `finally` atomically (closeTBMChan c))
