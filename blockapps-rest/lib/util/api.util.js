@@ -11,7 +11,6 @@ const externalStorageUrl = "/apex-api/bloc/file";
 
 const Endpoint = {
   ACCOUNT: `${strato12Url}/account`,
-  USERS: `${blocUrl}/users`,
   USER: `${blocUrl}/users/:username`,
   FILL: `${blocUrl}/users/:username/:address/fill`,
   STATE: `${blocUrl}/contracts/:name/:address/state`,
@@ -28,7 +27,7 @@ const Endpoint = {
   EXT_ATTEST: `${externalStorageUrl}/attest`,
   EXT_VERIFY: `${externalStorageUrl}/verify`,
   EXT_DOWNLOAD: `${externalStorageUrl}/download`,
-  EXT_LIST: `${externalStorageUrl}/list`,
+  EXT_LIST: `${externalStorageUrl}/list`
 };
 
 function constructEndpoint(endpointTemplate, options = {}, params = {}) {
@@ -50,7 +49,11 @@ function constructQuerySearch(options) {
   }
 
   const chainIds = options.chainIds;
-  if (chainIds !== undefined && chainIds.length !== undefined && chainIds.length > 0) {
+  if (
+    chainIds !== undefined &&
+    chainIds.length !== undefined &&
+    chainIds.length > 0
+  ) {
     if (chainIds.length == 1) {
       const queryObject = Object.assign(
         { chainId: `eq.${chainIds[0]}` },
@@ -66,7 +69,6 @@ function constructQuerySearch(options) {
       );
       const query = `?${queryString.stringify(queryObject)}`;
       return query;
-
     }
   } else {
     const query = `?${queryString.stringify(options.query)}`;
@@ -88,13 +90,6 @@ function constructQuery(options) {
   return query;
 }
 
-/**
- * This function constructes metadata that can be used to control the history and index flags
- * @method{constructMetadata}
- * @param{Object} options flags for history and indexing
- * @param{String} contractName
- * @returns{()} metadata
- */
 function constructMetadata(options, contractName) {
   const metadata = {};
   if (options === {}) return metadata;

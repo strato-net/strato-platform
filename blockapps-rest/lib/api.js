@@ -11,21 +11,6 @@ import {
 } from "./util/api.util";
 import { TxPayloadType } from "./constants";
 
-async function getUsers(args, options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.USERS, options);
-  return get(url, endpoint, setAuthHeaders(args, options));
-}
-
-async function getUser(args, options) {
-  const url = getNodeUrl(options);
-  const urlParams = {
-    username: args.username
-  };
-  const endpoint = constructEndpoint(Endpoint.USER, options, urlParams);
-  return get(url, endpoint, setAuthHeaders(args, options));
-}
-
 async function createUser(args, options) {
   const url = getNodeUrl(options);
   const data = {
@@ -50,7 +35,7 @@ async function fill(user, options) {
 }
 
 function getCreateArgs(contract, options) {
-  const src = options.config.VM === 'EVM' ? {} : { src: contract.source };
+  const src = options.config.VM === "EVM" ? {} : { src: contract.source };
 
   const payload = {
     ...src,
@@ -58,18 +43,21 @@ function getCreateArgs(contract, options) {
     args: contract.args,
     chainid: contract.chainid,
     txParams: contract.txParams,
-    metadata: constructMetadata(options, contract.name),
+    metadata: constructMetadata(options, contract.name)
   };
 
   const tx = {
     payload,
-    type: TxPayloadType.CONTRACT,
+    type: TxPayloadType.CONTRACT
   };
   return tx;
 }
 
 async function compileContracts(user, contracts, options) {
-  const body = contracts.map(contract => ({ contractName: contract.name, source: contract.source }));
+  const body = contracts.map(contract => ({
+    contractName: contract.name,
+    source: contract.source
+  }));
 
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.COMPILE, options);
@@ -149,18 +137,18 @@ function getCallArgs(callMethodArgs, options) {
   const { contract, method, args, value, chainid, txParams } = callMethodArgs;
   const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
   const payload = {
-      contractName: contract.name,
-      contractAddress: contract.address,
-      chainid,
-      value: valueFixed,
-      method,
-      args,
-      txParams,
-      metadata: constructMetadata(options, contract.name)
+    contractName: contract.name,
+    contractAddress: contract.address,
+    chainid,
+    value: valueFixed,
+    method,
+    args,
+    txParams,
+    metadata: constructMetadata(options, contract.name)
   };
   const tx = {
-      payload,
-      type: TxPayloadType.FUNCTION
+    payload,
+    type: TxPayloadType.FUNCTION
   };
   return tx;
 }
@@ -238,20 +226,28 @@ async function search(user, contract, options) {
 async function searchWithContentRange(user, contract, options) {
   const url = getNodeUrl(options);
   const urlParams = {
-      name: contract.name
+    name: contract.name
   };
   const endpoint = constructEndpoint(Endpoint.SEARCH, options, urlParams);
-  const headersWithCount = { ...options.headers, Prefer: 'count=exact' };
-  const optionsWithCount = { ...options, headers: headersWithCount, getFullResponse: true };
-  const { data, headers } = await get(url, endpoint, setAuthHeaders(user, optionsWithCount));
-  const contentRangeStr = headers['content-range'];
-  const [range, countStr] = contentRangeStr.split('/');
+  const headersWithCount = { ...options.headers, Prefer: "count=exact" };
+  const optionsWithCount = {
+    ...options,
+    headers: headersWithCount,
+    getFullResponse: true
+  };
+  const { data, headers } = await get(
+    url,
+    endpoint,
+    setAuthHeaders(user, optionsWithCount)
+  );
+  const contentRangeStr = headers["content-range"];
+  const [range, countStr] = contentRangeStr.split("/");
   const count = parseInt(countStr, 10);
   if (range === "*") {
     const contentRange = { count };
     return { data, contentRange };
   }
-  const [start, end] = range.split('-').map((s) => parseInt(s, 10));
+  const [start, end] = range.split("-").map(s => parseInt(s, 10));
   const contentRange = { start, end, count };
   return { data, contentRange };
 }
@@ -273,9 +269,9 @@ async function createChain(body, options) {
 }
 
 async function createChains(body, options) {
-    const url = getNodeUrl(options);
-    const endpoint = constructEndpoint(Endpoint.CHAINS, options);
-    return await post(url, endpoint, body, options);
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.CHAINS, options);
+  return await post(url, endpoint, body, options);
 }
 
 async function uploadExtStorage(body, options) {
@@ -319,18 +315,16 @@ async function listExtStorage(user, args, options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function pingOauth(user, options){
-  const url = getNodeUrl(options)
-  const endpoint = constructEndpoint(Endpoint.KEY, options)
-  const result = await get(url, endpoint, setAuthHeaders(user, options))
-  return result.status
+async function pingOauth(user, options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.KEY, options);
+  const result = await get(url, endpoint, setAuthHeaders(user, options));
+  return result.status;
 }
 
 export default {
   getAccounts,
   getBalance,
-  getUsers,
-  getUser,
   createUser,
   getCreateArgs,
   compileContracts,
@@ -358,5 +352,5 @@ export default {
   verifyExtStorage,
   downloadExtStorage,
   listExtStorage,
-  pingOauth,
-}
+  pingOauth
+};

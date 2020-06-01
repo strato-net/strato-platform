@@ -8,44 +8,44 @@ import { RestError, response } from "./util/rest.util";
 import jwt from "jsonwebtoken";
 
 /**
- * This is the main blockapps-rest interface
+ * This is the main blockapps-rest interface.
  * @module rest
  */
 
 /**
  * @typedef {Object} User This identifies a user
- * @property {string} token This is the OAuth JWT corresponding to this user. STRATO uses the JWT to identify the user and unlock the user's private key to sign transactions. The token must be present in most cases.
- * @property {string} address This is the address corresponding to the user's private key. This is an optional parameter.
+ * @property {String} token This is the OAuth JWT corresponding to this user. STRATO uses the JWT to identify the user and unlock the user's private key to sign transactions. The token must be present in most cases.
+ * @property {String} address This is the address corresponding to the user's private key. This is an optional parameter.
  */
 
 /**
  * @typedef {Object} OAuthConfig This object describes the oauth configuration of a STRATO node
- * @property {string} appTokenCookieName Specifies the HTTP only cookie name. Used to identify authentication cookie if cookies are used instead of headers
- * @property {string} scope Identifies OAuth scope
- * @property {number} appTokenCookieMaxAge Used to set auth cookie expiration
- * @property {string} clientId OAuth client id for client credential and auth code grant flows
- * @property {string} clientSecret OAuth client secret corresponding to the clientId
- * @property {string} openIdDiscoveryUrl Discovery url for OAuth
- * @property {string} redirectUri OAuth callback url for auth code grant flow
- * @property {string} logoutRedirectUri Redirect URI to redirect user after a successful logout
+ * @property {String} appTokenCookieName Specifies the HTTP only cookie name. Used to identify authentication cookie if cookies are used instead of headers
+ * @property {String} scope Identifies OAuth scope
+ * @property {Number} appTokenCookieMaxAge Used to set auth cookie expiration
+ * @property {String} clientId OAuth client id for client credential and auth code grant flows
+ * @property {String} clientSecret OAuth client secret corresponding to the clientId
+ * @property {String} openIdDiscoveryUrl Discovery url for OAuth
+ * @property {String} redirectUri OAuth callback url for auth code grant flow
+ * @property {String} logoutRedirectUri Redirect URI to redirect user after a successful logout
  */
 
 /**
  * @typedef {Object} Node This identifies a STRATO node and contains OAuth discovery urls to authenticate to this node.
- * @property {number} id Node identifier
- * @property {string} url The base url of the node of the form `{PROTOCOL}://{HOST}:{PORT}`
- * @property {string} publicKey This is the public key of the node. Used to verify the identify of the node.
- * @property {number} port This is the port number of the STRATO process on this node. Usually equals `30303`
+ * @property {Number} id Node identifier
+ * @property {String} url The base url of the node of the form `{PROTOCOL}://{HOST}:{PORT}`
+ * @property {String} publicKey This is the public key of the node. Used to verify the identify of the node.
+ * @property {Number} port This is the port number of the STRATO process on this node. Usually equals `30303`
  * @property {module:rest~OAuthConfig} oauth This describes the oauth configuration of a STRATO node
  *
  */
 
 /**
  * @typedef {Object} Config This contains node configuration information
- * @property {string} VM This identifies the type of VM to use. It must equal one of `EVM` or `SolidVM`
+ * @property {String} VM This identifies the type of VM to use. It must equal one of `EVM` or `SolidVM`
  * @property {Boolean} apiDebug This flag enables debug output to be sent to the logger
  * @property {module:rest~Node[]} nodes This contains a collection of STRATO nodes which are being used. It must have atleast one member
- * @property {number} timeout Length of time to wait before giving up on a request in milliseconds
+ * @property {Number} timeout Length of time to wait before giving up on a request in milliseconds
  */
 
 /**
@@ -53,9 +53,19 @@ import jwt from "jsonwebtoken";
  * @property {Config} config This contains node identifiers, configuration and metadata options for this call.
  * @property {Object} logger This is a logger interface. It uses the `console` by default but can be set to custom logger like winston.
  * @property {Object} headers This allows adding custom HTTP headers for requests to STRATO
- * @property {Object} params This allows adding custom HTTP query params to requests. Useful for searching contracts
- * @property {string[]} history This allows us to specify contract names for which to track history when uploading smart contract source code
- * @property {string[]} noindex This allows us to specify contract names for which to skip relational indexing when uploading smart contract source code
+ * @property {Object} query This allows adding custom HTTP query params to requests. Useful for searching contracts
+ * @property {String[]} history This allows us to specify contract names for which to track history when uploading smart contract source code
+ * @property {String[]} noindex This allows us to specify contract names for which to skip relational indexing when uploading smart contract source code
+ */
+
+/**
+ * @typedef {Object} Account This object defines a STRATO account
+ * @property {String} kind Account type
+ * @property {String} balance Eth balance in wei
+ * @property {String} address Account address
+ * @property {Number} latestBlockNum Last block number in which the state for this account was changed
+ * @property {String} codeHash Code hash. Relevant if this is a contract account
+ * @property {Number} nonce: Account nonce
  */
 
 // =====================================================================
@@ -118,13 +128,27 @@ async function resolveResults(user, pendingResults, _options = {}) {
 //   account details
 // =====================================================================
 /**
- * This call returns all the wallet addresses on the STRATO node identified by the options param.
+ * This function returns the state of STRATO accounts on the STRATO node identified by `options.config.nodes` and matching the query property `options.query`.
+ * @example
+ * var accounts = await rest.getAccounts(user, {...options, query: {address: user.address}})
+ *
+ * // returns a list of one account corresponding to the users' address
+ * // [ { contractRoot:'56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+ * //     next: '/eth/v1.2/account?address=25eaa2879018122d7ba25fe4d9701ac367c44bf5&index=5',
+ * //     kind: 'AddressStateRef',
+ * //     balance: '2000000000000000000000',
+ * //     address: '25eaa2879018122d7ba25fe4d9701ac367c44bf5',
+ * //     latestBlockNum: 1,
+ * //     codeHash:'c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470',
+ * //     code: '',
+ * //     nonce: 0 } ]
  * @param {module:rest~User} user This identifies the user performing the query and contains the authentication token for the API call
  * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~Account[]} A list of account details
  */
 async function getAccounts(user, options) {
   try {
-    return await api.getAccounts(user, options);
+    return await api.getAccounts(user, { ...options, isAsync: true });
   } catch (err) {
     throw new RestError(
       RestStatus.BAD_REQUEST,
@@ -137,16 +161,6 @@ async function getAccounts(user, options) {
 // =====================================================================
 //   user
 // =====================================================================
-
-async function getUsers(args, options) {
-  const users = await api.getUsers(args, options);
-  return users;
-}
-
-async function getUser(args, options) {
-  const [address] = await api.getUser(args, options);
-  return address;
-}
 
 async function createUser(args, options) {
   const address = await createOrGetKey(args, options);
@@ -531,8 +545,6 @@ async function waitForAddress(user, contract, _options) {
 
 export default {
   getAccounts,
-  getUsers,
-  getUser,
   createUser,
   compileContracts,
   createContract,
