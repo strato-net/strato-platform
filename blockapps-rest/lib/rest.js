@@ -8,8 +8,54 @@ import { RestError, response } from "./util/rest.util";
 import jwt from "jsonwebtoken";
 
 /**
+ * This is the main blockapps-rest interface
  * @module rest
- * @memberof blockapps-rest
+ */
+
+/**
+ * @typedef {Object} User This identifies a user
+ * @property {string} token This is the OAuth JWT corresponding to this user. STRATO uses the JWT to identify the user and unlock the user's private key to sign transactions. The token must be present in most cases.
+ * @property {string} address This is the address corresponding to the user's private key. This is an optional parameter.
+ */
+
+/**
+ * @typedef {Object} OAuthConfig This object describes the oauth configuration of a STRATO node
+ * @property {string} appTokenCookieName Specifies the HTTP only cookie name. Used to identify authentication cookie if cookies are used instead of headers
+ * @property {string} scope Identifies OAuth scope
+ * @property {number} appTokenCookieMaxAge Used to set auth cookie expiration
+ * @property {string} clientId OAuth client id for client credential and auth code grant flows
+ * @property {string} clientSecret OAuth client secret corresponding to the clientId
+ * @property {string} openIdDiscoveryUrl Discovery url for OAuth
+ * @property {string} redirectUri OAuth callback url for auth code grant flow
+ * @property {string} logoutRedirectUri Redirect URI to redirect user after a successful logout
+ */
+
+/**
+ * @typedef {Object} Node This identifies a STRATO node and contains OAuth discovery urls to authenticate to this node.
+ * @property {number} id Node identifier
+ * @property {string} url The base url of the node of the form `{PROTOCOL}://{HOST}:{PORT}`
+ * @property {string} publicKey This is the public key of the node. Used to verify the identify of the node.
+ * @property {number} port This is the port number of the STRATO process on this node. Usually equals `30303`
+ * @property {module:rest~OAuthConfig} oauth This describes the oauth configuration of a STRATO node
+ *
+ */
+
+/**
+ * @typedef {Object} Config This contains node configuration information
+ * @property {string} VM This identifies the type of VM to use. It must equal one of `EVM` or `SolidVM`
+ * @property {Boolean} apiDebug This flag enables debug output to be sent to the logger
+ * @property {module:rest~Node[]} nodes This contains a collection of STRATO nodes which are being used. It must have atleast one member
+ * @property {number} timeout Length of time to wait before giving up on a request in milliseconds
+ */
+
+/**
+ * @typedef {Object} Options This object defines options, configurations and metadata for the STRATO node
+ * @property {Config} config This contains node identifiers, configuration and metadata options for this call.
+ * @property {Object} logger This is a logger interface. It uses the `console` by default but can be set to custom logger like winston.
+ * @property {Object} headers This allows adding custom HTTP headers for requests to STRATO
+ * @property {Object} params This allows adding custom HTTP query params to requests. Useful for searching contracts
+ * @property {string[]} history This allows us to specify contract names for which to track history when uploading smart contract source code
+ * @property {string[]} noindex This allows us to specify contract names for which to skip relational indexing when uploading smart contract source code
  */
 
 // =====================================================================
@@ -71,11 +117,10 @@ async function resolveResults(user, pendingResults, _options = {}) {
 // =====================================================================
 //   account details
 // =====================================================================
-
 /**
- *
- * @param {*} user
- * @param {*} options
+ * This call returns all the wallet addresses on the STRATO node identified by the options param.
+ * @param {module:rest~User} user This identifies the user performing the query and contains the authentication token for the API call
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
  */
 async function getAccounts(user, options) {
   try {
