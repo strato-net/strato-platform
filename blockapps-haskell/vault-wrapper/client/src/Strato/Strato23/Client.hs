@@ -18,16 +18,16 @@ import           Strato.Strato23.API
 getPing :: ClientM String
 getPing = client (Proxy @ GetPing)
 
-getKey :: Text -> Maybe Text -> ClientM StatusAndAddress
+getKey :: Text -> Maybe Text -> ClientM AddressAndKey
 getKey = client (Proxy @ GetKey)
 
 getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]
 getUsers = client (Proxy @ GetUsers)
 
-postKey :: Text -> ClientM StatusAndAddress
+postKey :: Text -> ClientM AddressAndKey
 postKey = client (Proxy @ PostKey)
 
-postSignature :: Text -> UserData -> ClientM SignatureDetails
+postSignature :: Text -> MsgHash -> ClientM SignatureDetails
 postSignature = client (Proxy @ PostSignature)
 
 postPassword :: Text -> ClientM ()

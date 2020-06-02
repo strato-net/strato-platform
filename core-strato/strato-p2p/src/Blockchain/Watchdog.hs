@@ -33,10 +33,12 @@ mkWatchdog mtid interval = do
         lastValue <- atomically $ swapTVar hasBeenPet False
         if lastValue
           then liftIO . setAlarm this $ addUTCTime interval now
-          else throwTo mtid $ WatchdogBite mtid interval
+          else do
+            destroyAlarmClock this
+            throwTo mtid $ WatchdogBite mtid interval
 
   when (interval > 0) $ do
-    (_, alarm) <- allocate (liftIO $ newAlarmClock' checkForPet) destroyAlarmClock
+    alarm <- liftIO $ newAlarmClock' checkForPet
     liftIO $ setAlarmNow alarm
   return $ Watchdog hasBeenPet
 

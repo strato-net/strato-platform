@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Blockchain.EthConf.Model where
 -- These are the aspects EthConf that don't require unsafePerformIO
 

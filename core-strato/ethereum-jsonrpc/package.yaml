@@ -23,7 +23,7 @@ executables:
       - http-client
       - http-types
       - json-rpc-server
-      - blockapps-milena
+      - milena
       - mtl
       - random
       - strato-conf

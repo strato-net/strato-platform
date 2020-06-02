@@ -7,7 +7,7 @@ synopsis: types and tools needed to write a VM for Strato
 category:      Data Structures
 
 dependencies:
-  - base >= 4 && < 5
+  - base
   - blockapps-data
   - blockapps-datadefs
   - blockapps-util
@@ -38,7 +38,6 @@ library:
   dependencies:
     - ansi-wl-pprint
     - binary
-    - blockapps-milena
     - blockapps-mpdbs
     - bytestring
     - cross-monitoring
@@ -55,6 +54,7 @@ library:
     - leveldb-haskell
     - lrucache
     - merkle-patricia-db
+    - milena
     - monad-alter
     - mtl
     - nibblestring

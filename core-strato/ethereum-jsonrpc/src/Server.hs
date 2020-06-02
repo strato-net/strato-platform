@@ -22,7 +22,7 @@ startServer = do
 
 app::Request->(Response->IO ResponseReceived)->IO ResponseReceived
 app req respond = do
-  theRequest <- requestBody req
+  theRequest <- getRequestBodyChunk req
   putStrLn $ show (remoteHost req) ++ " >>> " ++ show theRequest
 
   response <- doRPC $ BL.fromStrict theRequest

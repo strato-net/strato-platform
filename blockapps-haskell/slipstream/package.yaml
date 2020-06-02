@@ -28,7 +28,6 @@ library:
     - aeson
     - binary
     - blockapps-bloc22-server
-    - blockapps-milena
     - blockapps-solidity
     - blockapps-util
     - bloomfilter
@@ -41,6 +40,7 @@ library:
     - lens
     - lifted-base
     - lrucache
+    - milena
     - mtl
     - network
     - ordered-containers
@@ -65,9 +65,9 @@ executables:
       - base
       - blockapps-bloc22-server
       - blockapps-init
-      - blockapps-milena
       - hflags
       - http-client
+      - milena
       - persistent-postgresql
       - postgresql-simple
       - postgresql-typed
@@ -83,7 +83,7 @@ tests:
     main: Main.hs
     source-dirs: tests/
     dependencies:
-      - base >=4 && < 5
+      - base
       - aeson
       - aeson-qq
       - base16-bytestring

@@ -10,11 +10,13 @@ library:
   source-dirs:
     src/
   dependencies:
+    - aeson
     - binary
     - bytestring
+    - base16-bytestring
     - ethereum-encryption
-    - fast-ecrecover
     - strato-model
+    - text
 
 tests:
   stolen-secp256k1-tests:
