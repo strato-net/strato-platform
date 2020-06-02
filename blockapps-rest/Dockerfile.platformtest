@@ -14,7 +14,7 @@ ARG host
 
 RUN sed -i 's|http://localhost|http://'"${host}"'|g' .oauth-platform-test-config && \
     cat .oauth-platform-test-config && \
-    cp .oauth-test-env .env && \
+    cp .oauth-platform-test-env .env && \
     cp .oauth-platform-test-config lib/test/fixtures/config.yaml && \
     cp .oauth-platform-test-config lib/util/test/fixtures/config.yaml
 
