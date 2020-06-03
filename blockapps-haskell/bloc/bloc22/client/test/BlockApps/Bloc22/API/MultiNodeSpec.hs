@@ -28,7 +28,6 @@ import           BlockApps.Bloc22.Client
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
--- import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

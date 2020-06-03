@@ -52,6 +52,7 @@ library:
   - persistent
   - persistent-postgresql
   - persistent-template
+  - quickcheck-instances
   - resourcet
   - strato-conf
   - strato-model

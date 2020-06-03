@@ -26,9 +26,12 @@ library:
   - aeson-casing
   - base16-bytestring
   - base64-bytestring
+  - blockapps-data
+  - blockapps-datadefs
   - blockapps-ethereum
   - blockapps-solidity
   - blockapps-strato-api
+  - blockapps-util
   - bytestring
   - containers
   - cryptonite
