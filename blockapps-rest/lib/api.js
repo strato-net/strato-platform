@@ -27,7 +27,6 @@ async function fill(user, options) {
   const body = {};
   const url = getNodeUrl(options);
   const urlParams = {
-    username: user.username,
     address: user.address
   };
   const endpoint = constructEndpoint(Endpoint.FILL, options, urlParams);
@@ -124,13 +123,6 @@ async function getState(user, contract, options) {
   };
   const endpoint = constructEndpoint(Endpoint.STATE, options, urlParams);
   return get(url, endpoint, setAuthHeaders(user, options));
-}
-
-async function getBatchStates(user, stateArgs, options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.STATES, options);
-  const body = stateArgs ? stateArgs : [];
-  return post(url, endpoint, body, setAuthHeaders(user, options));
 }
 
 function getCallArgs(callMethodArgs, options) {

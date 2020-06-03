@@ -12,9 +12,8 @@ const externalStorageUrl = "/apex-api/bloc/file";
 const Endpoint = {
   ACCOUNT: `${strato12Url}/account`,
   USER: `${blocUrl}/users/:username`,
-  FILL: `${blocUrl}/users/:username/:address/fill`,
+  FILL: `${blocUrl}/users/user/:address/fill`,
   STATE: `${blocUrl}/contracts/:name/:address/state`,
-  STATES: `${blocUrl}/contracts/states`,
   TXRESULTS: `${blocUrl}/transactions/results`,
   SEND: `${strato23Url}/transaction`,
   SEND_PARALLEL: `${strato23Url}/transaction/parallel`,

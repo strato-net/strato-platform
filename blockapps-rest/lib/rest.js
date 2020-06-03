@@ -14,13 +14,17 @@ import jwt from "jsonwebtoken";
 
 /**
  * @typedef {Object} User This identifies a user
- * @property {String} token This is the OAuth JWT corresponding to this user. STRATO uses the JWT to identify the user and unlock the user's private key to sign transactions. The token must be present in most cases.
- * @property {String} address This is the address corresponding to the user's private key. This is an optional parameter.
+ * @property {String} token This is the OAuth JWT corresponding to this user.
+ * STRATO uses the JWT to identify the user and unlock the user's private key to sign transactions.
+ * The token must be present in most cases.
+ * @property {String} address This is the address corresponding to the user's private key.
+ * This is an optional parameter.
  */
 
 /**
  * @typedef {Object} OAuthConfig This object describes the oauth configuration of a STRATO node
- * @property {String} appTokenCookieName Specifies the HTTP only cookie name. Used to identify authentication cookie if cookies are used instead of headers
+ * @property {String} appTokenCookieName Specifies the HTTP only cookie name. Used to identify
+ * authentication cookie if cookies are used instead of headers
  * @property {String} scope Identifies OAuth scope
  * @property {Number} appTokenCookieMaxAge Used to set auth cookie expiration
  * @property {String} clientId OAuth client id for client credential and auth code grant flows
@@ -31,7 +35,8 @@ import jwt from "jsonwebtoken";
  */
 
 /**
- * @typedef {Object} Node This identifies a STRATO node and contains OAuth discovery urls to authenticate to this node.
+ * @typedef {Object} Node This identifies a STRATO node and contains OAuth discovery urls to
+ * authenticate to this node.
  * @property {Number} id Node identifier
  * @property {String} url The base url of the node of the form `{PROTOCOL}://{HOST}:{PORT}`
  * @property {String} publicKey This is the public key of the node. Used to verify the identify of the node.
@@ -44,18 +49,23 @@ import jwt from "jsonwebtoken";
  * @typedef {Object} Config This contains node configuration information
  * @property {String} VM This identifies the type of VM to use. It must equal one of `EVM` or `SolidVM`
  * @property {Boolean} apiDebug This flag enables debug output to be sent to the logger
- * @property {module:rest~Node[]} nodes This contains a collection of STRATO nodes which are being used. It must have atleast one member
+ * @property {module:rest~Node[]} nodes This contains a collection of STRATO nodes which are being used.
+ * It must have atleast one member
  * @property {Number} timeout Length of time to wait before giving up on a request in milliseconds
  */
 
 /**
  * @typedef {Object} Options This object defines options, configurations and metadata for the STRATO node
  * @property {Config} config This contains node identifiers, configuration and metadata options for this call.
- * @property {Object} logger This is a logger interface. It uses the `console` by default but can be set to custom logger like winston.
+ * @property {Object} logger This is a logger interface. It uses the `console` by default but can be
+ * set to custom logger like winston.
  * @property {Object} headers This allows adding custom HTTP headers for requests to STRATO
- * @property {Object} query This allows adding custom HTTP query params to requests. Useful for searching contracts
- * @property {String[]} history This allows us to specify contract names for which to track history when uploading smart contract source code
- * @property {String[]} noindex This allows us to specify contract names for which to skip relational indexing when uploading smart contract source code
+ * @property {Object} query This allows adding custom HTTP query params to requests.
+ * Useful for searching contracts
+ * @property {String[]} history This allows us to specify contract names for which to track history
+ * when uploading smart contract source code
+ * @property {String[]} noindex This allows us to specify contract names for which to skip relational
+ * indexing when uploading smart contract source code
  */
 
 /**
@@ -66,6 +76,33 @@ import jwt from "jsonwebtoken";
  * @property {Number} latestBlockNum Last block number in which the state for this account was changed
  * @property {String} codeHash Code hash. Relevant if this is a contract account
  * @property {Number} nonce: Account nonce
+ */
+
+/**
+ * @typedef {Object} Contract This object defines a STRATO smart contract
+ * @property {String} name Name of the smart contract
+ * @property {String} source Source code for the smart contract
+ * @property {Object} args Optional arguments for the smart contract constructor
+ * @property {String} codeHash: Contract code hash. Not required. Populated by the compileContract call.
+ * @property {String} address: Contract address. Not required. Populated by uploading a contract to STRATO.
+ */
+
+/**
+ * @typedef {Object} CodeHash This object defines the codeHash and the vm type in an uploaded contract object
+ * @property {String} kind This is the type of VM used. Is either `SolidVM` or `EVM`
+ * @property {String} digest This is the code hash
+ */
+
+/**
+ * @typedef {Object} UploadedContract This object describes the result of uploading one contract in a list of smart
+ * contracts being uploaded to STRATO
+ * @property {String} name Name of the smart contract
+ * @property {String} chainId Chain identifier if the smart contract is being uploaded to a private chain.
+ * This property is `null` for main chain smart contracts
+ * @property {String} address: Contract address. Not required. Populated by uploading a contract to STRATO.
+ * @property {module:rest~CodeHash} codeHash: Describes the codehash and the VM used to generate the code hash
+ * @property {String} bin: The compiled Solidity byte code
+ * @property {Object} xabi: An object defining the contract metadata
  */
 
 // =====================================================================
@@ -128,10 +165,12 @@ async function resolveResults(user, pendingResults, _options = {}) {
 //   account details
 // =====================================================================
 /**
- * This function returns the state of STRATO accounts on the STRATO node identified by `options.config.nodes` and matching the query property `options.query`.
+ * @static
+ * This function returns the state of STRATO accounts on the STRATO node
+ * identified by `options.config.nodes` and matching the query property `options.query`.
  * @example
- * var accounts = await rest.getAccounts(user, {...options, query: {address: user.address}})
  *
+ * var accounts = await rest.getAccounts(user, {...options, query: {address: user.address}})
  * // returns a list of one account corresponding to the users' address
  * // [ { contractRoot:'56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
  * //     next: '/eth/v1.2/account?address=25eaa2879018122d7ba25fe4d9701ac367c44bf5&index=5',
@@ -142,7 +181,9 @@ async function resolveResults(user, pendingResults, _options = {}) {
  * //     codeHash:'c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470',
  * //     code: '',
  * //     nonce: 0 } ]
- * @param {module:rest~User} user This identifies the user performing the query and contains the authentication token for the API call
+ *
+ * @param {module:rest~User} user This identifies the user performing the query and contains the
+ * authentication token for the API call
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~Account[]} A list of account details
  */
@@ -152,8 +193,8 @@ async function getAccounts(user, options) {
   } catch (err) {
     throw new RestError(
       RestStatus.BAD_REQUEST,
-      err.response.statusText,
-      err.response.data
+      err.response.statusText || err.response || err,
+      err.response.data || err.response || err
     );
   }
 }
@@ -162,7 +203,22 @@ async function getAccounts(user, options) {
 //   user
 // =====================================================================
 
-async function createUser(args, options) {
+/**
+ * @static
+ * This function createsand faucets a STRATO public/private key pair for the OAuth identity identified
+ * by the token in the user object. If a key pair already exists, it returns the ethereum address corresponding
+ * to this users key pair.
+ * @example
+ *
+ * var user = await rest.createUser({token: `${token}`}, options)
+ * // returns a STRATO user
+ * // { token: "eyJhbGc...ondq6g", address: "25eaa2879018122d7ba25fe4d9701ac367c44bf5"}
+ *
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~User}
+ */
+async function createUser(user, options) {
   const address = await createOrGetKey(args, options);
   const user = Object.assign({}, args, { address });
   return user;
@@ -177,14 +233,35 @@ async function fill(user, options) {
 //   compile contracts
 // =====================================================================
 
-async function compileContracts(user, contract, options) {
+/**
+ * @static
+ * This function is helper method that can be used to check if your smart contract compiles successfully using
+ * STRATO.
+ * @example
+ *
+ * const contract = { name: "SimpleStorage", source: "...contract source" }
+ * const result = await rest.compileContracts(
+ *  stratoUser,
+ *  [contract],
+ *  options
+ * );
+ * // returns
+ * // [ { contractName: 'SimpleStorage',
+ * //     codeHash: '4552b102deb8f69bba4ca79847913c6878892787c0ff4592245452c00e324779' } ]
+ *
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~Contract[]} Returns a list of contracts with the `name` and `codeHash` values populated
+ */
+async function compileContracts(user, contracts, options) {
   try {
-    return await api.compileContracts(user, contract, options);
+    return await api.compileContracts(user, contracts, options);
   } catch (err) {
     throw new RestError(
       RestStatus.BAD_REQUEST,
-      err.response.statusText,
-      err.response.data
+      err.response.statusText || err.response || err,
+      err.response.data || err.response || err
     );
   }
 }
@@ -193,7 +270,22 @@ async function compileContracts(user, contract, options) {
 //   contract
 // =====================================================================
 
-async function createContract(user, contract, options) {
+/**
+ * @static
+ * This function uploads a smart contract to STRATO
+ * @example
+ *
+ * const result = await rest.createContractList(stratoUser, contracts, options);
+ * // returns
+ * // { name: 'SimpleStorage',
+ * //   address: '5043751be046762926fc563fefb33e62919bf8b7' }
+ *
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract} contract This object describes the contract to upload
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~Contract} Returns a list of contracts with the `name` and `address` values populated
+ */
+async function createContract(user, contracts, options) {
   const [pendingTxResult] = await api.createContract(user, contract, options);
   return createContractResolve(user, pendingTxResult, options);
 }
@@ -220,7 +312,42 @@ async function createContractResolve(user, pendingTxResult, options) {
 //   contract list
 // =====================================================================
 
-async function createContractList(user, contract, options) {
+/**
+ * @static
+ * This function uploads a list of smart contracts to STRATO
+ * @example
+ *
+ * const result = await rest.createContractList(stratoUser, [contract], options);
+ * // returns
+ * // [{ bin:
+ * //     '608060405234801561001057600080fd5b5060df8061001f6000396000f3006080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806360fe47b114604e5780636d4ce63c146078575b600080fd5b348015605957600080fd5b5060766004803603810190808035906020019092919050505060a0565b005b348015608357600080fd5b50608a60aa565b6040518082815260200191505060405180910390f35b8060008190555050565b600080549050905600a165627a7a72305820cc57e5c7247b87ff38ff587e3514e14fa087cc512a6504300c1825957a56e0c10029',
+ * //    chainId: null,
+ * //    address: 'b728ad420aadd7082380e2024b935dd2898f6117',
+ * //    'bin-runtime':
+ * //     '6080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806360fe47b114604e5780636d4ce63c146078575b600080fd5b348015605957600080fd5b5060766004803603810190808035906020019092919050505060a0565b005b348015608357600080fd5b50608a60aa565b6040518082815260200191505060405180910390f35b8060008190555050565b600080549050905600a165627a7a72305820cc57e5c7247b87ff38ff587e3514e14fa087cc512a6504300c1825957a56e0c10029',
+ * //    codeHash:
+ * //     { kind: 'EVM',
+ * //       digest:
+ * //        '4552b102deb8f69bba4ca79847913c6878892787c0ff4592245452c00e324779' },
+ * //    name: 'SimpleStorage',
+ * //    src:
+ * //     'contract SimpleStorage {\n    uint storedData;\n\n    function set(uint x) {\n        storedData = x;\n    }\n\n    function get() returns (uint) {\n        return storedData;\n    }\n}',
+ * //    xabi:
+ * //     { modifiers: {},
+ * //       funcs: [Object],
+ * //       kind: 'ContractKind',
+ * //       types: [Object],
+ * //       using: {},
+ * //       constr: null,
+ * //       events: {},
+ * //       vars: [Object] } } ]
+ *
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract[]} contracts This is a list of contracts to upload
+ * @param {module:rest~Options} options This identifies the options and configurations for this call.
+ * @returns {module:rest~UploadedContract[]} Returns a list of uploaded contracts with their addresses, byte code and code hashes
+ */
+async function createContractList(user, contracts, options) {
   const pendingTxResult = await api.createContractList(user, contract, options);
   return createContractListResolve(user, pendingTxResult, options);
 }
@@ -284,14 +411,36 @@ async function getBlocResults(user, hashes, options) {
   return api.blocResults(user, hashes, options);
 }
 
+/**
+ * @static
+ * This call gets the state of a STRATO smart contract
+ * @example
+ *
+ * const state = await rest.getState(stratoUser, contract, options);
+ * // returns
+ * // { get: 'function () returns (uint)',
+ * //   set: 'function (uint) returns ()',
+ * //   storedData: '0' }
+ *
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract} contract This object describes the contract to fetch state for. Minimally
+ * contains the address and the name of the contract
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {Object} Returns an object with all accessible functions and state variables in this smart contract
+ */
 async function getState(user, contract, options) {
   return api.getState(user, contract, options);
 }
 
-async function getBatchStates(user, contracts, options) {
-  return api.getBatchStates(user, contracts, options);
-}
-
+/**
+ * @static
+ * This call is used to query the state of an array in a STRATO smart contract
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract} contract This object describes the contract to fetch state for. Minimally
+ * contains the address and the name of the contract
+ * @param {String} name This is the name of the array variable in the smart contract
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ */
 async function getArray(user, contract, name, options) {
   const MAX_SEGMENT_SIZE = 100;
   options.stateQuery = { name, length: true };
@@ -550,7 +699,6 @@ export default {
   createContract,
   createContractList,
   getState,
-  getBatchStates,
   getArray,
   call,
   callList,

@@ -8,7 +8,7 @@
     "includePattern": ".+\\.js(doc)?$",
     "excludePattern": "(^|\\/|\\\\)_"
   },
-  "plugins": [],
+  "plugins": ["plugins/markdown"],
   "templates": {
     "default": {
       "outputSourceFiles": false

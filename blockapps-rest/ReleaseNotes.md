@@ -4,6 +4,10 @@
 
 -   Fix issue with `getAccounts` and `resolve` flag
 -   Remove bloc account endpoints and interfaces
+-   Remove `getBatchStates` function call
+-   Update `fill` call to not require username
+-   Fixes for error handling in `compileContracts`
+-   Fixes for error handling in `getAccounts`
 -   Add js docs
 
 ### Version 7.6.6
