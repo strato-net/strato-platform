@@ -87,7 +87,7 @@ extra-deps:
 #- git: https://github.com/blockapps/milena
 #  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
 
-resolver: lts-14.20 #also duplicated in docker section below
+resolver: lts-14.27 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -104,6 +104,6 @@ ghc-options:
 
 docker:
   enable: true
-  image: "strato-buildbase:lts-14.20"
+  image: "strato-buildbase:lts-14.27"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
