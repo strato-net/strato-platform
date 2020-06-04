@@ -26,13 +26,15 @@ import           BlockApps.Bloc22.Client
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
-import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Json
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Gas
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import           Blockchain.Strato.Model.Wei
+import           Handlers.AccountInfo
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
@@ -69,12 +71,12 @@ spec =
       accts1 `shouldSatisfy` isRight
       accts2 `shouldSatisfy` isRight
       let
-        Right (account1 : _) = accts1
-        Right (account2 : _) = accts2
-        balance1 = unStrung (accountBalance account1)
-        balance2 = unStrung (accountBalance account2)
-      balance1 `shouldBe` initialWei
-      balance2 `shouldBe` initialWei
+        Right (AddressStateRef' account1 _: _) = accts1
+        Right (AddressStateRef' account2 _: _) = accts2
+        balance1 = addressStateRefBalance account1
+        balance2 = addressStateRefBalance account2
+      fromInteger balance1 `shouldBe` initialWei
+      fromInteger balance2 `shouldBe` initialWei
       threadDelay 4000000
       let
         weiToSend = 100
@@ -87,9 +89,9 @@ spec =
         (ClientEnv mgr stratoUrl Nothing)
       accts2AfterSend `shouldSatisfy` isRight
       let
-        Right (account2AS : _) = accts2AfterSend
-        balance2AS = unStrung (accountBalance account2AS)
-      balance2AS `shouldBe` initialWei + weiToSend
+        Right (AddressStateRef' account2AS _: _) = accts2AfterSend
+        balance2AS = addressStateRefBalance account2AS
+      fromInteger balance2AS `shouldBe` initialWei + weiToSend
 
     it "should create SimpleStorage contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
       let

@@ -23,6 +23,7 @@ import           Data.Time
 import qualified Data.Sequence                as S
 import           GHC.Generics
 import           Test.QuickCheck
+import           Test.QuickCheck.Instances.Text()
 
 import           Blockchain.MiscArbitrary()
 import           Blockchain.MiscJSON()

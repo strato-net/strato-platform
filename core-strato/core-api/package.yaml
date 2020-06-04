@@ -21,6 +21,7 @@ library:
   - blockapps-util
   - bytestring
   - clock
+  - conduit
   - containers
   - deepseq
   - directory
@@ -36,7 +37,10 @@ library:
   - monad-logger
   - mtl
   - process
+  - QuickCheck
   - seqevents
+  - servant-client
+  - servant-client-core
   - servant-multipart
   - servant-swagger-tags
   - strato-model
@@ -44,6 +48,7 @@ library:
   - template-haskell
   - text
   - transformers
+  - unliftio
 
 executables:
   core-api:
@@ -69,6 +74,8 @@ executables:
     - servant-swagger
     - servant-swagger-ui
     - swagger2
+    - transformers
+    - unliftio
     - wai
     - wai-cors
     - wai-extra

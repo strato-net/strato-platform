@@ -50,6 +50,7 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Kafka
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 
 newtype IConfig = IConfig { contextSQLDB :: SQLDB }
@@ -88,7 +89,7 @@ instance (Keccak256 `A.Alters` API OutputTx) IContextM where
 instance (Word256 `A.Alters` API ChainInfo) IContextM where
   lookup _ _               = liftIO . throwIO $ Lookup "API" "Word256" "ChainInfo"
   delete _ _               = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
-  insert _ cId (API cInfo) = void . lift $ putChainInfo cId cInfo
+  insert _ cId (API cInfo) = void . lift $ putChainInfo (ChainId cId) cInfo
 
 instance (Keccak256 `A.Alters` API OutputBlock) IContextM where
   lookup     _ _          = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"

@@ -10,13 +10,11 @@ import System.Exit
 import Text.Printf
 
 import Blockchain.Data.Block
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
 import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.EthConf
-import Blockchain.ExtWord
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.TypeLits
@@ -57,14 +55,14 @@ addBlocksFromFile fileName = do
 addGenesisFromFile :: FilePath -> IO ()
 addGenesisFromFile fileName = do
   file <- BLC.readFile fileName
-  case eitherDecode @(NamedMap "id" Word256 "info" ChainInfo) file of
+  case eitherDecode file of
     Left err -> die $ printf "Malformed ChainInfo file: %s" err
     Right bs -> do
       printf "Inserting %d chain infos into unseq_events...\n" (length bs)
       resps <- runKafkaConfigured "queryStrato" $ do
         assertTopicCreation
         writeUnseqEvents $
-          map ((IEGenesis . IngestGenesis (TXO.PeerString "")) . toTuple) bs
+          map ((IEGenesis . IngestGenesis (TXO.PeerString "")) . unNamedTuple @"id" @"info") bs
       mapM_ print resps
 
 addTxsFromFile :: FilePath -> IO ()

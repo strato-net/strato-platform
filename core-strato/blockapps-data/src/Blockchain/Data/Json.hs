@@ -21,7 +21,6 @@ import           Data.Time.Clock
 import           Data.Word
 import           GHC.Generics
 import           Numeric
-import           Text.Read
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
@@ -29,10 +28,10 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util                      (toMaybe)
-import           Text.Format
 
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON
@@ -46,32 +45,45 @@ instance ToSchema RawTransaction' where
     NamedSchema (Just "RawTransaction'") mempty
 
 instance ToJSON RawTransaction' where
-    toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl (Just (Address ta)) val cod cid r s v md bn h o) next) =
-        object $ ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
-        "to" .= showHex ta "" , "value" .= show val, "codeOrData" .= cod,
-        "r" .= showHex r "",
-        "s" .= showHex s "",
-        "v" .= showHex v "",
-        "blockNumber" .= bn,
-        "hash" .= h,
-        "transactionType" .= (show $ rawTransactionSemantics rt),
-        "timestamp" .= show t,
-        "origin" .= format o
-               ] ++ (("chainId" .=) <$> maybeToList (toMaybe 0 cid))
-                 ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
-    toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl Nothing val cod cid r s v md bn h o) next) =
-        object $ ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
-        "value" .= show val, "codeOrData" .= cod, "chainId" .= cid,
-        "r" .= showHex r "",
-        "s" .= showHex s "",
-        "v" .= showHex v "",
-        "blockNumber" .= bn,
-        "hash" .= h,
-        "transactionType" .= (show $ rawTransactionSemantics rt),
-        "timestamp" .= show t,
-        "origin" .= format o
-               ] ++ (("chainId" .=) <$> maybeToList (toMaybe 0 cid))
-                 ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
+    toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl (Just ta) val cod cid r s v md bn h o) next) =
+        object $
+          [ "next" .= next
+          , "from" .= fa
+          , "nonce" .= non
+          , "gasPrice" .= gp
+          , "gasLimit" .= gl
+          , "to" .= ta
+          , "value" .= show val
+          , "codeOrData" .= T.decodeUtf8 (B16.encode cod)
+          , "r" .= showHex r ""
+          , "s" .= showHex s ""
+          , "v" .= showHex v ""
+          , "blockNumber" .= bn
+          , "hash" .= h
+          , "transactionType" .= (show $ rawTransactionSemantics rt)
+          , "timestamp" .= t
+          , "origin" .= o
+          ] ++ (("chainId" .=) <$> maybeToList (ChainId <$> toMaybe 0 cid))
+            ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
+    toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl Nothing val cod cid r s v md bn h o) next) =
+        object $
+          [ "next" .= next
+          , "from" .= fa
+          , "nonce" .= non
+          , "gasPrice" .= gp
+          , "gasLimit" .= gl
+          , "value" .= show val
+          , "codeOrData" .= T.decodeUtf8 (B16.encode cod)
+          , "r" .= showHex r ""
+          , "s" .= showHex s ""
+          , "v" .= showHex v ""
+          , "blockNumber" .= bn
+          , "hash" .= h
+          , "transactionType" .= (show $ rawTransactionSemantics rt)
+          , "timestamp" .= t
+          , "origin" .= o
+          ] ++ (("chainId" .=) <$> maybeToList (ChainId <$> toMaybe 0 cid))
+            ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
 parseHexStr = fmap readHexStr
@@ -81,14 +93,14 @@ readHexStr = fst . head . readHex
 
 instance FromJSON RawTransaction' where
     parseJSON (Object t) = do
-      fa <- parseHexStr (t .:? "from" .!= "0")
+      fa <- t .:? "from" .!= (Address 0)
       tnon  <- t .:? "nonce" .!= 0
       tgp <- t .:? "gasPrice" .!= 0
       tgl <- t .:? "gasLimit" .!= 0
-      tto <- fmap (fmap $ Address . fst . head . readHex) (t .:? "to")
+      tto <- t .:? "to"
       tval <- read <$> t .:? "value" .!= "0"
       tcd <- fmap (fst .  B16.decode . T.encodeUtf8 ) (t .:? "codeOrData" .!= "")
-      cid <- fmap (fmap $ fst . head . readHex) (t .:? "chainId")
+      cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
       (tr :: Integer) <- parseHexStr (t .: "r")
       (ts :: Integer) <- parseHexStr (t .: "s")
       (tv :: Word8) <- parseHexStr (t .:? "v" .!= "0")
@@ -99,15 +111,14 @@ instance FromJSON RawTransaction' where
       -- instead of using the ToJSON instance for UTCTime, and so it fails
       -- to parse in FromJSON for UTCTime.
       let defaultTime = UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
-      (rawTime :: String) <- t .:? "timestamp" .!= ""
-      let (time :: UTCTime) = fromMaybe defaultTime . readMaybe $ rawTime
-      o <- (read <$> t .:? "origin" .!= "API") :: Parser TXOrigin
+      time <- t .:? "timestamp" .!= defaultTime
+      o <- t .:? "origin" .!= API
       next <- t .:? "next" .!= ""
 
       return (RawTransaction'
                (RawTransaction
                  time
-                 (Address fa)
+                 fa
                  (tnon :: Integer)
                  (tgp :: Integer)
                  (tgl :: Integer)

@@ -8,24 +8,23 @@ module Handlers.Peers (
 
 import           Control.Monad.IO.Class
 import           Data.Aeson
-import qualified Data.ByteString.Lazy.Char8               as BLC
 import           Servant
 
 import           Blockchain.Strato.Discovery.Data.Peer
 
-
-
+import           SQLM
+import           UnliftIO
 
 type API = "peers" :> Get '[JSON] Value
 
-server :: Server API
+server :: ServerT API SQLM
 server = getPeers
 
 ---------------------
 
-getPeers :: Handler Value
+getPeers :: MonadIO m => m Value
 getPeers = do
   eActivePeers <- liftIO getActivePeers
   case eActivePeers of
-    Left err -> throwError err500 { errBody = BLC.pack $ show err }
+    Left err -> throwIO . ServerError $ show err
     Right ps -> return . object . map (\p -> pPeerIp p .= pPeerTcpPort p) $ ps
