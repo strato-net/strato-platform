@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TypeOperators          #-}
 
 module Handlers.AccountInfo (
@@ -70,6 +71,16 @@ getAccount pool
           null code, null codeHash, null chainid
         ]) $
       throwError err400{ errBody = BLC.pack $ "Need one of: " ++ intercalate ", " accountQueryParams }
+
+    maybeCid <-
+      case chainid of
+        Nothing -> return $ Just 0
+        Just "main" -> return $ Just 0
+        Just "all" -> return Nothing
+        Just cidString -> do
+          case fromHexText cidString of
+            Nothing -> throwError err400{ errBody = BLC.pack $ "Malformed chainid: " ++ show chainid }
+            x -> return x
     
     addrs <-
       liftIO $ runSQLM pool $ sqlQuery $ E.select . E.distinct $
@@ -90,15 +101,11 @@ getAccount pool
                     fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val v) codeHash
                   ] 
               
-              let matchChainId cid = (accStateRef E.^. AddressStateRefChainId) E.==. (E.val $ fromHexText cid)
-              let chainCriteria = case chainid of
-                    Nothing -> [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
-                    Just cid -> do
-                        if (T.unpack cid == "main")
-                            then [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
-                            else if (T.unpack cid == "all")
-                                     then []
-                                     else [matchChainId cid]
+              let chainCriteria =
+                    case maybeCid of
+                      Just cid -> [accStateRef E.^. AddressStateRefChainId E.==. E.val cid]
+                      Nothing -> []
+                    
               let allCriteria = case chainCriteria of
                      [] -> [criteria]
                      _ -> map (\cc -> cc : criteria) chainCriteria
@@ -133,9 +140,11 @@ accountQueryParams = [ "address",
                        "codeHash",
                        "chainid"]
 
-fromHexText :: T.Text -> Word256
-fromHexText v = res
-  where ((res,_):_) = readHex $ T.unpack $ v :: [(Word256,String)]
+fromHexText :: T.Text -> Maybe Word256
+fromHexText v = 
+  case readHex $ T.unpack $ v :: [(Word256,String)] of
+    ((res,_):_) -> Just res
+    _ -> Nothing
 
 toCode :: Text -> BC.ByteString
 toCode v = fst $ B16.decode $ BC.pack $ (T.unpack v)
