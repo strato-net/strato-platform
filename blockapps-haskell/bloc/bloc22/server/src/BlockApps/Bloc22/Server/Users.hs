@@ -671,7 +671,7 @@ postUsersContractMethod' :: Should CacheNonce -> FunctionParameters -> Signer ->
 postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
     params <- getAccountTxParams cacheNonce fromAddr chainId txParams
 
-    let err = UserError $ Text.concat
+    let err = CouldNotFind $ Text.concat
                 [ "postUsersContractMethod': Couldn't find contract details for "
                 , contractName
                 , " at address "

@@ -29,7 +29,7 @@ import qualified Database.Esqueleto          as E
 import           Numeric.Natural
 import           Servant
 import           Servant.Client
-import           Servant.Swagger.Tags
+--import           Servant.Swagger.Tags
 
 
 import           Blockchain.Data.Address
@@ -43,14 +43,14 @@ import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 import           Settings
 import           SQLM
 import           UnliftIO
-
+{-
 -- TODO: Remove once https://github.com/nakaji-dayo/servant-swagger-tags/pull/1 is merged
 instance HasClient m api => HasClient m (Tags tags :> api) where
   type Client m (Tags tags :> api) = Client m api
   clientWithRoute pm _ = clientWithRoute pm (Proxy @api)
   hoistClientMonad pm _ f cl = hoistClientMonad pm (Proxy @api) f cl
-
-type API = Tags "section1" :> Summary "get user accounts" :> Description "Get information about user accounts" :>
+-}
+type API = -- Tags "section1" :> Summary "get user accounts" :> Description "Get information about user accounts" :>
   "account" :> QueryParam "address" Address
             :> QueryParam "balance" Natural
             :> QueryParam "minbalance" Natural

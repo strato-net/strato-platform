@@ -8,7 +8,7 @@ module Handlers.Peers (
 
 import           Control.Monad.IO.Class
 import           Data.Aeson
-import           Servant
+import           Servant                                 hiding (ServerError)
 
 import           Blockchain.Strato.Discovery.Data.Peer
 

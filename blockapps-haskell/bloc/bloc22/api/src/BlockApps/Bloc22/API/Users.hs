@@ -362,7 +362,7 @@ instance ToSchema PostUsersContractRequest where
     metadataSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text Text)))
     return $ NamedSchema (Just "Post Users Contract Request")
       ( mempty
-        & type_ .~ SwaggerObject
+        & type_ ?~ SwaggerObject
         & properties .~
             [ ("src", textSchema & mapped.description ?~ "Solidity source code")
             , ("password", pwSchema)
@@ -566,7 +566,7 @@ instance ToSchema PostUsersContractMethodRequest where
     metadataSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text Text)))
     return $ NamedSchema (Just "Post Users Contract Method Request")
       ( mempty
-        & type_ .~ SwaggerObject
+        & type_ ?~ SwaggerObject
         & properties .~
             [ ("password", pwSchema)
             , ("method", textSchema & mapped.description ?~ "Method name")

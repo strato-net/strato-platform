@@ -365,7 +365,7 @@ callMethodListLocal :: Text
                     -> Text
                     -> Map Text ArgValue
                     -> TestConfig
-                    -> IO [Either ServantError BlocTransactionResult]
+                    -> IO [Either ClientError BlocTransactionResult]
 callMethodListLocal method cAddr contractName args config@TestConfig{..} =
   let postMethodListRequest =
         PostMethodListRequest

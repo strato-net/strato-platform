@@ -27,7 +27,7 @@ instance FromJSON Gas where
 
 instance ToParamSchema Gas where
   toParamSchema _ = mempty
-    & type_ .~ SwaggerInteger
+    & type_ ?~ SwaggerInteger
     & minimum_ ?~ 0
     & maximum_ ?~ (2^(256 :: Integer) - 1)
     & format ?~ "hex string"
@@ -36,7 +36,7 @@ instance ToSchema Gas where
   declareNamedSchema _ = return $
     NamedSchema (Just "Gas")
       ( mempty
-        & type_ .~ SwaggerInteger
+        & type_ ?~ SwaggerInteger
         & example ?~ toJSON (Gas 1000)
         & description ?~ "Number of Gas units" )
 
