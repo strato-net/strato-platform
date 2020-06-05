@@ -138,13 +138,11 @@ pipeline {
               sh '''#!/bin/bash -le
                 set -x
                 rm -rf track-and-trace
-                git clone https://github.com/blockapps/track-and-trace.git
+                git clone -b master https://github.com/blockapps/track-and-trace.git
                 cd track-and-trace
-                git checkout oauth42style-test-fix
                 git submodule update --init --recursive
                 cd server
                 sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
-                # oauth42style-test-fix uses the old hardcoded ba-rest version
                 touch .env
                 yarn build
                 yarn install
@@ -307,9 +305,8 @@ pipeline {
               sh '''#!/bin/bash -le
                 set -x
                 rm -rf track-and-trace
-                git clone https://github.com/blockapps/track-and-trace.git
+                git clone -b master https://github.com/blockapps/track-and-trace.git
                 cd track-and-trace/server
-                git checkout test-fix
                 sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
                 # symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
                 cp -r ../../strato-worktree/blockapps-rest blockapps-rest
