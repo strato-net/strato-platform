@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE StrictData               #-}
+{-# LANGUAGE TypeApplications         #-}
 
 module Blockchain.Data.ChainInfo
   ( ChainInfo (..)
@@ -288,13 +289,13 @@ instance FromJSON ChainInfo where
     l <- o .: "label"
     as <- o .: "accountInfo"
     cs <- o .: "codeInfo"
-    ms <- ((o .: "members") :: NamedMapParser "address" Address "enode" Enode)
+    ms <- M.fromList . map (unNamedTuple @"address" @"enode") <$> (o .: "members")
     pc <- o .:? "parentChain"
     cb <- o .: "creationBlock"
     cn <- o .: "nonce"
     md <- o .: "metadata"
     sig <- o .:? "signature"
-    return $ ChainInfo (UnsignedChainInfo l as cs (M.fromList $ map toTuple ms) pc cb cn md) sig
+    return $ ChainInfo (UnsignedChainInfo l as cs ms pc cb cn md) sig
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
@@ -302,7 +303,7 @@ instance ToJSON ChainInfo where
     object [ "label" .= cl
            , "accountInfo" .= ai
            , "codeInfo" .= ci
-           , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enode" Enode)
+           , "members" .= (NamedTuple @"address" @"enode" <$> M.toList ms)
            , "parentChain" .= pc
            , "creationBlock" .= cb
            , "nonce" .= cn

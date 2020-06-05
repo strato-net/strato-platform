@@ -29,9 +29,10 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
 
-getChainInfo :: HasSQLDB m => Word256 -> m (Maybe (NamedTuple "id" Word256 "info" ChainInfo))
-getChainInfo chainId = do
+getChainInfo :: HasSQLDB m => ChainId -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
+getChainInfo (ChainId chainId) = do
   sqlQuery $ do
     entChainInfos <- E.select . E.from $ \cRef -> do
       E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
@@ -59,8 +60,8 @@ getChainInfo chainId = do
           sig <- fmap listToMaybe . E.select . E.from $ \csRef -> do
             E.where_ (csRef E.^. ChainSignatureRefChainInfoId E.==. E.val chainInfoRefId)
             return csRef
-          return . Just . fromTuple $
-            ( chainId
+          return . Just . NamedTuple @"id" @"info" $
+            ( ChainId chainId
             , ChainInfo
                (UnsignedChainInfo
                  (T.pack chainInfoRefChainLabel)
@@ -109,7 +110,7 @@ getChainInfo chainId = do
                                 (fromInteger chainSignatureRefS)
                                 chainSignatureRefV
 
-getChainInfos :: HasSQLDB m => [Word256] -> m (NamedMap "id" Word256 "info" ChainInfo)
+getChainInfos :: HasSQLDB m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChainInfos chainIds = do
   cids <- case chainIds of
               [] -> do
@@ -118,7 +119,7 @@ getChainInfos chainIds = do
                           return cRef
                       case chains of
                           [] -> return []
-                          cs -> return $ map (chainInfoRefChainId . E.entityVal) cs
+                          cs -> return $ map (ChainId . chainInfoRefChainId . E.entityVal) cs
               cIds -> return cIds
   chainInfos <- mapM getChainInfo cids
   let cInfos = sequence $ filter isJust chainInfos
@@ -126,8 +127,8 @@ getChainInfos chainIds = do
       Nothing -> return []
       Just cis -> return cis
 
-putChainInfo :: HasSQLDB m => Word256 -> ChainInfo -> m (Key ChainInfoRef)
-putChainInfo chainId (ChainInfo UnsignedChainInfo{..} csig) = do
+putChainInfo :: HasSQLDB m => ChainId -> ChainInfo -> m (Key ChainInfoRef)
+putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} csig) = do
   sqlQuery $ do
     let chainInfoRef = ChainInfoRef chainId
                                     (T.unpack chainLabel)

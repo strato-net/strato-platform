@@ -9,7 +9,11 @@ import qualified Database.Esqueleto as E
 import           Database.Persist.Postgresql
 import           Servant
 
-data Sortby = ASC | DESC deriving (Show)
+data Sortby = ASC | DESC deriving (Eq, Ord, Show)
+
+instance ToHttpApiData Sortby where
+  toUrlPiece ASC = "asc"
+  toUrlPiece DESC = "desc"
 
 instance FromHttpApiData Sortby where
   parseQueryParam x =

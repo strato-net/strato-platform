@@ -5,6 +5,7 @@ module Blockchain.Data.ArbitraryInstances where
 import           Data.DeriveTH
 import           Data.Maybe                         (fromJust, isJust)
 import           Test.QuickCheck
+import           Test.QuickCheck.Instances.Text()
 
 import           Data.ByteString.Arbitrary
 import qualified Data.ByteString                    as B
@@ -15,6 +16,7 @@ import           System.IO.Unsafe                   (unsafePerformIO)
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
@@ -124,6 +126,12 @@ instance Arbitrary Transaction where
                   return . unsafePerformIO .
                       H.withSource H.devURandom $
                           createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId md prvKey
+
+instance Arbitrary RawTransaction where
+    arbitrary = txAndTime2RawTX <$> arbitrary
+                                <*> arbitrary
+                                <*> arbitrary
+                                <*> arbitrary
 
 instance Arbitrary Code where
   arbitrary = Code <$> arbitrary

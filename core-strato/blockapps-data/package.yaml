@@ -39,7 +39,6 @@ library:
   - esqueleto
   - ethereum-encryption
   - ethereum-rlp
-  - fast-ecrecover
   - filepath
   - format
   - http-api-data
@@ -53,6 +52,7 @@ library:
   - persistent
   - persistent-postgresql
   - persistent-template
+  - quickcheck-instances
   - resourcet
   - strato-conf
   - strato-model

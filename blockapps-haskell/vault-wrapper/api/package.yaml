@@ -27,12 +27,13 @@ library:
   dependencies:
   - aeson
   - aeson-casing
+  - base16-bytestring
   - blockapps-ethereum
   - bytestring
   - cryptonite
-  - haskoin-shim
   - lens
   - saltine
+  - secp256k1-haskell
   - servant
   - servant-server
   - strato-model
