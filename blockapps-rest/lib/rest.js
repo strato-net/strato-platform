@@ -109,19 +109,13 @@ import jwt from "jsonwebtoken";
  * @property {String} address: Contract address. Not required. Populated by uploading a contract to STRATO.
  */
 
-
-/**
- * @typedef {Object} UploadedContract This object describes the result of uploading one contract in a list of smart
- * contracts being uploaded to STRATO
- * @property {String} name Name of the smart contract
- * @property {String} chainId Chain identifier if the smart contract is being uploaded to a private chain.
- * This property is `null` for main chain smart contracts
- * @property {String} address: Contract address. Not required. Populated by uploading a contract to STRATO.
- * @property {module:rest~CodeHash} codeHash: Describes the codehash and the VM used to generate the code hash
- * @property {String} bin: The compiled Solidity byte code
- * @property {Object} xabi: An object defining the contract metadata
- */
-
+ /**
+  * @typedef {Object} SendArgs This object defines the shape of a request for transfer tokens
+  * @property {String} toAddress Address of the receiver
+  * @property {Number} value amount of tokens to transfer in wei
+  * @property {module:rest~TxParams} txParams: Optional. Defines gas limit and gas price for transaction execution
+  * @property {String} chainid: Optional chain id of the private chain if the transfer is being executed on a private chain
+  */
 
  /**
   * @typedef {Object} TxData This is the formatted output of a transaction execution
@@ -134,8 +128,8 @@ import jwt from "jsonwebtoken";
  * @typedef {Object} TxParams This object defines transaction specific options for STRATO.
  * There should be no need to change the defaults for most use cases.
  * @property {Number} gasLimit This is the upper limit for the amount of gas this transaction should consume.
- * Defaults to 32100000000 gwei
- * @property {Number} gasPrice This is the price of gas the user is willing to pay. Defaults to 1 gwei
+ * Defaults to 32100000000 wei
+ * @property {Number} gasPrice This is the price of gas the user is willing to pay. Defaults to 1 wei
  */
 
 /**
@@ -162,6 +156,18 @@ import jwt from "jsonwebtoken";
  * @property {String} hash Transaction hash
  * @property {module:rest~TxResult} txResult Result of the execution of the transaction
  * @property {module:rest~TxData} data Data returned by the execution of a STRATO transaction
+ */
+
+ /**
+ * @typedef {Object} UploadedContract This object describes the result of uploading one contract in a list of smart
+ * contracts being uploaded to STRATO
+ * @property {String} name Name of the smart contract
+ * @property {String} chainId Chain identifier if the smart contract is being uploaded to a private chain.
+ * This property is `null` for main chain smart contracts
+ * @property {String} address: Contract address. Not required. Populated by uploading a contract to STRATO.
+ * @property {module:rest~CodeHash} codeHash: Describes the codehash and the VM used to generate the code hash
+ * @property {String} bin: The compiled Solidity byte code
+ * @property {Object} xabi: An object defining the contract metadata
  */
 
 // =====================================================================
@@ -569,7 +575,7 @@ async function createContractListResolve(user, pendingTxResultList, options) {
 
 /**
  * @static
- * Returns the users' STRATO address.abs
+ * Returns the users' STRATO address
  * @example
  * 
  * // Initialize ba-rest oaut-utility
@@ -593,11 +599,56 @@ async function getKey(user, options) {
   return response.address;
 }
 
+
+/**
+ * @static
+ * Creates a public/private key pair on a STRATO node for the OAuth identity described the user argument. This throws an
+ * error if the key already exists
+ * @example
+ * 
+ * // Initialize ba-rest oaut-utility
+ * const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
+ *
+ * // Get token using client-credential flow
+ * const tokenResponse = await oauth.getAccessTokenByClientSecret();
+ *
+ * // Extract token from token response
+ * const oauthUser = { token: tokenResponse.token.access_token };
+ *
+ * const key = await rest.createKey(oauthUser, options);
+ * // Returns cdc7e277d9aecbce6aba5b9b16de815cadad3d2a
+ * 
+ * @param {module:rest~User} user This must contain the token for the user 
+ * @param {module:rest~Options} options This identifies the options and configurations for this call.
+ * @returns {String} The address corresponding to the key pair for this user
+ */
 async function createKey(user, options) {
   const response = await api.createKey(user, options);
   return response.address;
 }
 
+
+/**
+ * @static
+ * Creates a public/private key pair on a STRATO node for the OAuth identity described the user argument. 
+ * @example
+ * 
+ * // Initialize ba-rest oaut-utility
+ * const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
+ *
+ * // Get token using client-credential flow
+ * const tokenResponse = await oauth.getAccessTokenByClientSecret();
+ *
+ * // Extract token from token response
+ * const oauthUser = { token: tokenResponse.token.access_token };
+ *
+ * const key = await rest.createOrGetKey(oauthUser, options);
+ * // Returns cdc7e277d9aecbce6aba5b9b16de815cadad3d2a
+ * 
+ * @param {module:rest~User} user This must contain the token for the user 
+ * @param {module:rest~Options} options This identifies the options and configurations for this call.
+ * @returns {String} The address corresponding to the key pair for this user
+ */
 async function createOrGetKey(user, options) {
   try {
     const response = await api.getKey(user, options);
@@ -862,6 +913,46 @@ async function callListResolve(user, pendingTxResultList, options) {
 //   send
 // =====================================================================
 
+/**
+ * @static
+ * This function sends a token transfer transaction to STRATO
+ * @example
+ * 
+ * const sendArgs = {
+ *   toAddress: "cdc7e277d9aecbce6aba5b9b16de815cadad3d2b",
+ *   value: 100000000
+ * };
+ * 
+ * const result = await rest.send(stratoUser, sendArgs, options);
+ * // Returns
+ * // { hash:
+ * //  '168f76ccf50582953d2fc9cbdc3bb60bd777562662dd9a2330ef29edab282a5c',
+ * // gasLimit: 32100000000,
+ * // codeOrData: '',
+ * // chainId: null,
+ * // gasPrice: 1,
+ * // to: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2b',
+ * // value: '100000000',
+ * // from: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2a',
+ * // r:
+ * //  'a657713d295f159566fd1a8618cc12931e965b0f9a509a7125d2572fba73a3c1',
+ * // metadata: null,
+ * // s:
+ * //  'c46bf8706053e9809064bd8d0f89c6ac0c963bc4b274a31cf8922ff9db858fd',
+ * // v: '1b',
+ * // nonce: 19,
+ * // src: 'source removed.',
+ * // bin: 'bin removed.',
+ * // 'bin-runtime': 'bin-runtime removed.',
+ * // xabi: 'xabi removed.' }
+ * 
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~SendArgs} sendTx This describes the recipient, amount of tokens and the chain id (optional) for 
+ * the token transfer
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
 async function send(user, sendTx, options) {
   const [pendingTxResult] = await api.send(user, sendTx, options);
 
@@ -873,6 +964,46 @@ async function send(user, sendTx, options) {
   return resolvedResult.data.contents;
 }
 
+/**
+ * @static
+ * This function send multiple token transfer transactions to STRATO
+ * @example
+ * 
+ * const sendArgs = {
+ *   toAddress: "cdc7e277d9aecbce6aba5b9b16de815cadad3d2b",
+ *   value: 100000000
+ * };
+ * 
+ * const result = await rest.send(stratoUser, [sendArgs], options);
+ * // Returns
+ * // [{ hash:
+ * //  '168f76ccf50582953d2fc9cbdc3bb60bd777562662dd9a2330ef29edab282a5c',
+ * // gasLimit: 32100000000,
+ * // codeOrData: '',
+ * // chainId: null,
+ * // gasPrice: 1,
+ * // to: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2b',
+ * // value: '100000000',
+ * // from: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2a',
+ * // r:
+ * //  'a657713d295f159566fd1a8618cc12931e965b0f9a509a7125d2572fba73a3c1',
+ * // metadata: null,
+ * // s:
+ * //  'c46bf8706053e9809064bd8d0f89c6ac0c963bc4b274a31cf8922ff9db858fd',
+ * // v: '1b',
+ * // nonce: 19,
+ * // src: 'source removed.',
+ * // bin: 'bin removed.',
+ * // 'bin-runtime': 'bin-runtime removed.',
+ * // xabi: 'xabi removed.' }]
+ * 
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~SendArgs[]} sendTx This describes the recipient, amount of tokens and the chain id (optional) for 
+ * the token transfer
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
 async function sendMany(user, sendTxs, options) {
   const pendingTxResults = await api.sendTransactions(
     user,
