@@ -16,7 +16,8 @@ import           Control.Monad.Trans.Reader
 import qualified Data.ByteString.Lazy.Char8  as BLC
 import qualified Data.Text                   as T
 import           Database.Persist.Sql
-import           Servant
+import           Servant                     hiding (ServerError)
+import qualified Servant                     as SERVANT (ServerError)
 import           UnliftIO
 
 type SQLM = ReaderT SQLDB (LoggingT IO)
@@ -38,7 +39,7 @@ data ApiError
   | RuntimeError SomeException
   deriving (Show, Exception)
 
-apiErrorToServantErr :: ApiError -> ServantErr
+apiErrorToServantErr :: ApiError -> SERVANT.ServerError
 apiErrorToServantErr = \case
   NoFilterError str -> err400{ errBody = BLC.pack str }
   MissingParameterError str -> err400{ errBody = BLC.pack str }

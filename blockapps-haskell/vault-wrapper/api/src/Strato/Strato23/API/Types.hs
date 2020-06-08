@@ -10,7 +10,7 @@ module Strato.Strato23.API.Types
   ) where
 
 
-import           Control.Lens                 ((&), (?~), (.~))
+import           Control.Lens                 ((&), (?~))
 import           Crypto.Secp256k1
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -58,7 +58,7 @@ instance ToSchema AddressAndKey where
   declareNamedSchema _ = return $
     NamedSchema (Just "AddressAndKey")
       ( mempty
-        & type_ .~ SwaggerString
+        & type_ ?~ SwaggerString
         & example ?~ "address : 186aaf1491177570eab131275a678ded7cf8157f, pubkey : 04642f59c13697153aed4ebf469c31ede0b36551d7a253601a6cd1997dd53d0952e884aa07a71aecce9562b5954e62788990cd872eeff52477ff657933fadb51ea"
         & description ?~ "Ethereum address and public key")
 

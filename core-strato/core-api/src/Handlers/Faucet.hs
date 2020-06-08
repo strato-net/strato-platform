@@ -69,15 +69,7 @@ type API =
   "dataFaucet" :> QueryParam "size" Int
                :> QueryParam "count" Int
                :> Get '[JSON] [Keccak256]
-
-instance HasClient m api => HasClient m (MultipartForm tag a :> api) where
-  type Client m (MultipartForm tag a :> api) =
-    (LBS.ByteString, a) -> Client m api
-  clientWithRoute =
-    error "MultipartForm clientWithRoute: Unsupported version, please use >=servant-multipart-0.11.5"
-  hoistClientMonad pm _ f cl = \a ->
-      hoistClientMonad pm (Proxy @api) f (cl a)
-
+               
 postFaucetClient :: Address -> ClientM [Keccak256]
 postFaucetMultipartClient :: (LBS.ByteString, MultipartData Mem) -> ClientM [Keccak256]
 postDataFaucetClient :: Maybe Int -> Maybe Int -> ClientM [Keccak256]

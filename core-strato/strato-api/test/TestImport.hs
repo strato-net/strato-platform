@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS -fno-warn-orphans #-}
 module TestImport
     ( module TestImport
     , module XX

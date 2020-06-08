@@ -28,7 +28,7 @@ newtype HexStorage = HexStorage B.ByteString
                    deriving anyclass (NFData)
 
 instance ToParamSchema HexStorage where
-  toParamSchema _ =  mempty & type_ .~ SwaggerString
+  toParamSchema _ =  mempty & type_ ?~ SwaggerString
   
 word256ToHexStorage :: Word256 -> HexStorage
 word256ToHexStorage = HexStorage . word256ToBytes
