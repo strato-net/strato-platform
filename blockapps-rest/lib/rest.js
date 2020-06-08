@@ -66,6 +66,8 @@ import jwt from "jsonwebtoken";
  * when uploading smart contract source code
  * @property {String[]} noindex This allows us to specify contract names for which to skip relational
  * indexing when uploading smart contract source code
+ * @property {Boolean} isAsync If set, the call returns a transaction hash instead of waiting for a transaction
+ * confirmation. Default value is `false`.
  */
 
 /**
@@ -78,6 +80,26 @@ import jwt from "jsonwebtoken";
  * @property {Number} nonce: Account nonce
  */
 
+
+/**
+ * @typedef {Object} CallArgs This object defines a function call to a STRATO smart contract
+ * @property {module:rest~Contract} contract Defines the contract on which to call the method. Should contain `name` 
+ * and `address`.
+ * @property {String} method Name of the method to call
+ * @property {Object} args Arguments for the method call
+ * @property {Number} value: Optional. Number of tokens to send to the smart contract
+ * @property {String} chainid: Optional chain id of the private chain if the contract is being called on a private chain
+ * @property {module:rest~TxParams} txParams: Optional. Defines gas limit and gas price for transaction execution
+ */
+
+
+/**
+ * @typedef {Object} CodeHash This object defines the codeHash and the vm type in an uploaded contract object
+ * @property {String} kind This is the type of VM used. Is either `SolidVM` or `EVM`
+ * @property {String} digest This is the code hash
+ */
+
+
 /**
  * @typedef {Object} Contract This object defines a STRATO smart contract
  * @property {String} name Name of the smart contract
@@ -87,11 +109,6 @@ import jwt from "jsonwebtoken";
  * @property {String} address: Contract address. Not required. Populated by uploading a contract to STRATO.
  */
 
-/**
- * @typedef {Object} CodeHash This object defines the codeHash and the vm type in an uploaded contract object
- * @property {String} kind This is the type of VM used. Is either `SolidVM` or `EVM`
- * @property {String} digest This is the code hash
- */
 
 /**
  * @typedef {Object} UploadedContract This object describes the result of uploading one contract in a list of smart
@@ -103,6 +120,48 @@ import jwt from "jsonwebtoken";
  * @property {module:rest~CodeHash} codeHash: Describes the codehash and the VM used to generate the code hash
  * @property {String} bin: The compiled Solidity byte code
  * @property {Object} xabi: An object defining the contract metadata
+ */
+
+
+ /**
+  * @typedef {Object} TxData This is the formatted output of a transaction execution
+  * @property {String} Tag This identified the type of the transaction. Is one of `Call`, `Upload` or `Send`
+  * @property {Array|module:rest~UploadedContract} contents This is the formatted output of executing the transaction
+  */
+
+
+ /**
+ * @typedef {Object} TxParams This object defines transaction specific options for STRATO.
+ * There should be no need to change the defaults for most use cases.
+ * @property {Number} gasLimit This is the upper limit for the amount of gas this transaction should consume.
+ * Defaults to 32100000000 gwei
+ * @property {Number} gasPrice This is the price of gas the user is willing to pay. Defaults to 1 gwei
+ */
+
+/**
+ * @typedef {Object} TxResult The result of submitting a transaction to STRATO.
+ * @property {String} contractsDeleted Comma separated list of contract addresses that were deleted as a result of 
+ * executing this transaction
+ * @property {String} gasUsed Amount of gas used by this transaction in hexadecimal
+ * @property {String} stateDiff
+ * @property {String} time Amount of time the VM took to execute this tramsaction
+ * @property {String} kind Type of VM used to execute this transaction. `SolidVM` or `EVM`
+ * @property {String} chainid Chain id (present if transaction was executed on a private chain)
+ * @property {String} response Raw output of executing transaction
+ * @property {String} blockHash Block hash of the block in which this transaction was finalized
+ * @property {String} transactionHash Transaction hash
+ * @property {String} etherUsed Amount of ether used to execute this transaction (`gasUsed` * `gasPrice`)
+ * @property {String} contractsCreated Comma separated list of contract addresses created as a result of executing this
+ * transaction
+ */
+
+
+ /**
+ * @typedef {Object} TxResultWrapper The result of submitting a transaction to STRATO.
+ * @property {String} status Status of the transaction. One of `Pending`, `Success` or `Failure`.
+ * @property {String} hash Transaction hash
+ * @property {module:rest~TxResult} txResult Result of the execution of the transaction
+ * @property {module:rest~TxData} data Data returned by the execution of a STRATO transaction
  */
 
 // =====================================================================
@@ -141,10 +200,125 @@ function assertTxResultList(txResultList) {
   return txResultList;
 }
 
+/**
+ * @static
+ * This function is used to retrieve the results of an async transaction execution
+ * @example
+ * 
+ * const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
+ * const contractArgs = {
+ *   name: "SimpleStorage",
+ *   source: simpleStorageSrc,
+ *   args: {} // Any constructor args would go here. We dont have any.
+ * };
+ * const txResult = await rest.createContract(stratoUser, contractArgs, {
+ *   ...options,
+ *   isAsync: true
+ * });
+ * const result = await rest.resolveResult(stratoUser, txResult, options);
+ * // Returns
+ * // { status: 'Success',
+ * // hash:
+ * //  '3d25c575751bf4e9a502eef255dd5224f2b9585e339edc51fca02c33a45b177d',
+ * // txResult:
+ * //  { deletedStorage: '',
+ * //    contractsDeleted: '',
+ * //    gasUsed: '13955',
+ * //    stateDiff: '',
+ * //    time: 0.000694605,
+ * //    kind: 'EVM',
+ * //    chainId: null,
+ * //    response:
+ * //     '608060405260043...a6504300c1825957a56e0c10029',
+ * //    blockHash:
+ * //     '82bb60c456661c8e05caa36b227be8e717bf2b7c7ae0de30fcd7b295d731be9b',
+ * //    transactionHash:
+ * //     '3d25c575751bf4e9a502eef255dd5224f2b9585e339edc51fca02c33a45b177d',
+ * //    etherUsed: '13955',
+ * //    newStorage: '',
+ * //    message: 'Success!',
+ * //    trace: '',
+ * //    contractsCreated: 'bf68d882d8e95d94926379538ccab45932e26c03' },
+ * // data:
+ * //  { tag: 'Upload',
+ * //    contents:
+ * //     { bin: 'bin removed.',
+ * //       chainId: null,
+ * //       address: 'bf68d882d8e95d94926379538ccab45932e26c03',
+ * //       'bin-runtime': 'bin-runtime removed.',
+ * //       codeHash: [Object],
+ * //       name: 'SimpleStorage',
+ * //       src: 'source removed.',
+ * //       xabi: 'xabi removed.' },
+ * //    src: 'source removed.' } }
+ * 
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~TxResultWrapper} pendingTxResult The tx result to resolve. Must contain the transaction hash.
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper} 
+ */
 async function resolveResult(user, pendingTxResult, options) {
   return (await resolveResults(user, [pendingTxResult], options))[0];
 }
 
+
+/**
+ * @static
+ * This function is used to retrieve the results of multiple async transaction executions
+ * @example
+ * 
+ * const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
+ * const contractArgs = {
+ *   name: "SimpleStorage",
+ *   source: simpleStorageSrc,
+ *   args: {} // Any constructor args would go here. We dont have any.
+ * };
+ * const txResults = await rest.createContractList(stratoUser, [contractArgs], {
+ *   ...options,
+ *   isAsync: true
+ * });
+ * const results = await rest.resolveResults(stratoUser, txResults, options);
+ * // Returns
+ * // [{ status: 'Success',
+ * // hash:
+ * //  '3d25c575751bf4e9a502eef255dd5224f2b9585e339edc51fca02c33a45b177d',
+ * // txResult:
+ * //  { deletedStorage: '',
+ * //    contractsDeleted: '',
+ * //    gasUsed: '13955',
+ * //    stateDiff: '',
+ * //    time: 0.000694605,
+ * //    kind: 'EVM',
+ * //    chainId: null,
+ * //    response:
+ * //     '608060405260043...a6504300c1825957a56e0c10029',
+ * //    blockHash:
+ * //     '82bb60c456661c8e05caa36b227be8e717bf2b7c7ae0de30fcd7b295d731be9b',
+ * //    transactionHash:
+ * //     '3d25c575751bf4e9a502eef255dd5224f2b9585e339edc51fca02c33a45b177d',
+ * //    etherUsed: '13955',
+ * //    newStorage: '',
+ * //    message: 'Success!',
+ * //    trace: '',
+ * //    contractsCreated: 'bf68d882d8e95d94926379538ccab45932e26c03' },
+ * // data:
+ * //  { tag: 'Upload',
+ * //    contents:
+ * //     { bin: 'bin removed.',
+ * //       chainId: null,
+ * //       address: 'bf68d882d8e95d94926379538ccab45932e26c03',
+ * //       'bin-runtime': 'bin-runtime removed.',
+ * //       codeHash: [Object],
+ * //       name: 'SimpleStorage',
+ * //       src: 'source removed.',
+ * //       xabi: 'xabi removed.' },
+ * //    src: 'source removed.' } }]
+ * 
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~TxResultWrapper[]} pendingTxResults The tx results to resolve. Must contain the transaction hash.
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper[]} 
+ */
 async function resolveResults(user, pendingResults, _options = {}) {
   const options = Object.assign({ isAsync: true }, _options);
 
@@ -275,7 +449,13 @@ async function compileContracts(user, contracts, options) {
  * This function uploads a smart contract to STRATO
  * @example
  *
- * const result = await rest.createContractList(stratoUser, contracts, options);
+ * const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
+ * const contractArgs = {
+ *   name: "SimpleStorage",
+ *   source: simpleStorageSrc,
+ *   args: {} // Any constructor args would go here. We dont have any.
+ * };
+ * const result = await rest.createContract(stratoUser, contractArgs, options);
  * // returns
  * // { name: 'SimpleStorage',
  * //   address: '5043751be046762926fc563fefb33e62919bf8b7' }
@@ -283,7 +463,9 @@ async function compileContracts(user, contracts, options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract} contract This object describes the contract to upload
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~Contract} Returns a list of contracts with the `name` and `address` values populated
+ * @returns {module:rest~Contract|module:rest~TxResultWrapper} If `options.async` is set, it returns a transaction result 
+ * object with the transaction. Final result can be obtained by using the `resolveResult` call. If `options.async` is not 
+ * set (default), this call returns a contract with the `name` and `address` values populated
  */
 async function createContract(user, contracts, options) {
   const [pendingTxResult] = await api.createContract(user, contract, options);
@@ -317,21 +499,27 @@ async function createContractResolve(user, pendingTxResult, options) {
  * This function uploads a list of smart contracts to STRATO
  * @example
  *
- * const result = await rest.createContractList(stratoUser, [contract], options);
+ * const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
+ * const contractArgs = {
+ *   name: "SimpleStorage",
+ *   source: simpleStorageSrc,
+ *   args: {} // Any constructor args would go here. We dont have any.
+ * };
+ * const result = await rest.createContractList(stratoUser, [contractArgs], options);
  * // returns
  * // [{ bin:
- * //     '608060405234801561001057600080fd5b5060df8061001f6000396000f3006080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806360fe47b114604e5780636d4ce63c146078575b600080fd5b348015605957600080fd5b5060766004803603810190808035906020019092919050505060a0565b005b348015608357600080fd5b50608a60aa565b6040518082815260200191505060405180910390f35b8060008190555050565b600080549050905600a165627a7a72305820cc57e5c7247b87ff38ff587e3514e14fa087cc512a6504300c1825957a56e0c10029',
+ * //     '608060405234801561001057600080...6504300c1825957a56e0c10029',
  * //    chainId: null,
  * //    address: 'b728ad420aadd7082380e2024b935dd2898f6117',
  * //    'bin-runtime':
- * //     '6080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806360fe47b114604e5780636d4ce63c146078575b600080fd5b348015605957600080fd5b5060766004803603810190808035906020019092919050505060a0565b005b348015608357600080fd5b50608a60aa565b6040518082815260200191505060405180910390f35b8060008190555050565b600080549050905600a165627a7a72305820cc57e5c7247b87ff38ff587e3514e14fa087cc512a6504300c1825957a56e0c10029',
+ * //     '6080604052600436106049576000357...6504300c1825957a56e0c10029',
  * //    codeHash:
  * //     { kind: 'EVM',
  * //       digest:
  * //        '4552b102deb8f69bba4ca79847913c6878892787c0ff4592245452c00e324779' },
  * //    name: 'SimpleStorage',
  * //    src:
- * //     'contract SimpleStorage {\n    uint storedData;\n\n    function set(uint x) {\n        storedData = x;\n    }\n\n    function get() returns (uint) {\n        return storedData;\n    }\n}',
+ * //     'contract SimpleStorage {...}',
  * //    xabi:
  * //     { modifiers: {},
  * //       funcs: [Object],
@@ -345,7 +533,9 @@ async function createContractResolve(user, pendingTxResult, options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract[]} contracts This is a list of contracts to upload
  * @param {module:rest~Options} options This identifies the options and configurations for this call.
- * @returns {module:rest~UploadedContract[]} Returns a list of uploaded contracts with their addresses, byte code and code hashes
+ * @returns {module:rest~Contract[]|module:rest~TxResultWrapper[]} If `options.async` is set, it returns a list of 
+ * transaction result objects. Final results can be obtained by using the `resolveResults` call. If `options.async` is 
+ * not set (default), this call returns a list of contracts with the `name` and `address` values populated
  */
 async function createContractList(user, contracts, options) {
   const pendingTxResult = await api.createContractList(user, contract, options);
@@ -377,6 +567,27 @@ async function createContractListResolve(user, pendingTxResultList, options) {
 //   key
 // =====================================================================
 
+/**
+ * @static
+ * Returns the users' STRATO address.abs
+ * @example
+ * 
+ * // Initialize ba-rest oaut-utility
+ * const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
+ *
+ * // Get token using client-credential flow
+ * const tokenResponse = await oauth.getAccessTokenByClientSecret();
+ *
+ * // Extract token from token response
+ * const oauthUser = { token: tokenResponse.token.access_token };
+ *
+ * const key = await rest.getKey(oauthUser, options);
+ * // Returns cdc7e277d9aecbce6aba5b9b16de815cadad3d2a
+ * 
+ * @param {module:rest~User} user This must contain the token for the user 
+ * @param {module:rest~Options} options This identifies the options and configurations for this call.
+ * @returns {String}  
+ */
 async function getKey(user, options) {
   const response = await api.getKey(user, options);
   return response.address;
@@ -416,6 +627,25 @@ async function getBlocResults(user, hashes, options) {
  * This call gets the state of a STRATO smart contract
  * @example
  *
+ * // Consider the following contract
+ * // contract SimpleStorage {
+ * //   uint storedData;
+ * //
+ * //   function set(uint x) {
+ * //       storedData = x;
+ * //   }
+ * //
+ * //   function get() returns (uint) {
+ * //       return storedData;
+ * //   }
+ * // }
+ *
+ * const contractArgs = {
+ *   name: "SimpleStorage",
+ *   source: arraySrc,
+ *   args: {} // Any constructor args would go here. We dont have any.
+ * };
+ * const contract = await rest.createContract(stratoUser, contractArgs, options);
  * const state = await rest.getState(stratoUser, contract, options);
  * // returns
  * // { get: 'function () returns (uint)',
@@ -435,11 +665,37 @@ async function getState(user, contract, options) {
 /**
  * @static
  * This call is used to query the state of an array in a STRATO smart contract
+ * @example
+ *
+ * // Consider the following contract
+ * // contract DocArray {
+ * //   uint256[] arr;
+ * //
+ * //   constructor() public {
+ * //       arr = new uint256[](10);
+ * //       for (uint256 i = 0; i < 10; i++) {
+ * //           arr[i] = i + 1;
+ * //       }
+ * //   }
+ * // }
+ *
+ * const contractArgs = {
+ *   name: "DocArray",
+ *   source: arraySrc,
+ *   args: {} // Any constructor args would go here. We dont have any.
+ * };
+ *
+ * const contract = await rest.createContract(stratoUser, contractArgs, options);
+ *
+ * const array_state = await rest.getArray(stratoUser, contract, "arr", options);
+ * // returns [ '1', '2', '3', '4', '5', '6', '7', '8', '9', '10' ]
+ *
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract} contract This object describes the contract to fetch state for. Minimally
  * contains the address and the name of the contract
  * @param {String} name This is the name of the array variable in the smart contract
  * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {Array} Returns an array of values corresponding to the onchain state of the array variable named in the call
  */
 async function getArray(user, contract, name, options) {
   const MAX_SEGMENT_SIZE = 100;
@@ -463,6 +719,50 @@ async function getArray(user, contract, name, options) {
 //   call
 // =====================================================================
 
+/**
+ * @static
+ * This call is used to execute a function in a smart contract
+ * @example
+ *
+ * // Consider the following contract
+ * // contract SimpleStorage {
+ * //   uint storedData;
+ * //
+ * //   function set(uint x) {
+ * //       storedData = x;
+ * //   }
+ * //
+ * //   function get() returns (uint) {
+ * //       return storedData;
+ * //   }
+ * // }
+ *
+ * const contractArgs = {
+ *   name: "SimpleStorage",
+ *   source: arraySrc,
+ *   args: {} // Any constructor args would go here. We dont have any.
+ * };
+ * const contract = await rest.createContract(stratoUser, contractArgs, options);
+ *
+ * const callArgs = {
+ *   contract,
+ *   method: "get",
+ *   args: {}
+ * };
+ *
+ * const callResult = await rest.call(stratoUser, callArgs, options);
+ *
+ * console.log(callResult);
+ * // returns ['0' ...]
+ *
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~CallArgs} callArgs This defines the method and the method arguments
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {Array|module:rest~TxResultWrapper} If `options.isAsync` is set, this returns
+ * a transaction result object that contains the transaction hash. You can use `resolveResult` or `resolveResults` 
+ * call to get the final results. If the `options.isAsync` is not set (default), it returns the result of the call as an
+ * array.
+ */
 async function call(user, callArgs, options) {
   const [pendingTxResult] = await api.call(user, callArgs, options);
   return callResolve(user, pendingTxResult, options);
@@ -486,7 +786,52 @@ async function callResolve(user, pendingTxResult, options) {
 // =====================================================================
 //   call list
 // =====================================================================
-
+/**
+ * @static
+ * This call is used to request the execution of a list of function calls simultaneously.
+ * Useful when requesting batch executions against various different contracts.
+ * @example
+ *
+ * // Consider the following contract
+ * // contract SimpleStorage {
+ * //   uint storedData;
+ * //
+ * //   function set(uint x) {
+ * //       storedData = x;
+ * //   }
+ * //
+ * //   function get() returns (uint) {
+ * //       return storedData;
+ * //   }
+ * // }
+ *
+ * const contractArgs = {
+ *   name: "SimpleStorage",
+ *   source: arraySrc,
+ *   args: {} // Any constructor args would go here. We dont have any.
+ * };
+ * const contract = await rest.createContract(stratoUser, contractArgs, options);
+ *
+ * const callArgs = {
+ *   contract,
+ *   method: "get",
+ *   args: {}
+ * };
+ *
+ * const callResult = await rest.callList(stratoUser, [callArgs], options);
+ *
+ * console.log(callResult);
+ * // returns [ ['0' ...] ]
+ *
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~CallArgs[]} callListArgs A list of function calls
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {Array[]|module:rest~TxResultWrapper[]} If `options.isAsync` is set, this returns
+ * a list of transaction result objects that each contain the transaction hash. You can use `resolveResult` 
+ * or `resolveResults` call to get the final results. If the `options.isAsync` is not set (default), it returns the 
+ * results of transaction execution as a 2 dimensional array.
+ */
+ */
 async function callList(user, callListArgs, options) {
   const pendingTxResultList = await api.callList(user, callListArgs, options);
   return callListResolve(user, pendingTxResultList, options);
