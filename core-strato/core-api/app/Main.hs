@@ -110,7 +110,7 @@ enterCoreServer pool x = Handler $ do
   y <- liftIO . try . runSQLM pool $ x `catch` handleRuntimeError `catch` handleApiError
   case y of
     Right a -> pure a
-    Left e -> throwE e
+    Left e -> throwE $ apiErrorToServantErr e
 
 hoistCoreServer :: ConnectionPool -> Server CoreAPI
 hoistCoreServer pool = hoistServer (Proxy :: Proxy CoreAPI) (enterCoreServer pool) coreServer
