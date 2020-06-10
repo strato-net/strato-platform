@@ -60,6 +60,22 @@ async function resolveResults(user, pendingResults, _options = {}) {
 }
 
 // =====================================================================
+//   account details
+// =====================================================================
+
+async function getAccounts(user, options) {
+  try {
+    return await api.getAccounts(user, options);
+  } catch(err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText,
+      err.response.data
+    );
+  }
+}
+
+// =====================================================================
 //   user
 // =====================================================================
 
@@ -132,15 +148,15 @@ async function createContractResolve(user, pendingTxResult, options) {
 // =====================================================================
 
 async function createContractList(user, contract, options) {
-  const [pendingTxResult] = await api.createContractList(
+  const pendingTxResult = await api.createContractList(
     user,
     contract,
     options
   );
-  return createContractListResolve(pendingTxResult, options);
+  return createContractListResolve(user, pendingTxResult, options);
 }
 
-async function createContractListResolve(pendingTxResultList, options) {
+async function createContractListResolve(user, pendingTxResultList, options) {
   // throw if FAILURE
   assertTxResultList(pendingTxResultList); // @samrit what if 1 result failed ?
   // async - do not resolve
@@ -472,6 +488,7 @@ async function waitForAddress(user, contract, _options) {
 }
 
 export default {
+  getAccounts,
   getUsers,
   getUser,
   createUser,

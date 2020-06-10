@@ -10,21 +10,21 @@ github:              blockapps/strato-platform/core-strato/strato-conf
 library:
   source-dirs:      src
   dependencies:
-    - base >= 4.7 && < 5
+    - base
     - bytestring
     - directory
     - filepath
     - hflags
     - network
-    - hostname
     - yaml
     - postgresql-simple
     - containers
-    - blockapps-milena
     - ethereum-encryption
     - file-embed
     - crypto-random
     - crypto-pubkey
+    - milena
     - mtl
     - transformers
     - hedis
+    - swagger2

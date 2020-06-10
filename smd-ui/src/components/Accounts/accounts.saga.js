@@ -61,7 +61,7 @@ export function getAccountsApi() {
 
 export function getUserAddressesApi(username) {
   const options = { params: { user: username } };
-  const url = env.BLOC_URL + createUrl("/users/:user", options);
+  const url = env.BLOC_URL + createUrl("/users/::user", options);
 
   return fetch(
     url,
@@ -107,7 +107,7 @@ export function getAccountDetailApi(address, chainid) {
 
 export function postFaucet(username, address) {
   const options = { params: { user: username, address }, query: { resolve: true } };
-  const url = env.BLOC_URL + createUrl("/users/:user/:address/fill", options);
+  const url = env.BLOC_URL + createUrl("/users/::user/::address/fill", options);
 
   return fetch(
     url,

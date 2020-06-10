@@ -15,7 +15,7 @@ import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia             as MP
 import           Blockchain.Database.MerklePatricia.InternalMem
 import           Blockchain.Database.MerklePatriciaMem
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 
 import           Data.Functor.Identity
@@ -40,11 +40,11 @@ transactionsVerificationValue theList = runIdentity $ do
     mp <- addAllKVsMem blank $ zip [0..] $ theList
     return (mpStateRoot mp)
 
-ommersVerificationValue::[BlockData]->SHA
+ommersVerificationValue::[BlockData]->Keccak256
 ommersVerificationValue = listToRLPVerificationValue
 
 receiptsVerificationValue::()->MP.StateRoot
 receiptsVerificationValue _ = MP.emptyTriePtr
 
-listToRLPVerificationValue :: (RLPSerializable a) => [a] -> SHA
+listToRLPVerificationValue :: (RLPSerializable a) => [a] -> Keccak256
 listToRLPVerificationValue = hash ∘ rlpSerialize ∘ RLPArray ∘ map rlpEncode

@@ -1,6 +1,7 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
@@ -8,12 +9,12 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.SolidVM
-    (
-      call
-    , create
-    ) where
+  ( SolidVMBase
+  , call
+  , create
+  ) where
 
-import           Control.Lens hiding (assign, from, to)
+import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
@@ -24,7 +25,6 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
-import           Data.IORef
 import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
@@ -32,6 +32,7 @@ import           Data.Maybe
 import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import qualified Data.Text                            as T
+import qualified Data.Text.Encoding                   as TE
 --import qualified Data.List                            as List
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
@@ -46,6 +47,7 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
+import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
@@ -53,14 +55,13 @@ import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Metrics
-import           Blockchain.SolidVM.Model
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
-import           Blockchain.SHA
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
@@ -77,14 +78,18 @@ import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
+import           UnliftIO                             hiding (assert)
+
 import           CodeCollection
 
+type SolidVMBase m = VMBase m
 
 onTraced :: Monad m => m () -> m ()
 onTraced = when flags_svmTrace
 
 
-create :: Bool
+create :: SolidVMBase m
+       => Bool
        -> Bool
        -> S.Set Address
        -> BlockData
@@ -96,10 +101,10 @@ create :: Bool
        -> Gas
        -> Address
        -> Code
-       -> SHA
+       -> Keccak256
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
-       -> ContextM ExecResults
+       -> m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash' chainId' metadata = do
@@ -124,7 +129,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash
     (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' newAddress hsh cc contractName' args
 
-create' :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
+create' :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
 create' creator newAddress ch cc contractName' argExps = do
   initializeAction newAddress contractName' ch
 
@@ -181,7 +186,8 @@ initializeStorage root value = do
      x -> setVar root x
 -}
 
-call :: Bool
+call :: SolidVMBase m
+     => Bool
      -> Bool
      -> Bool
      -> S.Set Address
@@ -195,10 +201,10 @@ call :: Bool
      -> B.ByteString
      -> Gas
      -> Address
-     -> SHA
+     -> Keccak256
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
-     -> ContextM ExecResults
+     -> m ExecResults
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
@@ -242,7 +248,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       }
 
 
-getCodeAndCollection :: MonadSM m => Address -> m (Contract, SHA, CodeCollection)
+getCodeAndCollection :: MonadSM m => Address -> m (Contract, Keccak256, CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
@@ -259,13 +265,13 @@ getCodeAndCollection address' = do
     return (c', hsh, cc')
     else do
     codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
-    
+
     (contractName', ch, cc) <-
       case codeHash of
         SolidVMCode cn ch' -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')
-        ch -> internalError "SolidVM for non-solidvm code" ch
+        ch -> internalError "SolidVM for non-solidvm code" (format ch)
 
 
     let contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
@@ -279,11 +285,11 @@ logFunctionCall args address contract functionName f = do
       case args of
         OrderedVals argList -> fmap (intercalate ", ") $ forM argList showSM
         NamedVals argMap ->
-          fmap (intercalate ", ") $ 
+          fmap (intercalate ", ") $
           forM argMap $ \(n, v) -> do
             valString <- showSM v
             return $ n ++ ": " ++ valString
-        
+
     let shownFunc = functionName ++ "(" ++ argStrings ++ ")"
     liftIO $ putStrLn $ box $ concat $ map (wrap 150)
       ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ shownFunc]
@@ -831,8 +837,9 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
         ty <- getValueType apt
         case ty of
           TString -> do
-            SString s <- return val
-            return . Constant . SInteger . fromIntegral $ length s
+            let getInnerString (SString s) = s
+                getInnerString _ = error "impossible match in SolidVM.hs"
+            return . Constant . SInteger . fromIntegral $ length $ getInnerString val
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
@@ -896,7 +903,11 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
 expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
 expToVar' (Xabi.Binary "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
 expToVar' (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
-expToVar' (Xabi.Binary "/" expr1 expr2) = expToVarInteger expr1 div expr2 SInteger
+expToVar' ex@(Xabi.Binary "/" expr1 expr2) = do 
+  rhs <- getInt =<< expToVar expr2
+  case rhs of
+    0 -> divideByZero $ unparseExpression ex
+    _ -> expToVarInteger expr1 div expr2 SInteger
 expToVar' (Xabi.Binary "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
 expToVar' (Xabi.Binary "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (Xabi.Binary "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
@@ -1180,7 +1191,7 @@ callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
 callBuiltin "keccak256" [SString buf] Nothing = do
-  return . SString . BC.unpack . keccak256 . BC.pack $ buf
+  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ buf
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing
@@ -1230,7 +1241,7 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: MonadSM m => Address -> Address -> SHA -> CodeCollection -> String -> Xabi.ArgList -> m ()
+runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
   let contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
@@ -1337,7 +1348,7 @@ runTheCall :: MonadSM m
            => Address
            -> Contract
            -> String
-           -> SHA
+           -> Keccak256
            -> CodeCollection
            -> Xabi.Func
            -> ValList
@@ -1411,10 +1422,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
 
 
 
-
-
-
-
 logAssigningVariable :: MonadSM m => Value -> m ()
 logAssigningVariable v = do
   valueString <- showSM v
@@ -1425,18 +1432,63 @@ logVals val1 val2 = onTraced . liftIO $ printf
   "            %%%% val1 = %s\n\
   \            %%%% val2 = %s\n" (show val1) (show val2)
 
---TODO- It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
+--TODO: It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
 encodeForReturn :: MonadSM m => Value -> m ByteString
+
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
 encodeForReturn (SEnumVal _ _ v) = return . word256ToBytes . fromIntegral $ v
 encodeForReturn (SAddress a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
-encodeForReturn (SString s) =
-  -- TODO: Wings expects all return values as bytes32 and never string.
-  -- This will have to be changed when wings drops bytes32 usage, or to support
-  -- string returning applications as well.
-  return $ stringBytes `B.append` B.replicate (32 - B.length stringBytes) 0
-  where stringBytes = BC.pack s
-encodeForReturn (STuple items) = B.concat <$> forM (V.toList items) (encodeForReturn <=< getVar)
-encodeForReturn x = todo "encodeForReturn type case" x
+
+-- if it's just a single string, harcode offset as 32 and append strLen + str
+encodeForReturn (SString s) = do
+  let offset = word256ToBytes $ fromIntegral (32 :: Int)
+      encodedLength = word256ToBytes $ fromIntegral (B.length stringBytes)
+      retStr = offset `B.append` (encodedLength `B.append` stringBytes)
+  return retStr 
+  where stringBytes = TE.encodeUtf8 $ T.pack s
+
+
+-- in the case of tuples, we need to follow the EVM/Solidity encoding convention:
+--   1) starting at the first value to encode, check if it is fixed length type (32), or
+--      dynamic (right now, this group is only strings since we don't return arrays). 
+--   2) if a fixed type, encode it directly into the next 32 characters in the bytestring
+--   3) if dynamic:
+--      a) encode an offset value into the next 32 characters.
+--      b) at that offset, put the encoded string's length in the first 32 characters, 
+--         followed by the encoded string
+--   4) repeat for the remaining values
+--   
+--   The headers of the bytestring are the initial (tuple_length * 32) characters.
+--   They are either encoded simple values, or offsets. If some are offsets (to
+--   encoded strings), then they point to characters beyond the (tuple_length * 32)
+--   In other words, the final bytestring is headers `B.append` encodedStrings
+--  
+--
+--   As an example, return type (string, uint, string) would have the following encoding:
+--                                                                            
+--                                       (offsetStr1)            (offsetStr2)
+--   |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
+--   |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
+
+encodeForReturn (STuple items) = do
+  (headers, strings) <- foldM buildEncoding (B.empty, B.empty) =<< mapM getVar (V.toList items)
+  return $ headers `B.append` strings
+  where
+    headerLen = (V.length items) * 32
+    buildEncoding :: MonadSM m => (ByteString, ByteString) -> Value -> m (ByteString, ByteString)
+    buildEncoding (headers, strings) val = case val of
+      SString s -> do
+        let offset = word256ToBytes $ fromIntegral (headerLen + (B.length strings))
+            encStr = TE.encodeUtf8 $ T.pack s
+            encStrLen = word256ToBytes $ fromIntegral (B.length encStr)
+            strBS =  encStrLen `B.append` encStr
+        return (headers `B.append` offset, strings `B.append` strBS)
+      tup@(STuple _) -> todo "encoding nested tuples as return values" tup 
+      v -> do 
+        bs <- encodeForReturn v
+        return (headers `B.append` bs, strings)
+
+encodeForReturn x = todo "can't encode this return type" x
+

@@ -44,8 +44,8 @@ import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..), NodeData)
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
-import           Blockchain.SHA                     hiding (hash)
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Keccak256        hiding (hash)
 import qualified Blockchain.Verification            as V
 
 import           Executable.EVMFlags                (flags_maxTxsPerBlock)
@@ -66,7 +66,7 @@ class ( Monad m
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
-    txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
+    txsDroppedCallback :: [TxRejection] -> [Keccak256] -> m () -- called when a Tx is dropped from/rejected by the pool
 
     -- Would it make more sense to expand the MiningCache than to introduce a separate cache?
     cacheRunResults :: DD.BlockData -> (StateRoot, Integer, [TxRunResult]) -> m ()
@@ -74,7 +74,7 @@ class ( Monad m
     {-# MINIMAL isBlockstanbul, getBaggerState, peekPendingVote, clearPendingVote, putBaggerState,
         runFromStateRoot, rewardCoinbases, txsDroppedCallback, cacheRunResults, getCachedRunResults #-}
 
-    getCheckpointableState :: m (SHA, DD.BlockData)
+    getCheckpointableState :: m (Keccak256, DD.BlockData)
     getCheckpointableState = do
         state <- getBaggerState
         let miningCache = B.miningCache state
@@ -101,7 +101,7 @@ class ( Monad m
         promoteExecutables
         setStateDBStateRoot existingStateDbStateRoot
 
-    processNewBestBlock :: SHA -> DD.BlockData -> [SHA] -> m ()
+    processNewBestBlock :: Keccak256 -> DD.BlockData -> [Keccak256] -> m ()
     processNewBestBlock bh bd txShas = do
         $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
         existingStateDbStateRoot <- Mod.get (Proxy @StateRoot)
@@ -431,7 +431,7 @@ ourCoinbase :: Address
 ourCoinbase = fromInteger . fst . head . readHex . Conf.coinbaseAddress . Conf.quarryConfig $ Conf.ethConf
 
 buildNextBlockHeader :: DD.BlockData
-                     -> SHA
+                     -> Keccak256
                      -> [DD.BlockData]
                      -> StateRoot
                      -> [OutputTx]
@@ -459,7 +459,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataGasUsed          = 0
                         , DD.blockDataTimestamp        = time
                         , DD.blockDataExtraData        = txsLen2ExtraData (length txs)
-                        , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else SHA 0x0
+                        , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else unsafeCreateKeccak256FromWord256 0x0
                         , DD.blockDataNonce            = nonce
                         }
 

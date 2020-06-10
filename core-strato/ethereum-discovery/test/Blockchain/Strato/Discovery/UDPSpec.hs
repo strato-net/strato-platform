@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Blockchain.Strato.Discovery.UDPSpec where
 
 import           Data.Bits

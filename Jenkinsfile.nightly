@@ -59,26 +59,26 @@ pipeline {
             ./strato -m 1 --single
             docker ps
             # Few quick tests
-            check_bloc() {
+            check_availability() {
               counter=0
-              until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
+              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
               do
                 if [[ "$counter" -gt 120 ]]; then
-                  echo "bloc took longer than 2 minutes to initialize! aborting."
+                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
                   exit 73
                 fi
-                echo "waiting for bloc to be available through nginx"
+                echo "waiting for STRATO health endpoint to be available through nginx"
                 counter=$((counter+1))
                 sleep 1
               done
-              echo "bloc is available through nginx - node is running"
+              echo "STRATO health endpoint is available through nginx - node is running"
             }
-            check_bloc
+            check_availability
             echo "Restarting docker containers to simulate computer restart..."
             docker-compose -p strato --log-level ERROR stop
             docker-compose -p strato --log-level ERROR start
             PASSWORD=${PASSWORD} ./strato --set-password
-            check_bloc
+            check_availability
           '''
         }
       }
@@ -125,11 +125,11 @@ pipeline {
                 rm -rf track-and-trace
                 git clone https://github.com/blockapps/track-and-trace.git
                 cd track-and-trace
-                git checkout oauth42style
+                git checkout oauth42style-test-fix
                 git submodule update --init --recursive
                 cd server
                 sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
-                # oauth42style uses the old hardcoded ba-rest version
+                # oauth42style-test-fix uses the old hardcoded ba-rest version
                 touch .env
                 yarn build
                 yarn install
@@ -195,7 +195,22 @@ pipeline {
             dir ('strato-worktree/core-strato/strato-init') {
               sh './check_genesis_ingestion.sh'
             }
-          }
+          },
+
+          'STRATO API Tests': {
+            withCredentials([
+               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+            ]) {
+                sh '''#!/bin/bash -le
+                  set -x
+                  rm -rf strato-api-tests
+                  git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                  cd strato-api-tests
+                  docker build --tag strato-api-tests .
+                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=false -e DEBUG_LOG=false strato-api-tests
+                '''
+              }
+          },
         )
       }
     }
@@ -235,7 +250,7 @@ pipeline {
             # Few quick tests
             check_availability() {
               counter=0
-              until curl --silent --output /dev/null --fail --location ${NODE_HOST}/health
+              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
               do
                 if [[ "$counter" -gt 120 ]]; then
                   echo "STRATO node took longer than 2 minutes to initialize! aborting."
@@ -284,9 +299,8 @@ pipeline {
                 set -x
                 rm -rf track-and-trace
                 git clone https://github.com/blockapps/track-and-trace.git
-                cd track-and-trace
-                git submodule update --init --recursive
-                cd server
+                cd track-and-trace/server
+                git checkout test-fix
                 sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
                 # symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
                 cp -r ../../strato-worktree/blockapps-rest blockapps-rest
@@ -314,6 +328,28 @@ pipeline {
               cd strato-worktree/smd-ui
               docker build -f Dockerfile.test .
             '''
+          },
+
+          'STRATO API Tests': {
+            withCredentials([
+              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+            ]) {
+
+              sh '''#!/bin/bash -le
+                set -x
+                # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
+                rm -rf strato-api-tests
+                git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                cd strato-api-tests
+                docker build --tag strato-api-tests .
+                docker run -e OAUTH_CLIENT_ID=all-test-ci-blockapps-net-infinite \
+                -e OAUTH_CLIENT_SECRET=a7f199dc-9f50-45fc-9f50-13b40727ba31 \
+                -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration \
+                -e STRATO_NODE_URL=http://172.17.0.1:80 \
+                -e OAUTH_ENABLED=true \
+                -e DEBUG_LOG=false strato-api-tests
+                '''
+            }
           },
         )
       }

@@ -1,24 +1,27 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImplicitParams             #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 module BlockApps.Bloc22.Monad where
 
 
-import           Control.Exception.Lifted           hiding (Handler, handle)
-import           Control.Monad.Base
-import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Except
 import qualified Data.Aeson                         as JSON
 import qualified Data.ByteString.Lazy.Char8         as Lazy.Char8
+import           Data.Cache
 import           Data.Foldable
 import qualified Data.HashMap.Lazy                  as HashMap
+import           Data.Int                           (Int32)
+import           Data.Map.Strict                    (Map)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Pool (Pool, withResource)
 import           Data.Profunctor.Product.Default
@@ -34,48 +37,33 @@ import           Servant
 import           Servant.Client
 import           Text.Printf
 
+import           UnliftIO                           hiding (Handler(..))
+
+import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Logging
+import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Nonce
 
-newtype Bloc x = Bloc
-  { runBloc ::
-      ReaderT BlocEnv -- global immutable environment variable
-        ( LoggingT
-          ( ExceptT BlocError IO ) -- throw and catch errors
-        ) x
-  } deriving newtype
-  ( Functor
-  , Applicative
-  , Monad
-  , MonadIO
-  , MonadBase IO
-  , MonadReader BlocEnv
-  , MonadLogger
-  )
+data Should a = Don't a | Do a
+data Compile = Compile
+data CacheNonce = CacheNonce
 
+type Bloc = ReaderT BlocEnv (LoggingT IO)
 
-instance MonadError BlocError Bloc where
-  throwError err@(RuntimeError _) = do
-    $logErrorS "throwError/RuntimeError" . Text.pack $
-      formatError err ++ "\n  callstack missing for runtime errors"
-    Bloc $ throwError err
-  throwError err = do
-    $logErrorS "throwError" . Text.pack $ formatError err
-    Bloc $ throwError err
-  catchError m handle =
-    Bloc $ catchError (runBloc m) (runBloc . handle)
+dbErrorToUserError :: MonadUnliftIO m => m a -> m a
+dbErrorToUserError = flip catch $ \case
+                       DBError msg -> throwIO (UserError msg)
+                       err         -> throwIO err
 
-dbErrorToUserError :: MonadError BlocError m => m a -> m a
-dbErrorToUserError = flip catchError $ \case
-                       DBError msg -> throwError (UserError msg)
-                       err         -> throwError err
-
-toUserError :: MonadError BlocError m => Text -> m a -> m a
-toUserError msg = flip catchError (\_ -> throwError $ UserError msg)
+toUserError :: MonadUnliftIO m => Text -> m a -> m a
+toUserError msg = flip catch (\(_ :: SomeException) -> throwIO $ UserError msg)
 
 -- I am not sure if the logs should just print out the raw errors, or if we should pretty them up a bit.  I'll add this function for now, we can toy with it both ways.
 
 formatError::BlocError->String
-formatError (StratoError (FailureResponse Response{responseBody=e})) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
+formatError (StratoError (FailureResponse _ Response{responseBody=e})) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
 formatError e = show e
 
 
@@ -87,34 +75,30 @@ prettyCallStack' cs =
     formatCSLine (funcName, SrcLoc{..}) =
       "  " ++ funcName ++ ", called at " ++ srcLocModule ++ ":" ++ show srcLocStartLine ++ ":" ++ show srcLocStartCol
 
-blocError::HasCallStack=>BlocError->Bloc y
+blocError :: HasCallStack => BlocError -> Bloc y
 blocError err = do
     logErrorCS callStack . Text.pack $
       printf "err: %s\nCallstack:%s" (show err) (prettyCallStack callStack)
-    Bloc $ throwError err
-
-
-
-instance MonadBaseControl IO Bloc where
-  type StM Bloc x = Either BlocError x
-  liftBaseWith f = Bloc $ liftBaseWith $ \q -> f (q . runBloc)
-  restoreM = Bloc . restoreM
+    throwIO err
 
 data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
 
 data BlocEnv = BlocEnv
-  { urlStrato       :: BaseUrl
-  , urlVaultWrapper :: BaseUrl
-  , httpManager     :: Manager
-  , dbPool          :: Pool Connection
-  , deployMode      :: DeployMode
-  , stateFetchLimit :: Integer
+  { urlStrato          :: BaseUrl
+  , urlVaultWrapper    :: BaseUrl
+  , httpManager        :: Manager
+  , dbPool             :: Pool Connection
+  , deployMode         :: DeployMode
+  , stateFetchLimit    :: Integer
+  , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
+  , globalSourceCache  :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
+  , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
 
 data BlocError
-  = StratoError ServantError
-  | CirrusError ServantError
-  | VaultWrapperError ServantError
+  = StratoError ClientError
+  | CirrusError ServerError
+  | VaultWrapperError ClientError
   | DBError Text
   | UserError Text
   | CouldNotFind Text
@@ -124,35 +108,43 @@ data BlocError
   | RuntimeError SomeException
   | UnavailableError Text
   | InternalError Text
-  deriving Show
+  deriving (Show, Exception)
 
 --------------------------------------------------------------------------------
 
-runBlocWithEnv :: BlocEnv -> Bloc a -> ExceptT BlocError IO a
+runBlocWithEnv :: BlocEnv -> Bloc a -> IO a
 runBlocWithEnv env = runLoggingT
                    . flip runReaderT env
-                   . runBloc
 
 runBlocToIO :: BlocEnv -> Bloc a -> IO (Either BlocError a)
-runBlocToIO env = runExceptT . runBlocWithEnv env
+runBlocToIO env = try . runBlocWithEnv env
+
+handleRuntimeError :: SomeException -> Bloc a
+handleRuntimeError (e :: SomeException) = case fromException e of
+  Just (_ :: BlocError) -> throwIO e
+  Nothing -> throwIO $ RuntimeError e
+
+handleBlocError :: BlocError -> Bloc a
+handleBlocError = \case
+  e@(RuntimeError _) -> do
+    $logErrorS "handleBlocError/RuntimeError" . Text.pack $
+      formatError e ++ "\n  callstack missing for runtime errors"
+    throwIO e
+  e -> do
+    $logErrorS "handleBlocError" . Text.pack $ formatError e
+    throwIO e
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x
-enterBloc env x
-  = Handler
-  . withExceptT reThrowError
-  . runBlocWithEnv env
-  $ convertRuntimeErrors x
+enterBloc env x = Handler $ do
+  eRes <- liftIO . runBlocToIO env $ x `catch` handleRuntimeError `catch` handleBlocError
+  case eRes of
+    Right a -> return a
+    Left e -> throwE $ reThrowError e
   where
-    convertRuntimeErrors::Bloc x->Bloc x
-    convertRuntimeErrors f = do
-      val <- try f
-      case val of
-       Left e  -> throwError $ RuntimeError e
-       Right v -> return v
-    reThrowError :: BlocError -> ServantErr
+    reThrowError :: BlocError -> ServerError
     reThrowError
       = \case
-          StratoError (FailureResponse Response{..}) 
+          StratoError (FailureResponse _ Response{..}) 
             | responseStatusCode == status404 ->
                 err404{errBody = JSON.encode $ unlines
                    [
@@ -183,7 +175,7 @@ enterBloc env x
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
-          VaultWrapperError (FailureResponse Response{..}) | responseStatusCode == status503 ->
+          VaultWrapperError (FailureResponse _ Response{..}) | responseStatusCode == status503 ->
             err503{errBody = responseBody}
                                                            | statusIsClientError responseStatusCode ->
             err400{errBody = responseBody } 
@@ -250,7 +242,7 @@ enterBloc env x
 
 
 --This is an annoyingly named and poorly written function, deliberately designed that way to remind us that we need to clean up the response from strato-api/solc.
-compensateForTheOddStratoApiFormattingAndPullOutTheMessage::Lazy.Char8.ByteString->String
+compensateForTheOddStratoApiFormattingAndPullOutTheMessage :: Lazy.Char8.ByteString -> String
 compensateForTheOddStratoApiFormattingAndPullOutTheMessage x | "Invalid Arguments" `Lazy.Char8.isPrefixOf` x =
    case JSON.decode $ Lazy.Char8.drop 18 x of
      Nothing -> show x
@@ -278,7 +270,7 @@ blocQueryMaybe
 blocQueryMaybe q = blocQuery q >>= \case
     [] -> return Nothing
     [y] -> return (Just y)
-    _:_:_ -> throwError $ DBError "blocQueryMaybe: Multiple results, expected one row"
+    _:_:_ -> throwIO $ DBError "blocQueryMaybe: Multiple results, expected one row"
 
 blocQuery1
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
@@ -288,7 +280,7 @@ blocQuery1
 blocQuery1 loc q = blocQuery q >>= \case
     [] -> blocError . DBError . Text.concat $ ["blocQuery1: ", loc, ": No result, expected one row"]
     [y] -> return y
-    _:_:_ -> throwError . DBError . Text.concat $
+    _:_:_ -> throwIO . DBError . Text.concat $
        ["blocQuery1: ", loc, ": Multiple results, expected one row"]
 
 blocModify :: HasCallStack => (Connection -> IO x) -> Bloc x
@@ -302,9 +294,9 @@ blocModify1 modify = do
   logInfoCS callStack "Updating the database"
   results <- blocModify modify
   case results of
-    []    -> throwError $ DBError "No result, expected one row"
+    []    -> throwIO $ DBError "No result, expected one row"
     [y]   -> return y
-    _:_:_ -> throwError $ DBError "Multiple results, expected one row"
+    _:_:_ -> throwIO $ DBError "Multiple results, expected one row"
 
 blocTransaction :: Bloc x -> Bloc x
 blocTransaction bloc = do
@@ -328,4 +320,4 @@ blocVaultWrapper client' = do
   either (blocError . VaultWrapperError) return resultEither
 
 blocMaybe :: Text -> Maybe x -> Bloc x
-blocMaybe msg = maybe (throwError (CouldNotFind msg)) return
+blocMaybe msg = maybe (throwIO (CouldNotFind msg)) return

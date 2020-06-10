@@ -16,41 +16,44 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - aeson
+
+
+
+library:
+  source-dirs: src/
+  dependencies:
+  - QuickCheck
   - aeson-casing
   - base16-bytestring
   - base64-bytestring
+  - blockapps-data
+  - blockapps-datadefs
   - blockapps-ethereum
   - blockapps-solidity
   - blockapps-strato-api
+  - blockapps-util
+  - bytestring
   - containers
   - cryptonite
-  - bytestring
   - generic-random
   - gitrev
   - haskoin-shim
   - http-api-data
-  - http-media
   - lens
-  - QuickCheck
   - quickcheck-instances
   - saltine
   - servant
-  - servant-server
-  - servant-swagger
-  - servant-swagger-ui
   - servant-docs
   - servant-mock
+  - servant-server
+  - strato-model
   - swagger2
   - text
-
-library:
-  source-dirs: src/
 
 tests:
   api-test:
     source-dirs: test/
     main: APISpec.hs
     dependencies:
-      - aeson-qq
       - blockapps-bloc22-api
       - hspec

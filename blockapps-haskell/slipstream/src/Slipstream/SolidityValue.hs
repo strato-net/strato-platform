@@ -12,9 +12,6 @@
 
 module Slipstream.SolidityValue where
 
-import           BlockApps.Ethereum
-import           BlockApps.Solidity.Value
-import           BlockApps.Solidity.Type
 import           Data.Aeson               hiding (Value)
 import qualified Data.ByteString          as B
 import qualified Data.ByteString.Char8    as BC
@@ -27,6 +24,10 @@ import           Data.Text (Text)
 import qualified Data.Text as Text
 import           GHC.Generics
 import           Text.Printf
+
+import           BlockApps.Solidity.Value
+import           BlockApps.Solidity.Type
+import           Blockchain.Strato.Model.Address
 
 data SolidityValue
   = SolidityValueAsString Text

@@ -6,7 +6,6 @@
 
 module Strato.Strato23.Crypto where
 
-import           BlockApps.Ethereum                hiding (deriveAddress)
 import           Control.Monad                     ((<=<))
 import           Control.Monad.IO.Class
 import qualified Crypto.KDF.Scrypt                 as Scrypt
@@ -14,13 +13,18 @@ import           Crypto.Random.Entropy
 import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
-import           Crypto.HaskoinShim
 import           Data.ByteString                   (ByteString)
-import qualified Data.ByteString                   as BS
+import qualified Data.ByteString                   as B
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
 import           Text.Printf
+
+import           Blockchain.Strato.Model.Address
+import qualified Blockchain.Strato.Model.Keccak256 as SHA
+import           Crypto.Secp256k1
+
+
 
 newtype Password = Password ByteString
   deriving (Eq,Show)
@@ -39,6 +43,7 @@ data KeyStore = KeyStore
   , keystoreAcctNonce     :: SecretBox.Nonce
   , keystoreAcctEncSecKey :: ByteString
   , keystoreAcctAddress   :: Address
+  , keystoreAcctPubKey    :: PubKey
   } deriving (Eq, Show)
 
 decrypt
@@ -95,8 +100,14 @@ reencryptKey oldPass newPass salt nonce oldKey givenAddress=
                                              (show givenAddress)
                           else Right $ encrypt newPass salt nonce (getSecKey plainKey)
 
+
+
+-- first byte of serialized pubkey is metdata, so we drop it
+-- TODO: add a test against sample pubkey/address values to ensure this, maybe once
+-- this code is moved to strato-model/Address.hs
 deriveAddress :: SecKey -> Address
-deriveAddress = keccak256Address . BS.drop 1 . exportPubKey False . derivePubKey
+deriveAddress = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPubKey False . derivePubKey 
+
 
 newSaltAndNonce :: MonadIO m => m (ByteString, SecretBox.Nonce)
 newSaltAndNonce = liftIO $ do
@@ -114,9 +125,17 @@ newKeyStore pw = liftIO $ do
   acctSk <- liftIO newSecKey
   let encAcctSk = encrypt pw salt acctNonce $ getSecKey acctSk
       acctAddr = deriveAddress acctSk
+      acctPubKey = derivePubKey acctSk
   return KeyStore
     { keystoreSalt = salt
     , keystoreAcctNonce = acctNonce
     , keystoreAcctEncSecKey = encAcctSk
     , keystoreAcctAddress = acctAddr
+    , keystoreAcctPubKey = acctPubKey
     }
+
+newSecKey :: IO SecKey
+newSecKey = fromMaybe err . secKey <$> getEntropy 32
+  where
+    err = error "could not generate secret key"
+

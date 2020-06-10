@@ -12,7 +12,7 @@ import Blockchain.ExtendedECDSA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Internals as HK
@@ -21,7 +21,7 @@ spec :: Spec
 spec = parallel $ do
   describe "RLP - quorum test vectors" $ do
     let vw = View 54975581388 45212608023800330
-        digest = SHA 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1
+        digest = unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1
         addr = Address 0x787878787878787878787878
         mkCoord = fromIntegral . bytesToWord256 . B.pack
         sig = ExtendedSignature (HK.Signature (mkCoord [0..31]) (mkCoord [32..63])) True
@@ -29,8 +29,8 @@ spec = parallel $ do
     it "matches on serializing Preprepares" $ do
       let blk = Block {
               blockBlockData = BlockData {
-                blockDataParentHash = SHA 0x0,
-                blockDataUnclesHash = SHA 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
+                blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
+                blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
                 blockDataCoinbase = Address 0x0,
                 blockDataStateRoot = StateRoot . fst . B16.decode $ "0000000000000000000000000000000000000000000000000000000000000000",
                 blockDataTransactionsRoot = StateRoot . fst .B16.decode $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",

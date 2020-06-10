@@ -36,6 +36,7 @@ module BlockApps.Bloc22.Client
   , getBlocTransactionResult
   , postBlocTransactionResults
   , postBlocTransaction
+  , postBlocTransactionParallel
   ) where
 
 import           Data.Map.Strict                  (Map)
@@ -46,9 +47,11 @@ import           Servant.Client
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Keccak256
 
 getGitInfo :: ClientM GitInfo
 getGitInfo = client (Proxy @ GetGitInfo)
@@ -59,16 +62,16 @@ getAddresses = client (Proxy @ GetAddresses)
 getContracts :: Maybe ChainId -> ClientM GetContractsResponse
 getContracts = client (Proxy @ GetContracts)
 
-getContractsData :: ContractName -> ClientM [MaybeNamed Address]
+getContractsData :: ContractName -> ClientM [Address]
 getContractsData = client (Proxy @ GetContractsData)
 
 getContractsContract
-  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> ClientM ContractDetails
+  :: ContractName -> Address -> Maybe ChainId -> ClientM ContractDetails
 getContractsContract = client (Proxy @ GetContractsContract)
 
 getContractsState
   :: ContractName
-  -> MaybeNamed Address
+  -> Address
   -> Maybe ChainId
   -> Maybe Text
   -> Maybe Integer
@@ -87,20 +90,20 @@ getContractsDetails
 getContractsDetails = client (Proxy @ GetContractsDetails)
 
 getContractsFunctions
-  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> ClientM [FunctionName]
+  :: ContractName -> Address -> Maybe ChainId -> ClientM [FunctionName]
 getContractsFunctions = client (Proxy @ GetContractsFunctions)
 
 getContractsSymbols
-  :: ContractName -> MaybeNamed Address -> Maybe ChainId -> ClientM [SymbolName]
+  :: ContractName -> Address -> Maybe ChainId -> ClientM [SymbolName]
 getContractsSymbols = client (Proxy @ GetContractsSymbols)
 
 -- getContractsEnum
---   :: ContractName -> MaybeNamed Address -> EnumName -> Maybe ChainId -> ClientM [EnumValue]
+--   :: ContractName -> Address -> EnumName -> Maybe ChainId -> ClientM [EnumValue]
 -- getContractsEnum = client (Proxy @ GetContractsEnum)
 
 getContractsStateMapping
   :: ContractName
-  -> MaybeNamed Address
+  -> Address
   -> SymbolName
   -> Text
   -> Maybe ChainId
@@ -116,7 +119,7 @@ postContractsCompile = client (Proxy @ PostContractsCompile)
 postContractsXabi :: PostXabiRequest -> ClientM PostXabiResponse
 postContractsXabi = client (Proxy @ PostContractsXabi)
 
-getSearchContract :: ContractName -> ClientM [Greedy (MaybeNamed Address) ChainId]
+getSearchContract :: ContractName -> ClientM [Greedy Address ChainId]
 getSearchContract = client (Proxy @ GetSearchContract)
 
 getUsers :: ClientM [UserName]
@@ -198,5 +201,14 @@ postBlocTransaction
   -> Maybe ChainId
   -> Bool
   -> PostBlocTransactionRequest
-  -> ClientM [BlocTransactionResult]
+  -> ClientM [BlocChainOrTransactionResult]
 postBlocTransaction = client (Proxy @ PostBlocTransaction)
+
+postBlocTransactionParallel
+  :: Maybe Text
+  -> Maybe ChainId
+  -> Bool
+  -> Bool
+  -> PostBlocTransactionRequest
+  -> ClientM [BlocChainOrTransactionResult]
+postBlocTransactionParallel = client (Proxy @ PostBlocTransactionParallel)

@@ -9,31 +9,25 @@ library:
   source-dirs: src/
   dependencies:
     - base
-    - binary
-    - bytestring
-    - format
-    - nibblestring
-    - text
-    - containers
-    - unordered-containers
-    - resourcet
     - aeson
-    - strato-model
-    - strato-conf
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
     - blockapps-util
+    - bytestring
+    - containers
     - ethereum-rlp
+    - format
+    - lens
     - merkle-patricia-db
+    - milena
     - monad-alter
-    - monad-control
+    - nibblestring
     - persistent
     - persistent-postgresql
-    - blockapps-milena
-    - lens
-    - transformers
-    - time
+    - strato-conf
+    - strato-model
+    - text
   default-extensions:
     - MultiParamTypeClasses
     - FlexibleContexts

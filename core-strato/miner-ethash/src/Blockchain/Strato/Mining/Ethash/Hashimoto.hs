@@ -14,7 +14,8 @@ import           Data.Word
 import           Blockchain.Strato.Mining.Ethash.Constants
 import           Blockchain.Strato.Mining.Ethash.Dataset
 import           Blockchain.Strato.Mining.Ethash.Util
-import           Blockchain.Strato.Model.SHA               (keccak256, keccak512)
+import           Blockchain.Strato.Model.Keccak256          (hash, keccak256ToByteString)
+import           Blockchain.Strato.Model.Keccak512          (keccak512)
 
 --import Debug.Trace
 
@@ -73,7 +74,7 @@ hashimoto header nonce fullSize' dataset = do
         return $ v1 `fnv` v2 `fnv`  v3 `fnv` v4
 
   cmix <- fmap repair $ sequence $ map f2 [0,4..31]
-  return (cmix, keccak256 (s `B.append` cmix))
+  return (cmix, keccak256ToByteString $ hash (s `B.append` cmix))
 
 
 f::(Word32->IO Slice, Int, Integer, B.ByteString)->Word32->MA.IOUArray Word32 Word32->IO ()

@@ -1,7 +1,8 @@
+{-# LANGUAGE BangPatterns         #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE MagicHash            #-}
-{-# LANGUAGE BangPatterns         #-}
+{-# LANGUAGE OverloadedStrings    #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Strato.Model.ExtendedWord
  (
@@ -14,6 +15,7 @@ module Blockchain.Strato.Model.ExtendedWord
     fastWord256LSB
  ) where
 
+import           Control.Lens.Operators
 import           Control.Monad
 import qualified Data.Aeson                as Ae
 import qualified Data.Aeson.Encoding       as Enc
@@ -27,6 +29,7 @@ import qualified Data.ByteString.Base16    as B16
 import qualified Data.ByteString.Char8     as BC
 import           Data.Ix
 import qualified Data.Primitive.ByteArray  as PBA
+import           Data.Swagger              hiding (Format, format)
 import qualified Data.Text                 as T
 import           Foreign.ForeignPtr
 import           Foreign.Ptr
@@ -34,8 +37,10 @@ import qualified Foreign.Storable          as FS
 import           GHC.Exts
 import           GHC.Integer.GMP.Internals
 import           GHC.Word
+import           Numeric
 import           System.Endian
 import           System.IO.Unsafe
+import           Web.HttpApiData
 
 import           Network.Haskoin.Internals (Word128, Word160, Word256, Word512, BigWord(..))
 import           Blockchain.Data.RLP
@@ -162,6 +167,14 @@ bytesToWord512 bytes | length bytes == 64 =
   sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [512-8,512-16..0] bytes
 bytesToWord512 _ = error "slowBytesToWord256 was called with the wrong number of bytes"
 
+instance ToSchema Word256 where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Word256")
+      ( mempty
+        & type_ ?~ SwaggerString
+        & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
+        & description ?~ "Fixed-size words of 256 bits" )
+
 instance Ix Word256 where
     range (x, y) | x == y = [x]
     range (x, y) = x:range (x+1, y)
@@ -170,6 +183,12 @@ instance Ix Word256 where
     inRange (x, y) z | z >= x && z <= y = True
     inRange _ _      = False
 
+
+instance FromHttpApiData Word160 where
+  parseQueryParam v =
+    case readHex $ T.unpack v of
+      [(n, "")] -> Right n
+      _ -> Left $ T.pack $ "Error parsing Word160: " ++ show v
 
 instance RLPSerializable Word512 where
     rlpEncode val = RLPString $ BL.toStrict $ encode val

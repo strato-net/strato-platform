@@ -4,7 +4,6 @@ module Strato.Strato23.Server.User
   ( getUsers
   ) where
 
-import Control.Monad.Except
 import Data.Int
 import Data.Text hiding (map)
 
@@ -19,7 +18,7 @@ getUsers headerUsername mAddr mLimit mOffset = do
   exists <- (>0) <$> (vaultQuery1 (countUsers headerUsername) :: VaultM Int64)
   $logDebugLS "getUsers/count" exists
   if not exists
-    then throwError $ UserDoesNotExist headerUsername
+    then vaultWrapperError $ UserDoesNotExist headerUsername
     else case mAddr of
            Just addr -> do
              uname <- vaultQuery1 $ getUserByAddress addr

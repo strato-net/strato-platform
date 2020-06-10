@@ -18,7 +18,7 @@ import Test.QuickCheck
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import Network.Haskoin.Internals (BigWord(..))
 
 main :: IO ()
@@ -88,18 +88,18 @@ spec = do
         parse = Ae.eitherDecode . Ae.encode
     it "can parse legacy digests" $
       parse [aesonQQ|"ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"|]
-        `shouldBe` Right (EVMCode $ SHA 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+        `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
 
     it "can parse evm object digests" $
       parse [aesonQQ|{"kind": "EVM",
                       "digest": "ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"}|]
-        `shouldBe` Right (EVMCode $ SHA 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+        `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
 
     it "can parse solidvm object digests" $
       parse [aesonQQ|{"kind": "SolidVM", "name": "SimpleStorage",
                       "digest": "ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"}|]
         `shouldBe` Right (SolidVMCode "SimpleStorage"
-                            $ SHA 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+                            $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
 
     it "round trips correctly" $ property $ \(ptr::CodePtr) -> do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr

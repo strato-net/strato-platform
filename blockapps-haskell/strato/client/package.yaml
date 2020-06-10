@@ -14,30 +14,21 @@ ghc-options: -Wall
 
 dependencies:
   - base
-  - blockapps-ethereum
   - blockapps-strato-api
-  - binary
-  - aeson
-  - aeson-casing
-  - generic-random
-  - http-api-data
-  - http-client
-  - QuickCheck
-  - quickcheck-instances
-  - servant
   - servant-client
-  - servant-docs
-  - text
-  - time
-  - unordered-containers
 
 library:
   source-dirs: src/
+  dependencies:
+  - servant
 
 tests:
   blockapps-strato-client-test:
     source-dirs: test/
     main: Spec.hs
     dependencies:
+      - QuickCheck
       - blockapps-strato-client
+      - generic-random
       - hspec
+      - http-client

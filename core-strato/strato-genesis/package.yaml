@@ -11,50 +11,41 @@ description: A tool to setup the DBs for a Strato instance
 github: blockapps/strato-platform/core-strato/strato-genesis
 
 dependencies:
-  - aeson
-  - aeson-casing
   - base
-  - base16-bytestring
-  - binary
-  - blockapps-data
-  - blockapps-haskoin
-  - blockapps-milena
-  - blockapps-mpdbs
-  - blockapps-util
-  - bytestring
-  - containers
-  - crypto-api
-  - cryptonite
-  - csv
-  - directory
-  - entropy
-  - ethereum-rlp
-  - format
-  - json-stream
-  - leveldb-haskell
-  - memory
-  - merkle-patricia-db
-  - merkle-patricia-db
-  - monad-alter
-  - persistent-postgresql
-  - resourcet
-  - scientific
-  - split
-  - strato-conf
-  - strato-model
-  - strato-redis-blockdb
-  - strato-statediff
-  - text
-  - time
-  - transformers
-  - unordered-containers
-  - utf8-string
-  - vector
-  - yaml
 
 library:
     source-dirs: src/
     ghc-options: -Wall -O2
+    dependencies:
+      - aeson-casing
+      - base16-bytestring
+      - binary
+      - blockapps-haskoin
+      - blockapps-mpdbs
+      - blockapps-util
+      - containers
+      - crypto-api
+      - directory
+      - entropy
+      - format
+      - json-stream
+      - monad-alter
+      - scientific
+      - split
+      - strato-conf
+      - strato-statediff
+      - time
+      - unordered-containers
+      - vector
+
+      - aeson
+      - blockapps-data
+      - bytestring
+      - merkle-patricia-db
+      - strato-model
+      - text
+
+
 
 executables:
   generate-genesis:
@@ -62,10 +53,13 @@ executables:
     main: Main.hs
     other-modules: []
     dependencies:
-      - aeson-extra
-      - aeson-pretty
+      - aeson
+      - blockapps-data
+      - bytestring
       - hflags
       - strato-genesis
+      - strato-model
+      - text
 
   genesis-setup:
     source-dirs: exec_src/
@@ -75,13 +69,22 @@ executables:
       - strato-genesis
       - hflags
 
-
 tests:
   strato-genesis-test:
     source-dirs: test
     main: Main.hs
     dependencies:
-      - aeson-diff
+      - aeson
+      - base16-bytestring
+      - blockapps-data
+      - blockapps-haskoin
+      - bytestring
       - hspec
+      - json-stream
+      - merkle-patricia-db
       - strato-genesis
+      - strato-model
+      - text
+      - time
+      - vector
     ghc-options: -Wall

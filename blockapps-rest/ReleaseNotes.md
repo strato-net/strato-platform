@@ -1,13 +1,19 @@
 ## RELEASE NOTES
 
+### Version 7.6.6
+
+- Added /transaction/parallel endpoint
+- Bug fix for createContractList
+
+### Version 7.6.5
+
+- Added Bloc /compile endpoint
+- Add getAccounts to get the account details
+
 ### Version 7.6.4
 
 - Add source mappings for minified dist code
 - Add babel-preset-minify, remove gulp-uglify
-
-#### Minor upgrades
-
-- Added Bloc /compile endpoint
 
 ### Version 7.6.3
 

@@ -7,51 +7,15 @@ synopsis: types and tools needed to write a VM for Strato
 category:      Data Structures
 
 dependencies:
-  - base >= 4 && < 5
-  - ansi-wl-pprint
-  - binary
+  - base
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-milena
-  - blockapps-mpdbs
   - blockapps-util
   - blockstanbul
-  - bytestring
   - containers
-  - cross-monitoring
-  - data-default
-  - deepseq
-  - directory
-  - dlist
-  - ethereum-rlp
-  - exceptions
-  - extra
-  - format
-  - hedis
   - hflags
-  - lens
-  - leveldb-haskell
-  - lrucache
-  - merkle-patricia-db
-  - monad-alter
-  - mtl
-  - nibblestring
-  - persistent-postgresql
-  - persistent-sqlite
-  - prometheus-client
-  - resourcet
-  - strato-adit
   - strato-conf
-  - strato-index
   - strato-model
-  - strato-redis-blockdb
-  - seqevents
-  - split
-  - text
-  - temporary
-  - time
-  - transformers
-  - unliftio-core
 
 library:
   source-dirs: src/
@@ -71,6 +35,45 @@ library:
     - Blockchain.VMMetrics
     - Executable.EVMFlags
   ghc-options: -Wall -O2
+  dependencies:
+    - ansi-wl-pprint
+    - binary
+    - blockapps-mpdbs
+    - bytestring
+    - cross-monitoring
+    - data-default
+    - deepseq
+    - directory
+    - dlist
+    - ethereum-rlp
+    - exceptions
+    - extra
+    - format
+    - hedis
+    - lens
+    - leveldb-haskell
+    - lrucache
+    - merkle-patricia-db
+    - milena
+    - monad-alter
+    - mtl
+    - nibblestring
+    - persistent-postgresql
+    - persistent-sqlite
+    - prometheus-client
+    - resourcet
+    - seqevents
+    - split
+    - strato-adit
+    - strato-index
+    - strato-redis-blockdb
+    - text
+    - temporary
+    - time
+    - transformers
+    - unliftio
+    - unliftio-core
+
 
 
 tests:

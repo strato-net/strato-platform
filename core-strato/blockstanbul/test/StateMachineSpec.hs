@@ -34,7 +34,7 @@ import Blockchain.Blockstanbul.EventLoop
 import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import qualified Network.Haskoin.Crypto as HK
 
 testContext :: BlockstanbulContext
@@ -54,7 +54,7 @@ instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) wher
 disableAuth :: StateMachineM m => m ()
 disableAuth = productionAuth .= False
 
-setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, SHA)
+setupRound :: (StateMachineM m) => Block -> [Address] -> m (View, Keccak256)
 setupRound blk' as = do
   let blk = truncateExtra blk'
   proposal .= Just blk
@@ -417,7 +417,7 @@ spec = parallel $ do
       runTest $ do
         let blk = over extraLens (BS.take 32) . setBlockNo 19 $ blk'
         selfElected
-        lastParent .= Just (SHA 0x999992)
+        lastParent .= Just (unsafeCreateKeccak256FromWord256 0x999992)
         sendMessages [UnannouncedBlock blk] `shouldReturn` [MakeBlockCommand]
 
     it "accepts a block if the parent hash matches" $ property $ \blk' ->
@@ -425,9 +425,9 @@ spec = parallel $ do
         let blk = over extraLens (BS.take 32)
                     blk'{blockBlockData = (blockBlockData blk'){
                       blockDataNumber = 19,
-                      blockDataParentHash = SHA 0x999992}}
+                      blockDataParentHash = unsafeCreateKeccak256FromWord256 0x999992}}
         selfElected
-        lastParent .= Just (SHA 0x999992)
+        lastParent .= Just (unsafeCreateKeccak256FromWord256 0x999992)
         sendMessages [UnannouncedBlock blk] `shouldNotReturn` [MakeBlockCommand]
 
     it "seals the block" $ property $ \blk'' ->

@@ -23,12 +23,18 @@ import           BlockApps.Bloc22.API.SpecUtils
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Client
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
-import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
+
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Json
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Gas
+import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
+import           Blockchain.Strato.Model.Wei
+import           Handlers.AccountInfo
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
@@ -65,12 +71,12 @@ spec =
       accts1 `shouldSatisfy` isRight
       accts2 `shouldSatisfy` isRight
       let
-        Right (account1 : _) = accts1
-        Right (account2 : _) = accts2
-        balance1 = unStrung (accountBalance account1)
-        balance2 = unStrung (accountBalance account2)
-      balance1 `shouldBe` initialWei
-      balance2 `shouldBe` initialWei
+        Right (AddressStateRef' account1 _: _) = accts1
+        Right (AddressStateRef' account2 _: _) = accts2
+        balance1 = addressStateRefBalance account1
+        balance2 = addressStateRefBalance account2
+      fromInteger balance1 `shouldBe` initialWei
+      fromInteger balance2 `shouldBe` initialWei
       threadDelay 4000000
       let
         weiToSend = 100
@@ -83,9 +89,9 @@ spec =
         (ClientEnv mgr stratoUrl Nothing)
       accts2AfterSend `shouldSatisfy` isRight
       let
-        Right (account2AS : _) = accts2AfterSend
-        balance2AS = unStrung (accountBalance account2AS)
-      balance2AS `shouldBe` initialWei + weiToSend
+        Right (AddressStateRef' account2AS _: _) = accts2AfterSend
+        balance2AS = addressStateRefBalance account2AS
+      fromInteger balance2AS `shouldBe` initialWei + weiToSend
 
     it "should create SimpleStorage contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
       let
@@ -119,13 +125,13 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleStorageContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -183,7 +189,7 @@ spec =
       contractStateEither' <- runClientM
         (getContractsState
           (ContractName simpleStorageContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -243,13 +249,13 @@ spec =
                         (ClientEnv mgr blocUrl Nothing)
                       )
             let Just (Upload contractDetails) = blocTransactionData result
-                Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+                Just (contractAddr) = contractdetailsAddress contractDetails
             return contractAddr
       let contractState ctName addr = fromEither =<<
                                       runClientM
                                       ( getContractsState
                                         (ContractName ctName)
-                                        (Unnamed addr)
+                                        (addr)
                                         Nothing
                                         Nothing
                                         Nothing
@@ -325,14 +331,14 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleStorageAddressContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -387,7 +393,7 @@ spec =
       -- get state and verify
 
       contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing Nothing False)
+        (getContractsState contractName (contractAddr) Nothing Nothing Nothing Nothing False)
         (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
 
@@ -443,14 +449,14 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleStorageBytes32ArrayContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -512,7 +518,7 @@ spec =
       -- get state and verify
 
       contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing Nothing False)
+        (getContractsState contractName (contractAddr) Nothing Nothing Nothing Nothing False)
         (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
 
@@ -580,8 +586,7 @@ spec =
       postUsersContractEither `shouldSatisfy` isRight
 
 
-
-    it "should disambiguate contracts with the same name using latest and address" $ \ testConfig@TestConfig {..} -> do
+    it "should disambiguate contracts with the same name using address" $ \ testConfig@TestConfig {..} -> do
       pendingWith "Not yet supported for metadata compile"
       sameName1Src <- readSolFile "SameName1.sol"
       sameName2Src <- readSolFile "SameName2.sol"
@@ -616,12 +621,8 @@ spec =
       Right sameName2Symbols <- runClientM
         (getContractsSymbols "SameName" (fromJust $ contractdetailsAddress sameName2Details) Nothing)
         (ClientEnv mgr blocUrl Nothing)
-      Right sameNameLatestSymbols <- runClientM
-        (getContractsSymbols "SameName" (Named "Latest") Nothing)
-        (ClientEnv mgr blocUrl Nothing)
       sameName1Symbols `shouldBe` [SymbolName "myString"]
       sameName2Symbols `shouldBe` [SymbolName "myInt"]
-      sameNameLatestSymbols `shouldBe` [SymbolName "myInt"]
 
     it "should create SimpleConstructor contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
       pendingWith "Not yet supported for metadata compile"
@@ -660,14 +661,14 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleConstructorName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -921,14 +922,14 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- get contract state
 
       contractStateEither <- runClientM
         (getContractsState
           (ContractName simpleTupleContractName)
-          (Unnamed contractAddr)
+          (contractAddr)
           Nothing
           Nothing
           Nothing
@@ -989,7 +990,7 @@ spec =
       -- get state and verify
 
       contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing Nothing False)
+        (getContractsState contractName (contractAddr) Nothing Nothing Nothing Nothing False)
         (ClientEnv mgr blocUrl Nothing)
       contractStateEither' `shouldSatisfy` isRight
 
@@ -1043,7 +1044,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
 
       -- -- call contract store value
@@ -1134,7 +1135,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- call get value and verify
 
@@ -1230,7 +1231,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed iamAddr) = contractdetailsAddress contractDetails
+        Just (iamAddr) = contractdetailsAddress contractDetails
         bobName = UserName "bob"
       postBobEither <- runClientM (postUsersUser bobName pw) (ClientEnv mgr blocUrl Nothing)
       postBobEither `shouldSatisfy` isRight
@@ -1241,7 +1242,7 @@ spec =
       threadDelay 4000000
       let
         Right bobAddr = postBobEither
-        args = Map.singleton "userKey" . ArgString . Text.pack . addressString $ bobAddr
+        args = Map.singleton "userKey" . ArgString . Text.pack . formatAddressWithoutColor $ bobAddr
         contrMethodReq = PostUsersContractMethodRequest pw "createIdentityAgent" args (Just $ Strung 0) Nothing Nothing
       identityAgentEither <- getResolvedTx testConfig $ runClientM
         (postUsersContractMethod iamUsername iamUserAddr (ContractName "IdentityAccessManager") iamAddr Nothing True contrMethodReq)
@@ -1284,7 +1285,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         testContractName' = "ReturnTuple"
-        hash = keccak256ByteString $ keccak256 "foo"
+        hash = KECCAK256.keccak256ToByteString $ KECCAK256.hash "foo"
         arghash = ArgString $ Text.decodeUtf8 $ Base16.encode hash
         argcontents = ArgString "foo"
         postUsersContractRequest = PostUsersContractRequest
@@ -1309,7 +1310,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = contractdetailsAddress contractDetails
 
       -- call get value and verify
 

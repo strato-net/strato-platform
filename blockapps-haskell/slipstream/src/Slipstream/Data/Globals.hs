@@ -12,7 +12,10 @@ import           GHC.Generics
 
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi     (ContractDetails(..))
-import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.Data.GlobalsColdStorage (Handle)
 
 
@@ -27,7 +30,7 @@ data Globals = Globals { createdEvents :: S.Set (Text, Text) -- (contractName, e
                        , historyList :: S.Set CodePtr
                        , noIndexList :: S.Set CodePtr
                        , functionHistoryList :: S.Set CodePtr
-                       , contractABIs :: HM.HashMap SHA (M.Map Text (Int32, ContractDetails))
+                       , contractABIs :: HM.HashMap Keccak256 (M.Map Text (Int32, ContractDetails))
                        , contractStates :: LRU (Address, Maybe ChainId) [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

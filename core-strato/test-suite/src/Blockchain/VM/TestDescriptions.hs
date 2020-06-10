@@ -30,8 +30,8 @@ import           Numeric
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.EVM.VMState
-import           Blockchain.SHA
 import           Blockchain.Util
+import           Blockchain.Strato.Model.Keccak256
 
 data Env =
   Env {
@@ -40,7 +40,7 @@ data Env =
     currentGasLimit   ::  Integer,
     currentNumber     ::  String,
     currentTimestamp  ::  UTCTime,
-    previousHash      ::  Maybe SHA
+    previousHash      ::  Maybe Keccak256
     } deriving (Generic, Show, Eq)
 
 data AddressState' =

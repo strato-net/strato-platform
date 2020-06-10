@@ -2,25 +2,18 @@ name:                fastMP
 version:             0.1.0.0
 
 dependencies:
-- ansi-wl-pprint
-- base >= 4.7 && < 5
+- base
 - base16-bytestring
-- blockapps-util
 - bytestring
-- conduit
-- containers
-- data-default
 - ethereum-rlp
 - format
 - leveldb-haskell
 - merkle-patricia-db
-- monad-alter
-- monad-loops
 - nibblestring
 - resourcet
-- strato-model
-- text
-- transformers
+
+
+
 
 library:
   source-dirs:         src
@@ -28,6 +21,17 @@ library:
   - -threaded
   - -rtsopts
   - -with-rtsopts=-N
+  dependencies:
+    - ansi-wl-pprint
+    - blockapps-util
+    - conduit
+    - containers
+    - data-default
+    - monad-alter
+    - monad-loops
+    - strato-model
+    - text
+    - transformers
 
 
 executables:
@@ -43,7 +47,11 @@ executables:
   insertMP:
     main:                insertMP.hs
     source-dirs:         app
-    dependencies:	 fastMP
+    dependencies:
+      - conduit
+      - fastMP
+      - monad-alter
+      - transformers
     ghc-options:
     - -threaded
     - -rtsopts
@@ -52,7 +60,9 @@ executables:
   insertLDB:
     main:                insertLDB.hs
     source-dirs:         app
-    dependencies:	 fastMP
+    dependencies:
+      - conduit
+      - fastMP
     ghc-options:
     - -threaded
     - -rtsopts
@@ -65,3 +75,5 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    dependencies:
+      - strato-model

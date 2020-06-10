@@ -72,14 +72,16 @@ main = do
                 let !bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
                     !pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
                     selfAddress = prvKey2Address pkey
-                putStrLn . ("NODEKEY address: " ++) . formatAddress $ selfAddress
+                putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
                 addSelfAsMetric selfAddress
                 when (null validators) . ioError . userError
                     $ "must specify --validators with --blockstanbul"
-                unless (flags_blockstanbul_skip_check || selfAddress `elem` validators) . ioError . userError
-                    $ "NODEKEY must correspond to an address within --validators.\
-                      \ If adding a node to an existing network, supply --blockstanbul_skip_check\
-                      \ (set `blockstanbulSkipCheck=true` if using strato-getting-started)"
+                unless (selfAddress `elem` validators) . putStrLn
+                    $ "NODEKEY does not correspond to an address within --validators.\
+                      \ This probably means that you are connecting to an existing network,\
+                      \ and you are not one of the original validators of that network.\
+                      \ If this is the case, please disregard this message. Otherwise,\
+                      \ you may experience difficulty operating this node."
                 unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError
                     $ "--blockstanbul_block_period_ms must be nonnegative"
                 unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
@@ -94,8 +96,8 @@ main = do
         , depBlockDBPath        = flags_depblockdbpath
         , seenTransactionDBSize = flags_txdedupwindow
         , syncWrites            = flags_syncwrites
-        , blockstanbulBlockPeriod = fromIntegral flags_blockstanbul_block_period_ms / 1000.0
-        , blockstanbulRoundPeriod = fromIntegral flags_blockstanbul_round_period_s
+        , blockstanbulBlockPeriod = BlockPeriod $ fromIntegral flags_blockstanbul_block_period_ms / 1000.0
+        , blockstanbulRoundPeriod = RoundPeriod $ fromIntegral flags_blockstanbul_round_period_s
         , blockstanbulBeneficiary = chv
         , blockstanbulVoteResps = chr
         , blockstanbulTimeouts = cht

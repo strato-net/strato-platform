@@ -19,7 +19,6 @@ module BlockApps.Bloc22.Server.Utils
 
 import           Control.Concurrent               (threadDelay)
 import           Control.Monad                    (forM, unless, when)
-import           Control.Monad.Except             (throwError)
 import           Control.Monad.IO.Class           (liftIO)
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.Map.Strict                  as M
@@ -30,17 +29,20 @@ import qualified Data.Text.Encoding               as Text
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum         hiding (Transaction (..))
-import           BlockApps.Strato.Client
-import           BlockApps.Strato.Types
+
+import           Blockchain.Data.DataDefs
+import           Blockchain.Strato.Model.Keccak256
+import           Handlers.BatchTransactionResult
+
+import           UnliftIO
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
 
 maybeTxBatchResult :: [Keccak256] -> Bloc [Maybe TransactionResult]
-maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (postTxResultBatch hashes))
+maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (batchTransactionResultClient hashes))
   where maybeHeads btxr =
-          let list = map (flip M.lookup $ unBatchTransactionResult btxr) hashes
+          let list = map (flip M.lookup btxr) hashes
           in flip map list $ \mtrs -> case mtrs of
             Nothing -> Nothing
             Just trs -> listToMaybe trs
@@ -53,7 +55,7 @@ getBatchBlocTxStatus hashes = do
     case mtxr of
       Nothing -> return (Pending, mtxr)
       Just txr -> do
-        case transactionresultMessage txr of
+        case transactionResultMessage txr of
           "Success!" -> return (Success, mtxr)
           _          -> return (Failure, mtxr)
 
@@ -61,7 +63,7 @@ emptyTxParams :: TxParams
 emptyTxParams = TxParams Nothing Nothing Nothing
 
 binRuntimeToCodeHash :: Text.Text -> Keccak256
-binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
+binRuntimeToCodeHash = hash . fst . BS16.decode . Text.encodeUtf8
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
 partitionWith f = map (fmap (map snd)) . indexedPartitionWith f
@@ -90,7 +92,7 @@ waitFor :: Text.Text -> Bloc Bool -> Bloc ()
 waitFor msg action = go 20
   where go :: Int -> Bloc ()
         go ms = do
-          when (ms > 30000) . throwError $ CouldNotFind msg
+          when (ms > 30000) . throwIO $ CouldNotFind msg
           b <- action
           unless b $ do
             liftIO . threadDelay $ ms * 1000

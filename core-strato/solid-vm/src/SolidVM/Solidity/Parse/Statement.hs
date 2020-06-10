@@ -117,11 +117,11 @@ expression =
     [binary "^"],
     [binary "|"],
     [binary "==", binary "!="],
-    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
     [binary "<", binary ">", binary "<=", binary ">="],
+    [Postfix (do { reservedOp "?"; e1 <- expression; reservedOp ":"; e2 <- expression; return (\e -> Ternary e e1 e2)})],
+    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
     [binary "&&"],
-    [binary "||"],
-    [Postfix (do { reservedOp "?"; e1 <- expression; reservedOp ":"; e2 <- expression; return (\e -> Ternary e e1 e2)})]
+    [binary "||"]
   ]
   (tuple <|> array <|> primaryExpression)
 

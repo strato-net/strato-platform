@@ -16,7 +16,7 @@ const neededJobs = {
   "seq_main": "strato-sequencer",
   "blockapps-vault-wrapper-server": "vault-wrapper",
   "blockapps-bloc": "bloc",
-  "strato-api": "strato-api"
+  "core-api": "core-api"
 }
 
 const isOauthEnabled = (process.env['OAUTH_ENABLED'] === config.oAuthEnabledTrueValue);

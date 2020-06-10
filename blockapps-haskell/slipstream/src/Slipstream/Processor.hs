@@ -51,7 +51,6 @@ import Blockapps.Crossmon
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
-import BlockApps.Ethereum
 import BlockApps.Logging
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
@@ -63,8 +62,10 @@ import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import qualified Blockchain.Strato.Model.Action as BS
-import Blockchain.Strato.Model.CodePtr (codePtrToSHA)
-import Blockchain.Strato.Model.SHA (hash)
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainId
+import Blockchain.Strato.Model.CodePtr
+import Blockchain.Strato.Model.Keccak256
 
 
 import Slipstream.Data.Action
@@ -105,7 +106,7 @@ enterBloc2 env x = do
    Right v -> return v
 
 {-# NOINLINE emptyHash #-}
-emptyHash :: SHA
+emptyHash :: Keccak256
 emptyHash = hash B.empty
 
 matters :: AggregateAction -> Bool

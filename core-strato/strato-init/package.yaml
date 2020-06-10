@@ -13,25 +13,23 @@ github: blockapps/strato-platform/core-strato/strato-init
 ghc-options: -Wall -O2 -threaded
 
 dependencies:
-  - base >= 4 && < 5
+  - base
+
+library:
+  source-dirs: src/
+  dependencies:
   - aeson
   - base16-bytestring
   - base64-bytestring
-  - binary
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
-  - blockapps-milena
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
   - common-log
   - conduit
   - containers
-  - cryptohash
-  - cryptonite
-  - crypto-api
-  - csv
   - directory
   - either
   - entropy
@@ -46,15 +44,12 @@ dependencies:
   - json-stream
   - lens
   - leveldb-haskell
-  - memory
   - merkle-patricia-db
-  - monad-control
+  - milena
   - monad-alter
-  - mtl
   - nibblestring
   - persistent-postgresql
   - resourcet
-  - scientific
   - seqevents
   - split
   - strato-conf
@@ -64,29 +59,22 @@ dependencies:
   - strato-redis-blockdb
   - strato-sequencer
   - strato-statediff
-  - stm
-  - stm-chans
   - temporary
   - text
-  - time
   - transformers
-  - transformers-base
   - turtle
-  - unliftio-core
-  - unordered-containers
-  - utf8-string
-  - vector
   - unliftio
+  - unliftio-core
   - yaml
-
-library:
-  source-dirs: src/
 
 executables:
   strato-setup:
     source-dirs: exec_src/
     main: Main.hs
     dependencies:
+      - blockapps-util
+      - common-log
+      - hflags
       - strato-init
     other-modules: []
 
@@ -94,20 +82,23 @@ executables:
     source-dirs: exec_src/
     main: TabulaRasa.hs
     dependencies:
+      - common-log
+      - hflags
       - strato-init
+
     other-modules: []
 
   from-restore:
     source-dirs: exec_src/
     main: FromRestore.hs
-    dependencies:
-      - strato-init
     other-modules: []
 
   init-worker:
     source-dirs: exec_src/
     main: InitWorker.hs
     dependencies:
+      - common-log
+      - hflags
       - strato-init
     other-modules: []
 
@@ -116,6 +107,13 @@ tests:
     source-dirs: test/
     main: Main.hs
     dependencies:
-      - aeson-diff
+      - aeson
+      - base16-bytestring
+      - blockapps-data
+      - bytestring
       - hspec
-      - strato-init
+      - json-stream
+      - merkle-patricia-db
+      - strato-genesis
+      - strato-model
+      - time

@@ -11,8 +11,7 @@ dependencies:
   - blockapps-bloc22-api
   - blockapps-bloc22-server
   - blockapps-init
-  - blockapps-strato-api
-  - blockapps-strato-client
+  - cache
   - clock
   - common-log
   - hflags
@@ -24,9 +23,8 @@ dependencies:
   - servant-client
   - servant-options
   - servant-server
-  - servant-swagger
-  - servant-swagger-ui
   - text
+  - unliftio
   - wai
   - wai-cors
   - wai-extra

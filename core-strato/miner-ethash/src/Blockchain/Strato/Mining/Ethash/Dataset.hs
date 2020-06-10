@@ -16,7 +16,7 @@ import           Data.Word
 import           Blockchain.Strato.Mining.Ethash.Cache
 import           Blockchain.Strato.Mining.Ethash.Constants
 import           Blockchain.Strato.Mining.Ethash.Util
-import           Blockchain.Strato.Model.SHA               (keccak512)
+import           Blockchain.Strato.Model.Keccak512            (keccak512)
 
 
 type Slice = A.IOUArray Word32 Word32

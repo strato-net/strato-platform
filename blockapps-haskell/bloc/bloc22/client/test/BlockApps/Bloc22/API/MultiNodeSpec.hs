@@ -25,11 +25,9 @@ import           BlockApps.Bloc22.API.SpecUtils
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Client
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
--- import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -328,7 +326,7 @@ createContractOnMulti src cn args config@TestConfig{..} = do
   result `shouldSatisfy` isJust . blocTransactionTxResult
   result `shouldSatisfy` isJust . blocTransactionData
   let (Upload details) = fromJust $ blocTransactionData result
-      (Unnamed caddr) = fromJust $ contractdetailsAddress details
+      caddr = fromJust $ contractdetailsAddress details
   return caddr
 
 callMethodLocal :: Text
@@ -367,7 +365,7 @@ callMethodListLocal :: Text
                     -> Text
                     -> Map Text ArgValue
                     -> TestConfig
-                    -> IO [Either ServantError BlocTransactionResult]
+                    -> IO [Either ClientError BlocTransactionResult]
 callMethodListLocal method cAddr contractName args config@TestConfig{..} =
   let postMethodListRequest =
         PostMethodListRequest
@@ -403,7 +401,7 @@ getStateLocal addr cn TestConfig{..} =
   runClientM
   ( getContractsState
     (ContractName cn)
-    (Unnamed addr)
+    addr
     Nothing
     Nothing
     Nothing

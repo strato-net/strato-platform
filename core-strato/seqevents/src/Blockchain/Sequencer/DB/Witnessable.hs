@@ -1,8 +1,8 @@
 
 module Blockchain.Sequencer.DB.Witnessable where
 
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 class Witnessable t where
-    witnessableHash :: t -> SHA
+    witnessableHash :: t -> Keccak256
 

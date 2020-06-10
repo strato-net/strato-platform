@@ -29,9 +29,11 @@ import           Web.FormUrlEncoded               hiding (fieldLabelModifier)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Keccak256
 
 --------------------------------------------------------------------------------
 -- | Routes and types
@@ -42,7 +44,7 @@ type GetContracts = "contracts"
 
 data AddressCreatedAt = AddressCreatedAt
   { createdAt  :: Int64
-  , address    :: MaybeNamed Address
+  , address    :: Address
   , chainId :: Maybe ChainId
   } deriving (Eq, Show, Generic)
 
@@ -61,7 +63,7 @@ instance ToSchema AddressCreatedAt where
       ex :: AddressCreatedAt
       ex = AddressCreatedAt
         { createdAt = 1494448021000
-        , address = Unnamed $ Address 0xdeadbeef
+        , address = Address 0xdeadbeef
         , chainId = Nothing
         }
 
@@ -77,7 +79,7 @@ instance ToSchema GetContractsResponse where
     where
       ex :: GetContractsResponse
       ex = GetContractsResponse
-        { unContracts = Map.fromList [("MySampleContract", [AddressCreatedAt 1976 (Unnamed $ Address 0xdeadbeef) Nothing])]
+        { unContracts = Map.fromList [("MySampleContract", [AddressCreatedAt 1976 (Address 0xdeadbeef) Nothing])]
         }
 
 instance ToJSON GetContractsResponse where
@@ -91,12 +93,12 @@ instance Arbitrary GetContractsResponse where arbitrary = GR.genericArbitrary GR
 instance ToSample GetContractsResponse where
   toSamples _ = singleSample $ GetContractsResponse $ Map.singleton "Sample"
     [ AddressCreatedAt
-      { address = Unnamed $ Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
+      { address = Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
       , createdAt = 100
       , chainId = Nothing
       }
     , AddressCreatedAt
-      { address = Named "Addressed"
+      { address = Address 0x409e10eddc6333b82889bfc25a2b107b9c2c9a8d
       , createdAt = 101
       , chainId = Nothing
       }
@@ -105,18 +107,18 @@ instance ToSample GetContractsResponse where
 
 type GetContractsData = "contracts"
   :> Capture "contractName" ContractName
-  :> Get '[JSON] [MaybeNamed Address]
+  :> Get '[JSON] [Address]
 
 -- GET /contracts/:contractName/:contractAddress.:extension? TODO: Check .extension
 type GetContractsContract = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" (MaybeNamed Address)
+  :> Capture "contractAddress" Address
   :> QueryParam "chainid" ChainId
   :> Get '[JSON] ContractDetails
 --------------------------------------------------------------------------------
 type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" (MaybeNamed Address)
+  :> Capture "contractAddress" Address
   :> "state"
   :> QueryParam "chainid" ChainId
   :> QueryParam "name" Text
@@ -144,7 +146,7 @@ instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 
 data PostContractsBatchStatesRequest = PostContractsBatchStatesRequest
   { postcontractsbatchstatesrequestContractName :: ContractName
-  , postcontractsbatchstatesrequestAddress      :: MaybeNamed Address
+  , postcontractsbatchstatesrequestAddress      :: Address
   , postcontractsbatchstatesrequestChainid      :: Maybe ChainId -- lowercase `i` for camelCase JSON instances
   , postcontractsbatchstatesrequestVarName      :: Maybe Text
   , postcontractsbatchstatesrequestCount        :: Maybe Integer
@@ -171,7 +173,7 @@ instance ToSchema PostContractsBatchStatesRequest where
       ex :: PostContractsBatchStatesRequest
       ex = PostContractsBatchStatesRequest
         { postcontractsbatchstatesrequestContractName = ContractName "MySampleContract"
-        , postcontractsbatchstatesrequestAddress = Unnamed 0xdeadbeef
+        , postcontractsbatchstatesrequestAddress = 0xdeadbeef
         , postcontractsbatchstatesrequestChainid = Nothing
         , postcontractsbatchstatesrequestVarName = Nothing
         , postcontractsbatchstatesrequestCount   = Nothing
@@ -204,7 +206,7 @@ type GetContractsDetails = "contracts"
 -- GET /contracts/:contractName/:contractAddress/functions
 type GetContractsFunctions = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" (MaybeNamed Address)
+  :> Capture "contractAddress" Address
   :> QueryParam "chainid" ChainId
   :> "functions"
   :> Get '[JSON] [FunctionName]
@@ -233,7 +235,7 @@ instance ToSchema FunctionName where
 -- GET /contracts/:contractName/:contractAddress/symbols
 type GetContractsSymbols = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" (MaybeNamed Address)
+  :> Capture "contractAddress" Address
   :> QueryParam "chainid" ChainId
   :> "symbols"
   :> Get '[JSON] [SymbolName]
@@ -242,7 +244,7 @@ type GetContractsSymbols = "contracts"
 -- GET /contracts/:contractName/:contractAddress/enum/:enumName
 type GetContractsEnum = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" (MaybeNamed Address)
+  :> Capture "contractAddress" Address
   :> "enum"
   :> Capture "enumName" EnumName
   :> QueryParam "chainid" ChainId
@@ -274,7 +276,7 @@ instance ToParamSchema EnumName
 -- GET /contracts/:contractName/:contractAddress/state/:mapping/:key
 type GetContractsStateMapping = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" (MaybeNamed Address)
+  :> Capture "contractAddress" Address
   :> "state"
   :> Capture "mapping" SymbolName
   :> Capture "key" Text
@@ -384,7 +386,7 @@ instance ToSchema PostCompileResponse where
       ex :: PostCompileResponse
       ex = PostCompileResponse
         { postcompileresponseContractName = "MySampleContract"
-        , postcompileresponseCodeHash = keccak256 "codeHash"
+        , postcompileresponseCodeHash = hash "codeHash"
         }
 
 type PostContractsXabi = "contracts"

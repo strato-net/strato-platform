@@ -15,15 +15,17 @@ ghc-options: -Wall -Werror
 dependencies:
   - base
   - blockapps-bloc22-api
-  - blockapps-ethereum
   - blockapps-solidity
   - blockapps-strato-api
   - containers
   - servant-client
+  - strato-model
   - text
 
 library:
   source-dirs: src/
+  dependencies:
+    - blockapps-ethereum
 
 tests:
   blockapps-bloc22-client-test:
@@ -31,9 +33,12 @@ tests:
     main: Spec.hs
     dependencies:
      - blockapps-bloc22-client
+     - blockapps-data
+     - blockapps-datadefs
      - blockapps-strato-client
      - base16-bytestring
      - bytestring
+     - core-api
      - hspec
      - http-client
      - quickcheck-instances

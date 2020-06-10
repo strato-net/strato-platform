@@ -24,7 +24,9 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances        ()
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.Wei
 
 newtype ContractName = ContractName Text deriving (Eq,Ord,Show,Generic)
 
@@ -54,7 +56,7 @@ instance ToParamSchema ContractName
 instance ToSchema ContractName where
   declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
     & mapped.schema.description ?~ "The name of the smart contract."
-    & mapped.schema.paramSchema.type_ .~ SwaggerString
+    & mapped.schema.paramSchema.type_ ?~ SwaggerString
     & mapped.schema.example ?~ toJSON (ContractName "MySmartContract")
 
 --------------------------------------------------------------------------------
@@ -91,7 +93,7 @@ instance ToParamSchema UserName
 instance ToSchema UserName where
   declareNamedSchema _ = return $ NamedSchema (Just "User Name")
       ( mempty
-        & type_ .~ SwaggerString
+        & type_ ?~ SwaggerString
         & example ?~ toJSON (UserName "Nikita")
         & description ?~ "User Name" )
 
@@ -116,7 +118,7 @@ instance ToSchema TxParams where
     wordSchema <- declareSchemaRef (Proxy :: Proxy Word)
     return $ NamedSchema (Just "Transaction Parameters")
       ( mempty
-        & type_ .~ SwaggerObject
+        & type_ ?~ SwaggerObject
         & example ?~ toJSON
           (TxParams (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876)))
         & description ?~ "Transaction Parameters"

@@ -12,6 +12,14 @@ github: blockapps/strato-platform/core-strato/blockapps-data
 
 dependencies:
   - base
+
+ghc-options: -Wall -O2
+
+library:
+  source-dirs: src/
+  default-extensions: TemplateHaskell
+  dependencies:
+  - QuickCheck
   - aeson
   - ansi-wl-pprint
   - base-unicode-symbols
@@ -19,41 +27,36 @@ dependencies:
   - binary
   - blockapps-datadefs
   - blockapps-haskoin
-  - blockapps-milena
   - blockapps-util
   - bytestring
   - bytestring-arbitrary
   - clock
   - conduit
-  - conduit-combinators
   - containers
-  - crypto-pubkey-types
   - data-default
   - deepseq
   - derive
   - esqueleto
   - ethereum-encryption
   - ethereum-rlp
-  - fast-ecrecover
   - filepath
   - format
+  - http-api-data
   - json-stream
   - lens
-  - leveldb-haskell
-  - lifted-base
   - merkle-patricia-db
+  - milena
   - monad-alter
-  - monad-control
   - mtl
   - network
-  - nibblestring
   - persistent
   - persistent-postgresql
   - persistent-template
-  - QuickCheck
+  - quickcheck-instances
   - resourcet
   - strato-conf
   - strato-model
+  - swagger2
   - text
   - time
   - transformers
@@ -61,12 +64,6 @@ dependencies:
   - unliftio-core
   - unordered-containers
   - vector
-
-ghc-options: -Wall -O2
-
-library:
-  source-dirs: src/
-  default-extensions: TemplateHaskell
 
 executables:
   global-db:
@@ -82,13 +79,18 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
+      - aeson
       - aeson-diff
+      - base16-bytestring
       - blockapps-data
-      - directory
+      - blockapps-haskoin
+      - bytestring
+      - containers
+      - ethereum-rlp
       - hspec
-      - hspec-expectations-lifted
-      - HUnit
-      - unix
+      - strato-model
+      - text
       - unordered-containers
       - vector
+      - QuickCheck
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N

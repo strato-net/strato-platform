@@ -28,7 +28,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           Blockchain.Sequencer.Event
 
@@ -43,9 +43,9 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
     setKafkaCheckpoint nextOffset'
 
 indexAPI :: ( MonadLogger m
-            , (SHA `A.Alters` API OutputTx) m
+            , (Keccak256 `A.Alters` API OutputTx) m
             , (Word256 `A.Alters` API ChainInfo) m
-            , (SHA `A.Alters` API OutputBlock) m
+            , (Keccak256 `A.Alters` API OutputBlock) m
             )
          => [IndexEvent] -> m ()
 indexAPI idxEvents = do

@@ -2,13 +2,13 @@
 
 module Handler.TransactionResult where
 
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Database.Esqueleto           as E
 import           Handler.Common
 import           Import
 import qualified Prelude                      as P
 
-getTransactionResultR :: SHA -> HandlerFor App Value
+getTransactionResultR :: Keccak256 -> HandlerFor App Value
 getTransactionResultR txHash      = do
   addHeader "Access-Control-Allow-Origin" "*"
   rs <- runDB $ E.select $

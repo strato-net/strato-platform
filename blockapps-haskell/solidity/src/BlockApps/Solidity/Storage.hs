@@ -12,9 +12,9 @@ import           Data.Word                (Word8)
 import qualified Data.ByteString          as ByteString
 import qualified Data.Text.Encoding       as Text
 
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.Value
 
+import           Blockchain.Strato.Model.Address
 
 toStorage :: Value -> ByteString
 toStorage = \case

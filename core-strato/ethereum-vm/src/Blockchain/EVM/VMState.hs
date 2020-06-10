@@ -33,10 +33,9 @@ import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
 import           Text.Format
-
-type Gas = Int
 
 instance Show Counter where
   show = const "<unboxed_ioref>"
@@ -68,11 +67,11 @@ data DebugCallCreate =
     ccValue       :: Integer
     } deriving (Show, Eq, Generic, NFData)
 
+--TODO- gas and refund use Counter for performance reasons, but this is based on Int, which could overflow....  in practice this should not matter, as gas values are bounded by what the user has in the account, which will always be low, but we should keep an eye on this if we change the nature of how gas works
 data VMState =
   VMState {
     vmIsHomestead    :: Bool,
-    dbs              :: Context,
-    sqldb            :: Config,
+    vmMemDBs         :: MemDBs,
     vmGasRemaining   :: Counter,
     pc               :: Counter,
     memory           :: Memory,
@@ -102,11 +101,11 @@ makeLenses ''VMState
 
 
 instance Format VMState where
-  format state =
-    "pc: " ++ show (pc state) ++ "\n" ++
-    "done: " ++ show (done state) ++ "\n" ++
-    "gasRemaining: " ++ show (vmGasRemaining state) ++ "\n" ++
-    "stack: " ++ show (stack state) ++ "\n"
+  format VMState{..} =
+    "pc: " ++ show pc ++ "\n" ++
+    "done: " ++ show done ++ "\n" ++
+    "gasRemaining: " ++ show vmGasRemaining ++ "\n" ++
+    "stack: " ++ show stack ++ "\n"
 
 startingAction :: Environment -> Action
 startingAction Environment{..} = Action
@@ -121,8 +120,8 @@ startingAction Environment{..} = Action
   , _actionEvents             = Seq.empty
   }
 
-startingState :: Bool -> Bool -> Environment -> Config -> Context -> IO VMState
-startingState isRunningTests' isHomestead env sqldb' dbs' = do
+startingState :: Bool -> Bool -> Environment -> MemDBs -> IO VMState
+startingState isRunningTests' isHomestead env dbs' = do
   m <- newMemory
   pcref <- newCounter 0
   gasref <- newCounter 0
@@ -131,8 +130,7 @@ startingState isRunningTests' isHomestead env sqldb' dbs' = do
   return VMState
              {
                vmIsHomestead=isHomestead,
-               dbs = dbs',
-               sqldb = sqldb',
+               vmMemDBs = dbs',
                pc = pcref,
                done=False,
                returnVal=Nothing,

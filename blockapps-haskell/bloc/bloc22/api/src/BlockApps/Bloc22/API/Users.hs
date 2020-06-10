@@ -37,8 +37,17 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
-import           BlockApps.Strato.Types
+import           BlockApps.Strato.Types (Strung(..))
+import qualified BlockApps.Strato.Types as Deprecated
 
+import           Blockchain.Data.DataDefs
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.Wei
 
 --------------------------------------------------------------------------------
 -- | Routes and types
@@ -60,7 +69,7 @@ instance ToSchema BlocTransactionStatus where
     & mapped.schema.description ?~ "Bloc Transaction Status"
     & mapped.schema.example ?~ toJSON Success
 
-data BlocTransactionData = Send   PostTransaction
+data BlocTransactionData = Send   Deprecated.PostTransaction
                          | Upload ContractDetails
                          | Call   [SolidityValue]
                          deriving (Eq,Show,Generic)
@@ -71,7 +80,7 @@ instance Arbitrary BlocTransactionData where
 instance ToJSON BlocTransactionData where
   toJSON btd = case btd of
     Send   transaction -> object [ "tag" .= ("Send" :: Text)
-                                 , "contents" .= (transaction::PostTransaction)
+                                 , "contents" .= (transaction::Deprecated.PostTransaction)
                                  ]
     Upload details     -> object [ "tag" .= ("Upload":: Text)
                                  , "contents" .= (details::ContractDetails)
@@ -91,26 +100,26 @@ instance FromJSON BlocTransactionData where
 
 instance ToSample BlocTransactionData where
   toSamples _ = samples
-    [ Send PostTransaction {
-        posttransactionHash       = keccak256 "foo"
-      , posttransactionGasLimit   = 100000
-      , posttransactionCodeOrData = "Code or Data"
-      , posttransactionGasPrice   = 1
-      , posttransactionTo         = Just $ Address 0xdeadbeef
-      , posttransactionFrom       = Address 0x12345678
-      , posttransactionValue      = Strung 0
-      , posttransactionR          = Hex 0xdeadbeef
-      , posttransactionS          = Hex 0xdeadbeef
-      , posttransactionV          = Hex 0x1c
-      , posttransactionNonce      = 9876
-      , posttransactionChainId    = Nothing
-      , posttransactionMetadata   = Nothing
+    [ Send Deprecated.PostTransaction {
+        Deprecated.posttransactionHash       = hash "foo"
+      , Deprecated.posttransactionGasLimit   = 100000
+      , Deprecated.posttransactionCodeOrData = "Code or Data"
+      , Deprecated.posttransactionGasPrice   = 1
+      , Deprecated.posttransactionTo         = Just $ Address 0xdeadbeef
+      , Deprecated.posttransactionFrom       = Address 0x12345678
+      , Deprecated.posttransactionValue      = Strung 0
+      , Deprecated.posttransactionR          = Hex 0xdeadbeef
+      , Deprecated.posttransactionS          = Hex 0xdeadbeef
+      , Deprecated.posttransactionV          = Hex 0x1c
+      , Deprecated.posttransactionNonce      = 9876
+      , Deprecated.posttransactionChainId    = Nothing
+      , Deprecated.posttransactionMetadata   = Nothing
       }
     , Upload ContractDetails {
         contractdetailsBin        = "Contract Bin"
-      , contractdetailsAddress    = Just (Named "Latest")
+      , contractdetailsAddress    = Just (Address 0xdeadbeef)
       , contractdetailsBinRuntime = "Contract Bin Runtime"
-      , contractdetailsCodeHash   = EVMCode $ keccak256SHA $ keccak256 "Contract Code Hash"
+      , contractdetailsCodeHash   = EVMCode $ hash "Contract Code Hash"
       , contractdetailsName       = "Example"
       , contractdetailsSrc        = "contract Example { }"
       , contractdetailsXabi       = sampleXabi
@@ -136,7 +145,7 @@ data BlocTransactionResult = BlocTransactionResult
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary BlocTransactionResult where
-  arbitrary = GR.genericArbitrary GR.uniform
+  arbitrary = BlocTransactionResult <$> arbitrary <*> arbitrary <*> pure Nothing <*> arbitrary
 
 instance ToJSON BlocTransactionResult where
   toJSON = genericToJSON (aesonDrop 15 camelCase)
@@ -147,7 +156,7 @@ instance FromJSON BlocTransactionResult where
 instance ToSample BlocTransactionResult where
   toSamples _ = singleSample BlocTransactionResult
     { blocTransactionStatus = Success
-    , blocTransactionHash = keccak256 "foo"
+    , blocTransactionHash = hash "foo"
     , blocTransactionTxResult = Nothing
     , blocTransactionData = Nothing
     }
@@ -160,7 +169,7 @@ instance ToSchema BlocTransactionResult where
       ex :: BlocTransactionResult
       ex = BlocTransactionResult
         { blocTransactionStatus = Success
-        , blocTransactionHash = keccak256 "foo"
+        , blocTransactionHash = hash "foo"
         , blocTransactionTxResult = Nothing
         , blocTransactionData = Nothing
         }
@@ -353,7 +362,7 @@ instance ToSchema PostUsersContractRequest where
     metadataSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text Text)))
     return $ NamedSchema (Just "Post Users Contract Request")
       ( mempty
-        & type_ .~ SwaggerObject
+        & type_ ?~ SwaggerObject
         & properties .~
             [ ("src", textSchema & mapped.description ?~ "Solidity source code")
             , ("password", pwSchema)
@@ -557,7 +566,7 @@ instance ToSchema PostUsersContractMethodRequest where
     metadataSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text Text)))
     return $ NamedSchema (Just "Post Users Contract Method Request")
       ( mempty
-        & type_ .~ SwaggerObject
+        & type_ ?~ SwaggerObject
         & properties .~
             [ ("password", pwSchema)
             , ("method", textSchema & mapped.description ?~ "Method name")
@@ -775,7 +784,7 @@ instance FromJSON PostUsersContractMethodListResponse where
 
 instance ToSample PostUsersContractMethodListResponse where
   toSamples _ = samples
-    [ MethodHash (keccak256 "foo")
+    [ MethodHash (hash "foo")
     , MethodResolved $ Right
        [ SolidityValueAsString "1"
        , SolidityValueAsString "two"

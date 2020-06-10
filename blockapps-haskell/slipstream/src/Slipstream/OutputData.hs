@@ -24,15 +24,15 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
 import           Database.PostgreSQL.Typed
+import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
-import           Network
 import           Text.RawString.QQ
 import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import Slipstream.Data.Action
 import Slipstream.Events
@@ -105,8 +105,8 @@ tableUpsert = csv . map go
 
 cirrusInfo :: PGDatabase
 cirrusInfo = PGDatabase
-  { pgDBHost = flags_pghost :: HostName
-  , pgDBPort = PortNumber . fromIntegral $ flags_pgport
+  { pgDBAddr = Left (flags_pghost, show flags_pgport)
+  , pgDBTLS = TlsDisabled
   , pgDBUser = BC.pack flags_pguser :: B.ByteString
   , pgDBPass = BC.pack flags_password :: B.ByteString
   , pgDBName = BC.pack flags_database :: B.ByteString
@@ -249,7 +249,7 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 insertContractTableQuery :: ProcessedContract -> Text
 insertContractTableQuery ProcessedContract{..} =
   let conVals = wrapAndEscape . map escapeQuotes $
-        [ T.pack $ shaToHex $ codePtrToSHA codehash
+        [ T.pack $ keccak256ToHex $ codePtrToSHA codehash
         , contractName
         , abi
         , chain
@@ -306,10 +306,10 @@ insertIndexTableQuery contracts@(x:_) =
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
-                 , T.pack . shaToHex . blockHash
+                 , T.pack . keccak256ToHex . blockHash
                  , tshow . blockTimestamp
                  , tshow . blockNumber
-                 , T.pack . shaToHex . transactionHash
+                 , T.pack . keccak256ToHex . transactionHash
                  , tshow . transactionSender
                  ]
       tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
@@ -350,10 +350,10 @@ insertHistoryTableQuery contracts@(x:_) =
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
-                 , T.pack . shaToHex . blockHash
+                 , T.pack . keccak256ToHex . blockHash
                  , tshow . blockTimestamp
                  , tshow . blockNumber
-                 , T.pack . shaToHex . transactionHash
+                 , T.pack . keccak256ToHex . transactionHash
                  , tshow . transactionSender
                  ]
       tableVals = baseVals ++ [escapeQuotes . transactionFuncName]

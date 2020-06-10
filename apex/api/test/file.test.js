@@ -9,7 +9,6 @@ const models = require('../models');
 const externalStorage = require('../lib/externalStorage/externalStorage');
 const uploader = require('../lib/uploader');
 const bcrypt = require('bcrypt');
-const checkMode = require('../lib/checkMode');
 const appConfig = require('../config/app.config');
 
 const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
@@ -44,45 +43,32 @@ describe('File - ExternalStorage - non-OAuth/Public', function () {
   let _contractAddress, accountAddress, app;
 
   before(async function () {
-    if(SKIP_TEST_BLOCK){
+    if (SKIP_TEST_BLOCK) {
       this.skip();
     }
 
-    checkModeStub = sinon.stub(checkMode, 'checkMode').callsFake(function (req, res, next) {
-      return next();
-    });
-
     app = require('../app');
 
-    await models.TempUser.create({
-      email: 'test01@test.com',
-      password: bcrypt.hashSync('password', appConfig.passwordSaltRounds),
-      verified: true
-    });
-    const res1 = await chai.request(app)
-      .post('/users')
-      .send({
-        username: "test01@test.com",
-        password: "password"
-      });
+    const res1 = await chai.request(process.env.blocRoot)
+      .post('/users/test01@test.com')
+      .type('form')
+      .send({ password: "password" })
 
-    accountAddress = JSON.parse(res1.text).user.accountAddress;
+    accountAddress = JSON.parse(res1.text);
     await waitFaucet(accountAddress);
   });
 
   after(function () {
-    if(SKIP_TEST_BLOCK){
+    if (SKIP_TEST_BLOCK) {
       this.skip();
     }
-
-    checkMode.checkMode.restore();
   })
 
 
   describe('post /bloc/file/upload', async function () {
 
     beforeEach(function () {
-      if(SKIP_TEST_BLOCK){
+      if (SKIP_TEST_BLOCK) {
         this.skip();
       }
 
@@ -98,7 +84,7 @@ describe('File - ExternalStorage - non-OAuth/Public', function () {
     });
 
     afterEach(function () {
-      if(SKIP_TEST_BLOCK){
+      if (SKIP_TEST_BLOCK) {
         this.skip();
       }
 
@@ -158,14 +144,14 @@ describe('File - ExternalStorage - non-OAuth/Public', function () {
 
     describe('rejects', async function () {
 
-      before(function(){
-        if(SKIP_TEST_BLOCK){
+      before(function () {
+        if (SKIP_TEST_BLOCK) {
           this.skip();
         }
       })
 
       beforeEach(function () {
-        if(SKIP_TEST_BLOCK){
+        if (SKIP_TEST_BLOCK) {
           this.skip();
         }
 
@@ -173,7 +159,7 @@ describe('File - ExternalStorage - non-OAuth/Public', function () {
       });
 
       afterEach(function () {
-        if(SKIP_TEST_BLOCK){
+        if (SKIP_TEST_BLOCK) {
           this.skip();
         }
 
@@ -588,6 +574,7 @@ describe('File - ExternalStorage - non-OAuth/Public', function () {
           })
           .catch((err) => {
             const res = err.response;
+            console.log("-=-----------------", err.response)
             assert(res.text.includes("Internal server error"));
             assert.equal(res.status, '500');
           });

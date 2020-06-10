@@ -21,8 +21,9 @@ import           BlockApps.Bloc22.Database.Create
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Queries.Deprecated
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum
 import           BlockApps.Logging
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
 
 data Migration = MigrationAction (Bloc ())
                | MigrationQuery (MigrationErrorBehavior, Query)
@@ -141,8 +142,8 @@ migrateCodeHashToCodePtr = do
   idsAndCodeHashes <- blocModify $ flip query_ idQuery
   $logInfoS "migrateCodeHashToCodePtr" "Migrating code hashes to CodePtrs"
   forM_ idsAndCodeHashes $ \(i :: Integer, bs) ->
-    for_ (byteStringKeccak256 bs) $ \kecc -> do
-      let codePtrBS = Binary . rlpSerialize . EVMCode $ keccak256SHA kecc
+    for_ (Just $ unsafeCreateKeccak256FromByteString bs) $ \kecc -> do
+      let codePtrBS = Binary . rlpSerialize . EVMCode $ kecc
       $logInfoS "migrateCodeHashToCodePtr" . T.pack $ concat
         [ "Processing ID "
         , show i

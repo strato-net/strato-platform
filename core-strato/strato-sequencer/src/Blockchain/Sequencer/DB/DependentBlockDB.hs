@@ -18,7 +18,7 @@ import           Prelude                      hiding (lookup)
 import           Blockchain.Data.DataDefs
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
-import           Blockchain.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 type DependentBlockDB = LDB.DB
 
@@ -66,10 +66,10 @@ genericDeleteDependentBlockDB k = do
 genericBatchDeleteDependentBlockDB :: Binary k => k -> LDB.BatchOp
 genericBatchDeleteDependentBlockDB k = LDB.Del (B.toStrict $ encode k)
 
-bootstrapGenesisBlock :: (SHA `Alters` DependentBlockEntry) m => SHA -> Integer -> m ()
+bootstrapGenesisBlock :: (Keccak256 `Alters` DependentBlockEntry) m => Keccak256 -> Integer -> m ()
 bootstrapGenesisBlock hash' = insert Proxy hash' . Emitted
 
-appendDependentBlock :: (SHA `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
+appendDependentBlock :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
 appendDependentBlock b = --do
   let parentHash = blockDataParentHash $ sbBlockData b
    in lookup Proxy parentHash >>= \case
@@ -79,17 +79,17 @@ appendDependentBlock b = --do
         Just (DependentBlocks existingDeps) ->
           insert Proxy parentHash $ DependentBlocks (b : existingDeps)
 
-existingParent :: (SHA `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
+existingParent :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
 existingParent = lookup Proxy . blockDataParentHash . sbBlockData
 
-readyToEmit :: (SHA `Alters` DependentBlockEntry) m => SequencedBlock -> m Bool
+readyToEmit :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m Bool
 readyToEmit b = do
   ep <- existingParent b
   case ep of
     Just (Emitted _) -> return True
     _ -> return False
 
-enqueueIfParentNotEmitted :: (SHA `Alters` DependentBlockEntry) m => SequencedBlock -> m EmissionReadiness
+enqueueIfParentNotEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m EmissionReadiness
 enqueueIfParentNotEmitted b = existingParent b >>= \case
   Just (Emitted totalDifficulty') ->
       return $ ReadyToEmit totalDifficulty'
@@ -101,7 +101,7 @@ enqueueIfParentNotEmitted b = existingParent b >>= \case
     insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks [b]
     return NotReadyToEmit
 
-insertEmitted :: (SHA `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe OutputBlock)
+insertEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe OutputBlock)
 insertEmitted b = existingParent b >>= \case
   Just (Emitted t) -> do
     insert Proxy (sbHash b) . Emitted $ totalDifficulty' t
@@ -110,7 +110,7 @@ insertEmitted b = existingParent b >>= \case
   where totalDifficulty' t = t + sequencedBlockDifficulty b
         theBlock t = sequencedBlockToOutputBlock b $ totalDifficulty' t
 
-buildEmissionChain :: (SHA `Alters` DependentBlockEntry) m
+buildEmissionChain :: (Keccak256 `Alters` DependentBlockEntry) m
                    => SequencedBlock
                    -> Integer
                    -> m [OutputBlock]

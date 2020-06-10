@@ -12,49 +12,47 @@ description:
 github: blockapps/strato-platform/strato-platform/merkle-patricia-db
 
 dependencies:
-  - base >= 4 && < 5
-  - aeson
-  - base16-bytestring
-  - binary
-  - blockapps-util
-  - bytestring
-  - cryptohash
-  - data-default
-  - deepseq
+  - base
   - ethereum-rlp
-  - format
   - leveldb-haskell
   - monad-alter
-  - monad-control
   - nibblestring
   - resourcet
-  - transformers
-  - ansi-wl-pprint
-  - containers
-  - mtl
   - strato-model
+  - transformers
 
 library:
-    source-dirs: src
+  source-dirs: src
+  dependencies:
+  - ansi-wl-pprint
+  - base16-bytestring
+  - binary
+  - bytestring
+  - containers
+  - data-default
+  - deepseq
+  - format
+
 
 tests:
   test-merkle-patricia-db:
     source-dirs: test
     main:        MerklePatriciaSpec.hs
     dependencies:
-      - merkle-patricia-db
-      - test-framework
-      - test-framework-hunit
       - HUnit
+      - blockapps-util
       - hspec
       - hspec-contrib
+      - merkle-patricia-db
 
 benchmarks:
   mpbench:
     main: MPBench.hs
     source-dirs: bench/
     dependencies:
+      - bytestring
       - criterion
+      - deepseq
       - directory
       - merkle-patricia-db
       - directory

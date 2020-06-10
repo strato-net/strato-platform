@@ -11,27 +11,18 @@ library:
   dependencies:
     - base
     - aeson
-    - base16-bytestring
+    - bifunctors
     - binary
-    - blockapps-milena
+    - milena
     - bytestring
     - common-log
+    - comonad
     - containers
-    - cryptohash
-    - ethereum-rlp
-    - fast-logger
-    - global-lock
-    - hflags
     - lens
-    - lifted-base
     - monad-alter
-    - monad-control
     - mtl
-    - network
-    - path-pieces
-    - resource-pool
+    - QuickCheck
     - transformers
-    - http-api-data
     - text
     - unix
     - time

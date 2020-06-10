@@ -1,4 +1,3 @@
-flags: {}
 packages:
 - blockapps-haskell/bloc/bloc22/api
 - blockapps-haskell/bloc/bloc22/client
@@ -13,15 +12,14 @@ packages:
 - blockapps-haskell/vault-wrapper/api
 - blockapps-haskell/vault-wrapper/client
 - blockapps-haskell/vault-wrapper/server
-- core-strato/blockapps-milena
+- core-strato/milena/
+- core-strato/core-api
 - core-strato/strato-conf/
 - core-strato/miner-ethash/
 - core-strato/merkle-patricia-db/
 - core-strato/blockapps-data/
 - core-strato/blockapps-datadefs/
 - core-strato/blockapps-mpdbs/
-- core-strato/ecrecover/
-- core-strato/fast-ecrecover/
 - core-strato/fast-keccak256/
 - core-strato/strato-init/
 - core-strato/ethereum-discovery/
@@ -96,7 +94,40 @@ extra-deps:
 - hecc-0.4.1.1@sha256:7d9b43abf61720e3b594bcff1941ab4b67a6e1f2499c4e42661978c665422321,907
 - hF2-0.2@sha256:0c727d9753343d23d04bd6d3702f8ce2a6c77800fd246e80d3c358945d85c5ee,813
 
-resolver: lts-12.4 #also duplicated in docker section below
+extra-deps:
+- Crypto-4.2.5.1@sha256:52275a055f4adf7c488260fb9fae60d03679632e64d3c8fc69d8b5951e8129cc,3688
+- bloomfilter-2.0.1.0@sha256:5b67d765315fb2abc1cde85e3c20ae1badfbe8d1070ed57525b7c428586e2d2f,1728
+- bytestring-arbitrary-0.1.3@sha256:14db64d4fe126fbad2eb8d3601bfd80a693f3131e2db0e76891feffe44f10df8,1773
+- derive-2.6.5@sha256:41480f98be28ca5a942f137f1ce17c2fc5e67040c434e8d3f4c45459b8bc6cbb,3184
+- global-lock-0.1@sha256:b7affe140763f53f17fd9c937dfe9b8023c7d209216fb3793933957e49a7446f,1327
+- hflags-0.4.3@sha256:f6b85fc7cbd170787f49225646e62d5589e5dd75abe6f26d16287e5fff3e678e,3121
+- json-stream-0.4.2.4@sha256:8b7f17d54a6e1e6311756270f8bcf51e91bab4300945400de66118470dcf51b9,4716
+- monadIO-0.11.1.0@sha256:2407c8aee3a74f3eba897f7c87f702f502394aec8cd412f3d2334cc353f54f13,964
+- nibblestring-0.0.3@sha256:aaf68a1c89cff51b628d4825d9e4caab2f8bbdf767a36ef05090b4d719cf295b,1660
+- normaldistribution-1.1.0.3@sha256:2615b784c4112cbf6ffa0e2b55b76790290a9b9dff18a05d8c89aa374b213477,2160
+- pbkdf-1.1.1.1@sha256:8d464cca917d723c65fe1a9f03e3b441e3f1bdbe4b72bf0f4e24a1e80ccfa326,2070
+#- postgresql-typed-0.6.1.0@sha256:d1b69f1aac9d29cd0ae7dbf616a3a77cbdc367f3bc3ac79938bde5a752b1e63d,4866
+- secp256k1-haskell-0.2.0@sha256:142c43f1d8612b351d0b3b96d13eb437ffbb728adf0aaac58d57cada9a14adee,2342
+- semver-range-0.2.8@sha256:44918080c220cf67b6e7c8ad16f01f3cfe1ac69d4f72e528e84d566348bb23c3,1941
+#- servant-aeson-specs-0.6.2.0@sha256:c2139f729695c18186394aeb50adceb5ba4b8adb3986626659f2210979bf5f99,2185
+#- servant-multipart-0.11.4
+- servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
+#- servant-swagger-tags-0.1.0.0@sha256:ffd61b869e56a7543f0641fe017647cf05fb57a76cb2d2acd045fc47bfbafb07,1079
+- wai-middleware-prometheus-1.0.0@sha256:1625792914fb2139f005685be8ce519111451cfb854816e430fbf54af46238b4,1314
+- haskell-src-exts-1.20.3@sha256:83ae523bbec907a42c043de1f5bbf4c1554e7c3b898af07bb1ce6e80eaa282ec,4589
+- servant-aeson-specs-0.6.2.0@sha256:c2139f729695c18186394aeb50adceb5ba4b8adb3986626659f2210979bf5f99,2185
+
+
+
+#- git: https://github.com/blockapps/milena
+#  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
+
+
+flags:
+ secp256k1-haskell:
+   recovery: true
+
+resolver: lts-14.27 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -111,8 +142,10 @@ ghc-options:
   strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing
   blockapps-haskoin: -Wall -Werror -fno-warn-overflowed-literals
 
+
+
 docker:
   enable: true
-  image: "strato-buildbase:lts-12.4"
+  image: "strato-buildbase:lts-14.27"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]

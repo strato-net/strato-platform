@@ -16,17 +16,17 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
-import           Blockchain.SHA
 import           Blockchain.Util
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad
 import           Data.Set
 
 import           Import
 
-sortToOrderBy :: (E.Esqueleto query expr backend, PersistField a)
-            => Maybe Text -> expr (E.Value a) -> (expr E.OrderBy)
+sortToOrderBy :: PersistField a
+              => Maybe Text -> E.SqlExpr (E.Value a) -> E.SqlExpr E.OrderBy
 sortToOrderBy (Just "asc")  x = E.asc  x
 sortToOrderBy (Just "desc") x = E.desc x
 sortToOrderBy _             x = E.asc  x
@@ -53,7 +53,7 @@ blockQueryParams = [ "txaddress",
                      "chainid"]
 
 -- todo: eliminate the Entity Block from this function
-getBlkFilter :: (E.Esqueleto query expr backend) => (expr (Entity BlockDataRef), expr (Entity AddressStateRef), expr (Entity RawTransaction))-> (Text, Text) -> expr (E.Value Bool)
+getBlkFilter :: (E.SqlExpr (Entity BlockDataRef), E.SqlExpr (Entity AddressStateRef), E.SqlExpr (Entity RawTransaction))-> (Text, Text) -> E.SqlExpr (E.Value Bool)
 
 getBlkFilter  _                               ("page", _)    = E.val True
 getBlkFilter  _                               ("index", _)    = E.val True
@@ -111,7 +111,7 @@ accountQueryParams = [ "address",
                        "chainid"]
 
 
-getAccFilter :: (E.Esqueleto query expr backend) => (expr (Entity AddressStateRef))-> (Text, Text) -> expr (E.Value Bool)
+getAccFilter :: (E.SqlExpr (Entity AddressStateRef))-> (Text, Text) -> E.SqlExpr (E.Value Bool)
 getAccFilter  _            ("page", _)       =  E.val True
 getAccFilter  _            ("index", _)      =  E.val True
 getAccFilter  _            ("raw", _)        =  E.val True
@@ -154,7 +154,7 @@ transactionQueryParams = [ "address",
                            "rejected",
                            "chainid"]
 
-getTransFilter :: (E.Esqueleto query expr backend) => (expr (Entity RawTransaction))-> (Text, Text) -> expr (E.Value Bool)
+getTransFilter :: (E.SqlExpr (Entity RawTransaction))-> (Text, Text) -> E.SqlExpr (E.Value Bool)
 getTransFilter  _          ("rejected", _)     = E.val True
 getTransFilter  _          ("page", _)         = E.val True
 getTransFilter  _          ("index", _)        = E.val True
@@ -187,7 +187,7 @@ getTransFilter (rawTx)     ("blocknumber", v)  = rawTx E.^. RawTransactionBlockN
 getTransFilter _           ("chainid", _)      = E.val True
 getTransFilter _           _                   = P.error ("no match in getTransFilter"::String)
 
-getStorageFilter :: (E.Esqueleto query expr backend) => (expr (Entity Storage), expr (Entity AddressStateRef)) -> (Text, Text) -> expr (E.Value Bool)
+getStorageFilter :: (E.SqlExpr (Entity Storage), E.SqlExpr (Entity AddressStateRef)) -> (Text, Text) -> E.SqlExpr (E.Value Bool)
 getStorageFilter (storage, addrStRef) (k, v) = case k of
   "key" -> storage E.^. StorageKey E.==. E.val (toHex v)
   "minkey" -> storage E.^. StorageKey E.>=. E.val (toHex v)
@@ -200,10 +200,10 @@ getStorageFilter (storage, addrStRef) (k, v) = case k of
   "chainid" -> E.val True
   _ -> P.error ("no match in getStorageFilter"::String)
 
-getLogFilter :: (E.Esqueleto query expr backend) => expr (Entity LogDB) -> (Text, Text) -> expr (E.Value Bool)
+getLogFilter :: E.SqlExpr (Entity LogDB) -> (Text, Text) -> E.SqlExpr (E.Value Bool)
 getLogFilter _ ("index",_) = E.val True         -- indexes are intercepted in handlers. We should probably deal with them here in the future
 getLogFilter log' ("address",v) = log' E.^. LogDBAddress E.==. E.val (toAddr v)
-getLogFilter log' ("hash",v) = log' E.^. LogDBTransactionHash  E.==. E.val ( SHA . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v )
+getLogFilter log' ("hash",v) = log' E.^. LogDBTransactionHash  E.==. E.val ( unsafeCreateKeccak256FromWord256 . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v )
 getLogFilter _           _  = P.error ("no match in getLogFilter"::String)
 
 toAddrId :: Text -> Key AddressStateRef
@@ -225,8 +225,8 @@ toHex = word256ToHexStorage . P.read . T.unpack
 toInteger' :: Text -> Integer
 toInteger' v = P.read $ T.unpack v
 
-toSHA :: Text -> SHA
-toSHA v = SHA . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v
+toSHA :: Text -> Keccak256
+toSHA v = unsafeCreateKeccak256FromWord256 . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v
 
 toCode :: Text -> ByteString
 toCode v = fst $ B16.decode $ BS8.pack $ (T.unpack v)

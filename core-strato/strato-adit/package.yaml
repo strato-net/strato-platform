@@ -10,32 +10,8 @@ ghc-options: -Wall -O2
 
 dependencies:
   - base
-  - ansi-wl-pprint
-  - blockapps-data
-  - blockapps-datadefs
-  - blockapps-init
-  - blockapps-milena
   - blockapps-util
-  - bytestring
-  - containers
-  - cryptohash
-  - ethereum-discovery
-  - ethereum-rlp
-  - format
   - hflags
-  - lens
-  - lifted-base
-  - monad-alter
-  - mtl
-  - normaldistribution
-  - random
-  - resourcet
-  - seqevents
-  - stm
-  - strato-conf
-  - text
-  - time
-  - unliftio
 
 other-extensions: OverloadedStrings
 
@@ -43,10 +19,35 @@ library:
   source-dirs: src
   other-modules:
     - Executable.AditM
+  dependencies:
+    - ansi-wl-pprint
+    - blockapps-data
+    - blockapps-datadefs
+    - bytestring
+    - containers
+    - cryptohash
+    - ethereum-discovery
+    - ethereum-rlp
+    - format
+    - lens
+    - milena
+    - monad-alter
+    - mtl
+    - normaldistribution
+    - random
+    - resourcet
+    - seqevents
+    - stm
+    - strato-conf
+    - text
+    - time
+    - unliftio
+
 
 executables:
   strato-adit:
     main:             Main.hs
     source-dirs:      exec_src
     dependencies:
+      - blockapps-init
       - strato-adit

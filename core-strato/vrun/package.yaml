@@ -17,29 +17,18 @@ copyright:           "2018 Author name here"
 description:         Please see the README on GitHub at <https://github.com/githubuser/vrun#readme>
 
 dependencies:
-- base >= 4.7 && < 5
+- base
 - blockapps-data
 - blockapps-datadefs
 - blockapps-haskoin
 - blockapps-mpdbs
 - blockapps-util
 - bytestring
-- containers
-- ethereum-vm
-- exceptions
-- fast-logger
-- hedis
 - hflags
-- leveldb-haskell
 - merkle-patricia-db
-- monad-control
-- persistent-sqlite
 - prometheus-client
-- resourcet
 - strato-model
 - seqevents
-- temporary
-- text
 - time
 - transformers
 - vm-runner

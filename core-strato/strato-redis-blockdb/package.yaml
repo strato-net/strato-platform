@@ -7,14 +7,19 @@ license:             Apache-2.0
 description:         Functions to operate against the Redis-backed BlockDB
 
 dependencies:
-  - QuickCheck
   - base
-  - base16-bytestring
   - blockapps-data
   - blockapps-datadefs
+  - containers
+
+library:
+  source-dirs: src
+  ghc-options: -Wall -Werror -O2
+  dependencies:
+  - QuickCheck
+  - base16-bytestring
   - blockapps-util
   - bytestring
-  - containers
   - ethereum-rlp
   - format
   - hedis
@@ -24,27 +29,25 @@ dependencies:
   - mtl
   - random
   - seqevents
-  - strato-conf
   - strato-model
   - text
-
-library:
-  source-dirs: src
-  ghc-options: -Wall -Werror -O2
-
-executables:
-  strato-redis-viz:
-    main: Viz.hs
-    source-dirs:
-      - exec_src/
-    dependencies:
-      - QuickCheck
-      - diagrams-contrib
-      - diagrams-html5
-      - diagrams-lib
-      - optparse-applicative
-      - strato-redis-blockdb
-    ghc-options: -threaded -Wall -Werror
+  
+# I am removing this executable because the package `diagrams-html5` has not been upgraded, and
+# won't work with newer stack lts' versions.
+# I don't think anyone uses this package (I asked on slack, no one knew what it is)....  If I
+# am wrong, uncomment this and find a replacement for `diagrams-html5`
+#executables:
+#  strato-redis-viz:
+#    main: Viz.hs
+#    source-dirs:
+#      - exec_src/
+#    dependencies:
+#      - diagrams-contrib
+#      - diagrams-html5
+#      - diagrams-lib
+#      - optparse-applicative
+#      - strato-redis-blockdb
+#    ghc-options: -threaded -Wall -Werror
 
 
 tests:
@@ -52,13 +55,16 @@ tests:
     source-dirs: test
     main: Test.hs
     dependencies:
-      - ansi-wl-pprint
+      - QuickCheck
       - containers
-      - bytestring
+      - format
+      - hedis
       - HUnit
-      - hspec-contrib
       - hspec
       - hspec-core
+      - lens-family
+      - seqevents
+      - strato-model
       - strato-redis-blockdb
     # We use -O0 here, since GHC takes *very* long to compile so many constants
     ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind

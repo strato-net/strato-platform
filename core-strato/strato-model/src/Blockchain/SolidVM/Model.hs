@@ -15,15 +15,31 @@ import qualified Data.Text as T
 import Data.Text.Encoding
 import GHC.Generics
 import Test.QuickCheck
+import Web.HttpApiData
+
+import              Control.Lens.Operators
+
+import Data.Swagger
 
 import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
 newtype HexStorage = HexStorage B.ByteString
-                   deriving (Eq, Show, Read, Generic)
+                   deriving (Eq, Ord, Show, Read, Generic)
                    deriving anyclass (NFData)
 
+instance ToParamSchema HexStorage where
+  toParamSchema _ =  mempty & type_ ?~ SwaggerString
+  
 word256ToHexStorage :: Word256 -> HexStorage
 word256ToHexStorage = HexStorage . word256ToBytes
+
+instance ToHttpApiData HexStorage where
+  toUrlPiece (HexStorage hs) = decodeUtf8 (B16.encode hs)
+
+instance FromHttpApiData HexStorage where
+  parseQueryParam t = case B16.decode (encodeUtf8 t) of
+    (hs, "") -> pure $ HexStorage hs
+    _ -> fail $ "non-hex string passed off as hex: " ++ T.unpack t
 
 instance ToSchema HexStorage where
   declareNamedSchema _ = return $ named "solidvm hex storage"  binarySchema

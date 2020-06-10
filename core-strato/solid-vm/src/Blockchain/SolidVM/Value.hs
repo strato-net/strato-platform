@@ -172,6 +172,8 @@ valEquals ct lhs rhs = case (lhs, rhs) of
   (SString s1, SString s2) -> s1 == s2
   (SAddress v1, SAddress v2) -> v1 == v2
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
+  (SContract _ a1, SAddress a2) -> a1 == a2
+  (SAddress a1, SContract _ a2) -> a1 == a2
   (SBuiltinVariable v1, SBuiltinVariable v2) ->
     todo "comparison of builtin vars requires evaluation: " (v1, v2)
   _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)

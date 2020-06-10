@@ -1,6 +1,6 @@
 BlockData
-    parentHash SHA
-    unclesHash SHA
+    parentHash Keccak256
+    unclesHash Keccak256
     coinbase Address
     stateRoot StateRoot
     transactionsRoot StateRoot
@@ -13,12 +13,12 @@ BlockData
     timestamp UTCTime
     extraData BS.ByteString
     nonce Word64
-    mixHash SHA
+    mixHash Keccak256
     deriving Eq Read Show Generic Data
 
 BlockDataRef
-    parentHash SHA
-    unclesHash SHA
+    parentHash Keccak256
+    unclesHash Keccak256
     coinbase Address
     stateRoot StateRoot
     transactionsRoot StateRoot
@@ -31,8 +31,8 @@ BlockDataRef
     timestamp UTCTime
     extraData BS.ByteString
     nonce Word64
-    mixHash SHA
-    hash SHA
+    mixHash Keccak256
+    hash Keccak256
     blockUncles [BlockData]
     powVerified Bool
     isConfirmed Bool
@@ -50,7 +50,7 @@ AddressStateRef
     balance Integer sqltype=numeric(1000,0)
     contractRoot StateRoot
     code BS.ByteString
-    codeHash SHA
+    codeHash Keccak256
     chainId Word256 default='0000000000000000000000000000000000000000000000000000000000000000'
     latestBlockDataRefNumber Integer
     UniqueAddress address chainId
@@ -71,7 +71,7 @@ RawTransaction
     v Word8
     metadata [TextPair] Maybe
     blockNumber Int
-    txHash SHA
+    txHash Keccak256
     origin TXOrigin
     UniqueTXHash txHash chainId
     deriving Eq Generic Read Show
@@ -84,8 +84,8 @@ Storage json
     deriving Eq Read Show
 
 TransactionResult json
-    blockHash SHA
-    transactionHash SHA
+    blockHash Keccak256
+    transactionHash Keccak256
     message String
     response BSS.ShortByteString
     trace String
@@ -143,8 +143,8 @@ Extra
     deriving Eq Read Show
 
 LogDB
-    blockHash SHA
-    transactionHash SHA
+    blockHash Keccak256
+    transactionHash Keccak256
     chainId Word256 Maybe
     address Address
     topic1 Word256 Maybe
@@ -165,7 +165,7 @@ ChainInfoRef
     chainId Word256
     chainLabel String
     parentChain Word256 Maybe
-    creationBlock SHA
+    creationBlock Keccak256
     chainNonce Word256
     deriving Eq Generic Show
 
