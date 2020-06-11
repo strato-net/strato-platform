@@ -181,9 +181,9 @@ pipeline {
         )
       }
     }
-    
+
     stage('Redeploy with OAuth') {
-      
+
       steps {
         withCredentials([
             usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
@@ -340,6 +340,16 @@ pipeline {
               '''
             }
           },
+
+          'BA-Rest Tests': {
+            sh '''#!/bin/bash -le
+            set -x
+            echo "Running ba-rest E2E tests"
+            cd strato-worktree/blockapps-rest
+            DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
+            docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
+            '''
+          },
         )
       }
     }
@@ -382,6 +392,6 @@ pipeline {
           message: "Nightly develop build *is fixed after it was failing*: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
-    
+
   }
 }
