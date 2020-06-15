@@ -4,5 +4,5 @@
 set -e
 printf "Building x509 cert-gen tool\n"
 stack build x509-certs
-cp .stack-work/dist/x86_64-linux-dkf7b33dd99b569c2d0a323e8a6dc29e94/Cabal-2.2.0.1/build/x509-certs/x509certs artifacts/.
+cp .stack-work/dist/x86_64-linux-dkf7b33dd99b569c2d0a323e8a6dc29e94/Cabal-2.4.0.1/build/x509certs/x509certs artifacts/.
 printf "\n\nDone. Run artifacts/x509certs\n"
