@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Blockstanbul.Authentication
   ( module Blockchain.Blockstanbul.Authentication
@@ -8,7 +9,7 @@ module Blockchain.Blockstanbul.Authentication
 
 import Control.Applicative ((<|>))
 import Control.Monad (liftM2, liftM3, unless)
-import Control.Lens
+import Control.Lens as L
 import Data.Binary
 import Data.List (intercalate)
 import qualified Data.ByteString as B
@@ -20,16 +21,17 @@ import Text.Printf
 
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication
+import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB(blockHash)
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
-import Blockchain.ExtendedECDSA
+import Blockchain.ECDSA
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import qualified Network.Haskoin.Crypto as HK
+
 
 
 
@@ -50,22 +52,22 @@ addValidators vs = over extraLens $
   . cookRawExtra
 
 getValidatorList :: Block -> [Address]
-getValidatorList x = view (istanbul . _Just . validatorList) (cookRawExtra $ view extraLens x )
+getValidatorList x = L.view (istanbul . _Just . validatorList) (cookRawExtra $ L.view extraLens x )
 
-getProposerSeal :: Block -> Maybe ExtendedSignature
+getProposerSeal :: Block -> Maybe Signature
 getProposerSeal x = do
-  ist <- view istanbul . cookRawExtra . view extraLens $ x
-  sig <- view proposedSig ist
+  ist <- L.view istanbul . cookRawExtra . L.view extraLens $ x
+  sig <- L.view proposedSig ist
   return sig
 
-addProposerSeal :: ExtendedSignature -> Block -> Block
+addProposerSeal :: Signature -> Block -> Block
 addProposerSeal sig = over extraLens $
     uncookRawExtra
   . over istanbul (\i -> fmap (set proposedSig (Just sig)) i
                      <|> error "must set validators before proposer seal")
   . cookRawExtra
 
-addCommitmentSeals :: [ExtendedSignature] -> Block -> Block
+addCommitmentSeals :: [Signature] -> Block -> Block
 addCommitmentSeals sigs = over extraLens $
     uncookRawExtra
   . over istanbul (\i -> fmap (set commitment sigs) i
@@ -79,38 +81,40 @@ scrubAllSeals = uncookRawExtra
               . cookRawExtra
 
 
-proposalMessage :: Block -> HK.Word256
+proposalMessage :: Block -> B.ByteString
 -- TODO(tim): Clear everything out of extraData except vanity and validators
-proposalMessage = keccak256ToWord256
+proposalMessage = keccak256ToByteString
                 . hash
                 . rlpSerialize
                 . rlpEncode
                 . over extraDataLens scrubAllSeals
                 . blockBlockData
 
-proposerSeal :: Block -> HK.PrvKey -> ExtendedSignature
-proposerSeal blk pk =
-  let msg = proposalMessage blk
-  in detExtSignMsg msg pk
 
 
-verifyProposerSeal :: Block -> ExtendedSignature -> Maybe Address
+proposerSeal :: (Signs m) => Block -> m (Signature)
+proposerSeal blk =
+  let mesg = proposalMessage blk
+  in sign mesg
+
+
+verifyProposerSeal :: Block -> Signature -> Maybe Address
 verifyProposerSeal blk sig =
-  let msg = proposalMessage blk
-  in pubKey2Address <$> getPubKeyFromSignature sig msg
+  let mesg = proposalMessage blk
+  in fromPublicKey <$> recoverPub sig mesg
 
-commitmentMessage :: Keccak256 -> HK.Word256
-commitmentMessage dig = keccak256ToWord256 . hash . (<> B.singleton 2) . keccak256ToByteString $ dig
+commitmentMessage :: Keccak256 -> B.ByteString
+commitmentMessage dig = keccak256ToByteString . hash . (<> B.singleton 2) . keccak256ToByteString $ dig
 
-commitmentSeal :: Keccak256 -> HK.PrvKey -> ExtendedSignature
-commitmentSeal sha pk =
-  let msg = commitmentMessage sha
-  in detExtSignMsg msg pk
+commitmentSeal :: (Signs m) => Keccak256 -> m (Signature)
+commitmentSeal sha =
+  let mesg = commitmentMessage sha
+  in sign mesg
 
-verifyCommitmentSeal :: Keccak256 -> ExtendedSignature -> Maybe Address
+verifyCommitmentSeal :: Keccak256 -> Signature -> Maybe Address
 verifyCommitmentSeal sha sig =
-  let msg = commitmentMessage sha
-  in pubKey2Address <$> getPubKeyFromSignature sig msg
+  let mesg = commitmentMessage sha
+  in fromPublicKey <$> recoverPub sig mesg
 
 finalHash :: Block -> Keccak256
 finalHash = hash
@@ -119,35 +123,34 @@ finalHash = hash
           . over extraDataLens scrubCommitmentSeals
           . blockBlockData
 
-signBenfInfo  :: HK.PrvKey -> (Address, Bool, Int) -> ExtendedSignature
-signBenfInfo pk bnf =
-  let msg = keccak256ToWord256 . hash . BL.toStrict $ encode (bnf)
-      -- addr = prvKey2Address pk
-  in detExtSignMsg msg pk
+signBenfInfo  :: (Signs m) => (Address, Bool, Int) -> m (Signature)
+signBenfInfo bnf =
+  let mesg = keccak256ToByteString . hash . BL.toStrict $ encode (bnf)
+  in sign mesg
 
-verifyBenfInfo :: (Address, Bool, Int) -> ExtendedSignature -> Maybe Address
-verifyBenfInfo bnf sign =
-  let msg = keccak256ToWord256 . hash . BL.toStrict $ encode (bnf)
-  in pubKey2Address <$> getPubKeyFromSignature sign msg
+verifyBenfInfo :: (Address, Bool, Int) -> Signature -> Maybe Address
+verifyBenfInfo bnf sig =
+  let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode (bnf)
+  in fromPublicKey <$> recoverPub sig mesg
 
-signMessage :: HK.PrvKey -> TrustedMessage -> OutEvent
-signMessage pk tm =
-  let msg = getHash tm
-      addr = prvKey2Address pk
-      sig = detExtSignMsg msg pk
-  in OMsg (MsgAuth addr sig) $ tm
+signMessage :: (StateMachineM m) => TrustedMessage -> m (OutEvent)
+signMessage tm = do
+  let mesg = getHash tm
+  addr <- use selfAddr
+  sig <- sign mesg
+  return $ OMsg (MsgAuth addr sig) $ tm
 
 authenticate :: InEvent -> Bool
 authenticate (IMsg (MsgAuth addr sig) tm) =
   let msgHash = getHash tm
-      mKey = getPubKeyFromSignature sig msgHash
-      mAddress = pubKey2Address <$> mKey
+      mKey = recoverPub sig msgHash
+      mAddress = fromPublicKey <$> mKey
   in mAddress == Just addr
 authenticate _ = True -- Non-messages are trusted implicitly
 
 replayHistoricBlock :: S.Set Address  -> Word256 -> Block -> Either String (Word256, Address)
 replayHistoricBlock realValidators seqNo blk = do
-  let ExtraData{..} = cookRawExtra . view extraLens $ blk
+  let ExtraData{..} = cookRawExtra . L.view extraLens $ blk
   IstanbulExtra{..} <- case _istanbul of
     Nothing -> Left "no istanbul metadata"
     Just ist -> Right ist
@@ -171,4 +174,5 @@ replayHistoricBlock realValidators seqNo blk = do
   Right (fromIntegral $ seqNo + 1, prop)
 
 isHistoricBlock :: Block -> Bool
-isHistoricBlock = (> 32) . B.length . view extraLens
+isHistoricBlock = (> 32) . B.length . L.view extraLens
+

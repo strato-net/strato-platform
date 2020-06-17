@@ -10,6 +10,7 @@ library:
   dependencies:
   - QuickCheck
   - aeson
+  - base16-bytestring
   - binary
   - blockapps-data
   - blockapps-datadefs

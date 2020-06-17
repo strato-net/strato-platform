@@ -8,13 +8,14 @@ module Blockchain.Blockstanbul.BenchmarkLib
 
 import Data.Aeson
 import Data.Bits
-import qualified Data.ByteString as BS
-import qualified Data.Map as M
-import Data.Maybe
+import qualified Data.ByteString        as BS
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8  as C8
+import qualified Data.Map               as M
 
-import qualified Network.Haskoin.Crypto as HK
 
 import Blockchain.Blockstanbul
+import Blockchain.ECDSA
 import Blockchain.Data.Block
 import Blockchain.Data.Code
 import Blockchain.Data.Json
@@ -44,11 +45,16 @@ oneTX size = ContractCreationTX {
   transactionMetadata = Nothing
   }
 
+
+benchPrivateKey :: PrivateKey
+benchPrivateKey = readPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")
+
+benchAddress :: Address
+benchAddress = fromPrivateKey benchPrivateKey
+
 benchContext :: BlockstanbulContext
-benchContext =
-  let mKey = HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5
-      pk = fromMaybe (error "working key now fails") mKey
-  in  newContext (Checkpoint (View 200 40) M.empty [prvKey2Address pk] []) pk
+benchContext = newContext (Checkpoint (View 200 40) M.empty [benchAddress] []) benchAddress
+
 
 makeBlock :: Int -> Int -> Block
 makeBlock txcount txsize = setBlockNo 41

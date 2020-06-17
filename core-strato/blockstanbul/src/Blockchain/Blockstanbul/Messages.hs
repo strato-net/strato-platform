@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
@@ -26,12 +27,13 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
-import Blockchain.ExtendedECDSA
+import Blockchain.ECDSA
 import Blockchain.Output
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Text.Colors as CL
 import Text.Format
+
 
 type RoundNumber = Word256
 type SequenceNumber = Word256
@@ -52,14 +54,15 @@ instance Format View where
 
 data MsgAuth = MsgAuth {
   sender :: Address,
-  signature :: ExtendedSignature
+  signature :: Signature
 } deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 data TrustedMessage = Preprepare View Block
                     | Prepare View Keccak256
-                    | Commit View Keccak256 ExtendedSignature
+                    | Commit View Keccak256 Signature
                     | RoundChange {roundchangeView :: View }
                     deriving (Eq, Show, Generic, Binary, NFData, Data)
+
 
 instance Format TrustedMessage where
   format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
@@ -191,15 +194,15 @@ outShortLog loc oev = $logInfoS loc . pack $
 
 instance NFData OutEvent
 
-getHash :: TrustedMessage -> Word256
+getHash :: TrustedMessage -> B.ByteString 
 -- This is wrong, because this means that the prepare and commits
 -- will have the same signature despite being different messages.
 -- It also needs a code for the message type.
 getHash = \case
-              (Preprepare _ blk) -> keccak256ToWord256 . blockHash $ blk
-              (Prepare _ di) -> keccak256ToWord256 di
-              (Commit _ di _) -> keccak256ToWord256 di
-              (RoundChange _) -> keccak256ToWord256 $ hash "TODO(tim): this signature is predictable"
+              (Preprepare _ blk) -> keccak256ToByteString . blockHash $ blk
+              (Prepare _ di) -> keccak256ToByteString di
+              (Commit _ di _) -> keccak256ToByteString di
+              (RoundChange _) -> keccak256ToByteString $ hash "TODO(tim): this signature is predictable"
 
 instance RLPSerializable View where
   rlpEncode (View r s) = RLPArray [rlpEncode r, rlpEncode s]
