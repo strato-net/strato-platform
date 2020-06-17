@@ -26,7 +26,6 @@ import           Data.Word
 
 import           GHC.Generics
 
-import           BlockApps.Ethereum
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
@@ -92,18 +91,12 @@ instance FromJSON MsgHash where
 instance ToSchema MsgHash where
   declareNamedSchema = const . pure $ named "MsgHash bytestring" binarySchema
 
+-- TODO: eventually, we should get rid of this and just use Signature from ECDSA
 data SignatureDetails = SignatureDetails {
-    r :: Hex Word256
-  , s :: Hex Word256
-  , v :: Hex Word8
+    r :: Word256
+  , s :: Word256
+  , v :: Word8
 } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
-
-
-instance ToSchema (Hex Word256) where
-  declareNamedSchema = const . pure $ named "hex word256" binarySchema
-
-instance ToSchema (Hex Word8) where
-  declareNamedSchema = const . pure $ named "hex word8" binarySchema
 
 
 data User = User
