@@ -65,9 +65,12 @@ createPeer peerString = buildPeer <$> parseEnode peerString
 
 -- TODO(tim): Reenable port selection
 buildPeer :: (Maybe String, String, Int) -> PPeer
-buildPeer (pubkeyMaybe, ip, _) =
+buildPeer (mpk, ip, p) = buildPeerPoint (stringToPoint <$> mpk, ip, p)
+
+buildPeerPoint :: (Maybe Point, String, Int) -> PPeer
+buildPeerPoint (pubkeyMaybe, ip, _) =
   let peer = PPeer {
-        pPeerPubkey = stringToPoint <$> pubkeyMaybe,
+        pPeerPubkey = pubkeyMaybe,
         pPeerIp = T.pack ip,
         pPeerUdpPort = 30303, --TODO think about this....  Should the UDP port be the same as the TCP port by default?
         pPeerTcpPort = 30303,
