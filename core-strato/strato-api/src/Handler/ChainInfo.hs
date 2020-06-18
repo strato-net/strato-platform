@@ -21,6 +21,7 @@ import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.ExtWord             (Word256)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 
@@ -103,5 +104,5 @@ getChainR = do
       [] -> getChainInfos []
       [cid] -> if (T.unpack cid == "all")
                    then getChainInfos []
-                   else getChainInfos [fromHexText cid]
-      cids -> getChainInfos $ fmap fromHexText cids
+                   else getChainInfos [ChainId $ fromHexText cid]
+      cids -> getChainInfos $ fmap (ChainId . fromHexText) cids

@@ -48,6 +48,7 @@ library:
     - lens
     - memory
     - nibblestring
+    - quickcheck-instances
     - path-pieces
     - persistent
     - persistent-template

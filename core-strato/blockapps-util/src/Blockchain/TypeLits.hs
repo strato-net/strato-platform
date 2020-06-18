@@ -1,6 +1,9 @@
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -10,42 +13,65 @@ module Blockchain.TypeLits
   , NamedTupleParser
   , NamedMap
   , NamedMapParser
-  , IsTuple(..)
   , module GHC.TypeLits
+  , nmap
+  , nmap1
+  , nmap2
+  , nmap1'
+  , nmap2'
   ) where
 
 import           Control.Applicative (liftA2)
+import           Control.Comonad
 import           Data.Aeson
 import           Data.Aeson.Types    (Parser)
+import           Data.Biapplicative
+import           Data.Bifoldable
+import           Data.Bitraversable
 import           Data.Proxy
 import qualified Data.Text           as Text
+import           GHC.Generics
 import           GHC.TypeLits
+import           Test.QuickCheck     hiding (Success, Failure)
 
-data NamedTuple (k :: Symbol) a (v :: Symbol) b = NamedTuple (a,b) deriving (Eq, Ord, Show)
+newtype NamedTuple (k :: Symbol) (v :: Symbol) a b = NamedTuple { unNamedTuple :: (a,b) }
+  deriving stock (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
+  deriving newtype (Applicative, Bifunctor, Biapplicative, Bifoldable, Comonad)
+  deriving anyclass (Bitraversable)
 
-type NamedTupleParser k a v b = Parser (NamedTuple k a v b)
+type NamedTupleParser k v a b = Parser (NamedTuple k v a b)
 
-type NamedMap k a v b = [NamedTuple k a v b]
+type NamedMap k v a b = [NamedTuple k v a b]
 
-type NamedMapParser k a v b = Parser (NamedMap k a v b)
+type NamedMapParser k v a b = Parser (NamedMap k v a b)
 
-class IsTuple t a b where
-  fromTuple :: (a,b) -> t
-  toTuple :: t -> (a,b)
-
-instance IsTuple (NamedTuple k a v b) a b where
-  fromTuple = NamedTuple
-  toTuple (NamedTuple t) = t
-
-instance forall k a v b. (KnownSymbol k, KnownSymbol v, ToJSON a, ToJSON b) => ToJSON (NamedTuple k a v b) where
+instance forall k a v b. (KnownSymbol k, KnownSymbol v, ToJSON a, ToJSON b) => ToJSON (NamedTuple k v a b) where
   toJSON (NamedTuple (a,b)) =
     object [ (Text.pack $ symbolVal (Proxy :: Proxy k)) .= toJSON a
            , (Text.pack $ symbolVal (Proxy :: Proxy v)) .= toJSON b
            ]
 
-instance forall k a v b. (KnownSymbol k, KnownSymbol v, FromJSON a, FromJSON b) => FromJSON (NamedTuple k a v b) where
+instance forall k a v b. (KnownSymbol k, KnownSymbol v, FromJSON a, FromJSON b) => FromJSON (NamedTuple k v a b) where
   parseJSON (Object o) = NamedTuple
                      <$> liftA2 (,)
                          (o .: (Text.pack $ symbolVal (Proxy :: Proxy k)))
                          (o .: (Text.pack $ symbolVal (Proxy :: Proxy v)))
   parseJSON o          = error $ "parseJSON NamedTuple: expected object, got " ++ show o
+
+instance forall k a v b. (KnownSymbol k, KnownSymbol v, Arbitrary a, Arbitrary b) => Arbitrary (NamedTuple k v a b) where
+  arbitrary = NamedTuple <$> (liftA2 (,) arbitrary arbitrary :: Gen (a,b))
+
+nmap :: (a -> b -> c) -> NamedMap k v a b -> [c]
+nmap f = map (uncurry f . unNamedTuple)
+
+nmap1 :: (a -> c) -> NamedMap k v a b -> [c]
+nmap1 f = map (f . fst . unNamedTuple)
+
+nmap2 :: (b -> c) -> NamedMap k v a b -> [c]
+nmap2 f = map (f . snd . unNamedTuple)
+
+nmap1' :: NamedMap k v a b -> [a]
+nmap1' = nmap1 id
+
+nmap2' :: NamedMap k v a b -> [b]
+nmap2' = nmap2 id

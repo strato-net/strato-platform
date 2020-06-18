@@ -11,17 +11,18 @@ module Handlers.UUID (
 import           Servant
 
 import           Blockchain.EthConf
+import           SQLM
 
 
 type API = "uuid" :> Get '[JSON] EthUniqueId
 
-server :: Server API
+server :: ServerT API SQLM
 server = getUUID
 
 -------------------------
 
-getUUID :: Handler EthUniqueId
-getUUID = return $ ethUniqueId ethConf
+getUUID :: Applicative m => m EthUniqueId
+getUUID = pure $ ethUniqueId ethConf
 {-
 getUUIDR = selectRep
              . provideJson

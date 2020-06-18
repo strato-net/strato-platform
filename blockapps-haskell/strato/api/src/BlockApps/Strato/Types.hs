@@ -41,7 +41,7 @@ module BlockApps.Strato.Types
   ) where
 
 import           Control.Applicative
-import           Control.Lens                 (mapped, (&), (.~), (?~))
+import           Control.Lens                 (mapped, (&), (?~))
 import           Control.Monad
 import           Data.Aeson
 import           Data.Aeson.Casing
@@ -169,7 +169,7 @@ instance ToSchema Word160 where
 instance ToSchema AbiBin
 
 instance ToParamSchema Word256 where
-  toParamSchema _ = mempty & type_ .~ SwaggerString
+  toParamSchema _ = mempty & type_ ?~ SwaggerString
 
 instance ToHttpApiData Word256 where
   toUrlPiece = Text.pack . ("0x" ++ ) . flip showHex ""

@@ -25,9 +25,12 @@ library:
     - aeson
     - base16-bytestring
     - blockapps-bloc22-api
+    - blockapps-data
+    - blockapps-datadefs
     - blockapps-ethereum
     - blockapps-strato-api
     - blockapps-strato-client
+    - blockapps-util
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - bytestring
@@ -36,10 +39,12 @@ library:
     - clock
     - common-log
     - conduit
+    - core-api
     - cryptonite
     - directory
     - extra
     - filepath
+    - format
     - haskoin-shim
     - http-client
     - http-types

@@ -204,7 +204,7 @@ instance ToCapture (Capture "userAddress" Address) where
 
 instance ToParamSchema Address where
   toParamSchema _ = mempty
-    & type_ .~ SwaggerString
+    & type_ ?~ SwaggerString
     & minimum_ ?~ fromInteger (toInteger . unAddress $ (minBound :: Address))
     & maximum_ ?~ fromInteger (toInteger . unAddress $ (maxBound :: Address))
     & Sw.format ?~ "hex string"
@@ -217,7 +217,7 @@ instance ToSchema Address where
   declareNamedSchema _ = return $
     NamedSchema (Just "Address")
       ( mempty
-        & type_ .~ SwaggerString
+        & type_ ?~ SwaggerString
         & example ?~ "address=deadbeef" --toJSON (Address 0xdeadbeef) -- FIXME if causing troubles outside /faucet
         & description ?~ "Ethereum Address, 20 byte hex encoded string" )
 

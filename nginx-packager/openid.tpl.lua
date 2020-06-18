@@ -69,10 +69,6 @@ if ngx.req.get_headers()["Authorization"] then
 
 else
   -- Else - use the openidc authenticate flow
-  if "<OAUTH_TEMPORARY_MIXED_AUTH>" == "true" then
-    -- This is a request coming from a legacy unit tests, leave it alone.
-    return
-  end
 
   -- If it's the logout request - unset custom cookies. All the rest is handled by .authenticate()
   if ngx.var.request_uri == authenticate_opts.logout_path then
