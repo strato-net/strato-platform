@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Blockstanbul.Authentication
   ( module Blockchain.Blockstanbul.Authentication
@@ -16,6 +17,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
+import qualified Data.Text as T
 import Test.QuickCheck
 import Text.Printf
 
@@ -28,6 +30,7 @@ import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.ECDSA
+import Blockchain.Output
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -125,7 +128,7 @@ finalHash = hash
 
 signBenfInfo  :: (Signs m) => (Address, Bool, Int) -> m (Signature)
 signBenfInfo bnf =
-  let mesg = keccak256ToByteString . hash . BL.toStrict $ encode (bnf)
+  let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode (bnf)
   in sign mesg
 
 verifyBenfInfo :: (Address, Bool, Int) -> Signature -> Maybe Address
@@ -138,6 +141,7 @@ signMessage tm = do
   let mesg = getHash tm
   addr <- use selfAddr
   sig <- sign mesg
+  $logInfoS "X509" . T.pack $ "we are signing a message....hope it doesn't fail!"
   return $ OMsg (MsgAuth addr sig) $ tm
 
 authenticate :: InEvent -> Bool
