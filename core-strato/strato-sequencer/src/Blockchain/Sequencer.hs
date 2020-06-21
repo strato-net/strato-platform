@@ -36,6 +36,7 @@ import           Text.Printf
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
+import           Blockchain.Blockstanbul.StateMachine -- TODO: Signs class should be in ECDSA
 import           Blockchain.ExtWord
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
@@ -83,6 +84,7 @@ instance HasBlockstanbulContext m => HasBlockstanbulContext (ConduitT i o m) whe
 instance (Monad m, HasPrivateHashDB m) => HasPrivateHashDB (ConduitT i o m) where
   requestChain = lift . requestChain
   requestTransaction = lift . requestTransaction
+
 
 data SeqEvent = ToVm VmEvent
               | ToP2p P2pEvent
@@ -185,6 +187,7 @@ runSequencerBatch :: ( MonadLogger m
                      , HasFullPrivacy m
                      , (Keccak256 `A.Alters` DependentBlockEntry) m
                      , (Keccak256 `A.Alters` ()) m
+                     , Signs m
                      )
                   => [SeqLoopEvent]
                   -> m BatchSeqEvent
@@ -199,6 +202,7 @@ checkForVotes :: ( MonadLogger m
                  , MonadBlockstanbul m
                  , HasFullPrivacy m
                  , (Keccak256 `A.Alters` DependentBlockEntry) m
+                 , Signs m
                  )
               => [CandidateReceived]
               -> ConduitT a SeqEvent m ()
@@ -221,6 +225,7 @@ checkForTimeouts :: ( MonadLogger m
                     , MonadBlockstanbul m
                     , HasFullPrivacy m
                     , (Keccak256 `A.Alters` DependentBlockEntry) m
+                    , Signs m
                     )
                  => [RoundNumber]
                  -> ConduitT a SeqEvent m ()
@@ -234,6 +239,7 @@ checkForUnseq :: ( MonadLogger m
                  , HasFullPrivacy m
                  , (Keccak256 `A.Alters` DependentBlockEntry) m
                  , (Keccak256 `A.Alters` ()) m
+                 , Signs m
                  )
               => [IngestEvent]
               -> ConduitT a SeqEvent m ()
@@ -251,6 +257,7 @@ blockstanbulSend :: ( MonadLogger m
                     , MonadBlockstanbul m
                     , HasFullPrivacy m
                     , (Keccak256 `A.Alters` DependentBlockEntry) m
+                    , Signs m
                     )
                  => [InEvent]
                  -> ConduitT a SeqEvent m ()
@@ -264,6 +271,7 @@ blockstanbulSend' :: ( MonadLogger m
                      , MonadBlockstanbul m
                      , (Keccak256 `A.Alters` ChainHashEntry) m
                      , (Keccak256 `A.Alters` DependentBlockEntry) m
+                     , Signs m
                      )
                   => InEvent
                   -> ConduitT a SeqEvent m ()
@@ -440,6 +448,7 @@ runBlockWithConsensus :: ( MonadLogger m
                          , MonadBlockstanbul m
                          , HasFullPrivacy m
                          , (Keccak256 `A.Alters` DependentBlockEntry) m
+                         , Signs m
                          )
                       => SequencedBlock
                       -> ConduitT a SeqEvent m ()
@@ -481,6 +490,7 @@ runConsensus :: ( MonadLogger m
                 , MonadBlockstanbul m
                 , (Keccak256 `A.Alters` ChainHashEntry) m
                 , (Keccak256 `A.Alters` DependentBlockEntry) m
+                , Signs m
                 )
              => ConduitT SequencedBlock SeqEvent m ()
 runConsensus = awaitForever $ \sb -> do
@@ -517,6 +527,7 @@ transformBlocks :: ( MonadLogger m
                    , MonadBlockstanbul m
                    , HasFullPrivacy m
                    , (Keccak256 `A.Alters` DependentBlockEntry) m
+                   , Signs m
                    )
                 => [IngestBlock]
                 -> ConduitT a SeqEvent m ()
@@ -553,6 +564,7 @@ splitEvents :: ( MonadLogger m
                , HasFullPrivacy m
                , (Keccak256 `A.Alters` DependentBlockEntry) m
                , (Keccak256 `A.Alters` ()) m
+               , Signs m
                )
             => [IngestEvent]
             -> ConduitT a SeqEvent m ()

@@ -9,13 +9,11 @@ import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
-import qualified Data.ByteString.Base64     as B64
 import qualified Data.ByteString.Char8      as C8
+import qualified Data.Text                  as T
 import           Data.Either.Extra
-import           Data.Maybe                 (fromMaybe)
 import           HFlags
 import           Safe
-import           System.Environment
 
 import           BlockApps.Init
 import           Blockchain.Blockstanbul
@@ -27,10 +25,13 @@ import           Blockchain.Sequencer
 import           Blockchain.Sequencer.Gregor
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.CablePackage
-import qualified Network.Haskoin.Crypto     as HK
 import qualified Network.Kafka.Protocol     as KP
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
+import           Network.HTTP.Client        (newManager, defaultManagerSettings)
+import           Servant.Client
+import qualified Strato.Strato23.API.Types  as VC
+import qualified Strato.Strato23.Client     as VC
 
 import           Flags
 
@@ -62,31 +63,42 @@ main = do
   putStrLn $ "Checkpoint: " ++ show ckpt
       -- TODO(tim): checkpoint validators, authSenders
   putStrLn $ "Interpreted validators: " ++ show validators
+  
+ 
+  -- setup the connection with vault-wrapper
+  mgr <- newManager defaultManagerSettings
+  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+  
+  selfAddress <- do 
+    eAddressAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv
+    case eAddressAndKey of
+      Left err -> error $ "error getting nodekey from vault: " ++ show err
+      Right addrAndKey -> return $ VC.unAddress addrAndKey
+  putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
+  addSelfAsMetric selfAddress
+  
   mCtx <- if not flags_blockstanbul
              then do
                 unless (null validators) . ioError . userError
                     $ "cannot specify --validators with --blockstanbul=false"
                 return Nothing
              else do
-                !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-                let !bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
-                    !pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
-                    selfAddress = prvKey2Address pkey
-                putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
-                addSelfAsMetric selfAddress
-                when (null validators) . ioError . userError
+               when (null validators) . ioError . userError
                     $ "must specify --validators with --blockstanbul"
-                unless (selfAddress `elem` validators) . putStrLn
+               unless (selfAddress `elem` validators) . putStrLn
                     $ "NODEKEY does not correspond to an address within --validators.\
                       \ This probably means that you are connecting to an existing network,\
                       \ and you are not one of the original validators of that network.\
                       \ If this is the case, please disregard this message. Otherwise,\
                       \ you may experience difficulty operating this node."
-                unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError
+               unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError
                     $ "--blockstanbul_block_period_ms must be nonnegative"
-                unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
+               unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
                     $ "--blockstanbul_round_period_s must be positive"
-                return . Just . newContext ckpt $ pkey
+               return $ Just $ newContext ckpt selfAddress
+  
+ 
   chr <- atomically newTQueue
   chv <- atomically newTQueue
   cht <- atomically newTMChan
@@ -104,6 +116,7 @@ main = do
         , cablePackage = pkg
         , maxEventsPerIter = flags_seq_max_events_per_iter
         , maxUsPerIter = flags_seq_max_us_per_iter
+        , vaultClient = Just clientEnv
         }
   race_ (runTheGregor gregorCfg)
       . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))
