@@ -23,8 +23,8 @@ import           Control.Monad
 import           Crypto.Random.Entropy
 import qualified Crypto.Secp256k1           as S
 
-import           Data.Binary
-import           Data.ByteString
+import           Data.Binary                
+import           Data.ByteString            as B
 import qualified Data.ByteString.Short      as BSS
 import           Data.Coerce
 import           Data.Data
@@ -48,10 +48,10 @@ import           Blockchain.Data.RLP
 -------------- THE NEWTYPE WRAPPERS ------------------
 ------------------------------------------------------
 
-newtype PublicKey = PublicKey S.PubKey deriving (Show)
-newtype PrivateKey = PrivateKey S.SecKey deriving (Show)
+newtype PublicKey = PublicKey S.PubKey deriving (Show, Eq)
+newtype PrivateKey = PrivateKey S.SecKey deriving (Show, Eq)
 newtype Signature = Signature S.CompactRecSig 
-  deriving          (Eq, Show, Generic)
+  deriving          (Show, Eq, Generic)
   deriving newtype  (NFData)
 
 
@@ -77,9 +77,9 @@ instance Binary Signature where
 
 instance Arbitrary Signature where
   arbitrary = do
-    r' <- replicateM 4 (arbitrary :: Gen Word8)
-    s' <- replicateM 4 (arbitrary :: Gen Word8)
-    v <- arbitrary :: Gen Word8
+    r' <- replicateM 32 (arbitrary :: Gen Word8)
+    s' <- replicateM 32 (arbitrary :: Gen Word8)
+    v <- (choose (0,3)) :: Gen Word8
     
     let r = BSS.toShort $ pack r'
         s = BSS.toShort $ pack s'
@@ -109,7 +109,7 @@ recoverPub (Signature s) msgHash = do
 
 
 signMsg :: PrivateKey -> ByteString -> Signature
-signMsg pk msgHash = do
+signMsg pk msgHash = do 
   let mesg = fromMaybe (error "could not import msgHash") (S.msg msgHash)
       sig' = S.signRecMsg (coerce pk) mesg
   Signature $ S.exportCompactRecSig sig'

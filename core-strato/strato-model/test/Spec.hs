@@ -15,6 +15,7 @@ import GHC.Integer.GMP.Internals
 import Test.Hspec
 import Test.QuickCheck
 
+import Blockchain.ECDSA
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.CodePtr
@@ -103,3 +104,13 @@ spec = do
 
     it "round trips correctly" $ property $ \(ptr::CodePtr) -> do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr
+
+  describe "ECDSA operations (using secp256k1-haskell)" $ do
+    it "can recover public keys from signatures" $ do
+      prv <- newPrivateKey
+      let pub = derivePublicKey prv 
+          mesg = keccak256ToByteString $ hash $ C8.pack "hey guys!" 
+          sig = signMsg prv mesg
+          mRecPub = recoverPub sig mesg
+      (Just pub) `shouldBe` mRecPub
+
