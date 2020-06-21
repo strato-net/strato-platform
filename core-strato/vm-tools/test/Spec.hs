@@ -1,24 +1,32 @@
-{-# LANGUAGE TemplateHaskell #-}
-import Control.Monad
-import Control.Monad.IO.Class
-import Data.Maybe
-import qualified Data.Set as S
-import Data.Word
-import HFlags
-import Test.Hspec (hspec, describe, Spec)
-import qualified Test.Hspec as HS
-import Test.Hspec.Expectations.Lifted
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+import           Control.Monad
+import           Control.Monad.IO.Class
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as C8
+import           Data.Maybe
+import qualified Data.Set                           as S
+import           Data.Word
+import           HFlags
+import           Test.Hspec (hspec, describe, Spec)
+import qualified Test.Hspec                         as HS
+import           Test.Hspec.Expectations.Lifted
 
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.BenchmarkLib
+import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
+import Blockchain.ECDSA
 import Blockchain.Output
 import Blockchain.Strato.Model.Address
 import Blockchain.VMContext
 import Executable.EVMFlags ()
 import Blockchain.VMOptions ()
-import qualified Network.Haskoin.Crypto as HK
 
 it :: String -> ContextM () -> HS.SpecWith ()
 it qual act = HS.it qual . void . runNoLoggingT . runTestContextM $ act
@@ -31,12 +39,19 @@ main = do
 blk :: Block
 blk = makeBlock 1 1
 
-prvKey :: HK.PrvKey
-prvKey = fromMaybe (error "invalid private key number")
-       $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5
+
+private :: PrivateKey
+private = readPrivateKey (fst $ B16.decode $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")
+
+
+instance Signs ContextM where
+  sign bs = return $ signMsg private bs
+
+--instance Signs IO where
+--  sign bs = return $ signMsg private bs
 
 sender :: Address
-sender = prvKey2Address prvKey
+sender = fromPrivateKey private
 
 recipient :: Address
 recipient = 0xdeadbeef
@@ -44,13 +59,13 @@ recipient = 0xdeadbeef
 recipient2 :: Address
 recipient2 = 0x0ddba11
 
-addVote :: MonadIO m => Address -> Word64 -> m Block
+addVote :: (MonadIO m, Signs m) => Address -> Word64 -> m Block
 addVote addr nonc = do
   let blk' = blk{blockBlockData = (blockBlockData blk)
     { blockDataCoinbase = addr
     , blockDataNonce = nonc}}
   let blk'' = addValidators (S.singleton 0x88) blk'
-      pSeal = proposerSeal blk'' prvKey
+  pSeal <- proposerSeal blk''
   return $ addProposerSeal pSeal blk''
 
 
