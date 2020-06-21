@@ -40,22 +40,22 @@ library:
   - unliftio
   - wai
 
-executables:
-  blockstanbul-vote:
-    source-dirs: exec-src/
-    main: Main.hs
-    other-modules: []
-    dependencies:
-      - aeson
-      - blockapps-haskoin
-      - blockstanbul
-      - base16-bytestring
-      - base64-bytestring
-      - bytestring
-      - HTTP
-      - ethereum-rlp
-      - extra
-      - strato-model
+    #executables:
+    #  blockstanbul-vote:
+    #  source-dirs: exec-src/
+    #    main: Main.hs
+    #    other-modules: []
+    #    dependencies:
+    #      - aeson
+    #      - blockapps-haskoin
+    #      - blockstanbul
+    #      - base16-bytestring
+    #      - base64-bytestring
+    #      - bytestring
+    #      - HTTP
+    #      - ethereum-rlp
+    #      - extra
+    #      - strato-model
 
 tests:
   blockstanbul-test:
