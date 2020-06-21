@@ -4,7 +4,6 @@
 
 module Strato.Strato23.Server.Signature where
 
-import           BlockApps.Ethereum
 import           Control.Monad.Reader                  (asks)
 import           Crypto.Secp256k1
 import qualified Data.ByteString.Short                 as BS
@@ -46,7 +45,6 @@ postSignature userName (MsgHash msgBS) = do
         let sig = exportCompactRecSig $ signRecMsg prvKey msg'
             r = bytesToWord256 $ BS.fromShort $ getCompactRecSigR sig
             s = bytesToWord256 $ BS.fromShort $ getCompactRecSigS sig
-        return $ SignatureDetails
-                  (Hex s)   -- yea, they're swapped. secp256k1-haskell has the order wrong
-                  (Hex r)
-                  (Hex $ 0x1b + getCompactRecSigV sig)
+            v = getCompactRecSigV sig
+        return $ SignatureDetails s r v
+        -- yea, s and r are swapped on purpose, secp256k1-haskell has the order wrong

@@ -53,6 +53,11 @@ library:
     - text
 
 
+    # remove
+    - cryptonite
+    - base64-bytestring
+
+
 
 executables:
   blockapps-vault-wrapper-server:
@@ -87,6 +92,20 @@ executables:
       - hflags
       - lens
       - opaleye
+      - text
+
+  migrate-nodekey:
+    source-dirs: app
+    main: MigrateNodeKey.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - base64-bytestring
+      - bytestring
+      - cryptonite
+      - hflags
+      - saltine
+      - secp256k1-haskell
       - text
 
 tests:
