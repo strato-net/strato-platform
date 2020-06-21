@@ -207,7 +207,7 @@ callSignature userName unsigned@UnsignedTransaction{..} = do
     unsignedTransactionValue
     unsignedTransactionInitOrData
     unsignedTransactionChainId
-    (unHex v)
-    (unHex r)
-    (unHex s)
+    v
+    r
+    s
     Nothing
