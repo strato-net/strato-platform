@@ -71,7 +71,10 @@ tests:
       - aeson
       - aeson-qq
       - base16-bytestring
+      - binary
+      - ethereum-encryption
       - integer-gmp
+      - secp256k1-haskell
       - strato-model
       - hspec
       - QuickCheck

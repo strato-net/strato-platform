@@ -2,18 +2,22 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-import Control.Monad
-import qualified Data.Aeson as Ae
-import Data.Aeson.QQ
-import qualified Data.Bits as Bits
-import qualified Data.ByteString as B
+
+import           Control.Monad
+import qualified Data.Aeson             as Ae
+import           Data.Aeson.QQ
+import qualified Data.Bits              as Bits
+import           Data.Binary
+import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as C8
-import Data.Word
-import GHC.Exts
-import GHC.Integer.GMP.Internals
-import Test.Hspec
-import Test.QuickCheck
+import qualified Data.ByteString.Short  as BSS
+import qualified Data.ByteString.Char8  as C8
+import           Data.Maybe
+import           Data.Word ()
+import           GHC.Exts
+import           GHC.Integer.GMP.Internals
+import           Test.Hspec
+import           Test.QuickCheck
 
 import Blockchain.ECDSA
 import Blockchain.Strato.Model.Address
@@ -21,6 +25,12 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 import Network.Haskoin.Internals (BigWord(..))
+
+
+import qualified Blockchain.ExtendedECDSA         as HK
+import qualified Crypto.Secp256k1                 as SEC
+import qualified Network.Haskoin.Crypto           as HK
+import qualified Network.Haskoin.Internals        as HK
 
 main :: IO ()
 main = hspec spec
@@ -113,4 +123,27 @@ spec = do
           sig = signMsg prv mesg
           mRecPub = recoverPub sig mesg
       (Just pub) `shouldBe` mRecPub
-
+  
+  describe "our ECDSA module works exactly like Haskoin" $ do
+    let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
+        hkPriv = fromMaybe (error "couldn't get EC key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
+        ecPriv = readPrivateKey testPrivBS
+    
+    it "can derive the same Ethereum address" $ do
+      let hkAddr = prvKey2Address hkPriv
+          ecAddr = fromPrivateKey ecPriv
+      hkAddr `shouldBe` ecAddr
+    it "can create the same ECDSA recoverable signature" $ do
+      let mesg = hash $ C8.pack "hey guys!"
+          (HK.ExtendedSignature (HK.Signature hr hs) hv) = HK.detExtSignMsg (keccak256ToWord256 mesg) hkPriv
+          (Signature (SEC.CompactRecSig er es ev)) = signMsg ecPriv $ keccak256ToByteString mesg
+          hkSigVals = [ word256ToBytes $ fromIntegral hr
+                      , word256ToBytes $ fromIntegral hs
+                      ]
+          ecSigVals = [ BSS.fromShort $ es   -- YES, secp256k1-haskell does have swapped R and S values
+                      , BSS.fromShort $ er
+                      ]
+          hvInt = (if hv then 1 else 0) :: Integer
+          ecInt = toInteger ev
+      hkSigVals `shouldBe` ecSigVals
+      hvInt `shouldBe` ecInt
