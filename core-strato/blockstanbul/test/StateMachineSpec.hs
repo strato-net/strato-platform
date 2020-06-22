@@ -158,7 +158,7 @@ spec = parallel $ do
         omsgs5' <- sendMessages aborts
         let omsgs5 = [o | o@(OMsg _ _) <- omsgs5']
             rest5 = omsgs5' \\ omsgs5
-        map oMessage omsgs5 `shouldBe` [RoundChange next]
+        oMessage (head omsgs5) `shouldBe` RoundChange next
         rest5 `shouldBe` [ResetTimer 21, NewCheckpoint $ Checkpoint next M.empty (map sender as) []]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
@@ -360,21 +360,23 @@ spec = parallel $ do
         (curView, _) <- setupRound blk . map sender $ [a1, a2, a3]
         next <- uses view (over round (+4))
         let roundNext = _round next
-        sendMessages [IMsg a1 $ RoundChange next] `shouldReturn` []
+        sendMessages [IMsg a1 $ RoundChange next] `shouldReturn` [OMsg a1 $ RoundChange next]
         -- 1 vote is not enough
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.singleton roundNext (S.singleton (sender a1))
         use view `shouldReturn` curView
         -- 2 votes will be broadcast, but not taken up.
         omsgs <- sendMessages [IMsg a2 $ RoundChange next]
-        map oMessage omsgs `shouldBe` [RoundChange next]
+        map oMessage omsgs `shouldBe` [RoundChange next, RoundChange next]
         use pendingRound `shouldReturn` Just roundNext
         use roundChanged `shouldReturn` M.singleton roundNext (S.fromList [sender a1, sender a2])
         use view `shouldReturn` curView
         -- 3 votes will do it
         sendMessages [IMsg a3 $ RoundChange next] `shouldReturn`
-          [ResetTimer 24
-          , NewCheckpoint (Checkpoint next M.empty (sort $ map sender [a1, a2, a3]) [])]
+          [ ResetTimer 24
+          , NewCheckpoint (Checkpoint next M.empty (sort $ map sender [a1, a2, a3]) [])
+          , OMsg a3 $ RoundChange next
+          ]
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
         use view `shouldReturn` next
@@ -516,8 +518,10 @@ spec = parallel $ do
         resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange roundAndSequencePlus1]
         let omsgs = [o | o@(OMsg _ _) <- resp]
             other = resp \\ omsgs
-        map oMessage omsgs `shouldBe` [RoundChange roundAndSequencePlus1,
-                                       Preprepare roundPlus1 blk]
+        map oMessage omsgs `shouldBe` [ RoundChange roundAndSequencePlus1
+                                      , Preprepare roundPlus1 blk
+                                      , RoundChange roundAndSequencePlus1
+                                      ]
         other `shouldBe`
           [ResetTimer $ _round roundPlus1
           , NewCheckpoint (Checkpoint roundPlus1 M.empty [me] [])]

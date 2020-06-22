@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -113,6 +114,15 @@ logFF str = $logInfoS str . T.pack
 -- replace with this when debugging tests
 --logFF str msg = void . return $! traceShowId $! trace (T.unpack str) msg
 
+type MonadSequencer m =
+  ( MonadLogger m
+  , MonadMonitor m
+  , MonadBlockstanbul m
+  , HasFullPrivacy m
+  , (Keccak256 `A.Alters` DependentBlockEntry) m
+  , (Keccak256 `A.Alters` ()) m
+  )
+
 sequencer :: SequencerM ()
 sequencer = do
   let logF = logFF "sequencer"
@@ -179,13 +189,7 @@ readEventsInBufferedWindow src = do
   logF . printf "read %d events from fused channels" $ length events
   return (src'', events)
 
-runSequencerBatch :: ( MonadLogger m
-                     , MonadMonitor m
-                     , MonadBlockstanbul m
-                     , HasFullPrivacy m
-                     , (Keccak256 `A.Alters` DependentBlockEntry) m
-                     , (Keccak256 `A.Alters` ()) m
-                     )
+runSequencerBatch :: MonadSequencer m
                   => [SeqLoopEvent]
                   -> m BatchSeqEvent
 runSequencerBatch events = runBatch $ do
@@ -228,13 +232,7 @@ checkForTimeouts rns = do
   withLabel seqLoopEvents "timeout" (flip unsafeAddCounter . fromIntegral . length $ rns)
   blockstanbulSend . map Timeout $ rns
 
-checkForUnseq :: ( MonadLogger m
-                 , MonadMonitor m
-                 , MonadBlockstanbul m
-                 , HasFullPrivacy m
-                 , (Keccak256 `A.Alters` DependentBlockEntry) m
-                 , (Keccak256 `A.Alters` ()) m
-                 )
+checkForUnseq :: MonadSequencer m
               => [IngestEvent]
               -> ConduitT a SeqEvent m ()
 checkForUnseq inEvents = do
