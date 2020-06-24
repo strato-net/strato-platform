@@ -3,6 +3,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+
 import           Control.Monad
 import qualified Data.Aeson             as Ae
 import           Data.Aeson.QQ
@@ -32,8 +33,12 @@ import qualified Crypto.Secp256k1                 as SEC
 import qualified Network.Haskoin.Crypto           as HK
 import qualified Network.Haskoin.Internals        as HK
 
+
+
+
 main :: IO ()
 main = hspec spec
+
 
 spec :: Spec
 spec = do
@@ -133,6 +138,7 @@ spec = do
       let hkAddr = prvKey2Address hkPriv
           ecAddr = fromPrivateKey ecPriv
       hkAddr `shouldBe` ecAddr
+    
     it "can create the same ECDSA recoverable signature" $ do
       let mesg = hash $ C8.pack "hey guys!"
           (HK.ExtendedSignature (HK.Signature hr hs) hv) = HK.detExtSignMsg (keccak256ToWord256 mesg) hkPriv
@@ -140,10 +146,21 @@ spec = do
           hkSigVals = [ word256ToBytes $ fromIntegral hr
                       , word256ToBytes $ fromIntegral hs
                       ]
-          ecSigVals = [ BSS.fromShort $ es   -- YES, secp256k1-haskell does have swapped R and S values
-                      , BSS.fromShort $ er
+          ecSigVals = [ BSS.fromShort $ er
+                      , BSS.fromShort $ es
                       ]
           hvInt = (if hv then 1 else 0) :: Integer
-          ecInt = toInteger ev
+          ecInt = (toInteger ev) - 0x1b
       hkSigVals `shouldBe` ecSigVals
       hvInt `shouldBe` ecInt
+    
+    it "can recover the same address from a signature" $ do
+      let mesg = hash $ C8.pack "hey guys!"
+          hkMsg = keccak256ToWord256 mesg
+          ecMsg = keccak256ToByteString mesg
+          hkSig = HK.detExtSignMsg hkMsg hkPriv
+          ecSig = signMsg ecPriv ecMsg
+          hkPub = fromMaybe (error "couldn't recover haskoin sig") (HK.getPubKeyFromSignature hkSig hkMsg)
+          ecPub = fromMaybe (error "couldn't recover ec sig") (recoverPub ecSig ecMsg)
+      fromPublicKey ecPub `shouldBe` pubKey2Address hkPub
+

@@ -30,6 +30,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
 
+import           BlockApps.Ethereum (Hex(..))--TODO: remove when we use Signature itself
 
 
 vaultWrapperSchemaOptions :: SchemaOptions
@@ -93,11 +94,16 @@ instance ToSchema MsgHash where
 
 -- TODO: eventually, we should get rid of this and just use Signature from ECDSA
 data SignatureDetails = SignatureDetails {
-    r :: Word256
-  , s :: Word256
-  , v :: Word8
+    r :: Hex Word256
+  , s :: Hex Word256
+  , v :: Hex Word8
 } deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
 
+instance ToSchema (Hex Word256) where
+  declareNamedSchema = const . pure $ named "hex word256" binarySchema
+
+instance ToSchema (Hex Word8) where
+  declareNamedSchema = const . pure $ named "hex word8" binarySchema
 
 data User = User
   { username :: T.Text

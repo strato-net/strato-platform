@@ -163,7 +163,7 @@ spec = do
           cSeal = signMsg (fakeKey) (keccak256ToByteString $ blockHash blk')
           blk = addCommitmentSeals [cSeal] blk'
           got = replayHistoricBlock vals 39 blk
-      got `shouldBe` Left "unknown signers: 34cd1157cae3aecfbcc92e7b8dfd4ef1d483e1d0" 
+      got `shouldBe` Left "unknown signers: dbbbaf9dd14074c9dba47830d026ae94b85f1e3f" 
 
     it "Accepts a block with 1 validator" $ do
       let vals = S.fromList $ map fromPrivateKey [private]

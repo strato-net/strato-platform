@@ -99,14 +99,16 @@ import           System.Directory                          (createDirectoryIfMis
 import           Text.Format
 
 import           Servant.Client
-import qualified Strato.Strato23.API                       as VC
+import qualified Strato.Strato23.API.Types                 as VC hiding (Address(..))
 import qualified Strato.Strato23.Client                    as VC
 
 
 
 import qualified Crypto.Secp256k1 as SEC --TODO: remove
-import           Data.Coerce
 import           Blockchain.Strato.Model.ExtendedWord -- TODO:remove  
+import           BlockApps.Ethereum (Hex(..)) --TODO: remove this disgusting insult to human decency
+import           Blockchain.Strato.Model.Address
+
 
 data Modification a = Modification a | Deletion
 
@@ -369,19 +371,35 @@ testPriv = readPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ff
 
 instance Signs SequencerM where
   sign mesg = do
-    mVc <- asks vaultClient
+    mVc <- asks vaultClient    
+    mCtx <- use blockstanbulContext
+    self <- case mCtx of
+      Nothing -> error "no blockstanbul context"
+      Just ctx -> return $ _selfAddr ctx
+
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
       Just vc -> do
         eSig <- liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
+        $logInfoS "X509" "after calling postSignature in Signs"
         case eSig of
           Left err -> error $ "vault-wrapper returned error on nodekey signature: " ++ show err
-          Right sig -> return $ coerce $ 
-            SEC.CompactRecSig { SEC.getCompactRecSigR = BSS.toShort $ word256ToBytes $ VC.r sig
-                              , SEC.getCompactRecSigS = BSS.toShort $ word256ToBytes $ VC.s sig
-                              , SEC.getCompactRecSigV = VC.v sig
-                              }
+          Right (VC.SignatureDetails r' s' v') -> do
+            let sig = Signature $ SEC.CompactRecSig { SEC.getCompactRecSigR = BSS.toShort $ word256ToBytes $ unHex r'
+                                                    , SEC.getCompactRecSigS = BSS.toShort $ word256ToBytes $ unHex s'
+                                                    , SEC.getCompactRecSigV = unHex v'
+                                                    }
 
+                mRecPub = recoverPub sig mesg
+            case mRecPub of 
+              Nothing -> error "failed to recover public key in Signs instance"
+              Just pub -> do
+                let recAddr = fromPublicKey pub
+                $logInfoS "X509" . T.pack $ "recovered address: " ++ format recAddr
+                $logInfoS "X509" . T.pack $ "my address: " ++ format self
+                if recAddr /= self then error "failed to recover self address"
+                else return sig
+            
 
 prunePrivacyDBs :: SequencerM ()
 prunePrivacyDBs = do

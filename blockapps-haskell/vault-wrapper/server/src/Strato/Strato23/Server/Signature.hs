@@ -18,6 +18,8 @@ import           Strato.Strato23.Server.Key            (postKey)
 import           UnliftIO
 
 
+import           BlockApps.Ethereum   (Hex(..)) --TODO: please god, remove
+
 postSignature :: Text -> MsgHash -> VaultM SignatureDetails
 postSignature userName (MsgHash msgBS) = do
   cache <- asks keyStoreCache
@@ -43,8 +45,9 @@ postSignature userName (MsgHash msgBS) = do
       Nothing -> vaultWrapperError $ AnError "Message was not 32 bytes long"
       Just msg' -> do
         let sig = exportCompactRecSig $ signRecMsg prvKey msg'
-            r = bytesToWord256 $ BS.fromShort $ getCompactRecSigR sig
-            s = bytesToWord256 $ BS.fromShort $ getCompactRecSigS sig
-            v = getCompactRecSigV sig
-        return $ SignatureDetails s r v
-        -- yea, s and r are swapped on purpose, secp256k1-haskell has the order wrong
+            r' = Hex $ bytesToWord256 $ BS.fromShort $ getCompactRecSigR sig
+            s' = Hex $ bytesToWord256 $ BS.fromShort $ getCompactRecSigS sig
+            v' = Hex $ 0x1b + getCompactRecSigV sig
+        return $ SignatureDetails s' r' v'
+        -- yea, s and r SHOULD be swapped ....secp256k1-haskell has the order wrong
+        -- eventually, the return type should be Blockchain.ECDSA.Signature
