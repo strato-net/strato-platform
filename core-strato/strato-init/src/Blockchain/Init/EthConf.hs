@@ -162,12 +162,12 @@ genEthConf = do
   let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
 
   -- temp
-  pIsSet <- runClientM (postPassword $ T.pack "1234") clientEnv
+  pIsSet <- runClientM (postPassword $ T.pack "123") clientEnv
   pub <- case pIsSet of 
     Left err -> error $ "could not set vault-wrapper password: " ++ (show err)
     Right _ -> do 
       key <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-      migrateNodeKey key "1234"
+      migrateNodeKey key "123"
 
 --  pub <- getNodeKey clientEnv
 
