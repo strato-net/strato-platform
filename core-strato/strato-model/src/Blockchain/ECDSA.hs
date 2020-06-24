@@ -11,7 +11,8 @@ module Blockchain.ECDSA
   , recoverPub
   , signMsg
   , newPrivateKey
-  , readPrivateKey
+  , exportPrivateKey
+  , importPrivateKey
   , derivePublicKey
   , exportPublicKey
   , importPublicKey
@@ -156,7 +157,7 @@ recoverPub (Signature (S.CompactRecSig r s v)) msgHash =
 
 signMsg :: PrivateKey -> ByteString -> Signature
 signMsg pk msgHash = 
-  let mesg = fromMaybe (error "could not import msgHash") (S.msg msgHash)
+  let mesg = fromMaybe (error "msg is not 32 bytes") (S.msg msgHash)
       (S.CompactRecSig r s v) = S.exportCompactRecSig $ S.signRecMsg (coerce pk) mesg
   in Signature $ S.CompactRecSig s r (0x1b + v) -- the swapped sig
 
@@ -187,10 +188,11 @@ newPrivateKey = do
   where
     err = error "could not generate new private key"
 
-readPrivateKey :: ByteString -> PrivateKey
-readPrivateKey bs = PrivateKey $ fromMaybe err (S.secKey bs)
-  where
-    err = error "could not make private key from bytestring"
+importPrivateKey :: ByteString -> Maybe PrivateKey
+importPrivateKey bs = PrivateKey <$> S.secKey bs
+
+exportPrivateKey :: PrivateKey -> ByteString
+exportPrivateKey = S.getSecKey . coerce
 
 derivePublicKey :: PrivateKey -> PublicKey
 derivePublicKey = PublicKey . S.derivePubKey . coerce

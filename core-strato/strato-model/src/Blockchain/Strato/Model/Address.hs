@@ -80,6 +80,7 @@ instance PrintfArg Address where
   formatArg (Address word) = formatArg word
 
 
+-- first byte of serialized pubkey is metdata, so we drop it
 fromPrivateKey :: PrivateKey -> Address
 fromPrivateKey =
   Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPublicKey False . derivePublicKey 

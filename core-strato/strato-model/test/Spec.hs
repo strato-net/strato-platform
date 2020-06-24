@@ -122,7 +122,8 @@ spec = do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr
 
   describe "ECDSA operations (using secp256k1-haskell)" $ do
-    let prv = readPrivateKey $ fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
+    let mPrv = importPrivateKey $ fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
+        prv = fromMaybe (error "could not import private key") mPrv
         pub = derivePublicKey prv 
         mesg = keccak256ToByteString $ hash $ C8.pack "hey guys!" 
         sig = signMsg prv mesg
@@ -144,8 +145,8 @@ spec = do
   
   describe "the ECDSA module works exactly like Haskoin on test values" $ do
     let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
-        hkPriv = fromMaybe (error "couldn't get EC key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
-        ecPriv = readPrivateKey testPrivBS
+        hkPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
+        ecPriv = fromMaybe (error "couldn't get EC key") $ importPrivateKey testPrivBS
     
     it "can derive the same Ethereum address" $ do
       let hkAddr = prvKey2Address hkPriv
