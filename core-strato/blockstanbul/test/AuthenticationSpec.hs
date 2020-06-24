@@ -12,6 +12,7 @@ import qualified Data.ByteString            as B
 import qualified Data.ByteString.Base16     as B16
 import qualified Data.ByteString.Char8      as C8
 import           Data.Monoid ((<>))
+import           Data.Maybe
 import qualified Data.Set                   as S
 import           Data.Time.Clock.POSIX
 import           Test.Hspec
@@ -56,7 +57,7 @@ testValidators :: [Address]
 testValidators = [Address 0x101, Address 0xaaa]
 
 private :: PrivateKey
-private = readPrivateKey (fst $ B16.decode $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866") -- 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5 
+private = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
 
 
 
@@ -155,7 +156,8 @@ spec = do
       got `shouldBe` Left "not enough commit seals (have 0 out of 1)"
 
     it "Rejects a block with an unknown seal" $ do
-      let fakeKey = readPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
+      let mFakeKey = importPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
+          fakeKey = fromMaybe (error "could not import fake key") mFakeKey
           vals = S.fromList $ map fromPrivateKey [private]
           blk'' = addValidators vals testBlock
       pSeal <- proposerSeal blk'' 

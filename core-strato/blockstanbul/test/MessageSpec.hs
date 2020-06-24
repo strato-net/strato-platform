@@ -4,6 +4,7 @@ module MessageSpec where
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8  as C8
+import Data.Maybe
 import Data.Time.Clock.POSIX
 import Test.Hspec
 
@@ -22,7 +23,7 @@ spec = parallel $ do
     let vw = View 54975581388 45212608023800330
         digest = unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1
         addr = Address 0x787878787878787878787878
-        priv = readPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")
+        priv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
         sigMsg = keccak256ToByteString blockstanbulMixHash 
         sealMsg = keccak256ToByteString $ unsafeCreateKeccak256FromWord256 0x0
         sig = signMsg priv sigMsg

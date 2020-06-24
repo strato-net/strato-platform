@@ -46,8 +46,6 @@ library:
     - stm-conduit
     - strato-conf
     - strato-model
-    - secp256k1-haskell # TODO: remove
-    - blockapps-ethereum # TODO: please, please, please, remove
     - servant-client
     - text
     - time

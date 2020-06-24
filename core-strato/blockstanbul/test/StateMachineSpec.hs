@@ -21,6 +21,7 @@ import qualified Data.ByteString.Base16     as B16
 import qualified Data.ByteString.Char8      as C8
 import           Data.List
 import qualified Data.Map                   as M
+import           Data.Maybe
 import qualified Data.Set                   as S
 import           Data.Word
 import           Prelude                    hiding (round, sequence)
@@ -41,7 +42,7 @@ import Blockchain.Strato.Model.Keccak256
 
 
 myPriv :: PrivateKey
-myPriv = readPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")
+myPriv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 
 testContext :: BlockstanbulContext

@@ -66,13 +66,13 @@ import qualified Data.ByteString                           as B
 import qualified Data.ByteString.Base16                    as B16
 import qualified Data.ByteString.Char8                     as C8
 import qualified Data.ByteString.Lazy                      as BL
-import qualified Data.ByteString.Short                     as BSS
 import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue
 import           Data.Foldable                             (foldl',toList)
 import           Data.IORef
 import           Data.Map                                  (Map)
 import qualified Data.Map                                  as M
+import           Data.Maybe
 import qualified Data.Sequence                             as Q
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -103,11 +103,6 @@ import qualified Strato.Strato23.API.Types                 as VC hiding (Address
 import qualified Strato.Strato23.Client                    as VC
 
 
-
-import qualified Crypto.Secp256k1 as SEC --TODO: remove
-import           Blockchain.Strato.Model.ExtendedWord -- TODO:remove  
-import           BlockApps.Ethereum (Hex(..)) --TODO: remove this disgusting insult to human decency
-import           Blockchain.Strato.Model.Address
 
 
 data Modification a = Modification a | Deletion
@@ -367,38 +362,19 @@ instance HasBlockstanbulContext SequencerM where
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot 
 -- easier than making a whole new SequencerM definition just to get a different Signs instance
 testPriv :: PrivateKey
-testPriv = readPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")
+testPriv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 instance Signs SequencerM where
   sign mesg = do
     mVc <- asks vaultClient    
-    mCtx <- use blockstanbulContext
-    self <- case mCtx of
-      Nothing -> error "no blockstanbul context"
-      Just ctx -> return $ _selfAddr ctx
-
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
       Just vc -> do
+        $logInfoS "Signs" "Asking the vault-wrapper to sign a Blockstanbul message"
         eSig <- liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
-        $logInfoS "X509" "after calling postSignature in Signs"
         case eSig of
           Left err -> error $ "vault-wrapper returned error on nodekey signature: " ++ show err
-          Right (VC.SignatureDetails r' s' v') -> do
-            let sig = Signature $ SEC.CompactRecSig { SEC.getCompactRecSigR = BSS.toShort $ word256ToBytes $ unHex r'
-                                                    , SEC.getCompactRecSigS = BSS.toShort $ word256ToBytes $ unHex s'
-                                                    , SEC.getCompactRecSigV = unHex v'
-                                                    }
-
-                mRecPub = recoverPub sig mesg
-            case mRecPub of 
-              Nothing -> error "failed to recover public key in Signs instance"
-              Just pub -> do
-                let recAddr = fromPublicKey pub
-                $logInfoS "X509" . T.pack $ "recovered address: " ++ format recAddr
-                $logInfoS "X509" . T.pack $ "my address: " ++ format self
-                if recAddr /= self then error "failed to recover self address"
-                else return sig
+          Right sig -> return sig
             
 
 prunePrivacyDBs :: SequencerM ()

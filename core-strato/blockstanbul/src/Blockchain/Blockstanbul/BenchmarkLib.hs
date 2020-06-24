@@ -12,7 +12,7 @@ import qualified Data.ByteString        as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8  as C8
 import qualified Data.Map               as M
-
+import Data.Maybe
 
 import Blockchain.Blockstanbul
 import Blockchain.ECDSA
@@ -47,7 +47,7 @@ oneTX size = ContractCreationTX {
 
 
 benchPrivateKey :: PrivateKey
-benchPrivateKey = readPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")
+benchPrivateKey = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 benchAddress :: Address
 benchAddress = fromPrivateKey benchPrivateKey
