@@ -14,6 +14,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 module Blockchain.Sequencer.Monad
   ( MonadBlockstanbul
+  , Modification(..)
   , SequencerContext(..)
   , SequencerConfig(..)
   , SequencerM
@@ -30,8 +31,6 @@ module Blockchain.Sequencer.Monad
   , genericLookupSequencer
   , genericInsertSequencer
   , genericDeleteSequencer
-  , getChainsDB
-  , getTransactionsDB
   , prunePrivacyDBs
   , runSequencerM
   , pairToVmTx
@@ -46,6 +45,19 @@ module Blockchain.Sequencer.Monad
   , drainVotes
   , fuseChannels
   , createWaitTimer
+  , dependentBlockDB
+  , seenTransactionDB
+  , dbeRegistry
+  , blockHashRegistry
+  , txHashRegistry
+  , chainHashRegistry
+  , chainIdRegistry
+  , getChainsDB
+  , getTransactionsDB
+  , ldbBatchOps
+  , blockstanbulContext
+  , loopTimeout
+  , latestRoundNumber
 ) where
 
 import           Prelude                                   hiding (round)
