@@ -106,6 +106,7 @@ executables:
       - hflags
       - saltine
       - secp256k1-haskell
+      - strato-model
       - text
 
 tests:
@@ -113,15 +114,15 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
+      - base16-bytestring
+      - blockapps-ethereum
+      - blockapps-haskoin
       - blockapps-vault-wrapper-server
       - bytestring
-      - hspec
+      - ethereum-encryption
       - clockwork
       - cryptonite
+      - haskoin-shim
+      - hspec
       - secp256k1-haskell
-      - haskoin-shim 
-      - blockapps-haskoin
-      - base16-bytestring
       - strato-model
-      - blockapps-ethereum
-      - ethereum-encryption

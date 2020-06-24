@@ -5,11 +5,10 @@
 module Strato.Strato23.Server.Signature where
 
 import           Control.Monad.Reader                  (asks)
-import           Crypto.Secp256k1
-import qualified Data.ByteString.Short                 as BS
+import qualified Data.ByteString                       as B
 import qualified Data.Cache                            as Cache
 import           Data.Text                             (Text)
-import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.ECDSA
 import           Strato.Strato23.Monad
 import           Strato.Strato23.API.Types
 import           Strato.Strato23.Crypto
@@ -18,9 +17,8 @@ import           Strato.Strato23.Server.Key            (postKey)
 import           UnliftIO
 
 
-import           BlockApps.Ethereum   (Hex(..)) --TODO: please god, remove
 
-postSignature :: Text -> MsgHash -> VaultM SignatureDetails
+postSignature :: Text -> MsgHash -> VaultM Signature
 postSignature userName (MsgHash msgBS) = do
   cache <- asks keyStoreCache
   cachedPk <- liftIO $ Cache.lookup cache userName
@@ -41,13 +39,6 @@ postSignature userName (MsgHash msgBS) = do
       pure (a,b,c,d,e)
   withPassword $ \pw -> case decryptSecKey pw salt nonce pKey of
     Nothing -> vaultWrapperError IncorrectPasswordError
-    Just prvKey -> case msg msgBS of
-      Nothing -> vaultWrapperError $ AnError "Message was not 32 bytes long"
-      Just msg' -> do
-        let sig = exportCompactRecSig $ signRecMsg prvKey msg'
-            r' = Hex $ bytesToWord256 $ BS.fromShort $ getCompactRecSigR sig
-            s' = Hex $ bytesToWord256 $ BS.fromShort $ getCompactRecSigS sig
-            v' = Hex $ 0x1b + getCompactRecSigV sig
-        return $ SignatureDetails s' r' v'
-        -- yea, s and r SHOULD be swapped ....secp256k1-haskell has the order wrong
-        -- eventually, the return type should be Blockchain.ECDSA.Signature
+    Just prvKey 
+      | B.length msgBS == 32 -> return $ signMsg prvKey msgBS 
+      | otherwise -> vaultWrapperError $ AnError "Message was not 32 bytes long"

@@ -12,7 +12,6 @@ module Strato.Strato23.Database.Queries where
 
 import           Control.Arrow
 import           Control.Monad                   (void)
-import           Crypto.Secp256k1               
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.ByteString                 (ByteString)
@@ -26,10 +25,12 @@ import qualified Data.Text                       as T
 import           Database.PostgreSQL.Simple      (Connection)
 import           Opaleye                         hiding (not, null, index)
 
+import           Blockchain.ECDSA
+import           Blockchain.Strato.Model.Address
+
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Tables
 
-import           Blockchain.Strato.Model.Address
 
 
 countUsers :: T.Text -> Query (Column PGInt8)
@@ -114,9 +115,9 @@ instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
 instance Default Constant SecretBox.Nonce (Column PGBytea) where
   def = lmap Saltine.encode def
 
-instance QueryRunnerColumnDefault PGBytea PubKey where
+instance QueryRunnerColumnDefault PGBytea PublicKey where
   queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode public key") . importPubKey . fst . B16.decode)
+    (fromMaybe (error "could not decode public key") . importPublicKey . fst . B16.decode)
     queryRunnerColumnDefault
-instance Default Constant PubKey (Column PGBytea) where
-  def = lmap (B16.encode . exportPubKey False) def
+instance Default Constant PublicKey (Column PGBytea) where
+  def = lmap (B16.encode . exportPublicKey False) def

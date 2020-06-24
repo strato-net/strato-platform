@@ -6,10 +6,12 @@ module Strato.Strato23.Server.Key where
 
 import           Data.Maybe                       (fromMaybe, isJust)
 import           Data.Text                        (Text)
+
 import           Strato.Strato23.API
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Monad
 import           Strato.Strato23.Database.Queries
+import           Blockchain.Strato.Model.Address
 
 
 getKey :: Text -> Maybe Text -> VaultM AddressAndKey
@@ -21,7 +23,7 @@ getKey headerUserName queryParamUserName = withPassword $ \pw -> do
     then return $ AddressAndKey addr pub -- not specified, to guarantee correctness
     else case decryptSecKey pw salt nonce encKey of
       Nothing -> vaultWrapperError IncorrectPasswordError
-      Just pKey -> return $ AddressAndKey (deriveAddress pKey) pub
+      Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) pub
 
 postKey :: Text -> VaultM AddressAndKey
 postKey userName = withPassword $ \pw -> do
@@ -31,4 +33,4 @@ postKey userName = withPassword $ \pw -> do
     then vaultWrapperError $ UserError ("User " <> userName <> " already exists")
     else case decryptSecKey pw keystoreSalt keystoreAcctNonce keystoreAcctEncSecKey of
       Nothing -> vaultWrapperError IncorrectPasswordError
-      Just pKey -> return $ AddressAndKey (deriveAddress pKey) keystoreAcctPubKey
+      Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) keystoreAcctPubKey

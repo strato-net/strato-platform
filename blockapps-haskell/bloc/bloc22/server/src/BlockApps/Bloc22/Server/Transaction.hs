@@ -8,15 +8,18 @@
 
 module BlockApps.Bloc22.Server.Transaction where
 
-import           Control.Applicative               ((<|>), liftA2)
+import           Control.Applicative                    ((<|>), liftA2)
 import           Control.Monad
 import           Control.Monad.Reader
+import qualified Crypto.Secp256k1                       as S
+import qualified Data.ByteString.Short                  as BSS
 import           Data.Conduit
 import           Data.Conduit.TQueue
-import qualified Data.Map.Strict                   as Map
+import qualified Data.Map.Strict                        as Map
 import           Data.Maybe
-import           Data.Text                         (Text)
-import qualified Data.Text                         as Text
+import           Data.Text                              (Text)
+import qualified Data.Text                              as Text
+import           Data.Word
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
@@ -29,7 +32,9 @@ import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Logging
 import           BlockApps.Solidity.Contract()
-import           BlockApps.Strato.Types            hiding (Transaction (..))
+import           BlockApps.Strato.Types                 hiding (Transaction (..))
+import           Blockchain.ECDSA
+import           Blockchain.Strato.Model.ExtendedWord   (Word256, bytesToWord256)
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 
@@ -195,10 +200,19 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           BlocGenesis f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
 
+
+-- so we can convert R and S from the signature
+getSigVals :: Signature -> (Word256, Word256, Word8)
+getSigVals (Signature (S.CompactRecSig r s v)) =
+  let convert = bytesToWord256 . BSS.fromShort
+  in (convert r, convert s, v)
+ 
+
 callSignature :: Text -> UnsignedTransaction -> Bloc Transaction
 callSignature userName unsigned@UnsignedTransaction{..} = do
   let msgHash = rlpHash unsigned
-  SignatureDetails{..} <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
+  sig <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
+  let (r, s, v) = getSigVals sig
   return $ Transaction
     unsignedTransactionNonce
     unsignedTransactionGasPrice
@@ -207,7 +221,7 @@ callSignature userName unsigned@UnsignedTransaction{..} = do
     unsignedTransactionValue
     unsignedTransactionInitOrData
     unsignedTransactionChainId
-    (unHex v)
-    (unHex r)
-    (unHex s)
+    v
+    r
+    s
     Nothing

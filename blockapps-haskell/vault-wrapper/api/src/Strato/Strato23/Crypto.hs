@@ -14,15 +14,13 @@ import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import           Data.ByteString                   (ByteString)
-import qualified Data.ByteString                   as B
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
 import           Text.Printf
 
+import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.Address
-import qualified Blockchain.Strato.Model.Keccak256 as SHA
-import           Crypto.Secp256k1
 
 
 
@@ -43,7 +41,7 @@ data KeyStore = KeyStore
   , keystoreAcctNonce     :: SecretBox.Nonce
   , keystoreAcctEncSecKey :: ByteString
   , keystoreAcctAddress   :: Address
-  , keystoreAcctPubKey    :: PubKey
+  , keystoreAcctPubKey    :: PublicKey
   } deriving (Eq, Show)
 
 decrypt
@@ -68,8 +66,8 @@ decryptSecKey
   -> ByteString -- salt
   -> SecretBox.Nonce
   -> ByteString -- encrypted secret key
-  -> Maybe SecKey
-decryptSecKey pw salt nonce = secKey <=< decrypt pw salt nonce
+  -> Maybe PrivateKey
+decryptSecKey pw salt nonce = importPrivateKey <=< decrypt pw salt nonce
 
 encrypt
   :: Password
@@ -93,20 +91,12 @@ reencryptKey :: Password -> Password -> ByteString -> SecretBox.Nonce -> ByteStr
 reencryptKey oldPass newPass salt nonce oldKey givenAddress=
   case decryptSecKey oldPass salt nonce oldKey of
     Nothing -> Left "could not decrypt account"
-    Just plainKey -> let foundAddress = deriveAddress plainKey
+    Just plainKey -> let foundAddress = fromPrivateKey plainKey
                      in if foundAddress /= givenAddress
                           then Left $ printf "address mismatch (wrong password?): got %s, want %s"
                                              (show foundAddress)
                                              (show givenAddress)
-                          else Right $ encrypt newPass salt nonce (getSecKey plainKey)
-
-
-
--- first byte of serialized pubkey is metdata, so we drop it
--- TODO: add a test against sample pubkey/address values to ensure this, maybe once
--- this code is moved to strato-model/Address.hs
-deriveAddress :: SecKey -> Address
-deriveAddress = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPubKey False . derivePubKey 
+                          else Right $ encrypt newPass salt nonce (exportPrivateKey plainKey)
 
 
 newSaltAndNonce :: MonadIO m => m (ByteString, SecretBox.Nonce)
@@ -122,10 +112,10 @@ newKeyStore pw = liftIO $ do
   -- NaCl SecretBox (XSalsa20 Poly1305) for encryption
   -- Secp256k1 for ethereum account creation
   (salt, acctNonce) <- newSaltAndNonce
-  acctSk <- liftIO newSecKey
-  let encAcctSk = encrypt pw salt acctNonce $ getSecKey acctSk
-      acctAddr = deriveAddress acctSk
-      acctPubKey = derivePubKey acctSk
+  acctSk <- liftIO newPrivateKey
+  let encAcctSk = encrypt pw salt acctNonce $ exportPrivateKey acctSk
+      acctAddr = fromPrivateKey acctSk
+      acctPubKey = derivePublicKey acctSk
   return KeyStore
     { keystoreSalt = salt
     , keystoreAcctNonce = acctNonce
@@ -133,9 +123,3 @@ newKeyStore pw = liftIO $ do
     , keystoreAcctAddress = acctAddr
     , keystoreAcctPubKey = acctPubKey
     }
-
-newSecKey :: IO SecKey
-newSecKey = fromMaybe err . secKey <$> getEntropy 32
-  where
-    err = error "could not generate secret key"
-

@@ -7,37 +7,33 @@
 module Strato.Strato23.API.Types
   ( module Strato.Strato23.API.Types
   , Address(..)
+  , Signature(..)
   ) where
 
 
 import           Control.Lens                 ((&), (?~))
-import           Crypto.Secp256k1
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types             hiding (fieldLabelModifier)
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Base16       as B16
 import qualified Data.ByteString.Char8        as C8
-import           Data.Maybe
 import qualified Data.Text                    as T
 import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named)
-import           Data.Word
 
 import           GHC.Generics
 
+import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ExtendedWord
 
-
-import           BlockApps.Ethereum (Hex(..))--TODO: remove when we use Signature itself
 
 
 vaultWrapperSchemaOptions :: SchemaOptions
 vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}
 
 
-data AddressAndKey = AddressAndKey { unAddress :: Address, unPubKey :: PubKey } deriving (Show, Generic)
+data AddressAndKey = AddressAndKey { unAddress :: Address, unPubKey :: PublicKey } deriving (Show, Generic)
 
 instance ToJSON AddressAndKey where
   toJSON (AddressAndKey a k) = object
@@ -63,20 +59,6 @@ instance ToSchema AddressAndKey where
         & description ?~ "Ethereum address and public key")
 
 
-instance ToJSON PubKey where
-  toJSON = String . T.pack . C8.unpack . B16.encode . exportPubKey False
-
-
-instance FromJSON PubKey where
-  parseJSON (String str) = return $ fromMaybe (err) $ importPubKey $ fst $ B16.decode $ C8.pack $ T.unpack str
-    where err = error $ "parseJSON for PubKey failed to read " ++ (T.unpack str)
-  parseJSON x = error $ "parseJSON for PubKey: expected string, got " ++ (show x)
-
-instance ToSchema PubKey where
-  declareNamedSchema _  = return $ named "PublicKey" binarySchema
-
-
-
 data MsgHash = MsgHash B.ByteString deriving (Eq, Show, Generic)
 
 instance ToJSON MsgHash where
@@ -92,18 +74,6 @@ instance FromJSON MsgHash where
 instance ToSchema MsgHash where
   declareNamedSchema = const . pure $ named "MsgHash bytestring" binarySchema
 
--- TODO: eventually, we should get rid of this and just use Signature from ECDSA
-data SignatureDetails = SignatureDetails {
-    r :: Hex Word256
-  , s :: Hex Word256
-  , v :: Hex Word8
-} deriving (Eq, Show, Generic, ToJSON, FromJSON, ToSchema)
-
-instance ToSchema (Hex Word256) where
-  declareNamedSchema = const . pure $ named "hex word256" binarySchema
-
-instance ToSchema (Hex Word8) where
-  declareNamedSchema = const . pure $ named "hex word8" binarySchema
 
 data User = User
   { username :: T.Text
