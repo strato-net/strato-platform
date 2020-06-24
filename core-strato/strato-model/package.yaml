@@ -64,7 +64,7 @@ library:
     - unordered-containers
 
 tests:
-  word256-tests:
+  strato-model-tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
@@ -73,6 +73,7 @@ tests:
       - base16-bytestring
       - binary
       - ethereum-encryption
+      - ethereum-rlp
       - integer-gmp
       - secp256k1-haskell
       - strato-model

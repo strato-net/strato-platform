@@ -5,14 +5,15 @@
 
 
 import           Control.Monad
-import qualified Data.Aeson             as Ae
+import qualified Crypto.Secp256k1                 as SEC
+import qualified Data.Aeson                       as Ae
 import           Data.Aeson.QQ
-import qualified Data.Bits              as Bits
+import qualified Data.Bits                        as Bits
 import           Data.Binary
-import qualified Data.ByteString        as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Short  as BSS
-import qualified Data.ByteString.Char8  as C8
+import qualified Data.ByteString                  as B
+import qualified Data.ByteString.Base16           as B16
+import qualified Data.ByteString.Short            as BSS
+import qualified Data.ByteString.Char8            as C8
 import           Data.Maybe
 import           Data.Word ()
 import           GHC.Exts
@@ -20,16 +21,16 @@ import           GHC.Integer.GMP.Internals
 import           Test.Hspec
 import           Test.QuickCheck
 
-import Blockchain.ECDSA
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.Keccak256
-import Network.Haskoin.Internals (BigWord(..))
+import           Blockchain.Data.RLP
+import           Blockchain.ECDSA
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
+import           Network.Haskoin.Internals        (BigWord(..))
 
 
 import qualified Blockchain.ExtendedECDSA         as HK
-import qualified Crypto.Secp256k1                 as SEC
 import qualified Network.Haskoin.Crypto           as HK
 import qualified Network.Haskoin.Internals        as HK
 
@@ -121,15 +122,27 @@ spec = do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr
 
   describe "ECDSA operations (using secp256k1-haskell)" $ do
+    let prv = readPrivateKey $ fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
+        pub = derivePublicKey prv 
+        mesg = keccak256ToByteString $ hash $ C8.pack "hey guys!" 
+        sig = signMsg prv mesg
+   
+    it "can convert public key to and from JSON encoding" $ do
+      Ae.decode (Ae.encode pub) `shouldBe` Just pub
+    it "can convert signature to and from JSON encoding" $ do
+      Ae.decode (Ae.encode sig) `shouldBe` Just sig
+    it "can convert signature to and from RLP encoding" $ do
+      let encSig = rlpSerialize (rlpEncode sig)
+      rlpDecode (rlpDeserialize encSig) `shouldBe` sig
+    it "can convert signature to and from Binary encoding" $ do
+      let encSig = encode sig
+      decode encSig `shouldBe` sig
+    
     it "can recover public keys from signatures" $ do
-      prv <- newPrivateKey
-      let pub = derivePublicKey prv 
-          mesg = keccak256ToByteString $ hash $ C8.pack "hey guys!" 
-          sig = signMsg prv mesg
-          mRecPub = recoverPub sig mesg
+      let mRecPub = recoverPub sig mesg
       (Just pub) `shouldBe` mRecPub
   
-  describe "our ECDSA module works exactly like Haskoin" $ do
+  describe "the ECDSA module works exactly like Haskoin on test values" $ do
     let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         hkPriv = fromMaybe (error "couldn't get EC key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
         ecPriv = readPrivateKey testPrivBS
@@ -149,8 +162,8 @@ spec = do
           ecSigVals = [ BSS.fromShort $ er
                       , BSS.fromShort $ es
                       ]
-          hvInt = (if hv then 1 else 0) :: Integer
-          ecInt = (toInteger ev) - 0x1b
+          hvInt = (if hv then 28 else 27) :: Integer
+          ecInt = toInteger ev
       hkSigVals `shouldBe` ecSigVals
       hvInt `shouldBe` ecInt
     

@@ -1,4 +1,4 @@
---{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 --{-# LANGUAGE DerivingStrategies #-}
@@ -14,6 +14,7 @@ module Blockchain.ECDSA
   , readPrivateKey
   , derivePublicKey
   , exportPublicKey
+  , importPublicKey
   ) where
 
 
@@ -21,21 +22,24 @@ module Blockchain.ECDSA
 import           Control.DeepSeq
 import           Control.Monad
 import           Crypto.Random.Entropy
-import qualified Crypto.Secp256k1           as S
+import qualified Crypto.Secp256k1               as S
 
+import           Data.Aeson
 import           Data.Binary                
-import           Data.ByteString            as B
-import qualified Data.ByteString.Short      as BSS
+import           Data.ByteString                as B
+import qualified Data.ByteString.Base16         as B16
+import qualified Data.ByteString.Char8          as C8
+import qualified Data.ByteString.Short          as BSS
 import           Data.Coerce
 import           Data.Data
 import           Data.Maybe
+import qualified Data.Text                      as T
+import           Data.Swagger                   (ToSchema)
+import           Data.Swagger.Internal.Schema   (named, declareNamedSchema, binarySchema)
 import           GHC.Generics
 import           Test.QuickCheck
 
 import           Blockchain.Data.RLP
---import           Blockchain.MiscJSON ()
---import           Blockchain.MiscArbitrary ()
-
 
 
 
@@ -85,6 +89,7 @@ instance Arbitrary Signature where
         s = BSS.toShort $ pack s'
     return $ Signature (S.CompactRecSig r s v)
 
+
 instance RLPSerializable Signature where
   rlpEncode (Signature sig) = RLPArray [ RLPString r
                                        , RLPString s
@@ -97,7 +102,28 @@ instance RLPSerializable Signature where
   
   rlpDecode (RLPArray [RLPString r, RLPString s, RLPScalar v]) = 
       Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v
-  rlpDecode x = error $ "rlpDecode for RecSig failed on " ++ (show x)
+  rlpDecode x = error $ "rlpDecode for RecSig failed on " ++ show x
+
+
+instance ToJSON Signature where
+  toJSON (Signature (S.CompactRecSig r s v)) = 
+      object [ "r" .= enc r
+             , "s" .= enc s
+             , "v" .= v
+             ]
+        where enc = T.pack . C8.unpack . B16.encode . BSS.fromShort
+
+instance FromJSON Signature where
+  parseJSON (Object o) = do
+    r <- o .: "r"
+    s <- o .: "s"
+    v <- o .: "v"
+    return $ Signature $ S.CompactRecSig (dec r) (dec s) v
+      where dec = BSS.toShort . fst . B16.decode . C8.pack . T.unpack
+  parseJSON o = error $ "parseJSON Signature failed: expected object, got: " ++ show o
+
+instance ToSchema Signature where
+  declareNamedSchema _ = return $ named "Signature" binarySchema
 
 
 
@@ -140,6 +166,20 @@ signMsg pk msgHash =
 ----------------------------- KEYS --------------------------------
 -------------------------------------------------------------------
 
+
+instance ToJSON PublicKey where
+  toJSON = String . T.pack . C8.unpack . B16.encode . exportPublicKey False
+
+instance FromJSON PublicKey where
+  parseJSON (String str) = return $ fromMaybe (err) $ importPublicKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+    where err = error $ "parseJSON for PublicKey failed to read " ++ T.unpack str
+  parseJSON x = error $ "parseJSON for PublicKey: expected string, got " ++ show x
+
+instance ToSchema PublicKey where
+  declareNamedSchema _ = return $ named "PublicKey" binarySchema
+
+
+
 newPrivateKey :: IO PrivateKey
 newPrivateKey = do
   ent <- getEntropy 32
@@ -157,3 +197,6 @@ derivePublicKey = PublicKey . S.derivePubKey . coerce
 
 exportPublicKey :: Bool -> PublicKey -> ByteString
 exportPublicKey compress (PublicKey pk) = S.exportPubKey compress pk
+
+importPublicKey :: ByteString -> Maybe PublicKey
+importPublicKey bs = PublicKey <$> S.importPubKey bs
