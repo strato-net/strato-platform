@@ -47,11 +47,6 @@ pipeline {
             export genesis=smokeTest
             export BLOC_DEBUG=true
             export SLIPSTREAM_OPTIONAL=false
-            export OAUTH_JWT_VALIDATION_ENABLED=true
-            export OAUTH_JWT_USERNAME_PROPERTY=email
-            export OAUTH_JWT_VALIDATION_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration
-            export OAUTH_STRATO42_FALLBACK=true
-            export OAUTH_TEMPORARY_MIXED_AUTH=true
             export PASSWORD=123
             export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
             export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -108,34 +103,6 @@ pipeline {
               APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
               docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
-          },
-
-          'Track And Trace': {
-            withEnv([
-              "ADMIN_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiI3ZDljMTc1ZS0zMDU2LTRhOGItOGYxYy05M2RhM2JiMGRiZmEiLCJleHAiOjE5ODE2MTMzNTIsIm5iZiI6MCwiaWF0IjoxNTQ5NjEzMzUzLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImU2NTEyZTcwLWI4ZTYtNDlmZC1hYmJjLTUzZjRhYjg1MWQwMyIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0OTYxMzM1Miwic2Vzc2lvbl9zdGF0ZSI6IjY2MzgyYTkwLWY0MzYtNDgxMS05YjNhLTRjNDgwY2EzOWU1OCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgQWRtaW5pc3RyYXRvciIsInByZWZlcnJlZF91c2VybmFtZSI6ImFkbWluaXN0cmF0b3JAdHQuYXBwIiwiZ2l2ZW5fbmFtZSI6IlRyYWNrIGFuZCBUcmFjZSIsImZhbWlseV9uYW1lIjoiQWRtaW5pc3RyYXRvciIsImVtYWlsIjoiYWRtaW5pc3RyYXRvckB0dC5hcHAifQ.CiJSG0BlwIN0HJXLZmzvajNXezu47-vQDWu1zGxxXF40rxxxlXTSEMLJMHi0XTJuqTEZ3dQAAow3qWvtRgzQK3zzMuBkd9BllcL1whQkqJ5F30QtiI799shtg89aokdNOflc8IcSTnjBLlonetTldhqotEbqBX-iZDPdjC1ql_5bOcFWv1LpSRUJlwUlTHWcxomd3ZUDzRmsl4DGl3PqsOrIxzbVqRCpHFA_E9ofBoC_KN7Aruq5HkB27IWz97Bne2WNNm_KuzWoWBAYxALUZQPCzx5xBGaV5iax6IChqP2scJsRPyJRZFakXJ0B3f3BOKr5WU-FSwh38v7j4uBfGw",
-              "MASTER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiJkMmM5M2Q3MS03NmFhLTQxNGYtODg5Yi01MDExNmZiYTYxMjMiLCJleHAiOjE5ODA4NzM2ODEsIm5iZiI6MCwiaWF0IjoxNTQ4ODczNjgxLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6Ijg5MTRhOWJmLTRlMzctNDI5Zi05MjdlLWU5OWE4NDFiMzlmNCIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0ODg3MzY4MSwic2Vzc2lvbl9zdGF0ZSI6ImI5OTE2Mzc0LTRkZDktNDQ3Zi1hNTEwLTcwMWYyZTE3MWViYyIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgTWFzdGVyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoibWFzdGVyQHR0LmFwcCIsImdpdmVuX25hbWUiOiJUcmFjayBhbmQgVHJhY2UiLCJmYW1pbHlfbmFtZSI6Ik1hc3RlciIsImVtYWlsIjoibWFzdGVyQHR0LmFwcCJ9.ImfWGcp0tkfLpVnwhy2X7Liy2zHe2AZc7ewoQaA-KX_oifia-0RzuYZL6odOGGfEcT-lPQetNnSl1WJ7EvH-E9ca7YGRljQHoNVIdb9i7mKQA_v9Ev_bc87IVBCCFh6sQjLJb2aqt4I9NPOO3FDS7G4ww9aO1bf2Od3Trcdlj6_RXvoE6_MkZWe2twa-clfbOmBP-vf_4pzf3Diymj4boSoquavV3dBf36VsFySyvFo0_xsmguIrdStD85xQwGD7ombzwkuQTuqT8NvwEWkfshc2afx0glNjjOMXgWke69ZGL2IzRpiqO9X3_NrDs4zQCKoRdz6SUDsQCwT4iAydlw",
-              "DISTRIBUTOR_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiJmNzI5NjlmMS1lMjEzLTRkYzktYmJjYS1mY2U2ZjQ2NTQxNzQiLCJleHAiOjE5ODA5MzczNTEsIm5iZiI6MCwiaWF0IjoxNTQ4OTM3MzUxLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjE5ZDcxNDBiLWQxNDgtNGQyOS04YWI3LWU0YWY3OWJkYjcyYiIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0ODkzNzM1MSwic2Vzc2lvbl9zdGF0ZSI6IjdmYzE0MTAxLWJmODgtNDc1ZC1hNDc5LWJjMzlkZmJmYTdhMCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgRGlzdHJpYnV0b3IiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJkaXN0cmlidXRvckB0dC5hcHAiLCJnaXZlbl9uYW1lIjoiVHJhY2sgYW5kIFRyYWNlIiwiZmFtaWx5X25hbWUiOiJEaXN0cmlidXRvciIsImVtYWlsIjoiZGlzdHJpYnV0b3JAdHQuYXBwIn0.FB6PvKPFYJvJ8QflJS1v_zxP427R79aa9_28mbUd9mfRAofMhhBMTJXoXeptY96Qlvc8L0TuLdtufeBQAQJrhYKfe4qCDYqg6ACSPyhC-YH482_-6l-ZANPieD006EBJ1JwBmG4so6G5uYlLxlNaufbvQh-l_hUl5TpKJXnRJoTf4KeP8KIrDnuLsS5reB3it-kO7lWf8kZoMVVgy6Cq6t8AvKfwyIyW55VO7GTNHd0FFpnX11a7apNMVBBwEW6hw2wPOwR8p0DcCV2zKuZ6OcV5X688xNPJpECl6UfeBe8_VzJsHvy3busU8mUaT01C1sPh6sUQ8-5KZZmQa294Ig",
-              "MANUFACTURER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiI5MDExYzIwNy01MDllLTQ5Y2MtYTM3My03MTBjZmUxMzhlNjciLCJleHAiOjE5ODA5MzcxODQsIm5iZiI6MCwiaWF0IjoxNTQ4OTM3MTg1LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjE5M2I3NWZlLTA0YzItNDY5YS1iZWE0LTYwNmI4ZjM2MTY0ZSIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0ODkzNzE4NCwic2Vzc2lvbl9zdGF0ZSI6ImJmMzMyOGE4LTFmZjgtNGEyMi1hMWE1LTk5MmRhYjRmZGM4MCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgTWFudWZhY3R1cmVyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoibWFudWZhY3R1cmVyQHR0LmFwcCIsImdpdmVuX25hbWUiOiJUcmFjayBhbmQgVHJhY2UiLCJmYW1pbHlfbmFtZSI6Ik1hbnVmYWN0dXJlciIsImVtYWlsIjoibWFudWZhY3R1cmVyQHR0LmFwcCJ9.UgEKRHo89t0DhHYM6veq4E-k44XXWDr2yg6LUHJa_UZ48B94_Ojeo6imCKNR8KP90goGfUwTSZrvc8T2rI2MUki-qUM7J45fcqwUIcts1QOVFbK6yYCPOS-ZDiRTdQIO0txhtj2oNekvnwEGxecp6xNs9cMTRGeVKKV1azj_w0H75AKW3dz_a4kSIdleeu5-dXTOTCiqu6i8czT6F1s74gAhkNETirI0XM24pdmrwHbq2g5O4okLQGbDFnwymFPNrvBXQX0DpGhqTpxLYVmQGLlGm0bYT00dsz9kRqrEVxXFU3syFP1-s4eTghIPSa1bj1hYo9J8UucqCBV_NORoCg",
-              "REGULATOR_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiIyZWVlYzZkYy0yYjUzLTQ0ZGQtOWQ3Zi1hODFmYzNmNTIzZGEiLCJleHAiOjE5ODA5MzQyMzAsIm5iZiI6MCwiaWF0IjoxNTQ4OTM0MjMxLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImI0MGIzMGM3LTAwNjMtNDAyMC05NGY0LTdmNzI4ZjFmMGYyMCIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0ODkzNDIzMCwic2Vzc2lvbl9zdGF0ZSI6IjgwYTIyMDJjLTFlYzAtNDIxZC1hNzA3LTkxMmVkNWE5NmU2NCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgUmVndWxhdG9yIiwicHJlZmVycmVkX3VzZXJuYW1lIjoicmVndWxhdG9yQHR0LmFwcCIsImdpdmVuX25hbWUiOiJUcmFjayBhbmQgVHJhY2UiLCJmYW1pbHlfbmFtZSI6IlJlZ3VsYXRvciIsImVtYWlsIjoicmVndWxhdG9yQHR0LmFwcCJ9.Vw_0e9yw7LlNjOnyNsjfJwALKCtpgcipXPK8HcIr5GCdR4o8fD6CsbRXxFgtohyPgDZg1StYJSe63MZLAxHxbVCesf1c2FUxT1qLfFLb1HtrTtyyc6lojjSzSp3om6RGZi5dtSrDyX-0QYLN9Q-E6JBD2lA50P6bhJmV4sLgCMHB0845rV_xxp4slMAjIfnkxMBl9bt4sa60IMYLHWOYdbfcyI5OL_7AqxeFy6JnsUtj63aZhAZoNnB-BMUfRMCptKD_uq8aTk8sQwiunmJHnbUfL7w4osiOl3wYsjCN86F-v9maP9VRf0bmeUyJA5f3MAZ4v6Gd8tcS0scJOGOroQ",
-              "RETAILER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiJjY2FlMzBiYS1lZGMxLTQ5MTMtOGI5Yi05NmM1YmVhZjllYWYiLCJleHAiOjE5ODE2MTM5NDUsIm5iZiI6MCwiaWF0IjoxNTQ5NjEzOTQ2LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjczYmQzZTRhLTRjYTktNDI4OS05ZWNiLTgwMGVhYWExYmY4MCIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0OTYxMzk0NSwic2Vzc2lvbl9zdGF0ZSI6IjI3MTQ3ZDczLWZjNTItNDkxNS1hYjZiLTgxOWM3MzQ2NTNmYiIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgUmV0YWlsZXIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJyZXRhaWxlckB0dC5hcHAiLCJnaXZlbl9uYW1lIjoiVHJhY2sgYW5kIFRyYWNlIiwiZmFtaWx5X25hbWUiOiJSZXRhaWxlciIsImVtYWlsIjoicmV0YWlsZXJAdHQuYXBwIn0.keWW5cWkvVdKlrHnbqlOrvW9anX6c6ssClLNVFNsMLqlvwg1a5U_j5sqNT3hTjqGo-fV6Y2yqRLbAAC5BNl7QnjQJtA0Rh3NBd3RsgGYftD6mw8TnqS3F0EWZaKx_rz12zOku0TPGrCYbKZ71GX7o1UdqRyXkFn_xQ31Mrc93em_nip7SlbvJ-wxX3r1nR8sJ1yaLG1-_NUx8Vrfkpv6nan8hkXNMNA_ODWAhd-wKjlCBae8qkR6yz850tNlavVbssY7PcZt3M3_-vy6YSznLCMlyqXRoPrdTZQlt6bjkOgaWnzKuibPlKTC4Q1SZGNRuJHROZfXF4clugB1S9Awdw"
-            ]) {
-
-              sh '''#!/bin/bash -le
-                set -x
-                rm -rf track-and-trace
-                git clone https://github.com/blockapps/track-and-trace.git
-                cd track-and-trace
-                git checkout oauth42style-test-fix
-                git submodule update --init --recursive
-                cd server
-                sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
-                # oauth42style-test-fix uses the old hardcoded ba-rest version
-                touch .env
-                yarn build
-                yarn install
-                yarn test
-              '''
-            }
           },
 
           'Core Strato tests': {
@@ -214,9 +181,9 @@ pipeline {
         )
       }
     }
-    
+
     stage('Redeploy with OAuth') {
-      
+
       steps {
         withCredentials([
             usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
@@ -238,9 +205,9 @@ pipeline {
             export BLOC_DEBUG=true
             export SLIPSTREAM_OPTIONAL=false
             export OAUTH_ENABLED=true
-            export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration
-            export OAUTH_CLIENT_ID=all-test-ci-blockapps-net-infinite
-            export OAUTH_CLIENT_SECRET=5718a315-2beb-487f-87a8-413cd88e6a5d
+            export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
+            export OAUTH_CLIENT_ID=dev
+            export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
             export PASSWORD=123
             export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
             export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -287,29 +254,50 @@ pipeline {
 
           'Track And Trace': {
             withEnv([
-              "ADMIN_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiI3ZDljMTc1ZS0zMDU2LTRhOGItOGYxYy05M2RhM2JiMGRiZmEiLCJleHAiOjE5ODE2MTMzNTIsIm5iZiI6MCwiaWF0IjoxNTQ5NjEzMzUzLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImU2NTEyZTcwLWI4ZTYtNDlmZC1hYmJjLTUzZjRhYjg1MWQwMyIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0OTYxMzM1Miwic2Vzc2lvbl9zdGF0ZSI6IjY2MzgyYTkwLWY0MzYtNDgxMS05YjNhLTRjNDgwY2EzOWU1OCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgQWRtaW5pc3RyYXRvciIsInByZWZlcnJlZF91c2VybmFtZSI6ImFkbWluaXN0cmF0b3JAdHQuYXBwIiwiZ2l2ZW5fbmFtZSI6IlRyYWNrIGFuZCBUcmFjZSIsImZhbWlseV9uYW1lIjoiQWRtaW5pc3RyYXRvciIsImVtYWlsIjoiYWRtaW5pc3RyYXRvckB0dC5hcHAifQ.CiJSG0BlwIN0HJXLZmzvajNXezu47-vQDWu1zGxxXF40rxxxlXTSEMLJMHi0XTJuqTEZ3dQAAow3qWvtRgzQK3zzMuBkd9BllcL1whQkqJ5F30QtiI799shtg89aokdNOflc8IcSTnjBLlonetTldhqotEbqBX-iZDPdjC1ql_5bOcFWv1LpSRUJlwUlTHWcxomd3ZUDzRmsl4DGl3PqsOrIxzbVqRCpHFA_E9ofBoC_KN7Aruq5HkB27IWz97Bne2WNNm_KuzWoWBAYxALUZQPCzx5xBGaV5iax6IChqP2scJsRPyJRZFakXJ0B3f3BOKr5WU-FSwh38v7j4uBfGw",
-              "MASTER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiJkMmM5M2Q3MS03NmFhLTQxNGYtODg5Yi01MDExNmZiYTYxMjMiLCJleHAiOjE5ODA4NzM2ODEsIm5iZiI6MCwiaWF0IjoxNTQ4ODczNjgxLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6Ijg5MTRhOWJmLTRlMzctNDI5Zi05MjdlLWU5OWE4NDFiMzlmNCIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0ODg3MzY4MSwic2Vzc2lvbl9zdGF0ZSI6ImI5OTE2Mzc0LTRkZDktNDQ3Zi1hNTEwLTcwMWYyZTE3MWViYyIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgTWFzdGVyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoibWFzdGVyQHR0LmFwcCIsImdpdmVuX25hbWUiOiJUcmFjayBhbmQgVHJhY2UiLCJmYW1pbHlfbmFtZSI6Ik1hc3RlciIsImVtYWlsIjoibWFzdGVyQHR0LmFwcCJ9.ImfWGcp0tkfLpVnwhy2X7Liy2zHe2AZc7ewoQaA-KX_oifia-0RzuYZL6odOGGfEcT-lPQetNnSl1WJ7EvH-E9ca7YGRljQHoNVIdb9i7mKQA_v9Ev_bc87IVBCCFh6sQjLJb2aqt4I9NPOO3FDS7G4ww9aO1bf2Od3Trcdlj6_RXvoE6_MkZWe2twa-clfbOmBP-vf_4pzf3Diymj4boSoquavV3dBf36VsFySyvFo0_xsmguIrdStD85xQwGD7ombzwkuQTuqT8NvwEWkfshc2afx0glNjjOMXgWke69ZGL2IzRpiqO9X3_NrDs4zQCKoRdz6SUDsQCwT4iAydlw",
-              "DISTRIBUTOR_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiJmNzI5NjlmMS1lMjEzLTRkYzktYmJjYS1mY2U2ZjQ2NTQxNzQiLCJleHAiOjE5ODA5MzczNTEsIm5iZiI6MCwiaWF0IjoxNTQ4OTM3MzUxLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjE5ZDcxNDBiLWQxNDgtNGQyOS04YWI3LWU0YWY3OWJkYjcyYiIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0ODkzNzM1MSwic2Vzc2lvbl9zdGF0ZSI6IjdmYzE0MTAxLWJmODgtNDc1ZC1hNDc5LWJjMzlkZmJmYTdhMCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgRGlzdHJpYnV0b3IiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJkaXN0cmlidXRvckB0dC5hcHAiLCJnaXZlbl9uYW1lIjoiVHJhY2sgYW5kIFRyYWNlIiwiZmFtaWx5X25hbWUiOiJEaXN0cmlidXRvciIsImVtYWlsIjoiZGlzdHJpYnV0b3JAdHQuYXBwIn0.FB6PvKPFYJvJ8QflJS1v_zxP427R79aa9_28mbUd9mfRAofMhhBMTJXoXeptY96Qlvc8L0TuLdtufeBQAQJrhYKfe4qCDYqg6ACSPyhC-YH482_-6l-ZANPieD006EBJ1JwBmG4so6G5uYlLxlNaufbvQh-l_hUl5TpKJXnRJoTf4KeP8KIrDnuLsS5reB3it-kO7lWf8kZoMVVgy6Cq6t8AvKfwyIyW55VO7GTNHd0FFpnX11a7apNMVBBwEW6hw2wPOwR8p0DcCV2zKuZ6OcV5X688xNPJpECl6UfeBe8_VzJsHvy3busU8mUaT01C1sPh6sUQ8-5KZZmQa294Ig",
-              "MANUFACTURER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiI5MDExYzIwNy01MDllLTQ5Y2MtYTM3My03MTBjZmUxMzhlNjciLCJleHAiOjE5ODA5MzcxODQsIm5iZiI6MCwiaWF0IjoxNTQ4OTM3MTg1LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjE5M2I3NWZlLTA0YzItNDY5YS1iZWE0LTYwNmI4ZjM2MTY0ZSIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0ODkzNzE4NCwic2Vzc2lvbl9zdGF0ZSI6ImJmMzMyOGE4LTFmZjgtNGEyMi1hMWE1LTk5MmRhYjRmZGM4MCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgTWFudWZhY3R1cmVyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoibWFudWZhY3R1cmVyQHR0LmFwcCIsImdpdmVuX25hbWUiOiJUcmFjayBhbmQgVHJhY2UiLCJmYW1pbHlfbmFtZSI6Ik1hbnVmYWN0dXJlciIsImVtYWlsIjoibWFudWZhY3R1cmVyQHR0LmFwcCJ9.UgEKRHo89t0DhHYM6veq4E-k44XXWDr2yg6LUHJa_UZ48B94_Ojeo6imCKNR8KP90goGfUwTSZrvc8T2rI2MUki-qUM7J45fcqwUIcts1QOVFbK6yYCPOS-ZDiRTdQIO0txhtj2oNekvnwEGxecp6xNs9cMTRGeVKKV1azj_w0H75AKW3dz_a4kSIdleeu5-dXTOTCiqu6i8czT6F1s74gAhkNETirI0XM24pdmrwHbq2g5O4okLQGbDFnwymFPNrvBXQX0DpGhqTpxLYVmQGLlGm0bYT00dsz9kRqrEVxXFU3syFP1-s4eTghIPSa1bj1hYo9J8UucqCBV_NORoCg",
-              "REGULATOR_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiIyZWVlYzZkYy0yYjUzLTQ0ZGQtOWQ3Zi1hODFmYzNmNTIzZGEiLCJleHAiOjE5ODA5MzQyMzAsIm5iZiI6MCwiaWF0IjoxNTQ4OTM0MjMxLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImI0MGIzMGM3LTAwNjMtNDAyMC05NGY0LTdmNzI4ZjFmMGYyMCIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0ODkzNDIzMCwic2Vzc2lvbl9zdGF0ZSI6IjgwYTIyMDJjLTFlYzAtNDIxZC1hNzA3LTkxMmVkNWE5NmU2NCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgUmVndWxhdG9yIiwicHJlZmVycmVkX3VzZXJuYW1lIjoicmVndWxhdG9yQHR0LmFwcCIsImdpdmVuX25hbWUiOiJUcmFjayBhbmQgVHJhY2UiLCJmYW1pbHlfbmFtZSI6IlJlZ3VsYXRvciIsImVtYWlsIjoicmVndWxhdG9yQHR0LmFwcCJ9.Vw_0e9yw7LlNjOnyNsjfJwALKCtpgcipXPK8HcIr5GCdR4o8fD6CsbRXxFgtohyPgDZg1StYJSe63MZLAxHxbVCesf1c2FUxT1qLfFLb1HtrTtyyc6lojjSzSp3om6RGZi5dtSrDyX-0QYLN9Q-E6JBD2lA50P6bhJmV4sLgCMHB0845rV_xxp4slMAjIfnkxMBl9bt4sa60IMYLHWOYdbfcyI5OL_7AqxeFy6JnsUtj63aZhAZoNnB-BMUfRMCptKD_uq8aTk8sQwiunmJHnbUfL7w4osiOl3wYsjCN86F-v9maP9VRf0bmeUyJA5f3MAZ4v6Gd8tcS0scJOGOroQ",
-              "RETAILER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJTTlRQNXpMTzNHVVhtdzhxRGRNazlDYnY5LUZNeUFhY1JTWmRoUExQaWVFIn0.eyJqdGkiOiJjY2FlMzBiYS1lZGMxLTQ5MTMtOGI5Yi05NmM1YmVhZjllYWYiLCJleHAiOjE5ODE2MTM5NDUsIm5iZiI6MCwiaWF0IjoxNTQ5NjEzOTQ2LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvdHJhY2stYW5kLXRyYWNlIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjczYmQzZTRhLTRjYTktNDI4OS05ZWNiLTgwMGVhYWExYmY4MCIsInR5cCI6IkJlYXJlciIsImF6cCI6InR0LWxvY2FsaG9zdCIsImF1dGhfdGltZSI6MTU0OTYxMzk0NSwic2Vzc2lvbl9zdGF0ZSI6IjI3MTQ3ZDczLWZjNTItNDkxNS1hYjZiLTgxOWM3MzQ2NTNmYiIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiaHR0cDovL2xvY2FsaG9zdCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJUcmFjayBhbmQgVHJhY2UgUmV0YWlsZXIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJyZXRhaWxlckB0dC5hcHAiLCJnaXZlbl9uYW1lIjoiVHJhY2sgYW5kIFRyYWNlIiwiZmFtaWx5X25hbWUiOiJSZXRhaWxlciIsImVtYWlsIjoicmV0YWlsZXJAdHQuYXBwIn0.keWW5cWkvVdKlrHnbqlOrvW9anX6c6ssClLNVFNsMLqlvwg1a5U_j5sqNT3hTjqGo-fV6Y2yqRLbAAC5BNl7QnjQJtA0Rh3NBd3RsgGYftD6mw8TnqS3F0EWZaKx_rz12zOku0TPGrCYbKZ71GX7o1UdqRyXkFn_xQ31Mrc93em_nip7SlbvJ-wxX3r1nR8sJ1yaLG1-_NUx8Vrfkpv6nan8hkXNMNA_ODWAhd-wKjlCBae8qkR6yz850tNlavVbssY7PcZt3M3_-vy6YSznLCMlyqXRoPrdTZQlt6bjkOgaWnzKuibPlKTC4Q1SZGNRuJHROZfXF4clugB1S9Awdw"
+                "ADMIN_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI1ZWE2NTBkNi1lMTM2LTQ5YjEtYTEzYi01MzY5MDM5MDdiNDEiLCJleHAiOjIwMjM5NzQxNDAsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MTQwLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjBjYWFlM2RmLWQ2ZWUtNDkxZC04ODYyLTJlY2ZmM2Y2YTI0MyIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDE0MCwic2Vzc2lvbl9zdGF0ZSI6IjI3MjEyNjBhLWU1ODItNGJiOS04N2I5LTc0YWQ3YWI5MmMzNyIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoiYWRtaW5pc3RyYXRvckB0dC5hcHAiLCJlbWFpbCI6ImFkbWluaXN0cmF0b3JAdHQuYXBwIn0.s-0MRMAEsG532YLM1k6GaXr3RKFUFpB13vR0WuYP8R1je2cP83hvE7Ll-N8hHbyAy8lumfEgSS6NXVIBCRrm0DEqX-XICOIEEkE6d6H-BPXqKZhfFV_HItfVWbWPDRHsCwvTI2ZAR8rgt19Dd8tWNOUVT_demsi20XYj8H2HuMo9vNMT7AN2wl1qRQPHffEppBrtPAx-PSauQpHm51xPgJSJMJPVhaVMWoM1tL91Ef6TOldZS8y89hReRaxeSZJP9kQWtIMLYe41AWcIKzrteOMBhPwa5e8PFfcDFJjvT6N_ASDtPldsxlNGrceMb0JVMwqmbcoetoE5_lMNKzGTkw",
+                "MASTER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiJlYmMzNzJkMy04NzlkLTRjMDQtOWEwMi1iZjcyMGYyNWM5OGQiLCJleHAiOjIwMjM5NzQyMzgsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MjM4LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImM5M2NjMzQxLWYzZGEtNGY0Yy1hZTczLTVkMDIzN2ZmZDVlZCIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDIzOCwic2Vzc2lvbl9zdGF0ZSI6ImVkNTY2OTQ0LWRlZTgtNDE5YS04M2Y1LTRiYTJjYzlhNjE3NCIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoibWFzdGVyQHR0LmFwcCIsImVtYWlsIjoibWFzdGVyQHR0LmFwcCJ9.wS7tU80jGm3akaaB_iSYw3a2aCJQ44-RfbYsYtAN1wYd6wk1gtaf9leCD0Cks98ItMtf8E7ZHb5yNLTZ6vsxrjhPNkmN0dVbn7Ol9UxJ_qOC4oVXyowESAGVSVZSeZ79PSKz16Mm9KQYacqEEfECnzVE4CN2143lBmWqQT6wjPbzn3-0xz6W7xZfQpuJX6EIYNOPjyheSTpKUpZxCNoFzTy0GRyHrVhnlucTkBTy3Dj-BLM3aDVwHyuSASXnq_qL3TZIG7ksJ4mF1L6XAQGu5p8pFs22XMlz0iXKtYJNfCzmRLoeto85oBcsw4gkh2e0xkOC9FJrDkkIDo8tTUTilQ",
+                "DISTRIBUTOR_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI2MjljMGMzOC1kMzg1LTQxMjktYmVlNy1lMTkzZjFhYzFhMzgiLCJleHAiOjIwMjM5NzQyNTIsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MjUyLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImZmODIxNzY1LWI0YjUtNDE2Zi1hMTY3LWM2ZmRhMTJkZjA2YSIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDI1Miwic2Vzc2lvbl9zdGF0ZSI6Ijc4MWNlZTE3LWFhZTgtNDNjMC1hNjVjLTk0MmI2Y2UwYTMyYSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoiZGlzdHJpYnV0b3JAdHQuYXBwIiwiZW1haWwiOiJkaXN0cmlidXRvckB0dC5hcHAifQ.nHdFsWfUSuech6fFOlQ9QWpxCxQ4W5IIpO6sICyo6KTm030F91LCyS55R419sA40rOhcUbMml-SGb_ZY1m6avwb4A89jBf0JgLx_iVfwKI4LQC_eQoyLety9e-VVJrRvovJsRrE__D8GTpvGBKOfXdkpmNF4iNSyL3jggFTpT05gv5LEvCQ4yB5kD6f3XoYIN9F1t8IfUMT9MaF8-zGJ1UHXfFnlWPz_ICPn8FJdl-bIObfMlk6YqEXv0SB_Gg9LtcoEUMEmt-vfwL01BXYr__G7LkJmqOXamomZi00Oi824EYCIyeJwSVU7EmqBpUA_EOzMWSR774Vr0sZjpG2vIQ",
+                "MANUFACTURER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiJhMGQ1MzkxYS1iNmQ0LTQzNDQtYjJhOS0wNTNhYjNmM2M2YzMiLCJleHAiOjIwMjM5NzQyNjQsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MjY0LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImVjNjVmNDNlLWM4MGUtNDY1My1hODFiLTNmZGE4MmJlOTk1NCIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDI2NCwic2Vzc2lvbl9zdGF0ZSI6IjliMmUxMzljLTMyOTUtNGYwMy04Nzk4LWVjY2JmNmQ0MzBiZSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoibWFudWZhY3R1cmVyQHR0LmFwcCIsImVtYWlsIjoibWFudWZhY3R1cmVyQHR0LmFwcCJ9.rakA66et-VRzE6lQis5c71-hG49o3ev0NfXQNuvBHkB8AG1UY5nEi8OxH0V66aMwKwMKWxefBU9BeLr8Kci8c8fDKNq8uM4mO6RN7PrmfJ1AAcgIuC7MNermTegIgb7IApxXo1zhxYUAyVyVCIRjOAy-QdlH36SDIRS3F-pJMDEUd-VKdqYDNFmcWr16-Lf8xvQH2xZVJQ_fsX9mz19RRQnBjYDEK1LHgtcGu7o5Sk5SUEAfBwMfQa6WuMkr9mZAtclGhqKflthafkrWww66BEDsOapwt-1IdWD0n4EM6-7aDCsFiVquRtWElT_O4PEKZN-pkiCoyGSyKR9g0GiU3Q",
+                "REGULATOR_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI3MGE4ZjJkYS1jY2RlLTRlNWQtYjEyNi1kOWI3NzBkODIxZGIiLCJleHAiOjIwMjM5NzQyNzQsIm5iZiI6MCwiaWF0IjoxNTkxOTc0Mjc1LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjJjNTE3MjAzLWNhNTEtNDQyNi04M2RlLTNmODdiY2VjZjg4YSIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDI3NCwic2Vzc2lvbl9zdGF0ZSI6IjZiZTI0OWYwLTMzYWQtNDkwMS1hOGYyLTEzNjRjNWFiYzIyYSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoicmVndWxhdG9yQHR0LmFwcCIsImVtYWlsIjoicmVndWxhdG9yQHR0LmFwcCJ9.eRpCW0cXzmUERDfYZ6PAvJCnssyZuqTW7vLH-CI4NYxVK9xu8CkWlCw-QlaI2ieBwn0u6nXUR7mEcKbYZQkk8sMATXxpCA_POVaoF7waf3gtyeJyU9dfoCwor5hytAa_LYuFd9FPVA9in9imkaXzUAVD9lqFIuCBv0AW2IOXUF1ELn6snMFej_V84_jGoppN-XSZsaCY2IZxvJFgeKgjsNholp_2n1mu64tzoFyM-SmEcxY6gNZC3f_aLMmYtJY-K4-WBusgSxj8TRoKQe98xPTgr1KmFGHc_1GCUGJFAhEKCHwMOHFf_bT80ai8UC77vF_0zvmgy-I-mJLRh05IDQ",
+                "RETAILER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI4OWVlNDc1Ny1kNzc4LTQ1ZTgtYmI4Zi0yODNmYWIxZjEyNmQiLCJleHAiOjIwMjM5NzQyODUsIm5iZiI6MCwiaWF0IjoxNTkxOTc0Mjg1LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImIzMGI2MjI0LWM0ZDktNDlhZC04Njc0LWYyY2NmNTNmMjYyOSIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDI4NSwic2Vzc2lvbl9zdGF0ZSI6IjczOTBlYzM2LWJiOGYtNGRmZi1hYTU2LWM2ZjZlOGYwNTBlNSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoicmV0YWlsZXJAdHQuYXBwIiwiZW1haWwiOiJyZXRhaWxlckB0dC5hcHAifQ.w-tQl7k_G_9gr2xUQt5GurI3q6sQN3upk8QIT4cnpWgO-4fYkCslg4sF7K6StC-yJlp7Ye7B9y1L5jg9EDhClM_fMukycdsN32Fr3-Ac2PaqshJmtwdJb32VXi47Vdokl3nB1S37a7sL6BIdT7yZESC9EYdPSPPvhmlR8hbKJiqVbqPHJZXmkpwXTQKaeGIB0h56AlVxtfTL4av4bn1gj7WbQ1q0CvtnTg390QyuS18n_NHxzrKu6a51X5kAPGo9gt7CjvPKLOuqIMY1kaPqzXgPMcrP4Qxc0zDC2XWCTJJgeDPp_mz4ndKxgUKN9jr3DSJARQt6tpJ7xM7VjOqchg"
             ]) {
-                  
-              sh '''#!/bin/bash -le
-                set -x
-                rm -rf track-and-trace
-                git clone https://github.com/blockapps/track-and-trace.git
-                cd track-and-trace/server
-                git checkout test-fix
-                sed -i "s/localhost:8080/localhost/g" config/localhost.config.yaml
-                # symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
-                cp -r ../../strato-worktree/blockapps-rest blockapps-rest
-                sed -i 's|.*blockapps-rest.*|"blockapps-rest": "file:./blockapps-rest",|' package.json
-                touch .env
-                yarn build
-                yarn install
-                yarn test
-              '''
+
+              sh 'rm -rf track-and-trace'
+              sh 'git clone -b master https://github.com/blockapps/track-and-trace.git'
+              dir ('track-and-trace/server') {
+                writeFile file: "config/jenkinstest.config.yaml", text: """
+                apiDebug: false
+                restVersion: 6
+                timeout: 120000
+                dappPath: ./dapp
+                libPath: blockapps-sol/dist
+                apiUrl: /api/v1
+                deployFilename: ./config/jenkinstest.deploy.yaml
+                
+                nodes:
+                  - id: 0
+                    url: "http://localhost"
+                    publicKey: "6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0"
+                    port: 30303
+                    oauth:
+                      appTokenCookieName: "tt_session"
+                      scope: "email openid"
+                      appTokenCookieMaxAge: 7776000000 # 90 days: 90 * 24 * 60 * 60 * 1000
+                      openIdDiscoveryUrl: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration"
+                      clientId: "dev-infinite"
+                      clientSecret: "091a22ec-3c81-4be4-83fb-d9f82084c3e8"
+                      redirectUri: "http://UNUSED/api/v1/authentication/callback"
+                      logoutRedirectUri: "http://UNUSED"
+
+                """
+                // symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
+                sh 'cp -r ../../strato-worktree/blockapps-rest blockapps-rest'
+                sh '''sed -i 's|.*blockapps-rest.*|"blockapps-rest": "file:./blockapps-rest",|' package.json'''
+                sh 'touch .env'
+                sh 'yarn build'
+                sh 'yarn install'
+                sh 'SERVER=jenkinstest yarn test'
+              }
             }
           },
 
@@ -342,14 +330,25 @@ pipeline {
                 git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
                 docker build --tag strato-api-tests .
-                docker run -e OAUTH_CLIENT_ID=all-test-ci-blockapps-net-infinite \
-                -e OAUTH_CLIENT_SECRET=a7f199dc-9f50-45fc-9f50-13b40727ba31 \
-                -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/track-and-trace/.well-known/openid-configuration \
-                -e STRATO_NODE_URL=http://172.17.0.1:80 \
-                -e OAUTH_ENABLED=true \
-                -e DEBUG_LOG=false strato-api-tests
-                '''
+                docker run \
+                  -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
+                  -e OAUTH_CLIENT_ID=dev \
+                  -e OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \
+                  -e STRATO_NODE_URL=http://172.17.0.1:80 \
+                  -e OAUTH_ENABLED=true \
+                  -e DEBUG_LOG=false strato-api-tests
+              '''
             }
+          },
+
+          'BA-Rest Tests': {
+            sh '''#!/bin/bash -le
+            set -x
+            echo "Running ba-rest E2E tests"
+            cd strato-worktree/blockapps-rest
+            DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
+            docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
+            '''
           },
         )
       }
@@ -393,6 +392,6 @@ pipeline {
           message: "Nightly develop build *is fixed after it was failing*: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
-    
+
   }
 }
