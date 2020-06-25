@@ -143,6 +143,7 @@ type MonadBlockstanbul m = ( MonadIO m
                            , Mod.Accessible BlockPeriod m
                            , Mod.Accessible RoundPeriod m
                            , Mod.Accessible (TQueue VoteResult) m
+                           , Signs m
                            )
 
 newtype BlockPeriod = BlockPeriod { unBlockPeriod :: NominalDiffTime }
