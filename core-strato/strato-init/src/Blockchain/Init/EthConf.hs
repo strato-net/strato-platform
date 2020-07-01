@@ -132,6 +132,20 @@ defaultConfig =
 --        Left err -> error $ "even more odd an error creating nodekey: " ++ (show err)
 --        Right pk -> return $ unPubKey pk
 
+
+-- TODO: maybe this should be a generic util function somewhere else
+{- waitOnVault :: (Show a) => IO (Either a b) -> IO b
+waitOnVault action = do
+  putStrLn "asking vault-wrapper for the node address (or to create a new key)"
+  res <- action
+  case res of
+    Left err -> do 
+      putStrLn $ "failed to get node address from vault-wrapper... got this error: " ++ show err
+      threadDelay 2000000 -- 2 seconds
+      waitOnVault action
+    Right val -> return val  
+ -}
+
 genEthConf :: IO EthConf
 genEthConf = do
   maybePGuser <- case flags_pguser of

@@ -382,13 +382,23 @@ instance Signs SequencerM where
     mVc <- asks vaultClient    
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
-      Just vc -> do
-        $logInfoS "Signs" "Asking the vault-wrapper to sign a Blockstanbul message"
-        eSig <- liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
-        case eSig of
-          Left err -> error $ "vault-wrapper returned error on nodekey signature: " ++ show err
-          Right sig -> return sig
-            
+      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
+
+-- TODO: this could be a more specific servant retry function...since other parts of strato will need it,
+-- maybe it should be in a util module or something
+waitOnVault :: (Show a) => SequencerM (Either a b) -> SequencerM b
+waitOnVault action = do
+  $logInfoS "SequencerM/Signs" "Asking the vault-wrapper to sign a Blockstanbul message"
+  res <- action
+  case res of
+    Left err -> do 
+      $logInfoS "SequencerM/Signs" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
+      liftIO $ threadDelay 2000000 -- 2 seconds
+      waitOnVault action
+    Right val -> do 
+      $logInfoS "SequencerM/Signs" "Got a signature from vault" 
+      return val
+  
 
 prunePrivacyDBs :: SequencerM ()
 prunePrivacyDBs = do

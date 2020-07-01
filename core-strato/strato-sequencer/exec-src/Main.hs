@@ -5,6 +5,7 @@
 module Main where
 
 import           Control.Monad
+import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
@@ -34,6 +35,21 @@ import qualified Strato.Strato23.API.Types  as VC
 import qualified Strato.Strato23.Client     as VC
 
 import           Flags
+
+
+
+-- TODO: maybe this should be a generic util function somewhere else
+waitOnVault :: (Show a) => IO (Either a b) -> IO b
+waitOnVault action = do
+  putStrLn "asking vault-wrapper for the node address"
+  res <- action
+  case res of
+    Left err -> do 
+      putStrLn $ "failed to get node address from vault-wrapper... got this error: " ++ show err
+      threadDelay 2000000 -- 2 seconds
+      waitOnVault action
+    Right val -> return val
+
 
 main :: IO ()
 main = do
@@ -70,11 +86,10 @@ main = do
   vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
   let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
   
-  selfAddress <- do 
-    eAddressAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv
-    case eAddressAndKey of
-      Left err -> error $ "error getting nodekey from vault: " ++ show err
-      Right addrAndKey -> return $ VC.unAddress addrAndKey
+  selfAddress <- do
+    addrAndKey <- waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv
+    return $ VC.unAddress addrAndKey
+  
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
   addSelfAsMetric selfAddress
   
