@@ -121,7 +121,7 @@ spec = do
     it "round trips correctly" $ property $ \(ptr::CodePtr) -> do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr
 
-  describe "ECDSA operations (using secp256k1-haskell)" $ do
+  describe "secp256k1, ECDSA, and ECDH operations (using secp256k1-haskell)" $ do
     let mPrv = importPrivateKey $ fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         prv = fromMaybe (error "could not import private key") mPrv
         pub = derivePublicKey prv 
@@ -142,7 +142,14 @@ spec = do
     it "can recover public keys from signatures" $ do
       let mRecPub = recoverPub sig mesg
       (Just pub) `shouldBe` mRecPub
-  
+ 
+    it "can generate ECDH shared secret" $ do
+      let mOtherPriv = importPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
+          otherPriv = fromMaybe (error "could not import other priv key") mOtherPriv
+          otherPub = derivePublicKey otherPriv
+          sec = getSharedSecret prv otherPub
+      B16.encode sec `shouldBe` B16.encode sec --if we got here, nothing failed, so that's all we need to know
+
   describe "the ECDSA module works exactly like Haskoin on test values" $ do
     let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         hkPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
@@ -177,4 +184,3 @@ spec = do
           hkPub = fromMaybe (error "couldn't recover haskoin sig") (HK.getPubKeyFromSignature hkSig hkMsg)
           ecPub = fromMaybe (error "couldn't recover ec sig") (recoverPub ecSig ecMsg)
       fromPublicKey ecPub `shouldBe` pubKey2Address hkPub
-

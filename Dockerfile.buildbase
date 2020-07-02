@@ -11,7 +11,7 @@ RUN apt-get update && \
     cd secp256k1/ && \
     git checkout 05d315affe0acd02591c8db783ce1badb0c37a31 && \
     ./autogen.sh && \
-    ./configure --enable-module-recovery --prefix=/usr/ && \
+    ./configure --enable-experimental --enable-module-ecdh --enable-module-recovery --prefix=/usr/ && \
     make && \
     make install && \
     cd .. && \

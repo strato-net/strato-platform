@@ -16,6 +16,7 @@ module Blockchain.ECDSA
   , derivePublicKey
   , exportPublicKey
   , importPublicKey
+  , getSharedSecret
   ) where
 
 
@@ -202,3 +203,7 @@ exportPublicKey compress (PublicKey pk) = S.exportPubKey compress pk
 
 importPublicKey :: ByteString -> Maybe PublicKey
 importPublicKey bs = PublicKey <$> S.importPubKey bs
+
+-- the shared Diffie-Hellman secret for ethereum-encryption
+getSharedSecret :: PrivateKey -> PublicKey -> ByteString
+getSharedSecret (PrivateKey prv) (PublicKey pub) = S.ecdh pub prv
