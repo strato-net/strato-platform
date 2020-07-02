@@ -336,7 +336,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             hasPreprepared .= True
             proposal .= Just realSealed
             yield $ signMessage pk (Preprepare v realSealed)
-    IMsg auth (Preprepare v' pp) -> do
+    IMsg auth ppp@(Preprepare v' pp) -> do
       pr <- use proposer
       mBlockLock <- use blockLock
       case () of
@@ -366,11 +366,15 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   $logInfoS "blockstanbul/roundchange" "chain inconsistency"
                   roundChange
                 Right () -> do
+                  wasProposed <- isJust <$> use proposal
+                  unless wasProposed . yield $ OMsg auth ppp
                   proposal .= Just pp
                   pk <- use prvkey
                   editVoted pp pr
                   yield $ signMessage pk (Prepare v (blockHash pp))
-    IMsg auth (Prepare v' di) -> when (v <= v') $ do
+    IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
+      preparers <- use prepared
+      unless (M.member (sender auth) preparers) . yield $ OMsg auth ppp
       ps <- prepared <%= M.insert (sender auth) di
       total <- poolSize
       let sameVoteCount = M.size . M.filter (==di) $ ps
@@ -382,7 +386,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         pk <- use prvkey
         let seal = commitmentSeal di pk
         yield $ signMessage pk (Commit v di seal)
-    IMsg auth (Commit v' di seal) -> when (v <= v') $ do
+    IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
+      committors <- use committed
+      unless (M.member (sender auth) committors) . yield $ OMsg auth ccc
       cs <- committed <%= M.insert (sender auth) (di, seal)
       total <- poolSize
       let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
