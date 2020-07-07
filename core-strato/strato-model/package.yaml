@@ -67,11 +67,14 @@ tests:
   strato-model-tests:
     source-dirs: test/
     main: Spec.hs
+    ghc-options: -dynamic  # this flag is the result of two weeks I spent trying to link secp256k1_ecdh
     dependencies:
       - aeson
       - aeson-qq
       - base16-bytestring
       - binary
+#      - crypto-pubkey         if we need to compare with eth-encryption's ecdh, add these back
+#      - crypto-pubkey-types
       - ethereum-encryption
       - ethereum-rlp
       - integer-gmp

@@ -3,9 +3,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-
 import           Control.Monad
-import qualified Crypto.Secp256k1                 as SEC
 import qualified Data.Aeson                       as Ae
 import           Data.Aeson.QQ
 import qualified Data.Bits                        as Bits
@@ -30,12 +28,15 @@ import           Blockchain.Strato.Model.Keccak256
 import           Network.Haskoin.Internals        (BigWord(..))
 
 
+-- all the different crypto modules to compare to our new one
 import qualified Blockchain.ExtendedECDSA         as HK
 import qualified Network.Haskoin.Crypto           as HK
 import qualified Network.Haskoin.Internals        as HK
 
+import qualified Crypto.Secp256k1                 as SEC
 
-
+--import qualified Crypto.Types.PubKey.ECC          as CR
+--import qualified Crypto.PubKey.ECC.DH             as CR
 
 main :: IO ()
 main = hspec spec
@@ -142,19 +143,26 @@ spec = do
     it "can recover public keys from signatures" $ do
       let mRecPub = recoverPub sig mesg
       (Just pub) `shouldBe` mRecPub
- 
+
     it "can generate ECDH shared secret" $ do
       let mOtherPriv = importPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
-          otherPriv = fromMaybe (error "could not import other priv key") mOtherPriv
+          otherPriv = fromMaybe (error "could not import the other priv key") mOtherPriv
           otherPub = derivePublicKey otherPriv
-          sec = getSharedSecret prv otherPub
-      B16.encode sec `shouldBe` B16.encode sec --if we got here, nothing failed, so that's all we need to know
+          sec1 = getSharedSecret prv otherPub
+          sec2 = getSharedSecret otherPriv pub
+      sec1 `shouldBe` sec2 
 
-  describe "the ECDSA module works exactly like Haskoin on test values" $ do
+  describe "the ECDSA module works exactly like Haskoin and Crypto-Pubkey on test values" $ do
     let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         hkPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
         ecPriv = fromMaybe (error "couldn't get EC key") $ importPrivateKey testPrivBS
-    
+
+--        otherPrivBS = fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d"
+--        hkOtherPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey otherPrivBS
+--        ecOtherPriv = fromMaybe (error "couldn't get EC key") $ importPrivateKey otherPrivBS
+--        hkOtherPub = HK.derivePubKey hkOtherPriv 
+--        ecOtherPub = derivePublicKey ecOtherPriv
+
     it "can derive the same Ethereum address" $ do
       let hkAddr = prvKey2Address hkPriv
           ecAddr = fromPrivateKey ecPriv
@@ -184,3 +192,14 @@ spec = do
           hkPub = fromMaybe (error "couldn't recover haskoin sig") (HK.getPubKeyFromSignature hkSig hkMsg)
           ecPub = fromMaybe (error "couldn't recover ec sig") (recoverPub ecSig ecMsg)
       fromPublicKey ecPub `shouldBe` pubKey2Address hkPub
+
+{-  TODO: Dan - not sure if this needs to work like in eth-encryption...I don't think so
+    it "can generate the same ECDH shared secret" $ do
+      let ecECDH = getSharedSecret ecPriv ecOtherPub
+          hkPoint = HK.pubKeyPoint hkOtherPub
+          hkPubX = HK.getBigWordInteger (fromMaybe (error "couldn't get X") $ HK.getX hkPoint)
+          hkPubY = HK.getBigWordInteger (fromMaybe (error "couldn't get Y") $ HK.getY hkPoint)
+          hkPubPoint = CR.Point hkPubX hkPubY 
+          CR.SharedKey hkECDH = CR.getShared (CR.getCurveByName CR.SEC_p256k1) (HK.fromPrvKey hkPriv) hkPubPoint
+      HK.getBigWordInteger (bytesToWord256 ecECDH) `shouldBe` hkECDH
+-}
