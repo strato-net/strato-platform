@@ -11,11 +11,11 @@ RUN apt-get update && \
     cd secp256k1/ && \
     git checkout 05d315affe0acd02591c8db783ce1badb0c37a31 && \
     ./autogen.sh && \
-    ./configure --enable-experimental --enable-module-ecdh --enable-module-recovery && \
+    ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh && \
     make && \
     make install && \
     cd .. && \
-    rm -rf secp256k1
+    rm -rf secp256k1 
 
 # package the pre-built solc (e.g. required for 'stack test blockapps-bloc22-server')
 COPY ./solc /usr/local/bin/
