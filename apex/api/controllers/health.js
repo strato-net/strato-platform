@@ -1,6 +1,9 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
 const winston = require('winston-color');
+const rp = require('request-promise');ermin
+const config = require('../config/app.config');
+
 module.exports = {
   ping: function (req, res) {
     res.status(200).send('pong');
@@ -48,6 +51,13 @@ module.exports = {
         winston.warn(`Health table has no entries; Health endpoint is called too soon`)
       }
 
+      let viewInfoBody;
+      
+      const viewInfo = await getPrometheusView();
+      if (viewInfo) {
+        viewInfoBody = viewInfo;
+      }
+
       res.status(200).json(
         {
           lastBlock: {
@@ -69,7 +79,8 @@ module.exports = {
             warningsActive: !systemInfoStatus,
             messages: warningMessages
           },
-          systemInfo: systemInfoBody
+          systemInfo: systemInfoBody,
+          viewInfo: viewInfoBody
         }
       )
     } catch (error) {
@@ -162,4 +173,18 @@ async function getLatestHealth() {
   ])
   
   return [healthInfo, stallInfo, systemInfo]
+}
+
+async function getPrometheusView() {
+  if (!process.env['prometheusHost']) {
+    throw Error('prometheusHost env var is not set - unable to get prometheus data');
+  }
+  const options = {
+    method: 'GET',
+    url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=pbft_current_view`,
+    followRedirects: false,
+    timeout: config.healthCheck.requestTimeout - 100,
+    json: true,
+  };
+  return rp(options);
 }
