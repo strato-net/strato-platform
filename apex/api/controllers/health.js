@@ -28,18 +28,11 @@ module.exports = {
         raw: true,
       });
 
-      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus, warningMessages, systemInfoBody, pbftInfoBody;
+      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus, warningMessages, systemInfoBody;
 
       const currentTime = Date.now();
 
-
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Request timed out'));
-        }, 4000);
-      })
-
-      const responses = await Promise.all([getLatestHealth(), Promise.race([getPbftInfo(), timeoutPromise])]);
+      const responses = await Promise.all([getLatestHealth(), getPbftInfo()]);
 
       const [[healthInfo, stallInfo, systemInfo], pbftInfo] = responses;
 
@@ -60,10 +53,6 @@ module.exports = {
       } else {
         winston.warn(`Health table has no entries; Health endpoint is called too soon`)
       }
-      
-      if (pbftInfo) {
-        pbftInfoBody = pbftInfo;
-      }
 
       res.status(200).json(
         {
@@ -74,7 +63,7 @@ module.exports = {
             totalDifficulty: lastBlock.total_difficulty,
             nonce: lastBlock.nonce,
           },
-          pbftInfo: pbftInfoBody,
+          pbftInfo: pbftInfo,
           healthInfo: {
             uptime: uptime / 1000,
             isHealthy: healthStatus,
@@ -91,14 +80,14 @@ module.exports = {
         }
       )
     } catch (error) {
-      return next(error);
+      console.error(error);
+      return next(new Error("Unable to collect some of the health info."));
     }
   },
 
   healthStatus: async function (req, res, next) {
     try {
       let healthStatus, stallStatus, uptime, isInc, isPending;
-
 
       const currentTime = Date.now();
 
@@ -126,7 +115,8 @@ module.exports = {
           }
       )
     } catch (error) {
-      return next(error);
+      console.error(error);
+      return next(new Error("Unable to collect some of the health info."));
     }
 
   }
@@ -182,7 +172,7 @@ async function getLatestHealth() {
   return [healthInfo, stallInfo, systemInfo]
 }
 
-async function getPbftInfo() {
+function getPbftInfo() {
   if (!process.env['prometheusHost']) {
     throw Error('prometheusHost env var is not set - unable to get prometheus data');
   }
