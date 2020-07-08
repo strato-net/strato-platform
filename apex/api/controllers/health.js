@@ -1,7 +1,7 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
 const winston = require('winston-color');
-const rp = require('request-promise');ermin
+const rp = require('request-promise');
 const config = require('../config/app.config');
 
 module.exports = {
@@ -126,7 +126,7 @@ module.exports = {
           }
       )
     } catch (error) {
-      return next(new Error('could not get data from database: ' + error));
+      return next(new Error('failed to get data from database: ' + error));
     }
 
   }
