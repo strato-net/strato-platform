@@ -39,7 +39,7 @@ module.exports = {
         }, 4000);
       })
 
-      const responses = await Promise.all(getLatestHealth(), Promise.race([getPbftInfo(), timeoutPromise]));
+      const responses = await Promise.all([getLatestHealth(), Promise.race([getPbftInfo(), timeoutPromise])]);
 
       const [[healthInfo, stallInfo, systemInfo], pbftInfo] = responses;
 
@@ -91,7 +91,7 @@ module.exports = {
         }
       )
     } catch (error) {
-      return next(new Error('could not get data from database: ' + error));
+      return next(error);
     }
   },
 
@@ -126,7 +126,7 @@ module.exports = {
           }
       )
     } catch (error) {
-      return next(new Error('failed to get data from database: ' + error));
+      return next(error);
     }
 
   }
