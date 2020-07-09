@@ -76,7 +76,8 @@ module.exports = {
             warningsActive: !systemInfoStatus,
             messages: warningMessages
           },
-          systemInfo: systemInfoBody
+          systemInfo: systemInfoBody,
+          version: process.env.STRATO_VERSION
         }
       )
     } catch (error) {
@@ -111,7 +112,8 @@ module.exports = {
               isNotStalled: stallStatus,
               isValidBlocksInc: isInc ,
               isLastPending: isPending
-            }
+            },
+            version: process.env.STRATO_VERSION
           }
       )
     } catch (error) {
