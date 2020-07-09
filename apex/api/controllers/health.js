@@ -1,6 +1,9 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
 const winston = require('winston-color');
+const rp = require('request-promise');
+const config = require('../config/app.config');
+
 module.exports = {
   ping: function (req, res) {
     res.status(200).send('pong');
@@ -29,7 +32,10 @@ module.exports = {
 
       const currentTime = Date.now();
 
-      const [healthInfo, stallInfo, systemInfo] = await getLatestHealth();
+      const responses = await Promise.all([getLatestHealth(), getPbftInfo()]);
+
+      const [[healthInfo, stallInfo, systemInfo], pbftInfo] = responses;
+
       if (healthInfo && stallInfo) {
         healthStatus = healthInfo.latestHealthStatus;
         stallStatus = stallInfo.latestHealthStatus;
@@ -57,6 +63,7 @@ module.exports = {
             totalDifficulty: lastBlock.total_difficulty,
             nonce: lastBlock.nonce,
           },
+          pbftInfo: pbftInfo,
           healthInfo: {
             uptime: uptime / 1000,
             isHealthy: healthStatus,
@@ -73,14 +80,14 @@ module.exports = {
         }
       )
     } catch (error) {
-      return next(new Error('could not get data from database: ' + error));
+      console.error(error);
+      return next(new Error("Unable to collect some of the health info."));
     }
   },
 
   healthStatus: async function (req, res, next) {
     try {
       let healthStatus, stallStatus, uptime, isInc, isPending;
-
 
       const currentTime = Date.now();
 
@@ -108,7 +115,8 @@ module.exports = {
           }
       )
     } catch (error) {
-      return next(new Error('could not get data from database: ' + error));
+      console.error(error);
+      return next(new Error("Unable to collect some of the health info."));
     }
 
   }
@@ -162,4 +170,18 @@ async function getLatestHealth() {
   ])
   
   return [healthInfo, stallInfo, systemInfo]
+}
+
+function getPbftInfo() {
+  if (!process.env['prometheusHost']) {
+    throw Error('prometheusHost env var is not set - unable to get prometheus data');
+  }
+  const options = {
+    method: 'GET',
+    url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=pbft_current_view`,
+    followRedirects: false,
+    timeout: config.healthCheck.requestTimeout - 100,
+    json: true,
+  };
+  return rp(options);
 }
