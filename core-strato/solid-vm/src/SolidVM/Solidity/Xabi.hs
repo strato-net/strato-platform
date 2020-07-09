@@ -5,7 +5,6 @@
 
 module SolidVM.Solidity.Xabi where
 
-import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
@@ -263,7 +262,7 @@ instance ToSchema Using where
 
 data ContractDetails = ContractDetails
   { contractdetailsBin        :: Text
-  , contractdetailsAddress    :: Maybe (MaybeNamed Address)
+  , contractdetailsAddress    :: Maybe Address
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: Keccak256
   , contractdetailsName       :: Text
@@ -275,21 +274,6 @@ data ContractDetails = ContractDetails
 instance ToSample ContractDetails where toSamples _ = noSamples
 
 --------------------------------------------------------------------------------
-
-data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic, NFData, Binary)
-
-instance ToJSON a => ToJSON (MaybeNamed a) where
-  toJSON (Named _name) = toJSON _name
-  toJSON (Unnamed a)   = toJSON a
-
-instance FromJSON a => FromJSON (MaybeNamed a) where
-  parseJSON x = Unnamed <$> parseJSON x <|> Named <$> parseJSON x
-
-instance Arbitrary a => Arbitrary (MaybeNamed a) where
-  arbitrary = oneof
-    [ elements [Named "name1", Named "name2", Named "name3"]
-    , Unnamed <$> arbitrary
-    ]
 
 soliditySchemaOptions :: SchemaOptions
 soliditySchemaOptions = SchemaOptions

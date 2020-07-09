@@ -20,19 +20,20 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/API#readme>
 
 dependencies:
-  - base >= 4.7 && < 5
+  - base
 
 library:
   source-dirs: src
   dependencies:
   - aeson
   - aeson-casing
+  - base16-bytestring
   - blockapps-ethereum
   - bytestring
   - cryptonite
-  - haskoin-shim
   - lens
   - saltine
+  - secp256k1-haskell
   - servant
   - servant-server
   - strato-model

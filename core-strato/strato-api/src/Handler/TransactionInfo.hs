@@ -10,6 +10,8 @@
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE RankNTypes             #-}
 
+{-# OPTIONS -fno-warn-deprecations #-}
+{-# OPTIONS -fno-warn-orphans #-}
 
 module Handler.TransactionInfo where
 

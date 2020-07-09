@@ -29,10 +29,10 @@ import qualified Data.Text.Encoding               as Text
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Strato.Client
-import           BlockApps.Strato.Types
 
+import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Keccak256
+import           Handlers.BatchTransactionResult
 
 import           UnliftIO
 
@@ -40,9 +40,9 @@ toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
 
 maybeTxBatchResult :: [Keccak256] -> Bloc [Maybe TransactionResult]
-maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (postTxResultBatch hashes))
+maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (batchTransactionResultClient hashes))
   where maybeHeads btxr =
-          let list = map (flip M.lookup $ unBatchTransactionResult btxr) hashes
+          let list = map (flip M.lookup btxr) hashes
           in flip map list $ \mtrs -> case mtrs of
             Nothing -> Nothing
             Just trs -> listToMaybe trs
@@ -55,7 +55,7 @@ getBatchBlocTxStatus hashes = do
     case mtxr of
       Nothing -> return (Pending, mtxr)
       Just txr -> do
-        case transactionresultMessage txr of
+        case transactionResultMessage txr of
           "Success!" -> return (Success, mtxr)
           _          -> return (Failure, mtxr)
 

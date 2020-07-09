@@ -401,21 +401,26 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             yield . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
-      rs <- roundChanged <%= M.alter (Just . S.insert (sender auth) . fromMaybe S.empty) rn
-      total <- poolSize
-      sentRN <- use pendingRound
-      let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
-      when (3 * sameRNCount > total && Just rn > sentRN) $ do
-        pendingRound .= Just rn
-        pk <- use prvkey
-        $logInfoS "blockstanbul/roundchange" "agreed change"
-        yield $ signMessage pk (RoundChange vn)
-      when (3 * sameRNCount > 2 * total) $ do
-        next <- use pendingRound
-        case next of
-          Nothing -> error "TODO(tim): a round was voted on without existing"
-          Just r -> nextRound (Round r)
-      return ()
+      mSigners <- use $ roundChanged . at rn
+      case S.member (sender auth) <$> mSigners of
+        Just True -> return ()
+        _ -> do
+          rs <- roundChanged <%= M.alter (Just . S.insert (sender auth) . fromMaybe S.empty) rn
+          total <- poolSize
+          sentRN <- use pendingRound
+          let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
+          when (3 * sameRNCount > total && Just rn > sentRN) $ do
+            pendingRound .= Just rn
+            pk <- use prvkey
+            $logInfoS "blockstanbul/roundchange" "agreed change"
+            yield $ signMessage pk (RoundChange vn)
+          when (3 * sameRNCount > 2 * total) $ do
+            next <- use pendingRound
+            case next of
+              Nothing -> error "TODO(tim): a round was voted on without existing"
+              Just r -> nextRound (Round r)
+          yield $ OMsg auth (RoundChange vn)
+          return ()
     Timeout r' -> do
       case r' `compare` _round v of
         LT ->

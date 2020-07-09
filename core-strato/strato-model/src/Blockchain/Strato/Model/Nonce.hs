@@ -32,7 +32,7 @@ instance ToSchema Nonce where
   declareNamedSchema _ = return $
     NamedSchema (Just "Nonce")
       ( mempty
-        & type_ .~ SwaggerInteger
+        & type_ ?~ SwaggerInteger
         & example ?~ toJSON (Nonce 1)
         & description ?~ "Numeric Nonce" )
 

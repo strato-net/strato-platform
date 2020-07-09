@@ -11,18 +11,19 @@ import           Strato.Strato23.Crypto
 import           Strato.Strato23.Monad
 import           Strato.Strato23.Database.Queries
 
-getKey :: Text -> Maybe Text -> VaultM StatusAndAddress
+
+getKey :: Text -> Maybe Text -> VaultM AddressAndKey
 getKey headerUserName queryParamUserName = withPassword $ \pw -> do
   let userName = fromMaybe headerUserName queryParamUserName
-  (salt, nonce, encKey, addr) <- toUserError ("User " <> userName <> " doesn't exist")
+  (salt, nonce, encKey, addr, pub) <- toUserError ("User " <> userName <> " doesn't exist")
                                . vaultQuery1 $ getUserKeyQuery userName
   if isJust queryParamUserName          -- decrypt and derive the address if query param
-    then return $ StatusAndAddress addr -- not specified, to guarantee correctness
+    then return $ AddressAndKey addr pub -- not specified, to guarantee correctness
     else case decryptSecKey pw salt nonce encKey of
       Nothing -> vaultWrapperError IncorrectPasswordError
-      Just pKey -> return . StatusAndAddress $ deriveAddress pKey
+      Just pKey -> return $ AddressAndKey (deriveAddress pKey) pub
 
-postKey :: Text -> VaultM StatusAndAddress
+postKey :: Text -> VaultM AddressAndKey
 postKey userName = withPassword $ \pw -> do
   keyStore@KeyStore{..} <- newKeyStore pw
   created <- vaultModify $ postUserKeyQuery userName keyStore
@@ -30,4 +31,4 @@ postKey userName = withPassword $ \pw -> do
     then vaultWrapperError $ UserError ("User " <> userName <> " already exists")
     else case decryptSecKey pw keystoreSalt keystoreAcctNonce keystoreAcctEncSecKey of
       Nothing -> vaultWrapperError IncorrectPasswordError
-      Just pKey -> return . StatusAndAddress $ deriveAddress pKey
+      Just pKey -> return $ AddressAndKey (deriveAddress pKey) keystoreAcctPubKey

@@ -1,5 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Handler.BatchTransactionResult where
 
 import           Blockchain.Strato.Model.Keccak256

@@ -115,7 +115,7 @@ enterVaultWrapper env x = Handler $ do
     Right a -> return a
     Left e -> throwE $ reThrowError e
   where
-    reThrowError :: VaultWrapperError -> ServantErr
+    reThrowError :: VaultWrapperError -> ServerError
     reThrowError
       = \case
           DBError err ->

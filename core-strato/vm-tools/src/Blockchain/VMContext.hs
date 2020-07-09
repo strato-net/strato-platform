@@ -11,7 +11,7 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
-
+{-# OPTIONS -fno-warn-deprecations #-}
 
 module Blockchain.VMContext
     ( VMBase

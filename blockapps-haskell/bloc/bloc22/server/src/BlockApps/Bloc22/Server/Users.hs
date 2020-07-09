@@ -9,7 +9,7 @@
 
 module BlockApps.Bloc22.Server.Users where
 
-import           ClassyPrelude                     ((<>), Hashable)
+import           ClassyPrelude                     ((<>), Hashable, getCurrentTime, UTCTime(..))
 import           Control.Concurrent
 import           Control.Applicative               ((<|>), liftA2)
 import           Control.Arrow
@@ -26,6 +26,7 @@ import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Char8             as BC
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
+import           Data.ByteString.Short             (fromShort)
 import qualified Data.Cache                        as Cache
 import qualified Data.Cache.Internal               as Cache
 import           Data.Either
@@ -70,15 +71,22 @@ import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
-import           BlockApps.Strato.Client
-import           BlockApps.Strato.Types            hiding (Transaction (..))
+import           BlockApps.Strato.Types            (Strung(..))
+import qualified BlockApps.Strato.Types            as Deprecated
 import           BlockApps.XAbiConverter
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Json
+import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
-import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
+import           Handlers.AccountInfo
+import           Handlers.Faucet
+import           Handlers.Transaction
 
 data TransactionHeader = TransactionHeader
   { transactionheaderToAddr   :: Maybe Address
@@ -105,10 +113,7 @@ data BatchState = BatchState
 makeLenses ''BatchState
 
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
-forStateT s as f = flip evalStateT s $ mapM f as
-
-forState :: s -> [a] -> (a -> State s b) -> [b]
-forState s as = runIdentity . forStateT s as
+forStateT s as = flip evalStateT s . for as
 
 getUsers :: Bloc [UserName]
 getUsers = do
@@ -167,22 +172,22 @@ waitForBalance :: Address -> Bloc ()
 waitForBalance addr = waitFor "no user account found" go
   where go :: Bloc Bool
         go = do
-          let params = accountsFilterParams{qaAddress = Just addr}
+          let params = accountsFilterParams{qaAddress = Just addr, qaMinBalance = Just 1}
           accts <- blocStrato $ getAccountsFilter params
           $logInfoLS "waitForBalance/req" params
           $logInfoLS "waitForBalance/resp" accts
-          return $ not (null accts || accountBalance (head accts) == Strung 0)
+          return . not $ null accts
 
 postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
   when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
-  hashes <- blocStrato $ postFaucet addr
+  hashes <- blocStrato $ postFaucetClient addr
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
     , constant h
     , constant (0 :: Int32)
     , constant (0 :: Int32)
-    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode defaultPostTx{posttransactionTo = Just addr})
+    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode Deprecated.defaultPostTx{Deprecated.posttransactionTo = Just addr})
     ) | h <- hashes]
   result <- getBlocTransactionResult' hashes resolve
   when (resolve && Success == blocTransactionStatus result) $ do
@@ -218,15 +223,15 @@ postUsersSend' cacheNonce TransferParameters{..} sign = do
         (Wei (fromIntegral $ unStrung value))
         ByteString.empty
         chainId
-    hash <- blocStrato $ postTx tx
+    txHash <- blocStrato $ postTx tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
       ( Nothing
-      , constant hash
+      , constant txHash
       , constant (0 :: Int32)
       , constant (0 :: Int32)
       , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
       )]
-    getBlocTransactionResult' [hash] resolve
+    getBlocTransactionResult' [txHash] resolve
 
 postUsersContract :: UserName -> Address -> Maybe ChainId -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
 postUsersContract userName addr chainId resolve
@@ -272,16 +277,16 @@ postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $
       (bin <> argsBin)
       chainId
   $logDebugLS "postUsersContractEVM'/tx" tx
-  hash <- blocStrato $ postTx tx
-  $logInfoLS "postUsersContractEVM'/hash" hash
+  txHash <- blocStrato $ postTx tx
+  $logInfoLS "postUsersContractEVM'/hash" txHash
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
-    , constant hash
+    , constant txHash
     , constant cmId
     , constant (1 :: Int32)
     , constant contractdetailsName
     )]
-  getBlocTransactionResult' [hash] resolve
+  getBlocTransactionResult' [txHash] resolve
 
 postUsersContractSolidVM' :: Should CacheNonce -> ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransaction $ do
@@ -306,16 +311,16 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
       (BC.pack $ Text.unpack src)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
-  hash <- blocStrato $ postTx tx
-  $logInfoLS "postUsersContractSolidVM'/hash" hash
+  txHash <- blocStrato $ postTx tx
+  $logInfoLS "postUsersContractSolidVM'/hash" txHash
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
-    , constant hash
+    , constant txHash
     , constant cmId
     , constant (1 :: Int32)
     , constant contractdetailsName
     )]
-  getBlocTransactionResult' [hash] resolve
+  getBlocTransactionResult' [txHash] resolve
 
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
 postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts msrcs _resolve) = do
@@ -382,12 +387,12 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
   hashes <- blocStrato (postTxList txs)
   void . blocModify $ \conn -> runInsertMany conn hashNameTable
     [( Nothing
-    , constant hash
+    , constant txHash
     , constant cmId
     , constant (1 :: Int32)
     , constant name
     )
-    | (hash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
+    | (txHash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
     ]
   getBatchBlocTransactionResult' hashes resolve
 
@@ -439,12 +444,12 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
   hashes <- blocStrato (postTxList txs)
   void . blocModify $ \conn -> runInsertMany conn hashNameTable
     [( Nothing
-    , constant hash
+    , constant txHash
     , constant cmId
     , constant (1 :: Int32)
     , constant name
     )
-    | (hash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
+    | (txHash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
     ]
   getBatchBlocTransactionResult' hashes resolve
 
@@ -476,12 +481,12 @@ postUsersSendList' cacheNonce TransferListParameters{..} sign = do
   hashes <- blocStrato $ postTxList txs''
   void . blocModify $ \conn -> runInsertMany conn hashNameTable
     [( Nothing
-    , constant hash
+    , constant txHash
     , constant (0 :: Int32)
     , constant (0 :: Int32)
     , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
     )
-    | (tx,hash) <- zip txs'' hashes
+    | (tx,txHash) <- zip txs'' hashes
     ]
   getBatchBlocTransactionResult' hashes resolve
 
@@ -489,12 +494,12 @@ ensureMostRecentSuccessfulTx
   :: [TransactionResult]
   -> Bloc TransactionResult
 ensureMostRecentSuccessfulTx results = blocMaybe err . listToMaybe $
-  filter ((== "Success!") . transactionresultMessage)
-    (sortOn (negate . transactionresultTime) results)
+  filter ((== "Success!") . transactionResultMessage)
+    (sortOn (negate . transactionResultTime) results)
   where
-    hash = transactionresultTransactionHash (head results)
+    txHash = transactionResultTransactionHash (head results)
     err = "Transaction with hash "
-      <> Text.pack (KECCAK256.formatKeccak256WithoutColor hash)
+      <> Text.pack (formatKeccak256WithoutColor txHash)
       <> " never ran successfully."
 
 postUsersContractMethodList
@@ -622,12 +627,12 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} sign = do
       mapM_ ($logInfoLS "postUsersContractMethodList'/hashes") hashes
       void . blocModify $ \conn -> runInsertMany conn hashNameTable
         [( Nothing
-        , constant hash
+        , constant txHash
         , constant cmId
         , constant (2 :: Int32)
         , constant funcName
         )
-        | (hash,(_,cmId, funcName)) <- zip hashes txsCmIdsFuncNames
+        | (txHash,(_,cmId, funcName)) <- zip hashes txsCmIdsFuncNames
         ]
       getBatchBlocTransactionResult' hashes resolve
 
@@ -666,7 +671,7 @@ postUsersContractMethod' :: Should CacheNonce -> FunctionParameters -> Signer ->
 postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
     params <- getAccountTxParams cacheNonce fromAddr chainId txParams
 
-    let err = UserError $ Text.concat
+    let err = CouldNotFind $ Text.concat
                 [ "postUsersContractMethod': Couldn't find contract details for "
                 , contractName
                 , " at address "
@@ -675,7 +680,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
     (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
       getContractDetailsAndMetadataId
         (ContractName contractName)
-        (Unnamed contractAddr)
+        contractAddr
         chainId
     contract' <- case xAbiToContract xabi of
       Left e -> throwIO . AnError $ Text.pack e
@@ -704,16 +709,16 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
         ((sel::ByteString) <> (argsBin::ByteString))
         chainId
     $logDebugLS "postUsersContractMethod'/tx" tx
-    hash <- blocStrato $ postTx tx
-    $logInfoLS "postUsersContractMethod'/hash" hash
+    txHash <- blocStrato $ postTx tx
+    $logInfoLS "postUsersContractMethod'/hash" txHash
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
       ( Nothing
-      , constant hash
+      , constant txHash
       , constant cmId
       , constant (2 :: Int32)
       , constant funcName
       )]
-    getBlocTransactionResult' [hash] resolve
+    getBlocTransactionResult' [txHash] resolve
 
 emptyBatchState :: BatchState
 emptyBatchState = BatchState Map.empty Map.empty
@@ -735,7 +740,7 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
-getBlocTransactionResult hash resolve = fmap head $ postBlocTransactionResults resolve [hash]
+getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
 
 getBatchBlocTransactionResult' :: [Keccak256] -> Bool -> Bloc [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
@@ -785,15 +790,15 @@ recurseTRDs resolve hashes = go 0 (toPending hashes)
 
 evalAndReturn :: [TRD] -> Bloc [BlocTransactionResult]
 evalAndReturn list = forStateT emptyBatchState list $
-    \(TRD status hash _ mtxr) -> case status of
-        Pending -> return $ BlocTransactionResult Pending hash Nothing Nothing
-        Failure -> return $ BlocTransactionResult Failure hash mtxr Nothing
+    \(TRD status txHash _ mtxr) -> case status of
+        Pending -> return $ BlocTransactionResult Pending txHash Nothing Nothing
+        Failure -> return $ BlocTransactionResult Failure txHash mtxr Nothing
         Success -> do
-          (cmId,ttype,tdata)::(Int32,Int32,Text) <- lift $ blocQuery1 "evalAndReturn" $ contractByTxHash hash
+          (cmId,ttype,tdata)::(Int32,Int32,Text) <- lift $ blocQuery1 "evalAndReturn" $ contractByTxHash txHash
           case ttype of
-            0 -> return $ BlocTransactionResult Success hash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata)
-            1 -> contractResult hash mtxr cmId tdata
-            2 -> functionResult hash mtxr cmId tdata
+            0 -> return $ BlocTransactionResult Success txHash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata)
+            1 -> contractResult txHash mtxr cmId tdata
+            2 -> functionResult txHash mtxr cmId tdata
             _ -> throwIO $ InternalError $ Text.pack $ "Unexpected transaction type: got" ++ show ttype
 
 contractResult :: Keccak256
@@ -801,39 +806,39 @@ contractResult :: Keccak256
                -> Int32
                -> Text
                -> StateT BatchState Bloc BlocTransactionResult
-contractResult hash mtxr cmId name = do
+contractResult txHash mtxr cmId name = do
   let
     Just txResult = mtxr
-    chainId = transactionresultChainId txResult
+    chainId = transactionResultChainId txResult
     addressMaybe = do
       str <- listToMaybe $
-        Text.splitOn "," (transactionresultContractsCreated txResult)
+        Text.splitOn "," (Text.pack $ transactionResultContractsCreated txResult)
       stringAddress $ Text.unpack str
   case addressMaybe of
-    Nothing -> case transactionresultMessage txResult of
+    Nothing -> case transactionResultMessage txResult of
       "Success!" -> do
         let mDelAddr = stringAddress . Text.unpack =<<
-              (listToMaybe . Text.splitOn "," $ transactionresultContractsDeleted txResult)
+              (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted txResult)
         case mDelAddr of
           Just _ -> lift $ throwIO $ UserError "Contract failed to upload, likely because the constructor threw"
           Nothing -> lift $ throwIO $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"
-      stratoMsg  -> lift $ throwIO $ UserError stratoMsg
+      stratoMsg  -> lift $ throwIO $ UserError $ Text.pack stratoMsg
     Just addr' -> do
       let cn = ContractName name
       mdetails <- use $ contractDetailsMap . at cn
       details <- case mdetails of
-        Just details' -> return details'{contractdetailsAddress = Just (Unnamed addr')}
+        Just details' -> return details'{contractdetailsAddress = Just addr'}
         Nothing -> do
-          cds <- lift $ getContractDetailsByMetadataId cmId (Unnamed addr') chainId
+          cds <- lift $ getContractDetailsByMetadataId cmId addr' (ChainId <$> chainId)
           contractDetailsMap . at cn <?= cds
-      return $ BlocTransactionResult Success hash mtxr (Just $ Upload details)
+      return $ BlocTransactionResult Success txHash mtxr (Just $ Upload details)
 
 functionResult :: Keccak256
                -> Maybe TransactionResult
                -> Int32
                -> Text
                -> StateT BatchState Bloc BlocTransactionResult
-functionResult hash mtxr cmId funcName = do
+functionResult txHash mtxr cmId funcName = do
   let Just txResult = mtxr
   mxabi <- use $ functionXabiMap . at cmId
   xabi <- case mxabi of
@@ -848,15 +853,16 @@ functionResult hash mtxr cmId funcName = do
       either (throwIO . UserError . Text.pack) return $
         xabiTypeToType xabi indexedTypeType
   let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
-      txResp = transactionresultResponse txResult
+      txResp = fromShort $ transactionResultResponse txResult
     -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
     -- workaround for enums
       mFormattedResponse = convertResultResToVals txResp mappedResultTypes
-  case transactionresultMessage txResult of
+  case transactionResultMessage txResult of
     "Success!" -> do
-      formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-      return $ BlocTransactionResult Success hash mtxr (Just $ Call formattedResponse)
-    stratoMsg  -> throwIO $ UserError stratoMsg
+      let r = Text.decodeUtf8 $ Base16.encode txResp
+      formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> r) mFormattedResponse
+      return $ BlocTransactionResult Success txHash mtxr (Just $ Call formattedResponse)
+    stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
@@ -865,10 +871,9 @@ convertEnumTypeToInt = \case
   TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
   ty -> ty
 
-convertResultResToVals :: Text -> [Type] -> Maybe [SolidityValue]
-convertResultResToVals txResp responseTypes =
-  let byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
-  in map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
+convertResultResToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
+convertResultResToVals byteResp responseTypes =
+  map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
 getArgValues :: Map Text ArgValue -> Map Text Xabi.IndexedType -> Bloc [Value]
 getArgValues argsMap argNamesTypes = do
@@ -975,12 +980,15 @@ getAccountNonce :: Address -> S.Set (Maybe ChainId) -> Bloc (Map (Maybe ChainId)
 getAccountNonce addr chainIds = do
   let chainIds' = map (fromMaybe (ChainId 0)) $ S.toList chainIds
   let params = accountsFilterParams{qaAddress = Just addr, qaChainId = chainIds'}
-  mAccts <- blocStrato $ getAccountsFilter params
+  mAccts <- fmap (map (\(AddressStateRef' a _) -> a)) . blocStrato $ getAccountsFilter params
   $logInfoLS "getAccountNonce/req" params
   $logInfoLS "getAccountNonce/resp" mAccts
   case mAccts of
     [] -> throwIO . UserError $ "User does not have a balance"
-    accts -> return . Map.fromList $ map (accountChainId &&& accountNonce) accts
+    accts -> do
+      let mkCid AddressStateRef{..} = ChainId <$> toMaybe 0 addressStateRefChainId
+          mkNonce AddressStateRef{..} = Nonce $ fromInteger addressStateRefNonce
+      return . Map.fromList $ map (mkCid &&& mkNonce) accts
 
 getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
 getAccountSecKey userName password addr = do
@@ -1018,26 +1026,29 @@ prepareUnsignedTx TransactionHeader{..} = UnsignedTransaction
   }
 
 preparePostTx
-  :: Address
+  :: UTCTime
+  -> Address
   -> Transaction
-  -> PostTransaction
-preparePostTx from tx = PostTransaction
-  { posttransactionHash = kecc
-  , posttransactionGasLimit = fromIntegral gasLimit
-  , posttransactionCodeOrData = code
-  , posttransactionGasPrice = fromIntegral gasPrice
-  , posttransactionTo = toAddr
-  , posttransactionFrom = from
-  , posttransactionValue = Strung $ fromIntegral value
-  , posttransactionR = Hex $ fromIntegral r
-  , posttransactionS = Hex $ fromIntegral s
-  , posttransactionV = Hex v
-  , posttransactionNonce = fromIntegral nonce'
-  , posttransactionChainId = chainId
-  , posttransactionMetadata = metadata
-  }
+  -> RawTransaction'
+preparePostTx time from tx = flip RawTransaction' "" $ RawTransaction
+  time
+  from
+  (fromIntegral nonce')
+  (fromIntegral gasPrice)
+  (fromIntegral gasLimit)
+  toAddr
+  (fromIntegral value)
+  code
+  chainId
+  (fromIntegral r)
+  (fromIntegral s)
+  v
+  metadata
+  0
+  kecc
+  API
   where
-    kecc = KECCAK256.hash (rlpSerialize tx)
+    kecc = hash (rlpSerialize tx)
     r = transactionR tx
     s = transactionS tx
     v = transactionV tx
@@ -1045,13 +1056,15 @@ preparePostTx from tx = PostTransaction
     Wei gasPrice = transactionGasPrice tx
     Nonce nonce' = transactionNonce tx
     Wei value = transactionValue tx
-    code = Text.decodeUtf8 $ Base16.encode $ transactionInitOrData tx
+    code = transactionInitOrData tx
     toAddr = transactionTo tx
-    chainId = transactionChainId tx
-    metadata = transactionMetadata tx
+    chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ transactionChainId tx
+    metadata = Map.toList <$> transactionMetadata tx
 
 addMetadata :: Maybe (Map Text Text) -> Transaction -> Transaction
 addMetadata m t = t{transactionMetadata = m}
 
-signAndPrepare :: Signer -> Address -> Maybe (Map Text Text) -> TransactionHeader -> Bloc PostTransaction
-signAndPrepare sign from md = fmap (preparePostTx from . addMetadata md) . sign . prepareUnsignedTx
+signAndPrepare :: Signer -> Address -> Maybe (Map Text Text) -> TransactionHeader -> Bloc RawTransaction'
+signAndPrepare sign from md th = do
+  time <- liftIO getCurrentTime
+  fmap (preparePostTx time from . addMetadata md) . sign $ prepareUnsignedTx th
