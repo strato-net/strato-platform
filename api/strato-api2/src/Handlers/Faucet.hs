@@ -1,32 +1,39 @@
-
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
-module Handlers.Faucet (
-  API,
-  server
+module Handlers.Faucet
+  ( API
+  , postFaucetClient
+  , postFaucetMultipartClient
+  , postDataFaucetClient
+  , server
   ) where
 
 import           Control.Monad
+import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
-import           Data.Aeson
+import           Control.Monad.Trans.Class
 import qualified Data.ByteString                       as B
-import qualified Data.ByteString.Lazy.Char8            as BLC
-import           Data.IORef
+import qualified Data.ByteString.Lazy                  as LBS
+import           Data.Conduit
 import           Data.Maybe
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import qualified Database.Esqueleto                    as E
-import           Database.Persist.Postgresql
 import qualified Network.Haskoin.Crypto                as H
 import           Numeric
 import           Servant
+import           Servant.Client
 import           Servant.Multipart
 import           System.IO.Unsafe
 import           Text.Printf
@@ -50,23 +57,34 @@ import           Text.Format
 
 import           FaucetKey
 import           SQLM
+import           UnliftIO
   
 type API = 
   "faucet" :> ReqBody '[FormUrlEncoded] Address
-           :> Post '[JSON] Value
+           :> Post '[JSON] [Keccak256]
   :<|>
   "faucet" :> MultipartForm Mem (MultipartData Mem)
-           :> Post '[JSON] Value
+           :> Post '[JSON] [Keccak256]
   :<|>
   "dataFaucet" :> QueryParam "size" Int
                :> QueryParam "count" Int
-               :> Get '[JSON] Value
+               :> Get '[JSON] [Keccak256]
+               
+postFaucetClient :: Address -> ClientM [Keccak256]
+postFaucetMultipartClient :: (LBS.ByteString, MultipartData Mem) -> ClientM [Keccak256]
+postDataFaucetClient :: Maybe Int -> Maybe Int -> ClientM [Keccak256]
+postFaucetClient
+  :<|> postFaucetMultipartClient
+  :<|> postDataFaucetClient = client (Proxy @API)
 
-server :: ConnectionPool -> Server API
-server pool =
-  postFaucet pool
-  :<|> postFaucetMultipart pool
-  :<|> postDataFaucet pool
+server :: ServerT API SQLM
+server  =
+  postFaucetC
+  :<|> postFaucetMultipartC
+  :<|> postDataFaucetC
+  where postFaucetC a = runConduit $ postFaucet a `fuseUpstream` emitKafkaTransactions
+        postFaucetMultipartC a = runConduit $ postFaucetMultipart a `fuseUpstream` emitKafkaTransactions
+        postDataFaucetC a b = runConduit $ postDataFaucet a b `fuseUpstream` emitKafkaTransactions
 
 -----------------------------------------
 
@@ -78,36 +96,31 @@ appFaucetNonce = unsafePerformIO (newIORef 0)
 
 ---------------
 
-postFaucet :: ConnectionPool -> Address -> Handler Value
-postFaucet pool addressParam = runLoggingT $ do
-
-  let addresses = [addressParam]
-  
+postFaucet :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+           => Address -> ConduitT a IngestEvent m [Keccak256]
+postFaucet target = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lookupNonce pool $ prvKey2Address key
+  minNonce <- lift . lookupNonce $ prvKey2Address key
 
-  toJSON <$> case addresses of
-    [target] -> do
-      maxNonce <- acquireNewMaxNonce minNonce
-      $logInfoS "postFaucet" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
-      mapM (putTX maxNonce key target) [maxNonce, minNonce]
-    addrTL -> do
-      liftIO $ putStrLn $ show addresses
-      -- TODO(tim): Find a multiple nonce strategy for multiple addresses
-      sequence . zipWith (putTX minNonce key) addrTL $ map (minNonce +) [0..]
+  maxNonce <- acquireNewMaxNonce minNonce
+  $logInfoS "postFaucet" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
+  mapM (putTX maxNonce key target) [maxNonce, minNonce]
+  where
+    putTX maxN k a n = do
+      ts <- liftIO getCurrentMicrotime
+      tx <- makeSendTX maxN k a n
+      yield . IETx ts $ IngestTx API tx
+      pure $ txHash tx
 
-        
-    where
-      putTX maxN k a = emitTransaction <=< makeSendTX maxN k a
-
-postFaucetMultipart :: ConnectionPool -> MultipartData Mem -> Handler Value
-postFaucetMultipart pool multipartData = do
+postFaucetMultipart :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+                    => MultipartData Mem -> ConduitT a IngestEvent m [Keccak256]
+postFaucetMultipart multipartData = do
   case lookupInput "address" multipartData of
     Just a ->
       case toAddr a of
-        Right address -> postFaucet pool address
-        Left e -> throwError err400{ errBody = BLC.pack e }
-    Nothing -> throwError err400{ errBody = "You need to provide the 'address' parameter" }
+        Right address -> postFaucet address
+        Left e -> throwIO $ InvalidArgs e
+    Nothing -> throwIO $ MissingParameterError "You need to provide the 'address' parameter"
 
 toAddr :: Text -> Either String Address
 toAddr v =
@@ -116,16 +129,19 @@ toAddr v =
     _ -> Left $ "Can't convert text to Address: " ++ show v
 
 
-postDataFaucet :: ConnectionPool -> Maybe Int -> Maybe Int -> Handler Value
-postDataFaucet pool mSize mCountOf = runLoggingT $ do
+postDataFaucet :: (MonadIO m, Selectable Address Integer m) 
+               => Maybe Int -> Maybe Int -> ConduitT a IngestEvent m [Keccak256]
+postDataFaucet mSize mCountOf = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lookupNonce pool $ prvKey2Address key
+  minNonce <- lift . lookupNonce $ prvKey2Address key
   let size = fromMaybe 4096 mSize
       countOf = fromMaybe 1 mCountOf
-  fmap toJSON . replicateM countOf $ do
+  replicateM countOf $ do
     maxN <- acquireNewMaxNonce minNonce
+    ts <- liftIO getCurrentMicrotime
     tx <- makeSizedTX maxN size key
-    emitTransaction tx
+    yield . IETx ts $ IngestTx API tx
+    pure $ txHash tx
 
 
 {-
@@ -143,35 +159,28 @@ acquireNewMaxNonce minNonce = do
         in (next, next)
   liftIO $ atomicModifyIORef' appFaucetNonce findNext
 
+instance Selectable Address Integer SQLM where
+  select _ addr = fmap (fmap (addressStateRefNonce . E.entityVal) . listToMaybe) . sqlQuery $ E.select $
+    E.from $ \accStateRef -> do
+    E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0
+        E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
+    return accStateRef
 
+lookupNonce :: Selectable Address Integer m => Address -> m Integer
+lookupNonce addr' = fromMaybe 0 <$> select (Proxy @Integer)  addr'
 
-lookupNonce :: MonadIO m => ConnectionPool -> Address -> m Integer
-lookupNonce pool addr' = liftIO $ runSQLM pool $ do
-  addrSt <- sqlQuery $ E.select $
-                      E.from $ \accStateRef -> do
-                      E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0
-                         E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr')
-                      return accStateRef
-  return $ case addrSt of
-    []      -> 0
-    n:_ -> addressStateRefNonce $ E.entityVal n
-
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
-emitKafkaTransactions txs = do
-    ts <- liftIO getCurrentMicrotime
-    let ingestTxs = (IETx ts . IngestTx API)  <$> txs
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length ingestTxs) ++ " faucet tx(s) to unseqevents"
-    rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestTxs
-    case rets of
-        Left e      -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
-        Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
-    return ()
-
-emitTransaction :: (MonadIO m, MonadLogger m) => Transaction -> m Keccak256
-emitTransaction tx = do
-  emitKafkaTransactions [tx]
-  return $ txHash tx
-
+emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()
+emitKafkaTransactions = loop id
+  where
+    -- this is essentially the same as sinkList,
+    -- except emitting to Kafka instead of returning the list
+    loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x:))
+    emit txs = do
+      $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
+      rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents txs
+      case rets of
+          Left e      -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
+          Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 
 makeSendTX :: MonadIO m => Integer -> H.PrvKey -> Address -> Integer -> m Transaction
 makeSendTX maxN k a n = do
