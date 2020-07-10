@@ -148,8 +148,8 @@ spec = do
       let mOtherPriv = importPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
           otherPriv = fromMaybe (error "could not import the other priv key") mOtherPriv
           otherPub = derivePublicKey otherPriv
-          sec1 = getSharedSecret prv otherPub
-          sec2 = getSharedSecret otherPriv pub
+          sec1 = deriveSharedKey prv otherPub
+          sec2 = deriveSharedKey otherPriv pub
       sec1 `shouldBe` sec2 
 
   describe "the ECDSA module works exactly like Haskoin and Crypto-Pubkey on test values" $ do

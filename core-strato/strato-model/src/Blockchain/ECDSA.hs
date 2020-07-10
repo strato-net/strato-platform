@@ -5,9 +5,10 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.ECDSA
-  ( Signature(..) 
+  ( PrivateKey(..)
   , PublicKey(..)
-  , PrivateKey(..)
+  , Signature(..) 
+  , SharedKey(..)
   , recoverPub
   , signMsg
   , newPrivateKey
@@ -16,7 +17,7 @@ module Blockchain.ECDSA
   , derivePublicKey
   , exportPublicKey
   , importPublicKey
-  , getSharedSecret
+  , deriveSharedKey
   ) where
 
 
@@ -56,10 +57,10 @@ import           Blockchain.Data.RLP
 
 newtype PublicKey = PublicKey S.PubKey deriving (Show, Eq)
 newtype PrivateKey = PrivateKey S.SecKey deriving (Show, Eq)
+newtype SharedKey = SharedKey ByteString deriving (Show, Eq) 
 newtype Signature = Signature S.CompactRecSig 
   deriving          (Show, Eq, Generic)
   deriving newtype  (NFData)
-
 
 ------------------------------------------------------------------
 ------------------------- SIGNATURES -----------------------------
@@ -181,6 +182,16 @@ instance ToSchema PublicKey where
   declareNamedSchema _ = return $ named "PublicKey" binarySchema
 
 
+instance ToJSON SharedKey where
+  toJSON = String . T.pack . C8.unpack . B16.encode . coerce
+
+instance FromJSON SharedKey where
+  parseJSON (String str) = return $ SharedKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+  parseJSON x = error $ "parseJSON failed for SharedKey: expected string, got " ++ show x
+
+instance ToSchema SharedKey where
+  declareNamedSchema _ = return $ named "SharedKey" binarySchema
+
 
 newPrivateKey :: IO PrivateKey
 newPrivateKey = do
@@ -204,6 +215,6 @@ exportPublicKey compress (PublicKey pk) = S.exportPubKey compress pk
 importPublicKey :: ByteString -> Maybe PublicKey
 importPublicKey bs = PublicKey <$> S.importPubKey bs
 
--- the shared Diffie-Hellman secret for ethereum-encryption
-getSharedSecret :: PrivateKey -> PublicKey -> ByteString
-getSharedSecret (PrivateKey prv) (PublicKey pub) = S.ecdh pub prv
+-- the shared Diffie-Hellman (ECDH) secret for ethereum-encryption
+deriveSharedKey :: PrivateKey -> PublicKey -> SharedKey
+deriveSharedKey (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdh pub prv

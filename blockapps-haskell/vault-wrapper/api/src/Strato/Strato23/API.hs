@@ -22,8 +22,9 @@ import           Strato.Strato23.API.Users
 
 type VaultWrapperAPI = GetPing
                   :<|> GetKey
-                  :<|> GetUsers
                   :<|> PostKey
+                  :<|> GetSharedKey
+                  :<|> GetUsers
                   :<|> PostSignature
                   :<|> PostPassword
                   :<|> VerifyPassword

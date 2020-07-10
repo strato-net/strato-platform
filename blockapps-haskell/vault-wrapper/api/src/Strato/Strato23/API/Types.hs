@@ -7,7 +7,9 @@
 module Strato.Strato23.API.Types
   ( module Strato.Strato23.API.Types
   , Address(..)
-  , Signature(..)
+  , Signature(..) -- TODO: remove, ideally
+  , PublicKey(..) --       same
+  , SharedKey(..) --       same
   ) where
 
 
