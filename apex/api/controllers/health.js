@@ -32,9 +32,9 @@ module.exports = {
 
       const currentTime = Date.now();
 
-      const responses = await Promise.all([getLatestHealth(), getPbftInfo()]);
+      const responses = await Promise.all([getLatestHealth(), getPbftData()]);
 
-      const [[healthInfo, stallInfo, systemInfo], pbftInfo] = responses;
+      const [[healthInfo, stallInfo, systemInfo], pbftData] = responses;
 
       if (healthInfo && stallInfo) {
         healthStatus = healthInfo.latestHealthStatus;
@@ -63,7 +63,7 @@ module.exports = {
             totalDifficulty: lastBlock.total_difficulty,
             nonce: lastBlock.nonce,
           },
-          pbftInfo: pbftInfo,
+          pbftData: findView(pbftData),
           healthInfo: {
             uptime: uptime / 1000,
             isHealthy: healthStatus,
@@ -174,7 +174,7 @@ async function getLatestHealth() {
   return [healthInfo, stallInfo, systemInfo]
 }
 
-function getPbftInfo() {
+function getPbftData() {
   if (!process.env['prometheusHost']) {
     throw Error('prometheusHost env var is not set - unable to get prometheus data');
   }
@@ -186,4 +186,19 @@ function getPbftInfo() {
     json: true,
   };
   return rp(options);
+}
+
+function findView(obj) {
+  if (!(obj && obj.data && obj.data.result)) {
+    return {};
+  }
+  const res = obj.data.result;
+  let ret = {};
+  res.forEach((elem) => {
+    if (elem && elem.metric && elem.value && elem.value.length >= 2) {
+      ret[elem.metric.view_field] = elem.value[1];
+    }
+  });
+  ret.timestamp = res.length && res[0].value[0];
+  return ret;
 }
