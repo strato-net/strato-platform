@@ -56,6 +56,8 @@ module.exports = {
 
       res.status(200).json(
         {
+          version: process.env.STRATO_VERSION,
+          timestamp: +new Date()/1000,
           lastBlock: {
             number: lastBlock.number,
             hash: lastBlock.hash,
@@ -77,7 +79,6 @@ module.exports = {
             messages: warningMessages
           },
           systemInfo: systemInfoBody,
-          version: process.env.STRATO_VERSION
         }
       )
     } catch (error) {
@@ -106,14 +107,15 @@ module.exports = {
 
       res.status(200).json(
           {
+            version: process.env.STRATO_VERSION,
+            timestamp: +new Date()/1000,
             healthInfo: {
               uptime: uptime / 1000,
               isHealthy: healthStatus,
               isNotStalled: stallStatus,
-              isValidBlocksInc: isInc ,
+              isValidBlocksInc: isInc,
               isLastPending: isPending
             },
-            version: process.env.STRATO_VERSION
           }
       )
     } catch (error) {
