@@ -199,6 +199,6 @@ function findView(obj) {
       ret[elem.metric.view_field] = elem.value[1];
     }
   });
-  ret.timestamp = res.length && res[0].value.length && res[0].value[0];
+  ret.timestamp = res.length && res[0].value.length && res[0].value[0] || null;
   return ret;
 }
