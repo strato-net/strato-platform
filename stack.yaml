@@ -1,4 +1,6 @@
 packages:
+- api/bloc2
+- api/bloc2api
 - api/strato-api2
 - blockapps-haskell/bloc/bloc22/api
 - blockapps-haskell/bloc/bloc22/client
