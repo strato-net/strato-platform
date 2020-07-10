@@ -92,7 +92,6 @@ import qualified Database.LevelDB                          as LDB
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
-import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Constants
 import           Blockchain.ExtWord                        (Word256)
 import           Blockchain.ECDSA
@@ -143,7 +142,7 @@ type MonadBlockstanbul m = ( MonadIO m
                            , Mod.Accessible BlockPeriod m
                            , Mod.Accessible RoundPeriod m
                            , Mod.Accessible (TQueue VoteResult) m
-                           , Signs m
+                           , HasVault m
                            )
 
 newtype BlockPeriod = BlockPeriod { unBlockPeriod :: NominalDiffTime }
@@ -371,18 +370,21 @@ instance HasBlockstanbulContext SequencerM where
   putBlockstanbulContext = assign (blockstanbulContext . _Just)
 
 
--- If there is no vault client (i.e. in hspec tests), the Signs instance will use this key, 
+-- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key, 
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot 
--- easier than making a whole new SequencerM definition just to get a different Signs instance
+-- easier than making a whole new SequencerM definition just to get a different HasVault instance
 testPriv :: PrivateKey
 testPriv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
-instance Signs SequencerM where
+instance HasVault SequencerM where
   sign mesg = do
     mVc <- asks vaultClient    
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
       Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
+
+  getPub = error "called getPub in SequencerM, but this should never happen"
+  getShared _ = error "called getShared in SequencerM, but this should never happen"
 
 -- TODO: this could be a more specific servant retry function...since other parts of strato will need it,
 -- maybe it should be in a util module or something

@@ -11,9 +11,7 @@ import           Conduit
 import           Control.Lens                     hiding (view)
 import           Control.Monad     
 import           Control.Monad.State.Class
-import           Control.Monad.Trans.State.Strict
 
-import qualified Data.ByteString                  as B
 import qualified Data.Map.Strict                  as M
 import           Data.Maybe
 import qualified Data.Set                         as S
@@ -32,29 +30,15 @@ import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
 
 
-
-class Monad m => Signs m where
-  sign :: B.ByteString -> m Signature
-  -- abstracts away the actual logic of getting signatures, so that we can have
-  -- hardcoded private keys in tests, and a vault-wrapper connection in production
-
-
 class Monad m => HasBlockstanbulContext m where
   getBlockstanbulContext :: m (Maybe BlockstanbulContext)
   putBlockstanbulContext :: BlockstanbulContext -> m ()
 
 
-instance Signs m => Signs (ConduitT i o m) where
-  sign = lift . sign
-
-instance Signs m => Signs (StateT s m) where
-  sign = lift . sign
-
-
 type StateMachineM m = ( MonadState BlockstanbulContext m
                        , MonadIO m
                        , MonadLogger m
-                       , Signs m
+                       , HasVault m
                        )
 
 

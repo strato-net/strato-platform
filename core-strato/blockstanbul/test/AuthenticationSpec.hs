@@ -19,7 +19,6 @@ import           Test.Hspec
 import           Test.QuickCheck
 
 import           Blockchain.Blockstanbul.Authentication
-import           Blockchain.Blockstanbul.StateMachine 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
@@ -61,8 +60,10 @@ private = fromMaybe (error "could not import private key") (importPrivateKey (fs
 
 
 
-instance Signs IO where
+instance HasVault IO where
   sign bs = return $ signMsg private bs 
+  getPub = error "called getPub, but this should never happen"
+  getShared _ = error "called getShared, but this should never happen"
 
 spec :: Spec
 spec = do

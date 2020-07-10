@@ -18,7 +18,6 @@ import           Test.Hspec.Expectations.Lifted
 
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.BenchmarkLib
-import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
 import Blockchain.ECDSA
@@ -44,11 +43,12 @@ private :: PrivateKey
 private = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 
-instance Signs ContextM where
+instance HasVault ContextM where
   sign bs = return $ signMsg private bs
+  getPub = error "called getPub, but this should never happen"
+  getShared _ = error "called getShared, but this should never happen"
 
---instance Signs IO where
---  sign bs = return $ signMsg private bs
+
 
 sender :: Address
 sender = fromPrivateKey private
@@ -59,7 +59,7 @@ recipient = 0xdeadbeef
 recipient2 :: Address
 recipient2 = 0x0ddba11
 
-addVote :: (MonadIO m, Signs m) => Address -> Word64 -> m Block
+addVote :: (MonadIO m, HasVault m) => Address -> Word64 -> m Block
 addVote addr nonc = do
   let blk' = blk{blockBlockData = (blockBlockData blk)
     { blockDataCoinbase = addr

@@ -290,10 +290,12 @@ instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
   putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
 
-instance MonadIO m => Signs (MonadTest m) where
+instance MonadIO m => HasVault (MonadTest m) where
   sign bs = do
     pk <- use prvKey
-    return $ signMsg pk bs 
+    return $ signMsg pk bs
+  getPub = error "for now, getPub should never be called"
+  getShared _ = error "for now, getShared should never be called"
 
 
 -- p2p still uses cryptonite, but blockstanbul uses our ECDSA (secp256k-haskell) module, hence this conversion

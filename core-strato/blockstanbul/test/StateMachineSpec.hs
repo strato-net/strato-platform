@@ -59,8 +59,10 @@ instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) wher
   putBlockstanbulContext = put
   getBlockstanbulContext = Just <$> get
 
-instance (Monad m) => Signs (StateT BlockstanbulContext m) where
+instance (Monad m) => HasVault (StateT BlockstanbulContext m) where
   sign bs = return $ signMsg myPriv bs 
+  getPub = error "called getPub, but this should never happen"
+  getShared _ = error "called getShared, but this should never happen"
 
 disableAuth :: StateMachineM m => m ()
 disableAuth = productionAuth .= False

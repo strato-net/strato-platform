@@ -37,7 +37,7 @@ import           Text.Printf
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
-import           Blockchain.Blockstanbul.StateMachine -- TODO: Signs class should be in ECDSA
+import           Blockchain.ECDSA
 import           Blockchain.ExtWord
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
@@ -123,7 +123,7 @@ type MonadSequencer m =
   , HasFullPrivacy m
   , (Keccak256 `A.Alters` DependentBlockEntry) m
   , (Keccak256 `A.Alters` ()) m
-  , Signs m
+  , HasVault m
   )
 
 sequencer :: SequencerM ()

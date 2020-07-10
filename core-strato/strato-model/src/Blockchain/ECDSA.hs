@@ -9,8 +9,7 @@ module Blockchain.ECDSA
   , PublicKey(..)
   , Signature(..) 
   , SharedKey(..)
-  , recoverPub
-  , signMsg
+  , HasVault(..)
   , newPrivateKey
   , exportPrivateKey
   , importPrivateKey
@@ -18,27 +17,32 @@ module Blockchain.ECDSA
   , exportPublicKey
   , importPublicKey
   , deriveSharedKey
+  , recoverPub
+  , signMsg
   ) where
 
 
 
 import           Control.DeepSeq
 import           Control.Monad
+import           Control.Monad.Trans.Class        (lift)
+import           Control.Monad.Trans.State.Strict (StateT)
 import           Crypto.Random.Entropy
-import qualified Crypto.Secp256k1               as S
+import qualified Crypto.Secp256k1                 as S
 
 import           Data.Aeson
 import           Data.Binary                
-import           Data.ByteString                as B
-import qualified Data.ByteString.Base16         as B16
-import qualified Data.ByteString.Char8          as C8
-import qualified Data.ByteString.Short          as BSS
+import           Data.ByteString                  as B
+import qualified Data.ByteString.Base16           as B16
+import qualified Data.ByteString.Char8            as C8
+import qualified Data.ByteString.Short            as BSS
 import           Data.Coerce
+import           Data.Conduit                     (ConduitT)
 import           Data.Data
 import           Data.Maybe
-import qualified Data.Text                      as T
-import           Data.Swagger                   (ToSchema)
-import           Data.Swagger.Internal.Schema   (named, declareNamedSchema, binarySchema)
+import qualified Data.Text                        as T
+import           Data.Swagger                     (ToSchema)
+import           Data.Swagger.Internal.Schema     (named, declareNamedSchema, binarySchema)
 import           GHC.Generics
 import           Test.QuickCheck
 
@@ -51,6 +55,8 @@ import           Blockchain.Data.RLP
 -- Use this instead of secp256k1 where possible
 
 
+
+
 ------------------------------------------------------------------
 -------------------- THE NEWTYPE WRAPPERS ------------------------
 ------------------------------------------------------------------
@@ -61,6 +67,90 @@ newtype SharedKey = SharedKey ByteString deriving (Show, Eq)
 newtype Signature = Signature S.CompactRecSig 
   deriving          (Show, Eq, Generic)
   deriving newtype  (NFData)
+
+
+-------------------------------------------------------------------
+------------------------- TYPECLASSES -----------------------------
+-------------------------------------------------------------------
+
+
+-- This type class allows for the abstraction of common secp256k1 operations
+--  in some monad that "has a vault" which stores the private key
+--  In prod, this is the vault-wrapper, and we use its servant client
+--  In tests, the private key is either in the monad, or a global key
+class Monad m => HasVault m where
+  sign :: ByteString -> m Signature
+  getPub :: m PublicKey
+  getShared :: PublicKey -> m Signature
+  
+
+-- some instances we use elsewhere
+instance HasVault m => HasVault (ConduitT i o m) where
+  sign = lift . sign
+  getPub = lift $ getPub
+  getShared = lift . getShared
+
+instance HasVault m => HasVault (StateT s m) where
+  sign = lift . sign
+  getPub = lift $ getPub
+  getShared = lift . getShared
+
+
+-------------------------------------------------------------------
+----------------------------- KEYS --------------------------------
+-------------------------------------------------------------------
+
+
+instance ToJSON PublicKey where
+  toJSON = String . T.pack . C8.unpack . B16.encode . exportPublicKey False
+
+instance FromJSON PublicKey where
+  parseJSON (String str) = return $ fromMaybe (err) $ importPublicKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+    where err = error $ "parseJSON for PublicKey failed to read " ++ T.unpack str
+  parseJSON x = error $ "parseJSON for PublicKey: expected string, got " ++ show x
+
+instance ToSchema PublicKey where
+  declareNamedSchema _ = return $ named "PublicKey" binarySchema
+
+
+instance ToJSON SharedKey where
+  toJSON = String . T.pack . C8.unpack . B16.encode . coerce
+
+instance FromJSON SharedKey where
+  parseJSON (String str) = return $ SharedKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+  parseJSON x = error $ "parseJSON failed for SharedKey: expected string, got " ++ show x
+
+instance ToSchema SharedKey where
+  declareNamedSchema _ = return $ named "SharedKey" binarySchema
+
+
+newPrivateKey :: IO PrivateKey
+newPrivateKey = do
+  ent <- getEntropy 32
+  return $ PrivateKey $ fromMaybe err (S.secKey ent)
+  where
+    err = error "could not generate new private key"
+
+importPrivateKey :: ByteString -> Maybe PrivateKey
+importPrivateKey bs = PrivateKey <$> S.secKey bs
+
+exportPrivateKey :: PrivateKey -> ByteString
+exportPrivateKey = S.getSecKey . coerce
+
+derivePublicKey :: PrivateKey -> PublicKey
+derivePublicKey = PublicKey . S.derivePubKey . coerce
+
+exportPublicKey :: Bool -> PublicKey -> ByteString
+exportPublicKey compress (PublicKey pk) = S.exportPubKey compress pk
+
+importPublicKey :: ByteString -> Maybe PublicKey
+importPublicKey bs = PublicKey <$> S.importPubKey bs
+
+-- the shared Diffie-Hellman (ECDH) secret for ethereum-encryption
+deriveSharedKey :: PrivateKey -> PublicKey -> SharedKey
+deriveSharedKey (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdh pub prv
+
+
 
 ------------------------------------------------------------------
 ------------------------- SIGNATURES -----------------------------
@@ -162,59 +252,3 @@ signMsg pk msgHash =
   let mesg = fromMaybe (error "msg is not 32 bytes") (S.msg msgHash)
       (S.CompactRecSig r s v) = S.exportCompactRecSig $ S.signRecMsg (coerce pk) mesg
   in Signature $ S.CompactRecSig s r (0x1b + v) -- the swapped sig
-
-
-
--------------------------------------------------------------------
------------------------------ KEYS --------------------------------
--------------------------------------------------------------------
-
-
-instance ToJSON PublicKey where
-  toJSON = String . T.pack . C8.unpack . B16.encode . exportPublicKey False
-
-instance FromJSON PublicKey where
-  parseJSON (String str) = return $ fromMaybe (err) $ importPublicKey $ fst $ B16.decode $ C8.pack $ T.unpack str
-    where err = error $ "parseJSON for PublicKey failed to read " ++ T.unpack str
-  parseJSON x = error $ "parseJSON for PublicKey: expected string, got " ++ show x
-
-instance ToSchema PublicKey where
-  declareNamedSchema _ = return $ named "PublicKey" binarySchema
-
-
-instance ToJSON SharedKey where
-  toJSON = String . T.pack . C8.unpack . B16.encode . coerce
-
-instance FromJSON SharedKey where
-  parseJSON (String str) = return $ SharedKey $ fst $ B16.decode $ C8.pack $ T.unpack str
-  parseJSON x = error $ "parseJSON failed for SharedKey: expected string, got " ++ show x
-
-instance ToSchema SharedKey where
-  declareNamedSchema _ = return $ named "SharedKey" binarySchema
-
-
-newPrivateKey :: IO PrivateKey
-newPrivateKey = do
-  ent <- getEntropy 32
-  return $ PrivateKey $ fromMaybe err (S.secKey ent)
-  where
-    err = error "could not generate new private key"
-
-importPrivateKey :: ByteString -> Maybe PrivateKey
-importPrivateKey bs = PrivateKey <$> S.secKey bs
-
-exportPrivateKey :: PrivateKey -> ByteString
-exportPrivateKey = S.getSecKey . coerce
-
-derivePublicKey :: PrivateKey -> PublicKey
-derivePublicKey = PublicKey . S.derivePubKey . coerce
-
-exportPublicKey :: Bool -> PublicKey -> ByteString
-exportPublicKey compress (PublicKey pk) = S.exportPubKey compress pk
-
-importPublicKey :: ByteString -> Maybe PublicKey
-importPublicKey bs = PublicKey <$> S.importPubKey bs
-
--- the shared Diffie-Hellman (ECDH) secret for ethereum-encryption
-deriveSharedKey :: PrivateKey -> PublicKey -> SharedKey
-deriveSharedKey (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdh pub prv

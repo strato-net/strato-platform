@@ -26,6 +26,7 @@ import Blockapps.Crossmon
 import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
+import Blockchain.ECDSA
 import Blockchain.Blockstanbul.Authentication
 import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Blockstanbul.Messages
@@ -170,7 +171,7 @@ nextRound nt = do
                                               (uses validators S.toList)
                                               (uses authSenders M.keys)
 
-eventLoop :: (MonadIO m, MonadLogger m, Signs m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
+eventLoop :: (MonadIO m, MonadLogger m, HasVault m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   debugShowCtx
   authz <- lift $ isAuthorized ev
@@ -350,7 +351,7 @@ loopback :: OutEvent -> Maybe InEvent
 loopback (OMsg a m) = Just $ IMsg a m
 loopback _ = Nothing
 
-sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, Signs m) => [InEvent] -> m [OutEvent]
+sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
 sendMessages wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.
@@ -372,7 +373,7 @@ sendMessages wms = do
       putBlockstanbulContext ctx'
       return evs
 
-sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, Signs m) => [InEvent] -> m [OutEvent]
+sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   out <- sendMessages wms
   $logDebugS "sendAllMessages" . T.pack $ format out

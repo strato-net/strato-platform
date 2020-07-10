@@ -25,16 +25,16 @@ import           Text.Printf
 
 import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Blockstanbul.HTTPAdmin
-import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Data.RLP
+import           Blockchain.ECDSA
 
 import           Servant.Client
 import qualified Strato.Strato23.API        as VC
 import qualified Strato.Strato23.Client     as VC
 
 
-instance Signs IO where
+instance HasVault IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
     url <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
@@ -43,6 +43,8 @@ instance Signs IO where
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
       Right sig -> return sig
 
+  getPub = error "called getPub, but we shouldn't ever do that in blockstanbul-vote"
+  getShared _ = error "called getShared, but we shouldn't ever do that in blockstanbul-vote"
 
 data Options = Options
   { optRemove    :: Bool

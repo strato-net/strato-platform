@@ -33,6 +33,7 @@ library:
     - binary
     - bytestring-arbitrary
     - classy-prelude
+    - conduit
     - containers
     - cpu
     - cryptonite
@@ -61,6 +62,7 @@ library:
     - swagger2
     - text
     - time
+    - transformers
     - unordered-containers
 
 tests:
