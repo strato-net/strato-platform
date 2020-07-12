@@ -7,7 +7,31 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
-module BlockApps.Bloc22.Server.Users where
+module BlockApps.Bloc22.Server.Users (
+  TRD(..),
+  postUsersUploadListEVM',
+  postUsersUploadListSolidVM',
+  postUsersContractMethod',
+  postUsersSendList,
+  postUsersSend',
+  postUsersSendList',
+  postUsersContractEVM',
+  postUsersUploadList,
+  postUsersContract,
+  postUsersSend,
+  getUsers,
+  postUsersUser,
+  getUsersUser,
+  getUsersKeyStore,
+  postUsersKeyStore,
+  postUsersFill,
+  postUsersContractSolidVM',
+  getBlocTransactionResult,
+  postBlocTransactionResults,
+  postUsersContractMethod,
+  postUsersContractMethodList,
+  postUsersContractMethodList'
+  ) where
 
 import           ClassyPrelude                     ((<>), Hashable, getCurrentTime, UTCTime(..))
 import           Control.Concurrent
@@ -489,18 +513,6 @@ postUsersSendList' cacheNonce TransferListParameters{..} sign = do
     | (tx,txHash) <- zip txs'' hashes
     ]
   getBatchBlocTransactionResult' hashes resolve
-
-ensureMostRecentSuccessfulTx
-  :: [TransactionResult]
-  -> Bloc TransactionResult
-ensureMostRecentSuccessfulTx results = blocMaybe err . listToMaybe $
-  filter ((== "Success!") . transactionResultMessage)
-    (sortOn (negate . transactionResultTime) results)
-  where
-    txHash = transactionResultTransactionHash (head results)
-    err = "Transaction with hash "
-      <> Text.pack (formatKeccak256WithoutColor txHash)
-      <> " never ran successfully."
 
 postUsersContractMethodList
   :: UserName
