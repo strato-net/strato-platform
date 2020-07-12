@@ -10,7 +10,47 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeOperators              #-}
 
-module BlockApps.Bloc22.API.Users where
+module BlockApps.Bloc22.API.Users (
+    BlocTransactionResult(..),
+    BlocTransactionStatus(..),
+    GetUsers,
+    PostUsersUser,
+    GetUsersUser,
+    GetUsersKeyStore,
+    PostUsersKeyStore,
+    PostUsersFill,
+    PostUsersSend,
+    PostUsersContract,
+    PostUsersUploadList,
+    PostUsersContractMethod,
+    PostUsersSendList,
+    PostUsersContractMethodList,
+    GetBlocTransactionResult,
+    PostBlocTransactionResults,
+    PostUsersKeyStoreRequest(..),
+    PostSendParameters(..),
+    TransferParameters(..),
+    PostUsersContractRequest(..),
+    ContractParameters(..),
+    UploadListRequest(..),
+    UploadListContract(..),
+    ContractListParameters(..),
+    PostSendListRequest(..),
+    TransferListParameters(..),
+    PostMethodListRequest(..),
+    FunctionListParameters(..),
+    PostUsersContractMethodRequest(..),
+    FunctionParameters(..),
+    SendTransaction(..),
+    MethodCall(..),
+    BlocTransactionData(..),
+    uploadlistcontractChainid,
+    uploadlistcontractTxParams,
+    sendtransactionChainid,
+    methodcallChainid,
+    methodcallTxParams,
+    sendtransactionTxParams
+  ) where
 
 import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
