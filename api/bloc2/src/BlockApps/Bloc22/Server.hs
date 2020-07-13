@@ -16,34 +16,34 @@ import           Servant.Swagger
 
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Bloc22.Server.Chain
-import           BlockApps.Bloc22.Server.Contracts
-import           BlockApps.Bloc22.Server.Transaction
-import           BlockApps.Bloc22.Server.Users
+--import           BlockApps.Bloc22.Server.Chain
+--import           BlockApps.Bloc22.Server.Contracts
+--import           BlockApps.Bloc22.Server.Transaction
+--import           BlockApps.Bloc22.Server.Users
 
-bloc :: ServerT BlocAPI Bloc
+bloc :: Monad m => ServerT BlocAPI m
 bloc = return gitInfo
-  :<|> postUsersFill
-  :<|> getContracts
-  :<|> postContractsBatchStates
-  :<|> getContractsData
-  :<|> getContractsContract
-  :<|> getContractsState
-  :<|> getContractsDetails
-  :<|> getContractsFunctions
-  :<|> getContractsSymbols
-  :<|> getContractsStateMapping
-  :<|> getContractsStates
-  :<|> getContractsEnum
-  :<|> postContractsCompile
-  :<|> postContractsXabi
-  :<|> getBlocTransactionResult
-  :<|> postBlocTransactionResults
-  :<|> postChainInfo
-  :<|> getChainInfo
-  :<|> postChainInfos
-  :<|> postBlocTransactionParallel
-  :<|> postBlocTransaction
+--  :<|> postUsersFill
+--  :<|> getContracts
+--  :<|> postContractsBatchStates
+--  :<|> getContractsData
+--  :<|> getContractsContract
+--  :<|> getContractsState
+--  :<|> getContractsDetails
+--  :<|> getContractsFunctions
+--  :<|> getContractsSymbols
+--  :<|> getContractsStateMapping
+--  :<|> getContractsStates
+--  :<|> getContractsEnum
+--  :<|> postContractsCompile
+--  :<|> postContractsXabi
+--  :<|> getBlocTransactionResult
+--  :<|> postBlocTransactionResults
+--  :<|> postChainInfo
+--  :<|> getChainInfo
+--  :<|> postChainInfos
+--  :<|> postBlocTransactionParallel
+--  :<|> postBlocTransaction
 
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = hoistServer blocApi (enterBloc env) bloc

@@ -60,9 +60,11 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - aeson
-    - bytestring
+    - bloc2
+    - bloc2api
     - blockapps-init
     - blockapps-util
+    - bytestring
     - core-api
     - format
     - hflags

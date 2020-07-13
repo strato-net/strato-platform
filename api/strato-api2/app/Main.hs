@@ -35,6 +35,8 @@ import           Servant.Swagger.UI
 
 
 
+import           BlockApps.Bloc22.API
+import           BlockApps.Bloc22.Server
 import           BlockApps.Init
 import           Blockchain.EthConf
 
@@ -83,6 +85,8 @@ type CoreAPI =
     :<|> UUID.API
     :<|> Version.API
   )
+
+type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
   
 coreServer :: ServerT CoreAPI SQLM
 coreServer = Account.server
@@ -103,6 +107,9 @@ coreServer = Account.server
   :<|> UUID.server
   :<|> Version.server
 
+fullServer :: ServerT FullAPI SQLM
+fullServer = coreServer :<|> bloc
+
 ----------------
 
 enterCoreServer  :: ConnectionPool -> SQLM a -> Handler a
@@ -112,17 +119,17 @@ enterCoreServer pool x = Handler $ do
     Right a -> pure a
     Left e -> throwE $ apiErrorToServantErr e
 
-hoistCoreServer :: ConnectionPool -> Server CoreAPI
-hoistCoreServer pool = hoistServer (Proxy :: Proxy CoreAPI) (enterCoreServer pool) coreServer
+hoistCoreServer :: ConnectionPool -> Server FullAPI
+hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (enterCoreServer pool) fullServer
 
 
-coreAPI :: Proxy CoreAPI
-coreAPI = Proxy
+fullAPI :: Proxy FullAPI
+fullAPI = Proxy
 
 main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
-  let theDoc = toSwagger (Proxy :: Proxy CoreAPI)
+  let theDoc = toSwagger (Proxy :: Proxy FullAPI)
                & info.title .~ "Strato API"
                & info.description ?~
                "This is the great Strato API, which let's \
@@ -132,7 +139,7 @@ main = do
   --print theDoc
   blockappsInit "core-api"
   pool <- runNoLoggingT $ createPostgresqlPool connStr 20
-  run 3000 $ app pool theDoc
+  run 3001 $ app pool theDoc
 
 app :: ConnectionPool -> Swagger -> Application
 app pool theDoc = 
@@ -141,7 +148,7 @@ app pool theDoc =
   $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
 --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
-  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw))
+  $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw))
   $ hoistCoreServer pool :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404
 
 
@@ -152,7 +159,7 @@ serveCustom404 x respond =
   $ "There is no content at: " ++ show (rawPathInfo x)
   ++ "\nHere are the available routes:" ++ tab ("\n" ++ unlines allPaths) ++ "\n"
   where
-    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy CoreAPI)
+    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)
 
 
 ----------
