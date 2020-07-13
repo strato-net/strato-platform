@@ -16,28 +16,14 @@ import           Servant.Swagger
 
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Bloc22.Server.Addresses
 import           BlockApps.Bloc22.Server.Chain
 import           BlockApps.Bloc22.Server.Contracts
-import           BlockApps.Bloc22.Server.Search
 import           BlockApps.Bloc22.Server.Transaction
 import           BlockApps.Bloc22.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
 bloc = return gitInfo
-  :<|> getUsers
-  :<|> postUsersUser
-  :<|> getUsersUser
-  :<|> getUsersKeyStore
-  :<|> postUsersKeyStore
   :<|> postUsersFill
-  :<|> postUsersSend
-  :<|> postUsersContract
-  :<|> postUsersUploadList
-  :<|> postUsersContractMethod
-  :<|> postUsersSendList
-  :<|> postUsersContractMethodList
-  :<|> getAddresses
   :<|> getContracts
   :<|> postContractsBatchStates
   :<|> getContractsData
@@ -51,7 +37,6 @@ bloc = return gitInfo
   :<|> getContractsEnum
   :<|> postContractsCompile
   :<|> postContractsXabi
-  :<|> getSearchContract
   :<|> getBlocTransactionResult
   :<|> postBlocTransactionResults
   :<|> postChainInfo

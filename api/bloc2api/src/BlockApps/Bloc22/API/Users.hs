@@ -13,18 +13,9 @@
 module BlockApps.Bloc22.API.Users (
     BlocTransactionResult(..),
     BlocTransactionStatus(..),
-    GetUsers,
-    PostUsersUser,
-    GetUsersUser,
     GetUsersKeyStore,
     PostUsersKeyStore,
     PostUsersFill,
-    PostUsersSend,
-    PostUsersContract,
-    PostUsersUploadList,
-    PostUsersContractMethod,
-    PostUsersSendList,
-    PostUsersContractMethodList,
     GetBlocTransactionResult,
     PostBlocTransactionResults,
     PostUsersKeyStoreRequest(..),
@@ -226,18 +217,6 @@ type PostBlocTransactionResults = "transactions"
   :> ReqBody '[JSON] [Keccak256]
   :> Post '[JSON] [BlocTransactionResult]
 
-type GetUsers = "users" :> Get '[JSON] [UserName]
-
-type GetUsersUser = "users"
-  :> Capture "user" UserName
-  :> Get '[JSON] [Address]
-
-
-type PostUsersUser = "users"
-  :> Capture "user" UserName
-  :> ReqBody '[JSON, FormUrlEncoded] Password
-  :> Post '[JSON] Address
-
 instance ToParam (QueryFlag "resolve") where
   toParam _ =
     DocQueryParam "resolve" ["0","1",""] "flag for resolving a transaction result" Flag
@@ -291,15 +270,6 @@ type PostUsersFill = "users"
   :> QueryFlag "resolve"
   :> Post '[JSON] BlocTransactionResult
 
-type PostUsersSend = "users"
-  :> Capture "user" UserName
-  :> Capture "address" Address
-  :> "send"
-  :> QueryParam "chainid" ChainId
-  :> QueryFlag "resolve"
-  :> ReqBody '[JSON] PostSendParameters
-  :> Post '[JSON] BlocTransactionResult
-
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
   , sendValue     :: Strung Natural
@@ -350,15 +320,6 @@ data TransferParameters = TransferParameters
   } deriving (Eq, Show, Generic)
 
 --------------------------------------------------------------------------------
-
-type PostUsersContract = "users"
-  :> Capture "user" UserName
-  :> Capture "address" Address
-  :> "contract"
-  :> QueryParam "chainid" ChainId
-  :> QueryFlag "resolve"
-  :> ReqBody '[JSON] PostUsersContractRequest
-  :> Post '[JSON] BlocTransactionResult
 
 data PostUsersContractRequest = PostUsersContractRequest
   { postuserscontractrequestSrc      :: Text
@@ -442,15 +403,6 @@ data ContractParameters = ContractParameters
   , resolve  :: Bool
   }
 --------------------------------------------------------------------------------
-
-type PostUsersUploadList = "users"
-  :> Capture "user" UserName
-  :> Capture "address" Address
-  :> "uploadList"
-  :> QueryParam "chainid" ChainId
-  :> QueryFlag "resolve"
-  :> ReqBody '[JSON] UploadListRequest
-  :> Post '[JSON] [BlocTransactionResult]
 
 data UploadListRequest = UploadListRequest
   { uploadlistPassword  :: Password
@@ -554,19 +506,6 @@ data ContractListParameters = ContractListParameters
 
 --------------------------------------------------------------------------------
 
--- This should return the return value from the method call
-type PostUsersContractMethod = "users"
-  :> Capture "user" UserName
-  :> Capture "userAddress" Address
-  :> "contract"
-  :> Capture "contractName" ContractName
-  :> Capture "contractAddress" Address
-  :> "call"
-  :> QueryParam "chainid" ChainId
-  :> QueryFlag "resolve"
-  :> ReqBody '[JSON] PostUsersContractMethodRequest
-  :> Post '[JSON] BlocTransactionResult
-
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod   :: Text
@@ -655,16 +594,6 @@ data FunctionParameters = FunctionParameters
   , resolve      :: Bool
   }
 --------------------------------------------------------------------------------
-
--- POST /users/:user/:userAddress/sendList
-type PostUsersSendList = "users"
-  :> Capture "user" UserName
-  :> Capture "userAddress" Address
-  :> "sendList"
-  :> QueryParam "chainid" ChainId
-  :> QueryFlag "resolve"
-  :> ReqBody '[JSON] PostSendListRequest
-  :> Post '[JSON] [BlocTransactionResult]
 
 data PostSendListRequest = PostSendListRequest
   { postsendlistrequestPassword :: Password
@@ -774,16 +703,6 @@ data TransferListParameters = TransferListParameters
   } deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
-
---POST /users/:user/:address/callList
-type PostUsersContractMethodList = "users"
-  :> Capture "user" UserName
-  :> Capture "address" Address
-  :> "callList"
-  :> QueryParam "chainid" ChainId
-  :> QueryFlag "resolve"
-  :> ReqBody '[JSON] PostMethodListRequest
-  :> Post '[JSON] [BlocTransactionResult]
 
 data PostUsersContractMethodListResponse
   = MethodHash Keccak256
