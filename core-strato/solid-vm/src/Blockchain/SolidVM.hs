@@ -786,12 +786,10 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SEnum enumName, _) -> do
         contract' <- getCurrentContract
         let maybeEnumValues = M.lookup enumName $ contract' ^. enums
-        enumVals <- case maybeEnumValues of
-          Nothing -> missingType "Enum nonexistent type" enumName
-          Just vals -> pure $ vals
-        num <- case name `elemIndex` enumVals of
-          Nothing -> missingType "Enum nonexistent member" (enumName, name)
-          Just n -> pure $ fromIntegral n
+            !enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
+            !num = maybe (missingType "Enum nonexistent member" (enumName, name)) 
+                         fromIntegral 
+                         (name `elemIndex` enumVals)
         return $ Constant $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (Constant . SAddress . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAddress . Env.origin) <$> getEnv
