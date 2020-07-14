@@ -6,7 +6,9 @@ module Blockchain.Data.PubKey (
   pointToString,
   pointToBytes,
   bytesToPoint,
-  pubKeyToBytes
+  pubKeyToBytes,
+  secPubKeyToPoint,
+  pointToSecPubKey
   ) where
 
 import           Crypto.Types.PubKey.ECC
@@ -20,6 +22,7 @@ import qualified Network.Haskoin.Internals as H
 
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord
+import qualified Blockchain.ECDSA          as Secp256k1
 import qualified Text.Colors               as CL
 import           Text.Format
 
@@ -73,3 +76,15 @@ bytesToPoint _ = error "bytesToPoint called with the wrong number of bytes"
 intToBytes::Integer->[Word8]
 intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
 
+
+-- TODO: eventually, secp256k1 is the ONLY library we should use
+secPubKeyToPoint :: Secp256k1.PublicKey -> Point
+secPubKeyToPoint pub = 
+  let pkbs = B.drop 1 $ Secp256k1.exportPublicKey False pub
+  in bytesToPoint pkbs
+
+pointToSecPubKey :: Point -> Secp256k1.PublicKey
+pointToSecPubKey pt = 
+  let pkbs = B.singleton 0x04 `B.append` pointToBytes pt -- 0x04 indicates this is a SEC serialized pubkey
+      err = "could not convert point to secp256k1 public key: " ++ show pt
+  in fromMaybe (error err) (Secp256k1.importPublicKey pkbs)

@@ -9,59 +9,62 @@ module Blockchain.ECIES (
 
 import                 Codec.Utils
 import                 Control.Monad
+import                 Control.Monad.IO.Class
 import "cipher-aes"    Crypto.Cipher.AES
 import                 Crypto.Hash.SHA256
-import "crypto-pubkey" Crypto.PubKey.ECC.DH
+--import "crypto-pubkey" Crypto.PubKey.ECC.DH
 import                 Crypto.Types.PubKey.ECC
 import                 Data.Binary
 import                 Data.Binary.Get
 import                 Data.Binary.Put
-import                 Data.Bits
+--import                 Data.Bits
 import qualified       Data.ByteString         as B
 import qualified       Data.ByteString.Lazy    as BL
 import                 Data.HMAC
 import                 System.Entropy
 
+import                 Blockchain.Data.PubKey
 import                 Blockchain.ExtWord
+import                 Blockchain.ECDSA
 
 theCurve :: Curve
 theCurve = getCurveByName SEC_p256k1
 
-encrypt  ::  PrivateNumber->Point->B.ByteString->B.ByteString->IO BL.ByteString
-encrypt myPrvKey otherPubKey bytes prefix = do
-  cipherIV <- getEntropy 16
-  return $ encode $ encryptECIES myPrvKey otherPubKey cipherIV bytes prefix
+encrypt  ::  MonadIO m => SharedKey->Point->B.ByteString->B.ByteString-> m BL.ByteString
+encrypt sharedKey myPubKey bytes prefix = do
+  cipherIV <- liftIO $ getEntropy 16
+  return $ encode $ encryptECIES sharedKey myPubKey cipherIV bytes prefix
 
-decrypt  ::  PrivateNumber->BL.ByteString->B.ByteString->Either String B.ByteString
-decrypt prvKey bytes prefix = do
+decrypt :: HasVault m => BL.ByteString -> B.ByteString -> m (Either String B.ByteString)
+decrypt bytes prefix = do
   let eciesMsg = decode bytes
 
   --Special case of the next check, indicates that a different key encoding was used
   when (eciesForm eciesMsg `elem` [2,3]) $ error "peer connected with unsupported handshake packet"
 
-  unless (eciesForm eciesMsg == 4) $
-       Left $ "first byte of buffer must be 4: " ++ show (BL.unpack bytes)
+  if (eciesForm eciesMsg == 4) then
+       return $ Left $ "first byte of buffer must be 4: " ++ show (BL.unpack bytes)
+  else do
+    sharedKey <- getShared $ pointToSecPubKey $ eciesPubKey eciesMsg 
+    
+    let msg = decryptECIES sharedKey eciesMsg
+        (expectedMac, _) = getMacAndCipher sharedKey (eciesCipherIV eciesMsg) msg prefix
 
-  let msg = decryptECIES prvKey eciesMsg
-
-  let (expectedMac, _) = getMacAndCipher prvKey (eciesPubKey eciesMsg) (eciesCipherIV eciesMsg) msg prefix
-
-  unless (eciesMac eciesMsg == expectedMac) $
-       Left $ "mac doesn't match: expected " ++ show expectedMac
+    if (eciesMac eciesMsg == expectedMac) then
+       return $ Left $ "mac doesn't match: expected " ++ show expectedMac
               ++ ", got " ++ show (eciesMac eciesMsg)
-
-  return msg
+    else return $ Right msg
 
 -----------------
 
-intToBytes  ::  Integer->[Word8]
-intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
+--intToBytes  ::  Integer->[Word8]
+--intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
 
 ctr  ::  [Word8]
 ctr=[0,0,0,1]
 
-s1  ::  [Word8]
-s1 = []
+--s1  ::  [Word8]
+--s1 = []
 
 
 data ECIESMessage =
@@ -110,38 +113,35 @@ errorHead msg _   = error msg
 encrypt'  ::  B.ByteString->B.ByteString->B.ByteString->B.ByteString
 encrypt' key cipherIV input = encryptCTR (initAES key) cipherIV input
 
-getMacAndCipher  ::  PrivateNumber->PublicPoint->B.ByteString->B.ByteString->B.ByteString->([Octet], B.ByteString)
-getMacAndCipher myPrvKey otherPubKey cipherIV msg prefix =
+getMacAndCipher  ::  SharedKey->B.ByteString->B.ByteString->B.ByteString->([Octet], B.ByteString)
+getMacAndCipher (SharedKey sharedKey) cipherIV msg prefix =
   (
     hmac (HashMethod (B.unpack . hash . B.pack) 512) (B.unpack mKey) (B.unpack cipherWithIV ++ B.unpack prefix),
     cipher
   )
   where
     cipherWithIV = cipherIV `B.append` cipher
-    SharedKey sharedKey = getShared theCurve myPrvKey otherPubKey
-    key = hash $ B.pack (ctr ++ intToBytes sharedKey ++ s1)
+    key = hash $ B.pack ctr `B.append` sharedKey
     mKeyMaterial = B.take 16 $ B.drop 16 key
     mKey = hash mKeyMaterial
     eKey = B.take 16 key
     cipher = encrypt' eKey cipherIV msg
 
-encryptECIES  ::  PrivateNumber->PublicPoint->B.ByteString->B.ByteString->B.ByteString->ECIESMessage
-encryptECIES myPrvKey otherPubKey cipherIV msg prefix =
+encryptECIES  ::  SharedKey->PublicPoint->B.ByteString->B.ByteString->B.ByteString->ECIESMessage
+encryptECIES sharedKey myPubKey cipherIV msg prefix =
   ECIESMessage {
     eciesForm = 4, --form=4 indicates pubkey is not compressed
-    eciesPubKey=calculatePublic theCurve myPrvKey,
+    eciesPubKey=myPubKey, 
     eciesCipherIV=cipherIV,
     eciesCipher=cipher,
     eciesMac=mac
     }
   where
-    (mac, cipher) = getMacAndCipher myPrvKey otherPubKey cipherIV msg prefix
+    (mac, cipher) = getMacAndCipher sharedKey cipherIV msg prefix
 
 
-decryptECIES  ::  PrivateNumber->ECIESMessage->B.ByteString
-decryptECIES myPrvKey msg =
-  decryptCTR (initAES eKey) (eciesCipherIV msg) (eciesCipher msg)
-  where
-    SharedKey sharedKey = getShared theCurve myPrvKey (eciesPubKey msg)
-    key = hash $ B.pack (ctr ++ intToBytes sharedKey ++ s1)
-    eKey = B.take 16 key
+decryptECIES  :: SharedKey -> ECIESMessage -> B.ByteString
+decryptECIES (SharedKey sharedKey) msg =
+  let key = hash $ B.pack ctr `B.append` sharedKey
+      eKey = B.take 16 key
+  in encryptCTR (initAES eKey) (eciesCipherIV msg) (eciesCipher msg)

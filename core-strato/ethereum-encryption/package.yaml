@@ -27,7 +27,6 @@ library:
   - conduit-extra
   - crypto-pubkey
   - crypto-pubkey-types
-  - crypto-random
   - cryptohash
   - cryptonite
   - entropy
@@ -35,6 +34,7 @@ library:
   - lifted-base
   - memory
   - mtl
+  - strato-model
 
 
 tests:
@@ -42,6 +42,10 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
-      - QuickCheck
+      - base16-bytestring
+      - bytestring
+      - crypto-pubkey-types
       - ethereum-encryption
       - hspec
+      - strato-model
+      - QuickCheck

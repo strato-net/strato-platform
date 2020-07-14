@@ -7,7 +7,7 @@ module Blockchain.Handshake (
   bytesToAckMsg
   ) where
 
-import "crypto-pubkey" Crypto.PubKey.ECC.DH
+import                 Control.Monad.IO.Class
 import                 Crypto.Types.PubKey.ECC
 import                 Data.Binary
 import                 Data.Binary.Get
@@ -16,19 +16,21 @@ import                 Data.Bits
 import qualified       Data.ByteString             as B
 import qualified       Data.ByteString.Lazy        as BL
 import                 Data.Maybe
-import qualified       Network.Haskoin.Internals   as H
+--import qualified       Network.Haskoin.Internals   as H
 
 import                 Blockchain.Data.PubKey
 import qualified       Blockchain.ECIES            as ECIES
-import                 Blockchain.ExtendedECDSA
+import                 Blockchain.ECDSA
+--import                 Blockchain.ExtendedECDSA
 import                 Blockchain.ExtWord
 import                 Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 
-sigToBytes::ExtendedSignature->B.ByteString
-sigToBytes (ExtendedSignature signature yIsOdd) =
-  word256ToBytes (fromIntegral $ H.sigR signature) <>
-  word256ToBytes (fromIntegral $ H.sigS signature) <>
-  B.singleton (if yIsOdd then 1 else 0)
+--sigToBytes::ExtendedSignature->B.ByteString
+--sigToBytes (ExtendedSignature signature yIsOdd) =
+--  word256ToBytes (fromIntegral $ H.sigR signature) <>
+--  word256ToBytes (fromIntegral $ H.sigS signature) <>
+--  B.singleton (if yIsOdd then 1 else 0)
+
 
 
 data AckMessage = AckMessage {
@@ -78,35 +80,46 @@ bytesToAckMsg bytes | B.length bytes == 97 =
     }
 bytesToAckMsg _ = error "wrong number of bytes in call to bytesToECIESMsg"
 
-getHandshakeBytes::PrivateNumber->PublicPoint->B.ByteString->IO B.ByteString
-getHandshakeBytes myPriv otherPubKey myNonce = do
-  let
-    myPublic = calculatePublic ECIES.theCurve myPriv
-    SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPubKey
+{- hPubKeyToPubKey :: H.PubKey -> Point
+hPubKeyToPubKey pubKey =
+  Point (fromIntegral x) (fromIntegral y)
+  where
+    x = fromMaybe (error "getX failed in prvKey2Address") $ H.getX hPoint
+    y = fromMaybe (error "getY failed in prvKey2Address") $ H.getY hPoint
+    hPoint = H.pubKeyPoint pubKey
+-}
+getHandshakeBytes :: (MonadIO m, HasVault m) => PublicPoint -> B.ByteString -> m B.ByteString
+getHandshakeBytes otherPubKey myNonce = do
+  myPublic' <- getPub
+  SharedKey sharedKey <- getShared $ pointToSecPubKey otherPubKey
 
-    msg = fromIntegral sharedKey `xor` bytesToWord256 myNonce
+  let myPublic = secPubKeyToPoint myPublic'
+      msg = word256ToBytes $ bytesToWord256 sharedKey `xor` bytesToWord256 myNonce
 
-
- --  putStrLn $ "sharedKey: " ++ show sharedKey
-  -- putStrLn $ "msg:       " ++ show msg
-  sig <- H.withSource H.devURandom $ extSignMsg msg (fromMaybe (error "invalid private number in call to getHandshakeBytes") $ H.makePrvKey $ fromIntegral myPriv)
+  -- TODO: these putStrLn's are just for logging, remove
+  liftIO $ putStrLn $ "myPublic: " ++ show myPublic'
+  liftIO $ putStrLn $ "sharedKey: " ++ show sharedKey
+  liftIO $ putStrLn $ "msg:       " ++ show msg
+  sig <- sign msg 
+  
+  -- this signature recovery is pointless - the "ephermal" key is actually just myPublic
   let
     ephemeral =
       fromMaybe (error "malformed signature given to call getHandshakeBytes") $
-      getPubKeyFromSignature sig msg
-    hepubk = keccak256ToByteString $ hash $ pubKeyToBytes ephemeral
+      recoverPub sig msg
+    hepubk = keccak256ToByteString $ hash $ pointToBytes $ secPubKeyToPoint ephemeral
     pubk = pointToBytes myPublic
-    theData = sigToBytes sig `B.append`
+    theData = (BL.toStrict $ encode sig) `B.append`
                 hepubk `B.append`
                 pubk `B.append`
                 myNonce `B.append`
-                B.singleton 0
-  -- putStrLn $ "ephemeral: " ++ show ephemeral
+                B.singleton 0  -- TODO: would be nice to have binary instances here, not just raw BS stuff
+  liftIO $ putStrLn $ "ephemeral: " ++ show ephemeral
   -- putStrLn $ "hepubk: " ++ show hepubk
   -- putStrLn $ "pubk: " ++ show pubk
   -- putStrLn $ "theData: " ++ show theData
 
-  eciesMsgBytes <- fmap BL.toStrict $ ECIES.encrypt myPriv otherPubKey theData B.empty
+  eciesMsgBytes <- fmap BL.toStrict $ ECIES.encrypt (SharedKey sharedKey) myPublic theData B.empty
 
   -- putStrLn $ "eciesMsg: "
   -- putStrLn $ show eciesMsg

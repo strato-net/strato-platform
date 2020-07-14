@@ -81,7 +81,7 @@ newtype Signature = Signature S.CompactRecSig
 class Monad m => HasVault m where
   sign :: ByteString -> m Signature
   getPub :: m PublicKey
-  getShared :: PublicKey -> m Signature
+  getShared :: PublicKey -> m SharedKey
   
 
 -- some instances we use elsewhere

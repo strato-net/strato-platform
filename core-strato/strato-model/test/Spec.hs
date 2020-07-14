@@ -128,7 +128,9 @@ spec = do
         pub = derivePublicKey prv 
         mesg = keccak256ToByteString $ hash $ C8.pack "hey guys!" 
         sig = signMsg prv mesg
-   
+  
+    it "can export public key as DER bytestring" $ do
+      B.length (exportPublicKey False pub) `shouldBe` 65
     it "can convert public key to and from JSON encoding" $ do
       Ae.decode (Ae.encode pub) `shouldBe` Just pub
     it "can convert signature to and from JSON encoding" $ do
