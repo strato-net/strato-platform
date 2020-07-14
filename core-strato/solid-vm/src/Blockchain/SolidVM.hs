@@ -140,7 +140,7 @@ create' creator newAddress ch cc contractName' argExps = do
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
-  let contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. contracts . at contractName')
+  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. contracts . at contractName')
 
   -- Add Storage
 
@@ -224,7 +224,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
-        argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
+        !argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
 
@@ -274,7 +274,7 @@ getCodeAndCollection address' = do
         ch -> internalError "SolidVM for non-solidvm code" (format ch)
 
 
-    let contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
+    let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
 
     return (contract', ch, cc)
 
@@ -489,14 +489,14 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   return Nothing -- just throw away the return value
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression)) = do
-  let maybeLoc = case entries of
+  let !maybeLoc = case entries of
                       [e] -> Xabi.vardefLocation e
                       es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
                               -- It is possible to supply locations in tuple definitions, but
                               -- I'm not sure what that exactly looks like when its not memory.
                               then todo "storage was not anticipated in a tuple entry" s
                               else Nothing
-  let singleType = case entries of
+  let !singleType = case entries of
                       [e] -> fromMaybe (todo "type inference not implemented" s) $ Xabi.vardefType e
                       _ -> todo "could not evaluate expression without tuple type" s
   !value <-
@@ -797,7 +797,7 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SBuiltinVariable "tx", "origin") -> (Constant . SAddress . Env.origin) <$> getEnv
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
-          Just val -> return val
+          Just v -> return v
       (SContractDef contractName', constName) -> do
         --TODO- move all variable name resolution by contract to a function
         (_, cc) <- getCurrentCodeCollection
@@ -1081,7 +1081,7 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant (SStructDef structName) -> do
       contract' <- getCurrentContract
-      let vals = fromMaybe (missingType "struct constructor not found" structName)
+      let !vals = fromMaybe (missingType "struct constructor not found" structName)
                $ M.lookup structName $ contract'^.structs
       return . Constant . SStruct structName . fmap Constant . M.fromList $
         case argVals of
@@ -1122,7 +1122,7 @@ expToVar' (Xabi.FunctionCall e args) = do
       case argVals of
         OrderedVals [SInteger i] -> do
           c <- getCurrentContract
-          let theEnum = fromMaybe (missingType "enum constructor" enumName)
+          let !theEnum = fromMaybe (missingType "enum constructor" enumName)
                       $ M.lookup enumName $ c^.enums
           return $ Constant $ SEnumVal enumName (theEnum !! fromInteger i) (fromInteger i)
         _ -> typeError "called enum constructor with improper args" argVals
@@ -1246,7 +1246,7 @@ bytesToInteger bytes =
 
 runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
-  let contract' =
+  let !contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.contracts . at contractName'
       argPairs = fromMaybe [] . fmap Xabi.funcArgs $ contract' ^. constructor
@@ -1393,7 +1393,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
 --  forM_ locals $ \(n, (_, v)) -> do
 --    liftIO $ putStrLn "need to initialize the storage 2"
 --    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
-  let commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
+  let !commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
   val <- runStatements commands
 
   let findNamedReturns = do
