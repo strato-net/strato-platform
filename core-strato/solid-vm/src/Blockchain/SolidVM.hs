@@ -786,21 +786,24 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SEnum enumName, _) -> do
         contract' <- getCurrentContract
         let maybeEnumValues = M.lookup enumName $ contract' ^. enums
-            enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
-            num = maybe (missingType "Enum nonexistent member" (enumName, name))
-                        fromIntegral
-                        (name `elemIndex` enumVals)
+        enumVals <- case maybeEnumValues of
+          Nothing -> missingType "Enum nonexistent type" enumName
+          Just vals -> pure $ vals
+        num <- case name `elemIndex` enumVals of
+          Nothing -> missingType "Enum nonexistent member" (enumName, name)
+          Just n -> pure $ fromIntegral n
         return $ Constant $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (Constant . SAddress . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAddress . Env.origin) <$> getEnv
-      (SStruct _ theMap, fieldName) ->
-        return $ fromMaybe (missingField "struct member access" fieldName)
-                  $ M.lookup fieldName theMap
+      (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
+          Nothing -> missingField "struct member access" fieldName
+          Just val -> return val
       (SContractDef contractName', constName) -> do
         --TODO- move all variable name resolution by contract to a function
         (_, cc) <- getCurrentCodeCollection
-        let cont = fromMaybe (missingType "contract function lookup" contractName')
-                          (M.lookup contractName' $ cc^.contracts)
+        cont <- case M.lookup contractName' $ cc^.contracts of
+          Nothing -> missingType "contract function lookup" contractName'
+          Just ct -> pure ct
         if constName `M.member` _functions cont
           then do
             -- TODO: Check that this contract actually is a contractName'
@@ -1317,7 +1320,9 @@ runTheConstructors from to hsh cc contractName' argExps = do
       Just theFunction -> do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
-        let commands = fromMaybe (missingField "contract constructor has been declared but not defined" contractName') $ Xabi.funcContents theFunction
+        commands <- case Xabi.funcContents theFunction of
+          Nothing -> missingField "contract constructor has been declared but not defined" contractName'
+          Just cms -> pure cms
         _ <- pushSender from $ runStatements commands
         return ()
 
