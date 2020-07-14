@@ -29,7 +29,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.RLP
 import           Blockchain.Util
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors                  as CL
 import           Text.Format
 import           Text.ShortDescription
@@ -64,8 +64,8 @@ data Transaction =
     transactionMetadata :: Maybe (Map Text Text)
     } |
   PrivateHashTX {
-    transactionTxHash    :: Word256,
-    transactionChainHash :: Word256
+    transactionTxHash    :: Keccak256,
+    transactionChainHash :: Keccak256
     } deriving (Show, Read, Eq, Ord, Generic, Data, NFData)
 
 instance Binary Transaction where
@@ -75,15 +75,15 @@ instance Binary Transaction where
 formatChainId :: Maybe Word256 -> String
 formatChainId = \case
   Nothing -> "<main chain>"
-  Just cid -> format $ SHA cid
+  Just cid -> CL.yellow $ format cid
 
 instance Format Transaction where
   format PrivateHashTX{transactionTxHash=h, transactionChainHash=ch} =
     CL.blue "Private Transaction Hash" ++
     tab (
       "\n" ++
-      "Transaction Hash:       " ++ format (SHA h) ++ "\n" ++
-      "Transaction Chain Hash: " ++ format (SHA ch) ++ "\n")
+      "Transaction Hash:       " ++ CL.yellow (format h) ++ "\n" ++
+      "Transaction Chain Hash: " ++ CL.yellow (format ch) ++ "\n")
   format t@MessageTX
              { transactionNonce=n
              , transactionGasPrice=gp

@@ -16,7 +16,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 
 newtype Nonce = Nonce Word256
                deriving (Eq, Show, Generic)
-               deriving newtype (Num, Ord)
+               deriving newtype (Num, Ord, Bounded)
                deriving anyclass (NFData)
 
 instance ToJSON Nonce where
@@ -32,7 +32,7 @@ instance ToSchema Nonce where
   declareNamedSchema _ = return $
     NamedSchema (Just "Nonce")
       ( mempty
-        & type_ .~ SwaggerInteger
+        & type_ ?~ SwaggerInteger
         & example ?~ toJSON (Nonce 1)
         & description ?~ "Numeric Nonce" )
 

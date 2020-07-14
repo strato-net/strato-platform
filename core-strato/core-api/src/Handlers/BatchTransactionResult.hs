@@ -1,80 +1,58 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -fno-warn-orphans   #-}
 
-module Handlers.BatchTransactionResult (
-  API,
-  server
+module Handlers.BatchTransactionResult
+  ( API
+  , batchTransactionResultClient
+  , server
   ) where
 
-
-import           Control.Monad
-import           Control.Monad.IO.Class
-import           Data.Aeson
-import           Data.Aeson.Encoding
+import           Control.Monad.Change.Alter
 import qualified Data.Map.Strict     as M
-import qualified Data.Text           as T
 import qualified Database.Esqueleto  as E
-import           Database.Persist.Postgresql
-import           Numeric             (readHex)
 import           Servant
+import           Servant.Client
+
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           SQLM
-
-
+import           UnliftIO
 
 type API = 
-  "transactionResult" :> "batch" :> ReqBody '[JSON,PlainText] [StrungSHA]
-                                 :> Post '[JSON] Value
+  "transactionResult" :> "batch" :> ReqBody '[JSON,PlainText] [Keccak256]
+                                 :> Post '[JSON] (M.Map Keccak256 [TransactionResult])
 
-server :: ConnectionPool -> Server API
-server connStr = postBatchTransactionResult connStr
+batchTransactionResultClient :: [Keccak256] -> ClientM (M.Map Keccak256 [TransactionResult])
+batchTransactionResultClient = client (Proxy @API)
 
----------------------------
+server :: ServerT API SQLM
+server = postBatchTransactionResult
 
-data StrungSHA = StrungSHA { unStrungSHA :: SHA }
-    deriving (Eq, Ord, Read, Show)
+instance Selectable Keccak256 [TransactionResult] SQLM where
+  selectMany _ []     = throwIO $ MissingParameterError "missing parameter: hashes"
+  selectMany _ hashes = do
+    txrs <- sqlQuery . E.select . E.from $ \txr -> do
+      let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList hashes
+      E.where_ matchHashes
+      return txr
+    let mmUpsert k v m = case M.lookup k m of
+                  Nothing -> M.insert k [v] m
+                  Just vs -> M.insert k (v:vs) m
+        theFold m v = mmUpsert (transactionResultTransactionHash v) v m
+        baseMap = foldl (\m k -> M.insert k [] m) M.empty hashes
+        grouped = foldl theFold baseMap (E.entityVal <$> txrs)
+    return grouped
 
-instance FromJSON StrungSHA where
-    parseJSON (String s) = case readHex $ T.unpack s of
-        [(x, "")] -> return . StrungSHA $ SHA x
-        _         -> fail "Expected a hex string of 32 bytes"
-    parseJSON _ = fail "Expected a String containing a SHA"
-
-instance ToJSON StrungSHA where
-    toJSON = String . T.pack . formatSHAWithoutColor . unStrungSHA
-
-instance ToJSONKey StrungSHA where
-    toJSONKey = ToJSONKeyText f (text . f)
-      where f = T.pack . formatSHAWithoutColor . unStrungSHA
-
-instance MimeUnrender PlainText [StrungSHA] where
-  mimeUnrender _ = maybe (Left "Couldn't decode [Keccak256]") Right . decode
-
-postBatchTransactionResult :: ConnectionPool -> [StrungSHA] -> Handler Value
-postBatchTransactionResult pool hashes = do
-
-  when (null hashes) $ throwError err400{ errBody="missing parameter: hashes" }
-  
---  hashesR <- parseJsonBody :: HandlerFor App (Result [StrungSHA])
-  txrs <- liftIO $ runSQLM pool $ sqlQuery . E.select . E.from $ \txr -> do
-    let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList (unStrungSHA <$> hashes)
-    E.where_ matchHashes
-    return txr
-  let mmUpsert k v m = case M.lookup k m of
-                Nothing -> M.insert k [v] m
-                Just vs -> M.insert k (v:vs) m
-      theFold m v = mmUpsert (StrungSHA $ transactionResultTransactionHash v) v m
-      baseMap = foldl (\m k -> M.insert k [] m) M.empty hashes
-      grouped = foldl theFold baseMap (E.entityVal <$> txrs)
-  return . toJSON $ grouped
-
-
+postBatchTransactionResult :: Selectable Keccak256 [TransactionResult] m => [Keccak256] -> m (M.Map Keccak256 [TransactionResult])
+postBatchTransactionResult = selectMany (Proxy @[TransactionResult])
 
 

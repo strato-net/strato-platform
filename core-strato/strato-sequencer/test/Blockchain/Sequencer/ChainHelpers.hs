@@ -2,7 +2,7 @@ module Blockchain.Sequencer.ChainHelpers where
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           Blockchain.Verification                 (ommersVerificationValue)
 
@@ -13,7 +13,7 @@ import           Test.QuickCheck
 -- todo should genesis block make somebody exceptionally wealthy?
 makeGenesisBlock :: IO IngestBlock
 makeGenesisBlock = do
-    startBlock <-  ( (setIngestBlockParentHash (SHA . fromIntegral $ (0 :: Int)))
+    startBlock <-  ( (setIngestBlockParentHash (unsafeCreateKeccak256FromWord256 . fromIntegral $ (0 :: Int)))
                    . (setIngestBlockUnclesHash (ommersVerificationValue []))
                    . (setIngestBlockNumber 0)
                    . (setIngestBlockGasUsed 0)
@@ -41,10 +41,10 @@ buildIngestChain seed depth maxSiblings = do
 mapIngestHeader :: (BlockData -> BlockData) -> IngestBlock -> IngestBlock
 mapIngestHeader f baseBlock = baseBlock { ibBlockData = (f . ibBlockData $ baseBlock) }
 
-setIngestBlockParentHash :: SHA -> IngestBlock -> IngestBlock
+setIngestBlockParentHash :: Keccak256 -> IngestBlock -> IngestBlock
 setIngestBlockParentHash hash' = mapIngestHeader $ \h -> h { blockDataParentHash = hash'}
 
-setIngestBlockUnclesHash :: SHA -> IngestBlock -> IngestBlock
+setIngestBlockUnclesHash :: Keccak256 -> IngestBlock -> IngestBlock
 setIngestBlockUnclesHash hash' = mapIngestHeader $ \h -> h { blockDataUnclesHash = hash'}
 
 setIngestBlockDifficulty :: Integer -> IngestBlock -> IngestBlock

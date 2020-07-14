@@ -29,11 +29,13 @@ library:
   source-dirs: src
   dependencies:
     - blockapps-ethereum
+    - base16-bytestring
     - bytestring
-    - haskoin-shim
+    - cache
+    - clock
     - http-client
     - lens
-    - monad-control >=1.0 && <1.1
+    - monad-control
     - mtl
     - opaleye
     - product-profunctors
@@ -45,9 +47,12 @@ library:
     - transformers
     - unliftio
     - resource-pool
+    - secp256k1-haskell == 0.2.0
     - servant
     - servant-server
     - text
+
+
 
 executables:
   blockapps-vault-wrapper-server:
@@ -57,6 +62,8 @@ executables:
     dependencies:
       - blockapps-vault-wrapper-server
       - blockapps-init
+      - cache
+      - clock
       - hflags
       - http-client
       - resource-pool
@@ -82,3 +89,20 @@ executables:
       - opaleye
       - text
 
+tests:
+  vault-wrapper-spec:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - hspec
+      - clockwork
+      - cryptonite
+      - secp256k1-haskell
+      - haskoin-shim 
+      - blockapps-haskoin
+      - base16-bytestring
+      - strato-model
+      - blockapps-ethereum
+      - ethereum-encryption

@@ -17,7 +17,7 @@ import           Test.QuickCheck.Instances ()
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Client
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Keccak256  hiding (hash)
 
 
 data TestConfig = TestConfig
@@ -59,7 +59,7 @@ readSolFile filename = do
   soliditySrc <- readFile filepath
   return (pack soliditySrc)
 
-resolveTx :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
+resolveTx :: TestConfig -> Keccak256 -> IO (Either ClientError BlocTransactionResult)
 resolveTx testConfig@TestConfig{..} hash = do
   eResult <- runClientM (getBlocTransactionResult hash True) (ClientEnv mgr blocUrl Nothing)
   case eResult of
@@ -69,21 +69,21 @@ resolveTx testConfig@TestConfig{..} hash = do
         Pending -> resolveTx testConfig hash
         _ -> return eResult
 
-getResolvedTx :: TestConfig -> IO (Either ServantError BlocTransactionResult) -> IO (Either ServantError BlocTransactionResult)
+getResolvedTx :: TestConfig -> IO (Either ClientError BlocTransactionResult) -> IO (Either ClientError BlocTransactionResult)
 getResolvedTx testConfig io = do
   eResult <- io
   case eResult of
     Left _ -> return eResult
     Right result -> resolveTx testConfig $ blocTransactionHash result
 
-getResolvedBatchTx :: TestConfig -> IO (Either ServantError [BlocTransactionResult]) -> IO [Either ServantError BlocTransactionResult]
+getResolvedBatchTx :: TestConfig -> IO (Either ClientError [BlocTransactionResult]) -> IO [Either ClientError BlocTransactionResult]
 getResolvedBatchTx testConfig io = do
   eResult <- io
   case eResult of
     Left err -> return [Left err]
     Right results -> mapM (resolveTx testConfig . blocTransactionHash) results
 
-resolveTxMulti :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
+resolveTxMulti :: TestConfig -> Keccak256 -> IO (Either ClientError BlocTransactionResult)
 resolveTxMulti testConfig@TestConfig{..} hash = do
   let Just blocclient = blocUrlMulti
   eResult <- runClientM (getBlocTransactionResult hash True) (ClientEnv mgr blocclient Nothing)
@@ -94,7 +94,7 @@ resolveTxMulti testConfig@TestConfig{..} hash = do
         Pending -> resolveTxMulti testConfig hash
         _ -> return eResult
 
-getResolvedTxMulti :: TestConfig -> IO (Either ServantError BlocTransactionResult) -> IO (Either ServantError BlocTransactionResult)
+getResolvedTxMulti :: TestConfig -> IO (Either ClientError BlocTransactionResult) -> IO (Either ClientError BlocTransactionResult)
 getResolvedTxMulti testConfig io = do
   eResult <- io
   case eResult of

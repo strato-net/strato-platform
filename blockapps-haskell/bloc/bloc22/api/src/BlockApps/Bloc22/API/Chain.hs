@@ -8,6 +8,7 @@
 {-# LANGUAGE OverloadedLists              #-}
 {-# LANGUAGE OverloadedStrings            #-}
 {-# LANGUAGE ScopedTypeVariables          #-}
+{-# LANGUAGE TypeApplications             #-}
 {-# LANGUAGE TypeOperators                #-}
 {-# LANGUAGE TypeSynonymInstances         #-}
 
@@ -30,8 +31,10 @@ import           Test.QuickCheck                    hiding (Success,Failure)
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Ethereum                 ()
 import           BlockApps.Solidity.ArgValue
-import           BlockApps.Strato.TypeLits
 
+import           Blockchain.Data.ArbitraryInstances ()
+import           Blockchain.Data.Enode
+import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 
@@ -39,24 +42,25 @@ import           Blockchain.Strato.Model.ChainId
 -- | Routes and types
 --------------------------------------------------------------------------------
 data ChainInput  = ChainInput
-  { chaininputSrc      :: Text
+  { chaininputSrc      :: Maybe Text
   , chaininputContract :: Maybe Text
   , chaininputLabel    :: Text
-  , chaininputBalances :: NamedMap "address" Address "balance" Integer
+  , chaininputBalances :: NamedMap "address" "balance" Address Integer
   , chaininputArgs     :: Map Text ArgValue
-  , chaininputMembers  :: NamedMap "address" Address "enode" Text
+  , chaininputMembers  :: NamedMap "address" "enode" Address Enode
   , chaininputMetadata :: Maybe (Map Text Text)
+  , chaininputAsync    :: Maybe Bool
   } deriving (Eq, Show, Generic)
 
-instance ToSchema (NamedTuple "address" Address "balance" Integer) where
+instance ToSchema (NamedTuple "address" "balance" Address Integer) where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "address and balance pair"
-    & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))) :: NamedTuple "address" Address "balance" Integer)
+    & mapped.schema.example ?~ toJSON (NamedTuple @"address" @"balance" (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer)))
 
-instance ToSchema (NamedTuple "address" Address "enode" Text) where
+instance ToSchema (NamedTuple "address" "enode" Address Enode) where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "address and enode pair"
-    & mapped.schema.example ?~ toJSON ((NamedTuple (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)) :: NamedTuple "address" Address "enode" Text)
+    & mapped.schema.example ?~ toJSON (NamedTuple @"address" @"balance" (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1))
 
 instance Arbitrary ChainInput where
   arbitrary = GR.genericArbitrary GR.uniform
@@ -70,18 +74,24 @@ instance ToJSON ChainInput where
 exampleSrc :: Text
 exampleSrc = "contract Governance { enum Rule { AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES } Rule addRule; Rule removeRule; Rule terminateRule; event MemberAdded (address member, string enode); event MemberRemoved (address member); event ChainTerminated(); struct MemberVotes { address member; uint votes; } MemberVotes[] addVotes; MemberVotes[] removeVotes; uint terminateVotes; function voteToAdd(address m, string e) { MemberAdded(m,e); } function voteToRemove(address m) { MemberRemoved(m); } function voteToTerminate() { terminateVotes++; if (satisfiesRule(terminateRule, terminateVotes)) { ChainTerminated(); } } function satisfiesRule(Rule rule, uint votes) returns (bool) { if (rule == Rule.AUTO_APPROVE) { return true; } else if (rule == Rule.TWO_VOTES_IN) { return votes >= 2; } else { return true; } } }";
 
-exampleEnode1 :: Text
-exampleEnode1 = "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"
+exampleEnode1 :: Enode
+exampleEnode1 = Enode (OrgId "6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0")
+                      (readIP "171.16.0.4")
+                      30303
+                      Nothing
 
-exampleEnode2 :: Text
-exampleEnode2 = "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@172.16.0.5:30303?discport=30303"
+exampleEnode2 :: Enode
+exampleEnode2 = Enode (OrgId "6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0")
+                      (readIP "172.16.0.5")
+                      30303
+                      (Just 30303)
 
 exChainInput :: ChainInput
 exChainInput = ChainInput
-    { chaininputSrc = exampleSrc
+    { chaininputSrc = Just exampleSrc
     , chaininputContract = Just "Governance"
     , chaininputLabel = "my chain"
-    , chaininputBalances = map fromTuple [
+    , chaininputBalances = map (NamedTuple @"address" @"balance") [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
        ]
@@ -89,11 +99,12 @@ exChainInput = ChainInput
          ("addRule", ArgString "AUTO_APPROVE")
        , ("removeRule", ArgString "AUTO_APPROVE")
        ]
-    , chaininputMembers = map fromTuple [
+    , chaininputMembers = map (NamedTuple @"address" @"enode") [
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
        ]
     , chaininputMetadata = Just $ Map.fromList [("history","Governance")]
+    , chaininputAsync = Nothing
     }
 
 instance ToSample ChainInput where
@@ -110,8 +121,8 @@ instance ToParam (QueryParams "chainid" ChainId) where
 
 data ChainOutput = ChainOutput
   { chainoutputLabel    :: Text
-  , chainoutputBalances :: NamedMap "address" Address "balance" Integer
-  , chainoutputMembers  :: NamedMap "address" Address "enode" Text
+  , chainoutputBalances :: NamedMap "address" "balance" Address Integer
+  , chainoutputMembers  :: NamedMap "address" "enode" Address Enode
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary ChainOutput where
@@ -126,11 +137,11 @@ instance ToJSON ChainOutput where
 exChainOutput :: ChainOutput
 exChainOutput = ChainOutput
   { chainoutputLabel = "my chain"
-  , chainoutputBalances = map fromTuple [
+  , chainoutputBalances = map (NamedTuple @"address" @"balance") [
       (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, (20000000 :: Integer))
     , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, (999999 :: Integer))
     ]
-  , chainoutputMembers = map fromTuple [
+  , chainoutputMembers = map (NamedTuple @"address" @"enode") [
       (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
     , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
     ]
@@ -145,10 +156,11 @@ instance ToSchema ChainOutput where
     & mapped.schema.example ?~ toJSON exChainOutput
 
 
-type ChainIdChainOutput = NamedTuple "id" ChainId "info" ChainOutput
+type ChainIdChainOutput = NamedTuple "id" "info" ChainId ChainOutput
 
 exChainIdChainOutput :: ChainIdChainOutput
-exChainIdChainOutput = NamedTuple ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
+exChainIdChainOutput = NamedTuple @"id" @"info"
+ ((fromJust $ stringChainId "6c5fdccedeaf8fb957618b0005015c6717c17525835c03d20deccf8ceb0d51a7i"), exChainOutput)
 
 instance ToSample ChainIdChainOutput where
   toSamples _ = singleSample exChainIdChainOutput

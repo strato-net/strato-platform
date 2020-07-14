@@ -48,7 +48,13 @@ compileSolc solcVersion mainSrc = do
   eRes <- liftIO . runExceptT $ runSolc solcVersion postParams mainFiles importFiles
   case eRes of
     Left (err, ExitFailure 1) -> blocError . UserError . Text.pack $ err
-    Left (err,_) -> blocError . AnError . Text.pack $ err
+    Left (err, s) -> blocError . AnError . Text.pack $ List.concat
+      [ "SolcError: Solc exited with code "
+      , show s
+      , " with message \""
+      , err
+      , "\"."
+      ]
     Right res ->
       maybe (blocError . AnError $ "SolcError : No \"src\" field in json artifact")
             return $ Map.lookup "src" res

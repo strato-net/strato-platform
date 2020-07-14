@@ -14,6 +14,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Except
 import qualified Data.ByteString.Lazy            as LB
+import           Data.Cache
 import           Data.Foldable
 import           Data.Pool                       (Pool, withResource)
 import           Data.Profunctor.Product.Default
@@ -59,6 +60,7 @@ data VaultWrapperEnv = VaultWrapperEnv
   { httpManager         :: Manager
   , dbPool              :: Pool Connection
   , superSecretPassword :: IORef (Maybe Text)
+  , keyStoreCache       :: Cache Text KeyStore
   }
 
 data VaultWrapperError
@@ -113,7 +115,7 @@ enterVaultWrapper env x = Handler $ do
     Right a -> return a
     Left e -> throwE $ reThrowError e
   where
-    reThrowError :: VaultWrapperError -> ServantErr
+    reThrowError :: VaultWrapperError -> ServerError
     reThrowError
       = \case
           DBError err ->

@@ -27,10 +27,10 @@ import qualified Network.URI                  as URI
 import           Blockchain.Data.Enode
 import           Blockchain.Data.PersistTypes ()
 import           Blockchain.Data.PubKey
-import           Blockchain.DB.SQLDB          (withGlobalSQLPool)
+import           Blockchain.DB.SQLDB          (runSqlPool, withGlobalSQLPool)
 import           Blockchain.MiscJSON          ()
 import           Blockchain.Strato.Discovery.Metrics
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 PPeer
@@ -44,7 +44,7 @@ PPeer
     enableTime UTCTime
     udpEnableTime UTCTime
     lastTotalDifficulty Integer
-    lastBestBlockHash SHA
+    lastBestBlockHash Keccak256
     bondState Int
     activeState Int
     version T.Text
@@ -65,9 +65,12 @@ createPeer peerString = buildPeer <$> parseEnode peerString
 
 -- TODO(tim): Reenable port selection
 buildPeer :: (Maybe String, String, Int) -> PPeer
-buildPeer (pubkeyMaybe, ip, _) =
+buildPeer (mpk, ip, p) = buildPeerPoint (stringToPoint <$> mpk, ip, p)
+
+buildPeerPoint :: (Maybe Point, String, Int) -> PPeer
+buildPeerPoint (pubkeyMaybe, ip, _) =
   let peer = PPeer {
-        pPeerPubkey = stringToPoint <$> pubkeyMaybe,
+        pPeerPubkey = pubkeyMaybe,
         pPeerIp = T.pack ip,
         pPeerUdpPort = 30303, --TODO think about this....  Should the UDP port be the same as the TCP port by default?
         pPeerTcpPort = 30303,
@@ -77,7 +80,7 @@ buildPeer (pubkeyMaybe, ip, _) =
         pPeerLastMsgTime = jamshidBirth,
         pPeerEnableTime = jamshidBirth,
         pPeerUdpEnableTime = jamshidBirth,
-        pPeerLastBestBlockHash = SHA 0,
+        pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0,
         pPeerBondState=0,
         pPeerActiveState = 0,
         pPeerVersion = T.pack "61", -- fix
@@ -115,7 +118,7 @@ parsePort uriAuth = read $ filter (/= ':') (URI.uriPort uriAuth)
 getAvailablePeers::IO (Either SomeException [PPeer])
 getAvailablePeers = try . withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
+  fmap (map SQL.entityVal) $ flip runSqlPool sqldb $
     SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
 
 setPeerActiveState::T.Text->Int->ActivityState->IO (Either SomeException ())
@@ -123,8 +126,7 @@ setPeerActiveState ip _ state = do
   recordStateChange state
   -- TODO(tim): Reenable port selection
   let port' = 30303
-  try $ withGlobalSQLPool $ \sqldb -> do
-    flip SQL.runSqlPool sqldb $
+  try . withGlobalSQLPool . runSqlPool $
       SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port']
                       [PPeerActiveState SQL.=. fromEnum state]
 
@@ -132,33 +134,33 @@ setPeerActiveState ip _ state = do
 getActivePeers::IO (Either SomeException [PPeer])
 getActivePeers = try . withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
+  fmap (map SQL.entityVal) $ flip runSqlPool sqldb $
     SQL.selectList [PPeerActiveState SQL.==. fromEnum Active, PPeerEnableTime SQL.<. currentTime] []
 
 setPeerBondingState::String->Int->Int->IO (Either SomeException ())
 setPeerBondingState ip _ state = try . withGlobalSQLPool $ \sqldb -> do
   -- TODO(tim): Reenable port selection
   let port' = 30303
-  flip SQL.runSqlPool sqldb $
+  flip runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. T.pack ip, PPeerUdpPort SQL.==. port'] [PPeerBondState SQL.=. state]
   return ()
 
 getBondedPeers::IO (Either SomeException [PPeer])
 getBondedPeers = try . withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
+  fmap (map SQL.entityVal) $ flip runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
 getBondedPeersForUDP::IO (Either SomeException [PPeer])
 getBondedPeersForUDP = try . withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
+  fmap (map SQL.entityVal) $ flip runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
 getUnbondedPeers::IO [PPeer]
 getUnbondedPeers = withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
+  fmap (map SQL.entityVal) $ flip runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 0, PPeerEnableTime SQL.<. currentTime] []
 
 thisPeer :: PPeer -> [SQL.Filter PPeer]
@@ -169,17 +171,17 @@ disableUDPPeerForSeconds peer' seconds = try . withGlobalSQLPool $ \sqldb -> do
   -- TODO(tim): Reenable port selection
   let peer = peer'{pPeerTcpPort=30303}
   currentTime <- getCurrentTime
-  flip SQL.runSqlPool sqldb $
+  flip runSqlPool sqldb $
     SQL.updateWhere (thisPeer peer) [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
 
 resetPeers :: IO ()
-resetPeers = withGlobalSQLPool $ SQL.runSqlPool (SQL.updateWhere [] [PPeerActiveState SQL.=. 0])
+resetPeers = withGlobalSQLPool $ runSqlPool (SQL.updateWhere [] [PPeerActiveState SQL.=. 0])
 
 nonviolentDisable :: PPeer -> IO (Either SomeException ())
 nonviolentDisable peer' = try . withGlobalSQLPool $ \sqldb -> do
   let peer = peer'{pPeerTcpPort=30303}
   currentTime <- getCurrentTime
-  flip SQL.runSqlPool sqldb $
+  flip runSqlPool sqldb $
     SQL.updateWhere (thisPeer peer) [PPeerEnableTime SQL.=. 10 `addUTCTime` currentTime]
 
 -- The first time a peer is disabled, the timeout is five seconds. Every subsequent failure that
@@ -192,7 +194,7 @@ lengthenPeerDisable peer' = try . withGlobalSQLPool $ \sqldb -> do
   let peer = peer'{pPeerTcpPort=30303}
   currentTime <- getCurrentTime
   let selector = thisPeer peer
-  flip SQL.runSqlPool sqldb $ do
+  flip runSqlPool sqldb $ do
     if (currentTime < pPeerDisableExpiration peer)
       then SQL.updateWhere selector [PPeerEnableTime SQL.=. fromIntegral (pPeerNextDisableWindowSeconds peer) `addUTCTime` currentTime
                                     , PPeerNextDisableWindowSeconds SQL.*=. 2

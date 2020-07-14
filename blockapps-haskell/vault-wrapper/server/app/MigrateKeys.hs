@@ -27,7 +27,7 @@ import Strato.Strato23.Server.Password
 
 getUserOldKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserOldKeyQuery username = proc () -> do
-  (_, name, salt, nonce, encSecKey, _, address) <- queryTable TS.usersTable -< ()
+  (_, name, salt, nonce, encSecKey, _, address, _) <- queryTable TS.usersTable -< ()
   restrict -< name .== constant username
   returnA -< (salt, nonce, encSecKey, address)
 

@@ -1,10 +1,13 @@
 /* eslint-disable no-console */
 /* eslint-disable no-await-in-loop */
 import { rest } from 'blockapps-rest';
+import fs from 'fs';
 import moment from 'moment';
-import utils from './utils';
+
 import config from '../loadConfig';
 import '../loadEnv';
+import utils from './utils';
+
 
 const { createUser, createContractList } = rest;
 
@@ -53,13 +56,24 @@ describe(`Strato Load Test - ${process.env.CONFIG_FILE}`, function beanstalkLoad
     await utils.waitResult(initialNonce, user, batchSize, batchCount, config);
 
     const transactionEndTimeinSec = moment().diff(startTime, 'seconds');
-    let message = `
-      --------------------------------------------
-      Transaction Time: ${transactionEndTimeinSec} sec
-      Bloc Submission Time: ${transactionsTime} sec
-      TPS ${batchSize * (batchCount / transactionEndTimeinSec)} sec
-      --------------------------------------------
-    `;
+    
+    let resultJson, resultText;
+    
+    resultJson = {
+      transactions: {
+        transaction_time: transactionEndTimeinSec,
+        bloc_submission_time: transactionsTime,
+        TPS: batchSize * (batchCount / transactionEndTimeinSec),
+      },
+      measure: 'sec',
+    }
+    resultText = `
+--------------------------------------------
+Transaction Time: ${resultJson.transactions.transaction_time} ${resultJson.measure}
+Bloc Submission Time: ${resultJson.transactions.bloc_submission_time} ${resultJson.measure}
+TPS ${resultJson.transactions.TPS} ${resultJson.measure}
+--------------------------------------------
+`
 
     let multinodeEndTimeInSec = 0;
 
@@ -74,11 +88,22 @@ describe(`Strato Load Test - ${process.env.CONFIG_FILE}`, function beanstalkLoad
       }
 
       multinodeEndTimeInSec = moment().diff(startTime, 'seconds');
-      message = `
-      --------------------------------------------
-      Multinode Sync Time: ${multinodeEndTimeInSec} sec ${message}`;
-    }
 
-    console.log(message);
+      resultJson.multinodeSyncTime = multinodeEndTimeInSec
+
+      resultText = `
+--------------------------------------------
+Multinode Sync Time: ${multinodeEndTimeInSec} sec ${resultText}
+`
+    }
+    console.log('RESULTS:');
+    console.log('JSON format:');
+    console.log(resultJson);
+    console.log('Text format:');
+    console.log(resultText);
+    console.log('Saving result.json and result.txt with the results accordingly...')
+    fs.writeFileSync('result.json', resultJson);
+    fs.writeFileSync('result.txt', resultText);
+    console.log('Done.')
   });
 });

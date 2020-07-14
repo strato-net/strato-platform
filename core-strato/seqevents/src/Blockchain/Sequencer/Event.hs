@@ -5,10 +5,10 @@
 module Blockchain.Sequencer.Event where
 
 import           Control.DeepSeq
+import           Control.Lens
 import           Data.Aeson                                hiding (encode)
 import           Data.Binary
 import           Data.Data
-import           Data.Functor.Identity
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust, isNothing)
 import           Data.DeriveTH
@@ -29,7 +29,7 @@ import           Blockchain.ExtWord                        (Word256)
 import qualified GHC.Generics                              as GHCG
 
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA               (SHA (..))
+import           Blockchain.Strato.Model.Keccak256               (Keccak256)
 import           Blockchain.Util
 
 import qualified Blockchain.Blockstanbul                   as PBFT
@@ -50,7 +50,7 @@ data AnchorChain = Public
                  | AnchoredPrivate Word256
                  deriving (Eq, Ord, Show, Read, GHCG.Generic, NFData, Data, ToJSON, FromJSON)
 
-getAnchorChain :: (Monad m, TransactionLike t) => (SHA -> m (Maybe Word256)) -> t -> m AnchorChain
+getAnchorChain :: (Monad m, TransactionLike t) => (Keccak256 -> m (Maybe Word256)) -> t -> m AnchorChain
 getAnchorChain f tx =
   if txType tx == PrivateHash
     then f (txChainHash tx) >>= \case
@@ -132,7 +132,7 @@ instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
-  format (IENewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
+  format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
 
@@ -153,7 +153,7 @@ data IngestGenesis = IngestGenesis { igOrigin          :: TO.TXOrigin
                                    } deriving (Eq, Show, GHCG.Generic, Data)
 
 data SequencedBlock = SequencedBlock { sbOrigin              :: TO.TXOrigin
-                                     , sbHash                :: SHA
+                                     , sbHash                :: Keccak256
                                      , sbBlockData           :: DD.BlockData
                                      , sbReceiptTransactions :: [OutputTx]
                                      , sbBlockUncles         :: [DD.BlockData]
@@ -172,7 +172,7 @@ data P2pEvent =
   | P2pBlock OutputBlock
   | P2pGenesis OutputGenesis
   | P2pGetChain [Word256]
-  | P2pGetTx [SHA]
+  | P2pGetTx [Keccak256]
   | P2pNewChainMember Word256 A.Address Enode
   | P2pBlockstanbul PBFT.WireMessage
   -- Ask and push for inclusive ranges of blocks
@@ -184,9 +184,9 @@ instance Format P2pEvent where
   format (P2pTx o)                 = format o
   format (P2pBlock o)              = format o
   format (P2pGenesis o)            = show o
-  format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (format . SHA) cids) ++ "]"
+  format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (CL.yellow . format) cids) ++ "]"
   format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format (P2pNewChainMember c a e) = intercalate ", " [format (SHA c), format a, show e]
+  format (P2pNewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (P2pBlockstanbul o)       = format o
   format x                          = show x
 
@@ -207,14 +207,14 @@ instance Format VmEvent where
   format x                          = show x
 
 data OutputTx = OutputTx { otOrigin      :: TO.TXOrigin
-                         , otHash        :: SHA
+                         , otHash        :: Keccak256
                          , otSigner      :: A.Address
                          , otAnchorChain :: AnchorChain
                          , otBaseTx      :: TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic, NFData, Data)
 
 data OutputTx' = OutputTx' { ot'Origin      :: TO.TXOrigin
-                           , ot'Hash        :: SHA
+                           , ot'Hash        :: Keccak256
                            , ot'Signer      :: A.Address
                            , ot'AnchorChain :: AnchorChain
                            , ot'BaseTx      :: Transaction'
@@ -266,7 +266,7 @@ ingestBlockToBlock :: IngestBlock -> BDB.Block
 ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBlockUncles = us} =
     BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us}
 
-ingestBlockToSequencedBlock :: Monad m => (SHA -> m (Maybe Word256)) -> IngestBlock -> m (Maybe SequencedBlock)
+ingestBlockToSequencedBlock :: Monad m => (Keccak256 -> m (Maybe Word256)) -> IngestBlock -> m (Maybe SequencedBlock)
 ingestBlockToSequencedBlock f ib = do
   let theHash = (BDB.blockHeaderHash . ibBlockData $ ib)
   otxs <- traverse (wrapIngestBlockTransaction f theHash) $ ibReceiptTransactions ib
@@ -299,7 +299,7 @@ sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
     "Block #" ++ CL.yellow(show . DD.blockDataNumber $ d) ++ "/" ++ CL.blue(format theHash)
 
-wrapTransaction :: Monad m => (SHA -> m (Maybe Word256)) -> IngestTx -> m (Maybe OutputTx)
+wrapTransaction :: Monad m => (Keccak256 -> m (Maybe Word256)) -> IngestTx -> m (Maybe OutputTx)
 wrapTransaction f tx@IngestTx{} = do
   let baseTx = itTransaction tx
   case TX.whoSignedThisTransaction baseTx of
@@ -329,7 +329,7 @@ wrapTransactionUnanchored tx@IngestTx{} =
                 , otBaseTx = baseTx
                 }
 
-wrapIngestBlockTransaction :: Monad m => (SHA -> m (Maybe Word256)) -> SHA -> TX.Transaction -> m (Maybe OutputTx)
+wrapIngestBlockTransaction :: Monad m => (Keccak256 -> m (Maybe Word256)) -> Keccak256 -> TX.Transaction -> m (Maybe OutputTx)
 wrapIngestBlockTransaction f hash tx =
   case TX.whoSignedThisTransaction tx of
     Nothing -> return Nothing
@@ -343,7 +343,7 @@ wrapIngestBlockTransaction f hash tx =
         , otHash   = TX.transactionHash tx
         }
 
-wrapIngestBlockTransactionUnanchored :: SHA -> TX.Transaction -> Maybe OutputTx
+wrapIngestBlockTransactionUnanchored :: Keccak256 -> TX.Transaction -> Maybe OutputTx
 wrapIngestBlockTransactionUnanchored hash tx =
   case TX.whoSignedThisTransaction tx of
     Nothing -> Nothing
@@ -360,7 +360,7 @@ wrapIngestBlockTransactionUnanchored hash tx =
 parentHashBS :: SequencedBlock -> BS.ByteString
 parentHashBS = B.toStrict . encode . DD.blockDataParentHash . sbBlockData
 
-ingestBlockHash :: IngestBlock -> SHA
+ingestBlockHash :: IngestBlock -> Keccak256
 ingestBlockHash = BDB.blockHeaderHash . ibBlockData
 
 ingestBlockHashBS :: IngestBlock -> BS.ByteString
@@ -375,14 +375,14 @@ blockHashBS = B.toStrict . encode . sbHash
 sequencedBlockDifficulty :: SequencedBlock -> Integer
 sequencedBlockDifficulty = DD.blockDataDifficulty . sbBlockData
 
-outputBlockHash :: OutputBlock -> SHA
+outputBlockHash :: OutputBlock -> Keccak256
 outputBlockHash = BDB.blockHeaderHash . obBlockData
 
 outputBlockToBlock :: OutputBlock -> Block
 outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}=
     BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions=otBaseTx <$> txs, BDB.blockBlockUncles=us}
 
-quarryBlockToOutputBlock :: Monad m => (SHA -> m (Maybe Word256)) -> BDB.Block -> m OutputBlock
+quarryBlockToOutputBlock :: Monad m => (Keccak256 -> m (Maybe Word256)) -> BDB.Block -> m OutputBlock
 quarryBlockToOutputBlock f BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} = do
   rtxs <- mapM wrapQuarryReceipt txs
   return OutputBlock
@@ -542,3 +542,22 @@ instance FromJSON OutputTx' where
 -- just end me fam
 instance Arbitrary JsonRpcCommand where
    arbitrary = JRCGetBalance <$> arbitrary <*> arbitrary <*> arbitrary
+
+-- has to go down here because of Lens TH shenanigans
+data BatchSeqLoopEvent = BatchSeqLoopEvent
+  { _timerFires  :: [PBFT.RoundNumber]
+  , _votesMade   :: [PBFT.CandidateReceived]
+  , _ingestEvents :: [IngestEvent]
+  }
+makeLenses ''BatchSeqLoopEvent
+
+emptyBatchSeqLoopEvent :: BatchSeqLoopEvent
+emptyBatchSeqLoopEvent = BatchSeqLoopEvent [] [] []
+
+batchSeqLoopEvents :: [SeqLoopEvent] -> BatchSeqLoopEvent
+batchSeqLoopEvents = foldr f emptyBatchSeqLoopEvent
+  where f s b = case s of
+          TimerFire r -> (timerFires %~ (r:)) b
+          VoteMade r -> (votesMade %~ (r:)) b
+          UnseqEvent r -> (ingestEvents %~ (r:)) b
+          WaitTerminated -> b

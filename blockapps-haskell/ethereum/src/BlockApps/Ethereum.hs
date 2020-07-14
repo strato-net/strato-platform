@@ -36,9 +36,7 @@ import           Crypto.HaskoinShim
 import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson             as Aeson
 import           Data.Bits
-import qualified Data.ByteArray         as ByteArray
 import           Data.ByteString        (ByteString)
-import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Char8  as Char8
 import           Data.Map.Strict        (Map)
 import qualified Data.Map.Strict        as M
@@ -65,7 +63,7 @@ import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
-import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Keccak256   hiding (rlpHash)
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
 
@@ -107,14 +105,14 @@ show256 = padZeros 64 . flip showHex ""
 
 
 instance RLPEncodable CodePtr where
-  rlpEncode (EVMCode codeHash) = rlpEncode $ shaKeccak256 codeHash
+  rlpEncode (EVMCode codeHash) = rlpEncode codeHash
   rlpEncode (SolidVMCode n ch) = RLP.Array [RLP.String $ Char8.pack "SolidVM"
                                            , rlpEncode n
-                                           , rlpEncode $ shaKeccak256 ch
+                                           , rlpEncode ch
                                            ]
 
-  rlpDecode (RLP.Array [RLP.String "SolidVM", n, ch]) = SolidVMCode <$> rlpDecode n <*> (keccak256SHA <$> rlpDecode ch)
-  rlpDecode ch = EVMCode . keccak256SHA <$> rlpDecode ch
+  rlpDecode (RLP.Array [RLP.String "SolidVM", n, ch]) = SolidVMCode <$> rlpDecode n <*> rlpDecode ch
+  rlpDecode ch = EVMCode <$> rlpDecode ch
 
 --------------------------------------------------------------------------------
 
@@ -231,9 +229,8 @@ rlpMsg
 
 rlpHash :: RLPEncodable x => x -> ByteString
 rlpHash
-  = ByteArray.convert
-  . digestKeccak256
-  . keccak256
+  = keccak256ToByteString
+  . hash
   . packRLP
   . rlpEncode
 
@@ -328,7 +325,7 @@ instance ToSchema CodeInfo where
   declareNamedSchema _ = return $
     NamedSchema (Just "CodeInfo")
       ( mempty
-        & type_ .~ SwaggerInteger
+        & type_ ?~ SwaggerInteger
         & example ?~ toJSON (CodeInfo "ContractBin" "ContractSrc" "ContractName")
         & description ?~ "Code Info" )
 
@@ -374,14 +371,14 @@ instance ToSchema AccountInfo where
   declareNamedSchema _ = return $
     NamedSchema (Just "AccountInfo")
       ( mempty
-        & type_ .~ SwaggerInteger
+        & type_ ?~ SwaggerInteger
         & example ?~ toJSON (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (20000000 :: Integer))
         & description ?~ "Account Info" )
 
 
 
 deriveAddress :: PubKey -> Address
-deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
+deriveAddress (PubKey val) = pubKey2Address val
 
 
 

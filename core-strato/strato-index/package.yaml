@@ -17,13 +17,13 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-milena
   - bytestring
   - conduit
   - containers
   - deepseq
   - format
   - hedis
+  - milena
   - monad-alter
   - persistent-postgresql
   - resourcet

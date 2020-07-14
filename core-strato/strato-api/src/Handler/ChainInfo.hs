@@ -3,6 +3,8 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Handler.ChainInfo where
 
 import           Data.Aeson
@@ -19,8 +21,9 @@ import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.ExtWord             (Word256)
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 import           Handler.Filters
 import           Import                         hiding (hash)
@@ -90,8 +93,8 @@ processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Us
     case accountCodeHashes S.\\ codeCodeHashes of
       s | s /= S.empty -> Left (i, "Each contract code hash in accountInfo must match a corresponding code hash in codeInfo.")
         | otherwise -> do
-          let SHA cid = rlpHash gen
-          return cid
+          let cid = rlpHash gen
+          return $ keccak256ToWord256 cid
 
 getChainR :: HandlerFor App Value
 getChainR = do
@@ -101,5 +104,5 @@ getChainR = do
       [] -> getChainInfos []
       [cid] -> if (T.unpack cid == "all")
                    then getChainInfos []
-                   else getChainInfos [fromHexText cid]
-      cids -> getChainInfos $ fmap fromHexText cids
+                   else getChainInfos [ChainId $ fromHexText cid]
+      cids -> getChainInfos $ fmap (ChainId . fromHexText) cids

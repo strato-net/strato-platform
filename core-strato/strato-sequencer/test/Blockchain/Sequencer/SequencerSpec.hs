@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Sequencer.SequencerSpec where
 
@@ -21,6 +23,7 @@ import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
+import qualified Control.Monad.Change.Modify         as Mod
 import           Control.Monad.IO.Class              (liftIO)
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
@@ -44,13 +47,15 @@ import           Blockchain.Sequencer
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.ChainHelpers
 import           Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.SHA
-import qualified Blockchain.Strato.Model.SHA         as SHA
+import           Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import qualified Data.ByteString.Char8               as C8
+import qualified Data.Set                            as S
 import qualified Network.Haskoin.Crypto     as HK
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
@@ -91,7 +96,7 @@ runPBFTTestM m = do
   gb <- makeGenesisBlock
   void $ withTemporaryDepBlockDB True gb m
 
-runPBFTTestMWithGenesis :: (SHA -> SequencerM a) -> IO ()
+runPBFTTestMWithGenesis :: (Keccak256 -> SequencerM a) -> IO ()
 runPBFTTestMWithGenesis m = do
   gb <- makeGenesisBlock
   let hsh = blockHash . ingestBlockToBlock $ gb
@@ -114,8 +119,8 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , depBlockDBPath        = fullPath
                                , seenTransactionDBSize = dedupWindow
                                , syncWrites            = False
-                               , blockstanbulBlockPeriod = 0
-                               , blockstanbulRoundPeriod = 10000000
+                               , blockstanbulBlockPeriod = BlockPeriod 0
+                               , blockstanbulRoundPeriod = RoundPeriod 10000000
                                , blockstanbulBeneficiary = vch
                                , blockstanbulVoteResps = rch
                                , blockstanbulTimeouts = tch
@@ -170,9 +175,8 @@ spec = do
             gb <- makeGenesisBlock
             inChain <- buildIngestChain gb 8 2
             outBlocks <- withTemporaryDepBlockDB False gb $ do
-              splitEvents (IEBlock <$> inChain)
-              oes <- drainVM
-              return [block | VmBlock block <- oes ]
+              BatchSeqEvent{..} <- runBatch $ splitEvents (IEBlock <$> inChain)
+              return [block | VmBlock block <- _toVm ]
             ret <- validateOrder gb outBlocks
             ret `shouldSatisfy` isValid
 
@@ -181,9 +185,8 @@ spec = do
             inChain <- buildIngestChain gb 8 2
             shuffled <- generate $ shuffle inChain
             outBlocks <- withTemporaryDepBlockDB False gb $ do
-              splitEvents (IEBlock <$> shuffled)
-              oes <- drainVM
-              return [block | VmBlock block <- oes ]
+              BatchSeqEvent{..} <- runBatch $ splitEvents (IEBlock <$> shuffled)
+              return [block | VmBlock block <- _toVm ]
             ret <- validateOrder gb outBlocks
             ret `shouldSatisfy` isValid
 
@@ -193,14 +196,12 @@ spec = do
             inTxSize <- generate $ choose (10, dedupWindow - 1)
             inTxs  <- generate $ vectorOf inTxSize arbitrary
             outTxs <- withTemporaryDepBlockDB False gb $ do
-              splitEvents (IETx ts <$> inTxs)
-              oes <- drainVM
-              return [t | t@VmTx{} <- oes]
+              BatchSeqEvent{..} <- runBatch $ splitEvents (IETx ts <$> inTxs)
+              return [t | t@VmTx{} <- _toVm]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn = feedBackOutputsToInput outTxs
             dedupedOut <- withTemporaryDepBlockDB False gb $ do
-              splitEvents dedupedIn
-              drainVM
+              _toVm <$> runBatch (splitEvents dedupedIn)
             length dedupedOut `shouldBe` length dedupedIn
 
         it ("should allow duplicate incoming transactions that come in after a specified window (" ++ show dedupWindow ++ " txs)") $ do
@@ -209,35 +210,21 @@ spec = do
             inTxSize <- generate $ choose (2 * dedupWindow, (3 * dedupWindow) - 1)
             inTxs  <- generate . vectorOf inTxSize $ suchThat arbitrary (isNothing . txChainId . itTransaction)
             outTxs <- withTemporaryDepBlockDB False gb $ do
-              splitEvents (IETx ts <$> inTxs)
-              oes <- drainVM
-              return [t | t@VmTx{} <- oes]
+              BatchSeqEvent{..} <- runBatch $ splitEvents (IETx ts <$> inTxs)
+              return [t | t@VmTx{} <- _toVm]
             -- ^^ in case any arbitrary Txs weren't unique
             let dedupedIn          = feedBackOutputsToInput outTxs
                 replicationsNeeded = (dedupWindow `quot` length dedupedIn) + 1
                 replicatedIn       = concat $ replicate replicationsNeeded dedupedIn
             dedupedOut <- withTemporaryDepBlockDB False gb $ do
-              splitEvents replicatedIn
-              oes <- drainVM
-              return [o | o@(VmTx _ _) <- oes]
+              BatchSeqEvent{..} <- runBatch $ splitEvents replicatedIn
+              return [o | o@(VmTx _ _) <- _toVm]
             length dedupedOut `shouldBe` length dedupedOut
 
     describe "SequencerM" $ do
-      -- TODO: Benchmark more tightly.
-      -- This is amazingly slow for how little it appears to be doing.
-      it "queues events" $ withMaxSuccess 5 $ property $ \evs1 evs2 -> runTestM $ do
-        drainVM `shouldReturn` []
-        drainP2P `shouldReturn` []
-        mapM_ markForVM evs1
-        mapM_ markForP2P evs2
-        drainVM `shouldReturn` evs1
-        drainVM `shouldReturn` []
-        drainP2P `shouldReturn` evs2
-        drainP2P `shouldReturn` []
-
       it "queues timeouts -- with retries" $ runTestM $ do
         let input = [20, 45, 30]
-        local (\cfg -> cfg{blockstanbulRoundPeriod=0.00005}) $
+        local (\cfg -> cfg{blockstanbulRoundPeriod = RoundPeriod 0.00005}) $
           mapM_ createNewTimer input
         liftIO $ threadDelay 10000 -- Who are you to judge?
         rnref <- gets _latestRoundNumber
@@ -272,9 +259,8 @@ spec = do
             liftIO $ API.uploadVote url vote `shouldReturn` Right ()
             voteList <- drainVotes
             voteList `shouldMatchList` [vote]
-            checkForVotes voteList
-            vmevs <- drainVM
-            vmevs `shouldContain` [VmVoteToMake { voteRecipient = testAddr, voteVotingDir = True, voteSender = addr}]
+            b1 <- runBatch $ checkForVotes voteList
+            _toVm b1 `shouldContain` [VmVoteToMake { voteRecipient = testAddr, voteVotingDir = True, voteSender = addr}]
             let esign' = signBenfInfo pvk (testAddr, False, 1)
                 esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
                 vote' = API.CandidateReceived{API.sender=addr
@@ -285,9 +271,8 @@ spec = do
             liftIO $ API.uploadVote url vote' `shouldReturn` Right ()
             voteList' <- drainVotes
             voteList' `shouldMatchList` [vote']
-            checkForVotes voteList'
-            vmevs' <- drainVM
-            vmevs' `shouldNotContain` [VmVoteToMake { voteRecipient = testAddr, voteVotingDir = False, voteSender = addr}]
+            b2 <- runBatch $ checkForVotes voteList'
+            _toVm b2 `shouldNotContain` [VmVoteToMake { voteRecipient = testAddr, voteVotingDir = False, voteSender = addr}]
             bctn <- getBlockstanbulContext
             let unwrapbct' = fromMaybe bct bctn
             _authSenders unwrapbct' `shouldBe` M.singleton addr 1
@@ -338,12 +323,10 @@ spec = do
                       (blockReceiptTransactions b')
                       (blockBlockUncles b')
             iev = IEBlock . blockToIngestBlock TO.Morphism $ b
-        checkForUnseq [iev]
-        p2pevs <- drainP2P
-        let pbftEvs = [m | P2pBlockstanbul (WireMessage _ m) <- p2pevs]
+        BatchSeqEvent{..} <- runBatch $ checkForUnseq [iev]
+        let pbftEvs = [m | P2pBlockstanbul (WireMessage _ m) <- _toP2p]
         map categorize pbftEvs `shouldMatchList` [PreprepareK, PrepareK, CommitK]
-        vmevs <- drainVM
-        vmevs `shouldContain` [VmCreateBlockCommand]
+        _toVm `shouldContain` [VmCreateBlockCommand]
 
       it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
@@ -357,11 +340,10 @@ spec = do
             blk4 = addCommitmentSeals [cseal] blk3
             iev = IEBlock . blockToIngestBlock TO.Morphism $ blk4
         putBlockstanbulContext ctx
-        checkForUnseq [iev]
-        drainP2P `shouldReturn` []
-        vmevs <- drainVM
-        vmevs `shouldContain` [VmCreateBlockCommand]
-        map outputBlockToBlock [oblk | VmBlock oblk <- vmevs] `shouldMatchList` [blk4]
+        BatchSeqEvent{..} <- runBatch $ checkForUnseq [iev]
+        _toP2p `shouldBe` []
+        _toVm `shouldContain` [VmCreateBlockCommand]
+        map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` [blk4]
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 1
 
@@ -381,11 +363,10 @@ spec = do
                               in b : mkBlkChn (n - 1) (blockHash b) (i + 1)
             blkChn = mkBlkChn (5 :: Int) h 1
         putBlockstanbulContext ctx
-        checkForUnseq $ ieBlk <$> reverse blkChn
-        drainP2P `shouldReturn` []
-        vmevs <- drainVM
-        vmevs `shouldContain` [VmCreateBlockCommand]
-        map outputBlockToBlock [oblk | VmBlock oblk <- vmevs] `shouldMatchList` blkChn
+        BatchSeqEvent{..} <- runBatch . checkForUnseq $ ieBlk <$> reverse blkChn
+        _toP2p `shouldBe` []
+        _toVm `shouldContain` [VmCreateBlockCommand]
+        map outputBlockToBlock [oblk | VmBlock oblk <- _toVm] `shouldMatchList` blkChn
         ctx' <- fromMaybe (error "context required for pbft") <$> getBlockstanbulContext
         _view ctx' `shouldBe` View 0 5
 
@@ -402,27 +383,27 @@ spec = do
 
       -- chain 1
       let cInfo1 = ChainInfo
-                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
                     Nothing
-          SHA chainId1 = SHA.rlpHash cInfo1
-          SHA chainHash1 = SHA.rlpHash cInfo1
-          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (chainId1, cInfo1))
+          chainId1 = Keccak256.rlpHash cInfo1
+          chainHash1 = Keccak256.rlpHash cInfo1
+          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId1, cInfo1))
       tx1 <- runIO . HK.withSource HK.devURandom $ do
         pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId1) Nothing pk
-      let hashTx1 = PrivateHashTX (unSHA $ txHash tx1) chainHash1
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId1) Nothing pk
+      let hashTx1 = PrivateHashTX (txHash tx1) chainHash1
 
       -- chain 2
       let cInfo2 = ChainInfo
-                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (SHA 0) 0 M.empty)
+                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
                     Nothing
-          SHA chainId2 = SHA.rlpHash cInfo2
-          SHA chainHash2 = SHA.rlpHash cInfo2
-          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (chainId2, cInfo2))
+          chainId2 = Keccak256.rlpHash cInfo2
+          chainHash2 = Keccak256.rlpHash cInfo2
+          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId2, cInfo2))
       tx2 <- runIO . HK.withSource HK.devURandom $ do
         pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just chainId2) Nothing pk
-      let hashTx2 = PrivateHashTX (unSHA $ txHash tx2) chainHash2
+        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId2) Nothing pk
+      let hashTx2 = PrivateHashTX (txHash tx2) chainHash2
 
       let b1' = makeBlockWithTransactions [hashTx1]
           blk1' h = Block (blockBlockData b1'){ blockDataParentHash = h
@@ -440,134 +421,114 @@ spec = do
           iev2' = IEBlock . blockToIngestBlock TO.Morphism . blk2'
 
       it "should forward a private transaction hash" . runTestM $ do
-        SHA th <- fmap SHA.hash . liftIO $ getEntropy 32
-        SHA ch <- fmap SHA.hash . liftIO $ getEntropy 32
+        th <- fmap Keccak256.hash . liftIO $ getEntropy 32
+        ch <- fmap Keccak256.hash . liftIO $ getEntropy 32
         let hashTx = PrivateHashTX th ch
-        checkForUnseq [IETx 0 (IngestTx TO.Morphism hashTx)]
-        vmevs <- drainVM
-        let txs = [tx | VmTx _ tx <- vmevs]
+        BatchSeqEvent{..} <- runBatch $ checkForUnseq [IETx 0 (IngestTx TO.Morphism hashTx)]
+        let txs = [tx | VmTx _ tx <- _toVm]
         map txType txs `shouldBe` [PrivateHash]
-        p2pevs <- drainP2P
-        let txs' = [tx | P2pTx tx <- p2pevs]
+        let txs' = [tx | P2pTx tx <- _toP2p]
         map txType txs' `shouldBe` [PrivateHash]
 
       it "should forward a private transaction hash only once" . runTestM $ do
-        SHA th <- fmap SHA.hash . liftIO $ getEntropy 32
-        SHA ch <- fmap SHA.hash . liftIO $ getEntropy 32
+        th <- fmap Keccak256.hash . liftIO $ getEntropy 32
+        ch <- fmap Keccak256.hash . liftIO $ getEntropy 32
         let hashTx = PrivateHashTX th ch
             ietx = IETx 0 (IngestTx TO.Morphism hashTx)
-        checkForUnseq [ietx,ietx]
-        vmevs <- drainVM
-        let txs = [tx | VmTx _ tx <- vmevs]
+        BatchSeqEvent{..} <- runBatch $ checkForUnseq [ietx,ietx]
+        let txs = [tx | VmTx _ tx <- _toVm]
         map txType txs `shouldBe` [PrivateHash]
-        p2pevs <- drainP2P
-        let txs' = [tx | P2pTx tx <- p2pevs]
+        let txs' = [tx | P2pTx tx <- _toP2p]
         map txType txs' `shouldBe` [PrivateHash]
 
       it "should create a PrivateHashTX for a private transaction" . runTestM $ do
-        checkForUnseq [chainDetails1]
-        checkForUnseq [IETx 0 (IngestTx TO.API tx1)]
-        vmevs <- drainVM
-        let txs = [tx | VmTx _ tx <- vmevs]
+        BatchSeqEvent{..} <- runBatch $ do
+          checkForUnseq [chainDetails1]
+          checkForUnseq [IETx 0 (IngestTx TO.API tx1)]
+        let txs = [tx | VmTx _ tx <- _toVm]
         map txType txs `shouldBe` [PrivateHash]
-        p2pevs <- drainP2P
-        let txs' = [tx | P2pTx tx <- p2pevs]
+        let txs' = [tx | P2pTx tx <- _toP2p]
         map txType txs' `shouldBe` [Message, PrivateHash]
 
       it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
-        checkForUnseq [chainDetails1]
-        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx1)]
-        checkForUnseq [iev]
-        p2pevs <- drainP2P
-        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        BatchSeqEvent{..} <- runBatch $ do
+          checkForUnseq [chainDetails1]
+          checkForUnseq [IETx 0 (IngestTx TO.Morphism tx1)]
+          checkForUnseq [iev]
+        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
-        vmevs <- drainVM
-        let obs = [b | VmBlock b <- vmevs]
+        let obs = [b | VmBlock b <- _toVm]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash],[Message]]
 
       it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
-        checkForUnseq [chainDetails1]
-        checkForUnseq [iev]
-        vmevs <- drainVM
-        let obs = [b | VmBlock b <- vmevs]
+        b1 <- runBatch $ do
+          checkForUnseq [chainDetails1]
+          checkForUnseq [iev]
+        let obs = [b | VmBlock b <- _toVm b1]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash]]
-        p2pevs <- drainP2P
-        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b1]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
-        checkForUnseq [IETx 0 (IngestTx TO.Morphism tx1)]
-        vmevs' <- drainVM
-        let obs' = [b | VmBlock b <- vmevs']
+        b2 <- runBatch $ checkForUnseq [IETx 0 (IngestTx TO.Morphism tx1)]
+        let obs' = [b | VmBlock b <- _toVm b2]
         map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message]]
 
       it "should not split up block when all chains are known" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
             ietx = IETx 0 . IngestTx TO.Morphism
-        checkForUnseq [chainDetails1, chainDetails2]
-        checkForUnseq [ietx tx1, ietx tx2]
-        checkForUnseq [iev]
-        p2pevs <- drainP2P
-        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        BatchSeqEvent{..} <- runBatch $ do
+          checkForUnseq [chainDetails1, chainDetails2]
+          checkForUnseq [ietx tx1, ietx tx2]
+          checkForUnseq [iev]
+        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash, PrivateHash]]
-        vmevs <- drainVM
-        let obs = [b | VmBlock b <- vmevs]
+        let obs = [b | VmBlock b <- _toVm]
         map (map txType . obReceiptTransactions) obs `shouldBe`
           [[PrivateHash,PrivateHash],[Message,Message]]
 
       it "should split up block when chain infos are delayed" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
             ietx = IETx 0 . IngestTx TO.Morphism
-        checkForUnseq [ietx tx1, ietx tx2]
-        checkForUnseq [iev]
-        p2pevs <- drainP2P
-        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        b1 <- runBatch $ do
+          checkForUnseq [ietx tx1, ietx tx2]
+          checkForUnseq [iev]
+        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b1]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash,PrivateHash]]
-        vmevs <- drainVM
-        let obs = [b | VmBlock b <- vmevs]
+        let obs = [b | VmBlock b <- _toVm b1]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash,PrivateHash]]
-        checkForUnseq [chainDetails1, chainDetails2]
-        vmevs' <- drainVM
-        let obs' = [b | VmBlock b <- vmevs']
+        b2 <- runBatch $ checkForUnseq [chainDetails1, chainDetails2]
+        let obs' = [b | VmBlock b <- _toVm b2]
         map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message],[Message]]
 
       it "should split up block when chain infos are staggered" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
             ietx = IETx 0 . IngestTx TO.Morphism
-        checkForUnseq [ietx tx1, ietx tx2, iev]
-        p2pevs <- drainP2P
-        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        b1 <- runBatch $ checkForUnseq [ietx tx1, ietx tx2, iev]
+        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b1]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash,PrivateHash]]
-        vmevs <- drainVM
-        let obs = [b | VmBlock b <- vmevs]
+        let obs = [b | VmBlock b <- _toVm b1]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash,PrivateHash]]
-        checkForUnseq [chainDetails1]
-        vmevs' <- drainVM
-        let obs' = [b | VmBlock b <- vmevs']
+        b2 <- runBatch $ checkForUnseq [chainDetails1]
+        let obs' = [b | VmBlock b <- _toVm b2]
         map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message]]
-        checkForUnseq [chainDetails2]
-        vmevs'' <- drainVM
-        let obs'' = [b | VmBlock b <- vmevs'']
+        b3 <- runBatch $ checkForUnseq [chainDetails2]
+        let obs'' = [b | VmBlock b <- _toVm b3]
         map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message]]
 
       it "should re-run blocks when chain info is delayed" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
             ietx = IETx 0 . IngestTx TO.Morphism
-        checkForUnseq [iev]
-        p2pevs <- drainP2P
-        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- p2pevs]
+        b1 <- runBatch $ checkForUnseq [iev]
+        let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b1]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
-        vmevs <- drainVM
-        let obs = [b | VmBlock b <- vmevs]
+        let obs = [b | VmBlock b <- _toVm b1]
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash]]
-        checkForUnseq [chainDetails1]
-        vmevs' <- drainVM
-        let obs' = [b | VmBlock b <- vmevs']
+        b2 <- runBatch $ checkForUnseq [chainDetails1]
+        let obs' = [b | VmBlock b <- _toVm b2]
         obs' `shouldBe` []
-        p2pevs' <- drainP2P
-        let gtxs' = [th | P2pGetTx th <- p2pevs']
-        gtxs' `shouldBe` [[txHash tx1]]
-        checkForUnseq [ietx tx1]
-        vmevs'' <- drainVM
-        let obs'' = [b | VmBlock b <- vmevs'']
+        txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
+        txHashes `shouldBe` S.singleton (txHash tx1)
+        b3 <- runBatch $ checkForUnseq [ietx tx1]
+        let obs'' = [b | VmBlock b <- _toVm b3]
         map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message]]

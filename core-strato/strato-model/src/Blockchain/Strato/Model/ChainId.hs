@@ -14,6 +14,7 @@ import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson.Encoding    as AesonEnc
 import qualified Data.Binary            as Binary
 import           Data.Either.Extra      (maybeToEither)
+import           Data.Hashable
 import           Data.RLP
 import           Data.Swagger
 import qualified Data.Text              as Text
@@ -30,6 +31,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 
 newtype ChainId = ChainId { unChainId :: Word256 }
   deriving (Eq, Ord, Generic, Bounded)
+  deriving newtype (Hashable)
   deriving anyclass (NFData, Binary.Binary)
 
 instance Show ChainId where show = chainIdString
@@ -96,7 +98,7 @@ instance ToParam (QueryParam "chainid" ChainId) where
 
 instance ToParamSchema ChainId where
   toParamSchema _ = mempty
-    & type_ .~ SwaggerString
+    & type_ ?~ SwaggerString
     & minimum_ ?~ fromInteger (toInteger . unChainId $ (minBound :: ChainId))
     & maximum_ ?~ fromInteger (toInteger . unChainId $ (maxBound :: ChainId))
     & format ?~ "hex string"
@@ -105,7 +107,7 @@ instance ToSchema ChainId where
   declareNamedSchema _ = return $
     NamedSchema (Just "ChainId")
       ( mempty
-        & type_ .~ SwaggerString
+        & type_ ?~ SwaggerString
         & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
         & description ?~ "Private chain id, 32 byte hex encoded string" )
 

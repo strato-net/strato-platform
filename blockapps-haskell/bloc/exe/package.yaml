@@ -11,6 +11,7 @@ dependencies:
   - blockapps-bloc22-api
   - blockapps-bloc22-server
   - blockapps-init
+  - cache
   - clock
   - common-log
   - hflags
@@ -23,6 +24,7 @@ dependencies:
   - servant-options
   - servant-server
   - text
+  - unliftio
   - wai
   - wai-cors
   - wai-extra

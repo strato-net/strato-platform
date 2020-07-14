@@ -12,11 +12,8 @@
 
 module Blockchain.Event (
   module Blockchain.EventModel,
-  All,
-  All2,
   handleEvents,
   handleGetChainDetails,
-  getBestKafkaBlockNumber,
   checkPeerIsMember' -- For testing
   ) where
 
@@ -44,7 +41,6 @@ import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.These
 import           Data.Time.Clock
-import           GHC.Exts                              (Constraint)
 import           MonadUtils
 import           Prelude                               hiding (lookup)
 import           System.Random
@@ -69,53 +65,33 @@ import           Blockchain.EventException
 import           Blockchain.ExtWord
 import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.SHA
-import           Blockchain.Stream.VMEvent
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Util
 import           Blockchain.Verification
 
 import           Blockchain.Sequencer.Event
-import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Model.Class
 
 import           Blockapps.Crossmon                    (recordMaxBlockNumber)
 import           Blockchain.Metrics
 
+import qualified Text.Colors                           as CL
 import           Text.Format
 import           Text.Tools
 
 import           Debug.Trace                           (trace)
 
--- TODO: These type families should be exposed by monad-alter, not defined here
---       but merging in the latest monad-alter will take some additional work
-type family All' (k :: * -> (* -> *) -> Constraint) (ts :: [*]) (m :: * -> *) :: Constraint where
-  All' k (t : '[]) m = k t m
-  All' k (t ': ts) m = (k t m, All' k ts m)
-
-type family All (ks :: [* -> (* -> *) -> Constraint]) (ts :: [*]) (m :: * -> *) :: Constraint where
-  All (k ': '[]) ts m = All' k ts m
-  All (k ': ks) ts m = (All' k ts m, All ks ts m)
-
-type family All2' (k :: * -> * -> (* -> *) -> Constraint) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
-  All2' k ('(t1, t2) : '[]) m = k t1 t2 m
-  All2' k ('(t1, t2) ': ts) m = (k t1 t2 m, All2' k ts m)
-
-type family All2 (ks :: [* -> * -> (* -> *) -> Constraint]) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
-  All2 (k ': '[]) ts m = All2' k ts m
-  All2 (k ': ks) ts m = (All2' k ts m, All2 ks ts m)
-
 setTitleAndProduceBlocks :: ( MonadLogger m
                             , MonadIO m
-                            , HasVMEventsSink m
+                            , Stacks Block m
                             ) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
-    lastVMEvents <- liftIO $ fetchLastVMEvents 200
-    let lastBlockHashes = [blockHash b | ChainBlock b <- lastVMEvents]
+    lastBlockHashes <- map blockHash <$> takeStack (Proxy @Block) 200
     let newBlocks = filter (not . (`elem` lastBlockHashes) . blockHash) blocks
-    sink <- getVMEventsSink
     unless (null newBlocks) $ do
         liftIO . setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
-        sink . map ChainBlock $ newBlocks
+        pushStack newBlocks
     return $ length newBlocks
 
 -- drop every n-th element from the list
@@ -142,48 +118,19 @@ yieldR = yield . Right
 yieldL :: Monad m => e -> ConduitT i (Either e a) m ()
 yieldL = yield . Left
 
-handleEvents :: ( HasVMEventsSink m
-                , MonadIO m
-                , MonadResource m
-                , MonadLogger m
-                , All '[Accessible, Modifiable]
-                    '[ ActionTimestamp
-                     , [BlockData]
-                     , RemainingBlockHeaders
-                     , PeerAddress
-                     ] m
-                , All '[Accessible]
-                    '[ (SK.UnseqSink m)
-                     , MaxReturnedHeaders
-                     , ConnectionTimeout
-                     ] m
-                , All '[Modifiable]
-                    '[ BestBlock
-                     , WorldBestBlock
-                     ] m
-                , All2 '[Selectable]
-                    '[ '(Integer, Canonical BlockData)
-                     , '(IPAddress, IPChains)
-                     , '(OrgId, OrgIdChains)
-                     , '(SHA, ChainTxsInBlock)
-                     , '(Word256, ChainMembers)
-                     , '(Word256, ChainInfo)
-                     , '(SHA, Private (Word256, OutputTx))
-                     ] m
-                , All2 '[Alters]
-                    '[ '(SHA, BlockData)
-                     , '(SHA, OutputBlock)
-                     ] m
-                ) => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
+handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
     MsgEvt Ping     -> yieldR Pong
 
     MsgEvt (Transactions txs) -> do
+        $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s)"
         lift stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
-        lift $ SK.emitKafkaTransactions txo txs
+        ts <- liftIO getCurrentMicrotime
+        let ingestTxs = IETx ts . IngestTx txo <$> txs
+        yieldL $ ToUnseq ingestTxs
 
     MsgEvt (NewBlock block' tdiff) -> do
         lift stampActionTimestamp
@@ -205,7 +152,8 @@ handleEvents peer = awaitForever $ \case
             syncFetch Forward fetchNumber
           Just _ -> do
             lift . void $ setTitleAndProduceBlocks [block']
-            void . lift $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer) block'
+            let ingestBlock = IEBlock $ blockToIngestBlock (Origin.PeerString $ peerString peer) block'
+            yieldL $ ToUnseq [ingestBlock]
 
     MsgEvt (NewBlockHashes _) -> do
         lift stampActionTimestamp
@@ -296,7 +244,7 @@ handleEvents peer = awaitForever $ \case
             lift stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
-    -- todo: e.g. if they have bodies for SHAs [1, 2, 4, 7, 8, 9] and you request [1..10] you'll get
+    -- todo: e.g. if they have bodies for Keccak256s [1, 2, 4, 7, 8, 9] and you request [1..10] you'll get
     -- todo: bodies [1, 2, 4, 7, 8, 9] and have to correlate the bodies to the headers yourself
     -- todo: it doesn't seem like we support that behavior very well yet, so we'll just stop sending
     -- todo: blocks once we can't find one. this way we can always correlate header to body in
@@ -316,11 +264,11 @@ handleEvents peer = awaitForever $ \case
           yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
           ptxs <- fmap M.elems . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) pshas
           unless (null ptxs) . yieldR . Transactions $ morphTx  . snd . unPrivate <$> ptxs
-        where getUntilMissing :: ( (SHA `Selectable` ChainTxsInBlock) m
+        where getUntilMissing :: ( (Keccak256 `Selectable` ChainTxsInBlock) m
                                  , (Word256 `Selectable` ChainMembers) m
-                                 , (SHA `Alters` OutputBlock) m
+                                 , (Keccak256 `Alters` OutputBlock) m
                                  )
-                              => [SHA] -> DL.DList OutputBlock -> DL.DList SHA -> m ([OutputBlock],[SHA])
+                              => [Keccak256] -> DL.DList OutputBlock -> DL.DList Keccak256 -> m ([OutputBlock],[Keccak256])
               getUntilMissing []     bodies pshas = return (DL.toList bodies, DL.toList pshas)
               getUntilMissing (h:hs) bodies pshas = lookup (Proxy @OutputBlock) h >>= \case
                   Nothing   -> return (DL.toList bodies, DL.toList pshas)
@@ -353,7 +301,7 @@ handleEvents peer = awaitForever $ \case
         recordMaxBlockNumber "p2p_block_bodies" . maximum $ map blockDataNumber headers
         let blocks' = zipWith createBlockFromHeaderAndBody (morphBlockHeader <$> headers) bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
-        lift . forM_ blocks' $ SK.emitKafkaBlock (Origin.PeerString $ peerString peer)
+        yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
         rHeaders <- lift getRemainingBHeaders
         let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
         lift $ putBlockHeaders neededHeaders
@@ -366,19 +314,20 @@ handleEvents peer = awaitForever $ \case
             else do
                 yieldR $ GetBlockBodies (map blockHeaderHash neededHeaders)
                 lift stampActionTimestamp
-    MsgEvt (Blockstanbul wm) -> lift $ do
-      stampActionTimestamp
-      setPeerAddrIfUnset $ blockstanbulSender wm
-      peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
-      $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-      SK.emitBlockstanbulMsg wm
+    MsgEvt (Blockstanbul wm) -> do
+      lift $ do
+        stampActionTimestamp
+        setPeerAddrIfUnset $ blockstanbulSender wm
+        peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
+        $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
+      yieldL $ ToUnseq [IEBlockstanbul wm]
 
     -- private chains
     MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'
 
     MsgEvt (ChainDetails chpairs) -> do
       lift stampActionTimestamp
-      lift $ mapM_ (uncurry (SK.emitKafkaChainDetails (Origin.PeerString $ peerString peer))) chpairs
+      yieldL . ToUnseq $ IEGenesis . IngestGenesis (Origin.PeerString $ peerString peer) <$> chpairs
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
     MsgEvt (GetTransactions trHashes) -> do
@@ -432,7 +381,7 @@ handleEvents peer = awaitForever $ \case
       P2pGetChain chainIds -> yieldR $ GetChainDetails chainIds
       P2pGetTx shas -> yieldR $ GetTransactions shas
       P2pNewChainMember cId _ _ -> do
-        let formatted = format $ SHA cId
+        let formatted = CL.yellow $ format cId
         $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "New member added to chain " ++ formatted
         mems <- lift $ selectWithDefault (Proxy @ChainMembers) cId
         when (checkPeerIsMember peer mems) $ do
@@ -511,7 +460,7 @@ handleGetChainDetails peer cids' = do
 
   unless (null filteredPairs) $ do
     cInfos <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) cids
-    yieldR $ ChainDetails cInfos
+    for_ cInfos $ yieldR . ChainDetails . (:[])
     lift stampActionTimestamp
     $logInfoS "handleGetChainDetails" $ T.pack $ "the following ChainIds were returned " ++
       (intercalate "\n" $ formatChainId . Just . fst <$> cInfos)

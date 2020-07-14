@@ -17,8 +17,11 @@ import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Except
 import qualified Data.Aeson                         as JSON
 import qualified Data.ByteString.Lazy.Char8         as Lazy.Char8
+import           Data.Cache
 import           Data.Foldable
 import qualified Data.HashMap.Lazy                  as HashMap
+import           Data.Int                           (Int32)
+import           Data.Map.Strict                    (Map)
 import           Data.Maybe                         (fromMaybe)
 import           Data.Pool (Pool, withResource)
 import           Data.Profunctor.Product.Default
@@ -36,7 +39,16 @@ import           Text.Printf
 
 import           UnliftIO                           hiding (Handler(..))
 
+import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Logging
+import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Nonce
+
+data Should a = Don't a | Do a
+data Compile = Compile
+data CacheNonce = CacheNonce
 
 type Bloc = ReaderT BlocEnv (LoggingT IO)
 
@@ -51,7 +63,7 @@ toUserError msg = flip catch (\(_ :: SomeException) -> throwIO $ UserError msg)
 -- I am not sure if the logs should just print out the raw errors, or if we should pretty them up a bit.  I'll add this function for now, we can toy with it both ways.
 
 formatError::BlocError->String
-formatError (StratoError (FailureResponse Response{responseBody=e})) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
+formatError (StratoError (FailureResponse _ Response{responseBody=e})) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
 formatError e = show e
 
 
@@ -72,18 +84,21 @@ blocError err = do
 data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
 
 data BlocEnv = BlocEnv
-  { urlStrato       :: BaseUrl
-  , urlVaultWrapper :: BaseUrl
-  , httpManager     :: Manager
-  , dbPool          :: Pool Connection
-  , deployMode      :: DeployMode
-  , stateFetchLimit :: Integer
+  { urlStrato          :: BaseUrl
+  , urlVaultWrapper    :: BaseUrl
+  , httpManager        :: Manager
+  , dbPool             :: Pool Connection
+  , deployMode         :: DeployMode
+  , stateFetchLimit    :: Integer
+  , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
+  , globalSourceCache  :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
+  , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
 
 data BlocError
-  = StratoError ServantError
-  | CirrusError ServantError
-  | VaultWrapperError ServantError
+  = StratoError ClientError
+  | CirrusError ServerError
+  | VaultWrapperError ClientError
   | DBError Text
   | UserError Text
   | CouldNotFind Text
@@ -126,10 +141,10 @@ enterBloc env x = Handler $ do
     Right a -> return a
     Left e -> throwE $ reThrowError e
   where
-    reThrowError :: BlocError -> ServantErr
+    reThrowError :: BlocError -> ServerError
     reThrowError
       = \case
-          StratoError (FailureResponse Response{..}) 
+          StratoError (FailureResponse _ Response{..}) 
             | responseStatusCode == status404 ->
                 err404{errBody = JSON.encode $ unlines
                    [
@@ -160,7 +175,7 @@ enterBloc env x = Handler $ do
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
-          VaultWrapperError (FailureResponse Response{..}) | responseStatusCode == status503 ->
+          VaultWrapperError (FailureResponse _ Response{..}) | responseStatusCode == status503 ->
             err503{errBody = responseBody}
                                                            | statusIsClientError responseStatusCode ->
             err400{errBody = responseBody } 

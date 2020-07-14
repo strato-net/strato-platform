@@ -41,9 +41,7 @@ import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 
 
 import           Control.Lens
-import           Control.Monad.Change.Modify        (Accessible(..), Proxy(..))
 import           Control.Monad.State
-import           Control.Monad.Trans.Resource
 
 import           Blockchain.Constants
 import           Blockchain.Data.BlockHeader
@@ -57,7 +55,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 
 import           Blockchain.Strato.Model.Class
@@ -68,14 +66,14 @@ instance Pretty B.ByteString where
   pretty = blue . text . BC.unpack . B16.encode
 
 blk2BlkDataRef :: Block
-               -> SHA
+               -> Keccak256
                -> Integer
                -> Bool
                -> BlockDataRef
 blk2BlkDataRef b hash' difficulty' makeHashOne =
   BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
-      hash'' = if makeHashOne then SHA 1 else hash'
+      hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
       bd = blockBlockData b
       uncles = blockBlockUncles b
       pH = blockDataParentHash bd
@@ -95,12 +93,10 @@ blk2BlkDataRef b hash' difficulty' makeHashOne =
       mH = blockDataMixHash bd
 
 getBlock :: HasSQLDB m
-         => SHA
+         => Keccak256
          -> m (Maybe BlockDataRef)
 getBlock h = do
-  db <- access (Proxy @SQLDB)
-  entBlkL <- runResourceT $
-    SQL.runSqlPool actions db
+  entBlkL <- sqlQuery actions
 
   case entBlkL of
     []  -> return Nothing
@@ -145,9 +141,7 @@ putBlocks :: HasSQLDB m
           -> m [Key BlockDataRef]
 putBlocks blocksAndDifficulties makeHashOne = do
   let blocksHashesAndDifficulties = (\(b,d) -> (b, blockHash b, d)) <$> blocksAndDifficulties
-  db <- access (Proxy @SQLDB)
-  runResourceT $
-    flip SQL.runSqlPool db $
+  sqlQuery $
     forM blocksHashesAndDifficulties $ \(b, hash', diff) -> do
       insertTXIfNew' (BlockHash $ blockHash b) (Just $ blockDataNumber $ blockBlockData b) (blockReceiptTransactions b)
 

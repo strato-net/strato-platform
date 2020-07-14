@@ -15,7 +15,7 @@ module BlockApps.Strato.Types
   , Address (..)
   , stringAddress
   , ChainId (..)
-  , Keccak256 (..)
+  , Keccak256
   , WithNext (..)
   , TransactionType (..)
   , Transaction (..)
@@ -41,13 +41,14 @@ module BlockApps.Strato.Types
   ) where
 
 import           Control.Applicative
-import           Control.Lens                 (mapped, (&), (.~), (?~))
+import           Control.Lens                 (mapped, (&), (?~))
 import           Control.Monad
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types
 import qualified Data.Binary                  as Binary
+import qualified Data.ByteString.Lazy         as BL
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
@@ -119,7 +120,7 @@ instance ToSchema Transaction where
       ex :: Transaction
       ex  = Transaction
           { transactionTransactionType = Transfer
-          , transactionHash            = keccak256 "989ad6524e83e1a38b485bb898d27abbac65fc33905c3d3a2fd41c5bb91c3fc8"
+          , transactionHash            = hash "989ad6524e83e1a38b485bb898d27abbac65fc33905c3d3a2fd41c5bb91c3fc8"
           , transactionGasLimit        = Strung 90000000
           , transactionCodeOrData      = Just ""
           , transactionNonce           = Strung 123
@@ -151,10 +152,10 @@ instance ToSchema Account where
           { accountAddress        = Address 0xdeadbeef
           , accountNonce          = Nonce 42
           , accountBalance        = Strung 123
-          , accountContractRoot   = keccak256 "123"
+          , accountContractRoot   = hash "123"
           , accountKind           = "AddressStateRef"
           , accountCode           = "60606040526000357c01000000000000000000000000000000000000000000000000000000009004806360fe47b11460415780636d4ce63c14605757603f565b005b605560048080359060200190919050506078565b005b606260048050506086565b6040518082815260200191505060405180910390f35b806000600050819055505b50565b600060006000505490506094565b9056"
-          , accountCodeHash       = keccak256 "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
+          , accountCodeHash       = hash "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
           , accountChainId        = Nothing
           , accountLatestBlockNum = 23
           }
@@ -168,7 +169,7 @@ instance ToSchema Word160 where
 instance ToSchema AbiBin
 
 instance ToParamSchema Word256 where
-  toParamSchema _ = mempty & type_ .~ SwaggerString
+  toParamSchema _ = mempty & type_ ?~ SwaggerString
 
 instance ToHttpApiData Word256 where
   toUrlPiece = Text.pack . ("0x" ++ ) . flip showHex ""
@@ -264,7 +265,7 @@ instance ToSample PostTransaction where
 
 defaultPostTx :: PostTransaction -- TODO: Make this a real default
 defaultPostTx = PostTransaction
-    { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
+    { posttransactionHash = hash $ BL.toStrict (Binary.encode @ Integer 1)
     , posttransactionGasLimit = 21000
     , posttransactionCodeOrData = ""
     , posttransactionGasPrice = 50000000000
@@ -483,8 +484,8 @@ instance ToSchema TransactionResult where
     where ex = exampleTxResult
 
 exampleTxResult :: TransactionResult
-exampleTxResult = TransactionResult (keccak256 "blockHask")
-                                    (keccak256 "txhash")
+exampleTxResult = TransactionResult (hash "blockHask")
+                                    (hash "txhash")
                                     "I'm a tx result message"
                                     "I'm a tx result response"
                                     "tx trace"

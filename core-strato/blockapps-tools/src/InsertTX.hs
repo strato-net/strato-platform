@@ -4,7 +4,6 @@ module InsertTX where
 
 import           Control.Monad
 import           Blockchain.Output
-import           Control.Monad.Trans.Resource
 import qualified Data.Binary                  as BN
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Lazy         as BL
@@ -16,7 +15,7 @@ import           System.FilePath
 import           Blockchain.Data.Code
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
-import           Blockchain.DB.SQLDB          (createPostgresqlPool')
+import           Blockchain.DB.SQLDB          (runSqlPool, createPostgresqlPool)
 import           Blockchain.EthConf
 
 retrievePrvKey :: FilePath -> IO (Maybe H.PrvKey)
@@ -28,6 +27,6 @@ insertTX :: IO ()
 insertTX = do
   Just prvKey <- retrievePrvKey $ "config" </> "priv"
   theTime <- getCurrentTime
-  db <- runNoLoggingT $ createPostgresqlPool' connStr 20
+  db <- runNoLoggingT $ createPostgresqlPool connStr 20
   tx <- H.withSource H.devURandom $ createContractCreationTX 0 1 1000000 0 (Code $ B.pack [0x60, 0, 0x56]) Nothing prvKey
-  runResourceT $ flip SQL.runSqlPool db $ void $ SQL.insert (txAndTime2RawTX Direct tx (-1) theTime)
+  flip runSqlPool db $ void $ SQL.insert (txAndTime2RawTX Direct tx (-1) theTime)

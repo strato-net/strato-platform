@@ -37,7 +37,7 @@ import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
 import Blockchain.Output
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import qualified Data.NibbleString as N
 import qualified SolidVM.Model.Storable as MS
 
@@ -58,9 +58,9 @@ makeLenses ''CachedStorage
 type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
 
 instance HasMemRawStorageDB StorM where
-  getMemRawStorageTxDB = liftM2 (,) (use sdb) (use stx)
+  getMemRawStorageTxDB = use stx
   putMemRawStorageTxMap = assign stx
-  getMemRawStorageBlockDB = liftM2 (,) (use sdb) (use sbs)
+  getMemRawStorageBlockDB = use sbs
   putMemRawStorageBlockMap = assign sbs
 
 instance HasMemAddressStateDB StorM where
@@ -147,7 +147,7 @@ storageSpec = do
       flushMemStorageDB
       use stx `shouldReturn` M.empty
       use sbs `shouldReturn` M.empty
-      let toKey = N.EvenNibbleString . keccak256 . word256ToBytes
+      let toKey = N.EvenNibbleString . keccak256ToByteString . hash . word256ToBytes
       kvs <- getAllStorageKeyVals' 0x1
       kvs `shouldMatchList` [ (toKey 2, 3)
                             , (toKey 3, 6)

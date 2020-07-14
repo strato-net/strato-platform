@@ -5,7 +5,7 @@
 module Blockchain.Database.MerklePatricia.Internal (
   Key,
   Val,
-  MPDB(..),
+  StateDB(..),
   StateRoot(..),
   NodeData(..),
   openMPDB,
@@ -41,7 +41,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.MPDB
 import           Blockchain.Database.MerklePatricia.NodeData
 import           Blockchain.Database.MerklePatricia.StateRoot
-import           Blockchain.Strato.Model.SHA                  (keccak256)
+import           Blockchain.Strato.Model.Keccak256            (hash, keccak256ToByteString)
 import           Text.Format
 
 unsafePutKeyVal :: (StateRoot `Alters` NodeData) m
@@ -68,7 +68,7 @@ unsafeDeleteKey sr key = do
 
 keyToSafeKey :: N.NibbleString -> N.NibbleString
 keyToSafeKey key =
-  N.EvenNibbleString $ keccak256 keyByteString
+  N.EvenNibbleString $ keccak256ToByteString $ hash keyByteString
   where
     N.EvenNibbleString keyByteString = key
 
@@ -217,7 +217,7 @@ getNodeData (PtrRef sr) =
 putNodeData :: (StateRoot `Alters` NodeData) m => NodeData -> m StateRoot
 putNodeData nd = do
   let bytes = rlpSerialize $ rlpEncode nd
-      ptr = StateRoot $ keccak256 bytes
+      ptr = StateRoot $ keccak256ToByteString $ hash bytes
   A.insert Proxy ptr nd
   return ptr
 

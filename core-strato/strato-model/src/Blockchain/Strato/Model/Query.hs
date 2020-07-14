@@ -1,12 +1,12 @@
 module Blockchain.Strato.Model.Query where
 
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 data BlockQuery = GetBlocksByNumber [Int]
-                | GetBlocksByHash [SHA]
+                | GetBlocksByHash [Keccak256]
 
 
 data HeaderQuery = GetHeadersByNumbers [Int]
-                 | GetHeadersByHash [SHA]
+                 | GetHeadersByHash [Keccak256]
 
-data TransactionQuery = GetTransactionsByBlockHash SHA
+data TransactionQuery = GetTransactionsByBlockHash Keccak256

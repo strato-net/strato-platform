@@ -21,8 +21,7 @@ import           Data.String
 
 import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON    ()
-import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors as CL
 import           Text.Format
 
@@ -57,10 +56,10 @@ instance RLPSerializable StateRoot where
 
 -- | The stateRoot of the empty database.
 emptyTriePtr::StateRoot
-emptyTriePtr = StateRoot $ keccak256 $ rlpSerialize $ rlpEncode (0::Integer)
+emptyTriePtr = StateRoot $ keccak256ToByteString $ hash $ rlpSerialize $ rlpEncode (0::Integer)
 
-sha2StateRoot::SHA->StateRoot
-sha2StateRoot (SHA x) = StateRoot $ word256ToBytes x
+sha2StateRoot::Keccak256->StateRoot
+sha2StateRoot x = StateRoot $ keccak256ToByteString x
 
 unboxStateRoot :: StateRoot -> B.ByteString
 unboxStateRoot (StateRoot b) = b

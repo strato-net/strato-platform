@@ -1,7 +1,7 @@
 name:                core-api
 
 dependencies:
-- base >= 4.7 && < 5
+- base
 - persistent
 - persistent-postgresql
 - servant-server
@@ -21,6 +21,7 @@ library:
   - blockapps-util
   - bytestring
   - clock
+  - conduit
   - containers
   - deepseq
   - directory
@@ -29,17 +30,25 @@ library:
   - extra
   - filepath
   - format
+  - hflags
   - http-api-data
+  - lens
   - monad-alter
   - monad-logger
   - mtl
   - process
+  - QuickCheck
   - seqevents
+  - servant-client
+  - servant-client-core
   - servant-multipart
+#  - servant-swagger-tags
   - strato-model
+  - swagger2
   - template-haskell
   - text
   - transformers
+  - unliftio
 
 executables:
   core-api:
@@ -50,8 +59,25 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - aeson
+    - bytestring
+    - blockapps-init
+    - blockapps-util
     - core-api
+    - format
+    - hflags
+    - http-types
+    - insert-ordered-containers
+    - lens
     - monad-logger
+    - servant-multipart
+    - servant-swagger
+    - servant-swagger-ui
+    - swagger2
+    - transformers
+    - unliftio
+    - wai
     - wai-cors
     - wai-extra
+    - wai-middleware-prometheus
     - warp

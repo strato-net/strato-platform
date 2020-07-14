@@ -23,6 +23,7 @@ import           Data.Time
 import qualified Data.Sequence                as S
 import           GHC.Generics
 import           Test.QuickCheck
+import           Test.QuickCheck.Instances.Text()
 
 import           Blockchain.MiscArbitrary()
 import           Blockchain.MiscJSON()
@@ -31,7 +32,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord (Word256, bytesToWord256)
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 
 data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData)
 
@@ -150,10 +151,10 @@ instance FromJSON ActionData where
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Action = Action
-  { _actionBlockHash          :: SHA
+  { _actionBlockHash          :: Keccak256
   , _actionBlockTimestamp     :: UTCTime
   , _actionBlockNumber        :: Integer
-  , _actionTransactionHash    :: SHA
+  , _actionTransactionHash    :: Keccak256
   , _actionTransactionChainId :: Maybe Word256
   , _actionTransactionSender  :: Address
   , _actionData               :: Map Address ActionData

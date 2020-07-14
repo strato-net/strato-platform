@@ -15,7 +15,7 @@ import           Data.Word
 
 import           Blockchain.Strato.Mining.Ethash.Constants
 import           Blockchain.Strato.Mining.Ethash.Util
-import           Blockchain.Strato.Model.SHA               (keccak512)
+import           Blockchain.Strato.Model.Keccak512            (keccak512)
 
 type Cache = A.UArray (Word32, Word32) Word32
 

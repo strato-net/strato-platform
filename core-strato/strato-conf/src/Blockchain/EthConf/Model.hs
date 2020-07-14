@@ -1,3 +1,7 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+{-# OPTIONS -fno-warn-deprecations #-}
+
 module Blockchain.EthConf.Model where
 -- These are the aspects EthConf that don't require unsafePerformIO
 
@@ -7,6 +11,7 @@ import           Crypto.Random
 import           Data.Bifunctor
 import qualified Data.ByteString            as B
 import qualified Data.ByteString.Char8      as C8
+import           Data.Swagger               hiding (port, host)
 import           Data.Ratio
 import           Data.Yaml
 import qualified Database.PostgreSQL.Simple as PS (ConnectInfo(..), postgreSQLConnectionString)
@@ -86,6 +91,10 @@ data EthUniqueId =
         genesisHash :: String,
         networkId   :: Int
     } deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+instance ToSchema EthUniqueId where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "EthUniqueId") mempty
 
 data LevelDBConf =
     LevelDBConf {

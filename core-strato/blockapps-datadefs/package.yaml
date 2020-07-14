@@ -13,6 +13,7 @@ dependencies:
   - persistent
   - persistent-template
   - strato-model
+  - swagger2
   - text
   - time
   - transformers

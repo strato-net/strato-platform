@@ -32,7 +32,7 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.Voting
 import Blockchain.ExtendedECDSA
-import Blockchain.Strato.Model.SHA
+import Blockchain.Strato.Model.Keccak256
 import qualified Network.Haskoin.Crypto as HK
 import Text.Format
 
@@ -52,9 +52,9 @@ data BlockstanbulContext = BlockstanbulContext {
   -- The total group of participants
   , _validators :: S.Set Address
   -- Validators who have sent us a prepare for this round
-  , _prepared :: M.Map Address SHA
+  , _prepared :: M.Map Address Keccak256
   -- Validators who have sent us a commitment seal for this round
-  , _committed :: M.Map Address (SHA, ExtendedSignature)
+  , _committed :: M.Map Address (Keccak256, ExtendedSignature)
   -- We've already sent out a commit message to indicate a transition
   -- to prepared
   , _hasPreprepared :: Bool
@@ -72,7 +72,7 @@ data BlockstanbulContext = BlockstanbulContext {
   , _authSenders :: M.Map Address Int
   -- TODO(tim): Initialize _lastParent with the genesis block and
   -- make it required
-  , _lastParent :: Maybe SHA
+  , _lastParent :: Maybe Keccak256
 }
 
 makeLenses ''BlockstanbulContext
@@ -193,7 +193,7 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
       unless ret . raiseInProd $ "Rejecting Commit; bad seal"
     _ -> return () -- No specific auth for any other messages
 
-assertChainConsistency :: HK.Word256 -> Maybe SHA -> Block -> Either T.Text ()
+assertChainConsistency :: HK.Word256 -> Maybe Keccak256 -> Block -> Either T.Text ()
 assertChainConsistency seqNo wantParent blk = do
   let blkData = blockBlockData blk
       blkNo = fromIntegral . blockDataNumber $ blkData
@@ -208,7 +208,7 @@ assertChainConsistency seqNo wantParent blk = do
 generateNonceMap :: [Address] -> M.Map Address Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
 
-hasSameHash :: (StateMachineM m) => SHA -> m Bool
+hasSameHash :: (StateMachineM m) => Keccak256 -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
 
 roundChange :: (StateMachineM m) => ConduitM InEvent OutEvent m ()
@@ -401,21 +401,26 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             yield . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
-      rs <- roundChanged <%= M.alter (Just . S.insert (sender auth) . fromMaybe S.empty) rn
-      total <- poolSize
-      sentRN <- use pendingRound
-      let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
-      when (3 * sameRNCount > total && Just rn > sentRN) $ do
-        pendingRound .= Just rn
-        pk <- use prvkey
-        $logInfoS "blockstanbul/roundchange" "agreed change"
-        yield $ signMessage pk (RoundChange vn)
-      when (3 * sameRNCount > 2 * total) $ do
-        next <- use pendingRound
-        case next of
-          Nothing -> error "TODO(tim): a round was voted on without existing"
-          Just r -> nextRound (Round r)
-      return ()
+      mSigners <- use $ roundChanged . at rn
+      case S.member (sender auth) <$> mSigners of
+        Just True -> return ()
+        _ -> do
+          rs <- roundChanged <%= M.alter (Just . S.insert (sender auth) . fromMaybe S.empty) rn
+          total <- poolSize
+          sentRN <- use pendingRound
+          let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
+          when (3 * sameRNCount > total && Just rn > sentRN) $ do
+            pendingRound .= Just rn
+            pk <- use prvkey
+            $logInfoS "blockstanbul/roundchange" "agreed change"
+            yield $ signMessage pk (RoundChange vn)
+          when (3 * sameRNCount > 2 * total) $ do
+            next <- use pendingRound
+            case next of
+              Nothing -> error "TODO(tim): a round was voted on without existing"
+              Just r -> nextRound (Round r)
+          yield $ OMsg auth (RoundChange vn)
+          return ()
     Timeout r' -> do
       case r' `compare` _round v of
         LT ->

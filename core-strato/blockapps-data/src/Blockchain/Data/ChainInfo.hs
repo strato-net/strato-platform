@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE StrictData               #-}
+{-# LANGUAGE TypeApplications         #-}
 
 module Blockchain.Data.ChainInfo
   ( ChainInfo (..)
@@ -26,7 +27,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON()
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.TypeLits
 import           Blockchain.Util
 
@@ -37,6 +38,7 @@ import qualified Data.ByteString.Char8                as C8
 import           Data.Data
 import qualified Data.JsonStream.Parser               as JS
 import qualified Data.Map.Strict                      as M
+import           Data.Swagger                         hiding (Format, format)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
 import qualified Data.Vector                          as V
@@ -46,6 +48,7 @@ import qualified GHC.Generics                         as GHCG
 import           Numeric                              (showHex)
 import           Text.Format
 
+import qualified Text.Colors                          as CL
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
@@ -188,8 +191,8 @@ instance Format ChainSignature where
   format (ChainSignature r s v) = unlines
     [ "ChainSignature"
     , "--------------"
-    , tab $ "r: " ++ format (SHA r)
-    , tab $ "s: " ++ format (SHA s)
+    , tab $ "r: " ++ CL.yellow (format r)
+    , tab $ "s: " ++ CL.yellow (format s)
     , tab $ "v: " ++ showHex v "0x"
     ]
 
@@ -227,10 +230,32 @@ data UnsignedChainInfo = UnsignedChainInfo
   , codeInfo       :: [CodeInfo]
   , members        :: (M.Map Address Enode)
   , parentChain    :: (Maybe Word256)
-  , creationBlock  :: SHA
+  , creationBlock  :: Keccak256
   , chainNonce     :: Word256
   , chainMetadata  :: (M.Map T.Text T.Text)
   } deriving (Eq, Show, GHCG.Generic, Data)
+
+
+
+instance ToSchema IPAddress where
+instance ToSchema OrgId where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "OrgId")
+      ( mempty )
+  
+instance ToSchema Enode where
+instance ToSchema CodeInfo where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "CodeInfo")
+      ( mempty )
+    
+instance ToSchema AccountInfo where
+instance ToSchema ChainSignature where
+instance ToSchema UnsignedChainInfo where
+instance ToSchema ChainInfo where
+--  declareNamedSchema _ = return $
+--    NamedSchema (Just "ChainInfo")
+--      ( mempty )
 
 instance Format UnsignedChainInfo where
   format UnsignedChainInfo{..} = unlines
@@ -240,9 +265,9 @@ instance Format UnsignedChainInfo where
     , tab $ "Account info:   " ++ format accountInfo
     , tab $ "Code info:      " ++ format codeInfo
     , tab $ "Members:        " ++ show members
-    , tab $ "Parent chain:   " ++ format (SHA <$> parentChain)
+    , tab $ "Parent chain:   " ++ CL.yellow (format parentChain)
     , tab $ "Creation block: " ++ format creationBlock
-    , tab $ "Nonce:          " ++ format (SHA chainNonce)
+    , tab $ "Nonce:          " ++ CL.yellow (format chainNonce)
     , tab $ "Metadata:       " ++ show chainMetadata
     ]
 
@@ -264,13 +289,13 @@ instance FromJSON ChainInfo where
     l <- o .: "label"
     as <- o .: "accountInfo"
     cs <- o .: "codeInfo"
-    ms <- ((o .: "members") :: NamedMapParser "address" Address "enode" Enode)
+    ms <- M.fromList . map (unNamedTuple @"address" @"enode") <$> (o .: "members")
     pc <- o .:? "parentChain"
     cb <- o .: "creationBlock"
     cn <- o .: "nonce"
     md <- o .: "metadata"
     sig <- o .:? "signature"
-    return $ ChainInfo (UnsignedChainInfo l as cs (M.fromList $ map toTuple ms) pc cb cn md) sig
+    return $ ChainInfo (UnsignedChainInfo l as cs ms pc cb cn md) sig
   parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
 
 instance ToJSON ChainInfo where
@@ -278,7 +303,7 @@ instance ToJSON ChainInfo where
     object [ "label" .= cl
            , "accountInfo" .= ai
            , "codeInfo" .= ci
-           , "members" .= ((map fromTuple (M.toList ms)) :: NamedMap "address" Address "enode" Enode)
+           , "members" .= (NamedTuple @"address" @"enode" <$> M.toList ms)
            , "parentChain" .= pc
            , "creationBlock" .= cb
            , "nonce" .= cn
