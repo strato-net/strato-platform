@@ -27,10 +27,10 @@ toBool = maybe False $ const True
 type HasSeenTransactionDB = Keccak256 `Alters` ()
 
 data SeenTransactionDB = SeenTransactionDB
-  { _size       :: Int
-  , _operations :: Int -- track number of pushes to start popping after `size`
-  , _clearQueue :: Q.Seq Keccak256
-  , _seen       :: S.Set Keccak256
+  { _size       :: {-# UNPACK #-} !Int
+  , _operations :: {-# UNPACK #-} !Int -- track number of pushes to start popping after `size`
+  , _clearQueue :: !(Q.Seq Keccak256)
+  , _seen       :: !(S.Set Keccak256)
   }
 makeLenses ''SeenTransactionDB
 
