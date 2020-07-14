@@ -39,6 +39,7 @@ import           UnliftIO
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context
 import           Blockchain.ECIES
+import           Blockchain.ECDSA
 import           Blockchain.EthConf                    hiding (genesisHash, port)
 import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
@@ -55,9 +56,8 @@ import           Blockchain.TCPClientWithTimeout
 import qualified Text.Colors                           as C
 import           Text.Format
 
-runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
+runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m)
         => PPeer
-        -> PrivateNumber
         -> BC.ByteString -- otherServiceCommHost
         -> CommPort      -- otherServiceCommPort
         -> m ()
@@ -111,7 +111,7 @@ runEthClientConduit myPriv peer peerSource peerSink seqSource unseqSink peerStr 
                   .| eventSink
                   .| peerSink
 
-getPubKeyRunPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
+getPubKeyRunPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m, HasVault m)
                  => PPeer
                  -> BC.ByteString
                  -> CommPort

@@ -313,6 +313,9 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
+instance (MonadIO m, MonadLogger m) => HasVault m where
+  sign bs = 
+
 type MonadP2P m = ( MonadIO m
                   , MonadLogger m
                   , MonadResource m

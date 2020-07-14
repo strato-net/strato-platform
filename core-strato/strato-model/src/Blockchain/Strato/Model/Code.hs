@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+wh-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Strato.Model.Code where
 

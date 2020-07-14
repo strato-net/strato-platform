@@ -45,6 +45,8 @@ import           Data.Swagger                     (ToSchema)
 import           Data.Swagger.Internal.Schema     (named, declareNamedSchema, binarySchema)
 import           GHC.Generics
 import           Test.QuickCheck
+import qualified Text.Colors                      as CL
+import           Text.Format
 
 import           Blockchain.Data.RLP
 
@@ -87,14 +89,13 @@ class Monad m => HasVault m where
 -- some instances we use elsewhere
 instance HasVault m => HasVault (ConduitT i o m) where
   sign = lift . sign
-  getPub = lift $ getPub
+  getPub = lift getPub
   getShared = lift . getShared
 
 instance HasVault m => HasVault (StateT s m) where
   sign = lift . sign
-  getPub = lift $ getPub
+  getPub = lift getPub
   getShared = lift . getShared
-
 
 -------------------------------------------------------------------
 ----------------------------- KEYS --------------------------------
@@ -111,6 +112,9 @@ instance FromJSON PublicKey where
 
 instance ToSchema PublicKey where
   declareNamedSchema _ = return $ named "PublicKey" binarySchema
+
+instance Format PublicKey where
+  format = CL.yellow . C8.unpack . B16.encode . exportPublicKey False
 
 
 instance ToJSON SharedKey where
