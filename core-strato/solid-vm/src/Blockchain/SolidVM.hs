@@ -496,7 +496,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
                               -- I'm not sure what that exactly looks like when its not memory.
                               then todo "storage was not anticipated in a tuple entry" s
                               else Nothing
-  let !singleType = case entries of
+  let singleType = case entries of
                       [e] -> fromMaybe (todo "type inference not implemented" s) $ Xabi.vardefType e
                       _ -> todo "could not evaluate expression without tuple type" s
   !value <-
