@@ -119,6 +119,15 @@ newContext (Checkpoint v pendingVotes as senderlist) pk =
      , _lastParent = Nothing
      }
 
+yieldL :: Monad m => b -> ConduitM a (Either b c) m ()
+yieldL = yield . Left
+
+yieldR :: Monad m => c -> ConduitM a (Either b c) m ()
+yieldR = yield . Right
+
+yieldManyR :: Monad m => [c] -> ConduitM a (Either b c) m ()
+yieldManyR = yieldMany . map Right
+
 selfAddr :: (StateMachineM m) => m Address
 selfAddr = uses prvkey prvKey2Address
 
@@ -211,14 +220,14 @@ generateNonceMap = M.fromList . flip zip (repeat 0)
 hasSameHash :: (StateMachineM m) => Keccak256 -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
 
-roundChange :: (StateMachineM m) => ConduitM InEvent OutEvent m ()
+roundChange :: (StateMachineM m) => ConduitM InEvent EOutEvent m ()
 roundChange = do
   nextView <- uses view (over round (+1))
   pk <- use prvkey
   pendingRound .= Just (_round nextView)
-  yield $ signMessage pk (RoundChange nextView)
+  yieldR $ signMessage pk (RoundChange nextView)
 
-nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent OutEvent m ()
+nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent EOutEvent m ()
 nextRound nt = do
   --update validators list
   val <- uses validators S.toList
@@ -233,7 +242,7 @@ nextRound nt = do
     Sequence s -> view . sequence .= s
     Round r -> do
       view . round .= r
-      yield $ ResetTimer r
+      yieldR $ ResetTimer r
   use view >>= recordView
   vals <- use validators
   thisR <- use $ view . round
@@ -251,11 +260,11 @@ nextRound nt = do
   when (leader == self) $ do
     lock <- use blockLock
     case lock of
-      Nothing -> yield MakeBlockCommand
+      Nothing -> yieldR MakeBlockCommand
       Just lb -> do
         pk <- use prvkey
         v <- use view
-        yield $ signMessage pk (Preprepare v lb)
+        yieldR $ signMessage pk (Preprepare v lb)
   prepared .= M.empty
   committed .= M.empty
   roundChanged %= M.dropWhileAntitone (<= thisR)
@@ -264,12 +273,12 @@ nextRound nt = do
   hasCommitted .= False
   hasPrepared .= False
   pendingRound .= Nothing
-  yield . NewCheckpoint =<< liftM4 Checkpoint (use view)
+  yieldR . NewCheckpoint =<< liftM4 Checkpoint (use view)
                                               (use voted)
                                               (uses validators S.toList)
                                               (uses authSenders M.keys)
 
-eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent OutEvent m BlockstanbulContext
+eventLoop :: (MonadIO m, MonadLogger m) => BlockstanbulContext -> ConduitM InEvent EOutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   debugShowCtx
   authz <- lift $ isAuthorized ev
@@ -277,7 +286,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   v <- use view
   case authz of
    AuthFailure reason -> case ev of
-      NewBeneficiary{} -> yield . VoteResponse $ HA.Rejected reason
+      NewBeneficiary{} -> yieldR . VoteResponse $ HA.Rejected reason
       _ -> return ()
    AuthSuccess -> case ev of
     ForcedConfigChange cc -> do
@@ -291,7 +300,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
     NewBeneficiary (MsgAuth addr _) (benf, dir, nonc)  -> do
       authSenders %= M.insert addr nonc
       self <- selfAddr
-      yieldMany [PendingVote benf dir self, VoteResponse HA.Enqueued]
+      yieldManyR [PendingVote benf dir self, VoteResponse HA.Enqueued]
     PreviousBlock blk -> do
       realValidators <- use validators
       seqNo <- use $ view . sequence
@@ -307,7 +316,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           acceptHistoric
           $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
           editVoted blk props
-          yield . ToCommit $ blk
+          yieldR . ToCommit $ blk
     UnannouncedBlock blk' -> do
       let blk = truncateExtra blk'
       ppl <- use proposal
@@ -331,11 +340,11 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
               -- peers will be able to commit the lock and historic replay of it
               -- could absolve us.
               $logErrorS "blockstanbul" "Lock has wrong block number; cannot commit"
-            yield MakeBlockCommand
+            yieldR MakeBlockCommand
           Right () -> do
             hasPreprepared .= True
             proposal .= Just realSealed
-            yield $ signMessage pk (Preprepare v realSealed)
+            yieldR $ signMessage pk (Preprepare v realSealed)
     IMsg auth ppp@(Preprepare v' pp) -> do
       pr <- use proposer
       mBlockLock <- use blockLock
@@ -350,9 +359,9 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                 printf "Rejecting proposal: " ++ format v' ++ " is not " ++ format v
               let intSeq = fromIntegral . _sequence
               when (_sequence v < _sequence v') $
-                yield $ GapFound (intSeq v) (intSeq v') (sender auth)
+                yieldR $ GapFound (intSeq v) (intSeq v') (sender auth)
               when (_sequence v > _sequence v') $
-                yield $ LeadFound (intSeq v) (intSeq v') (sender auth)
+                yieldR $ LeadFound (intSeq v) (intSeq v') (sender auth)
               roundChange
            | isJust mBlockLock && Just pp /= mBlockLock -> do
               $logWarnS "blockstanbul/ppl" "Rejecting proposal: block does not match lock"
@@ -367,14 +376,14 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                   roundChange
                 Right () -> do
                   wasProposed <- isJust <$> use proposal
-                  unless wasProposed . yield $ OMsg auth ppp
+                  unless wasProposed . yieldL $ OMsg auth ppp
                   proposal .= Just pp
                   pk <- use prvkey
                   editVoted pp pr
-                  yield $ signMessage pk (Prepare v (blockHash pp))
+                  yieldR $ signMessage pk (Prepare v (blockHash pp))
     IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
       preparers <- use prepared
-      unless (M.member (sender auth) preparers) . yield $ OMsg auth ppp
+      unless (M.member (sender auth) preparers) . yieldL $ OMsg auth ppp
       ps <- prepared <%= M.insert (sender auth) di
       total <- poolSize
       let sameVoteCount = M.size . M.filter (==di) $ ps
@@ -385,10 +394,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         setLock
         pk <- use prvkey
         let seal = commitmentSeal di pk
-        yield $ signMessage pk (Commit v di seal)
+        yieldR $ signMessage pk (Commit v di seal)
     IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
       committors <- use committed
-      unless (M.member (sender auth) committors) . yield $ OMsg auth ccc
+      unless (M.member (sender auth) committors) . yieldL $ OMsg auth ccc
       cs <- committed <%= M.insert (sender auth) (di, seal)
       total <- poolSize
       let sameVoteCount = M.size . M.filter ((==di) . fst) $ cs
@@ -404,7 +413,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             let seals = map snd . M.elems $ cs
             let blockNo = blockDataNumber . blockBlockData $ blk
             recordMaxBlockNumber "pbft_commit" blockNo
-            yield . ToCommit . addCommitmentSeals seals $ blk
+            yieldR . ToCommit . addCommitmentSeals seals $ blk
     IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
       let rn = _round vn
       mSigners <- use $ roundChanged . at rn
@@ -419,13 +428,13 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             pendingRound .= Just rn
             pk <- use prvkey
             $logInfoS "blockstanbul/roundchange" "agreed change"
-            yield $ signMessage pk (RoundChange vn)
+            yieldR $ signMessage pk (RoundChange vn)
           when (3 * sameRNCount > 2 * total) $ do
             next <- use pendingRound
             case next of
               Nothing -> error "TODO(tim): a round was voted on without existing"
               Just r -> nextRound (Round r)
-          yield $ OMsg auth (RoundChange vn)
+          yieldL $ OMsg auth (RoundChange vn)
           return ()
     Timeout r' -> do
       case r' `compare` _round v of
@@ -455,12 +464,12 @@ class (Monad m) => HasBlockstanbulContext m where
   getBlockstanbulContext :: m (Maybe BlockstanbulContext)
   putBlockstanbulContext :: BlockstanbulContext -> m ()
 
-loopback :: OutEvent -> Maybe InEvent
-loopback (OMsg a m) = Just $ IMsg a m
+loopback :: EOutEvent -> Maybe InEvent
+loopback (Right (OMsg a m)) = Just $ IMsg a m
 loopback _ = Nothing
 
-sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
-sendMessages wms = do
+sendMessages' :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [EOutEvent]
+sendMessages' wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.
   mCtx <- getBlockstanbulContext
@@ -476,16 +485,20 @@ sendMessages wms = do
               .| eventLoop ctx
               `fuseUpstream` (iterMC recordOutEvent
                            .| iterMC (outShortLog "blockstanbul/OutShortLog")
-                           .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format))
+                           .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format . fromE))
       (ctx', evs) <- runConduit $ fuseBoth base sinkList
       putBlockstanbulContext ctx'
       return evs
 
+sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
+sendMessages = fmap (map fromE) . sendMessages'
+
 sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
-  out <- sendMessages wms
+  eout <- sendMessages' wms
+  let out = fromE <$> eout 
   $logDebugS "sendAllMessages" . T.pack $ format out
-  case mapMaybe loopback out of
+  case mapMaybe loopback eout of
              [] -> return out
              wms' -> (out ++) <$> sendAllMessages wms'
 
@@ -525,9 +538,9 @@ recordInEvent ev = let inc txt = liftIO $ withLabel inEventMetric txt incCounter
    NewBeneficiary{} -> inc "new_beneficiary"
    ForcedConfigChange{} -> inc "forced_config_change"
 
-recordOutEvent :: (MonadIO m) => OutEvent -> m ()
-recordOutEvent ev = let inc txt = liftIO $ withLabel outEventMetric txt incCounter
-  in case ev of
+recordOutEvent :: (MonadIO m) => EOutEvent -> m ()
+recordOutEvent eev = let inc txt = liftIO $ withLabel outEventMetric txt incCounter
+  in case fromE eev of
     OMsg _ Preprepare{} -> inc "preprepare_message"
     OMsg _ Prepare{} -> inc "prepare_message"
     OMsg _ Commit{} -> inc "commit_message"
