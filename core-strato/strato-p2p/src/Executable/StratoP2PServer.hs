@@ -105,13 +105,9 @@ runEthServerConduit :: MonadP2P m
 runEthServerConduit p peerSource peerSink seqSource unseqSink peerStr = do
   myPubKey' <- getPub
   
-  liftIO $ putStrLn "running server conduit"
-  
   let myPubkey = secPubKeyToPoint myPubKey'
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
   (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptAccept otherPubKey `fuseUpstream` peerSink
-  
-  liftIO $ putStrLn "after ethCryptConnect"
   
   !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
   !eventSink <- mkEthP2PEventConduit peerStr outCtx unseqSink

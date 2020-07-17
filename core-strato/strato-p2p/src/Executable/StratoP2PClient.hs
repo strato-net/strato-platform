@@ -119,8 +119,6 @@ runEthClientConduit peer peerSource peerSink seqSource unseqSink peerStr = do
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
   (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptConnect otherPubKey `fuseUpstream` peerSink
 
-  liftIO $ putStrLn "after ethCryptConnect"
-  
   !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
   !eventSink <- mkEthP2PEventConduit peerStr outCtx unseqSink
   fmap (either Just (const Nothing)) . try . runConduit $ eventSource
