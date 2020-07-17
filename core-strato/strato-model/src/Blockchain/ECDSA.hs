@@ -102,6 +102,12 @@ instance HasVault m => HasVault (StateT s m) where
 -------------------------------------------------------------------
 
 
+instance Arbitrary PrivateKey where
+  arbitrary = do
+    k <- replicateM 32 (arbitrary :: Gen Word8)
+    return $ fromMaybe (error "could not generate arbitrary private key") (importPrivateKey $ B.pack k)
+
+
 instance ToJSON PublicKey where
   toJSON = String . T.pack . C8.unpack . B16.encode . exportPublicKey False
 

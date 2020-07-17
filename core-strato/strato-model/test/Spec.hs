@@ -154,6 +154,16 @@ spec = do
           sec2 = deriveSharedKey otherPriv pub
       sec1 `shouldBe` sec2 
 
+    it "test address derivation, signatures, and signature recovery on arbitrary private keys" $ property $ \k -> do
+      let sig' = signMsg k mesg
+          pub' = derivePublicKey k
+          add = fromPublicKey pub'
+          mRecPub = recoverPub sig' mesg
+      Just pub' `shouldBe` mRecPub
+      fromPublicKey (fromJust mRecPub) `shouldBe` add
+      fromPublicKey (fromJust mRecPub) `shouldBe` fromPrivateKey k
+      fromPrivateKey k `shouldBe` add
+  
   describe "the ECDSA module works exactly like Haskoin and Crypto-Pubkey on test values" $ do
     let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         hkPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
