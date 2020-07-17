@@ -129,7 +129,7 @@ spec = do
         mesg = keccak256ToByteString $ hash $ C8.pack "hey guys!" 
         sig = signMsg prv mesg
   
-    it "can export public key as DER bytestring" $ do
+    it "can export public key as SEC bytestring" $ do
       B.length (exportPublicKey False pub) `shouldBe` 65
     it "can convert public key to and from JSON encoding" $ do
       Ae.decode (Ae.encode pub) `shouldBe` Just pub
