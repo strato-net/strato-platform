@@ -53,6 +53,7 @@ module Blockchain.Context
 
 import           Conduit
 import           Control.Applicative
+import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
@@ -74,6 +75,7 @@ import           Blockchain.Data.Enode
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
+import           Blockchain.ECDSA
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
 import           Blockchain.Options
@@ -96,6 +98,10 @@ import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 import           Blockchain.Util                       (toMaybe)
+import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
+import           Servant.Client
+import qualified Strato.Strato23.API                   as VC
+import qualified Strato.Strato23.Client                as VC
 
 import           UnliftIO
 
@@ -313,14 +319,45 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
-instance (MonadIO m, MonadLogger m) => HasVault m where
-  sign bs = 
+
+-- TODO: ideally, we put one ClientEnv into the Config and not make a new one for 
+-- each request, and then we can make this an instance on ReaderT
+instance (MonadIO m, Monad m) => HasVault (ReaderT Config m) where
+  sign bs = do
+    mgr <- liftIO $ newManager defaultManagerSettings
+    url <- liftIO $ parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+    let env = ClientEnv mgr url  Nothing
+    liftIO $ waitOnVault $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) env
+  
+  getPub = do
+    mgr <- liftIO $ newManager defaultManagerSettings
+    url <- liftIO $ parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+    let env = ClientEnv mgr url  Nothing
+    fmap VC.unPubKey $ liftIO $ waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) env
+  
+  getShared pub = do
+    mgr <- liftIO $ newManager defaultManagerSettings
+    url <- liftIO $ parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+    let env = ClientEnv mgr url  Nothing
+    liftIO $ waitOnVault $ runClientM (VC.getSharedKey "nodekey" pub) env
+
+
+waitOnVault :: (Show a) => IO (Either a b) -> IO b
+waitOnVault action = do
+  res <- action
+  case res of
+    Left err -> do
+      putStrLn $ "waiting and waiting and waiting, because of: " ++ show err
+      threadDelay 2000000
+      waitOnVault action
+    Right val -> return val
 
 type MonadP2P m = ( MonadIO m
                   , MonadLogger m
                   , MonadResource m
                   , MonadUnliftIO m
                   , Stacks Block m
+                  , HasVault m
                   , All '[Mod.Accessible, Mod.Modifiable]
                       '[ ActionTimestamp
                        , [BlockData]

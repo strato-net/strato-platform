@@ -17,7 +17,6 @@ import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Crypto.PubKey.ECC.DH
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Base16                as B16
 import qualified Data.ByteString.Char8                 as BC
@@ -29,7 +28,6 @@ import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
 import qualified Data.Sequence                         as Q
 import           Text.Printf
-import           Numeric                               (readHex)
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
@@ -294,13 +292,14 @@ instance MonadIO m => HasVault (MonadTest m) where
   sign bs = do
     pk <- use prvKey
     return $ signMsg pk bs
-  getPub = error "for now, getPub should never be called"
-  getShared _ = error "for now, getShared should never be called"
-
-
--- p2p still uses cryptonite, but blockstanbul uses our ECDSA (secp256k-haskell) module, hence this conversion
-convertKey :: PrivateKey -> PrivateNumber
-convertKey = fst . head . readHex . BC.unpack . B16.encode . exportPrivateKey
+  
+  getPub = do
+    pk <- use prvKey
+    return $ derivePublicKey pk
+  
+  getShared pub = do
+    pk <- use prvKey
+    return $ deriveSharedKey pk pub
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -440,15 +439,13 @@ createConnection server client = do
   clientToServer <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqSource server
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqSource client
-  let runServer = runEthServerConduit (convertKey $ _p2pPeerPrivKey server)
-                                      (_p2pPeerPPeer client)
+  let runServer = runEthServerConduit (_p2pPeerPPeer client)
                                       (sourceTQueue clientToServer)
                                       (sinkTQueue serverToClient)
                                       (sourceTMChan serverSeqSource)
                                       (_p2pPeerUnseqSink server)
                                       (_p2pPeerName server ++ " -> " ++ _p2pPeerName client)
-      runClient = runEthClientConduit (convertKey $ _p2pPeerPrivKey client)
-                                      (_p2pPeerPPeer server)
+      runClient = runEthClientConduit (_p2pPeerPPeer server)
                                       (sourceTQueue serverToClient)
                                       (sinkTQueue clientToServer)
                                       (sourceTMChan clientSeqSource)
