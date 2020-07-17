@@ -6,7 +6,6 @@ module Blockchain.Data.PubKey (
   pointToString,
   pointToBytes,
   bytesToPoint,
-  pubKeyToBytes,
   secPubKeyToPoint,
   pointToSecPubKey
   ) where
@@ -18,7 +17,6 @@ import qualified Data.ByteString.Base16    as B16
 import qualified Data.ByteString.Char8     as BC
 import           Data.Maybe
 import           Data.Word
-import qualified Network.Haskoin.Internals as H
 
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord
@@ -58,15 +56,6 @@ pointToBytes::Point->B.ByteString
 pointToBytes (Point x y) = B.pack $ intToBytes x ++ intToBytes y
 pointToBytes PointO      = error "pointToBytes got value PointO, I don't know what to do here"
 
-hPointToBytes::H.Point->B.ByteString
-hPointToBytes point = word256ToBytes (fromIntegral x) <> word256ToBytes (fromIntegral y)
-  where
-    x = fromMaybe (error "getX failed in prvKey2Address") $ H.getX point
-    y = fromMaybe (error "getY failed in prvKey2Address") $ H.getY point
-
-pubKeyToBytes::H.PubKey->B.ByteString
-pubKeyToBytes pubKey = hPointToBytes $ H.pubKeyPoint pubKey
-
 bytesToPoint::B.ByteString->Point
 bytesToPoint bs | B.length bs == 64 =
   let (xs, ys)= B.splitAt 32 bs
@@ -77,7 +66,7 @@ intToBytes::Integer->[Word8]
 intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
 
 
--- TODO: eventually, secp256k1 is the ONLY library we should use
+-- TODO: eventually, secp256k1 is the ONLY library we should use (no Point conversions)
 secPubKeyToPoint :: Secp256k1.PublicKey -> Point
 secPubKeyToPoint pub = 
   let pkbs = B.drop 1 $ Secp256k1.exportPublicKey False pub

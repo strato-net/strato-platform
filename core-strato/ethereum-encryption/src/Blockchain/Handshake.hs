@@ -16,21 +16,12 @@ import                 Data.Bits
 import qualified       Data.ByteString             as B
 import qualified       Data.ByteString.Lazy        as BL
 import                 Data.Maybe
---import qualified       Network.Haskoin.Internals   as H
 
 import                 Blockchain.Data.PubKey
 import qualified       Blockchain.ECIES            as ECIES
 import                 Blockchain.ECDSA
---import                 Blockchain.ExtendedECDSA
 import                 Blockchain.ExtWord
 import                 Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
-
---sigToBytes::ExtendedSignature->B.ByteString
---sigToBytes (ExtendedSignature signature yIsOdd) =
---  word256ToBytes (fromIntegral $ H.sigR signature) <>
---  word256ToBytes (fromIntegral $ H.sigS signature) <>
---  B.singleton (if yIsOdd then 1 else 0)
-
 
 
 data AckMessage = AckMessage {
@@ -80,14 +71,7 @@ bytesToAckMsg bytes | B.length bytes == 97 =
     }
 bytesToAckMsg _ = error "wrong number of bytes in call to bytesToECIESMsg"
 
-{- hPubKeyToPubKey :: H.PubKey -> Point
-hPubKeyToPubKey pubKey =
-  Point (fromIntegral x) (fromIntegral y)
-  where
-    x = fromMaybe (error "getX failed in prvKey2Address") $ H.getX hPoint
-    y = fromMaybe (error "getY failed in prvKey2Address") $ H.getY hPoint
-    hPoint = H.pubKeyPoint pubKey
--}
+
 getHandshakeBytes :: (MonadIO m, HasVault m) => PublicPoint -> B.ByteString -> m B.ByteString
 getHandshakeBytes otherPubKey myNonce = do
   myPublic' <- getPub
