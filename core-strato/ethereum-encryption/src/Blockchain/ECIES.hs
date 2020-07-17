@@ -42,7 +42,7 @@ decrypt bytes prefix = do
   --Special case of the next check, indicates that a different key encoding was used
   when (eciesForm eciesMsg `elem` [2,3]) $ error "peer connected with unsupported handshake packet"
 
-  if (eciesForm eciesMsg == 4) then
+  if (eciesForm eciesMsg /= 4) then
        return $ Left $ "first byte of buffer must be 4: " ++ show (BL.unpack bytes)
   else do
     sharedKey <- getShared $ pointToSecPubKey $ eciesPubKey eciesMsg 
@@ -50,7 +50,7 @@ decrypt bytes prefix = do
     let msg = decryptECIES sharedKey eciesMsg
         (expectedMac, _) = getMacAndCipher sharedKey (eciesCipherIV eciesMsg) msg prefix
 
-    if (eciesMac eciesMsg == expectedMac) then
+    if (eciesMac eciesMsg /= expectedMac) then
        return $ Left $ "mac doesn't match: expected " ++ show expectedMac
               ++ ", got " ++ show (eciesMac eciesMsg)
     else return $ Right msg

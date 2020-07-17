@@ -20,7 +20,6 @@ import qualified       Data.ByteString.Lazy              as BL
 import                 Data.Conduit
 import qualified       Data.Conduit.Binary               as CB
 import                 Data.Maybe
-import qualified       Network.Haskoin.Internals         as H
 
 import qualified       Blockchain.AESCTR                 as AES
 import                 Blockchain.Data.PubKey
@@ -28,7 +27,6 @@ import                 Blockchain.Data.RLP
 import qualified       Blockchain.ECIES                  as ECIES
 import                 Blockchain.Error
 import                 Blockchain.EthEncryptionException
-import                 Blockchain.ExtendedECDSA
 import                 Blockchain.ExtWord
 import                 Blockchain.Frame
 import                 Blockchain.Handshake
@@ -51,7 +49,6 @@ ethCryptConnect otherPubKey = do
   let myNonce = word256ToBytes 20 --TODO- Important!  Don't hardcode this
 
   handshakeInitBytes <- getHandshakeBytes otherPubKey myNonce
-
   yield handshakeInitBytes
 
   handshakeReplyBytes <- CB.take 210
@@ -63,6 +60,7 @@ ethCryptConnect otherPubKey = do
   let ackMsg = bytesToAckMsg $ either (error . ("error in ethCryptConnect"++)) id eAckBS 
   
   SharedKey shared <- getShared $ pointToSecPubKey $ ackEphemeralPubKey ackMsg
+
 
   let m_originated      = False -- hardcoded for now, I can only connect as client
       otherNonce        = word256ToBytes $ ackNonce ackMsg
@@ -90,32 +88,27 @@ add :: B.ByteString
 add acc val | B.length acc ==32 && B.length val == 32 = keccak256ToByteString $ hash $ val `B.append` acc
 add _ _     = error "add called with ByteString of length not 32"
 
-hPubKeyToPubKey :: H.PubKey -> Point
-hPubKeyToPubKey pubKey =
-  Point (fromIntegral x) (fromIntegral y)
-  where
-    x = fromMaybe (error "getX failed in prvKey2Address") $ H.getX hPoint
-    y = fromMaybe (error "getY failed in prvKey2Address") $ H.getY hPoint
-    hPoint = H.pubKeyPoint pubKey
 
 ethCryptAccept :: (MonadIO m, HasVault m)
                => Point
                -> ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptAccept otherPoint = do
-  hsBytes <- CB.take 307
-
+  
+  hsBytes <- CB.take 323 -- was 307... new binary encoded sigV is 16 bytes (not 1) for some reason
+  
   hs <- ECIES.decrypt hsBytes B.empty
   maybeResult <-
     case hs of
      Left _  -> return Nothing
      Right x -> ethCryptAcceptOld otherPoint hsBytes x
+  
 
   case maybeResult of
    Just x -> return x
    Nothing -> do
      let (first:second:_) = BL.unpack hsBytes
          fullSize = fromIntegral first*256 + fromIntegral second
-         remainingSize = fullSize - 307 + 2
+         remainingSize = fullSize - 323 + 2 -- was 307
      remainingBytes <- CB.take remainingSize
      let fullBuffer = BL.drop 2 $ hsBytes `BL.append` remainingBytes
      maybeEciesMsgIBytes <- ECIES.decrypt fullBuffer $ BL.toStrict $ BL.take 2 $ hsBytes `BL.append` remainingBytes
@@ -141,10 +134,10 @@ ethCryptAcceptEIP8 _ hsBytes eciesMsgIBytes = do
   when (version /= 4) $ error "wrong version in packet sent to ethCryptAcceptEIP8"
 
   SharedKey sharedKey <- getShared $ pointToSecPubKey otherPoint
-  let msg = bytesToWord256 sharedKey `xor` bytesToWord256 otherNonce
-      otherEphemeral = hPubKeyToPubKey $
+  let msg = word256ToBytes $ bytesToWord256 sharedKey `xor` bytesToWord256 otherNonce
+      otherEphemeral = secPubKeyToPoint $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
-                            getPubKeyFromSignature extSig msg
+                            recoverPub extSig msg
 
   ephemeralPriv <- liftIO $ newPrivateKey
   let myEphemeral = secPubKeyToPoint $ derivePublicKey ephemeralPriv
@@ -185,19 +178,18 @@ ethCryptAcceptOld :: (MonadIO m, HasVault m)
 ethCryptAcceptOld otherPoint hsBytes eciesMsgIBytes = do
 
     SharedKey sharedKey <- getShared $ pointToSecPubKey otherPoint
-    let otherNonce = B.take 32 $ B.drop 161 $ eciesMsgIBytes
-        msg = bytesToWord256 sharedKey `xor` bytesToWord256 otherNonce
-        extSig = rlpDecode . RLPString $ eciesMsgIBytes
-        otherEphemeral = hPubKeyToPubKey $
+    let otherNonce = B.take 32 $ B.drop 177 $ eciesMsgIBytes -- was B.drop 161
+        msg = word256ToBytes $ bytesToWord256 sharedKey `xor` bytesToWord256 otherNonce
+        extSig = decode $ BL.fromStrict eciesMsgIBytes
+        otherEphemeral = secPubKeyToPoint $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
-                            getPubKeyFromSignature extSig msg
+                            recoverPub extSig msg
     
     ephemeralPriv <- liftIO $ newPrivateKey
     let myEphemeral = secPubKeyToPoint $ derivePublicKey ephemeralPriv
         myNonce = 25 :: Word256
         ackMsg = AckMessage { ackEphemeralPubKey=myEphemeral, ackNonce=myNonce, ackKnownPeer=False }
         cryptSecret = deriveSharedKey ephemeralPriv (pointToSecPubKey otherPoint)
-
     eciesMsgOBytes <- fmap BL.toStrict $ ECIES.encrypt cryptSecret myEphemeral (BL.toStrict $ encode $ ackMsg) B.empty
 
     yield $ eciesMsgOBytes

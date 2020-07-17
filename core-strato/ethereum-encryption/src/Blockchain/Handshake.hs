@@ -95,11 +95,7 @@ getHandshakeBytes otherPubKey myNonce = do
 
   let myPublic = secPubKeyToPoint myPublic'
       msg = word256ToBytes $ bytesToWord256 sharedKey `xor` bytesToWord256 myNonce
-
-  -- TODO: these putStrLn's are just for logging, remove
-  liftIO $ putStrLn $ "myPublic: " ++ show myPublic'
-  liftIO $ putStrLn $ "sharedKey: " ++ show sharedKey
-  liftIO $ putStrLn $ "msg:       " ++ show msg
+  
   sig <- sign msg 
   
   -- this signature recovery is pointless - the "ephermal" key is actually just myPublic
@@ -114,18 +110,8 @@ getHandshakeBytes otherPubKey myNonce = do
                 pubk `B.append`
                 myNonce `B.append`
                 B.singleton 0  -- TODO: would be nice to have binary instances here, not just raw BS stuff
-  liftIO $ putStrLn $ "ephemeral: " ++ show ephemeral
-  -- putStrLn $ "hepubk: " ++ show hepubk
-  -- putStrLn $ "pubk: " ++ show pubk
-  -- putStrLn $ "theData: " ++ show theData
-
+  
   eciesMsgBytes <- fmap BL.toStrict $ ECIES.encrypt (SharedKey sharedKey) myPublic theData B.empty
-
-  -- putStrLn $ "eciesMsg: "
-  -- putStrLn $ show eciesMsg
-
-  -- putStrLn $ "length ciphertext: " ++ (show . B.length $ eciesCipher eciesMsg)
-  -- putStrLn $ "length of wire message: " ++ (show . B.length $ eciesMsgBytes)
 
   return $ eciesMsgBytes
 
