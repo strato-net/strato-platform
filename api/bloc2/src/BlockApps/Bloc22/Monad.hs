@@ -127,12 +127,12 @@ runBlocWithEnv env = runLoggingT
 runBlocToIO :: BlocEnv -> Bloc a -> IO (Either BlocError a)
 runBlocToIO env = try . runBlocWithEnv env
 
-handleRuntimeError :: SomeException -> Bloc a
+handleRuntimeError :: MonadIO m => SomeException -> m a
 handleRuntimeError (e :: SomeException) = case fromException e of
   Just (_ :: BlocError) -> throwIO e
   Nothing -> throwIO $ RuntimeError e
 
-handleBlocError :: BlocError -> Bloc a
+handleBlocError :: (MonadIO m, MonadLogger m) => BlocError -> m a
 handleBlocError = \case
   e@(RuntimeError _) -> do
     $logErrorS "handleBlocError/RuntimeError" . Text.pack $
@@ -312,7 +312,8 @@ blocTransaction bloc = do
   pool <- getBlocSQLPool
   withResource pool (\conn -> liftBaseOp_ (withTransaction conn) bloc)
 
-blocStrato :: HasCallStack => ClientM x -> Bloc x
+blocStrato :: HasCallStack =>
+              ClientM x -> Bloc x
 blocStrato client' = do
   logInfoCS callStack "Querying Strato"
   url <- asks urlStrato
@@ -320,7 +321,8 @@ blocStrato client' = do
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
   either (blocError . StratoError) return resultEither
 
-blocVaultWrapper :: HasCallStack => ClientM x -> Bloc x
+blocVaultWrapper :: HasCallStack =>
+                    ClientM x -> Bloc x
 blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault Wrapper"
   url <- asks urlVaultWrapper
@@ -328,5 +330,5 @@ blocVaultWrapper client' = do
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
   either (blocError . VaultWrapperError) return resultEither
 
-blocMaybe :: Text -> Maybe x -> Bloc x
+blocMaybe :: MonadIO m => Text -> Maybe x -> m x
 blocMaybe msg = maybe (throwIO (CouldNotFind msg)) return
