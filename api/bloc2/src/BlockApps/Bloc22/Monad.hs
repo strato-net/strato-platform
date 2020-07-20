@@ -9,6 +9,9 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module BlockApps.Bloc22.Monad where
 
 
@@ -46,12 +49,17 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Nonce
 
+import           Control.Monad.Composable.BlocSQL
+
 data Should a = Don't a | Do a
 data Compile = Compile
 data CacheNonce = CacheNonce
 
 type Bloc = ReaderT BlocEnv (LoggingT IO)
 
+instance HasBlocSQL Bloc where
+  getBlocSQLPool = asks dbPool
+  
 dbErrorToUserError :: MonadUnliftIO m => m a -> m a
 dbErrorToUserError = flip catch $ \case
                        DBError msg -> throwIO (UserError msg)
@@ -75,7 +83,7 @@ prettyCallStack' cs =
     formatCSLine (funcName, SrcLoc{..}) =
       "  " ++ funcName ++ ", called at " ++ srcLocModule ++ ":" ++ show srcLocStartLine ++ ":" ++ show srcLocStartCol
 
-blocError :: HasCallStack => BlocError -> Bloc y
+blocError :: (HasCallStack, MonadIO m, MonadLogger m) => BlocError -> m y
 blocError err = do
     logErrorCS callStack . Text.pack $
       printf "err: %s\nCallstack:%s" (show err) (prettyCallStack callStack)
@@ -254,42 +262,43 @@ formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"
 formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
 
-blocQuery
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
-  => Query x
-  -> Bloc [y]
+blocQuery :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y, HasBlocSQL m,
+              MonadIO m, MonadBaseControl IO m, MonadLogger m) =>
+             Query x -> m [y]
 blocQuery q = do
   traverse_ (logInfoCS callStack . Text.pack) (showSql q)
-  pool <- asks dbPool
+  pool <- getBlocSQLPool
   withResource pool $ liftIO . flip runQuery q
 
 blocQueryMaybe
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y,
+      MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m)
   => Query x
-  -> Bloc (Maybe y)
+  -> m (Maybe y)
 blocQueryMaybe q = blocQuery q >>= \case
     [] -> return Nothing
     [y] -> return (Just y)
     _:_:_ -> throwIO $ DBError "blocQueryMaybe: Multiple results, expected one row"
 
 blocQuery1
-  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
-  => Text
-  -> Query x
-  -> Bloc y
+  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y,
+      MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+  Text -> Query x -> m y
 blocQuery1 loc q = blocQuery q >>= \case
     [] -> blocError . DBError . Text.concat $ ["blocQuery1: ", loc, ": No result, expected one row"]
     [y] -> return y
     _:_:_ -> throwIO . DBError . Text.concat $
        ["blocQuery1: ", loc, ": Multiple results, expected one row"]
 
-blocModify :: HasCallStack => (Connection -> IO x) -> Bloc x
+blocModify :: (HasCallStack, MonadIO m, MonadBaseControl IO m, HasBlocSQL m, MonadLogger m) =>
+              (Connection -> IO x) -> m x
 blocModify modify = do
   logInfoCS callStack "Updating the database"
-  pool <- asks dbPool
+  pool <- getBlocSQLPool
   withResource pool (liftIO . modify)
 
-blocModify1 :: HasCallStack => (Connection -> IO [x]) -> Bloc x
+blocModify1 :: (HasCallStack, MonadIO m, MonadBaseControl IO m, HasBlocSQL m, MonadLogger m) =>
+               (Connection -> IO [x]) -> m x
 blocModify1 modify = do
   logInfoCS callStack "Updating the database"
   results <- blocModify modify
@@ -300,7 +309,7 @@ blocModify1 modify = do
 
 blocTransaction :: Bloc x -> Bloc x
 blocTransaction bloc = do
-  pool <- asks dbPool
+  pool <- getBlocSQLPool
   withResource pool (\conn -> liftBaseOp_ (withTransaction conn) bloc)
 
 blocStrato :: HasCallStack => ClientM x -> Bloc x

@@ -18,6 +18,7 @@ library:
   dependencies:
     - aeson
     - base16-bytestring
+    - bloc-sql-monad
     - bloc2api
     - blockapps-data
     - blockapps-datadefs
