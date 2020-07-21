@@ -1,6 +1,5 @@
 {-# LANGUAGE Arrows              #-}
 {-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -9,10 +8,18 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
+{-# LANGUAGE MultiParamTypeClasses #-}
+
+{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
+{-# OPTIONS -fno-warn-orphans #-}
+
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Applicative               (liftA2)
 import           Control.Monad                     (when, unless)
+import           Control.Monad.Trans.Control
 import           Crypto.Random.Entropy
 import qualified Data.ByteString.Base16            as B16
 import           Data.Foldable                     (for_)
@@ -42,10 +49,19 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
+
 import           Control.Monad.Change.Alter
+import           Control.Monad.Composable.BlocSQL
+
 import           Handlers.Chain
 
 import           UnliftIO
+
+import           Control.Monad.Change.Alter
+import           Control.Monad.Composable.SQL
+import qualified Blockchain.Data.ChainInfoDB    as Qqqq
+import           Control.Monad.Change.Modify
+import           Blockchain.DB.SQLDB
 
 
 governanceAddress :: Address
@@ -67,7 +83,8 @@ replaceMembers Struct{..} addrs m =
           TypeArrayDynamic (SimpleType TypeAddress) -> m'
           _ -> m
 
-createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
+createChainInfo :: Monad m =>
+                   ChainInput -> m (Maybe Int32, ChainInfo)
 createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
@@ -124,36 +141,40 @@ creationBlockHash :: Keccak256
 creationBlockHash = fromJust $
   stringKeccak256 "0000000000000000000000000000000000000000000000000000000000000000"
 
-postChainInfo :: ChainInput -> Bloc ChainId
+postChainInfo :: (MonadIO m, Accessible SQLDB m, MonadBaseControl IO m, MonadUnliftIO m,
+                  HasBlocSQL m, MonadLogger m) =>
+                 ChainInput -> m ChainId
 postChainInfo chainInput = do
   (mCmId, chainInfo) <- createChainInfo chainInput
-  chainId <- blocStrato $ postChainClient chainInfo
+  chainId <- postChainC chainInfo
+--  chainId <- blocStrato $ postChainClient chainInfo
   let isAsync = fromMaybe False $ chaininputAsync chainInput
-  unless isAsync $ undefined chainId -- TODO- put waitForChainInfos back in here
---  unless isAsync $ waitForChainInfo chainId
+  unless isAsync $ waitForChainInfo chainId
   for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
-postChainInfos :: [ChainInput] -> Bloc [ChainId]
+postChainInfos :: (MonadUnliftIO m, MonadBaseControl IO m, Accessible SQLDB m,
+                   HasBlocSQL m, MonadLogger m) =>
+                  [ChainInput] -> m [ChainId]
 postChainInfos chainInputs = do
   chainInfos <- traverse createChainInfo chainInputs
-  chainIds <- blocStrato . postChainsClient $ map snd chainInfos
+  chainIds <- postChainsC $ map snd chainInfos
+--  chainIds <- blocStrato . postChainsClient $ map snd chainInfos
   let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
       asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
-  unless (null asyncChains) $ undefined asyncChains -- TODO- put waitForChainInfos back in here
---  unless (null asyncChains) $ waitForChainInfos asyncChains
+  unless (null asyncChains) $ waitForChainInfos asyncChains
   let cmIdChains = catMaybes $ zipWith (liftA2 (,)) (map fst chainInfos) (map Just chainIds)
   for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainIds
 
-waitForChainInfo :: (MonadIO m, MonadLogger m, Selectable ChainId ChainInfo m) =>
+waitForChainInfo :: (Monad m, Accessible SQLDB m, MonadUnliftIO m, MonadLogger m) =>
                     ChainId -> m ()
 waitForChainInfo chainId = waitForChainInfos [chainId]
 
-waitForChainInfos :: (MonadIO m, MonadLogger m, Selectable ChainId ChainInfo m) =>
+waitForChainInfos :: (Monad m, Accessible SQLDB m, MonadUnliftIO m, MonadLogger m) =>
                      [ChainId] -> m ()
 waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
-  where go :: (MonadLogger m, Selectable ChainId ChainInfo m) => m Bool
+  where --go :: Bloc Bool
         go = do
           infos <- getChainInfo chainIds
           $logInfoLS "waitForChainInfo/req" chainIds
@@ -161,10 +182,19 @@ waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
           return $ length infos == length chainIds
 
 
-getChainInfo :: Selectable ChainId ChainInfo m =>
+instance (Monad m, MonadUnliftIO m, Accessible SQLDB m) => Selectable ChainId ChainInfo m where
+  selectMany _ = fmap (Map.fromList . map (unNamedTuple @"id" @"info")) . Qqqq.getChainInfos
+  select     _ = fmap (fmap (snd . unNamedTuple @"id" @"info")) . Qqqq.getChainInfo
+
+{-
+instance (MonadUnliftIO m, HasSQL m, Accessible SQLDB m) => Selectable ChainId ChainInfo m where
+-}
+  
+getChainInfo :: (Monad m, Accessible SQLDB m, MonadUnliftIO m) =>
                 [ChainId] -> m [ChainIdChainOutput]
 getChainInfo chainIds = do
   chainIdChainInfos <- getChain chainIds
+--  chainIdChainInfos <- blocStrato $ getChainClient chainIds
   return $ map convertChainInfo chainIdChainInfos
     where
       convertChainInfo :: NamedTuple "id" "info" ChainId ChainInfo -> ChainIdChainOutput

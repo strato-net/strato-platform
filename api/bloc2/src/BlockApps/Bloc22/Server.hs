@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
@@ -8,6 +9,8 @@
 module BlockApps.Bloc22.Server where
 
 import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
+import           Control.Monad.IO.Class
+--import           Control.Monad.Logger
 import           Data.HashMap.Strict.InsOrd
 import           Data.Proxy
 import           Data.Swagger
@@ -15,13 +18,19 @@ import           Servant
 import           Servant.Swagger
 
 import           BlockApps.Bloc22.API
-import           BlockApps.Bloc22.Monad
---import           BlockApps.Bloc22.Server.Chain
+--import           BlockApps.Bloc22.Monad
+import           BlockApps.Bloc22.Server.Chain
 --import           BlockApps.Bloc22.Server.Contracts
 --import           BlockApps.Bloc22.Server.Transaction
 --import           BlockApps.Bloc22.Server.Users
 
-bloc :: Monad m => ServerT BlocAPI m
+import Control.Monad.Change.Alter
+import Blockchain.Strato.Model.ChainId
+import Blockchain.Data.ChainInfo
+
+
+bloc :: (MonadIO m, Selectable ChainId ChainInfo m) => ServerT BlocAPI m
+--bloc :: (MonadIO m, MonadLogger m, Selectable ChainId ChainInfo m) => ServerT BlocAPI m
 bloc = return gitInfo
 --  :<|> postUsersFill
 --  :<|> getContracts
@@ -40,13 +49,13 @@ bloc = return gitInfo
 --  :<|> getBlocTransactionResult
 --  :<|> postBlocTransactionResults
 --  :<|> postChainInfo
---  :<|> getChainInfo
+  :<|> getChainInfo
 --  :<|> postChainInfos
 --  :<|> postBlocTransactionParallel
 --  :<|> postBlocTransaction
 
-serveBloc :: BlocEnv -> Server BlocAPI
-serveBloc env = hoistServer blocApi (enterBloc env) bloc
+--serveBloc :: BlocEnv -> Server BlocAPI
+--serveBloc env = hoistServer blocApi (enterBloc env) bloc
 
 blocSwagger :: Swagger
 blocSwagger = toSwagger (Proxy @BlocAPI)

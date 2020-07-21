@@ -19,7 +19,7 @@ import           Servant
 import           Servant.Docs
 import           Servant.Mock
 
---import           BlockApps.Bloc22.API.Chain
+import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Git
 --import           BlockApps.Bloc22.API.Transaction
@@ -51,7 +51,7 @@ type BlocAPI =
 --  :<|> PostBlocTransactionResults
   -- /chain endpoints
 --  :<|> PostChainInfo
---  :<|> GetChainInfo
+  :<|> GetChainInfo
   -- /chains endpoints
 --  :<|> PostChainInfos
   -- /transaction endpoints
