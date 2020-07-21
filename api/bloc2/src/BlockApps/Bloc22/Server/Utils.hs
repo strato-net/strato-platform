@@ -88,10 +88,10 @@ mergeSortedListsWith f (a1:a2:as) = mergeSortedListsWith f ((merge a1 a2):as)
                                 then x:merge xs (y:ys)
                                 else y:merge (x:xs) ys
 
-waitFor :: Text.Text -> Bloc Bool -> Bloc ()
+waitFor :: MonadIO m =>
+           Text.Text -> m Bool -> m ()
 waitFor msg action = go 20
-  where go :: Int -> Bloc ()
-        go ms = do
+  where go ms = do
           when (ms > 30000) . throwIO $ CouldNotFind msg
           b <- action
           unless b $ do

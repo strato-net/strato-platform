@@ -12,8 +12,11 @@
 
 module Handlers.Chain
   ( API
+  , getChain
   , getChainClient
+  , postChain
   , postChainClient
+  , postChains
   , postChainsClient
   , server
   , ChainInfo(..)
@@ -59,9 +62,7 @@ postChainsClient :: [ChainInfo] -> ClientM [ChainId]
 getChainClient :<|> postChainClient :<|> postChainsClient = client (Proxy @API)
 
 server :: ServerT API SQLM
-server = getChain :<|> postChainC :<|> postChainsC
-  where postChainC  c  = runConduit $ postChain c `fuseUpstream` emitKafkaTransactions
-        postChainsC cs = runConduit $ postChains cs `fuseUpstream` emitKafkaTransactions
+server = getChain :<|> postChain :<|> postChains
 
 -----------------------
 
@@ -76,8 +77,8 @@ instance Selectable ChainId ChainInfo SQLM where
 getChain :: Selectable ChainId ChainInfo m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
 getChain = fmap (map (NamedTuple @"id" @"info") . M.toList) . selectMany (Proxy @ChainInfo)
     
-postChain :: (MonadIO m, MonadLogger m) => ChainInfo -> ConduitT a IngestEvent m ChainId
-postChain ci = do
+postChainConduit :: (MonadIO m, MonadLogger m) => ChainInfo -> ConduitT a IngestEvent m ChainId
+postChainConduit ci = do
     case processChainInfos [ci] of
       Left (_, err) -> throwIO . InvalidArgs $ "invalid args: " ++ err
       Right [] -> error "postChainR: The impossible happened. processChainInfos succeeded, but returned an empty list"
@@ -87,8 +88,13 @@ postChain ci = do
         yield . IEGenesis $ IngestGenesis API (c,ci)
         return cid
 
-postChains :: (MonadIO m, MonadLogger m) => [ChainInfo] -> ConduitT a IngestEvent m [ChainId]
-postChains cis = do
+postChain :: (MonadIO m, MonadLogger m) =>
+             ChainInfo -> m ChainId
+postChain  c  = runConduit $ postChainConduit c `fuseUpstream` emitKafkaTransactions
+
+
+postChainsConduit :: (MonadIO m, MonadLogger m) => [ChainInfo] -> ConduitT a IngestEvent m [ChainId]
+postChainsConduit cis = do
   case processChainInfos cis of
       Left (i, err) -> throwIO . InvalidArgs $ "invalid args at index " ++ show i ++ ": " ++ err
       Right cids -> do
@@ -96,6 +102,10 @@ postChains cis = do
         $logInfoS "postChainsR" $ T.intercalate ", " (T.pack . show <$> cids)
         yieldMany $ zipWith (\(ChainId a) b -> IEGenesis (IngestGenesis API (a,b))) cids cis
         return cids
+
+postChains :: (MonadIO m, MonadLogger m) =>
+              [ChainInfo] -> m [ChainId]
+postChains cs = runConduit $ postChainsConduit cs `fuseUpstream` emitKafkaTransactions
 
 ---------------------------------------
 

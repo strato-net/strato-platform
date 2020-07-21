@@ -12,7 +12,9 @@ module BlockApps.Bloc22.Database.Queries where
 
 import           Control.Arrow
 import           Control.Monad
+import           Control.Monad.Logger
 import           Control.Monad.Reader            (asks)
+import           Control.Monad.Trans.Control
 import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
@@ -56,6 +58,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 
+import           Control.Monad.Composable.BlocSQL
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
@@ -795,11 +798,8 @@ instance Default Constant (Maybe ChainId) (Column PGBytea) where
                 Nothing -> BS.empty
                 Just cid -> word256ToByteString $ unChainId cid
 
-insertContractInstance
-  :: Int32
-  -> Address
-  -> Maybe ChainId
-  -> Bloc Int32
+insertContractInstance :: (MonadIO m, MonadBaseControl IO m, HasBlocSQL m, MonadLogger m) =>
+                          Int32 -> Address -> Maybe ChainId -> m Int32
 insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertManyReturning conn contractsInstanceTable
   [
   ( Nothing

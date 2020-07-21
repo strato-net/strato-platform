@@ -34,7 +34,7 @@ library:
     - clock
     - common-log
     - conduit
-    - core-api
+    - core-api2
     - cryptonite
     - directory
     - extra
@@ -46,7 +46,9 @@ library:
     - insert-ordered-containers
     - lens
     - memory
+    - monad-alter
     - monad-control
+    - monad-logger
     - mtl
     - opaleye
     - ordered-containers
