@@ -20,6 +20,8 @@ import           Options
 import           HFlags
 
 
+-- usage: migrate-nodekey --pw=<vault_password> --key=<nodekey_to_insert>
+
 main :: IO ()
 main = do
   _ <- $initHFlags "migrate-nodekey"
