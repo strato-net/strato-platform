@@ -73,9 +73,6 @@ library:
   - unliftio-core
   - yaml
 
-  # remove after testing the nodekey migration
-  - blockapps-vault-wrapper-server
-
 executables:
   strato-setup:
     source-dirs: exec_src/

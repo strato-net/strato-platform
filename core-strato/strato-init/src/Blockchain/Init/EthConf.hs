@@ -1,34 +1,24 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 module Blockchain.Init.EthConf (genEthConf) where
 
--- import Control.Concurrent
-import Control.Monad
+import           Control.Concurrent
 import qualified Data.ByteString.Base16             as B16
-import qualified Data.ByteString.Base64             as B64
 import qualified Data.ByteString.Char8              as C8
-import Data.Coerce
-import Data.Maybe
-import Data.Either.Extra
-import System.Entropy
-import System.Environment
+import           Data.Maybe
+import qualified Data.Text                          as T
+import           Network.HTTP.Client                (newManager, defaultManagerSettings)
+--import           Network.HTTP.Types.Status
+import           Servant.Client
+import           System.Entropy
+import           Text.Format
 
-import qualified Data.Text as T
-import Servant.Client
-import Network.HTTP.Client (newManager, defaultManagerSettings)
---import Network.HTTP.Types.Status
-import Strato.Strato23.Client
---import Strato.Strato23.API.Types
---import qualified Crypto.Secp256k1 as Crypto
+import           Blockchain.EthConf
+import           Blockchain.Init.Options
+import           Blockchain.Strato.Model.Address
+import           Strato.Strato23.Client
+import qualified Strato.Strato23.API                as VC
 
-import Blockchain.EthConf
-import Blockchain.Init.Options
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
-
-
-
--- TODO: Remove after migration testing
-import Strato.Strato23.MigrateNodeKey
 
 
 defaultSqlConfig :: SqlConf
@@ -61,9 +51,6 @@ defaultBlockConfig =
       blockTime = 13,
       minBlockDifficulty = 131072
     }
-
-defaultPrivKey :: PrivKey
-defaultPrivKey = PrivKey 0
 
 defaultEthUniqueId :: EthUniqueId
 defaultEthUniqueId =
@@ -102,7 +89,6 @@ defaultConfig :: EthConf
 defaultConfig =
     EthConf {
       ethUniqueId        = defaultEthUniqueId,
-      privKey            = defaultPrivKey,
       sqlConfig          = defaultSqlConfig,
       redisBlockDBConfig = defaultRedisBlockDBConfig,
       levelDBConfig      = defaultLevelDBConfig,
@@ -113,38 +99,27 @@ defaultConfig =
     }
 
 
-
---getNodeKey :: ClientEnv -> IO Crypto.PubKey
---getNodeKey clientEnv = do
---  pIsSet <- runClientM (postPassword $ T.pack "1234") clientEnv
---  case pIsSet of 
---    Left err -> error $ "could not set vault-wrapper password: " ++ (show err)
---    Right _ -> do 
---      ePub <- runClientM (postKey $ T.pack "_nodekey") clientEnv 
---      case ePub of 
---        Left (FailureResponse resp) -> do
---          if (statusCode $ responseStatusCode resp) == 503 then do
---            putStrLn $ "vault-wrapper password is not set, cannot create nodekey"
---            threadDelay $ 50000
---            getNodeKey clientEnv
---          else
---            error $ "some unexpected error creating nodekey:" ++ (show resp)
---        Left err -> error $ "even more odd an error creating nodekey: " ++ (show err)
---        Right pk -> return $ unPubKey pk
+getNodeKey :: IO (VC.PublicKey, Address)
+getNodeKey = do
+  mgr <- newManager defaultManagerSettings
+  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
+  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+  ak <- waitOnVault $ runClientM (postKey $ T.pack "_nodekey") clientEnv 
+  return (VC.unPubKey ak, VC.unAddress ak)
 
 
 -- TODO: maybe this should be a generic util function somewhere else
-{- waitOnVault :: (Show a) => IO (Either a b) -> IO b
+waitOnVault :: (Show a) => IO (Either a b) -> IO b
 waitOnVault action = do
-  putStrLn "asking vault-wrapper for the node address (or to create a new key)"
+  putStrLn "asking vault-wrapper for the node's key (or to create a new key)"
   res <- action
   case res of
-    Left err -> do 
-      putStrLn $ "failed to get node address from vault-wrapper... got this error: " ++ show err
+    Left _ -> do 
+      putStrLn $ "failed to connect to vault-wrapper... probably password is not set?" 
       threadDelay 2000000 -- 2 seconds
       waitOnVault action
     Right val -> return val  
- -}
+
 
 genEthConf :: IO EthConf
 genEthConf = do
@@ -167,40 +142,13 @@ genEthConf = do
                   return "localhost"
          host' -> return host'
 
+
+  (pub, addr) <- getNodeKey 
+  putStrLn $ "the node's public key: " ++ format pub
+  putStrLn $ "the node's address: " ++ format addr
+
+
   bytes <- getEntropy 20
-
-
-
-  mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
-  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
-
-  -- temp
-  pIsSet <- runClientM (postPassword $ T.pack "123") clientEnv
-  pub <- case pIsSet of 
-    Left err -> error $ "could not set vault-wrapper password: " ++ (show err)
-    Right _ -> do 
-      key <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-      migrateNodeKey key "123"
-
---  pub <- getNodeKey clientEnv
-
-  putStrLn $ "DEBUG/vault's node public key: " ++ (show pub)
-
-  -- TODO: what to do with the pubkey, privkey in ethconf file?
- 
-
-  --       If blockstanbulPrivateKey is set, run migration code to add it to vault-wrapper
-  --       manually. Then we don't need it anymore after that. If not, make the key.
-  
-  myPrivKey <-
-    if flags_singlePrivateKey
-      then do 
-        !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-        let !bs = fromRight (error $ "Invalid base64 NODEKEY: " ++ show skey) . B64.decode . C8.pack $ skey
-        when (C8.length bs /= 32) $ error $ "The private key decoded from NODEKEY is the wrong length: NODEKEY: " ++ show skey ++ ", decoded: '" ++ C8.unpack (B16.encode bs) ++ "'"
-        return . PrivKey . fromIntegral $ bytesToWord256 bs
-      else generatePrivKey
   let user'' =  case maybePGuser of
                     Nothing  -> "postgres"
                     Just ""  -> "postgres"
@@ -228,13 +176,12 @@ genEthConf = do
 
 
   return cfg {
-                   privKey = myPrivKey,
                    sqlConfig = pgCfg'',
                    kafkaConfig = kafkaCfg,
                    ethUniqueId = defaultEthUniqueId {
                      peerId = uniqueString
                    },
                    quarryConfig = (quarryConfig cfg) {
-                    coinbaseAddress = formatAddressWithoutColor . fromInteger $ coerce myPrivKey
+                    coinbaseAddress = formatAddressWithoutColor addr
                    }
                  }
