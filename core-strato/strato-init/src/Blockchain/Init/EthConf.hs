@@ -104,7 +104,7 @@ getNodeKey = do
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
   let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
-  ak <- waitOnVault $ runClientM (postKey $ T.pack "_nodekey") clientEnv 
+  ak <- waitOnVault $ runClientM (postKey $ T.pack "nodekey") clientEnv 
   return (VC.unPubKey ak, VC.unAddress ak)
 
 
