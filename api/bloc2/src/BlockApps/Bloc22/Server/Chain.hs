@@ -100,7 +100,7 @@ createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               b' = fst . B16.decode $ encodeUtf8 b
-              codeInfo' = CodeInfo b' s contractdetailsName
+              codeInfo' = CodeInfo b' s cname
           return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let maybeNonContract a b | a == governanceAddress = Nothing

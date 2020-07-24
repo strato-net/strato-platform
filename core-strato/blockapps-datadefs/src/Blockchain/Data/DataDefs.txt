@@ -194,7 +194,7 @@ CodeInfoRef
     chainInfoId ChainInfoRefId
     evmByteCode BS.ByteString
     contractCode String
-    contractName String
+    contractName String Maybe
     deriving Eq Generic Show
 
 ChainMetadataRef
