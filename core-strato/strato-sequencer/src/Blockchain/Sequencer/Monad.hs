@@ -386,8 +386,6 @@ instance HasVault SequencerM where
   getPub = error "called getPub in SequencerM, but this should never happen"
   getShared _ = error "called getShared in SequencerM, but this should never happen"
 
--- TODO: this could be a more specific servant retry function...since other parts of strato will need it,
--- maybe it should be in a util module or something
 waitOnVault :: (Show a) => SequencerM (Either a b) -> SequencerM b
 waitOnVault action = do
   $logInfoS "SequencerM/Signs" "Asking the vault-wrapper to sign a Blockstanbul message"

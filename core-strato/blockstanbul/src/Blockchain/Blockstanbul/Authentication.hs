@@ -17,7 +17,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
-import qualified Data.Text as T
 import Test.QuickCheck
 import Text.Printf
 
@@ -30,7 +29,6 @@ import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.ECDSA
-import Blockchain.Output
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256

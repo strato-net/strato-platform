@@ -136,6 +136,7 @@ data Config = Config
   , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
   , configConnectionTimeout  :: ConnectionTimeout
   , configMaxReturnedHeaders :: MaxReturnedHeaders
+  , configVaultClient        :: ClientEnv
   , configContext            :: IORef Context
   }
 
@@ -320,34 +321,27 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
 
--- TODO: ideally, we put one ClientEnv into the Config and not make a new one for 
--- each request, and then we can make this an instance on ReaderT
 instance (MonadIO m, Monad m) => HasVault (ReaderT Config m) where
   sign bs = do
-    mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
-    let env = ClientEnv mgr url  Nothing
-    liftIO $ waitOnVault $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) env
+    vc <- asks configVaultClient 
+    liftIO $ waitOnVault $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
   
   getPub = do
-    mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
-    let env = ClientEnv mgr url  Nothing
-    fmap VC.unPubKey $ liftIO $ waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) env
+    vc <- asks configVaultClient 
+    fmap VC.unPubKey $ liftIO $ waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
   
   getShared pub = do
-    mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
-    let env = ClientEnv mgr url  Nothing
-    liftIO $ waitOnVault $ runClientM (VC.getSharedKey "nodekey" pub) env
+    vc <- asks configVaultClient 
+    liftIO $ waitOnVault $ runClientM (VC.getSharedKey "nodekey" pub) vc
 
 
 waitOnVault :: (Show a) => IO (Either a b) -> IO b
 waitOnVault action = do
+  putStrLn "calling vault-wrapper..."
   res <- action
   case res of
     Left err -> do
-      putStrLn $ "waiting and waiting and waiting, because of: " ++ show err
+      putStrLn $ "got an error from vault-wrapper: " ++ show err
       threadDelay 2000000
       waitOnVault action
     Right val -> return val
@@ -425,6 +419,11 @@ initConfig :: ( MonadLogger m
 initConfig maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  vaultClient <- do
+    mgr <- liftIO $ newManager defaultManagerSettings
+    url <- liftIO $ parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+    return $ ClientEnv mgr url Nothing
+
   initState <- newIORef initContext
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -433,6 +432,7 @@ initConfig maxHeaders = do
     , configVmEventsSink = void . produceVMEventsM
     , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
+    , configVaultClient = vaultClient
     , configContext = initState
     }
 
