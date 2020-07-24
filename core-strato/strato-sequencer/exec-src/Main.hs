@@ -9,10 +9,10 @@ import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
-import qualified Data.Aeson                 as Ae
+--import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
 import qualified Data.Text                  as T
-import           Data.Either.Extra
+--import           Data.Either.Extra
 import           HFlags
 import           Safe
 
@@ -71,16 +71,7 @@ main = do
         , kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId'
         , cablePackage = pkg
         }
-  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
-      !validators = fromRight (error "invalid validators") eValidators
-      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
-      !authSenders = fromRight (error "invalid admins") eAuthSenders
-  ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
-  putStrLn $ "Checkpoint: " ++ show ckpt
-      -- TODO(tim): checkpoint validators, authSenders
-  putStrLn $ "Interpreted validators: " ++ show validators
   
- 
   -- setup the connection with vault-wrapper
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
@@ -92,6 +83,20 @@ main = do
   
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
   addSelfAsMetric selfAddress
+ 
+--  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
+--      !validators' = fromRight (error "invalid validators") eValidators
+      -- since selfAddr can't be known before starting strato, we add it to the validator list and admins list
+  let validators = [selfAddress] -- : validators'
+--      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
+--      !authSenders' = fromRight (error "invalid admins") eAuthSenders
+      authSenders = [selfAddress] -- : authSenders'
+  ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
+  putStrLn $ "Checkpoint: " ++ show ckpt
+      -- TODO(tim): checkpoint validators, authSenders
+  putStrLn $ "Interpreted validators: " ++ show validators
+  
+ 
   
   mCtx <- if not flags_blockstanbul
              then do
