@@ -371,8 +371,7 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
     (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
     when (addressNonce > txn) .
        throwE $ NonceTooLow Validation Incoming addressNonce t
-    when (addressBalance < txFee) $ do
-       $logInfoS "X509" . T.pack $ "about to throw low balance error for address: " ++ (format address)
+    when (addressBalance < txFee) .
        throwE $ BalanceTooLow Validation Incoming txFee addressBalance t
     return ()
 

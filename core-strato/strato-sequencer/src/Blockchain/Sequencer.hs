@@ -350,7 +350,6 @@ transformFullTransactions pairs = do
       Nothing -> return Nothing
       Just otx -> do
         let witnessHash = witnessableHash otx
-        $logInfoS "X509" . T.pack $ "outputTX signer address:" ++ (format $ otSigner otx)
         wasTransactionHashWitnessed witnessHash >>= \case
           True -> do
             logF $ "Already witnessed " ++ prettyTx itx

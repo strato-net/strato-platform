@@ -141,7 +141,6 @@ signMessage tm = do
   let mesg = getHash tm
   addr <- use selfAddr
   sig <- sign mesg
-  $logInfoS "X509" . T.pack $ "we are signing a message....hope it doesn't fail!"
   return $ OMsg (MsgAuth addr sig) $ tm
 
 authenticate :: InEvent -> Bool

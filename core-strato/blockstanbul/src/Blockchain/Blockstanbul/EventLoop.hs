@@ -115,7 +115,6 @@ roundChange :: (StateMachineM m) => ConduitM InEvent OutEvent m ()
 roundChange = do
   nextView <- uses view (over round (+1))
   pendingRound .= Just (_round nextView)
-  $logInfoS "X509" . T.pack $ "Round change! Signing round change message"
   yieldM $ signMessage (RoundChange nextView)
 
 
@@ -156,7 +155,6 @@ nextRound nt = do
       Nothing -> yield MakeBlockCommand
       Just lb -> do
         v <- use view
-        $logInfoS "X509" . T.pack $ "Setting up next round, signing prepare message"
         yieldM $ signMessage (Preprepare v lb)
   prepared .= M.empty
   committed .= M.empty
@@ -236,7 +234,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           Right () -> do
             hasPreprepared .= True
             proposal .= Just realSealed
-            $logInfoS "X509" . T.pack $ "Unannounced block received, signing Preprepare message"
             yieldM $ signMessage (Preprepare v realSealed)
     IMsg auth (Preprepare v' pp) -> do
       pr <- use proposer
@@ -270,7 +267,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
                 Right () -> do
                   proposal .= Just pp
                   editVoted pp pr
-                  $logInfoS "X509" . T.pack $ "Prepare message received, signing Prepare message"
                   yieldM $ signMessage (Prepare v (blockHash pp))
     IMsg auth (Prepare v' di) -> when (v <= v') $ do
       ps <- prepared <%= M.insert (sender auth) di
@@ -282,7 +278,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
         hasPrepared .= True
         setLock
         seal <- commitmentSeal di
-        $logInfoS "X509" . T.pack $ "Prepare message received, signing Commit"
         yieldM $ signMessage (Commit v di seal)
     IMsg auth (Commit v' di seal) -> when (v <= v') $ do
       cs <- committed <%= M.insert (sender auth) (di, seal)
