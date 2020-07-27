@@ -65,7 +65,7 @@ runPeer peer _ _ = do
     void $ register ender
 
     myPublic <- getPub
-
+    
     otherPubKey <- case (pPeerPubkey peer) of
       Nothing -> do
         $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
@@ -78,10 +78,6 @@ runPeer peer _ _ = do
             $logErrorS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
             throwIO NoPeerPubKey
       Just pub -> return pub
-
-
-    --let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
-
 
     $logInfoS "runPeer" . T.pack . C.blue  $ "Welcome to strato-p2p-client"
     $logInfoS "runPeer" . T.pack . C.blue  $ "============================"
@@ -125,24 +121,6 @@ runEthClientConduit peer peerSource peerSink seqSource unseqSink peerStr = do
                   .| handleMsgClientConduit myPublic peer
                   .| eventSink
                   .| peerSink
-
-{- getPubKeyRunPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-                 => PPeer
-                 -> BC.ByteString
-                 -> CommPort
-                 -> m ()
-getPubKeyRunPeer peer otherServiceCommHost otherServiceCommPort = do 
-    case (pPeerPubkey peer) of
-      Nothing -> do
-        $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
-        eitherOtherPubKey <- getServerPubKey (T.unpack $ pPeerIp peer) (fromIntegral $ pPeerTcpPort peer)
-        case eitherOtherPubKey of
-          Right otherPubKey -> do
-            $logInfoS "getPubKeyRunPeer" $ T.pack $ "#### Success, the pubkey has been obtained: " ++ format otherPubKey
-            runPeer peer{pPeerPubkey=Just otherPubKey} otherServiceCommHost otherServiceCommPort
-          Left e -> $logInfoS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
-      Just _ -> runPeer peer otherServiceCommHost otherServiceCommPort
--}
 
 runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
               => PPeer

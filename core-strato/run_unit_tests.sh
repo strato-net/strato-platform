@@ -10,6 +10,7 @@ TESTS=(
   blockapps-tools
   blockstanbul
   ethereum-discovery
+  ethereum-encryption
   ethereum-rlp
   ethereum-vm
   fast-keccak256
