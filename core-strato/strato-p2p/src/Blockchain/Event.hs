@@ -460,7 +460,7 @@ handleGetChainDetails peer cids' = do
 
   unless (null filteredPairs) $ do
     cInfos <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) cids
-    yieldR $ ChainDetails cInfos
+    for_ cInfos $ yieldR . ChainDetails . (:[])
     lift stampActionTimestamp
     $logInfoS "handleGetChainDetails" $ T.pack $ "the following ChainIds were returned " ++
       (intercalate "\n" $ formatChainId . Just . fst <$> cInfos)

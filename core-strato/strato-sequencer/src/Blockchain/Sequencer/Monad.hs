@@ -120,15 +120,15 @@ data Modification a = Modification a | Deletion
 
 data SequencerContext = SequencerContext
   { _dependentBlockDB    :: DependentBlockDB
-  , _seenTransactionDB   :: SeenTransactionDB
-  , _dbeRegistry         :: Map Keccak256 DependentBlockEntry
-  , _blockHashRegistry   :: Map Keccak256 (Modification OutputBlock)
-  , _txHashRegistry      :: Map Keccak256 (Modification OutputTx)
-  , _chainHashRegistry   :: Map Keccak256 (Modification ChainHashEntry)
-  , _chainIdRegistry     :: Map Word256 (Modification ChainIdEntry)
-  , _getChainsDB         :: GetChainsDB
-  , _getTransactionsDB   :: GetTransactionsDB
-  , _ldbBatchOps         :: Q.Seq LDB.BatchOp
+  , _seenTransactionDB   :: !SeenTransactionDB
+  , _dbeRegistry         :: !(Map Keccak256 DependentBlockEntry)
+  , _blockHashRegistry   :: !(Map Keccak256 (Modification OutputBlock))
+  , _txHashRegistry      :: !(Map Keccak256 (Modification OutputTx))
+  , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
+  , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
+  , _getChainsDB         :: !GetChainsDB
+  , _getTransactionsDB   :: !GetTransactionsDB
+  , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
@@ -173,11 +173,11 @@ instance HasDependentBlockDB SequencerM where
 
 instance Mod.Modifiable GetChainsDB SequencerM where
   get _ = use getChainsDB
-  put _ = assign getChainsDB
+  put _ g = modify' $ getChainsDB .~ g
 
 instance Mod.Modifiable GetTransactionsDB SequencerM where
   get _ = use getTransactionsDB
-  put _ = assign getTransactionsDB
+  put _ g = modify' $ getTransactionsDB .~ g
 
 instance HasPrivateHashDB SequencerM where
   requestChain = insertGetChainsDB
@@ -262,7 +262,7 @@ genericInsertSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
                        -> a
                        -> SequencerM ()
 genericInsertSequencer registry p k a = do
-  registry . at k ?= Modification a
+  modify' $ registry . at k ?~ Modification a
   addLdbBatchOps . (:[]) $ batchInsertInLDB p k a
 
 genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
@@ -271,7 +271,7 @@ genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
                        -> NSKey a
                        -> SequencerM ()
 genericDeleteSequencer registry p k = do
-  registry . at k ?= Deletion
+  modify' $ registry . at k ?~ Deletion
   addLdbBatchOps . (:[]) $ batchDeleteInLDB p k
 
 instance (Keccak256 `A.Alters` OutputBlock) SequencerM where
@@ -325,19 +325,19 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
       Just v -> return $ Just v
       Nothing -> genericLookupDependentBlockDB k
   insert _ k v = do
-    dbeRegistry . at k ?= v
+    modify' $ dbeRegistry . at k ?~ v
     addLdbBatchOps . (:[]) $ genericBatchInsertDependentBlockDB k v
   delete _ k = do
-    dbeRegistry . at k .= Nothing
+    modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
-  put _ = assign seenTransactionDB
+  put _ = modify' . (.~) seenTransactionDB
 
 instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
   get _ = use ldbBatchOps
-  put _ = assign ldbBatchOps
+  put _ = modify' . (.~) ldbBatchOps
 
 instance Mod.Accessible (IORef RoundNumber) SequencerM where
   access _ = use latestRoundNumber
@@ -367,7 +367,7 @@ instance (Keccak256 `A.Alters` ()) SequencerM where
 
 instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
-  putBlockstanbulContext = assign (blockstanbulContext . _Just)
+  putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
 
 
 -- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key, 
@@ -406,9 +406,7 @@ prunePrivacyDBs = do
   prune txHashRegistry
   prune chainHashRegistry
   prune chainIdRegistry
-  where prune = flip (%=) . M.mapMaybe $ \case
-          Modification a -> Just $ Modification a
-          Deletion       -> Nothing
+  where prune r = modify' $ r .~ M.empty
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
@@ -441,7 +439,7 @@ pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
 pairToVmTx = uncurry VmTx
 
 clearDBERegistry :: SequencerM ()
-clearDBERegistry = dbeRegistry .= M.empty
+clearDBERegistry = modify' $ dbeRegistry .~ M.empty
 
 createFirstTimer :: ( MonadBlockstanbul m
                     , Mod.Accessible View m

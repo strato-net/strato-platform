@@ -41,7 +41,7 @@ build_all: bloc strato apex dappstore nginx postgrest prometheus smd vault-wrapp
 
 apex:
 	@echo Now building apex...
-	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} make --directory=apex/
+	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} STRATO_VERSION=${VERSION} make --directory=apex/
 
 dappstore:
 	@echo Now building dappstore...

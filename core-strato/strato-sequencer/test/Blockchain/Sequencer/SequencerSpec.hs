@@ -345,7 +345,7 @@ spec = do
             iev = IEBlock . blockToIngestBlock TO.Morphism $ b
         BatchSeqEvent{..} <- runBatch $ checkForUnseq [iev]
         let pbftEvs = [m | P2pBlockstanbul (WireMessage _ m) <- _toP2p]
-        map categorize pbftEvs `shouldMatchList` [PreprepareK, PrepareK, CommitK]
+        map categorize pbftEvs `shouldMatchList` [PreprepareK, PrepareK, PrepareK, CommitK, CommitK]
         _toVm `shouldContain` [VmCreateBlockCommand]
 
       it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
