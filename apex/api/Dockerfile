@@ -21,4 +21,8 @@ RUN npm install
 
 COPY . /usr/src/app
 
+ARG STRATO_VERSION
+
+ENV STRATO_VERSION=${STRATO_VERSION}
+
 CMD [ "bash", "-c", "/usr/src/app/docker-run.sh" ]

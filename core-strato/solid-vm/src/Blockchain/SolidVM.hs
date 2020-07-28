@@ -140,7 +140,7 @@ create' creator newAddress ch cc contractName' argExps = do
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAddress ++ " of type " ++ contractName'
 
-  let contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. contracts . at contractName')
+  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. contracts . at contractName')
 
   -- Add Storage
 
@@ -224,7 +224,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
-        argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
+        !argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
 
@@ -274,7 +274,7 @@ getCodeAndCollection address' = do
         ch -> internalError "SolidVM for non-solidvm code" (format ch)
 
 
-    let contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
+    let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
 
     return (contract', ch, cc)
 
@@ -489,7 +489,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
   return Nothing -- just throw away the return value
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression)) = do
-  let maybeLoc = case entries of
+  let !maybeLoc = case entries of
                       [e] -> Xabi.vardefLocation e
                       es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
                               -- It is possible to supply locations in tuple definitions, but
@@ -786,21 +786,22 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SEnum enumName, _) -> do
         contract' <- getCurrentContract
         let maybeEnumValues = M.lookup enumName $ contract' ^. enums
-            enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
-            num = maybe (missingType "Enum nonexistent member" (enumName, name))
-                        fromIntegral
-                        (name `elemIndex` enumVals)
+            !enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
+            !num = maybe (missingType "Enum nonexistent member" (enumName, name)) 
+                         fromIntegral 
+                         (name `elemIndex` enumVals)
         return $ Constant $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (Constant . SAddress . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAddress . Env.origin) <$> getEnv
-      (SStruct _ theMap, fieldName) ->
-        return $ fromMaybe (missingField "struct member access" fieldName)
-                  $ M.lookup fieldName theMap
+      (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
+          Nothing -> missingField "struct member access" fieldName
+          Just v -> return v
       (SContractDef contractName', constName) -> do
         --TODO- move all variable name resolution by contract to a function
         (_, cc) <- getCurrentCodeCollection
-        let cont = fromMaybe (missingType "contract function lookup" contractName')
-                          (M.lookup contractName' $ cc^.contracts)
+        cont <- case M.lookup contractName' $ cc^.contracts of
+          Nothing -> missingType "contract function lookup" contractName'
+          Just ct -> pure ct
         if constName `M.member` _functions cont
           then do
             -- TODO: Check that this contract actually is a contractName'
@@ -1078,7 +1079,7 @@ expToVar' (Xabi.FunctionCall e args) = do
 
     Constant (SStructDef structName) -> do
       contract' <- getCurrentContract
-      let vals = fromMaybe (missingType "struct constructor not found" structName)
+      let !vals = fromMaybe (missingType "struct constructor not found" structName)
                $ M.lookup structName $ contract'^.structs
       return . Constant . SStruct structName . fmap Constant . M.fromList $
         case argVals of
@@ -1119,7 +1120,7 @@ expToVar' (Xabi.FunctionCall e args) = do
       case argVals of
         OrderedVals [SInteger i] -> do
           c <- getCurrentContract
-          let theEnum = fromMaybe (missingType "enum constructor" enumName)
+          let !theEnum = fromMaybe (missingType "enum constructor" enumName)
                       $ M.lookup enumName $ c^.enums
           return $ Constant $ SEnumVal enumName (theEnum !! fromInteger i) (fromInteger i)
         _ -> typeError "called enum constructor with improper args" argVals
@@ -1243,7 +1244,7 @@ bytesToInteger bytes =
 
 runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
-  let contract' =
+  let !contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.contracts . at contractName'
       argPairs = fromMaybe [] . fmap Xabi.funcArgs $ contract' ^. constructor
@@ -1317,7 +1318,9 @@ runTheConstructors from to hsh cc contractName' argExps = do
       Just theFunction -> do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
-        let commands = fromMaybe (missingField "contract constructor has been declared but not defined" contractName') $ Xabi.funcContents theFunction
+        commands <- case Xabi.funcContents theFunction of
+          Nothing -> missingField "contract constructor has been declared but not defined" contractName'
+          Just cms -> pure cms
         _ <- pushSender from $ runStatements commands
         return ()
 
@@ -1388,7 +1391,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
 --  forM_ locals $ \(n, (_, v)) -> do
 --    liftIO $ putStrLn "need to initialize the storage 2"
 --    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
-  let commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
+  let !commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
   val <- runStatements commands
 
   let findNamedReturns = do

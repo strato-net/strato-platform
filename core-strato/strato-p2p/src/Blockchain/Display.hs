@@ -42,5 +42,9 @@ displayMessage dir peerName (BlockBodies bodies) = do
     ++ "(" ++ show (length bodies)
     ++ " bodies, includes " ++ show transactionCount
     ++ " transaction" ++ (if transactionCount == 1 then "" else "s") ++ ")"
+displayMessage dir peerName (ChainDetails cInfos) = do
+  let chainIds = fst <$> cInfos
+  $logInfoS "displayMessage" $ T.pack $ prefix dir peerName ++ CL.blue "ChainDetails: "
+    ++ concat (map (\cId -> "\n  " ++ format cId) chainIds)
 displayMessage dir peerName msg =
   $logInfoS "displayMessage" $ T.pack $ (prefix dir peerName) ++ format msg
