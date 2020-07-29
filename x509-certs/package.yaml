@@ -10,36 +10,39 @@ description:
     A Haskell x509 certificate generator
 
 dependencies:
+  - asn1-encoding
+  - asn1-types
   - base >= 4 && < 5
+  - bytestring
+  - cereal
+  - containers
+  - cryptonite
+  - ecdsa
+  - hourglass
+  - memory
+  - pem
+  - random
+  - time
+  - transformers
+  - secp256k1-haskell
   - x509
 #   - x509-util
 #  - x509-store
 #  - x509-validation
-  - asn1-encoding
-  - asn1-types
-  - cryptonite
-  - cereal
-  - hourglass
-  - time
-  - ecdsa
-  - bytestring
-  - pem
-  - random
-  - transformers
-  - containers
 
 ghc-options: -Wall -Werror
 
 
 library:
   source-dirs: src
-  ghc-options: -Wall -O2
+  ghc-options: -Wall -O2 
 
 
 executables:
-  x509certs:
+  x509Test:
     source-dirs: exec_src/
-    main: x509CertsMain.hs
+    main: x509Test.hs
     dependencies:
       - hflags
       - x509-certs
+      - secp256k1-haskell

@@ -6,39 +6,43 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 
-module Generate (
+module X509.Generate (
   Issuer(..),
   Subject(..),
   certToBytes, 
-  privToBytes,
-  pubToBytes,
+--  privToBytes,
+--  pubToBytes,
   bsToCert,
-  bsToPriv,
-  bsToPub,
+--  bsToPriv,
+--  bsToPub,
   makeSignedCert,
-  signWithECDSA,
+--  ecdsaWithSHA256,
   fromASN1CS -- TODO: you don't need this to be exported...create the Issuer maker func
  ) where
 
 
 
 
-import           Crypto.PubKey.ECC.DH
-import           Crypto.PubKey.ECC.ECDSA        
+--import           Crypto.PubKey.ECC.DH
+--import           Crypto.PubKey.ECC.ECDSA        
 import           Crypto.PubKey.ECC.Types
-import           Crypto.Number.Serialize
+--import           Crypto.Number.Serialize
+import           Crypto.Hash
 import qualified Crypto.Hash.Algorithms         as CH
 
+import qualified Crypto.Secp256k1               as SEC
 
-import           Data.ASN1.Encoding
-import           Data.ASN1.BinaryEncoding
+--import           Data.ASN1.Encoding
+--import           Data.ASN1.BinaryEncoding
 import           Data.ASN1.OID
 import           Data.ASN1.Types.String
-import           Data.ASN1.Types                
-import           Data.Serialize
+--import           Data.ASN1.Types                
+import qualified Data.ByteArray                 as BA
 import qualified Data.ByteString                as B
+
+--import           Data.Serialize
 import           Data.X509
-import           Data.X509.EC
+--import           Data.X509.EC
 import           Data.PEM
 import           Data.Maybe
 
@@ -46,10 +50,10 @@ import           Data.Maybe
 import           Time.Types
 import           Time.System
 import           System.Random
-import           GHC.Generics
+--import           GHC.Generics
 
 
-import qualified ECDSA                          as ECD
+--import qualified ECDSA                          as ECD
 
 
 
@@ -74,7 +78,7 @@ data Issuer = Issuer
     issCommonName :: String
   , issCountry    :: String
   , issOrg        :: String
-  , issPriv       :: PrivateNumber
+  , issPriv       :: SEC.SecKey
   } deriving (Show, Eq)
 
 
@@ -84,12 +88,12 @@ data Subject = Subject
   , subCountry    :: String
   , subOrg        :: String
   , subUnit       :: String
-  , subPub        :: PublicPoint
+  , subPub        :: SEC.PubKey
   } deriving (Show, Eq)
 
 
 
-
+{-
 deriving instance Generic PublicPoint
 deriving instance Serialize PublicPoint
 
@@ -117,7 +121,7 @@ instance ASN1Object PrivKeyEC where
         : End (Container Context 0) 
         : End Sequence : xs ) = Right (PrivKeyEC_Named SEC_p256k1 (os2ip str), xs) 
   fromASN1 _ = error "no ASN1 decoding for this kind of EC private key"
-  
+  -}
 
 
 
@@ -138,7 +142,7 @@ certToPem cert = PEM
   , pemContent = encodeSignedObject cert
   }
 
-
+{- 
 privToBytes :: PrivateNumber -> B.ByteString
 privToBytes = pemWriteBS . privToPem
 
@@ -161,25 +165,13 @@ pubToPem pub = PEM
   , pemHeader = []
   , pemContent = encodeASN1' DER $ toASN1 (serializeAndWrap pub) []
   }
-
+-}
 
 ----------------------------------------------------------------------------------------------
 ---------------------------------------- READING ---------------------------------------------
 ----------------------------------------------------------------------------------------------
 
 
-bsToPriv :: B.ByteString -> PrivateNumber
-bsToPriv bs =
-  case (pemParseBS bs) of
-    Left str -> error str
-    Right [] -> error "nothing parsed...but no errors?"
-    Right (pem:_) -> 
-      case (decodeASN1' DER $ pemContent pem) of
-        Left err -> error (show err)
-        Right asn -> case fromASN1 asn of
-          Left str' -> error str'
-          Right (PrivKeyEC_Named SEC_p256k1 priv, _) -> priv
-          Right _ -> error "we didn't encode this private key, its a diff type"
 
 
 
@@ -194,6 +186,19 @@ bsToCert bs =
         Left str -> error str
         Right cert -> cert
 
+{-
+bsToPriv :: B.ByteString -> PrivateNumber
+bsToPriv bs =
+  case (pemParseBS bs) of
+    Left str -> error str
+    Right [] -> error "nothing parsed...but no errors?"
+    Right (pem:_) -> 
+      case (decodeASN1' DER $ pemContent pem) of
+        Left err -> error (show err)
+        Right asn -> case fromASN1 asn of
+          Left str' -> error str'
+          Right (PrivKeyEC_Named SEC_p256k1 priv, _) -> priv
+          Right _ -> error "we didn't encode this private key, its a diff type"
 
 bsToPub :: B.ByteString -> PublicPoint
 bsToPub bs = 
@@ -208,7 +213,7 @@ bsToPub bs =
           Right (PubKeyEC (PubKeyEC_Named SEC_p256k1 serialPt), _) -> fromMaybe (error "could not deserialize public point") $ unserializePoint (getCurveByName SEC_p256k1) serialPt
           Right _ -> error "we didn't encode this public key, its a diff type"
 
-
+-}
 
 --------------------------------------------------------------------------------------------
 --------------------------------- CERT GENERATION AND SIGNING ------------------------------
@@ -218,12 +223,10 @@ bsToPub bs =
 
 
 makeSignedCert :: Issuer -> Subject -> IO (SignedCertificate)
-makeSignedCert iss sub = signCert (issPriv iss) =<< makeCert iss sub
+makeSignedCert iss sub = makeCert iss sub >>= signCert (issPriv iss)
 
-signCert :: PrivateNumber -> Certificate -> IO (SignedCertificate)
-signCert priv' cert = objectToSignedExactF (signWithECDSA $ priv) cert
-  where
-    priv = PrivateKey (getCurveByName SEC_p256k1) priv'
+signCert :: SEC.SecKey -> Certificate -> IO (SignedCertificate)
+signCert priv cert = objectToSignedExactF (ecdsaWithSHA256 $ priv) cert
 
 makeCert :: Issuer -> Subject -> IO (Certificate)
 makeCert iss sub = do
@@ -244,15 +247,27 @@ makeCert iss sub = do
 
 
 
--- We must provide the signing function to the Data.X509 objectToSignedExact function 
--- with this return type
-signWithECDSA :: PrivateKey -> B.ByteString -> IO (B.ByteString, SignatureALG) 
+-- Data.X509's objectToSignedExact function expects a signing function with signature
+-- B.ByteString -> f (B.ByteString, SignatureALG), and assumes that you will hash the
+-- bytestring message, so hence this function. We partially apply the privkey when we 
+-- pass it to objectToSignedExact
+--
+-- yea, I wish we could use Keccak256. Data.X509 hasn't caught up yet. Maybe I'll
+-- make a PR for it
+ecdsaWithSHA256 :: SEC.SecKey -> B.ByteString -> IO (B.ByteString, SignatureALG)
+ecdsaWithSHA256 prv mesg' = do
+  let mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 mesg'
+      mesg = fromMaybe (error "msg hash was not 32 bytes") (SEC.msg mesgBS)
+      sig = SEC.signMsg prv mesg
+  return (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
+
+{- signWithECDSA :: PrivateKey -> B.ByteString -> IO (B.ByteString, SignatureALG) 
 signWithECDSA priv msg = do
   let hashAlg = CH.SHA256
   sig <- sign priv hashAlg msg
   
   return (ECD.signatureEncodeDER $ sillySignatureConversion sig, SignatureALG HashSHA256 PubKeyALG_EC) 
-
+-}
 
 
 toASN1CS :: String -> ASN1CharacterString
@@ -301,7 +316,13 @@ getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
 
 
-serializeAndWrap :: PublicPoint -> PubKey
+serializeAndWrap :: SEC.PubKey -> PubKey
+serializeAndWrap pub =
+  let serialPoint = SerializedPoint $ SEC.exportPubKey False pub
+  in PubKeyEC $ PubKeyEC_Named SEC_p256k1 serialPoint
+
+{-
+serializeAndWrap :: SEC.PubKey -> PubKey
 serializeAndWrap pub = 
   let serialPoint = serializePoint (getCurveByName SEC_p256k1) pub
       eccKey = case serialPoint of
@@ -342,4 +363,4 @@ serializePoint curve (Point px py) = SerializedPoint . B.cons ptFormat <$> outpu
       bits            = curveSizeBits curve
       dimensionLength = (bits + 7) `div` 8
 
-
+-}
