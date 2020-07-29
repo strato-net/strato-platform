@@ -25,8 +25,8 @@ import qualified Data.Text                       as T
 import           Database.PostgreSQL.Simple      (Connection)
 import           Opaleye                         hiding (not, null, index)
 
-import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Secp256k1
 
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Tables

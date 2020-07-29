@@ -37,7 +37,6 @@ import           Text.Printf
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
-import           Blockchain.ECDSA
 import           Blockchain.ExtWord
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
@@ -58,6 +57,7 @@ import qualified Blockchain.Data.RLP                       as RL
 
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 
 import           Blockchain.Util
 import qualified Text.Colors                               as CL

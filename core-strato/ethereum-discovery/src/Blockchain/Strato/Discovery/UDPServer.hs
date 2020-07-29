@@ -34,9 +34,9 @@ import           System.Timeout
 
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB
-import           Blockchain.ECDSA
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.P2PUtil

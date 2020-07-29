@@ -45,10 +45,10 @@ import           System.Timeout
 
 import           Blockchain.Data.RLP
 import           Blockchain.ExtendedECDSA -- say it with me: DEPRECATED!
-import           Blockchain.ECDSA
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..), hPubKeyToPubKey)
 import           Blockchain.Strato.Model.Keccak256           
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Util
 
 import           Blockchain.Strato.Discovery.Data.Peer

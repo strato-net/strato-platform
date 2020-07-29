@@ -12,7 +12,7 @@ import           Strato.Strato23.Crypto
 import           Strato.Strato23.Monad
 import           Strato.Strato23.Database.Queries
 import           Blockchain.Strato.Model.Address
-import           Blockchain.ECDSA
+import           Blockchain.Strato.Model.Secp256k1
 
 
 getKey :: Text -> Maybe Text -> VaultM AddressAndKey

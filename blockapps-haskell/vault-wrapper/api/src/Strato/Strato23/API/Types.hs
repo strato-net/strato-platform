@@ -26,8 +26,8 @@ import           Data.Swagger.Internal.Schema (named)
 
 import           GHC.Generics
 
-import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Secp256k1
 
 
 

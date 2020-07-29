@@ -65,7 +65,7 @@ import           Blockchain.Strato.Model.ExtendedWord (Word256)
 --TODO: remove some of these, reorganize
 --import qualified Crypto.Secp256k1 as SEC
 --import qualified Data.ByteString.Short as BSS
---import qualified Blockchain.ECDSA as EC
+--import qualified Blockchain.Strato.Model.Secp256k1 as EC
 
 instance TransactionLike Transaction where
     txHash        = \case

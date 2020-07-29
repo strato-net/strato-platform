@@ -20,7 +20,7 @@ import           Data.Word
 
 import           Blockchain.Data.RLP
 import           Blockchain.ExtWord
-import qualified Blockchain.ECDSA          as Secp256k1
+import qualified Blockchain.Strato.Model.Secp256k1          as Secp256k1
 import qualified Text.Colors               as CL
 import           Text.Format
 

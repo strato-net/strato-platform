@@ -94,7 +94,6 @@ import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
 import           Blockchain.ExtWord                        (Word256)
-import           Blockchain.ECDSA
 import           Blockchain.Output
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
@@ -105,6 +104,7 @@ import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
 import           Text.Format

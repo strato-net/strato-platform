@@ -5,9 +5,9 @@ import Control.Lens
 import qualified Data.ByteString as B
 import Data.Monoid ((<>))
 
-import Blockchain.ECDSA
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Secp256k1
 
 type RawExtraData = B.ByteString
 

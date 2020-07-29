@@ -22,9 +22,9 @@ import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
-import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.StateRoot
 
 

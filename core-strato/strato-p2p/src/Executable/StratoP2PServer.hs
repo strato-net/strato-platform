@@ -29,7 +29,7 @@ import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           UnliftIO
 
 import           Blockchain.Data.PubKey                (secPubKeyToPoint)
-import           Blockchain.ECDSA
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Options
 import           Blockchain.Output
 import           Blockchain.P2PUtil

@@ -31,8 +31,7 @@ import                 Blockchain.ExtWord
 import                 Blockchain.Frame
 import                 Blockchain.Handshake
 import                 Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
-
-import                 Blockchain.ECDSA
+import                 Blockchain.Strato.Model.Secp256k1
 
 
 bXor :: B.ByteString

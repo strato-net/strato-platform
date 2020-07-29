@@ -27,7 +27,7 @@ import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Data.RLP
-import           Blockchain.ECDSA
+import           Blockchain.Strato.Model.Secp256k1
 
 import           Servant.Client
 import qualified Strato.Strato23.API        as VC

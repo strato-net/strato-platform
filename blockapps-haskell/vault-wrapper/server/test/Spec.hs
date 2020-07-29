@@ -20,9 +20,9 @@ import           Data.Maybe
 import           Data.Coerce
 import           System.IO.Unsafe
 
-import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Secp256k1
 import qualified BlockApps.Ethereum                    as E
 import           Clockwork
 

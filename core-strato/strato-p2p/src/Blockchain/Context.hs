@@ -75,7 +75,6 @@ import           Blockchain.Data.Enode
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
-import           Blockchain.ECDSA
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
 import           Blockchain.Options
@@ -84,6 +83,7 @@ import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Stream.VMEvent             ( HasVMEventsSink(..)
                                                        , VMEvent(..)
                                                        , fetchLastVMEvents

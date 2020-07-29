@@ -33,8 +33,8 @@ import           BlockApps.Ethereum
 import           BlockApps.Logging
 import           BlockApps.Solidity.Contract()
 import           BlockApps.Strato.Types                 hiding (Transaction (..))
-import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.ExtendedWord   (Word256, bytesToWord256)
+import           Blockchain.Strato.Model.Secp256k1
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 

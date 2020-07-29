@@ -25,9 +25,9 @@ import           Blockchain.Blockstanbul.Messages
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
-import           Blockchain.ECDSA
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 
 
 class Monad m => HasBlockstanbulContext m where

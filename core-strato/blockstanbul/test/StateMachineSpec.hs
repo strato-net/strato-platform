@@ -29,7 +29,6 @@ import           Prelude                    hiding (round, sequence)
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Block
 import Blockchain.Data.BlockDB
-import Blockchain.ECDSA
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.BenchmarkLib
 import Blockchain.Blockstanbul.EventLoop
@@ -38,6 +37,7 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1
 
 
 

@@ -20,9 +20,9 @@ import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.BenchmarkLib
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.ECDSA
 import Blockchain.Output
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Secp256k1
 import Blockchain.VMContext
 import Executable.EVMFlags ()
 import Blockchain.VMOptions ()

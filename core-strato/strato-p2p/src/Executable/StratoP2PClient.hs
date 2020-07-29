@@ -37,7 +37,6 @@ import           UnliftIO
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context
 import           Blockchain.Data.PubKey                (secPubKeyToPoint)
-import           Blockchain.ECDSA
 import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Metrics
@@ -46,6 +45,7 @@ import           Blockchain.Output
 import           Blockchain.P2PRPC
 import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.TCPClientWithTimeout

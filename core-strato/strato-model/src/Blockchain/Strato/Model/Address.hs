@@ -52,9 +52,9 @@ import           Web.PathPieces
 
 
 import           Blockchain.Data.RLP
-import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
 import qualified Blockchain.Strato.Model.Keccak256    as SHA (hash, keccak256ToWord256)
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Util
 import qualified Data.NibbleString                    as N
 import qualified Data.RLP                             as RLP2

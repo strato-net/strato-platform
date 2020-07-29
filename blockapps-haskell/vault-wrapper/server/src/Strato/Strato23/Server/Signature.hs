@@ -8,7 +8,7 @@ import           Control.Monad.Reader                  (asks)
 import qualified Data.ByteString                       as B
 import qualified Data.Cache                            as Cache
 import           Data.Text                             (Text)
-import           Blockchain.ECDSA
+import           Blockchain.Strato.Model.Secp256k1
 import           Strato.Strato23.Monad
 import           Strato.Strato23.API.Types
 import           Strato.Strato23.Crypto

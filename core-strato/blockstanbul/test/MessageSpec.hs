@@ -10,11 +10,11 @@ import Test.Hspec
 
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.ECDSA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.StateRoot
 
 spec :: Spec

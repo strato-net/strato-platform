@@ -4,7 +4,7 @@
 --{-# LANGUAGE DerivingStrategies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.ECDSA
+module Blockchain.Strato.Model.Secp256k1
   ( PrivateKey(..)
   , PublicKey(..)
   , Signature(..) 

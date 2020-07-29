@@ -19,8 +19,8 @@ import           Data.Text                         (Text)
 import qualified Data.Text.Encoding                as Text
 import           Text.Printf
 
-import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Secp256k1
 
 
 

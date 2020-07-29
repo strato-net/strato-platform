@@ -43,7 +43,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction         (createChainMessageTX)
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin as TO
-import           Blockchain.ECDSA
 import           Blockchain.Output
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.CablePackage
@@ -56,6 +55,7 @@ import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import qualified Data.ByteString.Char8               as C8
 import qualified Data.Set                            as S
 import qualified Network.Haskoin.Crypto     as HK    -- TODO: get rid of this

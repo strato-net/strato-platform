@@ -12,8 +12,8 @@ import           Data.Maybe
 import qualified Data.Text                          as T
 
 
-import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Secp256k1
 import qualified Strato.Strato23.Crypto             as VC
 import qualified Strato.Strato23.Database.Queries   as VQ
 import           Options

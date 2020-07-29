@@ -27,11 +27,11 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
-import           Blockchain.ECDSA
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 

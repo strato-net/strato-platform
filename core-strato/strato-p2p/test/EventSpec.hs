@@ -42,7 +42,6 @@ import           Blockchain.Data.Enode
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
-import           Blockchain.ECDSA
 import           Blockchain.Event
 import           Blockchain.ExtWord
 import           Blockchain.Options                    (AuthorizationMode(..))
@@ -59,6 +58,7 @@ import           Blockchain.Sequencer.Monad
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256           (Keccak256, unsafeCreateKeccak256FromWord256)
+import           Blockchain.Strato.Model.Secp256k1
 
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer

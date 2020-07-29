@@ -12,12 +12,10 @@ import                 Control.Monad
 import                 Control.Monad.IO.Class
 import "cipher-aes"    Crypto.Cipher.AES
 import                 Crypto.Hash.SHA256
---import "crypto-pubkey" Crypto.PubKey.ECC.DH
 import                 Crypto.Types.PubKey.ECC
 import                 Data.Binary
 import                 Data.Binary.Get
 import                 Data.Binary.Put
---import                 Data.Bits
 import qualified       Data.ByteString         as B
 import qualified       Data.ByteString.Lazy    as BL
 import                 Data.HMAC
@@ -25,7 +23,7 @@ import                 System.Entropy
 
 import                 Blockchain.Data.PubKey
 import                 Blockchain.ExtWord
-import                 Blockchain.ECDSA
+import                 Blockchain.Strato.Model.Secp256k1
 
 theCurve :: Curve
 theCurve = getCurveByName SEC_p256k1

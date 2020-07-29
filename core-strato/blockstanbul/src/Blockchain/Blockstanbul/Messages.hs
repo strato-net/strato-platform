@@ -27,10 +27,10 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
-import Blockchain.ECDSA
 import Blockchain.Output
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Secp256k1
 import qualified Text.Colors as CL
 import Text.Format
 
