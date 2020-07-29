@@ -6,14 +6,17 @@ import qualified Crypto.Secp256k1       as S
 --import qualified Data.ByteString        as B
 import           Data.Coerce
 import           Data.Maybe
+
 import           Data.X509
+import           Data.X509.Validation
 
 import           Test.Hspec
 
 import           X509.Generate
 
 
-
+-- TODO: ideally, we have helpers wrapping the original x509 modules 
+--        so that we dont need to use them directly
 main :: IO ()
 main = hspec spec
 
@@ -24,15 +27,14 @@ makePriv = do
 
 spec :: Spec
 spec = do
-  describe "generates an x509 certificate" $ do 
-    
-    it "certificate pubkey matches original pubkey" $ do
-      priv <- makePriv
-      let pub = S.derivePubKey priv
-          iss = Issuer "5" "0" "9" priv
-          sub = Subject "x" "5" "0" "9" (S.derivePubKey priv)
-      cert <- makeCert iss sub
+  describe "x509 certificates" $ do 
+    priv <- runIO makePriv 
+    let pub = S.derivePubKey priv
+        iss = Issuer "5" "0" "9" priv
+        sub = Subject "x" "5" "0" "9" (S.derivePubKey priv)
 
+    it "certificate pubkey matches original pubkey" $ do
+      cert <- makeCert iss sub
       let certPub = certPubKey cert
           certPubSerialPoint = case certPub of
             PubKeyEC (PubKeyEC_Named SEC_p256k1 serialPoint) -> serialPoint
@@ -42,4 +44,20 @@ spec = do
       certPub `shouldBe` PubKeyEC exPub
       inPub `shouldBe` pub
       
-      
+    it "can do PEM encoding roundtrips" $ do
+      pendingWith "serialization of DateTime drops the nanoseconds (per the RFC), so this would fail"
+      -- TODO: the reason this fails is because when we serialize DateTimes, we lose the nanoseconds
+      -- cert <- makeSignedCert iss sub
+      --cert `shouldBe` bsToCert (certToBytes cert)
+
+    it "can verify cert signatures" $ do
+      cert <- makeSignedCert iss sub
+      let sigVerification = verifySignedSignature cert (certPubKey $ getCertificate cert)
+      sigVerification `shouldBe` SignaturePass
+    it "can reject invalid signatures" $ do
+      cert <- makeSignedCert iss sub
+      fakePriv <- makePriv
+      let fakeSerialPub = SerializedPoint $ S.exportPubKey False (S.derivePubKey fakePriv)
+          fakePub = PubKeyEC $ PubKeyEC_Named SEC_p256k1 fakeSerialPub
+          sigVerification = verifySignedSignature cert fakePub
+      sigVerification `shouldBe` SignatureFailed SignatureInvalid
