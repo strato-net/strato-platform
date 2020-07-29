@@ -75,7 +75,7 @@ data Issuer = Issuer
   , issCountry    :: String
   , issOrg        :: String
   , issPriv       :: PrivateNumber
-  }
+  } deriving (Show, Eq)
 
 
 data Subject = Subject
@@ -85,7 +85,7 @@ data Subject = Subject
   , subOrg        :: String
   , subUnit       :: String
   , subPub        :: PublicPoint
-  }
+  } deriving (Show, Eq)
 
 
 
