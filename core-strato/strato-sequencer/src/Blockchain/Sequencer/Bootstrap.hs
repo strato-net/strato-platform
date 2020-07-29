@@ -1,24 +1,27 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
-import ClassyPrelude (atomically, newTMChan, newTQueue, fromMaybe)
+import           ClassyPrelude (atomically, newTMChan, newTQueue, fromMaybe)
 import qualified Data.ByteString.Char8 as C8
 
-import Blockchain.Constants
-import Blockchain.Data.Address
-import Blockchain.Data.BlockDB
-import Blockchain.EthConf as EC
+import           Blockchain.Constants
+import           Blockchain.Data.Address
+import           Blockchain.Data.BlockDB
+import           Blockchain.EthConf as EC
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
-import Blockchain.Output
+import           Blockchain.Output
 import qualified Network.Kafka.Protocol as KP
 
-import Blockchain.Sequencer.CablePackage
-import Blockchain.Sequencer.Constants
-import Blockchain.Sequencer.DB.DependentBlockDB
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Gregor
-import Blockchain.Sequencer.Monad
+import           Blockchain.Sequencer.CablePackage
+import           Blockchain.Sequencer.Constants
+import           Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Gregor
+import           Blockchain.Sequencer.Monad
+
+import           Network.HTTP.Client        (newManager, defaultManagerSettings)
+import           Servant.Client
 
 -- bootstrap genesis block into leveldb if needed
 --
@@ -53,7 +56,13 @@ bootstrapSequencer Block{blockBlockData = bd,
       tch <- atomically newTMChan
       vch <- atomically newTQueue
       rch <- atomically newTQueue
-      let dummySequencerCfg = SequencerConfig
+      
+      -- initialize vault client, TODO: make this URL a cl arg
+      mgr <- newManager defaultManagerSettings
+      vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+      let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+
+          dummySequencerCfg = SequencerConfig
             { depBlockDBCacheSize   = 0
             , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
             , seenTransactionDBSize = 10
@@ -66,6 +75,7 @@ bootstrapSequencer Block{blockBlockData = bd,
             , cablePackage = pkg
             , maxEventsPerIter = 65
             , maxUsPerIter = 20000
+            , vaultClient = Just clientEnv
             }
       runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty

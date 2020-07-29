@@ -12,7 +12,6 @@ import qualified Data.ByteString.Short          as Sh
 
 import           Crypto.Random.Entropy
 import qualified Network.Haskoin.Internals         as HKI
-import qualified Strato.Strato23.Crypto         as VWC
 import qualified Crypto.HaskoinShim             as HK
 import qualified Crypto.Secp256k1               as SEC
 
@@ -21,7 +20,9 @@ import           Data.Maybe
 import           Data.Coerce
 import           System.IO.Unsafe
 
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Secp256k1
 import qualified BlockApps.Ethereum                    as E
 import           Clockwork
 
@@ -47,6 +48,7 @@ main = do
   timingTests
 
 
+-- TODO: this should be somewhere else, like in the ECDSA tests in strato-model
 secp256k1_haskell_spec :: Spec
 secp256k1_haskell_spec = 
   describe "secp256k1-haskell can do crypto operations just like haskoin" $ do
@@ -59,7 +61,7 @@ secp256k1_haskell_spec =
       oldPubBS `shouldBe` newPubBS 
     it "create Ethereum addresses" $ do
       let oldAddy = E.deriveAddress $ HK.derivePubKey oldPriv
-          newAddy = VWC.deriveAddress newPriv
+          newAddy = fromPrivateKey (PrivateKey newPriv)
       oldAddy `shouldBe` newAddy
     
     it "create secp256k1 private keys from test key value" $ do
@@ -77,7 +79,7 @@ secp256k1_haskell_spec =
       let testOldPriv = fromMaybe (error "couldn't get test haskoin key") (HK.secKey testPriv)
           testNewPriv = fromMaybe (error "couldn't get test secp key") (SEC.secKey testPriv)
           oldAddy = E.deriveAddress $ HK.derivePubKey testOldPriv
-          newAddy = VWC.deriveAddress testNewPriv
+          newAddy = fromPrivateKey (PrivateKey testNewPriv)
       oldAddy `shouldBe` newAddy
    
 
@@ -144,7 +146,7 @@ timingTests = do
   putStrLn "Haskoin: "
   _ <- cwPrintTime $ return $ E.deriveAddress $ HK.derivePubKey oldPriv
   putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ return $ VWC.deriveAddress newPriv
+  _ <- cwPrintTime $ return $ fromPrivateKey (PrivateKey newPriv)
 
 
   -- message hashes for signatures

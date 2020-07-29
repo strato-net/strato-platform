@@ -53,6 +53,7 @@ module Blockchain.Context
 
 import           Conduit
 import           Control.Applicative
+import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
@@ -82,6 +83,7 @@ import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Stream.VMEvent             ( HasVMEventsSink(..)
                                                        , VMEvent(..)
                                                        , fetchLastVMEvents
@@ -96,6 +98,10 @@ import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 import           Blockchain.Util                       (toMaybe)
+import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
+import           Servant.Client
+import qualified Strato.Strato23.API                   as VC
+import qualified Strato.Strato23.Client                as VC
 
 import           UnliftIO
 
@@ -130,6 +136,7 @@ data Config = Config
   , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
   , configConnectionTimeout  :: ConnectionTimeout
   , configMaxReturnedHeaders :: MaxReturnedHeaders
+  , configVaultClient        :: ClientEnv
   , configContext            :: IORef Context
   }
 
@@ -313,11 +320,38 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
+
+instance (MonadIO m, Monad m) => HasVault (ReaderT Config m) where
+  sign bs = do
+    vc <- asks configVaultClient 
+    liftIO $ waitOnVault $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
+  
+  getPub = do
+    vc <- asks configVaultClient 
+    fmap VC.unPubKey $ liftIO $ waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+  
+  getShared pub = do
+    vc <- asks configVaultClient 
+    liftIO $ waitOnVault $ runClientM (VC.getSharedKey "nodekey" pub) vc
+
+
+waitOnVault :: (Show a) => IO (Either a b) -> IO b
+waitOnVault action = do
+  putStrLn "calling vault-wrapper..."
+  res <- action
+  case res of
+    Left err -> do
+      putStrLn $ "got an error from vault-wrapper: " ++ show err
+      threadDelay 2000000
+      waitOnVault action
+    Right val -> return val
+
 type MonadP2P m = ( MonadIO m
                   , MonadLogger m
                   , MonadResource m
                   , MonadUnliftIO m
                   , Stacks Block m
+                  , HasVault m
                   , All '[Mod.Accessible, Mod.Modifiable]
                       '[ ActionTimestamp
                        , [BlockData]
@@ -385,6 +419,11 @@ initConfig :: ( MonadLogger m
 initConfig maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  vaultClient <- do
+    mgr <- liftIO $ newManager defaultManagerSettings
+    url <- liftIO $ parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+    return $ ClientEnv mgr url Nothing
+
   initState <- newIORef initContext
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -393,6 +432,7 @@ initConfig maxHeaders = do
     , configVmEventsSink = void . produceVMEventsM
     , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
+    , configVaultClient = vaultClient
     , configContext = initState
     }
 
