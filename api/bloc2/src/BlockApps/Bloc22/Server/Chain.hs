@@ -11,12 +11,9 @@
 
 module BlockApps.Bloc22.Server.Chain where
 
-import           Control.Applicative               (liftA2)
 import           Control.Monad                     (when, unless)
 import           Crypto.Random.Entropy
 import qualified Data.ByteString.Base16            as B16
-import           Data.Foldable                     (for_)
-import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromJust, fromMaybe)
@@ -67,7 +64,7 @@ replaceMembers Struct{..} addrs m =
           TypeArrayDynamic (SimpleType TypeAddress) -> m'
           _ -> m
 
-createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
+createChainInfo :: ChainInput -> Bloc ChainInfo
 createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
@@ -118,7 +115,7 @@ createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _
                            (fromMaybe Map.empty mmd)
         )
         Nothing
-  return (fst <$> mContract, chainInfo)
+  return chainInfo
 
 creationBlockHash :: Keccak256
 creationBlockHash = fromJust $
@@ -126,24 +123,21 @@ creationBlockHash = fromJust $
 
 postChainInfo :: ChainInput -> Bloc ChainId
 postChainInfo chainInput = do
-  (mCmId, chainInfo) <- createChainInfo chainInput
+  chainInfo <- createChainInfo chainInput
   chainId <- blocStrato $ postChainClient chainInfo
   let isAsync = fromMaybe False $ chaininputAsync chainInput
   unless isAsync $ undefined chainId -- TODO- put waitForChainInfos back in here
 --  unless isAsync $ waitForChainInfo chainId
-  for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
 postChainInfos :: [ChainInput] -> Bloc [ChainId]
 postChainInfos chainInputs = do
   chainInfos <- traverse createChainInfo chainInputs
-  chainIds <- blocStrato . postChainsClient $ map snd chainInfos
+  chainIds <- blocStrato . postChainsClient $ chainInfos
   let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
       asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
   unless (null asyncChains) $ undefined asyncChains -- TODO- put waitForChainInfos back in here
 --  unless (null asyncChains) $ waitForChainInfos asyncChains
-  let cmIdChains = catMaybes $ zipWith (liftA2 (,)) (map fst chainInfos) (map Just chainIds)
-  for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainIds
 
 waitForChainInfo :: (MonadIO m, MonadLogger m, Selectable ChainId ChainInfo m) =>
