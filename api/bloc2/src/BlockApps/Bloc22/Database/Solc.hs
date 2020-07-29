@@ -5,6 +5,7 @@ module BlockApps.Bloc22.Database.Solc (compileSolc, compileSolcIO) where
 
 import           ClassyPrelude              ((<>))
 import           Control.Monad.IO.Class     (MonadIO(..))
+import           Control.Monad.Logger
 import           Control.Monad.Trans.Except
 import           Data.Aeson hiding (String)
 import qualified Data.List                  as List
@@ -42,7 +43,7 @@ import BlockApps.Bloc22.Monad
 -- This is really hard to understand and highly non-idomatic for json formation or parsing.
 -- It was basically copy/pasted directly from strato-api for expediency, someone should really fix
 -- this if it is something we want to maintain.
-compileSolc :: SolcVersion -> Text -> Bloc Aeson.Value
+compileSolc :: (MonadIO m, MonadLogger m) => SolcVersion -> Text -> m Aeson.Value
 compileSolc solcVersion mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runExceptT $ runSolc solcVersion postParams mainFiles importFiles
