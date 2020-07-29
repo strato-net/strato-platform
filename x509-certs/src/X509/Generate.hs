@@ -15,6 +15,7 @@ module X509.Generate (
   bsToCert,
 --  bsToPriv,
 --  bsToPub,
+  makeCert,
   makeSignedCert,
 --  ecdsaWithSHA256,
   fromASN1CS -- TODO: you don't need this to be exported...create the Issuer maker func
