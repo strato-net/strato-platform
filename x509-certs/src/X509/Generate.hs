@@ -18,7 +18,8 @@ module X509.Generate (
   makeCert,
   makeSignedCert,
 --  ecdsaWithSHA256,
-  fromASN1CS -- TODO: you don't need this to be exported...create the Issuer maker func
+  fromASN1CS, -- TODO: you don't need this to be exported...create the Issuer maker func
+  newPriv
  ) where
 
 
@@ -27,6 +28,7 @@ module X509.Generate (
 --import           Crypto.PubKey.ECC.DH
 --import           Crypto.PubKey.ECC.ECDSA        
 import           Crypto.PubKey.ECC.Types
+impot            Crypto.Random.Entropy
 --import           Crypto.Number.Serialize
 import           Crypto.Hash
 import qualified Crypto.Hash.Algorithms         as CH
@@ -65,7 +67,11 @@ import           System.Random
 
 
 
-
+-- TODO: super temporary it's not even funny
+newPriv :: IO (S.SecKey)
+newPriv = do
+  ent <- getEntropy 32
+  return $ fromMaybe (error "could not create private key") (S.secKey ent)
 
 
 -----------------------------------------------------------------------------------------------
@@ -171,7 +177,6 @@ pubToPem pub = PEM
 ----------------------------------------------------------------------------------------------
 ---------------------------------------- READING ---------------------------------------------
 ----------------------------------------------------------------------------------------------
-
 
 
 
