@@ -33,9 +33,12 @@ tests:
     main: Spec.hs
     dependencies:
      - blockapps-bloc22-client
+     - blockapps-data
+     - blockapps-datadefs
      - blockapps-strato-client
      - base16-bytestring
      - bytestring
+     - core-api
      - hspec
      - http-client
      - quickcheck-instances

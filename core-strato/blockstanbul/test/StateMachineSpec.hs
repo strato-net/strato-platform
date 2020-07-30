@@ -71,6 +71,10 @@ vanityCompare lhs rhs =
   let clean = BS.takeWhile (/=0) . BS.take 32
   in clean lhs `shouldBe` clean rhs
 
+io :: InEvent -> OutEvent
+io (IMsg a msg) = OMsg a msg
+io x = error $ "io: " ++ show x
+
 spec :: Spec
 spec = parallel $ do
   describe "The blockstanbul event loop" $ do
@@ -106,16 +110,16 @@ spec = parallel $ do
         let ppr = as !! ((fromIntegral . _round $ v) `mod` length as)
         proposer .= sender ppr
         omsgs1 <- sendMessages [IMsg ppr $ Preprepare v blk]
-        map oMessage omsgs1 `shouldBe` [Prepare v hsh]
+        map oMessage omsgs1 `shouldBe` [Preprepare v blk, Prepare v hsh]
         let preps = map (\a -> IMsg a $ Prepare v hsh) as
         omsgs2 <- sendMessages preps
-        let [Commit v' hsh' seal'] = map oMessage omsgs2
-        (v', hsh') `shouldBe` (v, hsh)
+        let [(v', hsh', seal')] = [(k, l, m) | Commit k l m <- map oMessage omsgs2]
+        ( v', hsh') `shouldBe` (v, hsh)
         me <- selfAddr
         seal' `shouldSatisfy` (== Just me) . verifyCommitmentSeal hsh
         let coms = map (\a -> IMsg a $ Commit v hsh seal) as
         xsp <- sendMessages coms
-        let [ToCommit comBlock] = xsp
+        let [comBlock] = [cb | ToCommit cb <- xsp]
             n = length as
             sealCount = n - floor (fromIntegral (n - 1) / 3 :: Double)
         truncateExtra comBlock `shouldBe` truncateExtra blk
@@ -138,15 +142,16 @@ spec = parallel $ do
                           blockDataParentHash = hsh}}
         let hsh2 = blockHash blk2
         omsgs3 <- sendMessages [IMsg nextPpr $ Preprepare v2 blk2, IMsg ppr $ Preprepare v2 blk2]
-        map oMessage omsgs3 `shouldMatchList`
-            if sender ppr == sender nextPpr
-              then [Prepare v2 hsh2, Prepare v2 hsh2]
-              else [Prepare v2 hsh2]
+        let pps = [(k, l) | Prepare k l <- map oMessage omsgs3]
+        pps `shouldMatchList`
+           if sender ppr == sender nextPpr
+             then [(v2, hsh2), (v2, hsh2)]
+             else [(v2, hsh2)]
         -- Old prepares are now ignored
         sendMessages preps `shouldReturn` []
         let preps2 = map (\a -> IMsg a $ Prepare v2 hsh2) as
         omsgs4 <- sendMessages preps2
-        let [Commit v2' hsh2' seal2'] = map oMessage omsgs4
+        let [(v2', hsh2', seal2')] = [(k, l, m) | Commit k l m <- map oMessage omsgs4]
         (v2', hsh2') `shouldBe` (v2, hsh2)
         seal2' `shouldSatisfy` (== Just me) . verifyCommitmentSeal hsh2
         -- Old commits are now ignored
@@ -158,7 +163,7 @@ spec = parallel $ do
         omsgs5' <- sendMessages aborts
         let omsgs5 = [o | o@(OMsg _ _) <- omsgs5']
             rest5 = omsgs5' \\ omsgs5
-        map oMessage omsgs5 `shouldBe` [RoundChange next]
+        oMessage (head omsgs5) `shouldBe` RoundChange next
         rest5 `shouldBe` [ResetTimer 21, NewCheckpoint $ Checkpoint next M.empty (map sender as) []]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
@@ -187,7 +192,8 @@ spec = parallel $ do
         curView <- use view
         let hsh = blockHash sealedBlk
         omsgs <- sendMessages [IMsg auth $ Preprepare curView sealedBlk]
-        map oMessage omsgs `shouldBe` [Prepare curView hsh]
+        let ps = [(k, l) | Prepare k l <- map oMessage omsgs]
+        ps `shouldBe` [(curView, hsh)]
         use proposal `shouldReturn` Just sealedBlk
 
     it "rejects an unauthenticated preprepare" $ property $ \auth blk ->
@@ -251,7 +257,7 @@ spec = parallel $ do
         (curView, di) <- setupRound blk [sender auth]
         -- Only one validator, so that should be a majority
         omsgs <- sendMessages [IMsg auth $ Prepare curView di]
-        let [Commit v di' seal] = map oMessage omsgs
+        let [(v, di', seal)] = [(k, l, m) | Commit k l m <- map oMessage omsgs]
         (v, di') `shouldBe` (curView, di)
         seal `shouldSatisfy` (== Just me) . verifyCommitmentSeal di
 
@@ -260,16 +266,21 @@ spec = parallel $ do
       runTest $ do
         validators .= S.fromList [sender auth]
         curView <- use view
-        sendMessages [IMsg auth $ Prepare curView di] `shouldReturn` []
+        let i = [IMsg auth $ Prepare curView di]
+            o = map io i
+        sendMessages i `shouldReturn` o
         use prepared `shouldReturn` M.singleton (sender auth) di
     it "waits until there is more than 2/3s prepares to commit" $ property $ \sig a1 a2 a3 blk ->
       (S.size (S.fromList [a1, a2, a3]) == 3) ==> runTest $ do
         (curView, di) <- setupRound blk [a1, a2, a3]
         let upgrade a = IMsg (MsgAuth a sig) $ Prepare curView di
-        sendMessages (map upgrade [a1, a2]) `shouldReturn` []
+            ias = map upgrade [a1, a2]
+            oas = map io ias
+        sendMessages ias `shouldReturn` oas
         sendMessages [upgrade a2] `shouldReturn` []
         omsgs <- sendMessages [upgrade a3]
-        let [Commit v d s] = map oMessage omsgs
+        let [oa, Commit v d s] = map oMessage omsgs
+        oa `shouldBe` oMessage (io $ upgrade a3)
         (v, d) `shouldBe` (curView, di)
         me <- selfAddr
         s `shouldSatisfy` (== Just me) . verifyCommitmentSeal di
@@ -280,7 +291,10 @@ spec = parallel $ do
         (curView, di) <- setupRound blk as
         let input = map (\a -> IMsg (MsgAuth a sig) $ Prepare  curView di) as
         got <- sendMessages input
-        got `shouldSatisfy` (== min (length as) 1) . length
+        let expectedLength = if null as
+                               then 0
+                               else 1 + length as
+        got `shouldSatisfy` (== expectedLength) . length
 
   describe "A commit message" $ do
     it "returns a ready block" $ property $ \auth blk' seal ->
@@ -291,7 +305,7 @@ spec = parallel $ do
         curView <- use view
         let di = blockHash blk
         omsgs <- sendMessages [IMsg auth $ Commit curView di seal]
-        let [ToCommit b] = omsgs
+        let [b] = [k | ToCommit k <- omsgs]
         b `compareNoExtra` blk
         let got = cookRawExtra . L.view extraLens $ b
             want = ExtraData
@@ -303,14 +317,16 @@ spec = parallel $ do
     it "won't trigger a commit with a hash mismatch" $ property $ \auth di blk seal ->
       runTest $ do
         (curView, _) <- setupRound blk [sender auth]
-        sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
+        let i = IMsg auth $ Commit curView di seal
+        sendMessages [i] `shouldReturn` [io i]
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
     it "won't trigger a commit without a block" $ property $ \auth di seal ->
       runTest $ do
         validators .= S.fromList [sender auth]
         curView <- use view
-        sendMessages [IMsg auth $ Commit curView di seal] `shouldReturn` []
+        let i = IMsg auth $ Commit curView di seal
+        sendMessages [i] `shouldReturn` [io i]
         use committed `shouldReturn` M.singleton (sender auth) (di, seal)
         use view `shouldReturn` curView
     it "rejects a message from a non-validator" $ property $ \auth blk seal ->
@@ -339,12 +355,12 @@ spec = parallel $ do
             toCommit a = IMsg (MsgAuth a sig) $ Commit curView di seal
             earlyCommits = map toCommit front
             tippingPoint = map toCommit . take 1 $ back
-        sendMessages earlyCommits `shouldReturn` []
+        sendMessages earlyCommits `shouldReturn` map io earlyCommits
         use committed `shouldReturn` M.fromList (map (, (di, seal)) front)
         use view `shouldReturn` curView
         unless (null as) $ do
           omsgs <- sendMessages tippingPoint
-          let [ToCommit b] = omsgs
+          let [b] = [k | ToCommit k <- omsgs]
           b `compareNoExtra` blk
           let got = cookRawExtra . L.view extraLens $ b
           _vanity got `vanityCompare` L.view extraLens (blk)
@@ -360,21 +376,23 @@ spec = parallel $ do
         (curView, _) <- setupRound blk . map sender $ [a1, a2, a3]
         next <- uses view (over round (+4))
         let roundNext = _round next
-        sendMessages [IMsg a1 $ RoundChange next] `shouldReturn` []
+        sendMessages [IMsg a1 $ RoundChange next] `shouldReturn` [OMsg a1 $ RoundChange next]
         -- 1 vote is not enough
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.singleton roundNext (S.singleton (sender a1))
         use view `shouldReturn` curView
         -- 2 votes will be broadcast, but not taken up.
         omsgs <- sendMessages [IMsg a2 $ RoundChange next]
-        map oMessage omsgs `shouldBe` [RoundChange next]
+        map oMessage omsgs `shouldBe` [RoundChange next, RoundChange next]
         use pendingRound `shouldReturn` Just roundNext
         use roundChanged `shouldReturn` M.singleton roundNext (S.fromList [sender a1, sender a2])
         use view `shouldReturn` curView
         -- 3 votes will do it
         sendMessages [IMsg a3 $ RoundChange next] `shouldReturn`
-          [ResetTimer 24
-          , NewCheckpoint (Checkpoint next M.empty (sort $ map sender [a1, a2, a3]) [])]
+          [ ResetTimer 24
+          , NewCheckpoint (Checkpoint next M.empty (sort $ map sender [a1, a2, a3]) [])
+          , OMsg a3 $ RoundChange next
+          ]
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
         use view `shouldReturn` next
@@ -516,8 +534,10 @@ spec = parallel $ do
         resp <- sendMessages [IMsg (MsgAuth me sig) $ RoundChange roundAndSequencePlus1]
         let omsgs = [o | o@(OMsg _ _) <- resp]
             other = resp \\ omsgs
-        map oMessage omsgs `shouldBe` [RoundChange roundAndSequencePlus1,
-                                       Preprepare roundPlus1 blk]
+        map oMessage omsgs `shouldBe` [ RoundChange roundAndSequencePlus1
+                                      , Preprepare roundPlus1 blk
+                                      , RoundChange roundAndSequencePlus1
+                                      ]
         other `shouldBe`
           [ResetTimer $ _round roundPlus1
           , NewCheckpoint (Checkpoint roundPlus1 M.empty [me] [])]
@@ -549,7 +569,8 @@ spec = parallel $ do
         theirPK <- liftIO $ HK.withSource getEntropy HK.genPrvKey
         v <- use view
         (lockBlk, omsgs) <- resendLock blk theirPK theirPK
-        map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+        let ps = [(k, l) | Prepare k l <- map oMessage omsgs]
+        ps `shouldBe` [(v, blockHash lockBlk)]
 
     it "accepts a block if the signer is not the original sender" $ property $ \blk ->
       runAuthTest $ do
@@ -557,7 +578,8 @@ spec = parallel $ do
         v <- use view
         myKey <- use prvkey
         (lockBlk, omsgs) <- resendLock blk theirPK myKey
-        map oMessage omsgs `shouldBe` [Prepare v (blockHash lockBlk)]
+        let ps = [(k, l) | Prepare k l <- map oMessage omsgs]
+        ps `shouldBe` [(v, blockHash lockBlk)]
 
   describe "A NewBeneficiary" $ do
     it "yields a vote" $ property $ \auth -> runTest $ do

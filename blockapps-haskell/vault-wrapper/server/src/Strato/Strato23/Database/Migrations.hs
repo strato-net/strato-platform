@@ -34,6 +34,7 @@ migrations = [ (Throw, createTables)
              , (Throw, insertAddress)
              , (Throw, messageTable)
              , (Throw, insertSecPrvKey)
+             , (Throw, insertPublicKey)
              ]
 
 getSchemaVersion :: Query
@@ -50,3 +51,6 @@ insertAddress = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS address bytea; 
 
 insertSecPrvKey :: Query
 insertSecPrvKey = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS enc_sec_prv_key bytea NOT NULL; |]
+
+insertPublicKey :: Query
+insertPublicKey = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS pub_key bytea NOT NULL; |]

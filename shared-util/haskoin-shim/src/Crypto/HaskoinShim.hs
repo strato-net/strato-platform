@@ -22,19 +22,27 @@ module Crypto.HaskoinShim
   , derivePubKey
   , verifySig
   , signRecMsg
+  , HK.makePubKey
+  , HK.Point(..)
   ) where
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Binary
-import Data.Coerce
-import Test.QuickCheck
+import qualified Data.ByteString           as B
+import qualified Data.ByteString.Base16    as B16
+import qualified Data.ByteString.Lazy      as BL
+import qualified Data.ByteString.Char8     as C8
+import           Data.Binary
+import           Data.Coerce
+import qualified Data.Aeson                as Ae
+import           Data.Maybe
+import qualified Data.Text                 as T
+import           Test.QuickCheck
 
-import Blockchain.Strato.Model.ExtendedWord
-import qualified Network.Haskoin.Crypto as HK
+import           Blockchain.Strato.Model.ExtendedWord
+import qualified Network.Haskoin.Crypto    as HK
 import qualified Network.Haskoin.Internals as HK
-import Blockchain.ExtendedECDSA
-import Blockchain.FastECRecover
+
+import           Blockchain.ExtendedECDSA
+
 
 -- Interface types
 
@@ -58,6 +66,21 @@ newtype Sig = Sig HK.Signature deriving (Eq, Show)
 
 instance Eq PubKey where
   a == b = HK.pubKeyPoint (coerce a) == HK.pubKeyPoint (coerce b)
+
+instance Ae.ToJSON PubKey where
+  toJSON pk = Ae.String $ T.pack $ C8.unpack $ B16.encode $ exportPubKey False pk
+
+
+instance Ae.FromJSON PubKey where
+  parseJSON (Ae.String str) = return $ fromMaybe (err) $ importPubKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+    where err = error $ "parseJSON for PubKey failed to read " ++ (T.unpack str)
+  parseJSON x = error $ "parseJSON for PubKey: expected string, got " ++ (show x)
+
+
+
+--pubkey = drop 2 . C8.unpack . B16.encode . exportPubKey False . derivePubKey $ SecKey prvkey
+
+
 
 -- Type conversions
 
@@ -110,7 +133,8 @@ verifySig :: PubKey -> Sig -> Msg -> Bool
 verifySig pub sig word = HK.verifySig (coerce word) (coerce sig) (coerce pub)
 
 recover :: RecSig -> Msg -> Maybe PubKey
-recover rc word = coerce <$> getPubKeyFromSignature_fast (coerce rc) (coerce word)
+recover rc word = coerce <$> getPubKeyFromSignature (coerce rc) (coerce word)
+
 
 -- Misc
 instance Arbitrary PubKey where

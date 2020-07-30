@@ -82,21 +82,21 @@ TBD
 
 ## (**DEPRECATED** for docker-env stack builds) APPENDIX: Libraries used in build process
 
-For the list of currenty used libraries see Dockerfile.deploybase for run-time libs and Dockerfile.buildbase for compilation lib requirements
+For the list of currenty used libraries see Dockerfile.multi for run-time libs and Dockerfile.buildbase for compilation lib requirements
 These libraries are no longer required to be installed on the host since we use docker-enabled Stack. So we keep them here just in case:
 
 
 #### Ubuntu/debian:
 
 ```
-sudo apt-get install cmake libboost-all-dev libpq-dev libsodium-dev autoconf libleveldb-dev
+sudo apt-get install cmake libboost-all-dev libpq-dev libsodium-dev autoconf libleveldb-dev libsecp256k1-dev
 ```
 
 #### Centos/RHEL/Amazon linux 2
 
 ```
 sudo yum install http://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-11.noarch.rpm
-sudo yum install libsodium libsodium-devel postgresql-devel cmake3 gcc-c++ libleveldb-devel libtool automake libz-devel libleveldb-devel
+sudo yum install libsodium libsodium-devel postgresql-devel cmake3 gcc-c++ libleveldb-devel libtool automake libz-devel libleveldb-devel libsecp256k1-dev
 ```
 There are some additional awkward steps to have `cmake3` under a name that solidity can build with
 and to install a compatible version of boost:

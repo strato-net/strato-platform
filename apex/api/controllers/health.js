@@ -1,6 +1,9 @@
 const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const models = require('../models');
 const winston = require('winston-color');
+const rp = require('request-promise');
+const config = require('../config/app.config');
+
 module.exports = {
   ping: function (req, res) {
     res.status(200).send('pong');
@@ -29,7 +32,10 @@ module.exports = {
 
       const currentTime = Date.now();
 
-      const [healthInfo, stallInfo, systemInfo] = await getLatestHealth();
+      const responses = await Promise.all([getLatestHealth(), getPbftData()]);
+
+      const [[healthInfo, stallInfo, systemInfo], pbftData] = responses;
+
       if (healthInfo && stallInfo) {
         healthStatus = healthInfo.latestHealthStatus;
         stallStatus = stallInfo.latestHealthStatus;
@@ -50,6 +56,8 @@ module.exports = {
 
       res.status(200).json(
         {
+          version: process.env.STRATO_VERSION,
+          timestamp: +new Date()/1000,
           lastBlock: {
             number: lastBlock.number,
             hash: lastBlock.hash,
@@ -57,6 +65,7 @@ module.exports = {
             totalDifficulty: lastBlock.total_difficulty,
             nonce: lastBlock.nonce,
           },
+          pbftData: findView(pbftData),
           healthInfo: {
             uptime: uptime / 1000,
             isHealthy: healthStatus,
@@ -69,18 +78,18 @@ module.exports = {
             warningsActive: !systemInfoStatus,
             messages: warningMessages
           },
-          systemInfo: systemInfoBody
+          systemInfo: systemInfoBody,
         }
       )
     } catch (error) {
-      return next(new Error('could not get data from database: ' + error));
+      console.error(error);
+      return next(new Error("Unable to collect some of the health info."));
     }
   },
 
   healthStatus: async function (req, res, next) {
     try {
       let healthStatus, stallStatus, uptime, isInc, isPending;
-
 
       const currentTime = Date.now();
 
@@ -98,17 +107,20 @@ module.exports = {
 
       res.status(200).json(
           {
+            version: process.env.STRATO_VERSION,
+            timestamp: +new Date()/1000,
             healthInfo: {
               uptime: uptime / 1000,
               isHealthy: healthStatus,
               isNotStalled: stallStatus,
-              isValidBlocksInc: isInc ,
+              isValidBlocksInc: isInc,
               isLastPending: isPending
-            }
+            },
           }
       )
     } catch (error) {
-      return next(new Error('could not get data from database: ' + error));
+      console.error(error);
+      return next(new Error("Unable to collect some of the health info."));
     }
 
   }
@@ -162,4 +174,33 @@ async function getLatestHealth() {
   ])
   
   return [healthInfo, stallInfo, systemInfo]
+}
+
+function getPbftData() {
+  if (!process.env['prometheusHost']) {
+    throw Error('prometheusHost env var is not set - unable to get prometheus data');
+  }
+  const options = {
+    method: 'GET',
+    url: `http://${process.env['prometheusHost']}/prometheus/api/v1/query?query=pbft_current_view`,
+    followRedirects: false,
+    timeout: config.healthCheck.requestTimeout - 100,
+    json: true,
+  };
+  return rp(options);
+}
+
+function findView(obj) {
+  if (!(obj && obj.data && obj.data.result)) {
+    return {};
+  }
+  const res = obj.data.result;
+  let ret = {};
+  res.forEach((elem) => {
+    if (elem && elem.metric && elem.value && elem.value.length >= 2) {
+      ret[elem.metric.view_field] = elem.value[1];
+    }
+  });
+  ret.timestamp = res.length && res[0].value.length && res[0].value[0] || null;
+  return ret;
 }

@@ -1,6 +1,10 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Handlers.Stats (
@@ -8,12 +12,10 @@ module Handlers.Stats (
   server
   ) where
 
-import           Control.Monad.IO.Class
+import           Control.Monad.Change.Modify
 import           Data.Aeson
-import           Data.Text                     (Text)
+import           Data.Swagger
 import qualified Database.Esqueleto            as E
-import           Database.Persist.Postgresql
-import           GHC.Generics
 import           Servant
 
 import           Blockchain.Data.DataDefs
@@ -22,35 +24,54 @@ import           Blockchain.DB.SQLDB
 
 import           SQLM
 
+newtype TotalDifficulty = TotalDifficulty Integer
+
+instance ToJSON TotalDifficulty where
+  toJSON (TotalDifficulty td) = object ["difficulty" .= td]
+
+instance FromJSON TotalDifficulty where
+  parseJSON (Object o) = TotalDifficulty <$> o .: "difficulty"
+  parseJSON e          = fail $ "FromJSON TotalDifficulty: Expected object, got " ++ show e
+
+instance ToSchema TotalDifficulty where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "TotalDifficulty") mempty
+
+newtype TransactionCount = TransactionCount Integer
+
+instance ToJSON TransactionCount where
+  toJSON (TransactionCount td) = object ["transactionCount" .= td]
+
+instance FromJSON TransactionCount where
+  parseJSON (Object o) = TransactionCount <$> o .: "transactionCount"
+  parseJSON e          = fail $ "FromJSON TransactionCount: Expected object, got " ++ show e
+
+instance ToSchema TransactionCount where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "TransactionCount") mempty
 
 type API =
-  "stats" :> "totaltx" :> Get '[JSON] Value
-  :<|> "stats" :> "difficulty" :> Get '[JSON] Value
+  "stats" :> "totaltx" :> Get '[JSON] TransactionCount
+  :<|> "stats" :> "difficulty" :> Get '[JSON] TotalDifficulty
 
-server :: ConnectionPool -> Server API
-server connectionString = getStatTx connectionString :<|> getStatDiff connectionString
+server :: ServerT API SQLM
+server = getStatTx :<|> getStatDiff
 
 ---------------------
 
-data Stats = Stats
-    { name    :: Text
-    , version :: Int
-    , genesis :: String
-    } deriving Generic
+instance Accessible TotalDifficulty SQLM where
+  access _ = TotalDifficulty . blockDataRefTotalDifficulty <$> getBestBlock
 
-instance ToJSON Stats
-
-
-getStatDiff :: ConnectionPool -> Handler Value
-getStatDiff connectionString = liftIO $ runSQLM connectionString $ do
-  bestBlock <- getBestBlock
-  return $ object ["difficulty" .= blockDataRefTotalDifficulty bestBlock]
-
-
-getStatTx :: ConnectionPool -> Handler Value
-getStatTx pool = liftIO $ runSQLM pool $ do
-  tx <- sqlQuery $ E.select $ E.from $ \(_ :: E.SqlExpr (E.Entity RawTransaction)) -> return E.countRows
-  return $ myval (tx :: [E.Value Integer])
+instance Accessible TransactionCount SQLM where
+  access _ = do
+    tx <- sqlQuery $ E.select $ E.from $ \(_ :: E.SqlExpr (E.Entity RawTransaction)) -> return E.countRows
+    return .TransactionCount $ myval (tx :: [E.Value Integer])
     where
-      myval ((E.Value v):_) = object ["transactionCount" .= (v :: Integer)]
-      myval _               = object ["transactionCount" .= ("0" :: String)]
+      myval ((E.Value v):_) = v
+      myval _               = 0
+
+getStatDiff :: Accessible TotalDifficulty m => m TotalDifficulty
+getStatDiff = access (Proxy @TotalDifficulty)
+
+getStatTx :: Accessible TransactionCount m => m TransactionCount
+getStatTx = access (Proxy @TransactionCount)

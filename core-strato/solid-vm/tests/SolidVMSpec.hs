@@ -81,6 +81,10 @@ anyDivideByZeroError :: Selector HandledException
 anyDivideByZeroError (HE Blockchain.SolidVM.Exception.DivideByZero{}) = True
 anyDivideByZeroError _ = False
 
+anyMissingTypeError :: Selector HandledException
+anyMissingTypeError (HE Blockchain.SolidVM.Exception.MissingType{}) = True
+anyMissingTypeError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
 failedRequirementMsg _   _                         = False
@@ -2594,3 +2598,17 @@ contract qq {
   }
 }|]
     getFields ["x", "y"] `shouldReturn` [BInteger 100, BInteger 42]
+
+
+  it "rejects illegal enum access" $ (runTest (runBS [r|
+contract qq {
+  
+  enum Role { ADMIN, USER }
+  uint[] perms;
+
+  constructor() {
+    perms[uint(Role.ADMIN)] = 10;
+    perms[uint(Role.OTHER)] = 100;
+  }
+}|])) `shouldThrow` anyMissingTypeError
+

@@ -140,7 +140,7 @@ instance RLPSerializable Transaction where
           (_:o:_) -> error $ "rlpDecode Transaction: Expected metadata to be an RLPArray, but got: " ++ show o
     in case partial of
       PrivateHashTX{..} -> case cid of
-        Nothing -> PrivateHashTX (rlpDecode rVal) (rlpDecode sVal)
+        Nothing -> PrivateHashTX (unsafeCreateKeccak256FromWord256 $ rlpDecode rVal) (unsafeCreateKeccak256FromWord256 $ rlpDecode sVal)
         Just _ -> error "rlpDecode Transaction: PrivateHashTX transactions can't have a chainId"
       p@MessageTX{} -> p {
         transactionV = fromInteger $ rlpDecode vVal,
@@ -169,8 +169,8 @@ instance RLPSerializable Transaction where
                   RLPArray [
                   n, gp, gl, toAddr, val, i,
                   RLPString "",
-                  (rlpEncode transactionTxHash),
-                  (rlpEncode transactionChainHash)
+                  (rlpEncode $ keccak256ToWord256 transactionTxHash),
+                  (rlpEncode $ keccak256ToWord256 transactionChainHash)
                   ]
                 _ -> error "rlpEncode Transaction: PrivateHashTX transactions can't have a chainId"
               MessageTX{..} ->

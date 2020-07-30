@@ -98,7 +98,7 @@ instance ToParam (QueryParam "chainid" ChainId) where
 
 instance ToParamSchema ChainId where
   toParamSchema _ = mempty
-    & type_ .~ SwaggerString
+    & type_ ?~ SwaggerString
     & minimum_ ?~ fromInteger (toInteger . unChainId $ (minBound :: ChainId))
     & maximum_ ?~ fromInteger (toInteger . unChainId $ (maxBound :: ChainId))
     & format ?~ "hex string"
@@ -107,7 +107,7 @@ instance ToSchema ChainId where
   declareNamedSchema _ = return $
     NamedSchema (Just "ChainId")
       ( mempty
-        & type_ .~ SwaggerString
+        & type_ ?~ SwaggerString
         & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
         & description ?~ "Private chain id, 32 byte hex encoded string" )
 

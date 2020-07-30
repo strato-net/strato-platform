@@ -325,7 +325,7 @@ instance ToSchema CodeInfo where
   declareNamedSchema _ = return $
     NamedSchema (Just "CodeInfo")
       ( mempty
-        & type_ .~ SwaggerInteger
+        & type_ ?~ SwaggerInteger
         & example ?~ toJSON (CodeInfo "ContractBin" "ContractSrc" "ContractName")
         & description ?~ "Code Info" )
 
@@ -371,7 +371,7 @@ instance ToSchema AccountInfo where
   declareNamedSchema _ = return $
     NamedSchema (Just "AccountInfo")
       ( mempty
-        & type_ .~ SwaggerInteger
+        & type_ ?~ SwaggerInteger
         & example ?~ toJSON (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (20000000 :: Integer))
         & description ?~ "Account Info" )
 

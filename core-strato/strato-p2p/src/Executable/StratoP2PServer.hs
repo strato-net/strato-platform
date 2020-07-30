@@ -89,13 +89,13 @@ ethServerHandler myPriv peerSource peerSink seqSource unseqSink sockAddr = do
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr  ++ ". rejecting violently."
         Just _ -> do
-          (attempt :: Either SomeException ()) <- withActivePeer p $ do
+          (attempt :: Maybe SomeException) <- withActivePeer p $ do
             initState <- newIORef initContext
             local (\c -> c{configContext = initState}) $
               runEthServerConduit myPriv p peerSource peerSink seqSource unseqSink peerStr
           case attempt of
-            Right () -> $logDebugS "runEthServer" "Peer ran successfully!"
-            Left err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
+            Nothing -> $logDebugS "runEthServer" "Peer ran successfully!"
+            Just err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
 
 runEthServerConduit :: MonadP2P m
                     => PrivateNumber
@@ -105,14 +105,14 @@ runEthServerConduit :: MonadP2P m
                     -> ConduitM () P2pEvent m ()
                     -> ([IngestEvent] -> m ())
                     -> String
-                    -> m (Either SomeException ())
+                    -> m (Maybe SomeException)
 runEthServerConduit myPriv p peerSource peerSink seqSource unseqSink peerStr = do
   let myPubkey = calculatePublic theCurve myPriv
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
   (_, (outCtx, inCtx)) <- peerSource $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` peerSink
   !eventSource <- mkEthP2PEventSource peerSource seqSource peerStr inCtx
   !eventSink <- mkEthP2PEventConduit peerStr outCtx unseqSink
-  try . runConduit $ eventSource
+  fmap (either Just (const Nothing)) . try . runConduit $ eventSource
                   .| handleMsgServerConduit myPubkey p
                   .| eventSink
                   .| peerSink
