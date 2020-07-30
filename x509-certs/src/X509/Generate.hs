@@ -28,7 +28,7 @@ module X509.Generate (
 --import           Crypto.PubKey.ECC.DH
 --import           Crypto.PubKey.ECC.ECDSA        
 import           Crypto.PubKey.ECC.Types
-impot            Crypto.Random.Entropy
+import            Crypto.Random.Entropy
 --import           Crypto.Number.Serialize
 import           Crypto.Hash
 import qualified Crypto.Hash.Algorithms         as CH
