@@ -30,7 +30,7 @@ import           Data.Conduit
 import           Data.Default                          (def)
 import           Data.Foldable                         (for_)
 import qualified Data.DList                            as DL
-import           Data.List                             hiding (lookup)
+import           Data.List                             hiding (insert, lookup)
 import           Data.Map.Internal                     (WhenMissing(..), WhenMatched(..))
 import           Data.Map.Merge.Strict
 import qualified Data.Map.Strict                       as M
@@ -47,7 +47,7 @@ import           System.Random
 import           Text.Printf
 import           UnliftIO.Exception
 
-import           Blockchain.Blockstanbul               (blockstanbulSender)
+import           Blockchain.Blockstanbul               (blockstanbulSender, WireMessage)
 import           Blockchain.Context
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
@@ -320,7 +320,11 @@ handleEvents peer = awaitForever $ \case
         setPeerAddrIfUnset $ blockstanbulSender wm
         peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
         $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-      yieldL $ ToUnseq [IEBlockstanbul wm]
+      let msgHash = rlpHash wm
+      msgExists <- lift $ exists (Proxy @(Proxy WireMessage)) msgHash
+      unless msgExists $ do
+        lift $ insert (Proxy @(Proxy WireMessage)) msgHash (Proxy @WireMessage)
+        yieldL $ ToUnseq [IEBlockstanbul wm]
 
     -- private chains
     MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'

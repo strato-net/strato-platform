@@ -73,6 +73,7 @@ library:
     - monadIO
     - mtl
     - network
+    - ordered-containers
     - persistent
     - prometheus-client
     - random
@@ -120,6 +121,7 @@ tests:
       - lens
       - monad-alter
       - mtl
+      - ordered-containers
       - resourcet
       - seqevents
       - stm-chans

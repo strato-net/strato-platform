@@ -37,6 +37,7 @@ module Blockchain.Context
     , initContext
     , runContextM
     , blockstanbulPeerAddr
+    , blockstanbulWireMessages
     , getBlockHeaders
     , putBlockHeaders
     , getRemainingBHeaders
@@ -59,13 +60,16 @@ import qualified Control.Monad.Change.Modify           as Mod
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Data.Default
+import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
+import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
 
+import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
@@ -153,6 +157,7 @@ data Context = Context
   , remainingBlockHeaders :: RemainingBlockHeaders
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
+  , _blockstanbulWireMessages :: S.OSet Keccak256
   }
 
 makeLenses ''Context
@@ -232,6 +237,21 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) wher
                . RBDB.withRedisBlockDB . RBDB.getBlocks
   insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
   deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
+
+instance MonadIO m => (Keccak256 `A.Alters` (Proxy WireMessage)) (ReaderT Config m) where
+  lookup _  k = do
+    ctx <- readIORef =<< asks configContext
+    let b = S.member k $ _blockstanbulWireMessages ctx
+    pure $ if b then Just (Proxy @WireMessage) else Nothing
+  insert _ k _ = asks configContext >>= flip atomicModifyIORef' (\ctx ->
+    let wms = _blockstanbulWireMessages ctx
+        s = S.size wms
+        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+        wms'' = wms' S.>| k
+     in (ctx{_blockstanbulWireMessages = wms''}, ()))
+  delete _ k = asks configContext >>= flip atomicModifyIORef' (\ctx ->
+    let wms = S.delete k $ _blockstanbulWireMessages ctx
+     in (ctx{_blockstanbulWireMessages = wms}, ()))
 
 instance ( MonadIO m
          , MonadUnliftIO m
@@ -346,6 +366,7 @@ type MonadP2P m = ( MonadIO m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
                        , '(Keccak256, OutputBlock)
+                       , '(Keccak256, Proxy WireMessage)
                        ] m
                   )
 
@@ -404,6 +425,7 @@ initContext = Context
   , remainingBlockHeaders = RemainingBlockHeaders []
   , vmTrace=[]
   , _blockstanbulPeerAddr = PeerAddress Nothing
+  , _blockstanbulWireMessages = S.empty
   }
 
 
