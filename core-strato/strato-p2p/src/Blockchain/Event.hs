@@ -322,9 +322,12 @@ handleEvents peer = awaitForever $ \case
         $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
       let msgHash = rlpHash wm
       msgExists <- lift $ exists (Proxy @(Proxy WireMessage)) msgHash
-      unless msgExists $ do
-        lift $ insert (Proxy @(Proxy WireMessage)) msgHash (Proxy @WireMessage)
-        yieldL $ ToUnseq [IEBlockstanbul wm]
+      if msgExists
+        then $logInfoS "handleEvents/Blockstanbul" . T.pack $ "Already seen wire message " ++ format msgHash ++ ". Not forwarding to Sequencer."
+        else do
+          $logInfoS "handleEvents/Blockstanbul" . T.pack $ "First time seeing wire message " ++ format msgHash ++ ". Forwarding to Sequencer."
+          lift $ insert (Proxy @(Proxy WireMessage)) msgHash (Proxy @WireMessage)
+          yieldL $ ToUnseq [IEBlockstanbul wm]
 
     -- private chains
     MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'

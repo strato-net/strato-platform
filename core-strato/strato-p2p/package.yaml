@@ -29,6 +29,7 @@ executables:
     dependencies:
       - blockapps-init
       - lifted-async
+      - ordered-containers
       - strato-p2p
       - wai-middleware-prometheus
       - warp

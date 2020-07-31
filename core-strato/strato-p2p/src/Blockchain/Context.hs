@@ -37,7 +37,6 @@ module Blockchain.Context
     , initContext
     , runContextM
     , blockstanbulPeerAddr
-    , blockstanbulWireMessages
     , getBlockHeaders
     , putBlockHeaders
     , getRemainingBHeaders
@@ -135,6 +134,7 @@ data Config = Config
   , configConnectionTimeout  :: ConnectionTimeout
   , configMaxReturnedHeaders :: MaxReturnedHeaders
   , configContext            :: IORef Context
+  , configBlockstanbulWireMessages :: IORef (S.OSet Keccak256)
   }
 
 newtype ActionTimestamp = ActionTimestamp { unActionTimestamp :: Maybe UTCTime }
@@ -157,7 +157,6 @@ data Context = Context
   , remainingBlockHeaders :: RemainingBlockHeaders
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
-  , _blockstanbulWireMessages :: S.OSet Keccak256
   }
 
 makeLenses ''Context
@@ -240,18 +239,17 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) wher
 
 instance MonadIO m => (Keccak256 `A.Alters` (Proxy WireMessage)) (ReaderT Config m) where
   lookup _  k = do
-    ctx <- readIORef =<< asks configContext
-    let b = S.member k $ _blockstanbulWireMessages ctx
+    wms <- readIORef =<< asks configBlockstanbulWireMessages
+    let b = S.member k wms
     pure $ if b then Just (Proxy @WireMessage) else Nothing
-  insert _ k _ = asks configContext >>= flip atomicModifyIORef' (\ctx ->
-    let wms = _blockstanbulWireMessages ctx
-        s = S.size wms
+  insert _ k _ = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
+    let s = S.size wms
         wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
         wms'' = wms' S.>| k
-     in (ctx{_blockstanbulWireMessages = wms''}, ()))
-  delete _ k = asks configContext >>= flip atomicModifyIORef' (\ctx ->
-    let wms = S.delete k $ _blockstanbulWireMessages ctx
-     in (ctx{_blockstanbulWireMessages = wms}, ()))
+     in (wms'', ()))
+  delete _ k = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
+    let wms' = S.delete k wms
+     in (wms', ()))
 
 instance ( MonadIO m
          , MonadUnliftIO m
@@ -402,8 +400,8 @@ runContextM r = void . runResourceT . flip runReaderT r
 initConfig :: ( MonadLogger m
               , MonadUnliftIO m
               )
-           => Int -> m Config
-initConfig maxHeaders = do
+           => IORef (S.OSet Keccak256) -> Int -> m Config
+initConfig wireMessagesRef maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   initState <- newIORef initContext
@@ -415,6 +413,7 @@ initConfig maxHeaders = do
     , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
     , configContext = initState
+    , configBlockstanbulWireMessages = wireMessagesRef
     }
 
 initContext :: Context
@@ -425,7 +424,6 @@ initContext = Context
   , remainingBlockHeaders = RemainingBlockHeaders []
   , vmTrace=[]
   , _blockstanbulPeerAddr = PeerAddress Nothing
-  , _blockstanbulWireMessages = S.empty
   }
 
 

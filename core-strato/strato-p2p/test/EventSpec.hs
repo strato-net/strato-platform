@@ -121,7 +121,7 @@ data TestContext = TestContext
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String DataPeer.PPeer
-  , _pbftMessages          :: S.OSet Keccak256
+  , _pbftMessages          :: IORef (S.OSet Keccak256)
   , _unseqEvents           :: [IngestEvent]
   , _sequencerContext      :: SequencerContext
   }
@@ -317,15 +317,14 @@ instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
 
 instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy WireMessage)) (MonadTest m) where
   lookup _  k = do
-    wms <- use pbftMessages
+    wms <- readIORef =<< use pbftMessages
     pure $ if S.member k wms then Just (A.Proxy @WireMessage) else Nothing
-  insert _ k _ = do
-    wms <- use pbftMessages
+  insert _ k _ = use pbftMessages >>= flip atomicModifyIORef' (\wms ->
     let s = S.size wms
         wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
         wms'' = wms' S.>| k
-    assign pbftMessages wms''
-  delete _ k = pbftMessages %= S.delete k
+     in (wms'', ()))
+  delete _ k = use pbftMessages >>= flip atomicModifyIORef' (\wms -> (S.delete k wms, ()))
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -363,8 +362,8 @@ newSequencerContext bc = do
 
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
-testContext :: SequencerContext -> TestContext
-testContext ctx = TestContext
+testContext :: IORef (S.OSet Keccak256) -> SequencerContext -> TestContext
+testContext wireMessagesRef ctx = TestContext
   { _blocks                = []
   , _blockHeaders          = []
   , _remainingBlockHeaders = RemainingBlockHeaders []
@@ -385,7 +384,7 @@ testContext ctx = TestContext
   , _genesisBlockHash      = GenesisBlockHash (unsafeCreateKeccak256FromWord256 0)
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.empty
-  , _pbftMessages          = S.empty
+  , _pbftMessages          = wireMessagesRef
   , _unseqEvents           = []
   , _sequencerContext      = ctx
   }
@@ -396,7 +395,8 @@ testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)
 runTestPeer :: TestContextM a -> IO ()
 runTestPeer f = do
   seqCtx <- newSequencerContext emptyBlockstanbulContext
-  ctx <- newIORef $ testContext seqCtx
+  wmr <- newIORef (S.empty)
+  ctx <- newIORef $ testContext wmr seqCtx
   void . runNoLoggingT . runResourceT $ runReaderT f ctx
 
 execTestPeer :: PrivateNumber
@@ -405,8 +405,9 @@ execTestPeer :: PrivateNumber
              -> IO (a, TestContext)
 execTestPeer pk as f = do
   seqCtx <- newSequencerContext $ newBlockstanbulContext pk as
-  ctx <- newIORef $ testContext seqCtx
-  a <- runNoLoggingT . runResourceT $ runReaderT f ctx
+  wmr <- newIORef (S.empty)
+  ctx <- newIORef $ testContext wmr seqCtx
+  a <- runLoggingT . runResourceT $ runReaderT f ctx
   ctx' <- readIORef ctx
   return (a, ctx')
 
