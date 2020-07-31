@@ -107,7 +107,7 @@ function newnode {
     apiKey="${blockstanbulPrivateKey:-}"
   fi
 
-  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
+  runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
     "${baFlag}" "${scFlag}" --minLogLevel=$seqMinLogLevel \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
@@ -244,7 +244,7 @@ function doInit {
 
     echo "init event source: $cmd"
     # logging to stdout and log file:
-    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    $cmd 2>&1 | tee logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
@@ -259,7 +259,7 @@ function doInit {
 
     echo "strato-setup command: $cmd"
     # logging to stdout and log file:
-    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    $cmd 2>&1 | tee logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
