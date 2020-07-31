@@ -68,10 +68,10 @@ import           System.Random
 
 
 -- TODO: super temporary it's not even funny
-newPriv :: IO (S.SecKey)
+newPriv :: IO (SEC.SecKey)
 newPriv = do
   ent <- getEntropy 32
-  return $ fromMaybe (error "could not create private key") (S.secKey ent)
+  return $ fromMaybe (error "could not create private key") (SEC.secKey ent)
 
 
 -----------------------------------------------------------------------------------------------
