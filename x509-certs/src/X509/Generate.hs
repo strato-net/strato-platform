@@ -17,8 +17,6 @@ module X509.Generate (
 --  bsToPub,
   makeCert,
   makeSignedCert,
---  ecdsaWithSHA256,
-  fromASN1CS, -- TODO: you don't need this to be exported...create the Issuer maker func
   newPriv
  ) where
 
@@ -43,9 +41,7 @@ import           Data.ASN1.Types.String
 import qualified Data.ByteArray                 as BA
 import qualified Data.ByteString                as B
 
---import           Data.Serialize
 import           Data.X509
---import           Data.X509.EC
 import           Data.PEM
 import           Data.Maybe
 
@@ -56,13 +52,6 @@ import           System.Random
 --import           GHC.Generics
 
 
---import qualified ECDSA                          as ECD
-
-
-
-
--- import           System.IO.Unsafe               -- please, don't shame me!
- --import           Crypto.PubKey.ECC.Generate       (generate)
 
 
 
@@ -236,7 +225,7 @@ signCert priv cert = objectToSignedExactF (ecdsaWithSHA256 $ priv) cert
 
 makeCert :: Issuer -> Subject -> IO (Certificate)
 makeCert iss sub = do
-  serial <- (randomRIO (10000000, 99999999))
+  serial <- (randomRIO (10000000, 99999999)) -- TODO: how to not have repeat serials
   validity <- getValidity
   
 
@@ -267,23 +256,17 @@ ecdsaWithSHA256 prv mesg' = do
       sig = SEC.signMsg prv mesg
   return (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
 
-{- signWithECDSA :: PrivateKey -> B.ByteString -> IO (B.ByteString, SignatureALG) 
-signWithECDSA priv msg = do
-  let hashAlg = CH.SHA256
-  sig <- sign priv hashAlg msg
-  
-  return (ECD.signatureEncodeDER $ sillySignatureConversion sig, SignatureALG HashSHA256 PubKeyALG_EC) 
--}
 
 
 toASN1CS :: String -> ASN1CharacterString
 toASN1CS = asn1CharacterString UTF8
 
+{-
 fromASN1CS :: ASN1CharacterString -> String
 fromASN1CS cs = 
   let errstr = "failed to decode ASN1CharacterString: " ++ show cs
   in fromMaybe (error errstr) (asn1CharacterToString cs)
-
+-}
 
 getIssuerDN :: Issuer -> DistinguishedName
 getIssuerDN iss = 
@@ -306,10 +289,10 @@ getSubjectDN sub =
 
 getValidity :: IO (DateTime, DateTime)
 getValidity = do
-  curDate <- dateCurrent
-  let endDate = Date 2021 April 19
-      endTime = TimeOfDay 9 0 0 0
-  return (curDate, DateTime endDate endTime)
+  (DateTime dt tm') <- dateCurrent
+  let curDate@(DateTime _ tm) = DateTime dt tm'{todNSec = 0} -- need to wipe out nanseconds b/c they won't serialize
+      endDate = DateTime dt{dateYear=(dateYear dt) + 1} tm -- all certs are valid for a year
+  return (curDate, endDate)
  
 
 
@@ -326,47 +309,3 @@ serializeAndWrap :: SEC.PubKey -> PubKey
 serializeAndWrap pub =
   let serialPoint = SerializedPoint $ SEC.exportPubKey False pub
   in PubKeyEC $ PubKeyEC_Named SEC_p256k1 serialPoint
-
-{-
-serializeAndWrap :: SEC.PubKey -> PubKey
-serializeAndWrap pub = 
-  let serialPoint = serializePoint (getCurveByName SEC_p256k1) pub
-      eccKey = case serialPoint of
-        Right pt -> PubKeyEC_Named SEC_p256k1 pt
-        Left str -> error $ "ERROR: could not serialize public key - " ++ str
-  in PubKeyEC eccKey
-
-
--- Unfortunately ECDSA module has the function for encoding signatures as DER, but the signature type
--- we use for Data.X509 is defined in Crypto.PubKey.ECC.ECDSA. They are the same under the hood, but we
--- still need to convert them to do the DER encoding. Hence, this function below
-sillySignatureConversion :: Signature -> ECD.Signature
-sillySignatureConversion sig = ECD.Signature (sign_r sig) (sign_s sig)
-
-
-
-
--- NOTE: This function serializePoint is literally stolen from a PR made to the Data.X509 repo 
---    that was never merged
-
--- https://github.com/vincenthz/hs-certificate/pull/111/files
-
-serializePoint :: Curve -> Point -> Either String SerializedPoint
-serializePoint _curve PointO = Left "Serializing Point0 not supported"
-serializePoint curve (Point px py) = SerializedPoint . B.cons ptFormat <$> output
-    where
-      ptFormat = 4 -- non compressed format
-      output = (<>) <$> serializedX <*> serializedY
-      serializedX = maybe
-                    (Left "could not serialize the point's x dimension into a bytestring of given size")
-                    Right
-                    $ i2ospOf dimensionLength px
-      serializedY = maybe
-                    (Left "could not serialize the point's y dimension into a bytestring of given size")
-                    Right
-                    $ i2ospOf dimensionLength py
-
-      bits            = curveSizeBits curve
-      dimensionLength = (bits + 7) `div` 8
-
--}

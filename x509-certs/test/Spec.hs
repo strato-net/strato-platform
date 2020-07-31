@@ -45,10 +45,8 @@ spec = do
       inPub `shouldBe` pub
       
     it "can do PEM encoding roundtrips" $ do
-      pendingWith "serialization of DateTime drops the nanoseconds (per the RFC), so this would fail"
-      -- TODO: the reason this fails is because when we serialize DateTimes, we lose the nanoseconds
-      -- cert <- makeSignedCert iss sub
-      --cert `shouldBe` bsToCert (certToBytes cert)
+      cert <- makeSignedCert iss sub
+      cert `shouldBe` bsToCert (certToBytes cert)
 
     it "can verify cert signatures" $ do
       cert <- makeSignedCert iss sub
