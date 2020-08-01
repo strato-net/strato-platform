@@ -13,7 +13,7 @@ backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_run = \serve -> do
       serve $ \case
-        BackendRoute_Missing :=> Identity() -> pure ()
+        BackendRoute_Missing :=> Identity () -> pure ()
         BackendRoute_IDE :=> Identity () -> do
           runWebSocketsSnap application
   , _backend_routeEncoder = fullRouteEncoder
