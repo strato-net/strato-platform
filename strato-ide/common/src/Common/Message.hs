@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds #-}
 
 module Common.Message where
 
@@ -17,18 +16,13 @@ data Ann = Ann
   , annErr :: Bool
   } deriving (Eq, Show, Generic)
 
-data C2S = C2Scompile T.Text
-          |C2SdebugCode T.Text
-          |C2ScreateContract T.Text
-          |C2ScreateContractBundle T.Text T.Text -- first field is the name, second is the contract code
+data C2S = C2Scompile (Int, T.Text)
          deriving (Eq,Show, Generic)
 
 options :: Options
 options = defaultOptions -- { tagSingleConstructors = True }
 
 data S2C = S2Cannotations [Ann]
-          |S2CdebugCode T.Text
-          |S2CcreateContract T.Text
          deriving (Eq,Show, Generic)
 
 instance ToJSON Ann where toEncoding = genericToEncoding options

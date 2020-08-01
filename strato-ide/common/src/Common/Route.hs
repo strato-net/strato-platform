@@ -30,7 +30,6 @@ data BackendRoute :: * -> * where
   -- i.e. These do not serve the frontend, but do something different, such as serving static files.
 
 data FrontendRoute :: * -> * where
-  FrontendRoute_ExampleCode :: FrontendRoute()
   FrontendRoute_Main :: FrontendRoute ()
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
 
@@ -42,7 +41,6 @@ fullRouteEncoder = mkFullRouteEncoder
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_IDE -> PathSegment "ide" $ unitEncoder mempty)
   (\case
-      FrontendRoute_ExampleCode -> PathSegment "example_code" $ unitEncoder mempty
       FrontendRoute_Main -> PathEnd $ unitEncoder mempty)
 
 concat <$> mapM deriveRouteComponent

@@ -49,27 +49,15 @@ toAnnotation Ann{..} = Annotation
   , annotationType = if annErr then AnnotationError else AnnotationWarning
   }
 
-dynButton :: MonadWidget t m => Text -> m (Event t ())
-dynButton s = do
-  (e, _) <- el' "button" $ text s
-  pure $ domEvent Click e
-
 app :: MonadWidget t m => Maybe Text -> m ()
 app route = mdo
   ace <- appAceWidget evAnnotations
-  evCompile <- dynButton $ "Compile"
-  let codeEv = tag (current ace) evCompile -- codeEv is currently an Event
-  evAnns <- wsEv route $ C2Scompile <$> codeEv
+  evCompile <- button "Compile"
+  timesClicked <- count evCompile
+  el "p" $ dynText $ (T.pack . show) <$> timesClicked
+  let me = (,) <$> timesClicked <*> ace
+  evAnns <- wsEv route $ C2Scompile <$> tag (current me) evCompile
   let evAnnotations = (\case (S2Cannotations anns) -> map toAnnotation anns) <$> evAnns
-  
-  -- next step is to display the debug output
-  evDb <- wsEv route $ C2SdebugCode <$> codeEv
-  let evDebug = (\case (S2CdebugCode db) -> db) <$> evDb
-  debugOutputWidget evDebug
-  
-  -- the create contract text input
-  createContractWidget route $ ace
-  
   pure ()
  
 appAceWidget :: MonadWidget t m => Event t [Annotation] -> m (Dynamic t Text)
@@ -114,41 +102,4 @@ wsEv route msgSendEv = case checkEncoder fullRouteEncoder of
       Just uri -> do
         ws <- webSocket (render uri) $ def & webSocketConfig_send .~ sendEv
         let mS2c = fromStrict <$> _webSocket_recv ws
-        pure $ fmapMaybe Aeson.decode mS2c
-        
-  
-debugOutputWidget :: MonadWidget t m => Event t Text -> m ()
-debugOutputWidget debugOutput = do
-  tmpOut <- holdDyn "" debugOutput
-  el "debugOutput" $ dynText tmpOut
-  
-createContractWidget :: MonadWidget t m => Maybe Text -> Dynamic t Text -> m ()
-createContractWidget route codeDyn = do
-  el "div" $ text "Enter in the name of the contract you want to create: "
-
-  textDynamic <- el "contractName" $ do
-    ti <- inputElement def
-    return $ value ti
-        
-  submitEvent <- elClass "div" "contractButton" $ do
-    submitButton <- elAttr "domEvent" ("class" =: "submitButton") $ button "Create Contract"
-    return submitButton
-        
-      
-  let contractEv = tagPromptlyDyn textDynamic submitEvent
-  contractName <- holdDyn "" contractEv
-  
-  --let contractEv = tag (current contractName) submitEvent
-  
-  
-  let bundleDyn = C2ScreateContractBundle <$> contractName <*> codeDyn
-  evCon <- wsEv route $ tagPromptlyDyn bundleDyn submitEvent
-  
-  let evContract = (\case (S2CcreateContract cc) -> cc) <$> evCon
-  tmpContractName <- holdDyn "" evContract
-  el "contractName" $ dynText tmpContractName
-  pure ()
-  
-
-mapTuple :: (a -> b) -> (a, a) -> (b, b)
-mapTuple f (a1, a2) = (f a1, f a2)
+        pure $ fmapMaybe Aeson.decode mS2c 
