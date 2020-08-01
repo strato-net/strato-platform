@@ -16,7 +16,7 @@ data Ann = Ann
   , annErr :: Bool
   } deriving (Eq, Show, Generic)
 
-data C2S = C2Scompile (Int, T.Text)
+data C2S = C2Scompile T.Text
          deriving (Eq,Show, Generic)
 
 options :: Options

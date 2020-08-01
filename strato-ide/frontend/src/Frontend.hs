@@ -49,14 +49,16 @@ toAnnotation Ann{..} = Annotation
   , annotationType = if annErr then AnnotationError else AnnotationWarning
   }
 
+dynButton :: MonadWidget t m => Text -> m (Event t ())
+dynButton s = do
+  (e, _) <- el' "button" $ text s
+  pure $ domEvent Click e
+
 app :: MonadWidget t m => Maybe Text -> m ()
 app route = mdo
   ace <- appAceWidget evAnnotations
-  evCompile <- button "Compile"
-  timesClicked <- count evCompile
-  el "p" $ dynText $ (T.pack . show) <$> timesClicked
-  let me = (,) <$> timesClicked <*> ace
-  evAnns <- wsEv route $ C2Scompile <$> tag (current me) evCompile
+  evCompile <- dynButton $ "Compile"
+  evAnns <- wsEv route $ C2Scompile <$> tag (current ace) evCompile
   let evAnnotations = (\case (S2Cannotations anns) -> map toAnnotation anns) <$> evAnns
   pure ()
  
