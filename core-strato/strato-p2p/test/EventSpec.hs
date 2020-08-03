@@ -33,6 +33,7 @@ import qualified Data.Map.Strict                       as M
 import           Data.Maybe                            (fromJust)
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
+import           Data.Text (Text)
 import           Data.Word                             (Word8)
 import           Text.Printf
 
@@ -122,6 +123,7 @@ data TestContext = TestContext
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String DataPeer.PPeer
   , _pbftMessages          :: IORef (S.OSet Keccak256)
+  , _outboundPbftMessages  :: S.OSet (Text, Keccak256)
   , _unseqEvents           :: [IngestEvent]
   , _sequencerContext      :: SequencerContext
   }
@@ -315,16 +317,28 @@ instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
   putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
 
-instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy WireMessage)) (MonadTest m) where
+instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
   lookup _  k = do
     wms <- readIORef =<< use pbftMessages
-    pure $ if S.member k wms then Just (A.Proxy @WireMessage) else Nothing
+    pure $ if S.member k wms then Just (A.Proxy @(Inbound WireMessage)) else Nothing
   insert _ k _ = use pbftMessages >>= flip atomicModifyIORef' (\wms ->
     let s = S.size wms
         wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
         wms'' = wms' S.>| k
      in (wms'', ()))
   delete _ k = use pbftMessages >>= flip atomicModifyIORef' (\wms -> (S.delete k wms, ()))
+
+instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessage))) (MonadTest m) where
+  lookup _  k = do
+    wms <- use outboundPbftMessages
+    pure $ if S.member k wms then Just (A.Proxy @(Outbound WireMessage)) else Nothing
+  insert _ k _ = do
+    wms <- use outboundPbftMessages
+    let s = S.size wms
+        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+        wms'' = wms' S.>| k
+    assign outboundPbftMessages wms''
+  delete _ k = outboundPbftMessages %= S.delete k
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -385,6 +399,7 @@ testContext wireMessagesRef ctx = TestContext
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.empty
   , _pbftMessages          = wireMessagesRef
+  , _outboundPbftMessages  = S.empty
   , _unseqEvents           = []
   , _sequencerContext      = ctx
   }

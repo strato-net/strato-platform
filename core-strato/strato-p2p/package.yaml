@@ -130,6 +130,7 @@ tests:
       - strato-model
       - strato-p2p
       - strato-sequencer
+      - text
       - transformers
       - unliftio
   

@@ -321,12 +321,21 @@ handleEvents peer = awaitForever $ \case
         peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
         $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
       let msgHash = rlpHash wm
-      msgExists <- lift $ exists (Proxy @(Proxy WireMessage)) msgHash
+      lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
+      msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
       if msgExists
-        then $logInfoS "handleEvents/Blockstanbul" . T.pack $ "Already seen wire message " ++ format msgHash ++ ". Not forwarding to Sequencer."
+        then $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat
+               [ "Already seen wire message "
+               , format msgHash
+               , ". Not forwarding to Sequencer."
+               ]
         else do
-          $logInfoS "handleEvents/Blockstanbul" . T.pack $ "First time seeing wire message " ++ format msgHash ++ ". Forwarding to Sequencer."
-          lift $ insert (Proxy @(Proxy WireMessage)) msgHash (Proxy @WireMessage)
+          $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat 
+            [ "First time seeing inbound wire message "
+            , format msgHash
+            , ". Forwarding to Sequencer."
+            ]
+          lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
           yieldL $ ToUnseq [IEBlockstanbul wm]
 
     -- private chains
@@ -398,7 +407,25 @@ handleEvents peer = awaitForever $ \case
       P2pBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
-        yieldR outbound
+        let msgHash = rlpHash msg
+        lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
+        msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
+        if msgExists
+          then $logInfoS "handleEvents/Blockstanbul" $ T.concat
+                 [ "Already seen outbound wire message "
+                 , T.pack (format msgHash)
+                 , ". Not forwarding to peer "
+                 , pPeerIp peer
+                 ]
+          else do
+            $logInfoS "handleEvents/Blockstanbul" $ T.concat
+              [ "First time seeing wire message "
+              , T.pack (format msgHash)
+              , ". Forwarding to peer "
+              , pPeerIp peer
+              ]
+            lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
+            yieldR outbound
       P2pAskForBlocks start _ p -> do
         ss <- lift $ shouldSendToPeer p
         when ss $ do

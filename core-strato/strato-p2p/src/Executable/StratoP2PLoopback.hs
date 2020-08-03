@@ -43,14 +43,14 @@ stratoP2PLoopback wireMessagesRef = do
     let toWireMessage = \case
           P2pBlockstanbul wm -> do
             let msgHash = rlpHash wm
-            msgExists <- A.exists (A.Proxy @(A.Proxy WireMessage)) msgHash
+            msgExists <- A.exists (A.Proxy @(A.Proxy (Inbound WireMessage))) msgHash
             if msgExists
               then do
                 $logInfoS "handleEvents/Blockstanbul" . T.pack $ "Already seen wire message " ++ format msgHash ++ ". Not forwarding to Sequencer."
                 pure Nothing
               else do
                 $logInfoS "handleEvents/Blockstanbul" . T.pack $ "First time seeing wire message " ++ format msgHash ++ ". Forwarding to Sequencer."
-                A.insert (A.Proxy @(A.Proxy WireMessage)) msgHash (A.Proxy @WireMessage)
+                A.insert (A.Proxy @(A.Proxy (Inbound WireMessage))) msgHash A.Proxy
                 pure $ Just wm
           _ -> pure Nothing
 
