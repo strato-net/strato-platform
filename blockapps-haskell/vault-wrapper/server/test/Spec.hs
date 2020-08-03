@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
@@ -14,7 +15,7 @@ import           Crypto.Random.Entropy
 import qualified Network.Haskoin.Internals         as HKI
 import qualified Crypto.HaskoinShim             as HK
 import qualified Crypto.Secp256k1               as SEC
-
+import           Strato.Strato23.Crypto         
 
 import           Data.Maybe
 import           Data.Coerce
@@ -48,7 +49,7 @@ main = do
   timingTests
 
 
--- TODO: this should be somewhere else, like in the ECDSA tests in strato-model
+-- TODO: maybe this should be somewhere else, like in strato-model
 secp256k1_haskell_spec :: Spec
 secp256k1_haskell_spec = 
   describe "secp256k1-haskell can do crypto operations just like haskoin" $ do
@@ -177,5 +178,15 @@ timingTests = do
   _ <- cwPrintTime $ return $ HK.verifySig (HK.derivePubKey oldPriv) (HK.convertRecSig hSig) hMesg
   putStrLn "secp256k1-haskell:"
   _ <- cwPrintTime $ return $ SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig sSig) sMesg
+ 
+
+  putStrLn "\n\n\nOther Timing Tests:"
+  putStrLn "\nKeyStore creation (with encryption):" 
+  KeyStore{..} <- cwPrintTime $ newKeyStore $ textPassword "1234"
   
+  putStrLn "\nDecryption:"
+  _ <- cwPrintTime $ return $ decryptSecKey (textPassword "1234") keystoreSalt keystoreAcctNonce keystoreAcctEncSecKey
+
+
+
   putStrLn "\nDone"
