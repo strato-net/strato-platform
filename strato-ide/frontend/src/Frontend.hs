@@ -71,7 +71,7 @@ appAceWidget evAnnotations = do
       , "input { width:600px; }"
       ]
   ace <- elAttr "div" ("id" =: "editor") $ do
-    let cfg = def{ _aceConfigBasePath        = Just "/"
+    let cfg = def{ _aceConfigBasePath        = Nothing
                   , _aceConfigElemAttrs       = "id" =: "ace-editor"
                   , _aceConfigWordWrap        = True
                   , _aceConfigShowPrintMargin = True

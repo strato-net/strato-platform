@@ -3,6 +3,7 @@
 
 module Backend.Server where
 
+import           CodeCollection
 import           Control.Monad      (forever)
 import           Data.Aeson         (encode, decode)
 import qualified Data.ByteString    as B
