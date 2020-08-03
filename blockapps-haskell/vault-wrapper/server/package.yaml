@@ -53,12 +53,6 @@ library:
     - text
 
 
-    # remove
-    - cryptonite
-    - base64-bytestring
-
-
-
 executables:
   blockapps-vault-wrapper-server:
     source-dirs: app
@@ -105,7 +99,6 @@ executables:
       - cryptonite
       - hflags
       - saltine
-      - secp256k1-haskell
       - strato-model
       - text
 

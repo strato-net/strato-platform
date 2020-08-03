@@ -55,10 +55,6 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Text.Colors                           as CL
 import           Text.Format
 
--- 
---    encrypt?? really??
---encrypt :: H.PrvKey -> Word256 -> H.SecretT IO ExtendedSignature
---encrypt = flip extSignMsg
 
 data RawNodeDiscoveryPacket =
   RawNDPacket Keccak256 ExtendedSignature Integer RLPObject deriving (Show)
