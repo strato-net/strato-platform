@@ -83,7 +83,7 @@ import jwt from "jsonwebtoken";
 
 /**
  * @typedef {Object} CallArgs This object defines a function call to a STRATO smart contract
- * @property {module:rest~Contract} contract Defines the contract on which to call the method. Should contain `name` 
+ * @property {module:rest~Contract} contract Defines the contract on which to call the method. Should contain `name`
  * and `address`.
  * @property {String} method Name of the method to call
  * @property {Object} args Arguments for the method call
@@ -134,7 +134,7 @@ import jwt from "jsonwebtoken";
 
 /**
  * @typedef {Object} TxResult The result of submitting a transaction to STRATO.
- * @property {String} contractsDeleted Comma separated list of contract addresses that were deleted as a result of 
+ * @property {String} contractsDeleted Comma separated list of contract addresses that were deleted as a result of
  * executing this transaction
  * @property {String} gasUsed Amount of gas used by this transaction in hexadecimal
  * @property {String} stateDiff
@@ -210,7 +210,7 @@ function assertTxResultList(txResultList) {
  * @static
  * This function is used to retrieve the results of an async transaction execution
  * @example
- * 
+ *
  * const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
  * const contractArgs = {
  *   name: "SimpleStorage",
@@ -257,11 +257,11 @@ function assertTxResultList(txResultList) {
  * //       src: 'source removed.',
  * //       xabi: 'xabi removed.' },
  * //    src: 'source removed.' } }
- * 
+ *
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~TxResultWrapper} pendingTxResult The tx result to resolve. Must contain the transaction hash.
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~TxResultWrapper} 
+ * @returns {module:rest~TxResultWrapper}
  */
 async function resolveResult(user, pendingTxResult, options) {
   return (await resolveResults(user, [pendingTxResult], options))[0];
@@ -272,7 +272,7 @@ async function resolveResult(user, pendingTxResult, options) {
  * @static
  * This function is used to retrieve the results of multiple async transaction executions
  * @example
- * 
+ *
  * const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
  * const contractArgs = {
  *   name: "SimpleStorage",
@@ -319,11 +319,11 @@ async function resolveResult(user, pendingTxResult, options) {
  * //       src: 'source removed.',
  * //       xabi: 'xabi removed.' },
  * //    src: 'source removed.' } }]
- * 
+ *
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~TxResultWrapper[]} pendingTxResults The tx results to resolve. Must contain the transaction hash.
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~TxResultWrapper[]} 
+ * @returns {module:rest~TxResultWrapper[]}
  */
 async function resolveResults(user, pendingResults, _options = {}) {
   const options = Object.assign({ isAsync: true }, _options);
@@ -398,7 +398,7 @@ async function getAccounts(user, options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~User}
  */
-async function createUser(user, options) {
+async function createUser(args, options) {
   const address = await createOrGetKey(args, options);
   const user = Object.assign({}, args, { address });
   return user;
@@ -469,8 +469,8 @@ async function compileContracts(user, contracts, options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract} contract This object describes the contract to upload
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~Contract|module:rest~TxResultWrapper} If `options.async` is set, it returns a transaction result 
- * object with the transaction. Final result can be obtained by using the `resolveResult` call. If `options.async` is not 
+ * @returns {module:rest~Contract|module:rest~TxResultWrapper} If `options.async` is set, it returns a transaction result
+ * object with the transaction. Final result can be obtained by using the `resolveResult` call. If `options.async` is not
  * set (default), this call returns a contract with the `name` and `address` values populated
  */
 async function createContract(user, contracts, options) {
@@ -539,8 +539,8 @@ async function createContractResolve(user, pendingTxResult, options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract[]} contracts This is a list of contracts to upload
  * @param {module:rest~Options} options This identifies the options and configurations for this call.
- * @returns {module:rest~Contract[]|module:rest~TxResultWrapper[]} If `options.async` is set, it returns a list of 
- * transaction result objects. Final results can be obtained by using the `resolveResults` call. If `options.async` is 
+ * @returns {module:rest~Contract[]|module:rest~TxResultWrapper[]} If `options.async` is set, it returns a list of
+ * transaction result objects. Final results can be obtained by using the `resolveResults` call. If `options.async` is
  * not set (default), this call returns a list of contracts with the `name` and `address` values populated
  */
 async function createContractList(user, contracts, options) {
@@ -577,7 +577,7 @@ async function createContractListResolve(user, pendingTxResultList, options) {
  * @static
  * Returns the users' STRATO address
  * @example
- * 
+ *
  * // Initialize ba-rest oaut-utility
  * const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
  *
@@ -589,10 +589,10 @@ async function createContractListResolve(user, pendingTxResultList, options) {
  *
  * const key = await rest.getKey(oauthUser, options);
  * // Returns cdc7e277d9aecbce6aba5b9b16de815cadad3d2a
- * 
- * @param {module:rest~User} user This must contain the token for the user 
+ *
+ * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Options} options This identifies the options and configurations for this call.
- * @returns {String}  
+ * @returns {String}
  */
 async function getKey(user, options) {
   const response = await api.getKey(user, options);
@@ -605,7 +605,7 @@ async function getKey(user, options) {
  * Creates a public/private key pair on a STRATO node for the OAuth identity described the user argument. This throws an
  * error if the key already exists
  * @example
- * 
+ *
  * // Initialize ba-rest oaut-utility
  * const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
  *
@@ -617,8 +617,8 @@ async function getKey(user, options) {
  *
  * const key = await rest.createKey(oauthUser, options);
  * // Returns cdc7e277d9aecbce6aba5b9b16de815cadad3d2a
- * 
- * @param {module:rest~User} user This must contain the token for the user 
+ *
+ * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Options} options This identifies the options and configurations for this call.
  * @returns {String} The address corresponding to the key pair for this user
  */
@@ -630,9 +630,9 @@ async function createKey(user, options) {
 
 /**
  * @static
- * Creates a public/private key pair on a STRATO node for the OAuth identity described the user argument. 
+ * Creates a public/private key pair on a STRATO node for the OAuth identity described the user argument.
  * @example
- * 
+ *
  * // Initialize ba-rest oaut-utility
  * const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
  *
@@ -644,8 +644,8 @@ async function createKey(user, options) {
  *
  * const key = await rest.createOrGetKey(oauthUser, options);
  * // Returns cdc7e277d9aecbce6aba5b9b16de815cadad3d2a
- * 
- * @param {module:rest~User} user This must contain the token for the user 
+ *
+ * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Options} options This identifies the options and configurations for this call.
  * @returns {String} The address corresponding to the key pair for this user
  */
@@ -810,7 +810,7 @@ async function getArray(user, contract, name, options) {
  * @param {module:rest~CallArgs} callArgs This defines the method and the method arguments
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {Array|module:rest~TxResultWrapper} If `options.isAsync` is set, this returns
- * a transaction result object that contains the transaction hash. You can use `resolveResult` or `resolveResults` 
+ * a transaction result object that contains the transaction hash. You can use `resolveResult` or `resolveResults`
  * call to get the final results. If the `options.isAsync` is not set (default), it returns the result of the call as an
  * array.
  */
@@ -878,11 +878,11 @@ async function callResolve(user, pendingTxResult, options) {
  * @param {module:rest~CallArgs[]} callListArgs A list of function calls
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {Array[]|module:rest~TxResultWrapper[]} If `options.isAsync` is set, this returns
- * a list of transaction result objects that each contain the transaction hash. You can use `resolveResult` 
- * or `resolveResults` call to get the final results. If the `options.isAsync` is not set (default), it returns the 
+ * a list of transaction result objects that each contain the transaction hash. You can use `resolveResult`
+ * or `resolveResults` call to get the final results. If the `options.isAsync` is not set (default), it returns the
  * results of transaction execution as a 2 dimensional array.
  */
- */
+
 async function callList(user, callListArgs, options) {
   const pendingTxResultList = await api.callList(user, callListArgs, options);
   return callListResolve(user, pendingTxResultList, options);
@@ -917,12 +917,12 @@ async function callListResolve(user, pendingTxResultList, options) {
  * @static
  * This function sends a token transfer transaction to STRATO
  * @example
- * 
+ *
  * const sendArgs = {
  *   toAddress: "cdc7e277d9aecbce6aba5b9b16de815cadad3d2b",
  *   value: 100000000
  * };
- * 
+ *
  * const result = await rest.send(stratoUser, sendArgs, options);
  * // Returns
  * // { hash:
@@ -945,9 +945,9 @@ async function callListResolve(user, pendingTxResultList, options) {
  * // bin: 'bin removed.',
  * // 'bin-runtime': 'bin-runtime removed.',
  * // xabi: 'xabi removed.' }
- * 
+ *
  * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~SendArgs} sendTx This describes the recipient, amount of tokens and the chain id (optional) for 
+ * @param {module:rest~SendArgs} sendTx This describes the recipient, amount of tokens and the chain id (optional) for
  * the token transfer
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper} If `options.async` is set, only the hashes are populated, otherwise all the
@@ -968,12 +968,12 @@ async function send(user, sendTx, options) {
  * @static
  * This function send multiple token transfer transactions to STRATO
  * @example
- * 
+ *
  * const sendArgs = {
  *   toAddress: "cdc7e277d9aecbce6aba5b9b16de815cadad3d2b",
  *   value: 100000000
  * };
- * 
+ *
  * const result = await rest.send(stratoUser, [sendArgs], options);
  * // Returns
  * // [{ hash:
@@ -996,9 +996,9 @@ async function send(user, sendTx, options) {
  * // bin: 'bin removed.',
  * // 'bin-runtime': 'bin-runtime removed.',
  * // xabi: 'xabi removed.' }]
- * 
+ *
  * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~SendArgs[]} sendTx This describes the recipient, amount of tokens and the chain id (optional) for 
+ * @param {module:rest~SendArgs[]} sendTx This describes the recipient, amount of tokens and the chain id (optional) for
  * the token transfer
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
@@ -1024,6 +1024,52 @@ async function sendMany(user, sendTxs, options) {
 // =====================================================================
 //   search
 // =====================================================================
+
+/**
+ * @static
+ * This function searches for a specific contract
+ * @example
+ *
+ * const globalConfig = fsUtil.getYaml("config.yaml");
+ * const options = { config: globalConfig, logger: console };
+ * const queryOptions = {
+ *   ...options,
+ *   query: {}
+ * };
+ * const searchResults = await rest.search(
+ *  stratoUser,
+ *  { name: "history@SimpleStorage" },
+ *  queryOptions
+ * );
+ * // Returns
+ * // [ { address: '2793d0f3afc31720ef18f6736073154e9131b21e',
+ * //     chainId: '',
+ * //     block_hash:
+ * //      'df95ba0b693148fb106919c824fb133ab556cc108ef27fac5678e1399df58491',
+ * //     block_timestamp: '2020-08-04 15:57:07 UTC',
+ * //     block_number: '4',
+ * //     transaction_hash:
+ * //      '98c9b97be10aa1f91f29d78c7924ae8bbc79f797628464afa658a7cbcd41cf86',
+ * //     transaction_sender: '28aced430a5121bbc8613e8415583c47cb9a4516',
+ * //     transaction_function_name: '',
+ * //     storedData: 0 },
+ * //   { address: '2793d0f3afc31720ef18f6736073154e9131b21e',
+ * //     chainId: '',
+ * //     block_hash:
+ * //      '5f306c319d9493fa77d14516e6fa12accc9e6a1b31b3e32ea016270e529b5cda',
+ * //     block_timestamp: '2020-08-04 15:59:20 UTC',
+ * //     block_number: '5',
+ * //     transaction_hash:
+ * //      '3e6ed2346d35c38c2c87c9cdb5603d914998886e7110675db840ff870fe55784',
+ * //     transaction_sender: '28aced430a5121bbc8613e8415583c47cb9a4516',
+ * //     transaction_function_name: '',
+ * //     storedData: 10 } ]
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
 
 async function search(user, contract, options) {
   try {

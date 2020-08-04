@@ -325,7 +325,6 @@ export default {
   fill,
   blocResults,
   getState,
-  getBatchStates,
   getCallArgs,
   call,
   callList,
