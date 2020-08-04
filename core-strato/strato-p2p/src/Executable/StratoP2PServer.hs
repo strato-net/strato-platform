@@ -24,6 +24,7 @@ import           Crypto.PubKey.ECC.DH
 import qualified Data.ByteString                       as B
 import           Data.Conduit.Network
 import           Data.Maybe                            (fromMaybe)
+import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Network.Socket
 import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
@@ -37,14 +38,16 @@ import           Blockchain.P2PUtil
 import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors                           as C
 
 runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-             => PrivateNumber
+             => IORef (S.OSet Keccak256)
+             -> PrivateNumber
              -> Int
              -> m ()
-runEthServer myPriv listenPort = do
-  cfg <- initConfig flags_maxReturnedHeaders
+runEthServer wireMessagesRef myPriv listenPort = do
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   void . runContextM cfg $ do
     uSink <- asks configUnseqSink
     ethServer myPriv listenPort uSink
@@ -117,11 +120,11 @@ runEthServerConduit myPriv p peerSource peerSink seqSource unseqSink peerStr = d
                   .| eventSink
                   .| peerSink
 
-stratoP2PServer :: LoggingT IO ()
-stratoP2PServer = do
+stratoP2PServer :: IORef (S.OSet Keccak256) -> LoggingT IO ()
+stratoP2PServer wireMessagesRef = do
   let PrivKey myPriv = privKey ethConf
 
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
 
-  void $ runEthServer myPriv flags_listen
+  void $ runEthServer wireMessagesRef myPriv flags_listen

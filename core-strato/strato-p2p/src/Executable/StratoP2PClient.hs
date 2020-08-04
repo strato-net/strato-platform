@@ -31,6 +31,7 @@ import           Data.Conduit
 import           Data.Conduit.Network
 import           Data.Either.Combinators
 import           Data.Maybe
+import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import qualified Network.Haskoin.Internals             as H
@@ -50,19 +51,21 @@ import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 import           Text.Format
 
 runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-        => PPeer
+        => IORef (S.OSet Keccak256)
+        -> PPeer
         -> PrivateNumber
         -> BC.ByteString -- otherServiceCommHost
         -> CommPort      -- otherServiceCommPort
         -> m ()
-runPeer peer myPriv _ _ = do
-  cfg <- initConfig flags_maxReturnedHeaders
+runPeer wireMessagesRef peer myPriv _ _ = do
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   runContextM cfg $ do
     ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
     void $ register ender
@@ -112,11 +115,12 @@ runEthClientConduit myPriv peer peerSource peerSink seqSource unseqSink peerStr 
                   .| peerSink
 
 getPubKeyRunPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-                 => PPeer
+                 => IORef (S.OSet Keccak256)
+                 -> PPeer
                  -> BC.ByteString
                  -> CommPort
                  -> m ()
-getPubKeyRunPeer peer otherServiceCommHost otherServiceCommPort = do
+getPubKeyRunPeer wireMessagesRef peer otherServiceCommHost otherServiceCommPort = do
   let PrivKey myPriv = privKey ethConf
 
   case (pPeerPubkey peer) of
@@ -126,26 +130,27 @@ getPubKeyRunPeer peer otherServiceCommHost otherServiceCommPort = do
       case eitherOtherPubKey of
             Right otherPubKey -> do
               $logInfoS "getPubKeyRunPeer" $ T.pack $ "#### Success, the pubkey has been obtained: " ++ format otherPubKey
-              runPeer peer{pPeerPubkey=Just otherPubKey} myPriv otherServiceCommHost otherServiceCommPort
+              runPeer wireMessagesRef peer{pPeerPubkey=Just otherPubKey} myPriv otherServiceCommHost otherServiceCommPort
             Left e -> $logInfoS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
-    Just _ -> runPeer peer myPriv otherServiceCommHost otherServiceCommPort
+    Just _ -> runPeer wireMessagesRef peer myPriv otherServiceCommHost otherServiceCommPort
 
 
 runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-              => PPeer
+              => IORef (S.OSet Keccak256)
+              -> PPeer
               -> BC.ByteString
               -> CommPort
               -> m ()
-runPeerInList thePeer otherServiceHost otherServicePort = do
+runPeerInList wireMessagesRef thePeer otherServiceHost otherServicePort = do
   eErr <- liftIO $ nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   whenLeft eErr $ \err -> do
       $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
       $logErrorS "runPeerInList" "Simulating disable..."
       liftIO $ threadDelay $ 10 * 1000 * 1000
-  getPubKeyRunPeer thePeer otherServiceHost otherServicePort
+  getPubKeyRunPeer wireMessagesRef thePeer otherServiceHost otherServicePort
 
-stratoP2PClient :: LoggingT IO ()
-stratoP2PClient = do
+stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO ()
+stratoP2PClient wireMessagesRef = do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
 
   activePeersSem <- liftIO (SSem.new flags_maxConn)
@@ -171,7 +176,7 @@ stratoP2PClient = do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
             Just _  -> void . forkIO . runLoggingT $ do
-              result <- try $ runPeerInList p osch oscp
+              result <- try $ runPeerInList wireMessagesRef p osch oscp
               liftIO (SSem.signal sem)
               handleRunPeerResult p result
 
