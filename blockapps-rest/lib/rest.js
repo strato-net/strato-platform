@@ -1038,22 +1038,11 @@ async function sendMany(user, sendTxs, options) {
  * };
  * const searchResults = await rest.search(
  *  stratoUser,
- *  { name: "history@SimpleStorage" },
+ *  { name: "SimpleStorage" },
  *  queryOptions
  * );
  * // Returns
  * // [ { address: '2793d0f3afc31720ef18f6736073154e9131b21e',
- * //     chainId: '',
- * //     block_hash:
- * //      'df95ba0b693148fb106919c824fb133ab556cc108ef27fac5678e1399df58491',
- * //     block_timestamp: '2020-08-04 15:57:07 UTC',
- * //     block_number: '4',
- * //     transaction_hash:
- * //      '98c9b97be10aa1f91f29d78c7924ae8bbc79f797628464afa658a7cbcd41cf86',
- * //     transaction_sender: '28aced430a5121bbc8613e8415583c47cb9a4516',
- * //     transaction_function_name: '',
- * //     storedData: 0 },
- * //   { address: '2793d0f3afc31720ef18f6736073154e9131b21e',
  * //     chainId: '',
  * //     block_hash:
  * //      '5f306c319d9493fa77d14516e6fa12accc9e6a1b31b3e32ea016270e529b5cda',
@@ -1082,6 +1071,40 @@ async function search(user, contract, options) {
     throw err;
   }
 }
+
+/**
+ * @static
+ * This function searches for a specific contract
+ * @example
+ *
+ * const globalConfig = fsUtil.getYaml("config.yaml");
+ * const options = { config: globalConfig, logger: console };
+ * const queryOptions = {
+ *   ...options,
+ *   query: {}
+ * };
+ * // predicate is created: to wait until response is available otherwise throws the error
+ * function predicate(data) {};
+ * const result = await rest.searchUntil(stratoUser, {name: "SimpleStorage"}, predicate, queryOptions);
+ * // Returns
+ * // [ { address: '60fb089dc62858df014819d618aa3f43391ddb9c',
+ * //     chainId: '',
+ * //     block_hash:
+ * //      'fb7edc20a2678ca60024f81d926d1637eb418012beae2fedb7e7c4250406ea82',
+ * //     block_timestamp: '2020-08-04 20:48:18 UTC',
+ * //     block_number: '3',
+ * //     transaction_hash:
+ * //      '32321367696882da2feb9483fa31346f68abf77cc1a01ace6ef5a2b774bc8d38',
+ * //     transaction_sender: '594f19ad4a55d6434711a51f628f22abf4afc55a',
+ * //     transaction_function_name: '',
+ * //     storedData: 10 } ]
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
+ * @param {module:rest~Predicate} options This identifies the predicate that determines when to stop the search
+ * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
+
 
 async function searchUntil(user, contract, predicate, options) {
   const action = async o => {
