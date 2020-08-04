@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Main where
 
@@ -123,32 +124,45 @@ secp256k1_haskell_spec =
       [oldValid, newValid] `shouldBe` [True, True]
 
 
-
+-- be warned, ye who enter here: you must time your pure functions the way it's done below
+-- (with strict !let bindings in the cwPrintTime block), otherwise the value is thunked
+-- and evaluated later (outside the cwPrintTIme block), or discarded entirely (if you wildcard it)
 timingTests :: IO ()
 timingTests = do
+  e <- getEntropy 32
 
   putStrLn "\nLET'S TIME IT! comparing secp256k1-haskell and haskoin for all things EC"
-  
-  putStrLn "\nPrivate Key Creation:"
+    
+  putStrLn "\nPrivate Key import (from the same pre-pulled entropy):"
   putStrLn "Haskoin: "
-  _ <- cwPrintTime $ return $ HK.secKey ent
+  _ <- cwPrintTime $ do
+    let !pk = HK.secKey e
+    return pk
   putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ return $ SEC.secKey ent
- 
+  _ <- cwPrintTime $ do
+    let !pk = SEC.secKey e
+    return pk
 
-  putStrLn "\nPublic Key Creation:"
+  putStrLn "\nPublic Key derivation:"
   putStrLn "Haskoin: "
-  _ <- cwPrintTime $ return $ HK.exportPubKey False $ HK.derivePubKey oldPriv
+  _ <- cwPrintTime $ do
+    let !pub = HK.derivePubKey oldPriv
+    return pub
   putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ return $ SEC.exportPubKey False $ SEC.derivePubKey newPriv
+  _ <- cwPrintTime $ do
+    let !pub = SEC.derivePubKey newPriv
+    return pub
 
   
   putStrLn "\nAddress derivation:"
   putStrLn "Haskoin: "
-  _ <- cwPrintTime $ return $ E.deriveAddress $ HK.derivePubKey oldPriv
+  _ <- cwPrintTime $ do
+    let !addr = E.deriveAddress $ HK.derivePubKey oldPriv
+    return addr
   putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ return $ fromPrivateKey (PrivateKey newPriv)
-
+  _ <- cwPrintTime $ do
+    let !addr = fromPrivateKey (PrivateKey newPriv)
+    return addr
 
   -- message hashes for signatures
   let mesg = E.rlpHash ("A monad is like a burrito, or so the Glaswegians would have us believe" :: String)
@@ -157,10 +171,13 @@ timingTests = do
   
   putStrLn "\nECDSA Signatures:"
   putStrLn "Haskoin: "
-  _ <- cwPrintTime $ return $ HK.signRecMsg oldPriv hMesg
+  _ <- cwPrintTime $ do
+    let !sig = HK.signRecMsg oldPriv hMesg
+    return sig
   putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ return $ SEC.signRecMsg newPriv sMesg
-
+  _ <- cwPrintTime $ do
+    let !sig = SEC.signRecMsg newPriv sMesg
+    return sig
 
   -- signatures to use for recovery
   let hSig = HK.signRecMsg oldPriv hMesg
@@ -168,25 +185,31 @@ timingTests = do
 
   putStrLn "\nPublic Key Signature Recovery:"
   putStrLn "Haskoin:"
-  _ <- cwPrintTime $ return $ fromMaybe (error "couldn't recover haskoin pubkey") (HK.recover hSig hMesg)
+  _ <- cwPrintTime $ do
+    let !pub = fromMaybe (error "couldn't recover haskoin pubkey") (HK.recover hSig hMesg)
+    return pub
   putStrLn "secp256k1-haskell"
-  _ <- cwPrintTime $ return $ fromMaybe (error "couldnt recover secp256k1 pubkey") (SEC.recover sSig sMesg)
-
+  _ <- cwPrintTime $ do
+    let !pub = fromMaybe (error "couldnt recover secp256k1 pubkey") (SEC.recover sSig sMesg)
+    return pub
           
   putStrLn "\nSignature Verification:"
   putStrLn "Haskoin:"
-  _ <- cwPrintTime $ return $ HK.verifySig (HK.derivePubKey oldPriv) (HK.convertRecSig hSig) hMesg
+  _ <- cwPrintTime $ do
+    let !bl = HK.verifySig (HK.derivePubKey oldPriv) (HK.convertRecSig hSig) hMesg
+    return bl 
   putStrLn "secp256k1-haskell:"
-  _ <- cwPrintTime $ return $ SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig sSig) sMesg
- 
+  _ <- cwPrintTime $ do
+    let !bl  = SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig sSig) sMesg
+    return bl
 
   putStrLn "\n\n\nOther Timing Tests:"
-  putStrLn "\nKeyStore creation (with encryption):" 
+  putStrLn "\nKeyStore creation (with secret key encryption):" 
   KeyStore{..} <- cwPrintTime $ newKeyStore $ textPassword "1234"
+
+  putStrLn "\nSecret Key Decryption:"
+  _ <- cwPrintTime $ do
+    let !key' = decryptSecKey (textPassword "1234") keystoreSalt keystoreAcctNonce keystoreAcctEncSecKey
+    return key'
   
-  putStrLn "\nDecryption:"
-  _ <- cwPrintTime $ return $ decryptSecKey (textPassword "1234") keystoreSalt keystoreAcctNonce keystoreAcctEncSecKey
-
-
-
   putStrLn "\nDone"
