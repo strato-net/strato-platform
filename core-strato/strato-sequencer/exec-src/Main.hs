@@ -9,10 +9,10 @@ import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
---import qualified Data.Aeson                 as Ae
+import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
 import qualified Data.Text                  as T
---import           Data.Either.Extra
+import           Data.Either.Extra
 import           HFlags
 import           Safe
 
@@ -88,9 +88,9 @@ main = do
 --      !validators' = fromRight (error "invalid validators") eValidators
       -- since selfAddr can't be known before starting strato, we add it to the validator list and admins list
   let validators = [selfAddress] -- : validators'
---      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
---      !authSenders' = fromRight (error "invalid admins") eAuthSenders
-      authSenders = [selfAddress] -- : authSenders'
+      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
+      !authSenders' = fromRight (error "invalid admins") eAuthSenders
+      authSenders = selfAddress  : authSenders'
   ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
   putStrLn $ "Checkpoint: " ++ show ckpt
       -- TODO(tim): checkpoint validators, authSenders
