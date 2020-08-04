@@ -22,6 +22,7 @@ defineFlag "connectionTimeout" (300 :: Int) "Number of seconds to tolerate a use
 defineFlag "maxReturnedHeaders" (1000 :: Int) "Number of headers to return from a GetBlockHeaders request" -- todo: seriously???
 defineFlag "maxHeadersTxsLens" (2500 :: Int) "Number of txs size to return from a BlockHeader request"
 defineFlag "averageTxsPerBlock" (40 :: Int) "Average number of txs per block"
+defineFlag "wireMessageCacheSize" (2000 :: Int) "Number of wire messages to cache for network performance"
 defineFlag "txGossipFanout" (-1::Int) "Maxmimum number of peers to forward transactions to. Only\
                                       \ applicable for transactions received from peers, not\
                                       \ originating on this node."

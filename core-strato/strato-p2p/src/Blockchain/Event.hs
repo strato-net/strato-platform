@@ -325,7 +325,7 @@ handleEvents peer = awaitForever $ \case
       msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
       if msgExists
         then $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat
-               [ "Already seen wire message "
+               [ "Already seen inbound wire message "
                , format msgHash
                , ". Not forwarding to Sequencer."
                ]
@@ -411,15 +411,15 @@ handleEvents peer = awaitForever $ \case
         lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
         msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
         if msgExists
-          then $logInfoS "handleEvents/Blockstanbul" $ T.concat
+          then $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
                  [ "Already seen outbound wire message "
                  , T.pack (format msgHash)
                  , ". Not forwarding to peer "
                  , pPeerIp peer
                  ]
           else do
-            $logInfoS "handleEvents/Blockstanbul" $ T.concat
-              [ "First time seeing wire message "
+            $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
+              [ "First time seeing outbound wire message "
               , T.pack (format msgHash)
               , ". Forwarding to peer "
               , pPeerIp peer

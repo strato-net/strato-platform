@@ -54,6 +54,9 @@ function newnode {
   if [ -n "${participationMode}" ]; then
     pmFlag="--participationMode=${participationMode}"
   fi
+  if [ -n "${wireMessageCacheSize}" ]; then
+    cacheFlag="--wireMessageCacheSize=${wireMessageCacheSize}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -67,6 +70,7 @@ function newnode {
      ${atbFlag} \
      ${pcamFlag} \
      ${pmFlag} \
+     ${cacheFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo

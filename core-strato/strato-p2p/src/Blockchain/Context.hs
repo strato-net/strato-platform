@@ -250,7 +250,7 @@ instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (Read
     pure $ if b then Just (Proxy @(Inbound WireMessage)) else Nothing
   insert _ k _ = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
     let s = S.size wms
-        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+        wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
         wms'' = wms' S.>| k
      in (wms'', ()))
   delete _ k = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
@@ -265,7 +265,7 @@ instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessa
   insert _ k _ = Mod.modifyStatefully_ (Mod.Proxy @Context) $ do
     wms <- use outboundWireMessages
     let s = S.size wms
-        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+        wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
         wms'' = wms' S.>| k
     assign outboundWireMessages wms''
   delete _ k = Mod.modifyStatefully_ (Mod.Proxy @Context) $

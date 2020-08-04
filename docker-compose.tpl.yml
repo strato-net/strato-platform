@@ -235,6 +235,7 @@ services:
     - useSyncMode=${useSyncMode}
     - validators=${validators}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
+    - wireMessageCacheSize=${wireMessageCacheSize}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
