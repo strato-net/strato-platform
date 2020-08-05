@@ -180,10 +180,10 @@ ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rl
 
 dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, PublicKey)
 dataToPacket msg = do
-    let signature = decode $ BL.fromStrict $ B.take 80 $ B.drop 32 msg
-        theRest = B.unpack $ B.drop 113 msg
+    let signature = decode $ BL.fromStrict $ B.take 81 $ B.drop 32 msg
+        theRest = B.unpack $ B.drop 114 msg
         (rlp, _) = rlpSplit $ B.pack theRest
-    theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 112 msg
+    theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 113 msg
     let messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
     otherPubkey <- note (MalformedUDPException $ "malformed signature in udpHandshakeServer: " ++ show (signature, messageHash))
                         (recoverPub signature $ keccak256ToByteString messageHash)
@@ -217,10 +217,10 @@ sendPacket sock addr packet = do
   return ()
 
 processDataStream'::B.ByteString-> PublicKey
-processDataStream' bs | B.length bs < 113 = error "processDataStream' called with too few bytes"
+processDataStream' bs | B.length bs < 114 = error "processDataStream' called with too few bytes"
 processDataStream' bs =
   let (hs, bs') = B.splitAt 32 bs
-      (sigBS, bs'') = B.splitAt 80 bs'
+      (sigBS, bs'') = B.splitAt 81 bs'
       (vtype, rest) = B.splitAt 1 bs''
       theType = B.index vtype 0
       theHash = bytesToWord256 hs
@@ -284,7 +284,7 @@ getServerPubKey domain _ = do
     let sigBS = BL.toStrict $ encode sig 
         theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType <> theData
         theMsg = theHash <> sigBS <> B.singleton theType <> theData
-    liftIO $ putStrLn $ "DAN! The length of the ig in getServerPubKey is: " ++ show (B.length sigBS)
+    liftIO $ putStrLn $ "DAN! The length of the sig in getServerPubKey is: " ++ show (B.length sigBS)
 
     liftIO $ withSocketsDo $ bracket (getSocket domain port) close (talk theMsg)
   where
