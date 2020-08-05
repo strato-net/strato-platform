@@ -212,7 +212,6 @@ sendPacket sock addr packet = do
   let sigBS = BL.toStrict $ encode sig 
       theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType' <> theData
 
-  liftIO $ putStrLn $ "DAN! The length of the sig in sendPacket is: " ++ show (B.length sigBS)
   _ <- liftIO $ NB.sendTo sock ( theHash <> sigBS <> B.singleton theType' <> theData) addr
   return ()
 
@@ -284,7 +283,6 @@ getServerPubKey domain _ = do
     let sigBS = BL.toStrict $ encode sig 
         theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType <> theData
         theMsg = theHash <> sigBS <> B.singleton theType <> theData
-    liftIO $ putStrLn $ "DAN! The length of the sig in getServerPubKey is: " ++ show (B.length sigBS)
 
     liftIO $ withSocketsDo $ bracket (getSocket domain port) close (talk theMsg)
   where
