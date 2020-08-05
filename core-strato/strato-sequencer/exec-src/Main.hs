@@ -94,7 +94,9 @@ main = do
   ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
   putStrLn $ "Checkpoint: " ++ show ckpt
       -- TODO(tim): checkpoint validators, authSenders
-  putStrLn $ "Interpreted validators: " ++ show validators
+
+
+--  putStrLn $ "Interpreted validators: " ++ show validators
   
  
   
