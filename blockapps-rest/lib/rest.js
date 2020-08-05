@@ -1074,7 +1074,7 @@ async function search(user, contract, options) {
 
 /**
  * @static
- * This function searches for a specific contract
+ * This function searches for a specific contract until a particular condition is met
  * @example
  *
  * const globalConfig = fsUtil.getYaml("config.yaml");
@@ -1105,7 +1105,6 @@ async function search(user, contract, options) {
  * field are populated
  */
 
-
 async function searchUntil(user, contract, predicate, options) {
   const action = async o => {
     return search(user, contract, o);
@@ -1114,6 +1113,80 @@ async function searchUntil(user, contract, predicate, options) {
   const results = await util.until(predicate, action, options);
   return results;
 }
+
+/**
+ * @static
+ * This function searches for a specific contract in a specific range
+ * @example
+ *
+ * const globalConfig = fsUtil.getYaml("config.yaml");
+ * const options = { config: globalConfig, logger: console };
+ * const queryOptions = {
+ *   ...options,
+ *   query: {}
+ * };
+ * // predicate is created: to wait until response is available otherwise throws the error
+ * function predicate(response) {
+ *  return response.data.length >= 4;
+ * }
+ * const result = await rest.searchWithContentRangeUntil(stratoUser, contracts[0], predicate, queryOptions);
+ * // Returns
+ * // { data:
+ * //    [ { address: '07c9cb29ac43fe2257143074fb344203accb53eb',
+ * //        chainId: '',
+ * //        block_hash:
+ * //         '0e39030b10d80e5abaaf90a4b2d2322644fbb7b3b5cc0c8ea52a95d91adcd4ff',
+ * //        block_timestamp: '2020-08-05 16:49:28 UTC',
+ * //        block_number: '2',
+ * //        transaction_hash:
+ * //         '8c05b2ad6e8759122856c00f0646793073e0982d64ebd30ab3fb55a33da5cecf',
+ * //        transaction_sender: 'ebc383a8d64c07b3f472da8612bb463cf338c0b4',
+ * //        transaction_function_name: '',
+ * //        intValue: 2000,
+ * //        stringValue: '_2000_' },
+ * //      { address: '64560dd4c8789663303e97937f732976d98dab95',
+ * //        chainId: '',
+ * //        block_hash:
+ * //         '6840a306239c9f0e31359f9950a12e2a3595690273d38ce52bae970e26cd80e6',
+ * //        block_timestamp: '2020-08-05 16:49:29 UTC',
+ * //        block_number: '3',
+ * //        transaction_hash:
+ * //         '07e8b895559737c76e5323d3b2f1e6c893a91d68eb6fa08c6fb461133c37e4ad',
+ * //        transaction_sender: 'ebc383a8d64c07b3f472da8612bb463cf338c0b4',
+ * //        transaction_function_name: '',
+ * //        intValue: 2001,
+ * //        stringValue: '_2001_' },
+ * //      { address: '9f7f1f4a6479463145bab645b64acecc230f9332',
+ * //        chainId: '',
+ * //        block_hash:
+ * //         '50c25b7e693904b545bc7b9003c0eb57a6149d0bd42f12aac72962e01ae8588a',
+ * //        block_timestamp: '2020-08-05 16:49:30 UTC',
+ * //        block_number: '4',
+ * //        transaction_hash:
+ * //         '3a5e19730a8f32d71a707c78349c418375010d3ff98c74aa0f9156477ba98822',
+ * //        transaction_sender: 'ebc383a8d64c07b3f472da8612bb463cf338c0b4',
+ * //        transaction_function_name: '',
+ * //        intValue: 2002,
+ * //        stringValue: '_2002_' },
+ * //      { address: 'c1307553863b1a932f2a5d994926b64ecedc890e',
+ * //        chainId: '',
+ * //        block_hash:
+ * //         '1e674f96f42c08897d51ede082c95756493c26deb552588f854c44aa6f5adc4a',
+ * //        block_timestamp: '2020-08-05 16:49:31 UTC',
+ * //        block_number: '5',
+ * //        transaction_hash:
+ * //         'f93499e6e003d993ea5b2bf38d581da7e988a61c6a4077ebf60a242782e95b9c',
+ * //        transaction_sender: 'ebc383a8d64c07b3f472da8612bb463cf338c0b4',
+ * //        transaction_function_name: '',
+ * //        intValue: 2003,
+ * //        stringValue: '_2003_' } ],
+ * //   contentRange: { start: 0, end: 3, count: 4 } }
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
+ * @param {module:rest~Predicate} options This identifies the predicate that determines when to stop the search
+ * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
 
 async function searchWithContentRange(user, contract, options) {
   try {
