@@ -87,7 +87,7 @@ main = do
 --  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
 --      !validators' = fromRight (error "invalid validators") eValidators
       -- since selfAddr can't be known before starting strato, we add it to the validator list and admins list
-  let validators = [selfAddress] -- : validators'
+  let validators = [] -- [selfAddress] -- : validators'
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
       !authSenders' = fromRight (error "invalid admins") eAuthSenders
       authSenders = selfAddress  : authSenders'
