@@ -106,8 +106,8 @@ main = do
                     $ "cannot specify --validators with --blockstanbul=false"
                 return Nothing
              else do
-               when (null validators) . ioError . userError
-                    $ "must specify --validators with --blockstanbul"
+--               when (null validators) . ioError . userError
+--                    $ "must specify --validators with --blockstanbul"
                unless (selfAddress `elem` validators) . putStrLn
                     $ "NODEKEY does not correspond to an address within --validators.\
                       \ This probably means that you are connecting to an existing network,\
