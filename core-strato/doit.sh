@@ -101,11 +101,6 @@ function newnode {
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
   echo ${blockstanbulAdmins}
-  if [ -n "${faucetEnabled}" ]; then
-    apiKey=
-  else
-    apiKey="${blockstanbulPrivateKey:-}"
-  fi
 
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
@@ -148,11 +143,11 @@ function newnode {
   if [ "${USE_STRATO_API}" = true ]; then
       tbFlag="--blockstanbul=${blockstanbul}"
       echo "Starting strato-api"
-      HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
+      HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 \
 	  runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
   else
       echo "Starting core-api"
-      NODEKEY=$apiKey runBackgroundProcess core-api >> logs/core-api 2>&1
+      runBackgroundProcess core-api >> logs/core-api 2>&1
   fi
 
   
