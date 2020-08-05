@@ -159,9 +159,9 @@ udpHandshakeServer sock _ = do
     argValidator :: B.ByteString -> SockAddr -> Either DiscoverException (NodeDiscoveryPacket, ECC.Point, PortNumber)
     argValidator msg _ = do
       (packet, otherPubkey) <- dataToPacket msg
-      validOtherPubKey <- hPubKeyToPubKey otherPubkey
+      let validOtherPubKey = secPubKeyToPoint otherPubkey
       -- otherPort <- getAddrPort addr
-      let otherPort = 30303 -- TODO(tim): Reenable port selection
+          otherPort = 30303 -- TODO(tim): Reenable port selection
       return (packet, validOtherPubKey, otherPort)
 
 handleValidPacket :: ( HasSQLDB m

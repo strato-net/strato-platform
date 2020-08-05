@@ -22,7 +22,7 @@ module Blockchain.Strato.Discovery.UDP (
 import           Network.Socket
 import qualified Network.Socket.ByteString             as NB
 
-import           Control.Error                         (fmapL, note)
+import           Control.Error                         (note)
 import           Control.Exception
 import           Control.Monad.IO.Class
 import           Blockchain.Output
@@ -37,16 +37,16 @@ import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Time.Clock.POSIX
-import qualified Network.Haskoin.Internals             as H
 import qualified Network.URI                           as URI
 import           Numeric
 import           System.Endian
 import           System.Timeout
 
+import           Blockchain.Data.PubKey
 import           Blockchain.Data.RLP
 import           Blockchain.ExtendedECDSA -- say it with me: DEPRECATED!
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..), hPubKeyToPubKey)
+import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..))
 import           Blockchain.Strato.Model.Keccak256           
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Util
@@ -178,19 +178,15 @@ ndPacketToRLP (FindNeighbors target expiration) = (3, RLPArray [rlpEncode target
 ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rlpEncode neighbors, rlpEncode expiration])
 
 
-dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, H.PubKey)
+dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, PublicKey)
 dataToPacket msg = do
-    let r = bytesToWord256 $ B.take 32 $ B.drop 32 msg
-        s = bytesToWord256 $ B.take 32 $ B.drop 64 msg
-    v <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 96 msg
-    let yIsOdd = v == 28
-        signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
-        theRest = B.unpack $ B.drop 98 msg
+    let signature = decode $ BL.fromStrict $ B.take 80 $ B.drop 32 msg
+        theRest = B.unpack $ B.drop 113 msg
         (rlp, _) = rlpSplit $ B.pack theRest
-    theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 97 msg
+    theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 112 msg
     let messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
     otherPubkey <- note (MalformedUDPException $ "malformed signature in udpHandshakeServer: " ++ show (signature, messageHash))
-                        (getPubKeyFromSignature signature $ keccak256ToWord256 messageHash)
+                        (recoverPub signature $ keccak256ToByteString messageHash)
     packet <- typeToPacket theType rlp
     return (packet, otherPubkey)
   where
@@ -219,27 +215,20 @@ sendPacket sock addr packet = do
   _ <- liftIO $ NB.sendTo sock ( theHash <> sigBS <> B.singleton theType' <> theData) addr
   return ()
 
-processDataStream'::B.ByteString-> H.PubKey
-processDataStream' bs | B.length bs < 98 = error "processDataStream' called with too few bytes"
+processDataStream'::B.ByteString-> PublicKey
+processDataStream' bs | B.length bs < 113 = error "processDataStream' called with too few bytes"
 processDataStream' bs =
   let (hs, bs') = B.splitAt 32 bs
-      (rs, bs'') = B.splitAt 32 bs'
-      (ss, bs''') = B.splitAt 32 bs''
-      (vtype, rest) = B.splitAt 2 bs'''
-      v = B.index vtype 0
-      theType = B.index vtype 1
+      (sigBS, bs'') = B.splitAt 80 bs'
+      (vtype, rest) = B.splitAt 1 bs''
+      theType = B.index vtype 0
       theHash = bytesToWord256 hs
-      r = bytesToWord256 rs
-      s = bytesToWord256 ss
-      yIsOdd = v == 0x1c
-      signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
-
+      signature = decode $ BL.fromStrict sigBS 
       (rlp, _) = rlpSplit rest
 
       messageHash = hash $ B.singleton theType <> rlpSerialize rlp
-      publicKey = getPubKeyFromSignature signature $ keccak256ToWord256 messageHash
-      theHash' = hash $ word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s)
-                         <> B.singleton v <> B.singleton theType <> rlpSerialize rlp
+      publicKey = recoverPub signature $ keccak256ToByteString messageHash
+      theHash' = hash $ BL.toStrict (encode signature) <> B.singleton theType <> rlpSerialize rlp
   in if theHash /= keccak256ToWord256 theHash'
     then error "bad UDP data sent from peer, the hash isn't correct"
     else fromMaybe (error "malformed signature in call to processDataStream") publicKey
@@ -304,12 +293,12 @@ getServerPubKey domain _ = do
 
       --According to https://groups.google.com/forum/#!topic/haskell-cafe/aqaoEDt7auY, it looks like the only way we can time out UDP recv is to
       --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
-      pubKey <- try (timeout 5000000 . fmap processDataStream' $ NB.recv socket' 2000) :: IO (Either SomeException (Maybe H.PubKey))
+      pubKey <- try (timeout 5000000 . fmap processDataStream' $ NB.recv socket' 2000) :: IO (Either SomeException (Maybe PublicKey))
 
       case pubKey of
         Right Nothing  -> return $ Left $ SomeException UDPTimeout
         Left x         -> return $ Left x
-        Right (Just x) -> return $ fmapL SomeException $ hPubKeyToPubKey x
+        Right (Just x) -> return $ Right $ secPubKeyToPoint x
 
 
 -- TODO: do we need this? If so, we need to use HasVault
