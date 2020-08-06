@@ -1101,6 +1101,7 @@ async function search(user, contract, options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
  * @param {module:rest~Predicate} options This identifies the predicate that determines when to stop the search
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
  * field are populated
  */
@@ -1112,6 +1113,51 @@ async function searchUntil(user, contract, predicate, options) {
 
   const results = await util.until(predicate, action, options);
   return results;
+}
+
+/**
+ * @static
+ * This function searches for a specific contract with a content range
+ * @example
+ *
+ * const globalConfig = fsUtil.getYaml("config.yaml");
+ * const options = { config: globalConfig, logger: console };
+ * const queryOptions = {
+ *   ...options,
+ *   query: {}
+ * };
+ * const result = await rest.searchWithContentRange(stratoUser, { name: "SimpleStorage" }, queryOptions);
+ * // Returns
+ * // { data:
+ * //    [ { address: '1db4cdb5051bceb5fd0cfa8f186472bd47b5a29e',
+ * //        chainId: '',
+ * //        block_hash:
+ * //         '202f910a94fe10b5f0e2fa1ab40cfad94dada3d5cd38a46255bfbb168d7f2229',
+ * //        block_timestamp: '2020-08-06 14:41:05 UTC',
+ * //        block_number: '2',
+ * //        transaction_hash:
+ * //         '5cdeb87bdcce330b0c4c69bc78b1320773374c0db6423abc4806f43f545a14ca',
+ * //        transaction_sender: 'd7b9e349d779247462aedfce35cdaf9b1eb495dc',
+ * //        transaction_function_name: '',
+ * //        storedData: 0 } ],
+ * //   contentRange: { start: 0, end: 0, count: 1 } }
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
+
+async function searchWithContentRange(user, contract, options) {
+  try {
+    const results = await api.searchWithContentRange(user, contract, options);
+    return results;
+  } catch (err) {
+    if (err.response && err.response.status === RestStatus.NOT_FOUND) {
+      return {};
+    }
+    throw err;
+  }
 }
 
 /**
@@ -1184,21 +1230,10 @@ async function searchUntil(user, contract, predicate, options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
  * @param {module:rest~Predicate} options This identifies the predicate that determines when to stop the search
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
  * field are populated
  */
-
-async function searchWithContentRange(user, contract, options) {
-  try {
-    const results = await api.searchWithContentRange(user, contract, options);
-    return results;
-  } catch (err) {
-    if (err.response && err.response.status === RestStatus.NOT_FOUND) {
-      return {};
-    }
-    throw err;
-  }
-}
 
 async function searchWithContentRangeUntil(user, contract, predicate, options) {
   const action = async o => {
