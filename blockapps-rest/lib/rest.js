@@ -1100,7 +1100,7 @@ async function search(user, contract, options) {
  * //     storedData: 10 } ]
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
- * @param {module:rest~Predicate} options This identifies the predicate that determines when to stop the search
+ * @param {module:rest~Predicate} predicate This identifies the predicate that determines when to stop the search
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
  * field are populated
@@ -1229,7 +1229,7 @@ async function searchWithContentRange(user, contract, options) {
  * //   contentRange: { start: 0, end: 3, count: 4 } }
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
- * @param {module:rest~Predicate} options This identifies the predicate that determines when to stop the search
+ * @param {module:rest~Predicate} predicate This identifies the predicate that determines when to stop the search
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
  * field are populated
@@ -1247,6 +1247,33 @@ async function searchWithContentRangeUntil(user, contract, predicate, options) {
 // =====================================================================
 //   Chains
 // =====================================================================
+
+/**
+ * @static
+ * This function returns info about a private chain given its chainID
+ * @example
+ *
+ * const globalConfig = fsUtil.getYaml("config.yaml");
+ * const options = { config: globalConfig, logger: console };
+ * const queryOptions = {
+ *   ...options,
+ *   query: {}
+ * };
+ * const chainId = await rest.createChain(stratoUser, chain, contract, options);
+ * const result = await rest.getChain(stratoUser, chainId, options);
+ * // Returns
+ * // { id:
+ * //    'f99d95cf739bb7cc66fe16e352cd346def7d3c4b3f145f859072a2aae7119344',
+ * //   info:
+ * //    { balances: [ [Object], [Object] ],
+ * //      members: [ [Object] ],
+ * //      label: 'airline-2' } }
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~ChainID} chainID This must be the chainID of an existing private chain
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
 
 async function getChain(user, chainId, options) {
   const results = await api.getChains([chainId], setAuthHeaders(user, options));
