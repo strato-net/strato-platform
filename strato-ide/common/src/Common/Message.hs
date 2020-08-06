@@ -17,12 +17,16 @@ data Ann = Ann
   } deriving (Eq, Show, Generic)
 
 data C2S = C2Scompile T.Text
+          |C2SdebugCode T.Text
+          |C2ScreateContract T.Text -- the text field is the name of the contract to be created
          deriving (Eq,Show, Generic)
 
 options :: Options
 options = defaultOptions -- { tagSingleConstructors = True }
 
 data S2C = S2Cannotations [Ann]
+          |S2CdebugCode T.Text
+          |S2CcreateContract T.Text
          deriving (Eq,Show, Generic)
 
 instance ToJSON Ann where toEncoding = genericToEncoding options

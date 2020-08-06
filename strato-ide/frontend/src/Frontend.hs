@@ -13,7 +13,7 @@ import Control.Monad
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (fromStrict, toStrict)
 import Data.List.NonEmpty (nonEmpty)
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import qualified Data.Text as T
 import Text.URI
 
@@ -27,10 +27,13 @@ import Reflex.Dom.Core
 import Common.Message
 import Common.Route
 
+import Frontend.Nav
+
 frontend :: Frontend (R FrontendRoute)
 frontend = Frontend
   { _frontend_head = do
       el "title" $ text "Obelisk Minimal Example"
+      el "header" $ nav
       elAttr "link" ("href" =: static @"main.css" <> "type" =: "text/css" <> "rel" =: "stylesheet") blank
       let aceUrl = static @"js/ace/ace.js"
       void $ elAttr' "script" ("type" =: "text/javascript" <> "src" =: aceUrl <> "charset" =: "utf-8") blank
@@ -54,8 +57,15 @@ app :: MonadWidget t m => Maybe Text -> m ()
 app route = mdo
   ace <- appAceWidget evAnnotations
   evCompile <- dynButton $ "Compile"
-  evAnns <- wsEv route $ C2Scompile <$> tag (current ace) evCompile
+  let codeEv = tag (current ace) evCompile -- codeEv is currently an Event
+  evAnns <- wsEv route $ C2Scompile <$> codeEv
   let evAnnotations = (\case (S2Cannotations anns) -> map toAnnotation anns) <$> evAnns
+  
+  -- next step is to display the debug output
+  evDb <- wsEv route $ C2SdebugCode <$> codeEv
+  let evDebug = (\case (S2CdebugCode db) -> db) <$> evAnns
+  debugOutputWidget evDebug
+  
   pure ()
  
 appAceWidget :: MonadWidget t m => Event t [Annotation] -> m (Dynamic t Text)
@@ -100,4 +110,10 @@ wsEv route msgSendEv = case checkEncoder fullRouteEncoder of
       Just uri -> do
         ws <- webSocket (render uri) $ def & webSocketConfig_send .~ sendEv
         let mS2c = fromStrict <$> _webSocket_recv ws
-        pure $ fmapMaybe Aeson.decode mS2c 
+        pure $ fmapMaybe Aeson.decode mS2c
+        
+  
+debugOutputWidget :: MonadWidget t m => Event t Text -> m ()
+debugOutputWidget debugOutput = do
+  tmpOut <- holdDyn "" debugOutput
+  el "div" $ dynText tmpOut

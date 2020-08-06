@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Backend where
 
-import Backend.Server (application)
+import Backend.Server (application, createContract, debugCode)
 import Common.Route
 import Data.Dependent.Sum (DSum (..))
 import Data.Functor.Identity
@@ -16,5 +16,7 @@ backend = Backend
         BackendRoute_Missing :=> Identity () -> pure ()
         BackendRoute_IDE :=> Identity () -> do
           runWebSocketsSnap application
+          runWebSocketsSnap createContract
+          runWebSocketsSnap debugCode
   , _backend_routeEncoder = fullRouteEncoder
   }
