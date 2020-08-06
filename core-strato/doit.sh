@@ -38,10 +38,7 @@ function newnode {
     withCushion=$(( 2 * blockstanbulRoundPeriodS ))
     actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
   fi
-  if [ -n "${validators}" ]; then
-    numValidators=$(( 1 + $( echo "${validators}" | tr -cd , | wc -c) ))
-    maxConn=$(( maxConn >= numValidators ? maxConn : numValidators ))
-  fi
+ 
   if [[ -n "${blockstanbul}" || -n "${txGossipFanout}" ]]; then
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
@@ -88,9 +85,6 @@ function newnode {
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
     rpFlag="--blockstanbul_round_period_s=${blockstanbulRoundPeriodS}"
   fi
-  if [ -n "${validators}" ]; then
-    vsFlag="--validators=${validators}"
-  fi
   if [ -n "${seqMaxEventsPerIter}" ]; then
     evsFlag="--seq_max_events_per_iter=${seqMaxEventsPerIter}"
   fi
@@ -100,11 +94,12 @@ function newnode {
   if [ -n "${blockstanbulAdmins}" ]; then
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
-  echo ${blockstanbulAdmins}
-
+  
+  adFlag="--isAdmin=${isAdmin}"
+  
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
-    "${baFlag}" "${scFlag}" --minLogLevel=$seqMinLogLevel \
+    "${baFlag}" "${scFlag}" "${adFlag}" --minLogLevel=$seqMinLogLevel \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
@@ -217,21 +212,12 @@ function cleanupDB {
 function doInit {
   blockTime=${blockTime:-13}
   minBlockDifficulty=${minBlockDifficulty:-131072}
-  if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
-    xfFlag="--extraFaucets=${extraFaucets:-$validators}"
-  fi
-  if [[ -n "${validators}" ]]; then
-    # Keep active discovery until all other validators are peers
-    echo "Overriding minAvailablePeers with number of consensus peers"
-    actualMinPeers=$( echo "${validators}" | tr -cd , | wc -c )
-  else
-    actualMinPeers=$numMinPeers
-  fi
+  
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode \
-        --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty $xfFlag"
+        --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3

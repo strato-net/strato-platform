@@ -57,8 +57,8 @@ main = do
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
-  putStrLn $ "strato-sequencer validators: " ++ show flags_validators
   putStrLn $ "strato-sequencer authorized beneficiary senders" ++ show flags_blockstanbul_admins
+  putStrLn $ "strato-sequencer isAdmin/Validator: " ++ show flags_isAdmin
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/=':') flags_kafkaaddress of
@@ -84,30 +84,31 @@ main = do
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
   addSelfAsMetric selfAddress
  
---  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
---      !validators' = fromRight (error "invalid validators") eValidators
-      -- since selfAddr can't be known before starting strato, we add it to the validator list and admins list
-  let validators = [] -- [selfAddress] -- : validators'
-      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
-      !authSenders' = fromRight (error "invalid admins") eAuthSenders
-      authSenders = selfAddress  : authSenders'
-  ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
-  putStrLn $ "Checkpoint: " ++ show ckpt
-      -- TODO(tim): checkpoint validators, authSenders
+
+  let eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
+      !authSenders = fromRight (error "invalid admins") eAuthSenders
 
 
---  putStrLn $ "Interpreted validators: " ++ show validators
   
  
   
   mCtx <- if not flags_blockstanbul
-             then do
-                unless (null validators) . ioError . userError
-                    $ "cannot specify --validators with --blockstanbul=false"
-                return Nothing
+             then return Nothing
              else do
---               when (null validators) . ioError . userError
---                    $ "must specify --validators with --blockstanbul"
+               (validators, admins) <- 
+                 if flags_isAdmin then
+                   return ([selfAddress], [selfAddress])
+                 else do
+                   when (length authSenders == 0) . ioError . userError
+                      $ "This node is not an admin, but the blockstanbulAdmins list was empty.\
+                        \ This means that this node will not accept transactions.\
+                        \ This is a configuration error. If you are starting a single node, \
+                        \ just use the --single flag. If you are starting the first node in a network, \
+                        \ set isAdmin=true. If you are adding this node to an existing network, \
+                        \ put the address(es) of the network's admin node(s) in the blockstanbulAdmins \
+                        \ environment variable."
+                   return (authSenders, authSenders) 
+
                unless (selfAddress `elem` validators) . putStrLn
                     $ "NODEKEY does not correspond to an address within --validators.\
                       \ This probably means that you are connecting to an existing network,\
@@ -118,6 +119,13 @@ main = do
                     $ "--blockstanbul_block_period_ms must be nonnegative"
                unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
                     $ "--blockstanbul_round_period_s must be positive"
+     
+               putStrLn $ "validators: " ++ show validators
+               putStrLn $ "admins: " ++ show admins
+               
+               ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators admins
+               putStrLn $ "Checkpoint: " ++ show ckpt
+ 
                return $ Just $ newContext ckpt selfAddress
   
  
