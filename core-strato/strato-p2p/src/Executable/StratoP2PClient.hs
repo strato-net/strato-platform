@@ -95,7 +95,7 @@ runPeer peer _ _ = do
       attempt :: Maybe SomeException <- withActivePeer peer $ do
         initState <- newIORef initContext
         local (\c -> c{configContext = initState}) $
-          runEthClientConduit peer pSource pSink sSource uSink pStr
+          runEthClientConduit peer{pPeerPubkey=Just otherPubKey} pSource pSink sSource uSink pStr
       case attempt of
         Nothing -> $logDebugS "runPeer" "Peer ran successfully!"
         Just err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
