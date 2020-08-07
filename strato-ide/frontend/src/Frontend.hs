@@ -10,10 +10,11 @@
 module Frontend where
 
 import Control.Monad
+import Control.Applicative
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (fromStrict, toStrict)
 import Data.List.NonEmpty (nonEmpty)
-import Data.Text (Text, pack)
+import Data.Text (Text)
 import qualified Data.Text as T
 import Text.URI
 
@@ -63,8 +64,11 @@ app route = mdo
   
   -- next step is to display the debug output
   evDb <- wsEv route $ C2SdebugCode <$> codeEv
-  let evDebug = (\case (S2CdebugCode db) -> db) <$> evAnns
+  let evDebug = (\case (S2CdebugCode db) -> db) <$> evDb
   debugOutputWidget evDebug
+  
+  -- the create contract text input
+  createContractWidget route $ ace
   
   pure ()
  
@@ -116,4 +120,35 @@ wsEv route msgSendEv = case checkEncoder fullRouteEncoder of
 debugOutputWidget :: MonadWidget t m => Event t Text -> m ()
 debugOutputWidget debugOutput = do
   tmpOut <- holdDyn "" debugOutput
-  el "div" $ dynText tmpOut
+  el "debugOutput" $ dynText tmpOut
+  
+createContractWidget :: MonadWidget t m => Maybe Text -> Dynamic t Text -> m ()
+createContractWidget route codeDyn = do
+  el "div" $ text "Enter in the name of the contract you want to create: "
+
+  textDynamic <- el "contractName" $ do
+    ti <- inputElement def
+    return $ value ti
+        
+  submitEvent <- elClass "div" "contractButton" $ do
+    submitButton <- elAttr "domEvent" ("class" =: "submitButton") $ button "Create Contract"
+    return submitButton
+        
+      
+  let contractEv = tagPromptlyDyn textDynamic submitEvent
+  contractName <- holdDyn "" contractEv
+  
+  --let contractEv = tag (current contractName) submitEvent
+  
+  
+  let bundleDyn = C2ScreateContractBundle <$> contractName <*> codeDyn
+  evCon <- wsEv route $ tagPromptlyDyn bundleDyn submitEvent
+  
+  let evContract = (\case (S2CcreateContract cc) -> cc) <$> evCon
+  tmpContractName <- holdDyn "" evContract
+  el "contractName" $ dynText tmpContractName
+  pure ()
+  
+
+mapTuple :: (a -> b) -> (a, a) -> (b, b)
+mapTuple f (a1, a2) = (f a1, f a2)

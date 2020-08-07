@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Backend.Server where
 
@@ -7,6 +8,7 @@ import           Data.Aeson         (encode, decode)
 import qualified Data.ByteString    as B
 import           Data.ByteString.Lazy (toStrict)
 import           Data.Semigroup     ((<>))
+import           Data.Text
 import qualified Data.Text.IO       as T
 import qualified Network.WebSockets as WS
 
@@ -16,46 +18,8 @@ import           CheckContract
 import           Common.Message
 --------------------------------------------------------------------------------
 
-application :: WS.ServerApp
-application pending = do
-  conn <- WS.acceptRequest pending
-  WS.forkPingThread conn 30
-  forever $ do
-    msgbs <- WS.receiveData conn :: IO B.ByteString
-    let msgC = decode $ WS.toLazyByteString msgbs :: Maybe C2S
-    case msgC of
-      Nothing -> T.putStrLn "Decoded msgC is nothing..."
-      Just (C2Scompile txt) -> do
-        T.putStrLn $ "Running through a dummy compiler: " <> txt
-        let a = Ann 0 0 "this is not correct" True
-        WS.sendTextData conn . toStrict . encode $ S2Cannotations [a]
-        
-createContract :: WS.ServerApp
-createContract pending = do
-  conn <- WS.acceptRequest pending
-  WS.forkPingThread conn 30
-  forever $ do
-    msgbs <- WS.receiveData conn :: IO B.ByteString -- the contract name
-    let msgC = decode $ WS.toLazyByteString msgbs :: Maybe C2S
-    case msgC of
-      Nothing -> T.putStrLn "Decoded msgC is nothing..."
-      Just (C2ScreateContract txt) -> do 
-        let output = ("The contract named" <> txt <> "was created")
-        T.putStrLn $ "Creating contract named: " <> txt
-        WS.sendTextData conn . toStrict . encode $ S2CcreateContract output
-        
-        
-debugCode :: WS.ServerApp
-debugCode pending = do
-  conn <- WS.acceptRequest pending
-  WS.forkPingThread conn 30
-  forever $ do
-    msgbs <- WS.receiveData conn :: IO B.ByteString -- the code
-    let msgC = decode $ WS.toLazyByteString msgbs :: Maybe C2S
-    case msgC of
-      Nothing -> T.putStrLn "Decoded msgC is nothing..."
-      Just (C2SdebugCode txt) -> do 
-        let output = "\
+fakeOutput :: Text
+fakeOutput = "\
 \Line 180: error: cannot find symbol [in MyLinkedList.java]\
             \iter = iter.next;\
             \^\
@@ -91,6 +55,28 @@ debugCode pending = do
                      \^\
   \symbol:   variable before\
   \location: class MyLinkedList\
-\7 errors"
+\7 errors" :: Text
+
+
+application :: WS.ServerApp
+application pending = do
+  conn <- WS.acceptRequest pending
+  WS.forkPingThread conn 30
+  forever $ do
+    msgbs <- WS.receiveData conn :: IO B.ByteString
+    let msgC = decode $ WS.toLazyByteString msgbs :: Maybe C2S
+    case msgC of
+      Nothing -> T.putStrLn "Decoded msgC is nothing..."
+      Just (C2Scompile txt) -> do
+        T.putStrLn $ "Running through a dummy compiler: " <> txt
+        let a = Ann 0 0 "this is not correct" True
+        WS.sendTextData conn . toStrict . encode $ S2Cannotations [a]
+      Just (C2SdebugCode txt) -> do
         T.putStrLn $ "Producing debug output for the following code: " <> txt
-        WS.sendTextData conn . toStrict . encode $ S2CdebugCode output
+        WS.sendTextData conn . toStrict . encode $ S2CdebugCode fakeOutput
+      Just (C2ScreateContractBundle contractName contractCode) -> do 
+        let output = ("The contract named \"" <> contractName <> "\" was created")
+        T.putStrLn $ "Creating contract named: " <> contractName
+        -- T.putStrLn $ "Producing debug output for the following code: " <> contractCode
+        -- WS.sendTextData conn . toStrict . encode $ S2CdebugCode fakeOutput
+        WS.sendTextData conn . toStrict . encode $ S2CcreateContract output

@@ -1,73 +1,69 @@
-frontend/src/Frontend.hs:16:1-29: warning: [-Wunused-imports]
-    The import of ‘pack’ from module ‘Data.Text’ is redundant
+frontend/src/Frontend.hs:13:1-26: warning: [-Wunused-imports]
+    The import of ‘Control.Applicative’ is redundant
    |
-16 | import Data.Text (Text, pack)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-frontend/src/Frontend.hs:62:24-75: warning: [-Wincomplete-patterns]
+13 | import Control.Applicative
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+frontend/src/Frontend.hs:63:24-75: warning: [-Wincomplete-patterns]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns not matched:
             (S2CdebugCode _)
             (S2CcreateContract _)
    |
-62 |   let evAnnotations = (\case (S2Cannotations anns) -> map toAnnotation anns) <$> evAnns
+63 |   let evAnnotations = (\case (S2Cannotations anns) -> map toAnnotation anns) <$> evAnns
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-frontend/src/Frontend.hs:65:3-6: warning: [-Wunused-local-binds]
-    Defined but not used: ‘evDb’
-   |
-65 |   evDb <- wsEv route $ C2SdebugCode <$> codeEv
-   |   ^^^^
-frontend/src/Frontend.hs:66:18-46: warning: [-Wincomplete-patterns]
+frontend/src/Frontend.hs:67:18-46: warning: [-Wincomplete-patterns]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns not matched:
             (S2Cannotations _)
             (S2CcreateContract _)
    |
-66 |   let evDebug = (\case (S2CdebugCode db) -> db) <$> evAnns
+67 |   let evDebug = (\case (S2CdebugCode db) -> db) <$> evDb
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-backend/src/CheckContract.hs:5:1: warning: [-Wunused-imports]
+frontend/src/Frontend.hs:134:69-74: warning: [-Wdeprecations]
+    In the use of ‘button’
+    (imported from Reflex.Dom.Core, but defined in Reflex.Dom.Widget.Basic):
+    Deprecated: "Use 'elAttr'' in combination with 'domEvent' instead"
+    |
+134 |     submitButton <- elAttr "domEvent" ("class" =: "submitButton") $ button "Create Contract"
+    |                                                                     ^^^^^^
+frontend/src/Frontend.hs:147:21-54: warning: [-Wincomplete-patterns]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched:
+            (S2Cannotations _)
+            (S2CdebugCode _)
+    |
+147 |   let evContract = (\case (S2CcreateContract cc) -> cc) <$> evCon
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/src/Backend/Server.hs:15:1-30: warning: [-Wunused-imports]
+    The import of ‘CheckContract’ is redundant
+   |
+15 | import           CheckContract
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/src/Backend/Server.hs:(68,5)-(82,75): warning: [-Wincomplete-patterns]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched: (Just (C2ScreateContract _))
+   |
+68 |     case msgC of
+   |     ^^^^^^^^^^^^...
+backend/src/Backend/Server.hs:77:50-61: warning: [-Wunused-matches]
+    Defined but not used: ‘contractCode’
+   |
+77 |       Just (C2ScreateContractBundle contractName contractCode) -> do 
+   |                                                  ^^^^^^^^^^^^
+backend/src/CheckContract.hs:5:1-28: warning: [-Wunused-imports]
     The import of ‘Text.Parsec’ is redundant
   |
 5 | import           Text.Parsec
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-backend/src/CheckContract.hs:11:7: warning: [-Wunused-matches]
+backend/src/CheckContract.hs:11:7-10: warning: [-Wunused-matches]
     Defined but not used: ‘code’
    |
 11 | check code = pack "\
    |       ^^^^
-backend/src/Backend/Server.hs:13:1: warning: [-Wunused-imports]
-    The import of ‘CheckContract’ is redundant
-   |
-13 | import           CheckContract
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-backend/src/Backend/Server.hs:26:5: warning: [-Wincomplete-patterns]
-    Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched:
-            (Just (C2SdebugCode _))
-            (Just (C2ScreateContract _))
-   |
-26 |     case msgC of
-   |     ^^^^^^^^^^^^...
-backend/src/Backend/Server.hs:40:5: warning: [-Wincomplete-patterns]
-    Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched:
-            (Just (C2Scompile _))
-            (Just (C2SdebugCode _))
-   |
-40 |     case msgC of
-   |     ^^^^^^^^^^^^...
-backend/src/Backend/Server.hs:55:5: warning: [-Wincomplete-patterns]
-    Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched:
-            (Just (C2Scompile _))
-            (Just (C2ScreateContract _))
-   |
-55 |     case msgC of
-   |     ^^^^^^^^^^^^...
 frontend/src/Frontend/Nav.hs:11:1: warning: [-Wunused-imports]
     The import of ‘Obelisk.Generated.Static’ is redundant
    |

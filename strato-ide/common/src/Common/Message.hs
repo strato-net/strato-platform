@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds #-}
 
 module Common.Message where
 
@@ -18,7 +19,8 @@ data Ann = Ann
 
 data C2S = C2Scompile T.Text
           |C2SdebugCode T.Text
-          |C2ScreateContract T.Text -- the text field is the name of the contract to be created
+          |C2ScreateContract T.Text
+          |C2ScreateContractBundle T.Text T.Text -- first field is the name, second is the contract code
          deriving (Eq,Show, Generic)
 
 options :: Options
