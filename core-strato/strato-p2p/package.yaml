@@ -29,6 +29,7 @@ executables:
     dependencies:
       - blockapps-init
       - lifted-async
+      - ordered-containers
       - strato-p2p
       - wai-middleware-prometheus
       - warp
@@ -75,6 +76,7 @@ library:
     - monadIO
     - mtl
     - network
+    - ordered-containers
     - persistent
     - prometheus-client
     - random
@@ -122,6 +124,7 @@ tests:
       - lens
       - monad-alter
       - mtl
+      - ordered-containers
       - resourcet
       - seqevents
       - stm-chans
@@ -129,6 +132,7 @@ tests:
       - strato-model
       - strato-p2p
       - strato-sequencer
+      - text
       - transformers
       - unliftio
   

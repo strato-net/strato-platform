@@ -23,6 +23,7 @@ import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
 import           Data.Conduit.Network
 import           Data.Maybe                            (fromMaybe)
+import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Network.Socket
 import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
@@ -36,13 +37,15 @@ import           Blockchain.P2PUtil
 import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors                           as C
 
 runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-             => Int
+             => IORef (S.OSet Keccak256)
+             -> Int
              -> m ()
-runEthServer listenPort = do
-  cfg <- initConfig flags_maxReturnedHeaders
+runEthServer wireMessagesRef listenPort = do
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   void . runContextM cfg $ do
     uSink <- asks configUnseqSink
     ethServer listenPort uSink
@@ -116,10 +119,10 @@ runEthServerConduit p peerSource peerSink seqSource unseqSink peerStr = do
                   .| eventSink
                   .| peerSink
 
-stratoP2PServer :: LoggingT IO ()
-stratoP2PServer = do
+stratoP2PServer :: IORef (S.OSet Keccak256) -> LoggingT IO ()
+stratoP2PServer wireMessagesRef = do
 
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
 
-  void $ runEthServer flags_listen
+  void $ runEthServer wireMessagesRef flags_listen
