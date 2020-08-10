@@ -1280,10 +1280,86 @@ async function getChain(user, chainId, options) {
   return results && results.length > 0 ? results[0] : {};
 }
 
+/**
+ * @static
+ * This function returns info about multiple private chains given an array of chain IDs
+ * @example
+ *
+ * const globalConfig = fsUtil.getYaml("config.yaml");
+ * const options = { config: globalConfig, logger: console };
+ * const queryOptions = {
+ *   ...options,
+ *   query: {}
+ * };
+ * const result = await rest.getChains(stratoUser, [], options);
+ * // Returns
+ * // [ { id:
+ * //      'f99d95cf739bb7cc66fe16e352cd346def7d3c4b3f145f859072a2aae7119344',
+ * //     info: { balances: [Array], members: [Array], label: 'airline-2' } },
+ * //   { id:
+ * //      'a72d6955662b1d2da4d338f8c87833592ebc490938308a42d3d528180ae55530',
+ * //     info: { balances: [Array], members: [Array], label: 'airline-3' } },
+ * //   { id:
+ * //      '9f3a050a34faaab7d6d4c5c17bd70b0d1c2c9a6d40c1681323167fb43407bf18',
+ * //     info: { balances: [Array], members: [Array], label: 'airline-5' } } ]
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~ChainIDs} chainIDs This must be the array of chainIDs of existing private chains
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
+
 async function getChains(user, chainIds, options) {
   const results = await api.getChains(chainIds, setAuthHeaders(user, options));
   return results;
 }
+
+/**
+ * @static
+ * This function creates a private chain based on arguments given
+ * @example
+ *
+ * const globalConfig = fsUtil.getYaml("config.yaml");
+ * const options = { config: globalConfig, logger: console };
+ * const queryOptions = {
+ *   ...options,
+ *   query: {}
+ * };
+ * const createChainArgs = (uid, members) => {
+ *  const contractName = `TestContract_${uid}`;
+ *  const memberList = members.map(address => {
+ *    return { address: address, enode };
+ *  });
+ *  const balanceList = members.map(address => {
+ *    return { address: address, balance };
+ *  });
+ *
+ *  const chain = {
+ *    label: `airline-${uid}`,
+ *    src: `contract ${contractName} { }`,
+ *    args: {},
+ *    members: memberList,
+ *    balances: balanceList,
+ *    contractName
+ *  };
+ *
+ *  return { chain, contractName };
+ *
+ *  };
+ *  const uid = 5;
+ *  const { chain, contractName: name } = createChainArgs(uid, [
+ *    stratoUser.address
+ *  ]);
+ * const chainId = await rest.createChain(stratoUser, chain, contract, options);
+ * // Returns
+ * // "a72d6955662b1d2da4d338f8c87833592ebc490938308a42d3d528180ae55530
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Chain} chain This must be the object containing the arguments for the chain
+ * @param {module:rest~Contract} contract This must be the name of the contract
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
 
 async function createChain(user, chain, contract, options) {
   const result = await api.createChain(
