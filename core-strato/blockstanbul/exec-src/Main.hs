@@ -117,7 +117,7 @@ main = do
   
   putStrLn $ "Sender (admin node) address: " ++ show optSender
   putStrLn $ "Starting nonce: " ++ show optNonce
-  printf $ "\n\nSending the vote to the following nodes: " ++ show optNodes
+  printf $ "\nSending the vote to the following nodes: " ++ show optNodes
  
   let go [] _ = return ()
       go (nodeURL:xs) non = do
@@ -135,7 +135,7 @@ main = do
                     , nonce = non
                     }
             body = C8.unpack $ BL.toStrict $ Ae.encode payload
-        putStrLn $ "Request body: " ++ body
+        putStrLn $ "\n\nRequest body: " ++ body
         let url = printf "http://%s/blockstanbul/vote" nodeURL
         putStrLn $ "Sending to url: " ++ url
         let req' = postRequestWithBody url "application/json" body
