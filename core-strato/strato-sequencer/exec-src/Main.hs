@@ -5,17 +5,16 @@
 module Main where
 
 import           Control.Monad
+import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.Async             as Async
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TMChan
 import qualified Data.Aeson                 as Ae
-import qualified Data.ByteString.Base64     as B64
 import qualified Data.ByteString.Char8      as C8
+import qualified Data.Text                  as T
 import           Data.Either.Extra
-import           Data.Maybe                 (fromMaybe)
 import           HFlags
 import           Safe
-import           System.Environment
 
 import           BlockApps.Init
 import           Blockchain.Blockstanbul
@@ -27,12 +26,30 @@ import           Blockchain.Sequencer
 import           Blockchain.Sequencer.Gregor
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.CablePackage
-import qualified Network.Haskoin.Crypto     as HK
 import qualified Network.Kafka.Protocol     as KP
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
+import           Network.HTTP.Client        (newManager, defaultManagerSettings)
+import           Servant.Client
+import qualified Strato.Strato23.API.Types  as VC
+import qualified Strato.Strato23.Client     as VC
 
 import           Flags
+
+
+
+-- TODO: maybe this should be a generic util function somewhere else
+waitOnVault :: (Show a) => IO (Either a b) -> IO b
+waitOnVault action = do
+  putStrLn "asking vault-wrapper for the node address"
+  res <- action
+  case res of
+    Left err -> do 
+      putStrLn $ "failed to get node address from vault-wrapper... got this error: " ++ show err
+      threadDelay 2000000 -- 2 seconds
+      waitOnVault action
+    Right val -> return val
+
 
 main :: IO ()
 main = do
@@ -40,8 +57,8 @@ main = do
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
-  putStrLn $ "strato-sequencer validators: " ++ show flags_validators
   putStrLn $ "strato-sequencer authorized beneficiary senders" ++ show flags_blockstanbul_admins
+  putStrLn $ "strato-sequencer isAdmin/Validator: " ++ show flags_isAdmin
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/=':') flags_kafkaaddress of
@@ -54,39 +71,64 @@ main = do
         , kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId'
         , cablePackage = pkg
         }
-  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
-      !validators = fromRight (error "invalid validators") eValidators
-      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
+  
+  -- setup the connection with vault-wrapper
+  mgr <- newManager defaultManagerSettings
+  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+  
+  selfAddress <- do
+    addrAndKey <- waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv
+    return $ VC.unAddress addrAndKey
+  
+  putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
+  addSelfAsMetric selfAddress
+ 
+
+  let eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
       !authSenders = fromRight (error "invalid admins") eAuthSenders
-  ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
-  putStrLn $ "Checkpoint: " ++ show ckpt
-      -- TODO(tim): checkpoint validators, authSenders
-  putStrLn $ "Interpreted validators: " ++ show validators
+
+
+  
+ 
+  
   mCtx <- if not flags_blockstanbul
-             then do
-                unless (null validators) . ioError . userError
-                    $ "cannot specify --validators with --blockstanbul=false"
-                return Nothing
+             then return Nothing
              else do
-                !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-                let !bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
-                    !pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
-                    selfAddress = prvKey2Address pkey
-                putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
-                addSelfAsMetric selfAddress
-                when (null validators) . ioError . userError
-                    $ "must specify --validators with --blockstanbul"
-                unless (selfAddress `elem` validators) . putStrLn
+               (validators, admins) <- 
+                 if flags_isAdmin then
+                   return ([selfAddress], [selfAddress])
+                 else do
+                   when (length authSenders == 0) . ioError . userError
+                      $ "This node is not an admin, but the blockstanbulAdmins list was empty.\
+                        \ This means that this node will not accept transactions.\
+                        \ This is a configuration error. If you are starting a single node, \
+                        \ just use the --single flag. If you are starting the first node in a network, \
+                        \ set isAdmin=true. If you are adding this node to an existing network, \
+                        \ put the address(es) of the network's admin node(s) in the blockstanbulAdmins \
+                        \ environment variable."
+                   return (authSenders, authSenders) 
+
+               unless (selfAddress `elem` validators) . putStrLn
                     $ "NODEKEY does not correspond to an address within --validators.\
                       \ This probably means that you are connecting to an existing network,\
                       \ and you are not one of the original validators of that network.\
                       \ If this is the case, please disregard this message. Otherwise,\
                       \ you may experience difficulty operating this node."
-                unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError
+               unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError
                     $ "--blockstanbul_block_period_ms must be nonnegative"
-                unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
+               unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
                     $ "--blockstanbul_round_period_s must be positive"
-                return . Just . newContext ckpt $ pkey
+     
+               putStrLn $ "validators: " ++ show validators
+               putStrLn $ "admins: " ++ show admins
+               
+               ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators admins
+               putStrLn $ "Checkpoint: " ++ show ckpt
+ 
+               return $ Just $ newContext ckpt selfAddress
+  
+ 
   chr <- atomically newTQueue
   chv <- atomically newTQueue
   cht <- atomically newTMChan
@@ -104,6 +146,7 @@ main = do
         , cablePackage = pkg
         , maxEventsPerIter = flags_seq_max_events_per_iter
         , maxUsPerIter = flags_seq_max_us_per_iter
+        , vaultClient = Just clientEnv
         }
   race_ (runTheGregor gregorCfg)
       . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))

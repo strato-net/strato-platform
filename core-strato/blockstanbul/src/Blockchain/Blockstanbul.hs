@@ -27,3 +27,4 @@ module Blockchain.Blockstanbul
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Authentication
+import Blockchain.Blockstanbul.StateMachine

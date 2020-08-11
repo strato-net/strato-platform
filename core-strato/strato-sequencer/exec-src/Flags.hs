@@ -36,6 +36,7 @@ defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
 
 defineFlag "seq_max_events_per_iter" (500 :: Int) "How many elements to wait for in each sequencer iteration"
 defineFlag "seq_max_us_per_iter" (50000 :: Int) "How many μs to spend waiting for elements"
+defineFlag "isAdmin" (False :: Bool) "Whether to initialize PBFT with this node as admin and validator. Set this True when you are starting a single node, or the first node in a network"
 
 
 flags :: Vector (T.Text, T.Text) Counter
@@ -60,6 +61,7 @@ exportFlagsAsMetrics = do
   set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
   set "blockstanbul_port" $ show flags_blockstanbul_port
   set "blockstanbul_admins" flags_blockstanbul_admins
+  set "is_admin" $ show flags_isAdmin
   set "seq_debug_mode" $ show flags_seq_debug_mode
   set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter
   set "seq_max_us_per_iter" $ show flags_seq_max_us_per_iter

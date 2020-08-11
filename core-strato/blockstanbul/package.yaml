@@ -10,6 +10,7 @@ library:
   dependencies:
   - QuickCheck
   - aeson
+  - base16-bytestring
   - binary
   - blockapps-data
   - blockapps-datadefs
@@ -46,15 +47,20 @@ executables:
     other-modules: []
     dependencies:
       - aeson
-      - blockapps-haskoin
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-client
       - blockstanbul
       - base16-bytestring
       - base64-bytestring
       - bytestring
       - HTTP
+      - http-client
       - ethereum-rlp
       - extra
+      - servant-client
+      - split
       - strato-model
+      - text
 
 tests:
   blockstanbul-test:
