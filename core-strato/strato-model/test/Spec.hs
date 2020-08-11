@@ -122,7 +122,7 @@ spec = do
     it "round trips correctly" $ property $ \(ptr::CodePtr) -> do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr
 
-  describe "secp256k1, ECDSA, and ECDH operations (using secp256k1-haskell)" $ do
+  describe "secp256k1 operations (using secp256k1-haskell)" $ do
     let mPrv = importPrivateKey $ fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         prv = fromMaybe (error "could not import private key") mPrv
         pub = derivePublicKey prv 
@@ -164,7 +164,7 @@ spec = do
       fromPublicKey (fromJust mRecPub) `shouldBe` fromPrivateKey k
       fromPrivateKey k `shouldBe` add
   
-  describe "the ECDSA module works exactly like Haskoin and Crypto-Pubkey on test values" $ do
+  describe "the secp256k1 module works exactly like Haskoin on test values" $ do
     let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         hkPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
         ecPriv = fromMaybe (error "couldn't get EC key") $ importPrivateKey testPrivBS
