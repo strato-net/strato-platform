@@ -26,6 +26,8 @@ library:
     - blockapps-datadefs
     - blockapps-haskoin
     - blockapps-util
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
     - bytestring
     - classy-prelude
     - cpu
@@ -37,6 +39,7 @@ library:
     - ethereum-rlp
     - exceptions
     - format
+    - http-client
     - monad-alter
     - mtl
     - network-uri
@@ -45,6 +48,7 @@ library:
     - prometheus-client
     - random
     - resourcet
+    - servant-client
     - split
     - strato-conf
     - strato-model
