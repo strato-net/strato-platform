@@ -81,9 +81,7 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
-      - base16-bytestring
       - blockapps-haskoin
-      - bytestring
       - hspec
       - hspec-expectations-lifted
       - vm-tools
