@@ -71,7 +71,8 @@ extra-deps:
 - normaldistribution-1.1.0.3@sha256:2615b784c4112cbf6ffa0e2b55b76790290a9b9dff18a05d8c89aa374b213477,2160
 - pbkdf-1.1.1.1@sha256:8d464cca917d723c65fe1a9f03e3b441e3f1bdbe4b72bf0f4e24a1e80ccfa326,2070
 #- postgresql-typed-0.6.1.0@sha256:d1b69f1aac9d29cd0ae7dbf616a3a77cbdc367f3bc3ac79938bde5a752b1e63d,4866
-- secp256k1-haskell-0.2.0@sha256:142c43f1d8612b351d0b3b96d13eb437ffbb728adf0aaac58d57cada9a14adee,2342
+- secp256k1-haskell-0.2.0
+  #- secp256k1-haskell-0.2.0@sha256:142c43f1d8612b351d0b3b96d13eb437ffbb728adf0aaac58d57cada9a14adee,2342
 - semver-range-0.2.8@sha256:44918080c220cf67b6e7c8ad16f01f3cfe1ac69d4f72e528e84d566348bb23c3,1941
 #- servant-aeson-specs-0.6.2.0@sha256:c2139f729695c18186394aeb50adceb5ba4b8adb3986626659f2210979bf5f99,2185
 #- servant-multipart-0.11.4
@@ -87,16 +88,19 @@ extra-deps:
 #  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
 
 flags:
- secp256k1-haskell:
-   recovery: true
+  secp256k1-haskell:
+    ecdh: true
+    recovery: true
 
 resolver: lts-14.27 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
+- /usr/include
 
 extra-lib-dirs:
 - /usr/local/lib
+- /usr/lib
 
 ghc-options:
   "$locals": -Wall -Werror -fwarn-redundant-constraints -XDeriveAnyClass -XDeriveGeneric -XLambdaCase -XDerivingStrategies
