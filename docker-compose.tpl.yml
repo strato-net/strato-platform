@@ -189,7 +189,6 @@ services:
     - blockstanbul=${blockstanbul}
     - blockstanbulAdmins=${blockstanbulAdmins}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
-    - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
@@ -202,6 +201,7 @@ services:
     - faucetEnabled=${faucetEnabled}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
+    - isAdmin=${isAdmin:-false}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
     - maxConn=${maxConn}
@@ -233,7 +233,6 @@ services:
     - svmDev=${svmDev}
     - USE_STRATO_API=${USE_STRATO_API}
     - useSyncMode=${useSyncMode}
-    - validators=${validators}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
     - zkHost=zookeeper

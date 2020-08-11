@@ -38,10 +38,7 @@ function newnode {
     withCushion=$(( 2 * blockstanbulRoundPeriodS ))
     actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
   fi
-  if [ -n "${validators}" ]; then
-    numValidators=$(( 1 + $( echo "${validators}" | tr -cd , | wc -c) ))
-    maxConn=$(( maxConn >= numValidators ? maxConn : numValidators ))
-  fi
+ 
   if [[ -n "${blockstanbul}" || -n "${txGossipFanout}" ]]; then
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
@@ -92,9 +89,6 @@ function newnode {
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
     rpFlag="--blockstanbul_round_period_s=${blockstanbulRoundPeriodS}"
   fi
-  if [ -n "${validators}" ]; then
-    vsFlag="--validators=${validators}"
-  fi
   if [ -n "${seqMaxEventsPerIter}" ]; then
     evsFlag="--seq_max_events_per_iter=${seqMaxEventsPerIter}"
   fi
@@ -104,16 +98,12 @@ function newnode {
   if [ -n "${blockstanbulAdmins}" ]; then
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
-  echo ${blockstanbulAdmins}
-  if [ -n "${faucetEnabled}" ]; then
-    apiKey=
-  else
-    apiKey="${blockstanbulPrivateKey:-}"
-  fi
-
-  NODEKEY=${blockstanbulPrivateKey:-} runBackgroundProcess strato-sequencer \
+  
+  adFlag="--isAdmin=${isAdmin}"
+  
+  runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
-    "${baFlag}" "${scFlag}" --minLogLevel=$seqMinLogLevel \
+    "${baFlag}" "${scFlag}" "${adFlag}" --minLogLevel=$seqMinLogLevel \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
@@ -152,11 +142,11 @@ function newnode {
   if [ "${USE_STRATO_API}" = true ]; then
       tbFlag="--blockstanbul=${blockstanbul}"
       echo "Starting strato-api"
-      HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 NODEKEY=$apiKey \
+      HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 \
 	  runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
   else
       echo "Starting core-api"
-      NODEKEY=$apiKey runBackgroundProcess core-api >> logs/core-api 2>&1
+      runBackgroundProcess core-api >> logs/core-api 2>&1
   fi
 
   
@@ -226,21 +216,12 @@ function cleanupDB {
 function doInit {
   blockTime=${blockTime:-13}
   minBlockDifficulty=${minBlockDifficulty:-131072}
-  if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
-    xfFlag="--extraFaucets=${extraFaucets:-$validators}"
-  fi
-  if [[ -n "${validators}" ]]; then
-    # Keep active discovery until all other validators are peers
-    echo "Overriding minAvailablePeers with number of consensus peers"
-    actualMinPeers=$( echo "${validators}" | tr -cd , | wc -c )
-  else
-    actualMinPeers=$numMinPeers
-  fi
+  
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode \
-        --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty $xfFlag"
+        --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
@@ -248,7 +229,7 @@ function doInit {
 
     echo "init event source: $cmd"
     # logging to stdout and log file:
-    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    $cmd 2>&1 | tee logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
@@ -263,7 +244,7 @@ function doInit {
 
     echo "strato-setup command: $cmd"
     # logging to stdout and log file:
-    NODEKEY=${blockstanbulPrivateKey:-} $cmd 2>&1 | tee logs/strato-setup
+    $cmd 2>&1 | tee logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
