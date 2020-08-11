@@ -26,11 +26,9 @@ import           Data.Default                          (def)
 import           Data.Foldable                         (for_, toList)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe                            (fromJust)
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
-import           Data.Word                             (Word8)
 import           Text.Printf
 
 import           Blockchain.Blockstanbul
@@ -364,7 +362,7 @@ newSequencerContext bc = do
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
 testContext :: IORef (S.OSet Keccak256) -> PrivateKey -> SequencerContext -> TestContext
-testContext prv wireMessagesRef ctx = TestContext
+testContext wireMessagesRef prv ctx = TestContext
   { _blocks                = []
   , _blockHeaders          = []
   , _remainingBlockHeaders = RemainingBlockHeaders []
@@ -399,7 +397,7 @@ runTestPeer :: TestContextM a -> IO ()
 runTestPeer f = do
   seqCtx <- newSequencerContext emptyBlockstanbulContext
   wmr <- newIORef (S.empty)
-  ctx <- newIORef $ testContext undefined wmr seqCtx
+  ctx <- newIORef $ testContext wmr undefined seqCtx
   void . runNoLoggingT . runResourceT $ runReaderT f ctx
 
 execTestPeer :: PrivateKey
@@ -409,7 +407,7 @@ execTestPeer :: PrivateKey
 execTestPeer pk as f = do
   seqCtx <- newSequencerContext $ newBlockstanbulContext (fromPrivateKey pk) as
   wmr <- newIORef (S.empty)
-  ctx <- newIORef $ testContext pk wmr seqCtx
+  ctx <- newIORef $ testContext wmr pk seqCtx
   a <- runLoggingT . runResourceT $ runReaderT f ctx
   ctx' <- readIORef ctx
   return (a, ctx')
