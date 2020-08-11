@@ -6,8 +6,12 @@ module Strato.Strato23.Server.Password where
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
+import qualified Crypto.KDF.Scrypt                 as Scrypt
+import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
+import qualified Crypto.Saltine.Class              as Saltine
+import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import           Data.ByteString                  (ByteString)
-import           Data.Maybe                       (listToMaybe)
+import           Data.Maybe                       (fromMaybe, listToMaybe, isJust)
 import           Data.IORef
 import           Data.Text                        (Text)
 import           Data.Text.Encoding               (encodeUtf8)
@@ -21,38 +25,55 @@ superSecretVaultWrapperMessage :: ByteString
 superSecretVaultWrapperMessage =
   "A monad is just a monoid in the category of endofunctors, what's the problem?"
 
-setPassword :: Password -> Connection -> IO Bool
+getKeyFromPasswordAndSalt :: Password -> ByteString -> SecretBox.Key
+getKeyFromPasswordAndSalt (Password pw) salt = 
+  let scryptParams = Scrypt.Parameters
+        { Scrypt.n = 16384
+        , Scrypt.r = 8
+        , Scrypt.p = 1
+        , Scrypt.outputLength = Saltine.secretBoxKey
+        }
+  in fromMaybe (error "could not decode encryption key") . Saltine.decode $
+     Scrypt.generate scryptParams pw salt
+
+
+setPassword :: Password -> Connection -> IO (Maybe SecretBox.Key)
 setPassword pw conn = do
   (salt, nonce) <- newSaltAndNonce
-  let ciphertext = encrypt pw
-                           salt
+  let key = getKeyFromPasswordAndSalt pw salt
+  let ciphertext = encrypt key
                            nonce
                            superSecretVaultWrapperMessage
-  postMessageQuery salt nonce ciphertext conn
+  success <- postMessageQuery salt nonce ciphertext conn
+  if success
+    then return $ Just key
+    else return Nothing
 
 postPassword :: Text -> VaultM ()
 postPassword password = do
-  existingPassword <- asks superSecretPassword
-  doIAlreadyHaveAPassword <- liftIO $ readIORef existingPassword
-  let pw = encodeUtf8 password
-  case doIAlreadyHaveAPassword of
+  existingKey <- asks superSecretKey
+  doIAlreadyHaveAKey <- liftIO $ readIORef existingKey
+
+  case doIAlreadyHaveAKey of
     Just _ -> vaultWrapperError $ UserError "Password is already set"
     Nothing -> do
       mMsg <- listToMaybe <$> vaultQuery getMessageQuery
       case mMsg of
         Nothing -> do
-          success <- vaultModify . setPassword $ Password pw
-          if success
-            then liftIO . atomicWriteIORef existingPassword $ Just password
-            else vaultWrapperError $ AnError "Failed to insert encrypted message into database"
-        Just (salt, nonce, ciphertext) ->
-          case decrypt (Password pw) salt nonce ciphertext of
+          maybeKey <- vaultModify . setPassword $ Password $ encodeUtf8 password
+          case maybeKey of
+            Just key -> liftIO . atomicWriteIORef existingKey $ Just key
+            Nothing -> vaultWrapperError $ AnError "Failed to insert encrypted message into database"
+        Just (salt :: ByteString, nonce, ciphertext) -> do
+          let key = getKeyFromPasswordAndSalt (Password $ encodeUtf8 password) salt
+          case decrypt key nonce ciphertext of
             Just msg | msg == superSecretVaultWrapperMessage ->
-              liftIO . atomicWriteIORef existingPassword $ Just password
+              liftIO . atomicWriteIORef existingKey $ Just key
             _ -> vaultWrapperError $ UserError "Could not validate password"
 
 verifyPassword :: VaultM Bool
 verifyPassword = do 
-  existingPassword <- asks superSecretPassword
-  doIAlreadyHaveAPassword <- liftIO $ readIORef existingPassword
-  return $ maybe False (const True) doIAlreadyHaveAPassword
+  existingKey <- asks superSecretKey
+  doIAlreadyHaveAKey <- liftIO $ readIORef existingKey
+  return $ isJust doIAlreadyHaveAKey
+  
