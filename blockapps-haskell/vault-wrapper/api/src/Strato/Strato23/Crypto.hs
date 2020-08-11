@@ -8,11 +8,9 @@ module Strato.Strato23.Crypto where
 
 import           Control.Monad                     ((<=<))
 import           Control.Monad.IO.Class
-import qualified Crypto.KDF.Scrypt                 as Scrypt
 import           Crypto.Random.Entropy
 import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
-import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as B
 import           Data.Maybe
@@ -47,58 +45,36 @@ data KeyStore = KeyStore
   } deriving (Eq, Show)
 
 decrypt
-  :: Password
-  -> ByteString -- salt
+  :: SecretBox.Key
   -> SecretBox.Nonce
   -> ByteString -- encrypted secret key
   -> Maybe ByteString
-decrypt (Password pw) salt nonce encMsg = do
-  decKey <- Saltine.decode $ Scrypt.generate scryptParams pw salt
-  SecretBox.secretboxOpen decKey nonce encMsg
-  where
-    scryptParams = Scrypt.Parameters
-      { Scrypt.n = 16384
-      , Scrypt.r = 8
-      , Scrypt.p = 1
-      , Scrypt.outputLength = Saltine.secretBoxKey
-      }
+decrypt = SecretBox.secretboxOpen
 
 decryptSecKey
-  :: Password
-  -> ByteString -- salt
+  :: SecretBox.Key
   -> SecretBox.Nonce
   -> ByteString -- encrypted secret key
   -> Maybe SecKey
-decryptSecKey pw salt nonce = secKey <=< decrypt pw salt nonce
+decryptSecKey pw nonce = secKey <=< decrypt pw nonce
 
 encrypt
-  :: Password
-  -> ByteString -- salt
+  :: SecretBox.Key
   -> SecretBox.Nonce
   -> ByteString -- plaintext message
   -> ByteString -- ciphertext message
-encrypt (Password pw) salt nonce plaintext =
-  let scryptParams = Scrypt.Parameters
-        { Scrypt.n = 16384
-        , Scrypt.r = 8
-        , Scrypt.p = 1
-        , Scrypt.outputLength = Saltine.secretBoxKey
-        }
-      err = error "could not decode encryption key"
-      encKey = fromMaybe err . Saltine.decode $
-        Scrypt.generate scryptParams pw salt
-   in SecretBox.secretbox encKey nonce plaintext
+encrypt = SecretBox.secretbox
 
-reencryptKey :: Password -> Password -> ByteString -> SecretBox.Nonce -> ByteString -> Address -> Either String ByteString
-reencryptKey oldPass newPass salt nonce oldKey givenAddress=
-  case decryptSecKey oldPass salt nonce oldKey of
+reencryptKey :: SecretBox.Key -> SecretBox.Key -> SecretBox.Nonce -> ByteString -> Address -> Either String ByteString
+reencryptKey oldPass newPass nonce oldKey givenAddress=
+  case decryptSecKey oldPass nonce oldKey of
     Nothing -> Left "could not decrypt account"
     Just plainKey -> let foundAddress = deriveAddress plainKey
                      in if foundAddress /= givenAddress
                           then Left $ printf "address mismatch (wrong password?): got %s, want %s"
                                              (show foundAddress)
                                              (show givenAddress)
-                          else Right $ encrypt newPass salt nonce (getSecKey plainKey)
+                          else Right $ encrypt newPass nonce (getSecKey plainKey)
 
 
 
@@ -115,7 +91,7 @@ newSaltAndNonce = liftIO $ do
   nonce <- SecretBox.newNonce
   return (salt, nonce)
 
-newKeyStore :: MonadIO m => Password -> m KeyStore
+newKeyStore :: MonadIO m => SecretBox.Key -> m KeyStore
 newKeyStore pw = liftIO $ do
   -- BCrypt for password validation
   -- Scrypt for password derived encryption key
@@ -123,7 +99,7 @@ newKeyStore pw = liftIO $ do
   -- Secp256k1 for ethereum account creation
   (salt, acctNonce) <- newSaltAndNonce
   acctSk <- liftIO newSecKey
-  let encAcctSk = encrypt pw salt acctNonce $ getSecKey acctSk
+  let encAcctSk = encrypt pw acctNonce $ getSecKey acctSk
       acctAddr = deriveAddress acctSk
       acctPubKey = derivePubKey acctSk
   return KeyStore

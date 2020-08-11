@@ -10,6 +10,7 @@ import Control.Monad
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.Text as T
 import HFlags
+import Data.Maybe
 import Database.PostgreSQL.Simple hiding (Query)
 import Database.PostgreSQL.Simple.SqlQQ
 import Database.PostgreSQL.Simple.Transaction
@@ -61,7 +62,10 @@ main = do
           [user, subject] -> do
             let oldPassword = Password $ C8.pack subject
             (salt, nonce, oldkey, addr) <- q1 . runQuery conn . getUserOldKeyQuery $ T.pack user
-            newKey <- either die return $ reencryptKey oldPassword newPassword salt nonce oldkey addr
+            newKey <- either die return $ reencryptKey
+                                             (getKeyFromPasswordAndSalt oldPassword salt)
+                                             (getKeyFromPasswordAndSalt newPassword salt)
+                                             nonce oldkey addr
             void . runUpdate_ conn $ Update
                                    { uTable = TS.usersTable
                                    -- Note: These lenses are 1-indexed. Its not a huge problem to set enc_key again,
@@ -75,6 +79,6 @@ main = do
     void $ execute_ conn [sql| ALTER TABLE users ALTER COLUMN enc_sec_prv_key SET NOT NULL; |]
     void $ execute_ conn C.messageTable
     wasSet <- setPassword newPassword conn
-    unless wasSet $ die "unable to set password (password already set?)"
+    unless (isJust wasSet) $ die "unable to set password (password already set?)"
 
   putStrLn "Keys migrated successfully"
