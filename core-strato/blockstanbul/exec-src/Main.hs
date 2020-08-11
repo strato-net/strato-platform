@@ -83,7 +83,7 @@ options =
     "REQUIRED; The beneficiary address."
   , Option ['d'] ["nodes"]
       (ReqArg
-       (\ nd opts -> return opts { optNodes=(splitOn "," $ filter (/= ' ') nd) }
+       (\ nd opts -> return opts { optNodes=(splitOn "," nd) }
        ) "Nodes IP Addresses")
     "REQUIRED; The IP address(es) of the current voting node(s)."
   , Option ['e'] ["remove"]
@@ -135,9 +135,9 @@ main = do
                     , nonce = non
                     }
             body = C8.unpack $ BL.toStrict $ Ae.encode payload
-        putStrLn $ "\n\nRequest body: " ++ body
         let url = printf "http://%s/blockstanbul/vote" nodeURL
         putStrLn $ "Sending to url: " ++ url
+        putStrLn $ "\n\nRequest body: " ++ body
         let req' = postRequestWithBody url "application/json" body
             auth = AuthBasic (error "realm unused")
                              "admin" -- I hope we can just hardcode this
