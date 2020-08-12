@@ -16,7 +16,6 @@ import           Crypto.Random.Entropy
 import qualified Network.Haskoin.Internals         as HKI
 import qualified Crypto.HaskoinShim             as HK
 import qualified Crypto.Secp256k1               as SEC
-import           Strato.Strato23.Crypto         
 
 import           Data.Maybe
 import           Data.Coerce
@@ -202,14 +201,5 @@ timingTests = do
   _ <- cwPrintTime $ do
     let !bl  = SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig sSig) sMesg
     return bl
-
-  putStrLn "\n\n\nOther Timing Tests:"
-  putStrLn "\nKeyStore creation (with secret key encryption):" 
-  KeyStore{..} <- cwPrintTime $ newKeyStore $ textPassword "1234"
-
-  putStrLn "\nSecret Key Decryption:"
-  _ <- cwPrintTime $ do
-    let !key' = decryptSecKey (textPassword "1234") keystoreSalt keystoreAcctNonce keystoreAcctEncSecKey
-    return key'
   
   putStrLn "\nDone"
