@@ -1417,6 +1417,26 @@ async function listExtStorage(user, args, options) {
 //   OAuth
 // =====================================================================
 
+/**
+ * @static
+ * This function checks if the user is authenticated
+ * @example
+ *
+ * const globalConfig = fsUtil.getYaml("config.yaml");
+ * const options = { config: globalConfig, logger: console };
+ * const queryOptions = {
+ *   ...options,
+ *   query: {}
+ * };
+ * const result = await rest.pingOauth(stratoUser, options);
+ *
+ * // Returns
+ * // 'success'
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {String}
+ */
+
 async function pingOauth(user, options) {
   const response = await api.pingOauth(user, options);
   return response;
@@ -1425,6 +1445,38 @@ async function pingOauth(user, options) {
 // =====================================================================
 //   Common patterns used in applications
 // =====================================================================
+
+/**
+ * @static
+ * This function creates a private chain based on arguments given
+ * @example
+ *
+ * const globalConfig = fsUtil.getYaml("config.yaml");
+ * const options = { config: globalConfig, logger: console };
+ * const queryOptions = {
+ *   ...options,
+ *   query: {}
+ * };
+ * const result = await rest.waitForAddress(stratoUser, contract, queryOptions);
+ *
+ * // Returns
+ * // { address: '2b755e392056c9b58f4f71da7ea8f47f553dd50b',
+ * //   chainId: '',
+ * //   block_hash:
+ * //    '4cd55ea1189677fc32be1b4bbd9f93d75c81610c7bafb4f09964197a6b3096fa',
+ * //   block_timestamp: '2020-08-12 16:14:16 UTC',
+ * //   block_number: '2',
+ * //   transaction_hash:
+ * //    'f67484a3c5b9a1c57a66d843ee8e9dc72280336f6dccd8ec798873a64fb61f2d',
+ * //   transaction_sender: 'b311acca558955c4b6296306f0e4a7ee0eb8f13d',
+ * //   transaction_function_name: '',
+ * //   storedData: 0 }
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param {module:rest~Contract} contract This must be the name of the contract
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * field are populated
+ */
 
 async function waitForAddress(user, contract, _options) {
   const options = Object.assign(
