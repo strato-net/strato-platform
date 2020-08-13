@@ -84,6 +84,9 @@ reencryptKey oldPass newPass nonce oldKey givenAddress=
 deriveAddress :: SecKey -> Address
 deriveAddress = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPubKey False . derivePubKey 
 
+-- TODO: temporary proxy for secp256k1's derivePubKey, until the new crypto module is merged
+derivePublicKey :: SecKey -> PubKey
+derivePublicKey = derivePubKey
 
 newSaltAndNonce :: MonadIO m => m (ByteString, SecretBox.Nonce)
 newSaltAndNonce = liftIO $ do
