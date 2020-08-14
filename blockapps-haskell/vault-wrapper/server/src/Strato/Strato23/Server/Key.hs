@@ -26,6 +26,7 @@ getKey headerUserName queryParamUserName = withSecretKey $ \key -> do
     else case decryptSecKey key nonce encKey of
       Nothing -> vaultWrapperError IncorrectPasswordError
       Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
+      -- TODO: maybe we can remove addr and pub columns since we just derive them everytime
 
 postKey :: Text -> VaultM AddressAndKey
 postKey userName = withSecretKey $ \key -> do
