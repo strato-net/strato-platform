@@ -15,7 +15,6 @@ import           Strato.Strato23.Database.Queries
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Secp256k1
 
-
 getKey :: Text -> Maybe Text -> VaultM AddressAndKey
 getKey headerUserName queryParamUserName = withSecretKey $ \key -> do
   let userName = fromMaybe headerUserName queryParamUserName
