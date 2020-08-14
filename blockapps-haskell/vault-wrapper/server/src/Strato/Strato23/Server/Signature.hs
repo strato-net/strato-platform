@@ -22,7 +22,7 @@ postSignature :: Text -> MsgHash -> VaultM Signature
 postSignature userName (MsgHash msgBS) = do
   cache <- asks keyStoreCache
   cachedPk <- liftIO $ Cache.lookup cache userName
-  (salt,nonce,pKey,_,_) <- case cachedPk of
+  (_,nonce,pKey,_,_) <- case cachedPk of
     Just (KeyStore a b c d e) -> pure (a,b,c,d,e)
     Nothing -> do
       mpk <- vaultTransaction
@@ -37,7 +37,7 @@ postSignature userName (MsgHash msgBS) = do
             $ getUserKeyQuery userName
       liftIO . Cache.insert cache userName $ KeyStore a b c d e
       pure (a,b,c,d,e)
-  withPassword $ \pw -> case decryptSecKey pw salt nonce pKey of
+  withSecretKey $ \key -> case decryptSecKey key nonce pKey of
     Nothing -> vaultWrapperError IncorrectPasswordError
     Just prvKey 
       | B.length msgBS == 32 -> return $ signMsg prvKey msgBS 

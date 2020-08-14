@@ -33,6 +33,7 @@ library:
     - bytestring
     - cache
     - clock
+    - cryptonite
     - http-client
     - lens
     - monad-control
@@ -98,6 +99,7 @@ executables:
       - bytestring
       - cryptonite
       - hflags
+      - opaleye
       - saltine
       - strato-model
       - text
