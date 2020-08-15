@@ -300,34 +300,3 @@ getServerPubKey domain _ = do
         Left x         -> return $ Left x
         Right (Just x) -> return $ Right $ secPubKeyToPoint x
 
-
--- TODO: do we need this? If so, we need to use HasVault
-{- findNeighbors::H.PrvKey -> String -> PortNumber -> IO ()
-findNeighbors myPriv domain _ =
-    withSocketsDo $ bracket (getSocket domain port) close (talk myPriv)
-  where
-    -- TODO(tim): Reenable port selection
-    port = 30303
-    talk :: H.PrvKey -> Socket -> IO ()
-    talk prvKey' socket' = do
-      let (theType, theRLP) =
-            ndPacketToRLP $
-            FindNeighbors (NodeID $ fst $ B16.decode "eab4e595d178422cb8b31eddde2d6dda74ad16609693614a29a214d2b2f457a7c97a442e74e58afd1b16657c5c5908255a450d8a202e8d3b2b31c9b17e7221f3") 100000000000000000
-          theData = rlpSerialize theRLP
-          theMsgHash = hash $ B.singleton theType <> theData
-
-      ExtendedSignature signature yIsOdd <-
-        H.withSource H.devURandom $ encrypt prvKey' $ keccak256ToWord256 theMsgHash
-
-      let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
-          r = H.sigR signature
-          s = H.sigS signature
-          theSignature =
-            word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s) <> B.singleton v
-          theHash = keccak256ToByteString $ hash $ theSignature <> B.singleton theType <> theData
-
-      _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData
-
-      _ <- NB.recv socket' 10 >>= print -- processDataStream' . B.unpack
-      return ()
--}
