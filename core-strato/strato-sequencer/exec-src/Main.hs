@@ -59,6 +59,7 @@ main = do
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer authorized beneficiary senders" ++ show flags_blockstanbul_admins
   putStrLn $ "strato-sequencer isAdmin/Validator: " ++ show flags_isAdmin
+  putStrLn $ "strato-sequencer vault-wrapper URL: " ++ show flags_vaultWrapperUrl
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/=':') flags_kafkaaddress of
@@ -74,7 +75,7 @@ main = do
   
   -- setup the connection with vault-wrapper
   mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+  vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
   let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
   
   selfAddress <- do

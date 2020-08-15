@@ -36,6 +36,7 @@ defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
 
 defineFlag "seq_max_events_per_iter" (500 :: Int) "How many elements to wait for in each sequencer iteration"
 defineFlag "seq_max_us_per_iter" (50000 :: Int) "How many μs to spend waiting for elements"
+defineFlag "vaultWrapperUrl" ("http://vault-wrapper:8000/strato/v2.3" :: String) "The Vault-Wrapper URL"
 defineFlag "isAdmin" (False :: Bool) "Whether to initialize PBFT with this node as admin and validator. Set this True when you are starting a single node, or the first node in a network"
 
 
