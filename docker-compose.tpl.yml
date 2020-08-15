@@ -183,6 +183,7 @@ services:
     - kafka
     - postgres
     - redis
+    - vault-wrapper
     environment:
     - addBootnodes=${addBootnodes}
     - averageTxsPerBlock=${averageTxsPerBlock}
@@ -233,6 +234,7 @@ services:
     - svmDev=${svmDev}
     - USE_STRATO_API=${USE_STRATO_API}
     - useSyncMode=${useSyncMode}
+    - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
     - zkHost=zookeeper

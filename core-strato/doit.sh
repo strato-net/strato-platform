@@ -7,6 +7,9 @@ PROCESS_MONITORING=${PROCESS_MONITORING:-true}
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
+vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
+
+
 function newnode {
 
   if [[ ! -d .ethereumH ]] ; then
@@ -31,7 +34,7 @@ function newnode {
   fi
 
   echo "Starting ethereum-discover"
-  runBackgroundProcess ethereum-discover &>> logs/ethereum-discover
+  runBackgroundProcess ethereum-discover --vaultWrapperUrl=$vaultWrapperRoot &>> logs/ethereum-discover 
 
   actualTimeout="${connectionTimeout:-300}"
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
@@ -63,6 +66,7 @@ function newnode {
      --maxConn=$maxConn \
      --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
+     --vaultWrapperUrl=$vaultWrapperRoot \
      ${txgFlag} \
      ${atbFlag} \
      ${pcamFlag} \
@@ -104,7 +108,7 @@ function newnode {
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
     "${baFlag}" "${scFlag}" "${adFlag}" --minLogLevel=$seqMinLogLevel \
-    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+    --vaultWrapperUrl=$vaultWrapperRoot +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -220,7 +224,7 @@ function doInit {
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
-        --addBootnodes=$addBootnodes $stratoBootnode \
+        --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$vaultWrapperRoot \
         --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty"
 
   if ${splitinit:-false} ; then

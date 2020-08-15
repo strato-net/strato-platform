@@ -131,7 +131,6 @@ oneTimeSetup genesisBlockName = do
       inflateDir stratoAPICerts
       inflateDir stratoAPIConfigDir
 
-      putStrLn $ CL.red "WARNING: the private key for this strato node is being written to the file .ethereumH/ethconf.yaml.  Please keep it secure; anyone who reads it will become you."
       encodeFile (".ethereumH" </> "ethconf.yaml") ethconf
       makeReadOnly $ ".ethereumH" </> "ethconf.yaml"
 
