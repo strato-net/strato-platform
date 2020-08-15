@@ -461,7 +461,7 @@ initConfig wireMessagesRef maxHeaders = do
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
     mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+    url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
     return $ ClientEnv mgr url Nothing
 
   initState <- newIORef initContext
