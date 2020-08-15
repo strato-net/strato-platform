@@ -102,7 +102,7 @@ defaultConfig =
 getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
   mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
+  vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl 
   let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
   putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
   ak <- waitOnVault clientEnv $ runClientM (getKey (T.pack "nodekey") Nothing) clientEnv

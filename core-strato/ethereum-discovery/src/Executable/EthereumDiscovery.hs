@@ -5,31 +5,27 @@ module Executable.EthereumDiscovery (
   ethereumDiscovery
   ) where
 
-import           UnliftIO.Exception
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.Resource
--- import qualified Data.ByteString.Base16                  as B16
--- import           Data.Maybe
 import qualified Data.Text                               as T
 import qualified Network.Socket                          as S
+import           UnliftIO.Exception
 
---import           Blockchain.Data.PubKey
 import           Blockchain.EthConf
-
 import           Blockchain.Strato.Discovery.ContextLite
---import           Blockchain.Strato.Discovery.P2PUtil
 import           Blockchain.Strato.Discovery.UDPServer
+import           Executable.Options
+
 import qualified Text.Colors                             as CL
 
 ethereumDiscovery :: LoggingT IO ()
 ethereumDiscovery = do
   _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "Welcome to ethereum-discovery"
   _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "============================="
-  -- TODO: a lil getPub here so that we can print the NodeID like we used to
---  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green " * My NodeID is " ++ show (B16.encode $ pointToBytes pubKey)
+  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green $ "Talking to vault-wrapper at " ++ flags_vaultWrapperUrl
   _ <- runResourceT $ do
-    cxt <- initContextLite
+    cxt <- initContextLite flags_vaultWrapperUrl
 
     bracket
       (connectMe $ discoveryPort $ discoveryConfig ethConf)
