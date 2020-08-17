@@ -89,7 +89,7 @@ getHandshakeBytes otherPubKey myNonce = do
       recoverPub sig msg
     hepubk = keccak256ToByteString $ hash $ pointToBytes $ secPubKeyToPoint ephemeral
     pubk = pointToBytes myPublic
-    theData = (BL.toStrict $ encode sig) `B.append`
+    theData = (exportSignature sig) `B.append`
                 hepubk `B.append`
                 pubk `B.append`
                 myNonce `B.append`

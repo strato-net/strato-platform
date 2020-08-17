@@ -93,8 +93,7 @@ ethCryptAccept :: (MonadIO m, HasVault m)
                -> ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptAccept otherPoint = do
   
-  hsBytes <- CB.take 323 -- was 307... new binary encoded sigV is 16 bytes (not 1) for some reason
-  
+  hsBytes <- CB.take 307   
   hs <- ECIES.decrypt hsBytes B.empty
   maybeResult <-
     case hs of
@@ -107,7 +106,7 @@ ethCryptAccept otherPoint = do
    Nothing -> do
      let (first:second:_) = BL.unpack hsBytes
          fullSize = fromIntegral first*256 + fromIntegral second
-         remainingSize = fullSize - 323 + 2 -- was 307
+         remainingSize = fullSize - 307 + 2 
      remainingBytes <- CB.take remainingSize
      let fullBuffer = BL.drop 2 $ hsBytes `BL.append` remainingBytes
      maybeEciesMsgIBytes <- ECIES.decrypt fullBuffer $ BL.toStrict $ BL.take 2 $ hsBytes `BL.append` remainingBytes
@@ -177,9 +176,9 @@ ethCryptAcceptOld :: (MonadIO m, HasVault m)
 ethCryptAcceptOld otherPoint hsBytes eciesMsgIBytes = do
 
     SharedKey sharedKey <- getShared $ pointToSecPubKey otherPoint
-    let otherNonce = B.take 32 $ B.drop 177 $ eciesMsgIBytes -- was B.drop 161
+    let otherNonce = B.take 32 $ B.drop 161 $ eciesMsgIBytes
         msg = word256ToBytes $ bytesToWord256 sharedKey `xor` bytesToWord256 otherNonce
-        extSig = decode $ BL.fromStrict eciesMsgIBytes
+        extSig = importSignature $ B.take 65 eciesMsgIBytes
         otherEphemeral = secPubKeyToPoint $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
                             recoverPub extSig msg
