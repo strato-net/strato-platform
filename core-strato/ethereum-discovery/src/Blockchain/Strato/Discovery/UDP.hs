@@ -32,7 +32,6 @@ import           Data.Bits
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Base16                as B16
 import qualified Data.ByteString.Char8                 as BC
-import qualified Data.ByteString.Lazy                  as BL
 import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
@@ -180,10 +179,10 @@ ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rl
 
 dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, PublicKey)
 dataToPacket msg = do
-    let signature = decode $ BL.fromStrict $ B.take 81 $ B.drop 32 msg
-        theRest = B.unpack $ B.drop 114 msg
+    let signature = importSignature $ B.take 65 $ B.drop 32 msg
+        theRest = B.unpack $ B.drop 98 msg
         (rlp, _) = rlpSplit $ B.pack theRest
-    theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 113 msg
+    theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 97 msg
     let messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
     otherPubkey <- note (MalformedUDPException $ "malformed signature in udpHandshakeServer: " ++ show (signature, messageHash))
                         (recoverPub signature $ keccak256ToByteString messageHash)
@@ -209,26 +208,26 @@ sendPacket sock addr packet = do
       theMsgHash = keccak256ToByteString $ hash $ B.singleton theType' <> theData
   
   sig <- sign theMsgHash 
-  let sigBS = BL.toStrict $ encode sig 
+  let sigBS = exportSignature sig
       theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType' <> theData
 
   _ <- liftIO $ NB.sendTo sock ( theHash <> sigBS <> B.singleton theType' <> theData) addr
   return ()
 
 processDataStream'::B.ByteString-> PublicKey
-processDataStream' bs | B.length bs < 114 = error "processDataStream' called with too few bytes"
+processDataStream' bs | B.length bs < 98 = error "processDataStream' called with too few bytes"
 processDataStream' bs =
   let (hs, bs') = B.splitAt 32 bs
-      (sigBS, bs'') = B.splitAt 81 bs'
+      (sigBS, bs'') = B.splitAt 65 bs'
       (vtype, rest) = B.splitAt 1 bs''
       theType = B.index vtype 0
       theHash = bytesToWord256 hs
-      signature = decode $ BL.fromStrict sigBS 
+      signature = importSignature sigBS 
       (rlp, _) = rlpSplit rest
 
       messageHash = hash $ B.singleton theType <> rlpSerialize rlp
       publicKey = recoverPub signature $ keccak256ToByteString messageHash
-      theHash' = hash $ BL.toStrict (encode signature) <> B.singleton theType <> rlpSerialize rlp
+      theHash' = hash $ sigBS <> B.singleton theType <> rlpSerialize rlp
   in if theHash /= keccak256ToWord256 theHash'
     then error "bad UDP data sent from peer, the hash isn't correct"
     else fromMaybe (error "malformed signature in call to processDataStream") publicKey
@@ -280,7 +279,7 @@ getServerPubKey domain _ = do
         theMsgHash = keccak256ToByteString $ hash $ B.singleton theType <> theData
     
     sig <- sign theMsgHash
-    let sigBS = BL.toStrict $ encode sig 
+    let sigBS = exportSignature sig 
         theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType <> theData
         theMsg = theHash <> sigBS <> B.singleton theType <> theData
 
