@@ -392,7 +392,7 @@ waitOnVault action = do
   res <- action
   case res of
     Left err -> do 
-      $logInfoS "SequencerM/Signs" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
+      $logErrorS "SequencerM/Signs" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
       liftIO $ threadDelay 2000000 -- 2 seconds
       waitOnVault action
     Right val -> do 
