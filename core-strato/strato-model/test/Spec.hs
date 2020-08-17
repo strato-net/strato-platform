@@ -144,6 +144,10 @@ spec = do
     it "can export and import signature as a bytestring" $ do
       let sigBS = exportSignature sig
       importSignature sigBS `shouldBe` sig
+    it "exported sigs can be used for recovery" $ do
+      let sigBS = exportSignature sig
+          sig' = importSignature sigBS
+      recoverPub sig' mesg `shouldBe` Just pub
     
     it "can recover public keys from signatures" $ do
       let mRecPub = recoverPub sig mesg

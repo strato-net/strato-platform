@@ -270,6 +270,7 @@ exportSignature :: Signature -> ByteString
 exportSignature (Signature (S.CompactRecSig r s v)) = BSS.fromShort r <> BSS.fromShort s <> B.singleton v
 
 importSignature :: ByteString -> Signature
+importSignature bs | B.length bs /= 65 = error "importSignature called with incorrect number of bytes"
 importSignature bs = 
   let r = B.take 32 bs
       s = B.take 32 $ B.drop 32 bs
