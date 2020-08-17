@@ -144,6 +144,10 @@ spec = do
     it "can export and import signature as a bytestring" $ do
       let sigBS = exportSignature sig
       importSignature sigBS `shouldBe` sig
+    it "arbitrary sigs can be exported/imported" $ property $ \s -> do
+      let sigBS = exportSignature s
+      B.length sigBS `shouldBe` 65
+      importSignature sigBS `shouldBe` s
     it "exported sigs can be used for recovery" $ do
       let sigBS = exportSignature sig
           sig' = importSignature sigBS
