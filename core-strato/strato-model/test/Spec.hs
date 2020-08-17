@@ -10,8 +10,8 @@ import qualified Data.Bits                        as Bits
 import           Data.Binary
 import qualified Data.ByteString                  as B
 import qualified Data.ByteString.Base16           as B16
-import qualified Data.ByteString.Short            as BSS
 import qualified Data.ByteString.Char8            as C8
+import qualified Data.ByteString.Short            as BSS
 import           Data.Maybe
 import           Data.Word ()
 import           GHC.Exts
@@ -141,6 +141,9 @@ spec = do
     it "can convert signature to and from Binary encoding" $ do
       let encSig = encode sig
       decode encSig `shouldBe` sig
+    it "can export and import signature as a bytestring" $ do
+      let sigBS = exportSignature sig
+      importSignature sigBS `shouldBe` sig
     
     it "can recover public keys from signatures" $ do
       let mRecPub = recoverPub sig mesg
@@ -163,7 +166,7 @@ spec = do
       fromPublicKey (fromJust mRecPub) `shouldBe` add
       fromPublicKey (fromJust mRecPub) `shouldBe` fromPrivateKey k
       fromPrivateKey k `shouldBe` add
-  
+    
   describe "the secp256k1 module works exactly like Haskoin on test values" $ do
     let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         hkPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey testPrivBS

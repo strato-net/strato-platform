@@ -19,6 +19,8 @@ module Blockchain.Strato.Model.Secp256k1
   , deriveSharedKey
   , recoverPub
   , signMsg
+  , exportSignature
+  , importSignature
   ) where
 
 
@@ -262,3 +264,14 @@ signMsg pk msgHash =
   let mesg = fromMaybe (error "msg is not 32 bytes") (S.msg msgHash)
       (S.CompactRecSig r s v) = S.exportCompactRecSig $ S.signRecMsg (coerce pk) mesg
   in Signature $ S.CompactRecSig s r (0x1b + v) -- the swapped sig
+
+
+exportSignature :: Signature -> ByteString
+exportSignature (Signature (S.CompactRecSig r s v)) = BSS.fromShort r <> BSS.fromShort s <> B.singleton v
+
+importSignature :: ByteString -> Signature
+importSignature bs = 
+  let r = B.take 32 bs
+      s = B.take 32 $ B.drop 32 bs
+      v = B.head $ B.drop 64 bs
+  in Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v
