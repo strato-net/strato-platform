@@ -49,7 +49,11 @@ instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m)
     $logInfoS "HasVault" "asking vault-wrapper for a message signature"
     waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash msg)) vc
 
-  getPub = error "called HasVault's getPub in ethereum-discovery, but this should never happen"
+  getPub = do
+    vc <- asks vaultClient
+    $logInfoS "HasVault" "asking vault-wrapper for the node's public key"
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+
   getShared _ = error "called HasVault's getShared in ethereum-discovery, but this should never happen"
 
 waitOnVault :: (MonadIO m, MonadLogger m, Show a) => m (Either a b) -> m b
