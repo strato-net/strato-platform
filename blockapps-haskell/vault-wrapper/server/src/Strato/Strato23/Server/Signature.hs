@@ -13,7 +13,6 @@ import           Strato.Strato23.Monad
 import           Strato.Strato23.API.Types
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Queries      (getUserKeyQuery)
-import           Strato.Strato23.Server.Key            (postKey)
 import           UnliftIO
 
 
@@ -30,11 +29,7 @@ postSignature userName (MsgHash msgBS) = do
            $ getUserKeyQuery userName
       (a,b,c,d,e) <- case mpk of
         Just pk -> return pk
-        Nothing -> do
-          _ <- postKey userName
-          vaultTransaction
-            . vaultQuery1
-            $ getUserKeyQuery userName
+        Nothing -> vaultWrapperError $ UserError ("User " <> userName <> " doesn't exist")
       liftIO . Cache.insert cache userName $ KeyStore a b c d e
       pure (a,b,c,d,e)
   withSecretKey $ \key -> case decryptSecKey key nonce pKey of
