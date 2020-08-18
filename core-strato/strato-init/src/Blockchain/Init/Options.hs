@@ -27,4 +27,6 @@ defineFlag "redisDBNumber" (0  ::  Integer) "Redis database number"
 defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for more peers"
 defineFlag "genesisBlockName" "livenet" "use the alternate stablenet genesis block"
 
+defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
+
 $(return [])

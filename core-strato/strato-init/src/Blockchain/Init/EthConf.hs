@@ -117,9 +117,14 @@ waitOnVault clientEnv request = do
         putStrLn "vault password is not set. I'll keep trying until it is set"
         threadDelay 2000000 -- 2 seconds
         waitOnVault clientEnv request
-      400 -> do -- 400 is thrown when the key does not exist
-        putStrLn "nodekey does not exist, so I'm going to create one"
-        waitOnVault clientEnv $ runClientM (postKey $ T.pack "nodekey") clientEnv
+      400 -> -- 400 is thrown when the key does not exist
+        if flags_generateKey then do 
+          putStrLn "nodekey does not exist -  I'm going to create one"
+          waitOnVault clientEnv $ runClientM (postKey $ T.pack "nodekey") clientEnv
+        else do
+          putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
+          threadDelay 5000000 -- 5 seconds
+          waitOnVault clientEnv request
       _ -> do
         putStrLn $ "unexpected error thrown by vault-wrapper: " ++ show body
         putStrLn "will keep retrying anyway"

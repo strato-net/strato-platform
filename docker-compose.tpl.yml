@@ -200,6 +200,7 @@ services:
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
     - faucetEnabled=${faucetEnabled}
+    - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
     - isAdmin=${isAdmin:-false}

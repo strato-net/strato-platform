@@ -225,7 +225,8 @@ function doInit {
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$vaultWrapperRoot \
-        --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty"
+        --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
+        --generateKey=$generateKey"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
