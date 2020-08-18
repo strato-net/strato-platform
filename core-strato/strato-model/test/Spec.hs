@@ -201,7 +201,7 @@ spec = do
           ecSigVals = [ BSS.fromShort $ er
                       , BSS.fromShort $ es
                       ]
-          hvInt = (if hv then 28 else 27) :: Integer
+          hvInt = (if hv then 1 else 0) :: Integer
           ecInt = toInteger ev
       hkSigVals `shouldBe` ecSigVals
       hvInt `shouldBe` ecInt

@@ -284,7 +284,7 @@ whoSignedThisTransaction tx = case tx of
   t -> fromPublicKey <$> EC.recoverPub sig mesg
         where
           intToBSS = BSS.toShort . word256ToBytes . fromInteger
-          sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) (0x1b - transactionV t))
+          sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
           mesg = keccak256ToByteString $ partialTransactionHash t
 -}
 
