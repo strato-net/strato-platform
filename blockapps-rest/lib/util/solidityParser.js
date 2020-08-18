@@ -1,8 +1,24 @@
 import parser from 'solidity-parser-antlr'
 
+/**
+ * Parses a string Solidity Contract
+ *
+ * @method parse
+ * @param {String} input the Contract string
+ * @return {Object}
+ */
+
 function parse(input) {
   return parser.parse(input)
 }
+
+/**
+ * Parses enums found in a string Solidity contract
+ *
+ * @method parseEnum
+ * @param {String} input the Contract string with Enums
+ * @return {Object}
+ */
 
 function parseEnum(input) {
   const parsed = parse(input)
@@ -15,6 +31,14 @@ function parseEnum(input) {
 
   return myEnum
 }
+
+/**
+ * Parses fields found in a string Solidity contract
+ *
+ * @method parseFields
+ * @param {String} input the Contract string with Fields
+ * @return {Object}
+ */
 
 function parseFields(input, prefix) {
   const graph = parse(input)

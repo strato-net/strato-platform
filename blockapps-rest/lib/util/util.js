@@ -51,6 +51,8 @@ function isChecksumAddress(_address) {
 
 /**
  * Generates a unique integer id
+ * @method iuid
+ * @return {Int}
  */
 function iuid() {
   return this.uid(undefined, 12);
@@ -60,6 +62,11 @@ function sha3(address) {
   throw new Error('sha3 not found')
 }
 
+/**
+ * Generates a unique id
+ * @method uid
+ * @return {Int}
+ */
 function uid(prefix, digits = 6) {
   if (digits < 1) digits = 1
   if (digits > 16) digits = 16
@@ -67,6 +74,12 @@ function uid(prefix, digits = 6) {
   return (prefix === undefined) ? `${random}` : `${prefix}_${random}`
 }
 
+/**
+ * Formats an object's properties
+ * @method usc
+ * @param {*} Object An object with properties
+ * @return {Array}
+ */
 function usc(args) {
   return Object.keys(args).reduce((acc, key) => {
     acc[`_${key}`] = args[key]
