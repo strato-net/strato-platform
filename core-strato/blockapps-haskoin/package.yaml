@@ -15,7 +15,6 @@ category:              Bitcoin, Finance, Network
 build-type:            Simple
 extra-source-files:
   - tests/data/*.json
-github: blockapps/strato-platform/core-strato/blockapps-haskoin
 
 ghc-options: -Wall
 

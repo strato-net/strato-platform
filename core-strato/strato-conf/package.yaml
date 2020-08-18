@@ -5,7 +5,6 @@ license-file:        LICENSE
 author:              Jamshid
 category:            Web
 build-type:          Simple
-github:              blockapps/strato-platform/core-strato/strato-conf
 
 library:
   source-dirs:      src

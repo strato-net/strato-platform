@@ -51,6 +51,11 @@ project ./. ({ pkgs, hackGet, ... }: {
         rev = "862120993fd44f73853b04e81136306e33f6e58e";
         sha256 = "111cy89zyckdc2hp3y327prwibyshjkypcgfgp6jf5ylcjw5clfk";
       };
+      hpackHackage = self.callHackageDirect {
+        pkg = "hpack";
+        ver = "0.34.1";
+        sha256 = "1xghyficc5fk6dpy60pbb4r09dfvil8jklssybd8567lhsq6zxbv";
+      } {};
     in
     {
       haskell-src-exts = super.callHackageDirect {
@@ -79,6 +84,7 @@ project ./. ({ pkgs, hackGet, ... }: {
         ver = "1.0.0.0";
         sha256 = "1hrv660hs50aadphg38wcrzf0admfdcfkp3zf7b2fcz58zlm431y";
       } {};
+      hpack = pkgs.haskell.lib.dontCheck hpackHackage;
       servant = pkgs.haskell.lib.dontCheck super.servant;
       milena = pkgs.haskell.lib.dontCheck super.milena;
       strato-redis-blockdb = pkgs.haskell.lib.dontCheck super.strato-redis-blockdb;
