@@ -55,8 +55,13 @@ project ./. ({ pkgs, hackGet, ... }: {
     {
       haskell-src-exts = super.callHackageDirect {
         pkg = "haskell-src-exts";
-        ver = "1.23.1";
-        sha256 = "144q88agqqfpc8z1h2jr6mgx5xs72wxkrx4kbpsfg9cza3jm9fbx";
+        ver = "1.20.3";
+        sha256 = "15jl7xn8x3bf38npzhl9pgjwzq7w73qsgr23y6axnn6m19yshyqz";
+       } {};
+      hlint = super.callHackageDirect {
+        pkg = "hlint";
+        ver = "2.1.11";
+        sha256 = "053fcyzvlyl0xvf9jn2ff7kjqmmk78mkdbpnvzs1d1qbp5dfza9p";
        } {};
       ansi-wl-pprint = super.callHackageDirect {
         pkg = "ansi-wl-pprint";
@@ -74,6 +79,9 @@ project ./. ({ pkgs, hackGet, ... }: {
         ver = "1.0.0.0";
         sha256 = "1hrv660hs50aadphg38wcrzf0admfdcfkp3zf7b2fcz58zlm431y";
       } {};
+      servant = pkgs.haskell.lib.dontCheck super.servant;
+      milena = pkgs.haskell.lib.dontCheck super.milena;
+      strato-redis-blockdb = pkgs.haskell.lib.dontCheck super.strato-redis-blockdb;
       mkDerivation = drv: super.mkDerivation (drv // { jailbreak = true; doHaddock = false;});
   };
 })

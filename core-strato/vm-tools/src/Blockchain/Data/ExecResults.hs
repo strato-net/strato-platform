@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Data.ExecResults
@@ -8,6 +9,7 @@ module Blockchain.Data.ExecResults
   ) where
 
 import           Control.DeepSeq
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Short   as BSS
 import qualified Data.Set                as S
 import           GHC.Generics
@@ -39,7 +41,8 @@ data ExecResults =
     } deriving (Eq, Show, Generic)
 
 instance NFData ExecResults
-
+instance Aeson.ToJSON ExecResults
+instance Aeson.FromJSON ExecResults
 
 calculateReturned :: Transaction -> ExecResults -> Integer
 calculateReturned t er =

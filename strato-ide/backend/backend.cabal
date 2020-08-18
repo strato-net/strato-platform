@@ -8,11 +8,18 @@ library
   if impl(ghcjs)
     buildable: False
   build-depends: base
+               , blockapps-datadefs
                , common
+               , containers
                , frontend
+               , merkle-patricia-db
                , obelisk-backend
                , obelisk-route
                , solid-vm
+               , strato-model
+               , text
+               , time
+               , vm-tools
                , websockets-snap
   exposed-modules:
     Backend

@@ -4,6 +4,8 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net
 -- Maintainer: Charles Crain <charles@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module SolidVM.Solidity.Parse.Declarations where
 
 import           Control.DeepSeq

@@ -1,4 +1,6 @@
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -15,6 +17,7 @@
 
 module Blockchain.VMContext
     ( VMBase
+    , SVMTrace(..)
     , ContextDBs(..)
     , MemDBs(..)
     , ContextState(..)
@@ -47,6 +50,8 @@ module Blockchain.VMContext
     , contextPut
     , contextModify
     , contextModify'
+    , emptyMemDBs
+    , emptyContextState
     , runTestContextM
     , runContextM
     , evalContextM
@@ -60,6 +65,19 @@ module Blockchain.VMContext
     , peekPendingVote
     , clearPendingVote
     , compactContextM
+    , MemContextM
+    , MemContext(..)
+    , memContextGet
+    , memContextGets
+    , memContextPut
+    , memContextModify
+    , memContextModify'
+    , memContextStateGet
+    , memContextStateGets
+    , memContextStatePut
+    , memContextStateModify
+    , memContextStateModify'
+    , runMemContextM
     ) where
 
 import           Control.DeepSeq
@@ -124,6 +142,8 @@ instance NFData RBDB.RedisConnection where
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (Keccak256, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show, Generic, NFData)
 
+newtype SVMTrace = SVMTrace Bool
+
 data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB
   , _hashDB         :: HashDB
@@ -166,6 +186,7 @@ type ContextM = ReaderT Context (ResourceT (LoggingT IO))
 type VMBase m = ( MonadIO m
                 , MonadUnliftIO m
                 , MonadLogger m
+                , Mod.Accessible SVMTrace m
                 , Mod.Modifiable ContextState m
                 , Mod.Accessible ContextState m
                 , Mod.Modifiable MemDBs m
@@ -356,6 +377,31 @@ instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
 instance MonadMonitor (ResourceT (LoggingT IO)) where
     doIO = liftIO
 
+instance Mod.Accessible SVMTrace ContextM where
+  access _ = pure $ SVMTrace flags_svmTrace
+
+emptyMemDBs :: MemDBs
+emptyMemDBs = MemDBs
+  { _stateTxMap      = M.empty
+  , _stateBlockMap   = M.empty
+  , _storageTxMap    = M.empty
+  , _storageBlockMap = M.empty
+  , _stateRoot       = MP.emptyTriePtr
+  }
+
+emptyContextState :: MonadIO m => m ContextState
+emptyContextState = do
+  cache <- liftIO $ TRC.new 64
+  pure $ ContextState
+    { _memDBs            = emptyMemDBs
+    , _baggerState       = defaultBaggerState
+    , _bestBlockInfo     = Unspecified
+    , _hasBlockstanbul   = False
+    , _blockRequested    = False
+    , _coinbaseQueue     = Q.empty
+    , _txRunResultsCache = cache
+    }
+
 runTestContextM :: ( MonadIO m
                    , MonadUnliftIO m
                    , HasStateDB (ReaderT Context (ResourceT m))
@@ -384,7 +430,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       initialKafkaState <- newIORef $ K.mkKafkaState
                                         (K.KString "fake_client")
                                         (K.Host (K.KString "localhost"), K.Port 1234132)
-      cache <- liftIO $ TRC.new 64
 
       let cdbs = ContextDBs
             { _stateDB        = MP.StateDB sdb
@@ -396,23 +441,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _sqldb          = SQLDB conn
             }
 
-      let cmemDBs = MemDBs
-            { _stateTxMap      = M.empty
-            , _stateBlockMap   = M.empty
-            , _storageTxMap    = M.empty
-            , _storageBlockMap = M.empty
-            , _stateRoot       = error "must set stateroot for test context"
-            }
-
-      cstate <- newIORef $ ContextState
-            { _memDBs            = cmemDBs
-            , _baggerState       = defaultBaggerState
-            , _bestBlockInfo     = Unspecified
-            , _hasBlockstanbul   = False
-            , _blockRequested    = False
-            , _coinbaseQueue     = Q.empty
-            , _txRunResultsCache = cache
-            }
+      cstate <- newIORef =<< emptyContextState
 
       let ctx = Context
             { _dbs   = cdbs
@@ -442,7 +471,6 @@ runContextM f = do
       blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
       rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
       kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
-      cache <- liftIO $ TRC.new 64
 
       let cdbs = ContextDBs
             { _stateDB        = MP.StateDB sdb
@@ -453,24 +481,7 @@ runContextM f = do
             , _redisPool      = RBDB.RedisConnection rPool
             , _sqldb          = conn
             }
-
-      let cmemDBs = MemDBs
-            { _stateTxMap      = M.empty
-            , _stateBlockMap   = M.empty
-            , _storageTxMap    = M.empty
-            , _storageBlockMap = M.empty
-            , _stateRoot       = MP.emptyTriePtr
-            }
-
-      cstate <- newIORef $ ContextState
-            { _memDBs            = cmemDBs
-            , _baggerState       = defaultBaggerState
-            , _bestBlockInfo     = Unspecified
-            , _hasBlockstanbul   = flags_blockstanbul
-            , _blockRequested    = False
-            , _coinbaseQueue     = Q.empty
-            , _txRunResultsCache = cache
-            }
+      cstate <- newIORef =<< emptyContextState
 
       let ctx = Context
             { _dbs   = cdbs
@@ -555,3 +566,171 @@ clearPendingVote b = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ do
 
 compactContextM :: ContextM ()
 compactContextM = modify' force
+
+type MemContextM = ReaderT (IORef MemContext, IORef ContextState) (LoggingT IO)
+
+data MemContext = MemContext
+  { _memBlockHashRoot  :: BlockHashRoot
+  , _memGenesisRoot    :: GenesisRoot
+  , _memBestBlockRoot  :: BestBlockRoot
+  , _memStateDB        :: M.Map MP.StateRoot MP.NodeData
+  , _memHashDB         :: M.Map N.NibbleString N.NibbleString
+  , _memCodeDB         :: M.Map Keccak256 DBCode
+  , _memBlockSummaryDB :: M.Map Keccak256 BlockSummary
+  , _memRawStorageDB   :: M.Map RawStorageKey RawStorageValue
+  , _memWorldBestBlock :: Maybe WorldBestBlock
+  } deriving (Generic)
+makeLenses ''MemContext
+
+emptyMemContext :: MemContext
+emptyMemContext = MemContext
+  { _memBlockHashRoot   = BlockHashRoot MP.emptyTriePtr
+  , _memGenesisRoot     = GenesisRoot MP.emptyTriePtr
+  , _memBestBlockRoot   = BestBlockRoot MP.emptyTriePtr
+  , _memStateDB         = M.empty
+  , _memHashDB          = M.empty
+  , _memCodeDB          = M.empty
+  , _memBlockSummaryDB  = M.empty
+  , _memRawStorageDB    = M.empty
+  , _memWorldBestBlock  = Nothing
+  }
+
+memContextStateGet :: MemContextM ContextState
+memContextStateGet = readIORef =<< view _2
+{-# INLINE memContextStateGet #-}
+
+memContextStateGets :: (ContextState -> a) -> MemContextM a
+memContextStateGets f = f <$> memContextStateGet
+{-# INLINE memContextStateGets #-}
+
+memContextStatePut :: ContextState -> MemContextM ()
+memContextStatePut c = view _2 >>= \i -> atomicWriteIORef i c
+{-# INLINE memContextStatePut #-}
+
+memContextStateModify :: (ContextState -> ContextState) -> MemContextM ()
+memContextStateModify f = view _2 >>= \i -> atomicModifyIORef i (\a -> (f a, ()))
+{-# INLINE memContextStateModify #-}
+
+memContextStateModify' :: (ContextState -> ContextState) -> MemContextM ()
+memContextStateModify' f = view _2 >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
+{-# INLINE memContextStateModify' #-}
+
+memContextGet :: MemContextM MemContext
+memContextGet = readIORef =<< view _1
+{-# INLINE memContextGet #-}
+
+memContextGets :: (MemContext -> a) -> MemContextM a
+memContextGets f = f <$> memContextGet
+{-# INLINE memContextGets #-}
+
+memContextPut :: MemContext -> MemContextM ()
+memContextPut c = view _1 >>= \i -> atomicWriteIORef i c
+{-# INLINE memContextPut #-}
+
+memContextModify :: (MemContext -> MemContext) -> MemContextM ()
+memContextModify f = view _1 >>= \i -> atomicModifyIORef i (\a -> (f a, ()))
+{-# INLINE memContextModify #-}
+
+memContextModify' :: (MemContext -> MemContext) -> MemContextM ()
+memContextModify' f = view _1 >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
+{-# INLINE memContextModify' #-}
+
+instance Show MemContext where
+  show = const "<mem-context>"
+
+instance Mod.Modifiable ContextState MemContextM where
+  get _ = memContextStateGet
+  put _ = memContextStatePut
+
+instance Mod.Accessible ContextState MemContextM where
+  access _ = memContextStateGet
+
+instance Mod.Modifiable MemContext MemContextM where
+  get _ = memContextGet
+  put _ = memContextPut
+
+instance Mod.Accessible MemContext MemContextM where
+  access _ = memContextGet
+
+instance Mod.Modifiable MP.StateRoot MemContextM where
+  get _    = memContextStateGets . view $ memDBs . stateRoot
+  put _ sr = memContextStateModify $ memDBs . stateRoot .~ sr
+
+instance Mod.Accessible MemDBs MemContextM where
+  access _ = memContextStateGets $ view memDBs
+
+instance Mod.Modifiable MemDBs MemContextM where
+  get _    = memContextStateGets $ view memDBs
+  put _ md = memContextStateModify $ memDBs .~ md
+
+instance Mod.Modifiable BlockHashRoot MemContextM where
+  get _ = memContextGets $ view memBlockHashRoot
+  put _ bhr = memContextModify $ memBlockHashRoot .~ bhr
+
+instance Mod.Modifiable GenesisRoot MemContextM where
+  get _ = memContextGets $ view memGenesisRoot
+  put _ gr = memContextModify $ memGenesisRoot .~ gr
+
+instance Mod.Modifiable BestBlockRoot MemContextM where
+  get _ = memContextGets $ view memBestBlockRoot
+  put _ bbr = memContextModify $ memBestBlockRoot .~ bbr
+
+instance HasMemAddressStateDB MemContextM where
+  getAddressStateTxDBMap = memContextStateGets $ view $ memDBs . stateTxMap
+  putAddressStateTxDBMap theMap = memContextStateModify $ memDBs . stateTxMap .~ theMap
+  getAddressStateBlockDBMap = memContextStateGets $ view $ memDBs . stateBlockMap
+  putAddressStateBlockDBMap theMap = memContextStateModify $ memDBs . stateBlockMap .~ theMap
+
+instance (MP.StateRoot `A.Alters` MP.NodeData) MemContextM where
+  lookup _ k = memContextGets . view $ memStateDB . at k
+  insert _ k v = memContextModify $ memStateDB . at k ?~ v
+  delete _ k = memContextModify $ memStateDB %~ M.delete k
+
+instance (Address `A.Alters` AddressState) MemContextM where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
+
+instance (Keccak256 `A.Alters` DBCode) MemContextM where
+  lookup _ k = memContextGets . view $ memCodeDB . at k
+  insert _ k v = memContextModify $ memCodeDB . at k ?~ v
+  delete _ k = memContextModify $ memCodeDB %~ M.delete k
+
+instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where
+  lookup _ k = memContextGets . view $ memHashDB . at k
+  insert _ k v = memContextModify $ memHashDB . at k ?~ v
+  delete _ k = memContextModify $ memHashDB %~ M.delete k
+
+instance HasMemRawStorageDB MemContextM where
+  getMemRawStorageTxDB = memContextStateGets $ view $ memDBs . storageTxMap
+  putMemRawStorageTxMap theMap = memContextStateModify $ memDBs . storageTxMap .~ theMap
+  getMemRawStorageBlockDB = memContextStateGets $ view $ memDBs . storageBlockMap
+  putMemRawStorageBlockMap theMap = memContextStateModify $ memDBs . storageBlockMap .~ theMap
+
+instance (RawStorageKey `A.Alters` RawStorageValue) MemContextM where
+  lookup _ k = memContextGets . view $ memRawStorageDB . at k
+  insert _ k v = memContextModify $ memRawStorageDB . at k ?~ v
+  delete _ k = memContextModify $ memRawStorageDB %~ M.delete k
+
+instance (Keccak256 `A.Alters` BlockSummary) MemContextM where
+  lookup _ k = memContextGets . view $ memBlockSummaryDB . at k
+  insert _ k v = memContextModify $ memBlockSummaryDB . at k ?~ v
+  delete _ k = memContextModify $ memBlockSummaryDB %~ M.delete k
+
+instance Mod.Accessible (Maybe WorldBestBlock) MemContextM where
+  access _ = memContextGets $ view memWorldBestBlock
+
+instance Mod.Accessible SVMTrace MemContextM where
+  access _ = pure $ SVMTrace True
+
+runMemContextM :: MemContextM a -> LoggingT IO (a, MemContext, ContextState)
+runMemContextM f = do
+  memCtx <- newIORef emptyMemContext
+  cstate <- newIORef =<< emptyContextState
+  a <- flip runReaderT (memCtx, cstate) $ do
+    MP.initializeBlank
+    setStateDBStateRoot MP.emptyTriePtr
+    f
+  memCtx' <- readIORef memCtx
+  cstate' <- readIORef cstate
+  return (a, memCtx', cstate')

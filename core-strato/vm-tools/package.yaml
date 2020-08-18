@@ -7,6 +7,7 @@ synopsis: types and tools needed to write a VM for Strato
 category:      Data Structures
 
 dependencies:
+  - aeson
   - base
   - blockapps-data
   - blockapps-datadefs

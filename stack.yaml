@@ -89,6 +89,8 @@ extra-deps:
 flags:
  secp256k1-haskell:
    recovery: true
+ strato-conf:
+   embed: true 
 
 resolver: lts-14.27 #also duplicated in docker section below
 compiler-check: newer-minor

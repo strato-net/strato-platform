@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Network.Haskoin.Crypto.BigWord
 (
 -- Useful type aliases
@@ -375,6 +377,13 @@ instance ToJSON (BigWord Mod256) where
 
 instance FromJSON (BigWord Mod256) where
     parseJSON = withText "Word256" $
+        maybe mzero return . (decodeToMaybe <=< hexToBS) . T.unpack
+
+instance ToJSON (BigWord Mod512) where
+    toJSON = String . T.pack . bsToHex . encode'
+
+instance FromJSON (BigWord Mod512) where
+    parseJSON = withText "Word512" $
         maybe mzero return . (decodeToMaybe <=< hexToBS) . T.unpack
 
 instance BigWordMod n => Arbitrary (BigWord n) where

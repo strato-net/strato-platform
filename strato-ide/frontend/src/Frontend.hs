@@ -10,7 +10,7 @@
 module Frontend where
 
 import Control.Monad
-import Control.Applicative
+impor Control.Applicative
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (fromStrict, toStrict)
 import Data.List.NonEmpty (nonEmpty)
@@ -53,14 +53,6 @@ dynButton :: MonadWidget t m => Text -> m (Event t ())
 dynButton s = do
   (e, _) <- el' "button" $ text s
   pure $ domEvent Click e
-
-app :: MonadWidget t m => Maybe Text -> m ()
-app route = mdo
-  ace <- appAceWidget evAnnotations
-  evCompile <- dynButton $ "Compile"
-  evAnns <- wsEv route $ C2Scompile <$> tag (current ace) evCompile
-  let evAnnotations = (\case (S2Cannotations anns) -> map toAnnotation anns) <$> evAnns
-  pure ()
  
 appAceWidget :: MonadWidget t m => Event t [Annotation] -> m (Dynamic t Text)
 appAceWidget evAnnotations = do
@@ -105,3 +97,37 @@ wsEv route msgSendEv = case checkEncoder fullRouteEncoder of
         ws <- webSocket (render uri) $ def & webSocketConfig_send .~ sendEv
         let mS2c = fromStrict <$> _webSocket_recv ws
         pure $ fmapMaybe Aeson.decode mS2c 
+
+textbox :: MonadWidget t m => m (Dynamic t Text)
+textbox = do
+  ti <- textInput def
+  pure $ _textInput_value ti
+
+app :: MonadWidget t m => Maybe Text -> m ()
+app route = mdo
+  ace <- appAceWidget evAnnotations
+  evCompile <- dynButton $ "Compile"
+  contractNameDyn <- textbox
+  contractArgsDyn <- textbox
+  evCreate <- dynButton $ "Create"
+  evCall <- dynButton $ "Call"
+  resultDyn <- holdDyn "" evResult
+  el "div" $ dynText resultDyn
+  let c2sCompile = C2Scompile <$> ace
+      c2sCreateDyn = CreateArgs <$> contractNameDyn <*> contractArgsDyn <*> ace
+      c2sCallDyn = CallArgs <$> contractNameDyn <*> contractArgsDyn
+  let evC2S = leftmost [ tag (current c2sCompile) evCompile
+                       , C2Screate <$> tag (current c2sCreateDyn) evCreate 
+                       , C2Scall <$> tag (current c2sCallDyn) evCall 
+                       ]
+  evS2C <- wsEv route evC2S
+  let evAnnotations = fmapMaybe toAnnotations evS2C
+      evResult = fmapMaybe toResult evS2C
+  pure ()
+  where toAnnotations = \case
+          S2CcompileResult anns -> either (Just . map toAnnotation) (Just . const []) anns
+          _ -> Nothing
+        toResult = \case
+          S2CcompileResult e -> either (Just . const "") Just e
+          S2CcreateResult e -> Just . T.pack $ show e
+          S2CcallResult e -> Just . T.pack $ show e

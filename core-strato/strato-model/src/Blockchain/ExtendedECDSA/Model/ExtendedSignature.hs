@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.ExtendedECDSA.Model.ExtendedSignature where
 
 import Control.DeepSeq

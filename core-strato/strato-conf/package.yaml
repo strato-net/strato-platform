@@ -28,3 +28,11 @@ library:
     - transformers
     - hedis
     - swagger2
+  when:
+  - condition: flag(embed)
+    cpp-options: -DEMBED
+flags:
+  embed:
+    description: "Use TH to embed runtime config files"
+    manual: true
+    default: false

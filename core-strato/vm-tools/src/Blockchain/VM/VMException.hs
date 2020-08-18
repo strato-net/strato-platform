@@ -1,10 +1,14 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.VM.VMException (
   VMException(..)
   ) where
 
+import Blockchain.MiscJSON()
 import Blockchain.Strato.Model.Gas
 import Control.DeepSeq
 import Control.Exception
+import Data.Aeson
 import Data.ByteString (ByteString)
 import Data.Text (Text)
 import GHC.Generics
@@ -24,4 +28,4 @@ data VMException =
   WriteProtection |
   RevertException Gas ByteString |
   UnsupportedVM Text |
-  NonDebugCallCreate deriving (Show, Eq, Exception, Generic, NFData)
+  NonDebugCallCreate deriving (Show, Eq, Exception, Generic, NFData, ToJSON, FromJSON)

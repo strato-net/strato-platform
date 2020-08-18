@@ -63,7 +63,6 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext
-import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
 import qualified Text.Colors                          as C
 import           Text.Format
@@ -84,8 +83,10 @@ import           CodeCollection
 
 type SolidVMBase m = VMBase m
 
-onTraced :: Monad m => m () -> m ()
-onTraced = when flags_svmTrace
+onTraced :: (Monad m, Mod.Accessible SVMTrace m) => m () -> m ()
+onTraced f = do
+  (SVMTrace doTrace) <- Mod.access (Mod.Proxy @SVMTrace)
+  when doTrace f
 
 
 create :: SolidVMBase m
@@ -1430,7 +1431,7 @@ logAssigningVariable v = do
   valueString <- showSM v
   onTraced $ liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
 
-logVals :: (Show a, Show b, MonadIO m) => a -> b -> m ()
+logVals :: (Show a, Show b, Mod.Accessible SVMTrace m, MonadIO m) => a -> b -> m ()
 logVals val1 val2 = onTraced . liftIO $ printf
   "            %%%% val1 = %s\n\
   \            %%%% val2 = %s\n" (show val1) (show val2)

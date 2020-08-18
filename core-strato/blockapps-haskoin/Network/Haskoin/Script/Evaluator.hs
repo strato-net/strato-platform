@@ -5,6 +5,7 @@ Module providing Bitcoin script evaluation.  See
 EvalScript and <https://en.bitcoin.it/wiki/Script>
 
 -}
+{-# LANGUAGE LambdaCase #-}
 module Network.Haskoin.Script.Evaluator
 (
 -- * Script evaluation

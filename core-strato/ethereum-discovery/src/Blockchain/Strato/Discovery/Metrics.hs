@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Strato.Discovery.Metrics
   ( recordStateChange

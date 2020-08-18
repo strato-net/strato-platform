@@ -6,6 +6,8 @@
 --
 -- Currently does contracts and pragmas.  In the future should also handle
 -- imports.
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module SolidVM.Solidity.Parse.File where
 
 import           Prelude                               hiding (lookup)
@@ -29,6 +31,9 @@ import           SolidVM.Solidity.Parse.Pragmas
 newtype File = File {
   unsourceUnits :: [SourceUnit]
 } deriving (Show, Read, Generic, NFData)
+
+parseSolidity :: T.Text -> Either ParseError File
+parseSolidity = runParser solidityFile "qq" "qq" . T.unpack
 
 solidityFile :: SolidityParser File
 solidityFile = do

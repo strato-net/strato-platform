@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.VM.SolidException
   ( SolidException(..)
   , typeError
@@ -24,6 +26,7 @@ import Control.DeepSeq
 import Control.Exception (throw, throwIO, Exception)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Aeson
 import GHC.Generics
 import Text.Printf (printf)
 
@@ -44,7 +47,7 @@ data SolidException = TypeError String String
                     | UnknownVariable String String
                     | UnknownStatement String String
                     | DivideByZero String 
-                    deriving (Eq, Exception, Generic, NFData)
+                    deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
 
 instance Show SolidException where
   show (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
