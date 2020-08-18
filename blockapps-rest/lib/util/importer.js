@@ -35,11 +35,13 @@ function getImportName(line) {
   return importName;
 }
 
-//
-//readFileLines() reads a root file and parse all imports recursively
-//
-//@param {String} fullname
-//
+/**
+ * readFileLines() reads a root file and parse all imports recursively
+ *
+ * @method readFileLines
+ * @param {String} input name of file to be read
+ * @return {String}
+ */
 
 function readFileLines(fullname) {
   let buffer = '';
@@ -65,6 +67,16 @@ function readFileLines(fullname) {
 //  @param {String} fullname
 //  @param {String} line - the import line command
 // /
+
+/**
+ * importFile() reconstruct the import file path, and read it, unless it was already imported
+ *
+ * @method importFile
+ * @param {String} fullname name of file
+ * @param {String} line the import line command
+ * @return {String}
+ */
+
 function importFile(fullname, line) {
   let buffer = '//' + line + '\n';
   let importName = line.replace(/import[\s]+/i, '').replace(/\"/gi, '').replace(';', '');
@@ -86,6 +98,15 @@ function importFile(fullname, line) {
 // @param {String} fullname
 // @returns {Boolean} isImported
 //
+
+/**
+ * isImported() checks if a file is already imported
+ *
+ * @method isImported
+ * @param {String} fullname name of file
+ * @return {Boolean}
+ */
+
 function isImported(fullname) {
   let array = fullname.split(nodepath.sep);
   array = array.length <= 1 ? fullname.split('/') : array; // Windows fix
@@ -97,12 +118,14 @@ function isImported(fullname) {
   return false;
 }
 
-///
-// splitPath() get the path part of a full name
-//
-// @param {String} fullname
-// @returns {Boolean} isImported
-//
+/**
+ * splitPath() get the path part of a full name
+ *
+ * @method splitPath
+ * @param {String} fullname name of file
+ * @return {Array}
+ */
+
 function splitPath(fullname) {
   let array = fullname.split(nodepath.sep);
   array = array.length <= 1 ? fullname.split('/') : array; // Windows fix
