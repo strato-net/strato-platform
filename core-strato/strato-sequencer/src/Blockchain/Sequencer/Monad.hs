@@ -388,15 +388,15 @@ instance HasVault SequencerM where
 
 waitOnVault :: (Show a) => SequencerM (Either a b) -> SequencerM b
 waitOnVault action = do
-  $logInfoS "SequencerM/Signs" "Asking the vault-wrapper to sign a Blockstanbul message"
+  $logInfoS "HasVault" "Asking the vault-wrapper to sign a Blockstanbul message"
   res <- action
   case res of
     Left err -> do 
-      $logErrorS "SequencerM/Signs" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
+      $logErrorS "HasVault" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
       liftIO $ threadDelay 2000000 -- 2 seconds
       waitOnVault action
     Right val -> do 
-      $logInfoS "SequencerM/Signs" "Got a signature from vault" 
+      $logInfoS "HasVault" "Got a signature from vault" 
       return val
   
 

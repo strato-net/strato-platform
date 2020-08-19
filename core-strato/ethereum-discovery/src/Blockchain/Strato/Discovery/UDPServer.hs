@@ -61,8 +61,8 @@ runEthUDPServer :: ( MonadIO m
 runEthUDPServer ctx _ sock =
   void . runResourceT $ runReaderT (do 
     pub <- getPub
-    $logInfoS "ethereumDiscovery" . T.pack $ "My NodeID: " ++ show pub
-    $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ (show $ fromPublicKey pub)
+    $logInfoS "ethereumDiscovery" . T.pack $ "My NodeID: " ++ format pub
+    $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ (format $ fromPublicKey pub)
     udpHandshakeServer sock portNum) 
   ctx
      where portNum = 30303 -- TODO(tim): Reenable port selection

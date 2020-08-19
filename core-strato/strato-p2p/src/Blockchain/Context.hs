@@ -359,28 +359,30 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
 
-instance (MonadIO m, Monad m) => HasVault (ReaderT Config m) where
+instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) where
   sign bs = do
     vc <- asks configVaultClient 
-    liftIO $ waitOnVault $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
+    $logInfoS "HasVault" "Calling vault-wrapper for a signature"
+    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
   
   getPub = do
     vc <- asks configVaultClient 
-    fmap VC.unPubKey $ liftIO $ waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+    $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
   
   getShared pub = do
     vc <- asks configVaultClient 
-    liftIO $ waitOnVault $ runClientM (VC.getSharedKey "nodekey" pub) vc
+    $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
+    waitOnVault $ liftIO $ runClientM (VC.getSharedKey "nodekey" pub) vc
 
 
-waitOnVault :: (Show a) => IO (Either a b) -> IO b
+waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
 waitOnVault action = do
-  putStrLn "calling vault-wrapper..."
   res <- action
   case res of
     Left err -> do
-      putStrLn $ "got an error from vault-wrapper: " ++ show err
-      threadDelay 2000000
+      $logErrorS "HasVault" . T.pack $ "Got an error from vault-wrapper: " ++ show err
+      liftIO $ threadDelay 2000000
       waitOnVault action
     Right val -> return val
 
