@@ -235,6 +235,7 @@ services:
     - svmDev=${svmDev}
     - USE_STRATO_API=${USE_STRATO_API}
     - useSyncMode=${useSyncMode}
+    - validators=${validators}
     - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}

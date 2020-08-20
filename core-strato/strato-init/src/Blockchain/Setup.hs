@@ -12,9 +12,12 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
+import qualified Data.Aeson                         as Ae
 import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Char8              as C
 import           Data.FileEmbed
 import qualified Data.Map                           as Map
+import           Data.Maybe
 import           Data.String
 import qualified Data.Text                          as T
 import           Data.Yaml
@@ -38,10 +41,15 @@ import           Blockchain.Init.Monad
 import           Blockchain.Init.Options
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
+import           Blockchain.Strato.Model.Address
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery
 
 import qualified Text.Colors                        as CL
+
+
+decodedFaucets :: [Address]
+decodedFaucets = fromMaybe [] . Ae.decodeStrict . C.pack $ flags_extraFaucets
 
 createKafkaTopic  ::  TopicName -> IO ()
 createKafkaTopic topic = do
@@ -186,4 +194,4 @@ oneTimeSetup genesisBlockName = do
          liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
          void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
          liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
-         initializeGenesisBlock genesisBlockName []
+         initializeGenesisBlock genesisBlockName decodedFaucets

@@ -106,7 +106,7 @@ function newnode {
   adFlag="--isAdmin=${isAdmin}"
   
   runBackgroundProcess strato-sequencer \
-    "${bpFlag}" "${rpFlag}" "${vsFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
+    "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
     "${baFlag}" "${scFlag}" "${adFlag}" --minLogLevel=$seqMinLogLevel \
     --vaultWrapperUrl=$vaultWrapperRoot +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
@@ -220,13 +220,24 @@ function cleanupDB {
 function doInit {
   blockTime=${blockTime:-13}
   minBlockDifficulty=${minBlockDifficulty:-131072}
-  
+ 
+  if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
+    xfFlag="--extraFaucets=${extraFaucets:-$validators}"
+  fi
+  if [[ -n "${validators}" ]]; then
+    # Keep active discovery until all other validators are peers
+    echo "Overriding minAvailablePeers with number of consensus peers"
+    actualMinPeers=$( echo "${validators}" | tr -cd , | wc -c )
+  else
+    actualMinPeers=$numMinPeers
+  fi
+
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$vaultWrapperRoot \
-        --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
-        --generateKey=$generateKey"
+        --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty \
+        --generateKey=$generateKey $xfFlag"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
