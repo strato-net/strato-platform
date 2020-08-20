@@ -35,6 +35,7 @@ class OAuthUtil {
   /**
    * This function calls openIdConfigUrl to get openIdConfig and it also fetches
    * any public keys that maybe used to sign tokens
+   * @method{getOpenIdConfig}
    */
   getOpenIdConfig() {
     try {
@@ -57,6 +58,7 @@ class OAuthUtil {
 
   /**
    * This function creates a new instance of OauthUtil and populates the relevant fields
+   * @method{init}
    * @param oauthConfig
    * @returns o an instance of the OAuthUtil
    */
@@ -261,6 +263,7 @@ class OAuthUtil {
 
   /**
    * Validate the express.js API request against the tokens validity, refresh access token seamlessly for user if needed
+   * @method{validateAndGetNewToken}
    * @param req
    * @param res
    * @returns {Promise<*>}
@@ -344,6 +347,7 @@ class OAuthUtil {
 
   /**
    * Get the name of the cookie storing access token
+   * @method{getCookieNameAccessToken}
    * @returns(String) access token cookie name
    */
   getCookieNameAccessToken() {
@@ -352,6 +356,7 @@ class OAuthUtil {
 
   /**
    * Get the name of the cookie storing access token expire date
+   * @method{getCookieNameAccessTokenExpiry}
    * @returns(String) access token expire date cookie name
    */
   getCookieNameAccessTokenExpiry() {
@@ -360,6 +365,7 @@ class OAuthUtil {
 
   /**
    * Get the name of the cookie storing refresh token
+   * @method{getCookieNameRefreshToken}
    * @returns(String) refresh token cookie name
    */
   getCookieNameRefreshToken() {
