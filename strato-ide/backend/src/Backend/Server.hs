@@ -29,8 +29,6 @@ import           Data.Time
 import           Data.Time.Clock.POSIX
 import qualified Network.WebSockets as WS
 import           SolidVM.Solidity.Parse.File (parseSolidity)
-import           Text.Parsec
-import           Text.Parsec.Error
 import UnliftIO
 
 --------------------------------------------------------------------------------
@@ -51,27 +49,20 @@ application pending = do
         WS.sendTextData conn . toStrict . encode $ S2CcompileResult $
           bimap toAnn (T.pack . show) $ parseSolidity txt
       Just (C2Screate CreateArgs{..}) -> do
-        liftIO $ T.putStrLn $ "Creating contract: " <> contractName
-        eExecResults <- UnliftIO.try $ createSolidVM contractName contractArgs contractCode
+        liftIO $ T.putStrLn $ "Creating contract: " <> createName
+        liftIO $ T.putStrLn $ "Create args: " <> createArgs
+        eExecResults <- UnliftIO.try $ createSolidVM createName createArgs createCode
         let er = case eExecResults of
                    Left (e :: SomeException) -> Left . T.pack $ show e
                    Right e -> Right e
         liftIO $ WS.sendTextData conn . toStrict . encode $ S2CcreateResult er
       Just (C2Scall CallArgs{..}) -> do
-        liftIO $ T.putStrLn $ "Calling function: " <> funcName
-        eExecResults <- UnliftIO.try $ callSolidVM funcName funcArgs
+        liftIO $ T.putStrLn $ "Calling function: " <> callName
+        eExecResults <- UnliftIO.try $ callSolidVM callName callArgs
         let er = case eExecResults of
                    Left (e :: SomeException) -> Left . T.pack $ show e
                    Right e -> Right e
         liftIO $ WS.sendTextData conn . toStrict . encode $ S2CcallResult er
-
-toAnn :: ParseError -> [Ann]
-toAnn pe =
-  let sp = errorPos pe
-      ms = errorMessages pe
-      sl = sourceLine sp
-      sc = sourceColumn sp
-   in map (\m -> Ann sl sc (T.pack $ messageString m) True) ms
 
 timeZero :: UTCTime
 timeZero = posixSecondsToUTCTime 0

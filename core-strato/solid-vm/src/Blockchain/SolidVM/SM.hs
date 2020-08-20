@@ -76,7 +76,6 @@ import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
-import           Blockchain.VMOptions
 
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
@@ -225,6 +224,7 @@ instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
 runSM :: ( MonadIO m
          , MonadUnliftIO m
          , MonadLogger m
+         , Mod.Accessible SVMDev m
          , Mod.Modifiable ContextState m
          )
       => (Maybe ByteString)
@@ -252,7 +252,8 @@ runSM maybeCode env f = do
     -- The rest should always be a user error and handled safely
     Left se -> do
       $logErrorLS "runSM/error" se
-      if flags_svmDev
+      (SVMDev svmDev) <- Mod.access (Mod.Proxy @SVMDev)
+      if svmDev
         then do
           $logErrorLS "runSM/error_code" maybeCode
           throwIO se

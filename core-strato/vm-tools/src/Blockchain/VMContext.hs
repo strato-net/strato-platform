@@ -18,6 +18,7 @@
 module Blockchain.VMContext
     ( VMBase
     , SVMTrace(..)
+    , SVMDev(..)
     , ContextDBs(..)
     , MemDBs(..)
     , ContextState(..)
@@ -143,6 +144,7 @@ data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (Keccak256, Block
     deriving (Eq, Read, Show, Generic, NFData)
 
 newtype SVMTrace = SVMTrace Bool
+newtype SVMDev = SVMDev Bool
 
 data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB
@@ -187,6 +189,7 @@ type VMBase m = ( MonadIO m
                 , MonadUnliftIO m
                 , MonadLogger m
                 , Mod.Accessible SVMTrace m
+                , Mod.Accessible SVMDev m
                 , Mod.Modifiable ContextState m
                 , Mod.Accessible ContextState m
                 , Mod.Modifiable MemDBs m
@@ -379,6 +382,9 @@ instance MonadMonitor (ResourceT (LoggingT IO)) where
 
 instance Mod.Accessible SVMTrace ContextM where
   access _ = pure $ SVMTrace flags_svmTrace
+
+instance Mod.Accessible SVMDev ContextM where
+  access _ = pure $ SVMDev flags_svmDev
 
 emptyMemDBs :: MemDBs
 emptyMemDBs = MemDBs
@@ -722,6 +728,9 @@ instance Mod.Accessible (Maybe WorldBestBlock) MemContextM where
 
 instance Mod.Accessible SVMTrace MemContextM where
   access _ = pure $ SVMTrace True
+
+instance Mod.Accessible SVMDev MemContextM where
+  access _ = pure $ SVMDev True
 
 runMemContextM :: MemContextM a -> LoggingT IO (a, MemContext, ContextState)
 runMemContextM f = do

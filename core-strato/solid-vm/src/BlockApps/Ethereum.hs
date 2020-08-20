@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE PackageImports #-}
 
 -- {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 
@@ -15,7 +16,7 @@ module BlockApps.Ethereum
   ) where
 
 import           Control.DeepSeq
-import           Crypto.Hash
+import "cryptonite" Crypto.Hash
 import           Data.Binary
 import           Data.Binary.Get
 import           Data.Binary.Put

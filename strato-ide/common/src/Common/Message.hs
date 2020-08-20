@@ -10,6 +10,8 @@ import           Data.Aeson (ToJSON, FromJSON, toEncoding, parseJSON,
                             genericToEncoding, genericParseJSON)
 import qualified Data.Text as T
 import           GHC.Generics (Generic)
+import           Text.Parsec
+import           Text.Parsec.Error
 
 data Ann = Ann
   { annRow :: Int
@@ -18,15 +20,23 @@ data Ann = Ann
   , annErr :: Bool
   } deriving (Eq, Show, Generic)
 
+toAnn :: ParseError -> [Ann]
+toAnn pe =
+  let sp = errorPos pe
+      ms = errorMessages pe
+      sl = sourceLine sp - 1
+      sc = sourceColumn sp
+   in map (\m -> Ann sl sc (T.pack $ messageString m) True) ms
+
 data SolidVMCreateArgs = CreateArgs
-  { contractName :: T.Text
-  , contractArgs :: T.Text
-  , contractCode :: T.Text
+  { createName :: T.Text
+  , createArgs :: T.Text
+  , createCode :: T.Text
   } deriving (Eq, Show, Generic)
 
 data SolidVMCallArgs = CallArgs
-  { funcName :: T.Text
-  , funcArgs :: T.Text
+  { callName :: T.Text
+  , callArgs :: T.Text
   } deriving (Eq, Show, Generic)
 
 data C2S = C2Scompile T.Text

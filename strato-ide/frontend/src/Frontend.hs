@@ -12,8 +12,12 @@ module Frontend where
 import Control.Monad
 impor Control.Applicative
 import qualified Data.Aeson as Aeson
+import Data.Bifunctor (bimap)
 import Data.ByteString.Lazy (fromStrict, toStrict)
+import Data.List (sortOn)
 import Data.List.NonEmpty (nonEmpty)
+import qualified Data.Map.Strict as M
+import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Text.URI
@@ -25,6 +29,10 @@ import Obelisk.Generated.Static
 import Reflex.Dom.ACE
 import Reflex.Dom.Core
 
+import SolidVM.Solidity.Parse.File
+import SolidVM.Solidity.Parse.Declarations
+import SolidVM.Solidity.Xabi hiding (Event)
+
 import Common.Message
 import Common.Route
 
@@ -33,7 +41,8 @@ import Frontend.Nav
 frontend :: Frontend (R FrontendRoute)
 frontend = Frontend
   { _frontend_head = do
-      el "title" $ text "Obelisk Minimal Example"
+      el "title" $ text "STRATO IDE"
+      elAttr "link" ("rel" =: "icon" <> "type" =: "image/png" <> "href" =: static @"img/favicon.png") blank
       el "header" $ nav
       elAttr "link" ("href" =: static @"main.css" <> "type" =: "text/css" <> "rel" =: "stylesheet") blank
       let aceUrl = static @"js/ace/ace.js"
@@ -58,7 +67,7 @@ appAceWidget :: MonadWidget t m => Event t [Annotation] -> m (Dynamic t Text)
 appAceWidget evAnnotations = do
   elAttr "style" ("type" =: "text/css" <> "media" =: "screen") $ text $ T.unlines
       [ "#ace-editor { width:100%; height:100%; }"
-      , "#editor { position:relative; height:400px; left:-10px; padding:10px; }"
+      , "#editor { position:relative; height:1200px; left:-10px; padding:10px; }"
       , "body { width:100%; height:100%; }"
       , "input { width:600px; }"
       ]
@@ -103,30 +112,62 @@ textbox = do
   ti <- textInput def
   pure $ _textInput_value ti
 
+xabiWidget :: MonadWidget t m => Dynamic t [File] -> m (Event t (Text, Text))
+xabiWidget fileDyn = el "div" $ do
+  let getNamedXabi = \case
+        NamedXabi n x -> Just (n, x)
+        _ -> Nothing
+  let namedXabis = sortOn fst 
+                 . catMaybes 
+                 . map getNamedXabi 
+                 . concat  
+                 . map unsourceUnits 
+                 <$> fileDyn
+  createButtonClicks <- simpleList namedXabis $ \xabiDyn -> do -- (name, (Xabi{..}, baseConstrs) -> do
+    let name = fst <$> xabiDyn
+        xabi = fst . snd <$> xabiDyn
+        mConstr = listToMaybe . M.elems . xabiConstr <$> xabi
+        constrArgs = maybe [] funcArgs <$> mConstr
+    elAttr "div" ("style" =: "background-color: #C0C0F0; padding: 5px; border-radius: 10px; margin: 5px;") $ do
+      el "b" $ dynText name
+      el "br" blank
+      argValues <- el "div" . simpleList (zip [0..] <$> constrArgs) $ \arg -> do
+        let argName = (\(index, (mArgName, _)) -> fromMaybe (T.pack $ show index) mArgName) <$> arg
+        elAttr "div" ("style" =: "font-family: monospace;") $ do
+          dynText argName
+          text " "
+          textbox
+      let argsT = join $ sequence <$> argValues
+      let argsText = (\v -> "(" <> T.intercalate ", " v <> ")") <$> argsT
+          nameAndArgs = (,) <$> name <*> argsText
+      evCreate <- dynButton "Create"
+      pure $ tag (current nameAndArgs) evCreate
+  pure . switchPromptlyDyn $ leftmost <$> createButtonClicks
+
 app :: MonadWidget t m => Maybe Text -> m ()
-app route = mdo
-  ace <- appAceWidget evAnnotations
-  evCompile <- dynButton $ "Compile"
-  contractNameDyn <- textbox
-  contractArgsDyn <- textbox
-  evCreate <- dynButton $ "Create"
-  evCall <- dynButton $ "Call"
-  resultDyn <- holdDyn "" evResult
-  el "div" $ dynText resultDyn
-  let c2sCompile = C2Scompile <$> ace
-      c2sCreateDyn = CreateArgs <$> contractNameDyn <*> contractArgsDyn <*> ace
-      c2sCallDyn = CallArgs <$> contractNameDyn <*> contractArgsDyn
-  let evC2S = leftmost [ tag (current c2sCompile) evCompile
-                       , C2Screate <$> tag (current c2sCreateDyn) evCreate 
-                       , C2Scall <$> tag (current c2sCallDyn) evCall 
-                       ]
-  evS2C <- wsEv route evC2S
-  let evAnnotations = fmapMaybe toAnnotations evS2C
-      evResult = fmapMaybe toResult evS2C
-  pure ()
-  where toAnnotations = \case
-          S2CcompileResult anns -> either (Just . map toAnnotation) (Just . const []) anns
-          _ -> Nothing
+app route = do
+  elAttr "div" ("class" =: "grid-container" <> "style" =: "display: grid; grid-template-columns: 50% 50%; grid-template-rows: 1fr; height: 100%;") $ mdo
+    ace <- appAceWidget evAnnotations
+    evCompile <- debounce 0.1 $ updated ace
+    let evParse = parseSolidity <$> evCompile
+    let evCompileRes = bimap toAnn (T.pack . show) <$> evParse
+    evCompilationSuccess <- foldDyn (\a b -> either (const b) (:[]) a) [] evParse
+    evCreate <- xabiWidget evCompilationSuccess
+    -- resultDyn <- holdDyn "" evResult
+    -- el "div" $ dynText resultDyn
+    let evCreateArgs = attachPromptlyDynWith
+                         (\t (n, a) -> CreateArgs n a t)
+                         ace
+                         evCreate
+        -- c2sCallDyn = CallArgs <$> contractNameDyn <*> contractArgsDyn
+    let evC2S = leftmost [ C2Screate <$> evCreateArgs
+                         -- , C2Scall <$> tag (current c2sCallDyn) evCall 
+                         ]
+    evS2C <- wsEv route evC2S
+    let evAnnotations = fmapMaybe toAnnotations evCompileRes
+        evResult = fmapMaybe toResult $ leftmost [S2CcompileResult <$> evCompileRes, evS2C]
+    pure ()
+  where toAnnotations = either (Just . map toAnnotation) (Just . const [])
         toResult = \case
           S2CcompileResult e -> either (Just . const "") Just e
           S2CcreateResult e -> Just . T.pack $ show e

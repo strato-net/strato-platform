@@ -20,23 +20,26 @@ nav
      , Routed t (R FrontendRoute) m
      , RouteToUrl (R FrontendRoute) m
      , SetRoute t (R FrontendRoute) m
+     , Prerender js t m
      )
   => m ()
 nav = do
-  divClass "logo-menu" $ text "this is the placeholder for the logo and menu"
-{-
+  divClass "logo-menu" $ logo
+  --el "nav" menu
+
 -- | Displays the logo and returns an event that fires when the logo is clicked
-logo :: (DomBuilder t m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m)
+logo :: (DomBuilder t m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m)
   => m ()
 logo = do
   let logoAttrs = mconcat
         [ "class" =: "logo"
-        , "src" =: "img/blockapps-logo.svg"
-        , "alt" =: "Reflex"
+        , "src" =: static @"img/blockapps-logo.png"
+        , "alt" =: "BlockApps"
+        , "style" =: "width: 48px; height: 48px;"
         ]
-  el "logo" logoAttrs
+  routeLink (FrontendRoute_Main :/ ()) $ elAttr "img" logoAttrs blank
 
-
+{-
 -- | Build the nav's tabs
 menu
   :: ( DomBuilder t m
