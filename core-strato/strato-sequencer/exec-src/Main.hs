@@ -100,14 +100,14 @@ main = do
                  if flags_isAdmin then
                    return ([selfAddress], [selfAddress])
                  else do
-                   when (length authSenders == 0) . ioError . userError
+                   when (length authSenders == 0) . putStrLn
                       $ "This node is not an admin, but the blockstanbulAdmins list was empty.\
                         \ This means that this node will not accept transactions.\
                         \ This is a configuration error. If you are starting a single node, \
                         \ just use the --single flag. If you are starting the first node in a network, \
                         \ set isAdmin=true. If you are adding this node to an existing network, \
                         \ put the address(es) of the network's admin node(s) in the blockstanbulAdmins \
-                        \ environment variable."
+                        \ environment variable. I'll try with an empty validators list" 
                    return (authSenders, authSenders) 
 
                unless (selfAddress `elem` validators) . putStrLn
