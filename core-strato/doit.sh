@@ -93,6 +93,9 @@ function newnode {
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
     rpFlag="--blockstanbul_round_period_s=${blockstanbulRoundPeriodS}"
   fi
+  if [ -n "${validators}" ]; then
+    vsFlag="--validators=${validators}"
+  fi
   if [ -n "${seqMaxEventsPerIter}" ]; then
     evsFlag="--seq_max_events_per_iter=${seqMaxEventsPerIter}"
   fi
@@ -104,11 +107,13 @@ function newnode {
   fi
   
   adFlag="--isAdmin=${isAdmin}"
+  rtFlag="--isRootNode=${isRootNode}"
+  vwFlag="--vaultWrapperUrl=${vaultWrapperRoot}"
   
   runBackgroundProcess strato-sequencer \
-    "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
-    "${baFlag}" "${scFlag}" "${adFlag}" --minLogLevel=$seqMinLogLevel \
-    --vaultWrapperUrl=$vaultWrapperRoot +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+    "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
+    "${baFlag}" "${scFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
+    "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
   runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
@@ -220,10 +225,7 @@ function cleanupDB {
 function doInit {
   blockTime=${blockTime:-13}
   minBlockDifficulty=${minBlockDifficulty:-131072}
- 
-  if [[ -n "${extraFaucets}" || -n "${validators}" ]]; then
-    xfFlag="--extraFaucets=${extraFaucets:-$validators}"
-  fi
+
   if [[ -n "${validators}" ]]; then
     # Keep active discovery until all other validators are peers
     echo "Overriding minAvailablePeers with number of consensus peers"
@@ -231,13 +233,14 @@ function doInit {
   else
     actualMinPeers=$numMinPeers
   fi
-
+  # TODO: in very large validator pools, do we want this ^^^ ?
+  
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$vaultWrapperRoot \
         --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty \
-        --generateKey=$generateKey $xfFlag"
+        --generateKey=$generateKey --extraFaucets=$extraFaucets"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3

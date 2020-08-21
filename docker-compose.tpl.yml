@@ -199,11 +199,13 @@ services:
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
+    - extraFaucets=${extraFaucets}
     - faucetEnabled=${faucetEnabled}
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
     - isAdmin=${isAdmin:-false}
+    - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
     - maxConn=${maxConn}

@@ -57,8 +57,10 @@ main = do
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
-  putStrLn $ "strato-sequencer authorized beneficiary senders" ++ show flags_blockstanbul_admins
-  putStrLn $ "strato-sequencer isAdmin/Validator: " ++ show flags_isAdmin
+  putStrLn $ "strato-sequencer validators: " ++ show flags_validators
+  putStrLn $ "strato-sequencer authorized beneficiary senders: " ++ show flags_blockstanbul_admins
+  putStrLn $ "strato-sequencer isAdmin: " ++ show flags_isAdmin
+  putStrLn $ "strato-sequencer isRootNode: " ++ show flags_isRootNode
   putStrLn $ "strato-sequencer vault-wrapper URL: " ++ show flags_vaultWrapperUrl
   pkg <- atomically newCablePackage
   let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
@@ -85,33 +87,38 @@ main = do
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
   addSelfAsMetric selfAddress
  
-
-  let eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
-      !authSenders = fromRight (error "invalid admins") eAuthSenders
-
-
-  
+  let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
+      !validators' = fromRight (error "invalid validators") eValidators
+      eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
+      !authSenders' = fromRight (error "invalid admins") eAuthSenders
  
-  
+
   mCtx <- if not flags_blockstanbul
              then return Nothing
              else do
-               (validators, admins) <- 
-                 if flags_isAdmin then
-                   return ([selfAddress], [selfAddress])
-                 else do
-                   when (length authSenders == 0) . putStrLn
-                      $ "This node is not an admin, but the blockstanbulAdmins list was empty.\
-                        \ This means that this node will not accept transactions.\
-                        \ This is a configuration error. If you are starting a single node, \
-                        \ just use the --single flag. If you are starting the first node in a network, \
-                        \ set isAdmin=true. If you are adding this node to an existing network, \
-                        \ put the address(es) of the network's admin node(s) in the blockstanbulAdmins \
-                        \ environment variable. I'll try with an empty validators list" 
-                   return (authSenders, authSenders) 
+               validators <- 
+                 if flags_isRootNode then do
+                   unless (length validators' == 0) . putStrLn
+                      $ "WARNING: You have given me a validators list and you are telling me that this node \
+                        \ is the root node. I'll append this node's address to the validator list \
+                        \ you gave me, but this is likely a configuration error on your part."
+                   return $ selfAddress : validators'
+                 else
+                   return validators'
+                
+               authSenders <-
+                 if flags_isAdmin || flags_isRootNode then 
+                   return $ selfAddress : authSenders'
+                 else do 
+                   when (length authSenders' == 0) . putStrLn
+                       $ "WARNING: You haven't given me any blockstanbulAdmins. If you are starting \
+                       \ a single node, this is OK. But, if you are starting a network or adding a \
+                       \ validator node to a network, be warned - this node will not accept any votes for new \
+                       \ validators, as it has no authorized senders"
+                   return authSenders'
 
                unless (selfAddress `elem` validators) . putStrLn
-                    $ "NODEKEY does not correspond to an address within --validators.\
+                    $ "WARNING: NODEKEY does not correspond to an address within the validators.\
                       \ This probably means that you are connecting to an existing network,\
                       \ and you are not one of the original validators of that network.\
                       \ If this is the case, please disregard this message. Otherwise,\
@@ -121,10 +128,10 @@ main = do
                unless (flags_blockstanbul_round_period_s > 0) . ioError . userError
                     $ "--blockstanbul_round_period_s must be positive"
      
-               putStrLn $ "validators: " ++ show validators
-               putStrLn $ "admins: " ++ show admins
+               putStrLn $ "ACTUAL validators list: " ++ show validators
+               putStrLn $ "ACTUAL admins list: " ++ show authSenders
                
-               ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators admins
+               ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators authSenders
                putStrLn $ "Checkpoint: " ++ show ckpt
  
                return $ Just $ newContext ckpt selfAddress

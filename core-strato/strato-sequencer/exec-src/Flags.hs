@@ -32,12 +32,13 @@ defineFlag "blockstanbul_round_period_s" (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
 defineFlag "blockstanbul_port" (8050:: Int) "The port serving blockstanbul's admin server"
 defineFlag "blockstanbul_admins" ("[]" :: String) "JSON encoded addresses of admins. Admins can, for instance, nominate a new validator"
-defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
+defineFlag "isAdmin" (False :: Bool) "Whether to initialize PBFT with this node's address as an admin account"
+defineFlag "isRootNode" (False :: Bool) "Whether to initialize PBFT with this node as the sole validator. Set this to true when starting the first node in a new network, or a single node"
+defineFlag "vaultWrapperUrl" ("http://vault-wrapper:8000/strato/v2.3" :: String) "The Vault-Wrapper URL"
 
+defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
 defineFlag "seq_max_events_per_iter" (500 :: Int) "How many elements to wait for in each sequencer iteration"
 defineFlag "seq_max_us_per_iter" (50000 :: Int) "How many μs to spend waiting for elements"
-defineFlag "vaultWrapperUrl" ("http://vault-wrapper:8000/strato/v2.3" :: String) "The Vault-Wrapper URL"
-defineFlag "isAdmin" (False :: Bool) "Whether to initialize PBFT with this node as admin and validator. Set this True when you are starting a single node, or the first node in a network"
 
 
 flags :: Vector (T.Text, T.Text) Counter
@@ -62,7 +63,9 @@ exportFlagsAsMetrics = do
   set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
   set "blockstanbul_port" $ show flags_blockstanbul_port
   set "blockstanbul_admins" flags_blockstanbul_admins
-  set "is_admin" $ show flags_isAdmin
+  set "isAdmin" $ show flags_isAdmin
+  set "isRootNode" $ show flags_isRootNode
+  set "vaultWrapperUrl" $ flags_vaultWrapperUrl
   set "seq_debug_mode" $ show flags_seq_debug_mode
   set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter
   set "seq_max_us_per_iter" $ show flags_seq_max_us_per_iter
