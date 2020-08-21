@@ -11,6 +11,7 @@ description:
     The modified Merkle Patricia DB described in the Ethereum Yellowpaper
 
 dependencies:
+  - aeson
   - base
   - ethereum-rlp
   - leveldb-haskell

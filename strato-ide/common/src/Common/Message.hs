@@ -5,9 +5,11 @@
 module Common.Message where
 
 import           Blockchain.Data.ExecResults
+import qualified Blockchain.Database.MerklePatricia as MP
 import           Data.Aeson (ToJSON, FromJSON, toEncoding, parseJSON,
                             defaultOptions, Options,
                             genericToEncoding, genericParseJSON)
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import           GHC.Generics (Generic)
 import           Text.Parsec
@@ -42,6 +44,7 @@ data SolidVMCallArgs = CallArgs
 data C2S = C2Scompile T.Text
          | C2Screate SolidVMCreateArgs
          | C2Scall SolidVMCallArgs
+         | C2SgetMP
          deriving (Eq,Show, Generic)
 
 options :: Options
@@ -50,6 +53,7 @@ options = defaultOptions -- { tagSingleConstructors = True }
 data S2C = S2CcompileResult (Either [Ann] T.Text)
          | S2CcreateResult (Either T.Text ExecResults)
          | S2CcallResult (Either T.Text ExecResults)
+         | S2CMP MP.StateRoot (M.Map MP.StateRoot MP.NodeData)
          deriving (Eq,Show, Generic)
 
 instance ToJSON Ann where toEncoding = genericToEncoding options

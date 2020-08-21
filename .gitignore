@@ -10,4 +10,5 @@ blockapps-haskell/*.cabal
 core-strato/*.cabal
 shared-util/*.cabal
 monad-alter/*.cabal
+strato-ide/ghcid-output.txt
 *~

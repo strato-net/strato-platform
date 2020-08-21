@@ -1,5 +1,0 @@
-frontend/src/Frontend/Nav.hs:11:1: warning: [-Wunused-imports]
-    The import of ‘Obelisk.Generated.Static’ is redundant
-   |
-11 | import Obelisk.Generated.Static
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

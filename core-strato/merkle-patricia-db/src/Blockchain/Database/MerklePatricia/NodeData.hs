@@ -1,4 +1,6 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Database.MerklePatricia.NodeData (
   Key,
@@ -8,12 +10,14 @@ module Blockchain.Database.MerklePatricia.NodeData (
   emptyRef
   ) where
 
+import qualified Data.Aeson                                   as Aeson
 import           Data.Bits
 import qualified Data.ByteString                              as B
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as BC
 import           Data.ByteString.Internal
 import qualified Data.NibbleString                            as N
+import           GHC.Generics
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
@@ -23,6 +27,15 @@ import           Text.Format
 
 -------------------------
 
+instance Aeson.ToJSON N.NibbleString where
+  toJSON = Aeson.toJSON . N.unpack
+
+instance Aeson.FromJSON N.NibbleString where
+  parseJSON = fmap N.pack . Aeson.parseJSON
+
+instance Aeson.ToJSON RLPObject
+instance Aeson.FromJSON RLPObject
+
 -- | The type of the database key
 type Key = N.NibbleString
 
@@ -31,7 +44,10 @@ type Val = RLPObject
 
 -------------------------
 
-data NodeRef = SmallRef B.ByteString | PtrRef StateRoot deriving (Show, Eq)
+data NodeRef = SmallRef B.ByteString | PtrRef StateRoot deriving (Show, Eq, Generic)
+
+instance Aeson.ToJSON NodeRef
+instance Aeson.FromJSON NodeRef
 
 emptyRef::NodeRef
 emptyRef = SmallRef $ B.pack [0x80]
@@ -53,7 +69,10 @@ data NodeData = EmptyNodeData
                   nextNibbleString :: Key,
                   nextVal          :: Either NodeRef Val
                 }
-              deriving (Show, Eq)
+              deriving (Show, Eq, Generic)
+
+instance Aeson.ToJSON NodeData
+instance Aeson.FromJSON NodeData
 
 formatVal::Maybe RLPObject->Doc
 formatVal Nothing  = red $ text "NULL"

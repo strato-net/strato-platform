@@ -47,6 +47,8 @@ instance NFData StateRoot
 
 instance FromJSON StateRoot
 instance ToJSON StateRoot
+instance FromJSONKey StateRoot
+instance ToJSONKey StateRoot
 
 instance Binary StateRoot where
   put (StateRoot x) = sequence_ $ put <$> B.unpack x

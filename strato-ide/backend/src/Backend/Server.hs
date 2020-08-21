@@ -2,18 +2,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Backend.Server where
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.DB.StorageDB
+import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.Output
 import           Blockchain.SolidVM
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext
+import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad      (forever, void)
 import           Data.Aeson         (encode, decode)
@@ -39,6 +43,7 @@ application :: WS.ServerApp
 application pending = do
   conn <- WS.acceptRequest pending
   WS.forkPingThread conn 30
+  addrRef <- newIORef (0x100 :: Integer)
   void . runLoggingTWithLevel LevelDebug . runMemContextM . forever $ do
     msgbs <- liftIO $ WS.receiveData conn
     let msgC = decode $ WS.toLazyByteString (msgbs :: B.ByteString) :: Maybe C2S
@@ -51,7 +56,8 @@ application pending = do
       Just (C2Screate CreateArgs{..}) -> do
         liftIO $ T.putStrLn $ "Creating contract: " <> createName
         liftIO $ T.putStrLn $ "Create args: " <> createArgs
-        eExecResults <- UnliftIO.try $ createSolidVM createName createArgs createCode
+        addr <- atomicModifyIORef addrRef $ \i -> (i+1, i)
+        eExecResults <- UnliftIO.try $ createSolidVM addr createName createArgs createCode
         let er = case eExecResults of
                    Left (e :: SomeException) -> Left . T.pack $ show e
                    Right e -> Right e
@@ -63,6 +69,15 @@ application pending = do
                    Left (e :: SomeException) -> Left . T.pack $ show e
                    Right e -> Right e
         liftIO $ WS.sendTextData conn . toStrict . encode $ S2CcallResult er
+      Just C2SgetMP -> do
+        liftIO $ T.putStrLn "Getting MP"
+        flushMemStorageDB
+        flushMemAddressStateDB
+        sr <- Mod.get (Mod.Proxy @MP.StateRoot)
+        states <- memContextGets _memStateDB
+        liftIO . T.putStrLn $ "There are " <> T.pack (show $ M.size states) <> " entries in the state DB"
+        liftIO $ WS.sendTextData conn . toStrict . encode $ S2CMP sr states
+
 
 timeZero :: UTCTime
 timeZero = posixSecondsToUTCTime 0
@@ -84,8 +99,8 @@ emptyBlockData = BlockData (unsafeCreateKeccak256FromWord256 0)
                            0
                            (unsafeCreateKeccak256FromWord256 0)
 
-createSolidVM :: SolidVMBase m => T.Text -> T.Text -> T.Text -> m ExecResults
-createSolidVM contractName contractArgs contractCode = do
+createSolidVM :: SolidVMBase m => Integer -> T.Text -> T.Text -> T.Text -> m ExecResults
+createSolidVM addr contractName contractArgs contractCode = do
   create (error "isRunningTests")
          (error "isHomestead")
          (error "preExistingSuicideList")
@@ -96,7 +111,7 @@ createSolidVM contractName contractArgs contractCode = do
          (error "value")
          (error "gasPrice")
          (error "availableGas")
-         (Address 0xdeadbeef)
+         (Address $ fromInteger addr)
          (Code $ encodeUtf8 contractCode)
          (unsafeCreateKeccak256FromWord256 0)
          Nothing
