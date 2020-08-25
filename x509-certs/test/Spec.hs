@@ -7,7 +7,6 @@ import qualified Crypto.Secp256k1       as S
 import           Data.Coerce
 import           Data.Maybe
 
-import           Data.X509
 import           Data.X509.Validation
 
 import           Test.Hspec
