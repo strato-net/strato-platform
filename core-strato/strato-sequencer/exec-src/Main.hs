@@ -38,7 +38,6 @@ import           Flags
 
 
 
--- TODO: maybe this should be a generic util function somewhere else
 waitOnVault :: (Show a) => IO (Either a b) -> IO b
 waitOnVault action = do
   putStrLn "asking vault-wrapper for the node address"
@@ -100,10 +99,14 @@ main = do
                  if flags_isRootNode then do
                    unless (length validators' == 0) . putStrLn
                       $ "WARNING: You have given me a validators list and you are telling me that this node \
-                        \ is the root node. I'll append this node's address to the validator list \
+                        \ is the root node. I'll add this node's address to the validator list \
                         \ you gave me, but this is likely a configuration error on your part."
                    return $ selfAddress : validators'
-                 else
+                 else do
+                   when (length validators' == 0) . putStrLn
+                      $ "WARNING: You have given me an empty validators list, but this node is not the root \
+                        \ node. This is a configuration error on your part. \
+                        \ PBFT will almost certainly not function properly."
                    return validators'
                 
                authSenders <-
@@ -113,8 +116,8 @@ main = do
                    when (length authSenders' == 0) . putStrLn
                        $ "WARNING: You haven't given me any blockstanbulAdmins. If you are starting \
                        \ a single node, this is OK. But, if you are starting a network or adding a \
-                       \ validator node to a network, be warned - this node will not accept any votes for new \
-                       \ validators, as it has no authorized senders"
+                       \ validator node to a network, be warned - this node will not accept any votes \
+                       \ to add or remove validators, as it has no authorized senders."
                    return authSenders'
 
                unless (selfAddress `elem` validators) . putStrLn
