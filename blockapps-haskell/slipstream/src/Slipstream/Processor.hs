@@ -2,23 +2,32 @@
       DataKinds
     , DeriveGeneric
     , FlexibleContexts
+    , FlexibleInstances
     , GeneralizedNewtypeDeriving
+    , LambdaCase
+    , MultiParamTypeClasses
     , OverloadedStrings
     , QuasiQuotes
     , RecordWildCards
     , ScopedTypeVariables
     , TemplateHaskell
     , TupleSections
+    , TypeApplications
+    , TypeOperators
 #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Slipstream.Processor
   ( processTheMessages
   , parseActions -- For testing
   ) where
 
-import Control.Arrow ((&&&))
+import Conduit
+import Control.Arrow ((&&&), (***))
 import Control.Applicative
-import Control.Monad.Except
+import qualified Control.Monad.Change.Alter as A
+import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State.Strict hiding (state)
 import Control.Monad.Trans.Class (lift)
@@ -39,6 +48,7 @@ import Data.IORef
 import Data.List (foldl', sortOn)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
+import Data.Map (Map)
 import Data.Monoid ((<>))
 import Data.Maybe
 import Data.Ord (Down(..))
@@ -66,7 +76,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
-
 
 import Slipstream.Data.Action
 import Slipstream.Events
@@ -196,11 +205,12 @@ processedContract ABIID{..} state AggregateAction{..} =
     , functionCallData = Nothing
     }
 
-makeFunctionInserts :: Xabi
+makeFunctionInserts :: MonadIO m
+                    => Xabi
                     -> ABIID
                     -> Map.Map Text Value
                     -> AggregateAction
-                    -> Bloc [ProcessedContract]
+                    -> m [ProcessedContract]
 makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
   forM actionCallData $ \CallData{..} -> do
     let ibytes = SB.fromShort $ _callDataInput
@@ -239,19 +249,24 @@ lookupT k = MaybeT . return . Map.lookup k
 -- Tries to get contract metadata ID and contract details for a given contract.
 --  If they're not in the cache but they are in bloc database or action metadata,
 --  it reparses the whole source blob, and caches the details for every contract
-getSolidVMDetailsForRow :: IORef Globals -> AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
-getSolidVMDetailsForRow g row = runMaybeT  
+getSolidVMDetailsForRow :: ( MonadLogger m
+                           , Mod.Modifiable Globals m
+                           , A.Selectable CodePtr (Int32, ContractDetails) m
+                           , A.Selectable (Should Compile, Text) (Map Text (Int32, ContractDetails)) m
+                           )
+                        => AggregateAction -> m (Maybe (Int32, ContractDetails))
+getSolidVMDetailsForRow row = runMaybeT  
    $  checkCache 
   <|> checkBloc 
   <|> checkMetadata
   
   where checkCache = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking cache for contract details"
-          (MaybeT $ getContractABIs g codePtr) >>= (lookupT $ T.pack name)
+          (MaybeT $ getContractABIs codePtr) >>= (lookupT $ T.pack name)
         
         checkBloc = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
-          (MaybeT $ getContractDetailsByCodeHash codePtr) >>= (parseAndSet . contractdetailsSrc . snd)
+          (MaybeT $ A.select (A.Proxy @(Int32, ContractDetails)) codePtr) >>= (parseAndSet . contractdetailsSrc . snd)
         
         checkMetadata = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
@@ -259,10 +274,13 @@ getSolidVMDetailsForRow g row = runMaybeT
         
 
         -- parse source code, add all of details to cache, return the one we need
-        parseAndSet :: Text -> MaybeT Bloc (Int32, ContractDetails)
+        parseAndSet :: ( Mod.Modifiable Globals m
+                       , A.Selectable (Should Compile, Text) (Map Text (Int32, ContractDetails)) m
+                       )
+                    => Text -> MaybeT m (Int32, ContractDetails)
         parseAndSet src = do
-          detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
-          setContractABIs g codePtr detailsMap
+          detailsMap <- lift $ A.selectWithMempty A.Proxy ((Don't Compile), src)
+          lift $ setContractABIs codePtr detailsMap
           lookupT (T.pack name) detailsMap
           
         codePtr@(SolidVMCode name _) = actionCodeHash row
@@ -270,25 +288,31 @@ getSolidVMDetailsForRow g row = runMaybeT
 
 
 -- For now, EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
-getEVMDetailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
+getEVMDetailsForRow :: ( A.Selectable CodePtr (Int32, ContractDetails) m
+                       , A.Selectable (Should Compile, Text) (Map Text (Int32, ContractDetails)) m
+                       )
+                    => AggregateAction -> m (Maybe (Int32, ContractDetails))
 getEVMDetailsForRow row = liftM2 (<|>)
-  (getContractDetailsByCodeHash $ actionCodeHash row)
+  (A.select (A.Proxy @(Int32, ContractDetails)) $ actionCodeHash row)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
     name <- lookupT "name" md
-    detailsMap <- lift $ sourceToContractDetails (Do Compile) src
+    detailsMap <- lift $ A.selectWithMempty (A.Proxy @(Map Text (Int32, ContractDetails))) (Do Compile, src)
     lookupT name detailsMap)
 
 
 
 -- we want adjustGlobals to use cache and not recompile where possible, so we need the cache to link all contracts that share a source, and at the moment, we can only do this with SolidVMCode pointers
-adjustGlobals :: IORef Globals
-              -> Should Compile
+adjustGlobals :: ( MonadLogger m
+                 , Mod.Modifiable Globals m
+                 , A.Selectable (Should Compile, Text) (Map Text (Int32, ContractDetails)) m
+                 )
+              => Should Compile
               -> AggregateAction
               -> ContractDetails
-              -> Bloc ()
-adjustGlobals gref shouldCompile row details = do
+              -> m ()
+adjustGlobals shouldCompile row details = do
   let go m (k,f) = runMaybeT $ do
         v <- lookupT k $ actionMetadata row
         let contracts = filter (not . T.null) $ T.splitOn "," v
@@ -296,15 +320,13 @@ adjustGlobals gref shouldCompile row details = do
           (_, details') <- lookupT c m
           let codePtr = contractdetailsCodeHash details'
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
-          lift $ f gref codePtr
-
- 
+          lift $ f codePtr
 
   -- if we pass Don't Compile, we assume it's SolidVMCode, and use details from cache
   detailsMap <- case shouldCompile of
-    Do Compile -> sourceToContractDetails shouldCompile $ contractdetailsSrc details
+    Do Compile -> A.selectWithMempty A.Proxy (shouldCompile, contractdetailsSrc details)
     Don't Compile -> do 
-      mMap <- getContractABIs gref (actionCodeHash row)
+      mMap <- getContractABIs (actionCodeHash row)
       case mMap of
         Nothing -> error "solidVMABIs should be in the cache, but adjustGlobals didn't find them"
         Just dMap -> return dMap
@@ -318,40 +340,50 @@ adjustGlobals gref shouldCompile row details = do
                           ,("nofunctionhistory", removeFromFunctionHistoryList)
                           ]
 
-ensureContractInstance :: IORef Globals -> Int32 -> AggregateAction -> Bloc ()
-ensureContractInstance g cmId row = do
+ensureContractInstance :: ( Mod.Modifiable Globals m
+                          , A.Replaceable (Address, Maybe ChainId) Int32 m
+                          )
+                       => Int32 -> AggregateAction -> m ()
+ensureContractInstance cmId row = do
   let addr = actionAddress row
       chainId = actionTxChainId row
       codePtr = actionCodeHash row
-  instExists <- isInstanceCreated g codePtr
+  instExists <- isInstanceCreated codePtr
   if instExists then
     return ()
   else
-    insertContractInstance cmId addr chainId >> setInstanceCreated g codePtr
+    A.replace A.Proxy (addr, chainId) cmId >> setInstanceCreated codePtr
 
-readPreviousEVMState :: IORef Globals -> Address -> Maybe ChainId -> Contract -> Bloc [(Text, Value)]
-readPreviousEVMState gref addr chainId cont = do
+readPreviousEVMState :: (MonadIO m, Mod.Modifiable Globals m) => Address -> Maybe ChainId -> Contract -> m [(Text, Value)]
+readPreviousEVMState addr chainId cont = do
   let default' = SVR.decodeValues 0 (typeDefs cont) (mainStruct cont) (const 0) 0
-  fromMaybe default' <$> getContractState gref addr chainId
+  fromMaybe default' <$> getContractState addr chainId
 
-readPreviousSolidVMState :: IORef Globals -> Address -> Maybe ChainId -> Bloc [(Text, Value)]
-readPreviousSolidVMState gref addr chainId = fromMaybe [] <$> getContractState gref addr chainId
+readPreviousSolidVMState :: (MonadIO m, Mod.Modifiable Globals m) => Address -> Maybe ChainId -> m [(Text, Value)]
+readPreviousSolidVMState addr chainId = fromMaybe [] <$> getContractState addr chainId
 
 
-rowToInsert :: IORef Globals -> ABIID -> AggregateAction -> Contract -> [(Text, Value)]
-            -> Bloc ProcessedContract
-rowToInsert gref abiid row cont oldState = do
+rowToInsert :: ( MonadIO m
+               , Mod.Modifiable Globals m
+               )
+            => ABIID -> AggregateAction -> Contract -> [(Text, Value)]
+            -> m ProcessedContract
+rowToInsert abiid row cont oldState = do
   let newState = case actionStorage row of
                     BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
                     BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
-  setContractState gref (actionAddress row) (actionTxChainId row) newState
+  setContractState (actionAddress row) (actionTxChainId row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-rowToHistories :: IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> Contract
+rowToHistories :: ( MonadLogger m
+                  , MonadIO m
+                  , Mod.Modifiable Globals m
+                  )
+               => ABIID -> AggregateAction -> [AggregateAction] -> Contract
                -> ContractDetails -> [(Text, Value)]
-               -> Bloc ([ProcessedContract], [ProcessedContract])
-rowToHistories gref abiid row actions cont details oldState = do
-  hist <- isHistoric gref $ actionCodeHash row
+               -> m ([ProcessedContract], [ProcessedContract])
+rowToHistories abiid row actions cont details oldState = do
+  hist <- isHistoric $ actionCodeHash row
   second join . unzip <$> if not hist
     then pure []
     else flip evalStateT oldState . forM actions $ \hRow -> do
@@ -360,7 +392,7 @@ rowToHistories gref abiid row actions cont details oldState = do
                   BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp
       newMap <- gets Map.fromList
       let hInsert = processedContract abiid newMap hRow
-      functionHist <- isFunctionHistoric gref $ actionCodeHash hRow
+      functionHist <- lift . isFunctionHistoric $ actionCodeHash hRow
       fInserts <- if not functionHist
                     then pure []
                     else lift $ makeFunctionInserts
@@ -373,10 +405,10 @@ rowToHistories gref abiid row actions cont details oldState = do
 
 -- Parses xabi event declarations to create a table,
 -- ignoring indexes and anonymous flag
-createEvents :: ContractDetails -> Bloc [EventTable]
-createEvents details = do
+createEvents :: ContractDetails -> [EventTable]
+createEvents details =
   let events = xabiEvents $ contractdetailsXabi details
-  return $ map makeEvent $ Map.toList events
+   in map makeEvent $ Map.toList events
   where
     makeEvent :: (Text, Event) -> EventTable 
     makeEvent (name, event) = 
@@ -392,22 +424,37 @@ createEvents details = do
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
-parseActions :: [B.ByteString] -> [((Address, Maybe ChainId), [AggregateAction])]
-parseActions = sortOn withSourceFirst
-             . splitActions
-             . filter matters
-             . concatMap (flatten . toAction . BL.fromStrict)
+aggregate :: [Action] -> ([AggregateEvent], [((Address, Maybe ChainId), [AggregateAction])])
+aggregate = fmap ( sortOn withSourceFirst
+                 . splitActions
+                 . filter matters
+                 )
+          . (concat *** concat)
+          . unzip
+          . map (squash &&& flatten)
 
-parseEvents :: [B.ByteString] -> [AggregateEvent]
-parseEvents = concatMap (squash . toAction . BL.fromStrict)
+parseActionFromJSON :: B.ByteString -> Action
+parseActionFromJSON = toAction . BL.fromStrict
+
+-- only here for tests
+parseActions :: [B.ByteString] -> [((Address, Maybe ChainId), [AggregateAction])]
+parseActions = snd . aggregate . map parseActionFromJSON
+
+instance MonadIO m => Mod.Modifiable Globals (ReaderT (IORef Globals) m) where
+  get _ = liftIO . readIORef =<< ask
+  put _ g = ask >>= liftIO . flip writeIORef g
+
+instance (A.Selectable CodePtr (Int32, ContractDetails)) (ReaderT (IORef Globals) Bloc) where
+  select _ = lift . getContractDetailsByCodeHash
+
+instance (A.Selectable (Should Compile, Text) (Map Text (Int32, ContractDetails))) (ReaderT (IORef Globals) Bloc) where
+  select _ = fmap Just . lift . uncurry sourceToContractDetails
+
+instance (A.Replaceable (Address, Maybe ChainId) Int32) (ReaderT (IORef Globals) Bloc) where
+  replace _ (addr, chainId) cmId = void . lift $ insertContractInstance cmId addr chainId
 
 processTheMessages :: BlocEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> LoggingT IO ()
 processTheMessages env conn g messages = do
-
-  let changes = parseActions messages
-      events = parseEvents messages
-      -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      
 
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
@@ -417,57 +464,24 @@ processTheMessages env conn g messages = do
    1 -> $logInfoS "processTheMessages" "1 message has arrived"
    n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
 
-  inserts <- enterBloc2 env $ do
-    forM changes $ \((addr,chainId),actions) -> do
-      let row = combineActions actions
-      mapM_ recordAction actions
-      recordCombinedAction row
-      $logInfoS "processTheMessages" $ formatAction row
-      $logDebugLS "the diff is " $ actionStorage row
+  let actions = parseActionFromJSON <$> messages
 
-      case actionStorage row of
-        BS.ActionEVMDiff{} -> do
-          mDetails <- getEVMDetailsForRow row
-          case mDetails of
-            Nothing -> pure . Left $ "No details found for code hash "
-                            <> (T.pack . show $ actionCodeHash row)
-                            <> " and no 'src' field found in actionMetadata"
-            Just (cmId, details) -> do
-              let abiid = ABIID
-                    { aiAbi = xabiToText $ contractdetailsXabi details
-                    , aiName = T.filter (/= '"') $ contractdetailsName details
-                    , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
-                    }
-                  cont = either error id . xAbiToContract $ contractdetailsXabi details
-              adjustGlobals g (Do Compile) row details
+  enterBloc2 env . flip runReaderT g $ processActions (outputData conn) actions
 
-              ensureContractInstance g cmId row
-
-              oldState <- readPreviousEVMState g addr chainId cont
-              indexContract <- rowToInsert g abiid row cont oldState
-              (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              pure . Right $ BatchedInserts indexContract hs fhs []
-        BS.ActionSolidVMDiff{} -> do
-          mName <- getSolidVMDetailsForRow g row
-          case mName of
-            Nothing -> pure . Left $ "No SolidVM details for code hash "
-                            <> (T.pack . show $ actionCodeHash row)
-                            <> " and no 'src' field found in metadata"
-            Just (cmId, details) -> do
-              let abi = xabiToText $ contractdetailsXabi details
-                  name = T.filter (/= '"') $ contractdetailsName details
-                  abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
-                  cont = error "internal error: contract should be unused for solidvm"
-
-              ensureContractInstance g cmId row
-          
-              adjustGlobals g (Don't Compile) row details
-              oldState <- readPreviousSolidVMState g addr chainId
-              indexContract <- rowToInsert g abiid row cont oldState
-              (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              eventTables <- createEvents details
-              pure . Right $ BatchedInserts indexContract hs fhs eventTables
-
+processActions :: ( MonadLogger m
+                  , MonadIO m
+                  , MonadUnliftIO m
+                  , Mod.Modifiable Globals m
+                  , A.Selectable CodePtr (Int32, ContractDetails) m
+                  , A.Selectable (Should Compile, Text) (Map Text (Int32, ContractDetails)) m
+                  , A.Replaceable (Address, Maybe ChainId) Int32 m
+                  )
+               => (ConduitM () Text m () -> m ())
+               -> [Action]
+               -> m ()
+processActions output actions = do
+  let ~(aggEvents, aggActions) = aggregate actions
+  inserts <- forM aggActions $ \((a,b),c) -> processAggregateAction a b c
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -478,13 +492,74 @@ processTheMessages env conn g messages = do
                         $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn . createInsertIndexTable g $ map indexInsert ins
-    outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
-    outputData conn . createInsertFunctionHistoryTable g $ concatMap functionInserts ins
+    output . createInsertIndexTable $ map indexInsert ins
+    output . createInsertHistoryTable $ concatMap historyInserts ins
+    output . createInsertFunctionHistoryTable $ concatMap functionInserts ins
     when (length (concatMap eventCreations ins) > 0) $
-      outputData conn . createEventTables g $ concatMap eventCreations ins
+      output . createEventTables $ concatMap eventCreations ins
   
-  when (length events > 0) $ 
-    outputData conn $ insertEventTables g events
-  flushPendingWrites g
+  when (length aggEvents > 0) $ 
+    output $ insertEventTables aggEvents
+  flushPendingWrites
   
+processAggregateAction
+  :: ( MonadLogger m
+     , MonadIO m
+     , Mod.Modifiable Globals m
+     , A.Selectable CodePtr (Int32, ContractDetails) m
+     , A.Selectable (Should Compile, Text) (Map Text (Int32, ContractDetails)) m
+     , A.Replaceable (Address, Maybe ChainId) Int32 m
+     )
+  => Address
+  -> Maybe ChainId 
+  -> [AggregateAction] 
+  -> m (Either Text BatchedInserts)
+processAggregateAction addr chainId actions = do
+  let row = combineActions actions
+  mapM_ recordAction actions
+  recordCombinedAction row
+  $logInfoS "processTheMessages" $ formatAction row
+  $logDebugLS "the diff is " $ actionStorage row
+
+  case actionStorage row of
+    BS.ActionEVMDiff{} -> do
+      mDetails <- getEVMDetailsForRow row
+      case mDetails of
+        Nothing -> pure . Left $ "No details found for code hash "
+                        <> (T.pack . show $ actionCodeHash row)
+                        <> " and no 'src' field found in actionMetadata"
+        Just (cmId, details) -> do
+          let abiid = ABIID
+                { aiAbi = xabiToText $ contractdetailsXabi details
+                , aiName = T.filter (/= '"') $ contractdetailsName details
+                , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
+                }
+              cont = either error id . xAbiToContract $ contractdetailsXabi details
+          adjustGlobals (Do Compile) row details
+
+          ensureContractInstance cmId row
+
+          oldState <- readPreviousEVMState addr chainId cont
+          indexContract <- rowToInsert abiid row cont oldState
+          (hs, fhs) <- rowToHistories abiid row actions cont details oldState
+          pure . Right $ BatchedInserts indexContract hs fhs []
+    BS.ActionSolidVMDiff{} -> do
+      mName <- getSolidVMDetailsForRow row
+      case mName of
+        Nothing -> pure . Left $ "No SolidVM details for code hash "
+                        <> (T.pack . show $ actionCodeHash row)
+                        <> " and no 'src' field found in metadata"
+        Just (cmId, details) -> do
+          let abi = xabiToText $ contractdetailsXabi details
+              name = T.filter (/= '"') $ contractdetailsName details
+              abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
+              cont = error "internal error: contract should be unused for solidvm"
+
+          ensureContractInstance cmId row
+      
+          adjustGlobals (Don't Compile) row details
+          oldState <- readPreviousSolidVMState addr chainId
+          indexContract <- rowToInsert abiid row cont oldState
+          (hs, fhs) <- rowToHistories abiid row actions cont details oldState
+          let eventTables = createEvents details
+          pure . Right $ BatchedInserts indexContract hs fhs eventTables

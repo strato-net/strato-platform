@@ -32,6 +32,7 @@ import qualified Data.Text.IO       as T
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import qualified Network.WebSockets as WS
+import           Slipstream.Processor
 import           SolidVM.Solidity.Parse.File (parseSolidity)
 import UnliftIO
 

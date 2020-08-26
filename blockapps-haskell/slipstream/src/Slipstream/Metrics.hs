@@ -73,12 +73,12 @@ recordGlobals :: MonadIO m => Globals -> m ()
 recordGlobals g = liftIO $ do
   let rec  :: T.Text -> (Globals -> Int) -> IO ()
       rec lab acc = withLabel globalsSize lab (flip setGauge . fromIntegral . acc $ g)
-  rec "created_contracts" (S.size . createdContracts)
-  rec "history_list" (S.size . historyList)
-  rec "function_history_list" (S.size . functionHistoryList)
-  rec "no_index_list" (S.size . noIndexList)
-  rec "contract_abis" (HM.size . contractABIs)
-  rec "contract_states" (LRU.size . contractStates)
+  rec "created_contracts" (S.size . _createdContracts)
+  rec "history_list" (S.size . _historyList)
+  rec "function_history_list" (S.size . _functionHistoryList)
+  rec "no_index_list" (S.size . _noIndexList)
+  rec "contract_abis" (HM.size . _contractABIs)
+  rec "contract_states" (LRU.size . _contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length

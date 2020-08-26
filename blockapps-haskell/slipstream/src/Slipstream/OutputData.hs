@@ -1,17 +1,23 @@
 {-# LANGUAGE
     ConstraintKinds
   , FlexibleContexts
+  , FlexibleInstances
+  , MultiParamTypeClasses
   , OverloadedStrings
   , QuasiQuotes
   , RecordWildCards
   , TemplateHaskell
+  , TypeApplications
+  , TypeSynonymInstances
 #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Slipstream.OutputData where
 
 import           BlockApps.Solidity.Value
 import           Conduit
 import           Control.Monad
+import           Control.Monad.Change.Modify     hiding (yield, yieldMany)
 import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
@@ -27,7 +33,6 @@ import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
 import           Text.RawString.QQ
-import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
@@ -41,7 +46,11 @@ import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.SolidityValue
 
-type OutputM m = (MonadUnliftIO m, MonadLogger m)
+type OutputM m = (MonadUnliftIO m, MonadLogger m, Modifiable Globals m)
+
+instance Modifiable s m => Modifiable s (ConduitM i o m) where
+  get = lift . get
+  put p = lift . put p
 
 tshow :: Show a => a -> Text
 tshow = T.pack . show
@@ -151,44 +160,40 @@ baseTableColumns :: [Text]
 baseTableColumns = baseColumns ++ ["transaction_function_name"]
 
 createInserts :: OutputM m
-              => IORef Globals
-              -> [ProcessedContract]
+              => [ProcessedContract]
               -> ConduitM () Text m ()
-createInserts globalsIORef contracts = do
+createInserts contracts = do
   unless (null contracts) $ do
     let contract = head contracts
-    createIndexTable globalsIORef contract
-    createHistoryTable globalsIORef contract
-    insertIndexTable globalsIORef contracts
-    insertHistoryTable globalsIORef contracts
+    createIndexTable contract
+    createHistoryTable contract
+    insertIndexTable contracts
+    insertHistoryTable contracts
 
 createInsertIndexTable
   :: OutputM m
-  => IORef Globals
-  -> [ProcessedContract]
+  => [ProcessedContract]
   -> ConduitM () Text m ()
-createInsertIndexTable g cs = do
+createInsertIndexTable cs = do
   unless (null cs) $ do
     let c = head cs
-    createIndexTable g c
-    insertIndexTable g cs
+    createIndexTable c
+    insertIndexTable cs
 
 createInsertHistoryTable
   :: OutputM m
-  => IORef Globals
-  -> [ProcessedContract]
+  => [ProcessedContract]
   -> ConduitM () Text m ()
-createInsertHistoryTable g cs = do
+createInsertHistoryTable cs = do
   unless (null cs) $ do
     let c = head cs
-    createHistoryTable g c
-    insertHistoryTable g cs
+    createHistoryTable c
+    insertHistoryTable cs
 
 createInsertFunctionHistoryTable
-  :: IORef Globals
-  -> [ProcessedContract]
+  :: [ProcessedContract]
   -> ConduitM () Text m ()
-createInsertFunctionHistoryTable _ cs = do
+createInsertFunctionHistoryTable cs = do
   unless (null cs) $ do
     -- TODO: implement function history
     -- let c = head cs
@@ -197,13 +202,12 @@ createInsertFunctionHistoryTable _ cs = do
     pure ()
 
 createIndexTable :: OutputM m
-                 => IORef Globals
-                 -> ProcessedContract
+                 => ProcessedContract
                  -> ConduitM () Text m ()
-createIndexTable globalsIORef contract = do
-  globals <- readIORef globalsIORef
+createIndexTable contract = do
+  globals <- get (Proxy @Globals)
   let hashVal = codehash contract
-      contractAlreadyCreated = hashVal `Set.member` createdContracts globals
+      contractAlreadyCreated = hashVal `Set.member` _createdContracts globals
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
   $logDebugLS "createIndexTable/contractAlreadyCreated" (hashVal, contractAlreadyCreated)
@@ -211,15 +215,14 @@ createIndexTable globalsIORef contract = do
     incNumTables
     yield $ insertContractTableQuery contract
     yield $ createIndexTableQuery contract
-    setContractCreated globalsIORef hashVal
+    setContractCreated hashVal
 
 createHistoryTable :: OutputM m
-                   => IORef Globals
-                   -> ProcessedContract
+                   => ProcessedContract
                    -> ConduitM () Text m ()
-createHistoryTable globalsIORef contract = do
+createHistoryTable contract = do
   let hashVal = codehash contract
-  history <- isHistoric globalsIORef hashVal
+  history <- isHistoric hashVal
   when history $ do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract
@@ -227,23 +230,21 @@ createHistoryTable globalsIORef contract = do
 
       
 insertIndexTable :: OutputM m
-                 => IORef Globals
-                 -> [ProcessedContract]
+                 => [ProcessedContract]
                  -> ConduitM () Text m ()
-insertIndexTable _ [] = error "insertIndexTable: unhandled empty list"
-insertIndexTable globalsIORef contracts@(x:_) = do
+insertIndexTable [] = error "insertIndexTable: unhandled empty list"
+insertIndexTable contracts@(x:_) = do
   let hashVal = codehash x
-  index <- shouldIndex globalsIORef hashVal
+  index <- shouldIndex hashVal
   when index . yield $ insertIndexTableQuery contracts
 
 insertHistoryTable :: OutputM m
-                   => IORef Globals
-                   -> [ProcessedContract]
+                   => [ProcessedContract]
                    -> ConduitM () Text m ()
-insertHistoryTable _ [] = error "insertHistoryTable: unhandled empty list"
-insertHistoryTable globalsIORef contracts@(x:_) = do
+insertHistoryTable [] = error "insertHistoryTable: unhandled empty list"
+insertHistoryTable contracts@(x:_) = do
   let hashVal = codehash x
-  history <- isHistoric globalsIORef hashVal
+  history <- isHistoric hashVal
   when history . yield $ insertHistoryTableQuery contracts
 
 insertContractTableQuery :: ProcessedContract -> Text
@@ -374,24 +375,22 @@ insertHistoryTableQuery contracts@(x:_) =
 -- Creates tables for all event declarations, stores table name in
 -- globals{createdEvents}
 createEventTables :: OutputM m
-                  => IORef Globals
-                  -> [EventTable]
+                  => [EventTable]
                   -> ConduitM () Text m ()
-createEventTables globalsIORef events = do 
-  yieldMany . catMaybes =<< lift (mapM (createEventTable globalsIORef) events)
+createEventTables events = do 
+  yieldMany . catMaybes =<< lift (mapM createEventTable events)
    
 createEventTable :: OutputM m
-                 => IORef Globals
-                 -> EventTable
+                 => EventTable
                  -> m (Maybe Text)
-createEventTable globalsIORef ev = do
-  globals <- readIORef globalsIORef
+createEventTable ev = do
+  globals <- get (Proxy @Globals)
   let eventTuple = (eventContractName ev, eventName ev)
-      eventAlreadyCreated = eventTuple `Set.member` createdEvents globals
+      eventAlreadyCreated = eventTuple `Set.member` _createdEvents globals
   if eventAlreadyCreated then 
     return Nothing
   else do
-    setEventCreated globalsIORef eventTuple 
+    setEventCreated eventTuple 
     return (Just $ createEventTableQuery ev) 
 
 createEventTableQuery :: EventTable -> Text
@@ -407,20 +406,18 @@ createEventTableQuery ev =
 --   generating the insert query, the VM should prevent undeclared
 --   events from being emitted (it should also do an argument check)
 insertEventTables :: OutputM m
-                  => IORef Globals
-                  -> [AggregateEvent]
+                  => [AggregateEvent]
                   -> ConduitM () Text m ()
-insertEventTables globalsIORef events = do
-  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) events)
+insertEventTables events = do
+  yieldMany . catMaybes =<< lift (mapM insertEventTable events)
 
 insertEventTable :: OutputM m
-                 => IORef Globals
-                 -> AggregateEvent
+                 => AggregateEvent
                  -> m (Maybe Text)
-insertEventTable globalsIORef ev = do
-  globals <- readIORef globalsIORef
+insertEventTable ev = do
+  globals <- get (Proxy @Globals)
   let eventTuple = (agContractName ev, agEventName ev)
-      eventExists = eventTuple `Set.member` createdEvents globals
+      eventExists = eventTuple `Set.member` _createdEvents globals
   if eventExists then return (Just $ insertEventTableQuery ev)
   else return Nothing
 

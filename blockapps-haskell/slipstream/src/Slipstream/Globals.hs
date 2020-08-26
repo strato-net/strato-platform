@@ -1,9 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Slipstream.Globals
   ( module Slipstream.Globals
@@ -12,8 +14,9 @@ module Slipstream.Globals
 
 
 import           Control.DeepSeq
-
+import           Control.Lens
 import           Control.Monad
+import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
@@ -40,8 +43,8 @@ import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
-newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
+newGlobals :: Handle -> Globals
+newGlobals = Globals Set.empty Set.empty Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -54,128 +57,107 @@ xabiToText = T.replace "\'" "\'\'"
            . decodeUtf8 . BL.toStrict
            . JSON.encode
 
-setContractABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text (Int32, ContractDetails) -> m ()
-setContractABIs gref (SolidVMCode _ !codeHash) detailsMap = do 
-  globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{contractABIs=HM.insert codeHash detailsMap contractABIs}
-setContractABIs _ (EVMCode _) _ = error "cannot use the contractABIs cache for EVM contracts"
+setContractABIs :: Modifiable Globals m => CodePtr -> M.Map Text (Int32, ContractDetails) -> m ()
+setContractABIs (SolidVMCode _ !codeHash) detailsMap = modifyStatefully_ (Proxy @Globals) $
+  contractABIs %= HM.insert codeHash detailsMap
+setContractABIs (EVMCode _) _ = error "cannot use the contractABIs cache for EVM contracts"
 
 
-getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text (Int32, ContractDetails)))
-getContractABIs gref (SolidVMCode _ !codeHash) = do
-  abis <- contractABIs <$> readIORef gref
-  return $ HM.lookup codeHash abis
-getContractABIs _ (EVMCode _) = error "cannot use the contractABIs cache for EVM contracts"
+getContractABIs :: Modifiable Globals m => CodePtr -> m (Maybe (M.Map Text (Int32, ContractDetails)))
+getContractABIs (SolidVMCode _ !codeHash) = HM.lookup codeHash . _contractABIs <$> get (Proxy @Globals)
+getContractABIs (EVMCode _) = error "cannot use the contractABIs cache for EVM contracts"
 
-setContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
-setContractCreated globalsIORef codeHash = do
-  globals@Globals{..} <- readIORef globalsIORef
-  updateGlobals globalsIORef globals{createdContracts=Set.insert codeHash createdContracts}
+setContractCreated :: Modifiable Globals m => CodePtr -> m ()
+setContractCreated codeHash = modifyStatefully_ (Proxy @Globals) $
+  createdContracts %= Set.insert codeHash
 
-isContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m Bool
-isContractCreated globalsIORef codeHash = do
-  Globals{..} <- readIORef globalsIORef
-  return $ codeHash `Set.member` createdContracts
+isContractCreated :: Modifiable Globals m => CodePtr -> m Bool
+isContractCreated codeHash = Set.member codeHash . _createdContracts <$> get (Proxy @Globals)
 
 -- Hopefully temporary, just to remove extra calls to bloc in ensureContractInstance
-setInstanceCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
-setInstanceCreated globalsIORef codeHash = do
-  globals@Globals{..} <- readIORef globalsIORef
-  updateGlobals globalsIORef globals{createdInstances=Set.insert codeHash createdInstances}
+setInstanceCreated :: Modifiable Globals m => CodePtr -> m ()
+setInstanceCreated codeHash = modifyStatefully_ (Proxy @Globals) $
+  createdInstances %= Set.insert codeHash
 
-isInstanceCreated :: MonadIO m => IORef Globals -> CodePtr -> m Bool
-isInstanceCreated globalsIORef codeHash = do
-  Globals{..} <- readIORef globalsIORef
-  return $ codeHash `Set.member` createdInstances
+isInstanceCreated :: Modifiable Globals m => CodePtr -> m Bool
+isInstanceCreated codeHash = Set.member codeHash . _createdInstances <$> get (Proxy @Globals)
 
+setEventCreated :: Modifiable Globals m => (Text, Text) -> m ()
+setEventCreated evTup = modifyStatefully_ (Proxy @Globals) $
+  createdEvents %= Set.insert evTup
 
-setEventCreated :: MonadIO m => IORef Globals -> (Text, Text) -> m ()
-setEventCreated globalsIORef evTup = do
-  globals@Globals{..} <- readIORef globalsIORef
-  updateGlobals globalsIORef globals{createdEvents=Set.insert evTup createdEvents}
-
-isHistoric :: (MonadLogger m, MonadIO m) => IORef Globals -> CodePtr -> m Bool
-isHistoric globalsIORef name = do
-  Globals{..} <- readIORef globalsIORef
+isHistoric :: (MonadLogger m, Modifiable Globals m) => CodePtr -> m Bool
+isHistoric name = do
+  Globals{..} <- get (Proxy @Globals)
   $logInfoS "isHistoric" . T.pack $ "Checking history status of " ++ show name
-  $logInfoS "isHistoric" . T.pack $ "History list: " ++ show historyList
-  return $ name `Set.member` historyList
+  $logInfoS "isHistoric" . T.pack $ "History list: " ++ show _historyList
+  return $ name `Set.member` _historyList
 
-isFunctionHistoric :: MonadIO m => IORef Globals -> CodePtr -> m Bool
-isFunctionHistoric globalsIORef name = do
-  Globals{..} <- readIORef globalsIORef
-  return $ name `Set.member` functionHistoryList
+isFunctionHistoric :: Modifiable Globals m => CodePtr -> m Bool
+isFunctionHistoric name = Set.member name . _functionHistoryList <$> get (Proxy @Globals)
 
-getHistoryList :: MonadIO m => IORef Globals -> m (Set CodePtr)
-getHistoryList = fmap historyList . readIORef
+getHistoryList :: Modifiable Globals m => m (Set CodePtr)
+getHistoryList = _historyList <$> get (Proxy @Globals)
 
-getFunctionHistoryList :: MonadIO m => IORef Globals -> m (Set CodePtr)
-getFunctionHistoryList = fmap functionHistoryList . readIORef
+getFunctionHistoryList :: Modifiable Globals m => m (Set CodePtr)
+getFunctionHistoryList = _functionHistoryList <$> get (Proxy @Globals)
 
-addToHistoryList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-addToHistoryList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{historyList=Set.insert k historyList}
+addToHistoryList :: Modifiable Globals m => CodePtr -> m ()
+addToHistoryList k = modifyStatefully_ (Proxy @Globals) $
+  historyList %= Set.insert k
 
-removeFromHistoryList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-removeFromHistoryList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{historyList=Set.delete k historyList}
+removeFromHistoryList :: Modifiable Globals m => CodePtr -> m ()
+removeFromHistoryList k = modifyStatefully_ (Proxy @Globals) $
+  historyList %= Set.delete k
 
-shouldIndex :: MonadIO m => IORef Globals -> CodePtr -> m Bool
-shouldIndex globalsIORef name = do
-  Globals{..} <- readIORef globalsIORef
-  return . not $ name `Set.member` noIndexList
+shouldIndex :: Modifiable Globals m => CodePtr -> m Bool
+shouldIndex name = not . Set.member name . _noIndexList <$> get (Proxy @Globals)
 
-getNoIndexList :: MonadIO m => IORef Globals -> m (Set CodePtr)
-getNoIndexList = fmap noIndexList . readIORef
+getNoIndexList :: Modifiable Globals m => m (Set CodePtr)
+getNoIndexList = _noIndexList <$> get (Proxy @Globals)
 
-addToNoIndexList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-addToNoIndexList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{noIndexList=Set.insert k noIndexList}
+addToNoIndexList :: Modifiable Globals m => CodePtr -> m ()
+addToNoIndexList k = modifyStatefully_ (Proxy @Globals) $
+  noIndexList %= Set.insert k
 
-removeFromNoIndexList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-removeFromNoIndexList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{noIndexList=Set.delete k noIndexList}
+removeFromNoIndexList :: Modifiable Globals m => CodePtr -> m ()
+removeFromNoIndexList k = modifyStatefully_ (Proxy @Globals) $
+  noIndexList %= Set.delete k
 
-addToFunctionHistoryList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-addToFunctionHistoryList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{functionHistoryList=Set.insert k functionHistoryList}
+addToFunctionHistoryList :: Modifiable Globals m => CodePtr -> m ()
+addToFunctionHistoryList k = modifyStatefully_ (Proxy @Globals) $
+  functionHistoryList %= Set.insert k
 
-removeFromFunctionHistoryList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-removeFromFunctionHistoryList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{functionHistoryList=Set.delete k functionHistoryList}
+removeFromFunctionHistoryList :: Modifiable Globals m => CodePtr -> m ()
+removeFromFunctionHistoryList k = modifyStatefully_ (Proxy @Globals) $
+  functionHistoryList %= Set.delete k
 
-getContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> m (Maybe [(Text,Value)])
-getContractState globalsIORef address chainId = do
-  g@Globals{..} <- readIORef globalsIORef
-  case LRU.lookup (address, chainId) contractStates of
+getContractState :: (MonadIO m, Modifiable Globals m) => Address -> Maybe ChainId -> m (Maybe [(Text,Value)])
+getContractState address chainId = do
+  g@Globals{..} <- get (Proxy @Globals)
+  case LRU.lookup (address, chainId) _contractStates of
     (newCache, jv@Just{}) -> do
       recordCacheHit
-      writeIORef globalsIORef g{contractStates = newCache }
+      put (Proxy @Globals) g{_contractStates = newCache }
       return jv
     (newCache, Nothing) -> do
       recordCacheMiss
-      mvs <- eitherToMaybe <$> liftIO (readStorage csHandle address chainId)
+      mvs <- eitherToMaybe <$> liftIO (readStorage _csHandle address chainId)
       forM_ mvs $ \vs ->
         let newCache' = LRU.insert (address, chainId) vs newCache
-        in writeIORef globalsIORef g{contractStates = newCache' }
+        in  put (Proxy @Globals) g{_contractStates = newCache' }
       return mvs
 
-setContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> [(Text,Value)] -> m ()
-setContractState gref address chainId values = do
-  globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{contractStates = LRU.insert (address, chainId) values contractStates}
-  asyncWriteToStorage csHandle address chainId values
+setContractState :: (MonadIO m, Modifiable Globals m) => Address -> Maybe ChainId -> [(Text,Value)] -> m ()
+setContractState address chainId values = do
+  Globals{..} <- modifyStatefully (Proxy @Globals) $
+    contractStates %= LRU.insert (address, chainId) values
+  asyncWriteToStorage _csHandle address chainId values
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force
 
-flushPendingWrites :: MonadIO m => IORef Globals -> m ()
-flushPendingWrites gref = do
-  Globals{..} <- readIORef gref
-  syncStorage csHandle
+flushPendingWrites :: (MonadIO m, Modifiable Globals m) => m ()
+flushPendingWrites = do
+  Globals{..} <- get (Proxy @Globals)
+  syncStorage _csHandle

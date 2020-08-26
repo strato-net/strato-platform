@@ -4,9 +4,10 @@
     , QuasiQuotes
     , ScopedTypeVariables
     , DataKinds
+    , DeriveAnyClass
+    , DeriveGeneric
     , TemplateHaskell
     , FlexibleContexts
-    , GeneralizedNewtypeDeriving
     , FlexibleInstances
 #-}
 

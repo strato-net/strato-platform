@@ -1,5 +1,6 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImplicitParams             #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -46,9 +47,9 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Nonce
 
-data Should a = Don't a | Do a
-data Compile = Compile
-data CacheNonce = CacheNonce
+data Should a = Don't a | Do a deriving (Eq, Ord, Show)
+data Compile = Compile deriving (Eq, Ord, Show)
+data CacheNonce = CacheNonce deriving (Eq, Ord, Show)
 
 type Bloc = ReaderT BlocEnv (LoggingT IO)
 

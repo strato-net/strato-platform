@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 -- {-# OPTIONS_GHC -fno-warn-orphans #-}
 module BlockApps.Solidity.TypeDefs where
 
@@ -10,9 +12,6 @@ import GHC.Generics
 import BlockApps.Solidity.Struct
 
 type EnumSet = Bimap Int Text
-
---instance (NFData a, NFData b) => NFData (Bimap a b) where
---  rnf = rnf . toList
 
 data TypeDefs =
   TypeDefs {

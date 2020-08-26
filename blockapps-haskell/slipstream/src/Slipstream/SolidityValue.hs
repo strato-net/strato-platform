@@ -4,6 +4,9 @@
     , QuasiQuotes
     , ScopedTypeVariables
     , DataKinds
+    , DeriveAnyClass
+    , DeriveGeneric
+    , LambdaCase
     , TemplateHaskell
     , FlexibleContexts
     , GeneralizedNewtypeDeriving

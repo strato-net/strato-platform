@@ -15,15 +15,24 @@ project ./. ({ pkgs, hackGet, ... }: {
   ios.bundleName = "Obelisk Minimal Example";
   packages = {
     reflex-dom-ace = hackGet ./deps/reflex-dom-ace;
+    blockapps-bloc22-api = ../blockapps-haskell/bloc/bloc22/api;
+    blockapps-bloc22-server = ../blockapps-haskell/bloc/bloc22/server;
     blockapps-data = ../core-strato/blockapps-data;
     blockapps-datadefs = ../core-strato/blockapps-datadefs;
+    blockapps-ethereum = ../blockapps-haskell/ethereum;
     blockapps-haskoin = ../core-strato/blockapps-haskoin;
     blockapps-init = ../shared-util/blockapps-init;
     blockapps-mpdbs = ../core-strato/blockapps-mpdbs;
+    blockapps-solidity = ../blockapps-haskell/solidity;
+    blockapps-strato-api = ../blockapps-haskell/strato/api;
+    blockapps-strato-client = ../blockapps-haskell/strato/client;
     blockapps-tools = ../core-strato/blockapps-tools;
     blockapps-util = ../core-strato/blockapps-util;
+    blockapps-vault-wrapper-api = ../blockapps-haskell/vault-wrapper/api;
+    blockapps-vault-wrapper-client = ../blockapps-haskell/vault-wrapper/client;
     blockstanbul = ../core-strato/blockstanbul;
     common-log = ../shared-util/common-log;
+    core-api = ../core-strato/core-api;
     cross-monitoring = ../shared-util/cross-monitoring;
     ethereum-discovery = ../core-strato/ethereum-discovery;
     ethereum-encryption = ../core-strato/ethereum-encryption;
@@ -31,10 +40,12 @@ project ./. ({ pkgs, hackGet, ... }: {
     fast-keccak256 = ../core-strato/fast-keccak256;
     fastMP = ../core-strato/fastMP;
     format = ../shared-util/format;
+    haskoin-shim = ../shared-util/haskoin-shim;
     merkle-patricia-db = ../core-strato/merkle-patricia-db;
     milena = ../core-strato/milena;
     monad-alter = ../monad-alter;
     seqevents = ../core-strato/seqevents;
+    slipstream = ../blockapps-haskell/slipstream;
     solid-vm = ../core-strato/solid-vm;
     solid-vm-model = ../shared-util/solid-vm-model;
     strato-adit = ../core-strato/strato-adit;
@@ -56,8 +67,18 @@ project ./. ({ pkgs, hackGet, ... }: {
         ver = "0.34.1";
         sha256 = "1xghyficc5fk6dpy60pbb4r09dfvil8jklssybd8567lhsq6zxbv";
       } {};
+      postgresql-typedHackage = self.callHackageDirect {
+        pkg = "postgresql-typed";
+        ver = "0.6.1.2";
+        sha256 = "037nhi4lbrvpa6s99d77858xm2rlkzciyv9ar6vq168igjl1ffvd";
+      } {};
     in
     {
+      bimap = super.callHackageDirect {
+        pkg = "bimap";
+        ver = "0.4.0";
+        sha256 = "1jhnqzp1fa876abz0v6adkp9bl24zjnn0sdy8cxkpl1y8j62pcm8";
+      } {};
       haskell-src-exts = super.callHackageDirect {
         pkg = "haskell-src-exts";
         ver = "1.20.3";
@@ -84,9 +105,16 @@ project ./. ({ pkgs, hackGet, ... }: {
         ver = "1.0.0.0";
         sha256 = "1hrv660hs50aadphg38wcrzf0admfdcfkp3zf7b2fcz58zlm431y";
       } {};
+      servant-multipart = self.callHackageDirect {
+        pkg = "servant-multipart";
+        ver = "0.11.5";
+        sha256 = "0l2cajsyxiq3zsn5scqw82j635dvkbr90vp68cnn0pbdapi8krj0";
+      } {};
+      blockapps-strato-client = pkgs.haskell.lib.dontCheck super.blockapps-strato-client;
       hpack = pkgs.haskell.lib.dontCheck hpackHackage;
-      servant = pkgs.haskell.lib.dontCheck super.servant;
       milena = pkgs.haskell.lib.dontCheck super.milena;
+      postgresql-typed = pkgs.haskell.lib.dontCheck postgresql-typedHackage;
+      servant = pkgs.haskell.lib.dontCheck super.servant;
       strato-redis-blockdb = pkgs.haskell.lib.dontCheck super.strato-redis-blockdb;
       mkDerivation = drv: super.mkDerivation (drv // { jailbreak = true; doHaddock = false;});
   };
