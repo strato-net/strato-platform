@@ -26,7 +26,6 @@ library:
   - cereal
   - containers
   - cryptonite
-  - ecdsa
   - hourglass
   - memory
   - pem
