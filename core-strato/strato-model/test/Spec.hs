@@ -10,8 +10,8 @@ import qualified Data.Bits                        as Bits
 import           Data.Binary
 import qualified Data.ByteString                  as B
 import qualified Data.ByteString.Base16           as B16
-import qualified Data.ByteString.Short            as BSS
 import qualified Data.ByteString.Char8            as C8
+import qualified Data.ByteString.Short            as BSS
 import           Data.Maybe
 import           Data.Word ()
 import           GHC.Exts
@@ -122,7 +122,7 @@ spec = do
     it "round trips correctly" $ property $ \(ptr::CodePtr) -> do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr
 
-  describe "secp256k1, ECDSA, and ECDH operations (using secp256k1-haskell)" $ do
+  describe "secp256k1 operations (using secp256k1-haskell)" $ do
     let mPrv = importPrivateKey $ fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         prv = fromMaybe (error "could not import private key") mPrv
         pub = derivePublicKey prv 
@@ -141,6 +141,17 @@ spec = do
     it "can convert signature to and from Binary encoding" $ do
       let encSig = encode sig
       decode encSig `shouldBe` sig
+    it "can export and import signature as a bytestring" $ do
+      let sigBS = exportSignature sig
+      importSignature sigBS `shouldBe` sig
+    it "arbitrary sigs can be exported/imported" $ property $ \s -> do
+      let sigBS = exportSignature s
+      B.length sigBS `shouldBe` 65
+      importSignature sigBS `shouldBe` s
+    it "exported sigs can be used for recovery" $ do
+      let sigBS = exportSignature sig
+          sig' = importSignature sigBS
+      recoverPub sig' mesg `shouldBe` Just pub
     
     it "can recover public keys from signatures" $ do
       let mRecPub = recoverPub sig mesg
@@ -163,8 +174,8 @@ spec = do
       fromPublicKey (fromJust mRecPub) `shouldBe` add
       fromPublicKey (fromJust mRecPub) `shouldBe` fromPrivateKey k
       fromPrivateKey k `shouldBe` add
-  
-  describe "the ECDSA module works exactly like Haskoin and Crypto-Pubkey on test values" $ do
+    
+  describe "the secp256k1 module works exactly like Haskoin on test values" $ do
     let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         hkPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
         ecPriv = fromMaybe (error "couldn't get EC key") $ importPrivateKey testPrivBS
@@ -190,7 +201,7 @@ spec = do
           ecSigVals = [ BSS.fromShort $ er
                       , BSS.fromShort $ es
                       ]
-          hvInt = (if hv then 28 else 27) :: Integer
+          hvInt = (if hv then 1 else 0) :: Integer
           ecInt = toInteger ev
       hkSigVals `shouldBe` ecSigVals
       hvInt `shouldBe` ecInt

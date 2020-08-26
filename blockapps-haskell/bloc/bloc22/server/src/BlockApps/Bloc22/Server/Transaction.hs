@@ -201,11 +201,12 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 
--- so we can convert R and S from the signature
+-- so we can convert R and S from the signature, and add 27 to V, per
+-- Ethereum protocol (and backwards compatibility)
 getSigVals :: Signature -> (Word256, Word256, Word8)
 getSigVals (Signature (S.CompactRecSig r s v)) =
   let convert = bytesToWord256 . BSS.fromShort
-  in (convert r, convert s, v)
+  in (convert r, convert s, v + 0x1b)
  
 
 callSignature :: Text -> UnsignedTransaction -> Bloc Transaction

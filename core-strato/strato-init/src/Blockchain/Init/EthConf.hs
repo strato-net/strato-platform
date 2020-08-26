@@ -8,7 +8,7 @@ import qualified Data.ByteString.Char8              as C8
 import           Data.Maybe
 import qualified Data.Text                          as T
 import           Network.HTTP.Client                (newManager, defaultManagerSettings)
---import           Network.HTTP.Types.Status
+import           Network.HTTP.Types.Status
 import           Servant.Client
 import           System.Entropy
 import           Text.Format
@@ -102,23 +102,40 @@ defaultConfig =
 getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
   mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3" 
+  vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl 
   let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
-  ak <- waitOnVault $ runClientM (postKey $ T.pack "nodekey") clientEnv 
+  putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
+  ak <- waitOnVault clientEnv $ runClientM (getKey (T.pack "nodekey") Nothing) clientEnv
   return (VC.unPubKey ak, VC.unAddress ak)
 
-
--- TODO: maybe this should be a generic util function somewhere else
-waitOnVault :: (Show a) => IO (Either a b) -> IO b
-waitOnVault action = do
-  putStrLn "asking vault-wrapper for the node's key (or to create a new key)"
-  res <- action
+waitOnVault :: ClientEnv -> IO (Either ClientError VC.AddressAndKey) -> IO VC.AddressAndKey
+waitOnVault clientEnv request = do
+  res <- request
   case res of
-    Left _ -> do 
-      putStrLn $ "failed to connect to vault-wrapper... probably password is not set?" 
-      threadDelay 2000000 -- 2 seconds
-      waitOnVault action
-    Right val -> return val  
+    Left (FailureResponse _ (Response (Status code _) _ _ body)) -> case code of
+      503 -> do -- 503 is thrown when the password is not set
+        putStrLn "vault password is not set. I'll keep trying until it is set"
+        threadDelay 2000000 -- 2 seconds
+        waitOnVault clientEnv request
+      400 -> -- 400 is thrown when the key does not exist
+        if flags_generateKey then do 
+          putStrLn "nodekey does not exist -  I'm going to create one"
+          waitOnVault clientEnv $ runClientM (postKey $ T.pack "nodekey") clientEnv
+        else do
+          putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
+          threadDelay 5000000 -- 5 seconds
+          waitOnVault clientEnv request
+      _ -> do
+        putStrLn $ "unexpected error thrown by vault-wrapper: " ++ show body
+        putStrLn "will keep retrying anyway"
+        threadDelay 5000000 -- 5 seconds
+        waitOnVault clientEnv request
+    Left err -> do 
+      putStrLn $ "unexpected servant error: " ++ show err
+      putStrLn "will keep retrying anyway"
+      threadDelay 5000000 -- 5 seconds
+      waitOnVault clientEnv request
+    Right val -> return val
 
 
 genEthConf :: IO EthConf

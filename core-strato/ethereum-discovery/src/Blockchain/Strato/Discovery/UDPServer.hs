@@ -35,6 +35,7 @@ import           System.Timeout
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.ContextLite
@@ -58,7 +59,12 @@ runEthUDPServer :: ( MonadIO m
                 -> Socket
                 -> m ()
 runEthUDPServer ctx _ sock =
-  void . runResourceT $ runReaderT (udpHandshakeServer sock portNum) ctx
+  void . runResourceT $ runReaderT (do 
+    pub <- getPub
+    $logInfoS "ethereumDiscovery" . T.pack $ "My NodeID: " ++ format pub
+    $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ (format $ fromPublicKey pub)
+    udpHandshakeServer sock portNum) 
+  ctx
      where portNum = 30303 -- TODO(tim): Reenable port selection
 
 connectMe :: (MonadIO m, MonadFail m, MonadLogger m)
@@ -159,9 +165,9 @@ udpHandshakeServer sock _ = do
     argValidator :: B.ByteString -> SockAddr -> Either DiscoverException (NodeDiscoveryPacket, ECC.Point, PortNumber)
     argValidator msg _ = do
       (packet, otherPubkey) <- dataToPacket msg
-      validOtherPubKey <- hPubKeyToPubKey otherPubkey
+      let validOtherPubKey = secPubKeyToPoint otherPubkey
       -- otherPort <- getAddrPort addr
-      let otherPort = 30303 -- TODO(tim): Reenable port selection
+          otherPort = 30303 -- TODO(tim): Reenable port selection
       return (packet, validOtherPubKey, otherPort)
 
 handleValidPacket :: ( HasSQLDB m

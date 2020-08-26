@@ -183,13 +183,13 @@ services:
     - kafka
     - postgres
     - redis
+    - vault-wrapper
     environment:
     - addBootnodes=${addBootnodes}
     - averageTxsPerBlock=${averageTxsPerBlock}
     - blockstanbul=${blockstanbul}
     - blockstanbulAdmins=${blockstanbulAdmins}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
-    - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
@@ -199,9 +199,13 @@ services:
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
+    - extraFaucets=${extraFaucets}
     - faucetEnabled=${faucetEnabled}
+    - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
+    - isAdmin=${isAdmin:-false}
+    - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
     - maxConn=${maxConn}
@@ -234,7 +238,9 @@ services:
     - USE_STRATO_API=${USE_STRATO_API}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
+    - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
+    - wireMessageCacheSize=${wireMessageCacheSize}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}

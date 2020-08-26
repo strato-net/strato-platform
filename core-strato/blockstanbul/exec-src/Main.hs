@@ -114,41 +114,45 @@ main = do
     case eAdAndKey of
       Left err -> die $ "failed to get address from the admin node's vault: " ++ show err
       Right adAndKey -> return $ VC.unAddress adAndKey
-
+  
   putStrLn $ "Sender (admin node) address: " ++ show optSender
-  esign <- signBenfInfo (optRecipient, not optRemove, optNonce)
-  let esignStr = C8.unpack
-               . B16.encode
-               . rlpSerialize
-               . rlpEncode $ esign
-  let payload = CandidateReceived
-              { sender = optSender
-              , signature = esignStr
-              , recipient = optRecipient
-              , votingdir = not optRemove
-              , nonce = optNonce
-              }
-      body = C8.unpack $ BL.toStrict $ Ae.encode payload
-  putStrLn $ "Request body: " ++ body
-  printf $ "\n\nOk, sending the vote to the following nodes: " ++ show optNodes
+  putStrLn $ "Starting nonce: " ++ show optNonce
+  printf $ "\nSending the vote to the following nodes: " ++ show optNodes
  
-  mapM_ (\nodeUrl -> do
-          let url = printf "http://%s/blockstanbul/vote" nodeUrl
-          putStrLn $ "Sending to url: " ++ url
-          let req' = postRequestWithBody url "application/json" body
-              auth = AuthBasic (error "realm unused")
-                               "admin" -- I hope we can just hardcode this
-                               "admin"
-                               (error "uri unused")
-              authStr = withAuthority auth req'
-              req = insertHeaders [mkHeader HdrAuthorization authStr] req'
-  
-          putStrLn $ "request: " ++ show req
-          eResp <- simpleHTTP req
-          case eResp of
-            Left err -> die $ "connection error: " ++ show err
-            Right resp -> do
-              print resp
-              putStrLn $ "response: " ++ rspBody resp
-      ) optNodes
-  
+  let go [] _ = return ()
+      go (nodeURL:xs) non = do
+        esign <- signBenfInfo (optRecipient, not optRemove, non)
+        
+        let esignStr = C8.unpack
+                     . B16.encode
+                     . rlpSerialize
+                     . rlpEncode $ esign
+        let payload = CandidateReceived
+                    { sender = optSender
+                    , signature = esignStr
+                    , recipient = optRecipient
+                    , votingdir = not optRemove
+                    , nonce = non
+                    }
+            body = C8.unpack $ BL.toStrict $ Ae.encode payload
+        let url = printf "http://%s/blockstanbul/vote" nodeURL
+        putStrLn $ "Sending to url: " ++ url
+        putStrLn $ "\n\nRequest body: " ++ body
+        let req' = postRequestWithBody url "application/json" body
+            auth = AuthBasic (error "realm unused")
+                             "admin" -- I hope we can just hardcode this
+                             "admin"
+                             (error "uri unused")
+            authStr = withAuthority auth req'
+            req = insertHeaders [mkHeader HdrAuthorization authStr] req'
+
+        eResp <- simpleHTTP req
+        case eResp of
+          Left err -> die $ "connection error: " ++ show err
+          Right resp -> do
+            print resp
+            putStrLn $ "response: " ++ rspBody resp
+    
+        go xs $ non + 1
+    
+  go optNodes optNonce   

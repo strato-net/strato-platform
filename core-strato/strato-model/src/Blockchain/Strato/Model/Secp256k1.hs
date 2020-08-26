@@ -19,6 +19,8 @@ module Blockchain.Strato.Model.Secp256k1
   , deriveSharedKey
   , recoverPub
   , signMsg
+  , exportSignature
+  , importSignature
   ) where
 
 
@@ -186,7 +188,7 @@ instance Arbitrary Signature where
   arbitrary = do
     r' <- replicateM 32 (arbitrary :: Gen Word8)
     s' <- replicateM 32 (arbitrary :: Gen Word8)
-    v <- (choose (27,28)) :: Gen Word8
+    v <- (choose (0,1)) :: Gen Word8
     
     let r = BSS.toShort $ pack r'
         s = BSS.toShort $ pack s'
@@ -194,17 +196,11 @@ instance Arbitrary Signature where
 
 
 instance RLPSerializable Signature where
-  rlpEncode (Signature sig) = RLPArray [ RLPString r
-                                       , RLPString s
-                                       , RLPScalar v 
-                                       ]
-      where
-        r = BSS.fromShort $ S.getCompactRecSigR sig
-        s = BSS.fromShort $ S.getCompactRecSigS sig
-        v = S.getCompactRecSigV sig
-  
+  rlpEncode = RLPString . exportSignature
+
+  rlpDecode (RLPString str) = importSignature str
   rlpDecode (RLPArray [RLPString r, RLPString s, RLPScalar v]) = 
-      Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v
+      Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v 
   rlpDecode x = error $ "rlpDecode for RecSig failed on " ++ show x
 
 
@@ -245,13 +241,15 @@ instance ToSchema Signature where
 -- So, the signature and recovery functions below swap the R and S values, so that
 -- every other part of the platform can just assume that they are right
 --
--- Oh, and we have to add/subtract 0x1b to V ...Ethereum uses either 27 or 28 for this
--- value, but secp256k1-haskell uses 0 and 1 (VERY rarely, 3 and 4). So to be backwards 
--- compatible, we have to add 27. The Signature arbitrary instance chooses 27 or 28
+-- Oh, and in Ethereum, transaction signatures use either 27 or 28 for the V value,
+-- but secp256k1-haskell (and RLPx) uses 0 and 1 (and VERY rarely, 2 and 3). So, to be
+-- backwards compatible, we have to add 27 (0x1b) to the sigV value for all TX sigs. 
+-- We do this in Bloc, and then subtract 27 to do pubkey recovery in seqevents, so
+-- we can keep the sigVs normal here.
 
 recoverPub :: Signature -> ByteString -> Maybe PublicKey
 recoverPub (Signature (S.CompactRecSig r s v)) msgHash =
-  let sig' = S.CompactRecSig s r (v - 0x1b)  -- the swapped sig
+  let sig' = S.CompactRecSig s r v  -- the swapped sig
       sig = fromMaybe (error "could not import recsig") (S.importCompactRecSig sig')
       mesg = fromMaybe (error "could not import msgHash") (S.msg msgHash)
   in PublicKey <$> (S.recover sig mesg)
@@ -261,4 +259,16 @@ signMsg :: PrivateKey -> ByteString -> Signature
 signMsg pk msgHash = 
   let mesg = fromMaybe (error "msg is not 32 bytes") (S.msg msgHash)
       (S.CompactRecSig r s v) = S.exportCompactRecSig $ S.signRecMsg (coerce pk) mesg
-  in Signature $ S.CompactRecSig s r (0x1b + v) -- the swapped sig
+  in Signature $ S.CompactRecSig s r v -- the swapped sig
+
+
+exportSignature :: Signature -> ByteString
+exportSignature (Signature (S.CompactRecSig r s v)) = BSS.fromShort r <> BSS.fromShort s <> B.singleton v
+
+importSignature :: ByteString -> Signature
+importSignature bs | B.length bs /= 65 = error "importSignature called with incorrect number of bytes"
+importSignature bs = 
+  let r = B.take 32 bs
+      s = B.take 32 $ B.drop 32 bs
+      v = B.head $ B.drop 64 bs
+  in Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v

@@ -19,6 +19,7 @@ library:
     - Blockchain.Strato.Discovery.P2PUtil
     - Executable.EthereumDiscovery
     - Executable.EthDiscoverySetup
+    - Executable.Options
   dependencies:
     - base16-bytestring
     - binary
@@ -39,6 +40,7 @@ library:
     - ethereum-rlp
     - exceptions
     - format
+    - hflags
     - http-client
     - monad-alter
     - mtl

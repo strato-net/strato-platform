@@ -33,6 +33,7 @@ library:
     - bytestring
     - cache
     - clock
+    - cryptonite
     - http-client
     - lens
     - monad-control
@@ -51,12 +52,6 @@ library:
     - servant
     - servant-server
     - text
-
-
-    # remove
-    - cryptonite
-    - base64-bytestring
-
 
 
 executables:
@@ -104,8 +99,8 @@ executables:
       - bytestring
       - cryptonite
       - hflags
+      - opaleye
       - saltine
-      - secp256k1-haskell
       - strato-model
       - text
 

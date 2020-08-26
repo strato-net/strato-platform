@@ -18,13 +18,9 @@ import           Text.Format
 
 import           Blockchain.Strato.Model.Address
 
-
--- TODO: upgrade all of this to vault-keys
 getGlobalKey :: IO (Maybe H.PrvKey)
 getGlobalKey = fmap (H.makePrvKey . Bin.decode . BL.fromStrict) . BC.readFile $ "config" </> "priv"
 
-
--- TODO: do we ever use the local key?
 getLocalKey :: IO (Maybe H.PrvKey)
 getLocalKey = eitherExtractNodeKey >>= \case
   Left "NODEKEY not set" -> return Nothing

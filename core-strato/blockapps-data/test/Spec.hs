@@ -197,7 +197,7 @@ testAddresses = map (\i -> (take (40 - i) $ repeat '0') ++ (take i $ repeat 'a')
 
 
 sigRecovery :: Spec
-sigRecovery = it "whoSignedThisTransaction works on both haskoin and secp256k1-haskell signatures" $ do
+sigRecovery = it "whoSignedThisTransaction works with both Haskoin and secp256k1-haskell recovery functions" $ do
   mapM_ (\fp -> do tx' <- unsafeExtractTX fp
                    let tx = tPrimeToT tx'
                        err = error "whoSignedThisTransaction failed"
@@ -212,7 +212,7 @@ ecWhoSignedThisTransaction tx = case tx of
   t -> fromPublicKey <$> recoverPub sig mesg
         where
           intToBSS = BSS.toShort . word256ToBytes . fromInteger
-          sig = Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) (transactionV t))
+          sig = Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
           mesg = keccak256ToByteString $ partialTransactionHash t 
 
 

@@ -13,7 +13,6 @@ import           Strato.Strato23.Monad
 import           Strato.Strato23.API.Types
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Queries      (getUserKeyQuery)
-import           Strato.Strato23.Server.Key            (postKey)
 import           UnliftIO
 
 
@@ -22,7 +21,7 @@ postSignature :: Text -> MsgHash -> VaultM Signature
 postSignature userName (MsgHash msgBS) = do
   cache <- asks keyStoreCache
   cachedPk <- liftIO $ Cache.lookup cache userName
-  (salt,nonce,pKey,_,_) <- case cachedPk of
+  (_,nonce,pKey,_,_) <- case cachedPk of
     Just (KeyStore a b c d e) -> pure (a,b,c,d,e)
     Nothing -> do
       mpk <- vaultTransaction
@@ -30,14 +29,10 @@ postSignature userName (MsgHash msgBS) = do
            $ getUserKeyQuery userName
       (a,b,c,d,e) <- case mpk of
         Just pk -> return pk
-        Nothing -> do
-          _ <- postKey userName
-          vaultTransaction
-            . vaultQuery1
-            $ getUserKeyQuery userName
+        Nothing -> vaultWrapperError $ UserError ("User " <> userName <> " doesn't exist")
       liftIO . Cache.insert cache userName $ KeyStore a b c d e
       pure (a,b,c,d,e)
-  withPassword $ \pw -> case decryptSecKey pw salt nonce pKey of
+  withSecretKey $ \key -> case decryptSecKey key nonce pKey of
     Nothing -> vaultWrapperError IncorrectPasswordError
     Just prvKey 
       | B.length msgBS == 32 -> return $ signMsg prvKey msgBS 

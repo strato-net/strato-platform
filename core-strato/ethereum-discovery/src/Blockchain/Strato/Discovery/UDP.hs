@@ -22,7 +22,7 @@ module Blockchain.Strato.Discovery.UDP (
 import           Network.Socket
 import qualified Network.Socket.ByteString             as NB
 
-import           Control.Error                         (fmapL, note)
+import           Control.Error                         (note)
 import           Control.Exception
 import           Control.Monad.IO.Class
 import           Blockchain.Output
@@ -32,21 +32,20 @@ import           Data.Bits
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Base16                as B16
 import qualified Data.ByteString.Char8                 as BC
-import qualified Data.ByteString.Lazy                  as BL
 import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Time.Clock.POSIX
-import qualified Network.Haskoin.Internals             as H
 import qualified Network.URI                           as URI
 import           Numeric
 import           System.Endian
 import           System.Timeout
 
+import           Blockchain.Data.PubKey
 import           Blockchain.Data.RLP
 import           Blockchain.ExtendedECDSA -- say it with me: DEPRECATED!
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..), hPubKeyToPubKey)
+import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..))
 import           Blockchain.Strato.Model.Keccak256           
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Util
@@ -55,10 +54,6 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Text.Colors                           as CL
 import           Text.Format
 
--- 
---    encrypt?? really??
---encrypt :: H.PrvKey -> Word256 -> H.SecretT IO ExtendedSignature
---encrypt = flip extSignMsg
 
 data RawNodeDiscoveryPacket =
   RawNDPacket Keccak256 ExtendedSignature Integer RLPObject deriving (Show)
@@ -182,19 +177,15 @@ ndPacketToRLP (FindNeighbors target expiration) = (3, RLPArray [rlpEncode target
 ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rlpEncode neighbors, rlpEncode expiration])
 
 
-dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, H.PubKey)
+dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, PublicKey)
 dataToPacket msg = do
-    let r = bytesToWord256 $ B.take 32 $ B.drop 32 msg
-        s = bytesToWord256 $ B.take 32 $ B.drop 64 msg
-    v <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 96 msg
-    let yIsOdd = v == 28
-        signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
+    let signature = importSignature $ B.take 65 $ B.drop 32 msg
         theRest = B.unpack $ B.drop 98 msg
         (rlp, _) = rlpSplit $ B.pack theRest
     theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 97 msg
     let messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
     otherPubkey <- note (MalformedUDPException $ "malformed signature in udpHandshakeServer: " ++ show (signature, messageHash))
-                        (getPubKeyFromSignature signature $ keccak256ToWord256 messageHash)
+                        (recoverPub signature $ keccak256ToByteString messageHash)
     packet <- typeToPacket theType rlp
     return (packet, otherPubkey)
   where
@@ -217,33 +208,26 @@ sendPacket sock addr packet = do
       theMsgHash = keccak256ToByteString $ hash $ B.singleton theType' <> theData
   
   sig <- sign theMsgHash 
-  let sigBS = BL.toStrict $ encode sig 
+  let sigBS = exportSignature sig
       theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType' <> theData
 
   _ <- liftIO $ NB.sendTo sock ( theHash <> sigBS <> B.singleton theType' <> theData) addr
   return ()
 
-processDataStream'::B.ByteString-> H.PubKey
+processDataStream'::B.ByteString-> PublicKey
 processDataStream' bs | B.length bs < 98 = error "processDataStream' called with too few bytes"
 processDataStream' bs =
   let (hs, bs') = B.splitAt 32 bs
-      (rs, bs'') = B.splitAt 32 bs'
-      (ss, bs''') = B.splitAt 32 bs''
-      (vtype, rest) = B.splitAt 2 bs'''
-      v = B.index vtype 0
-      theType = B.index vtype 1
+      (sigBS, bs'') = B.splitAt 65 bs'
+      (vtype, rest) = B.splitAt 1 bs''
+      theType = B.index vtype 0
       theHash = bytesToWord256 hs
-      r = bytesToWord256 rs
-      s = bytesToWord256 ss
-      yIsOdd = v == 0x1c
-      signature = ExtendedSignature (H.Signature (fromIntegral r) (fromIntegral s)) yIsOdd
-
+      signature = importSignature sigBS 
       (rlp, _) = rlpSplit rest
 
       messageHash = hash $ B.singleton theType <> rlpSerialize rlp
-      publicKey = getPubKeyFromSignature signature $ keccak256ToWord256 messageHash
-      theHash' = hash $ word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s)
-                         <> B.singleton v <> B.singleton theType <> rlpSerialize rlp
+      publicKey = recoverPub signature $ keccak256ToByteString messageHash
+      theHash' = hash $ sigBS <> B.singleton theType <> rlpSerialize rlp
   in if theHash /= keccak256ToWord256 theHash'
     then error "bad UDP data sent from peer, the hash isn't correct"
     else fromMaybe (error "malformed signature in call to processDataStream") publicKey
@@ -295,10 +279,10 @@ getServerPubKey domain _ = do
         theMsgHash = keccak256ToByteString $ hash $ B.singleton theType <> theData
     
     sig <- sign theMsgHash
-    let sigBS = BL.toStrict $ encode sig 
+    let sigBS = exportSignature sig 
         theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType <> theData
         theMsg = theHash <> sigBS <> B.singleton theType <> theData
-    
+
     liftIO $ withSocketsDo $ bracket (getSocket domain port) close (talk theMsg)
   where
     port = 30303
@@ -308,41 +292,10 @@ getServerPubKey domain _ = do
 
       --According to https://groups.google.com/forum/#!topic/haskell-cafe/aqaoEDt7auY, it looks like the only way we can time out UDP recv is to
       --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
-      pubKey <- try (timeout 5000000 . fmap processDataStream' $ NB.recv socket' 2000) :: IO (Either SomeException (Maybe H.PubKey))
+      pubKey <- try (timeout 5000000 . fmap processDataStream' $ NB.recv socket' 2000) :: IO (Either SomeException (Maybe PublicKey))
 
       case pubKey of
         Right Nothing  -> return $ Left $ SomeException UDPTimeout
         Left x         -> return $ Left x
-        Right (Just x) -> return $ fmapL SomeException $ hPubKeyToPubKey x
+        Right (Just x) -> return $ Right $ secPubKeyToPoint x
 
-
--- TODO: do we need this? If so, we need to use HasVault
-{- findNeighbors::H.PrvKey -> String -> PortNumber -> IO ()
-findNeighbors myPriv domain _ =
-    withSocketsDo $ bracket (getSocket domain port) close (talk myPriv)
-  where
-    -- TODO(tim): Reenable port selection
-    port = 30303
-    talk :: H.PrvKey -> Socket -> IO ()
-    talk prvKey' socket' = do
-      let (theType, theRLP) =
-            ndPacketToRLP $
-            FindNeighbors (NodeID $ fst $ B16.decode "eab4e595d178422cb8b31eddde2d6dda74ad16609693614a29a214d2b2f457a7c97a442e74e58afd1b16657c5c5908255a450d8a202e8d3b2b31c9b17e7221f3") 100000000000000000
-          theData = rlpSerialize theRLP
-          theMsgHash = hash $ B.singleton theType <> theData
-
-      ExtendedSignature signature yIsOdd <-
-        H.withSource H.devURandom $ encrypt prvKey' $ keccak256ToWord256 theMsgHash
-
-      let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
-          r = H.sigR signature
-          s = H.sigS signature
-          theSignature =
-            word256ToBytes (fromIntegral r) <> word256ToBytes (fromIntegral s) <> B.singleton v
-          theHash = keccak256ToByteString $ hash $ theSignature <> B.singleton theType <> theData
-
-      _ <- NB.send socket' $ theHash <> theSignature <> B.singleton theType <> theData
-
-      _ <- NB.recv socket' 10 >>= print -- processDataStream' . B.unpack
-      return ()
--}

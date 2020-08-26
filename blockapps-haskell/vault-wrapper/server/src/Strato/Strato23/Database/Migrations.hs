@@ -53,4 +53,4 @@ insertSecPrvKey :: Query
 insertSecPrvKey = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS enc_sec_prv_key bytea NOT NULL; |]
 
 insertPublicKey :: Query
-insertPublicKey = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS pub_key bytea NOT NULL; |]
+insertPublicKey = [sql| ALTER TABLE users ADD COLUMN IF NOT EXISTS pub_key bytea; |]
