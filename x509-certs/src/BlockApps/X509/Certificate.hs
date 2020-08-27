@@ -2,11 +2,12 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 -- {-# LANGUAGE OverloadedStrings #-}
 -- {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 
-module X509.Generate (
+module BlockApps.X509.Certificate (
   Issuer(..),
   Subject(..),
   certToBytes, 
@@ -18,7 +19,6 @@ module X509.Generate (
   makeCert,
   makeSignedCert,
   newPriv,
-  module Data.X509
  ) where
 
 
@@ -46,6 +46,7 @@ import           Data.X509
 import           Data.PEM
 import           Data.Maybe
 
+import           Blockchain.Data.RLP
 
 import           Time.Types
 import           Time.System
@@ -121,11 +122,15 @@ instance ASN1Object PrivKeyEC where
   -}
 
 
+instance RLPSerializable SignedCertificate where
+  rlpEncode = RLPString . certToBytes
+  
+  rlpDecode (RLPString str) = bsToCert str
+  rlpDecode x = error $ "rlpDecode for SignedCertificate failed: expected RLPString, got " ++ show x
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------- WRITING --------------------------------------------
 ----------------------------------------------------------------------------------------------
-
 
 
 

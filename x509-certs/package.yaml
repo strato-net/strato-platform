@@ -26,6 +26,7 @@ library:
   - cereal
   - containers
   - cryptonite
+  - ethereum-rlp
   - hourglass
   - memory
   - pem
@@ -39,17 +40,6 @@ library:
 #  - x509-validation
 
 
-executables:
-  x509Test:
-    source-dirs: exec_src/
-    main: x509Test.hs
-    dependencies:
-      - cryptonite
-      - bytestring
-      - hflags
-      - secp256k1-haskell
-      - x509-certs
-
 tests:
   x509-test:
     main: Spec.hs
@@ -58,6 +48,7 @@ tests:
       - x509-certs
       - bytestring
       - cryptonite
+      - ethereum-rlp
       - secp256k1-haskell
       - x509
       - x509-validation

@@ -9,9 +9,10 @@ import           Data.Maybe
 
 import           Data.X509.Validation
 
+import           BlockApps.X509
+import           Blockchain.Data.RLP
 import           Test.Hspec
 
-import           X509.Generate
 
 
 -- TODO: ideally, we have helpers wrapping the original x509 modules 
@@ -46,7 +47,11 @@ spec = do
     it "can do PEM encoding roundtrips" $ do
       cert <- makeSignedCert iss sub
       cert `shouldBe` bsToCert (certToBytes cert)
-
+    it "can do RLP encoding roundtrips" $ do
+      cert <- makeSignedCert iss sub
+      let rlp = rlpEncode cert
+      rlpDecode rlp `shouldBe` cert
+      rlpEncode cert `shouldBe` rlp
     it "can verify cert signatures" $ do
       cert <- makeSignedCert iss sub
       let sigVerification = verifySignedSignature cert (certPubKey $ getCertificate cert)
