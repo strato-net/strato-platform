@@ -231,7 +231,7 @@ signCert priv cert = objectToSignedExactF (ecdsaWithSHA256 $ priv) cert
 
 makeCert :: Issuer -> Subject -> IO (Certificate)
 makeCert iss sub = do
-  serial <- (randomRIO (10000000, 99999999)) -- TODO: how to not have repeat serials
+  serial <- (randomRIO (10000000, 99999999)) -- TODO: might we have repeat serials?
   validity <- getValidity
   
 
