@@ -85,6 +85,7 @@ main = do
                                pool22
                                mode
                                flags_stateFetchLimit
+                               flags_gasOn
                                nonceCache
                                sourceCache
                                tbqueue

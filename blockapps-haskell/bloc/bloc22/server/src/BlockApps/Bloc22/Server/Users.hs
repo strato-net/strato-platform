@@ -985,7 +985,10 @@ getAccountNonce addr chainIds = do
   $logInfoLS "getAccountNonce/req" params
   $logInfoLS "getAccountNonce/resp" mAccts
   case mAccts of
-    [] -> return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
+    [] -> do
+      requireBalance <- asks gasOn
+      if requireBalance then throwIO . UserError $ "User does not have a balance"
+      else return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
     accts -> do
       let mkCid AddressStateRef{..} = ChainId <$> toMaybe 0 addressStateRefChainId
           mkNonce AddressStateRef{..} = Nonce $ fromInteger addressStateRefNonce
