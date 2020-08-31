@@ -477,12 +477,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
         $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
         $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
 
-    (acctBalance, acctNonce) <- lift $
-      (addressStateBalance &&& addressStateNonce) <$>
-        A.lookupWithDefault (Proxy @AddressState) tAddr
-    
-
-    let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
+    let txCost = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         realIG = fromIntegral intrinsicGas'
         maxGas = fromIntegral (maxBound :: Int)
     
@@ -491,6 +486,10 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
         faucetSuccess <- lift $ addToBalance tAddr txCost
         unless faucetSuccess $ error "failed to give balance to a gasOff account"
     
+    (acctBalance, acctNonce) <- lift $
+      (addressStateBalance &&& addressStateNonce) <$>
+        A.lookupWithDefault (Proxy @AddressState) tAddr
+   
     when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
     when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
     when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t

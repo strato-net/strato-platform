@@ -372,7 +372,7 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
     (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
     when (addressNonce > txn) .
        throwE $ NonceTooLow Validation Incoming addressNonce t
-    when (addressBalance < txFee && flags_gasOn) .
+    when (addressBalance < txFee) .
        throwE $ BalanceTooLow Validation Incoming txFee addressBalance t
     return ()
 
@@ -383,8 +383,13 @@ removeFromSeen :: MonadBagger m => OutputTx -> m ()
 removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
-getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$>
-  A.lookupWithDefault (A.Proxy @DD.AddressState) addr
+getAddressNonceAndBalance addr = do 
+  (nonce, balance) <- (DD.addressStateNonce &&& DD.addressStateBalance) <$>
+      A.lookupWithDefault (A.Proxy @DD.AddressState) addr
+  if flags_gasOn then 
+    return (nonce, balance) 
+  else 
+    return (nonce, 9999999999999999999999999999) -- fake a high balance, so all TXs are accepted
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
 addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)
