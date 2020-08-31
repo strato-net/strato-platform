@@ -47,6 +47,7 @@ import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx 
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256        hiding (hash)
 import qualified Blockchain.Verification            as V
+import           Blockchain.VMOptions               (flags_gasOn)
 
 import           Executable.EVMFlags                (flags_maxTxsPerBlock)
 
@@ -371,7 +372,7 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
     (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
     when (addressNonce > txn) .
        throwE $ NonceTooLow Validation Incoming addressNonce t
-    when (addressBalance < txFee) .
+    when (addressBalance < txFee && flags_gasOn) .
        throwE $ BalanceTooLow Validation Incoming txFee addressBalance t
     return ()
 

@@ -480,10 +480,17 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
     (acctBalance, acctNonce) <- lift $
       (addressStateBalance &&& addressStateNonce) <$>
         A.lookupWithDefault (Proxy @AddressState) tAddr
+    
 
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         realIG = fromIntegral intrinsicGas'
         maxGas = fromIntegral (maxBound :: Int)
+    
+    unless flags_gasOn $ do
+        $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
+        faucetSuccess <- lift $ addToBalance tAddr txCost
+        unless faucetSuccess $ error "failed to give balance to a gasOff account"
+    
     when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
     when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
     when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
@@ -493,7 +500,8 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
     let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
 
     lift $ incrementNonce tAddr
-
+    
+     
     success <- lift $ addToBalance tAddr (-transactionGasLimit bt * transactionGasPrice bt)
     when flags_debug $ $logDebugS "addTx" "running code"
     let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall

@@ -200,6 +200,7 @@ services:
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
     - faucetEnabled=${faucetEnabled}
+    - gasOn=${gasOn:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
     - kafkaHost=kafka
