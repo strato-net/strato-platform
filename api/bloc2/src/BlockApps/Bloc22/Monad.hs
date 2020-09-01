@@ -57,6 +57,12 @@ data CacheNonce = CacheNonce
 
 type Bloc = ReaderT BlocEnv (LoggingT IO)
 
+class HasBlocEnv m where
+  getBlocEnv :: m BlocEnv
+
+instance HasBlocEnv Bloc where
+  getBlocEnv = ask
+
 instance HasBlocSQL Bloc where
   getBlocSQLPool = asks dbPool
   
@@ -307,27 +313,28 @@ blocModify1 modify = do
     [y]   -> return y
     _:_:_ -> throwIO $ DBError "Multiple results, expected one row"
 
-blocTransaction :: Bloc x -> Bloc x
+blocTransaction :: (MonadBaseControl IO m, HasBlocSQL m) =>
+                   m x -> m x
 blocTransaction bloc = do
   pool <- getBlocSQLPool
   withResource pool (\conn -> liftBaseOp_ (withTransaction conn) bloc)
 
-blocStrato :: HasCallStack =>
-              ClientM x -> Bloc x
+blocStrato :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCallStack) =>
+              ClientM x -> m x
 blocStrato client' = do
   logInfoCS callStack "Querying Strato"
-  url <- asks urlStrato
-  mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
+  blocEnv <- getBlocEnv
+  resultEither <-
+    liftIO $ runClientM client' (ClientEnv (httpManager blocEnv) (urlStrato blocEnv) Nothing)
   either (blocError . StratoError) return resultEither
 
-blocVaultWrapper :: HasCallStack =>
-                    ClientM x -> Bloc x
+blocVaultWrapper :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCallStack) =>
+                    ClientM x -> m x
 blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault Wrapper"
-  url <- asks urlVaultWrapper
-  mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url Nothing)
+  blocEnv <- getBlocEnv
+  resultEither <-
+    liftIO $ runClientM client' (ClientEnv (httpManager blocEnv) (urlVaultWrapper blocEnv) Nothing)
   either (blocError . VaultWrapperError) return resultEither
 
 blocMaybe :: MonadIO m => Text -> Maybe x -> m x
