@@ -223,9 +223,10 @@ handleEvents peer = awaitForever $ \case
                  $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
                  syncFetch Reverse lastParent
 
-            let headerHashes = M.fromList $ map (blockHeaderHash &&& id) headers
-            headersInDB <- lift . lookupMany (Proxy @BlockData) $ M.keys headerHashes
-            let neededHeaders = M.elems $ headerHashes M.\\ headersInDB
+            let headerHashes = map (blockHeaderHash &&& id) headers
+                hashes = map fst headerHashes
+            headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockData) hashes
+            let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
                 (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
@@ -309,7 +310,8 @@ handleEvents peer = awaitForever $ \case
         if null neededHeaders
             then when (newCount > 0) $ do
                 mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-                yieldR $ GetBlockHeaders (BlockHash $ blockHeaderHash $ last headers) mrh 0 Forward
+                let sortedHeaders = sortOn blockHeaderBlockNumber headers
+                yieldR $ GetBlockHeaders (BlockHash $ blockHeaderHash $ last sortedHeaders) mrh 0 Forward
                 lift stampActionTimestamp
             else do
                 yieldR $ GetBlockBodies (map blockHeaderHash neededHeaders)
