@@ -50,7 +50,7 @@ AddressStateRef
     balance Integer sqltype=numeric(1000,0)
     contractRoot StateRoot
     code BS.ByteString
-    codeHash Keccak256
+    codeHash CodePtr
     chainId Word256 default='0000000000000000000000000000000000000000000000000000000000000000'
     latestBlockDataRefNumber Integer
     UniqueAddress address chainId

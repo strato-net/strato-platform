@@ -31,7 +31,7 @@ import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
-import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Strato.Model.Keccak256
 
 import Slipstream.Data.Action
@@ -249,7 +249,7 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 insertContractTableQuery :: ProcessedContract -> Text
 insertContractTableQuery ProcessedContract{..} =
   let conVals = wrapAndEscape . map escapeQuotes $
-        [ T.pack $ keccak256ToHex $ codePtrToSHA codehash
+        [ T.pack $ keccak256ToHex $ resolvedCodePtrToSHA codehash
         , contractName
         , abi
         , chain

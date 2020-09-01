@@ -6,9 +6,13 @@
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Blockchain.Strato.Model.CodePtr where
+module Blockchain.Strato.Model.CodePtr
+  ( CodePtr(..)
+  , CodeKind(..)
+  ) where
 
 import              Control.DeepSeq
+import              Control.Lens                         ((?~), (&))
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Types                     as Ae
 import              Data.Binary
@@ -17,17 +21,22 @@ import              Data.DeriveTH
 import              Data.Hashable                        (Hashable)
 import qualified    Data.Swagger                         as S 
 import              Data.Swagger.Internal.Schema (named)
+import qualified    Data.Text                            as T
 import              Database.Persist.TH
 import              GHC.Generics
+import              Servant.API
 import              Test.QuickCheck
+import              Text.Format
 
 import              Blockchain.Data.RLP
 import              Blockchain.SolidVM.Model             (CodeKind(..))
+import              Blockchain.Strato.Model.Address
 import              Blockchain.Strato.Model.Keccak256
-import              Text.Format
 
 
-data CodePtr = EVMCode Keccak256 | SolidVMCode String Keccak256
+data CodePtr = EVMCode Keccak256
+             | SolidVMCode String Keccak256
+             | CodeAtAddress Address String
              deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable, Data)
 
 
@@ -39,8 +48,10 @@ instance S.ToSchema CodePtr where
 instance RLPSerializable CodePtr where
   rlpEncode (EVMCode codeHash) = rlpEncode codeHash
   rlpEncode (SolidVMCode n ch) = RLPArray [RLPString "SolidVM", rlpEncode n, rlpEncode ch]
+  rlpEncode (CodeAtAddress a n) = RLPArray [RLPString "AtAddress", rlpEncode a, rlpEncode n]
 
   rlpDecode (RLPArray [RLPString "SolidVM", n, ch]) = SolidVMCode (rlpDecode n) (rlpDecode ch)
+  rlpDecode (RLPArray [RLPString "AtAddress", a, n]) = CodeAtAddress (rlpDecode a) (rlpDecode n)
   rlpDecode ch = EVMCode $ rlpDecode ch
 
 instance Binary CodePtr
@@ -57,17 +68,26 @@ instance Ae.ToJSON CodePtr where
                                             , ("name", Ae.toJSON name)
                                             , ("digest", Ae.toJSON hsh)
                                             ]
+  toJSON (CodeAtAddress addr name) = Ae.object [ ("address", Ae.toJSON addr)
+                                               , ("name", Ae.toJSON name)
+                                               ]
 
 instance Ae.FromJSON CodePtr where
   parseJSON (st@Ae.String{}) = EVMCode <$> Ae.parseJSON st
   parseJSON (Ae.Object o) = do
-    kind <- o Ae..: "kind"
-    hsh <- o Ae..: "digest"
+    kind <- o Ae..:? "kind"
     case kind of
-      EVM -> return $ EVMCode hsh
-      SolidVM -> do
+      Just EVM -> do
+        hsh <- o Ae..: "digest"
+        return $ EVMCode hsh
+      Just SolidVM -> do
+        hsh <- o Ae..: "digest"
         name <- o Ae..: "name"
         return $ SolidVMCode name hsh
+      Nothing -> do
+        addr <- o Ae..: "address"
+        name <- o Ae..: "name"
+        return $ CodeAtAddress addr name
   parseJSON x = Ae.typeMismatch "CodePtr" x
 
 derive makeArbitrary ''CodePtr
@@ -76,9 +96,24 @@ derivePersistField "CodePtr"
 
 instance Format CodePtr where
   format (EVMCode ch) = format ch
-  format (SolidVMCode n ch) = "<" ++ n ++ ", " ++ format ch ++ ">"
+  format (SolidVMCode n ch) = "<SolidVMCode: " ++ n ++ ", " ++ format ch ++ ">"
+  format (CodeAtAddress a n) = "<CodeAtAddress: " ++ format a ++ ", " ++ n ++ ">"
 
-codePtrToSHA :: CodePtr -> Keccak256
-codePtrToSHA (EVMCode hsh) = hsh
-codePtrToSHA (SolidVMCode _ hsh) = hsh
+instance ToHttpApiData CodePtr where
+  toUrlPiece (EVMCode hsh) = T.pack $ format hsh
+  toUrlPiece (SolidVMCode name hsh) = T.pack $ name ++ ":" ++ format hsh
+  toUrlPiece (CodeAtAddress addr name) = T.pack $ name ++ "@" ++ formatAddressWithoutColor addr
 
+instance FromHttpApiData CodePtr where
+  parseQueryParam x = case parseQueryParam x of
+    Right hsh -> Right $ EVMCode hsh
+    _ -> case T.split (=='@') x of
+           [addr, name] -> flip CodeAtAddress (T.unpack name) <$> parseQueryParam addr
+           _ -> case T.split (==':') x of
+             [name, hsh] -> SolidVMCode (T.unpack name) <$> parseQueryParam hsh
+             _ -> fail $ "FromHttpApiData CodePtr: couldn't resolve CodePtr from " ++ T.unpack x
+
+instance S.ToParamSchema CodePtr where
+  toParamSchema _ = mempty
+    & S.type_ ?~ S.SwaggerString
+    & S.format ?~ "hex string"

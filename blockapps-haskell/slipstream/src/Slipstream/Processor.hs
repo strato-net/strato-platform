@@ -47,6 +47,7 @@ import Data.Text (Text)
 import Database.PostgreSQL.Typed (PGConnection)
 
 import Blockapps.Crossmon
+import Blockchain.Data.AddressStateDB
 
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
@@ -64,7 +65,6 @@ import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 
 
@@ -105,13 +105,9 @@ enterBloc2 env x = do
    Left e -> error $ show e
    Right v -> return v
 
-{-# NOINLINE emptyHash #-}
-emptyHash :: Keccak256
-emptyHash = hash B.empty
-
 matters :: AggregateAction -> Bool
 matters AggregateAction{..} = (actionType == Create || (not $ diffNull actionStorage))
-                           && (codePtrToSHA actionCodeHash /= emptyHash)
+                           && (resolvedCodePtrToSHA actionCodeHash /= emptyHash)
 
 -- assumes all Actions in the list are for the same (Address, Maybe ChainId) pair
 combineActions :: [AggregateAction] -> AggregateAction

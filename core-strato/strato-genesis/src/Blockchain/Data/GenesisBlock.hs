@@ -206,9 +206,11 @@ zipSourceInfo accounts codes =
       findCodeFor (NonContract _ _) = Nothing
       findCodeFor acc@(ContractNoStorage _ _ (EVMCode hsh)) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor (ContractNoStorage _ _ (CodeAtAddress _ _)) = Nothing -- this is only for the main chain genesis block, so we'll stipulate that it cannot contain references by address
       findCodeFor acc@(ContractWithStorage _ _ (EVMCode hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-  in catMaybes . map findCodeFor $ accounts
+      findCodeFor (ContractWithStorage _ _ (CodeAtAddress _ _) _) = Nothing
+  in catMaybes $ map findCodeFor accounts
 
 genesisInfoToGenesisBlock :: ( MonadLogger m
                              , HasCodeDB m
@@ -258,6 +260,7 @@ initializeChainDBs :: ( MonadLogger m
                       , HasHashDB m
                       , HasSQLDB m
                       , HasStateDB m
+                      , (Ad.Address `A.Alters` AddressState) m
                       )
                    => Ext.Word256
                    -> ChainInfo
@@ -283,36 +286,36 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
         let cHash = hash $ codeInfoCode ci
             md    = Map.fromList [("src",codeInfoSource ci),("name",codeInfoName ci)]
          in (cHash, md)
-      getMetadata = fmap (`Map.union` chainMetadata) . flip Map.lookup metadatas
-      toAction a d = A.Action
-        { A._actionBlockHash = creationBlock
-        , A._actionBlockTimestamp = posixSecondsToUTCTime 0
-        , A._actionBlockNumber = 0
-        , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 chainId
-        , A._actionTransactionChainId = Just chainId
-        , A._actionTransactionSender = Ad.Address 0
-        , A._actionData = Map.singleton a $
-                           A.ActionData
-                             (codeHash d)
-                             vmType
-                             (case storage d of
-                                EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
-                                SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map fromDiff m)
-                             [A.emptyCallData]
-        , A._actionMetadata = getMetadata ch
-        , A._actionEvents = S.empty
-        }
+      getMetadata mch = fmap (`Map.union` chainMetadata) $ flip Map.lookup metadatas =<< mch
+      toAction a d = do
+        vm <- codePtrToCodeKind $ codeHash d
+        pure A.Action
+          { A._actionBlockHash = creationBlock
+          , A._actionBlockTimestamp = posixSecondsToUTCTime 0
+          , A._actionBlockNumber = 0
+          , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 chainId
+          , A._actionTransactionChainId = Just chainId
+          , A._actionTransactionSender = Ad.Address 0
+          , A._actionData = Map.singleton a $
+                             A.ActionData
+                               (codeHash d)
+                               vm
+                               (case storage d of
+                                  EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
+                                  SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map fromDiff m)
+                               [A.emptyCallData]
+          , A._actionMetadata = getMetadata ch
+          , A._actionEvents = S.empty
+          }
         where
              ch =
                case codeHash d of
-                 EVMCode ch' -> ch'
-                 SolidVMCode _ ch' -> ch'
-             vmType = case codeHash d of
-                 EVMCode _ -> EVM
-                 SolidVMCode _ _ -> SolidVM
+                 EVMCode ch' -> Just ch'
+                 SolidVMCode _ ch' -> Just ch'
+                 CodeAtAddress _ _ -> Nothing
       fromDiff (Value v) = v
-      squashMap f = map (uncurry f) . Map.toList
-      actions = squashMap toAction accountDiffs
+      squashMap f = traverse (uncurry f) . Map.toList
+  actions <- squashMap toAction accountDiffs
   mErr <- liftIO . runKafkaConfigured "strato-genesis" $ writeActionJSONToKafka actions
   case filterResponse <$> mErr of
     Right [] -> return ()

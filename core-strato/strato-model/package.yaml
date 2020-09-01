@@ -47,6 +47,7 @@ library:
     - integer-gmp
     - lens
     - memory
+    - monad-alter
     - nibblestring
     - quickcheck-instances
     - path-pieces

@@ -59,6 +59,7 @@ setContractABIs gref (SolidVMCode _ !codeHash) detailsMap = do
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{contractABIs=HM.insert codeHash detailsMap contractABIs}
 setContractABIs _ (EVMCode _) _ = error "cannot use the contractABIs cache for EVM contracts"
+setContractABIs _ (CodeAtAddress _ _) _ = error "cannot use the contractABIs cache for CodeAtAddress contracts"
 
 
 getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text (Int32, ContractDetails)))
@@ -66,6 +67,7 @@ getContractABIs gref (SolidVMCode _ !codeHash) = do
   abis <- contractABIs <$> readIORef gref
   return $ HM.lookup codeHash abis
 getContractABIs _ (EVMCode _) = error "cannot use the contractABIs cache for EVM contracts"
+getContractABIs _ (CodeAtAddress _ _) = error "cannot use the contractABIs cache for CodeAtAddress contracts"
 
 setContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
 setContractCreated globalsIORef codeHash = do

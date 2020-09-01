@@ -150,6 +150,7 @@ instance Bagger.MonadBagger ContextM where
             Just f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
             Just f@TFChainIdMismatch{} -> recoverable f
             Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
+            Just f@TFCodeCollectionNotFound{} -> recoverable f
 
     rewardCoinbases sr us uncles ourNumber = do
         startingStateRoot <- Mod.get (Proxy @MP.StateRoot)
@@ -234,6 +235,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
         (p' s q ++ "tx gas limit", hsh)
     LessLucrative  s q OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
         (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
+    CodeNotFound s q a n OutputTx{otHash=h} ->
+        (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "
@@ -507,7 +510,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
     lift $ P.incCounter txTypeCounter
     if success
         then do
-            execResults <- lift $ runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr t
+            execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAddr t
             s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
@@ -543,7 +546,7 @@ runCodeForTransaction :: VMBase m
                       -> Gas
                       -> Address
                       -> OutputTx
-                      -> m ExecResults
+                      -> ExceptT TransactionFailureCause m ExecResults
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
   when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
@@ -557,10 +560,10 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
                          return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
   --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
-  nonce <- addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
+  nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
   let newAddress = getNewAddress_unsafe tAddr (nonce-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
 
-  create isRunningTests'
+  lift $ create isRunningTests'
            isHomestead
            S.empty
            b
@@ -576,36 +579,44 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{
            (txChainId ut)
            (txMetadata ut)
 
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr OutputTx{otBaseTx=ut} = do --MessageTX
+runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr o@OutputTx{otBaseTx=ut} = do --MessageTX
   when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
 
   let owner = transactionTo ut
 
-  codeHash <- addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
+  codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
+  resolvedCodeHash <- lift $ resolveCodePtr codeHash
 
-  let call =
+  let eCall =
         case codeHash of
-          EVMCode _ -> EVM.call
-          SolidVMCode _ _ ->  SolidVM.call
+          EVMCode _ -> Right EVM.call
+          SolidVMCode _ _ ->  Right SolidVM.call
+          CodeAtAddress addr name -> case resolvedCodeHash of
+            Just (EVMCode _) -> Right EVM.call
+            Just (SolidVMCode _ _) -> Right SolidVM.call
+            Just (CodeAtAddress addr' name') -> Left (addr', name')
+            Nothing -> Left (addr, name)
 
-
-  call isRunningTests'
-       isHomestead
-       False
-       S.empty
-       b
-       0
-       owner
-       owner
-       tAddr
-       (fromInteger $ transactionValue ut)
-       (fromInteger $ transactionGasPrice ut)
-       (transactionData ut)
-       (fromIntegral availableGas)
-       tAddr
-       (txHash ut)
-       (txChainId ut)
-       (txMetadata ut)
+  case eCall of
+    Left (addr, name) -> throwE $ TFCodeCollectionNotFound addr name o
+    Right call -> lift $
+      call isRunningTests'
+        isHomestead
+        False
+        S.empty
+        b
+        0
+        owner
+        owner
+        tAddr
+        (fromInteger $ transactionValue ut)
+        (fromInteger $ transactionGasPrice ut)
+        (transactionData ut)
+        (fromIntegral availableGas)
+        tAddr
+        (txHash ut)
+        (txChainId ut)
+        (txMetadata ut)
 
 ----------------
 
@@ -834,6 +845,7 @@ completeDiff :: ( MonadLogger m
                 , HasCodeDB m
                 , HasHashDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
+                , (Address `A.Alters` AddressState) m
                 )
              => ToDiff -> m SD.StateDiff
 completeDiff (src, dst, hsh, num) = do

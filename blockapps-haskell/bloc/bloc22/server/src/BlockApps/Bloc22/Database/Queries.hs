@@ -40,6 +40,7 @@ import           Database.PostgreSQL.Simple      (Connection)
 import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
 import           System.Clock
+import           Text.Format
 import           UnliftIO
 
 import           BlockApps.Bloc22.API.Utils
@@ -397,6 +398,11 @@ getContractsDataNamesQuery contractName =
 
 getContractsMetaDataId :: Text -> Address -> Maybe ChainId -> Bloc (Maybe Int32)
 getContractsMetaDataId name contractId = fmap (fmap fst) . getContractDetailsAndMetadataId (ContractName name) contractId
+
+getContractDetailsAndMetadataIdByAddressOnly :: Address -> Maybe ChainId -> Bloc (Maybe (Int32, ContractDetails))
+getContractDetailsAndMetadataIdByAddressOnly contractAddr chainId = do
+  mName <- fmap listToMaybe . blocQuery $ contractNameFromAddress contractAddr chainId
+  fmap join . for mName $ \name -> getContractDetailsAndMetadataId (ContractName name) contractAddr chainId
 
 getContractDetailsByAddressOnly :: Address -> Maybe ChainId -> Bloc (Maybe ContractDetails)
 getContractDetailsByAddressOnly contractAddr chainId = do
@@ -854,6 +860,11 @@ getContractDetailsForContract theVM src mContract = do
           (SolidVMCode _ _) -> case theVM of
             "EVM" -> throwIO $ UserError evmContractSolidVMError
             _ -> pure x
+          (CodeAtAddress addr name) -> do
+            mCmIdDetails <- getContractDetailsAndMetadataIdByAddressOnly addr Nothing
+            case mCmIdDetails of
+              Nothing -> throwIO . UserError . Text.pack $ "Could not find contract details for " ++ name ++ " at address " ++ format addr
+              Just cmIdDetails -> pure (Text.pack name, cmIdDetails)
 
 sourceToContractDetails :: Should Compile -> Text -> Bloc (Map Text (Int32, ContractDetails))
 sourceToContractDetails shouldCompile source = do

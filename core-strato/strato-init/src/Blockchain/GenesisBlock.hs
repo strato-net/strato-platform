@@ -157,8 +157,17 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
     $logInfoS "initgen" "populateStorageDBs is done"
 
 --------------------------------------
-populateStorageDBs::(MonadLogger m, HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m) =>
-                    (Keccak256 -> Maybe (Map Text Text)) -> Block -> Maybe Word256 -> m ()
+populateStorageDBs :: ( MonadLogger m
+                      , HasSQLDB m
+                      , HasCodeDB m
+                      , HasStateDB m
+                      , HasHashDB m
+                      , (Ad.Address `Alters` AddressState) m
+                      )
+                   => (Keccak256 -> Maybe (Map Text Text))
+                   -> Block 
+                   -> Maybe Word256 
+                   -> m ()
 populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
     sr <- getStateRoot
@@ -206,6 +215,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     case codeHash d of
                       EVMCode ch' -> ch'
                       SolidVMCode _ ch' -> ch'
+                      CodeAtAddress _ _ -> error "TODO: Encountered CodeAtAddress in genesis block"
           fromDiff :: Diff Word256 'Eventual -> Word256
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList

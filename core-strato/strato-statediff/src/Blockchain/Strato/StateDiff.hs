@@ -162,6 +162,7 @@ chainDiff :: ( HasStateDB m
              , Modifiable BlockHashRoot m
              , Modifiable GenesisRoot m
              , Modifiable BestBlockRoot m
+             , (Address `Alters` AddressState) m
              )
           => Word256 -> Integer -> Keccak256 -> m (Maybe StateDiff)
 chainDiff chainId newBlockNum newBlockHash = do
@@ -175,8 +176,12 @@ chainDiff chainId newBlockNum newBlockHash = do
       putChainBestBlock chainId newBlockHash newBlockNum
       Just <$> stateDiff (Just chainId) newBlockNum newBlockHash sr newSR
 
-stateDiff :: (HasCodeDB m, HasHashDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
-             Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m StateDiff
+stateDiff :: ( HasCodeDB m
+             , HasHashDB m
+             , (MP.StateRoot `Alters` MP.NodeData) m
+             , (Address `Alters` AddressState) m
+             ) 
+          => Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m StateDiff
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   diffs <- Diff.dbDiff oldRoot newRoot
   collectModes diffs $
@@ -205,16 +210,24 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
       updateDiff <- accountUpdate k v1 v2
       coll c d (updateDiff : u) rest
 
-accountEnd :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
-              [N.Nibble] -> Val -> m (Address, AccountDiff 'Eventual)
+accountEnd :: ( HasHashDB m
+              , HasCodeDB m
+              , (MP.StateRoot `Alters` MP.NodeData) m
+              , (Address `Alters` AddressState) m
+              )
+           => [N.Nibble] -> Val -> m (Address, AccountDiff 'Eventual)
 accountEnd k v = do
   address <- lookupAddress k
   let addrState = retrieveMPDBValue v
   accountDiff <- eventualAccountState addrState
   return (address, accountDiff)
 
-accountUpdate :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
-                 [N.Nibble] -> Val -> Val -> m (Address, AccountDiff 'Incremental)
+accountUpdate :: ( HasHashDB m
+                 , HasCodeDB m
+                 , (MP.StateRoot `Alters` MP.NodeData) m
+                 , (Address `Alters` AddressState) m
+                 ) 
+              => [N.Nibble] -> Val -> Val -> m (Address, AccountDiff 'Incremental)
 accountUpdate k vOld vNew = do
   address <- lookupAddress k
   let oldAddrState = retrieveMPDBValue vOld
@@ -222,8 +235,12 @@ accountUpdate k vOld vNew = do
   accountDiff <- incrementalAccountState oldAddrState newAddrState
   return (address, accountDiff)
 
-eventualAccountState :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
-                        AddressState -> m (AccountDiff 'Eventual)
+eventualAccountState :: ( HasHashDB m
+                        , HasCodeDB m
+                        , (MP.StateRoot `Alters` MP.NodeData) m
+                        , (Address `Alters` AddressState) m
+                        )
+                     => AddressState -> m (AccountDiff 'Eventual)
 eventualAccountState
   AddressState{
     addressStateNonce,
@@ -245,12 +262,14 @@ eventualAccountState
       }
 
 
-incrementalAccountState :: (HasHashDB m, HasCodeDB m, (MP.StateRoot `Alters` MP.NodeData) m) =>
-                           AddressState -> AddressState -> m (AccountDiff 'Incremental)
+incrementalAccountState :: ( HasHashDB m
+                           , HasCodeDB m
+                           , (MP.StateRoot `Alters` MP.NodeData) m
+                           , (Address `Alters` AddressState) m
+                           ) 
+                        => AddressState -> AddressState -> m (AccountDiff 'Incremental)
 incrementalAccountState oldState newState = do
-  let codeKind = case addressStateCodeHash newState of
-                   EVMCode{} -> EVM
-                   SolidVMCode{} -> SolidVM
+  codeKind <- codePtrToCodeKind (addressStateCodeHash newState)
   storage <- (incrementalStorage codeKind `on` addressStateContractRoot) oldState newState
   return AccountDiff{
     nonce = (diff `on` addressStateNonce) oldState newState,
@@ -314,9 +333,10 @@ decodeStorageKV k v = do
 lookupAddress :: HasHashDB m => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (HasHashDB m, HasCodeDB m) => CodePtr -> m (CodeKind, ByteString)
+lookupCode :: (HasHashDB m, HasCodeDB m, (Address `Alters` AddressState) m) => CodePtr -> m (CodeKind, ByteString)
 lookupCode (EVMCode ch) = lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = lookupInMPDB "contract code" getCode ch
+lookupCode cp@(CodeAtAddress _ _) = maybe (pure (EVM, "")) lookupCode =<< resolveCodePtr cp
 
 lookupInMPDB :: (HasHashDB m, Format a) =>
                 String -> (a -> m (Maybe b)) -> a -> m b

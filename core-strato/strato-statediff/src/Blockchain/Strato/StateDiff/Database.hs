@@ -3,6 +3,7 @@
 {-# LANGUAGE NamedFieldPuns   #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Strato.StateDiff.Database
     ( sqlDiff
@@ -26,6 +27,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.SolidVM.Model
 
 import           Control.Monad
+import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (for_)
@@ -36,7 +38,7 @@ import           Blockchain.Strato.StateDiff
 
 type SqlDbM m = SQL.SqlPersistT m
 
-sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m)=>
+sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, (Address `Alters` AddressState) m)=>
            Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m ()
 sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
@@ -74,10 +76,7 @@ createAccount chainId blockNumber addressDiffs = do
       addressStateRefBalance = getField (theError address "balance") $ balance diff,
       addressStateRefContractRoot = getField (theError address "contractRoot") $ contractRoot diff,
       addressStateRefCode = getField (theError address "code") $ code diff,
-      addressStateRefCodeHash =
-          case codeHash diff of
-            SolidVMCode _ ch -> ch
-            EVMCode ch -> ch,
+      addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
       addressStateRefChainId = fromMaybe 0 chainId
       }

@@ -14,6 +14,7 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.SQLDB
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 
 import Blockchain.Strato.Model.ExtendedWord
@@ -31,7 +32,7 @@ updateSQLBalanceAndNonce vals = do
               addressStateRefBalance = v,
               addressStateRefContractRoot = MP.emptyTriePtr,
               addressStateRefCode = "",
-              addressStateRefCodeHash = hash "",
+              addressStateRefCodeHash = EVMCode $ hash "",
               addressStateRefChainId = fromMaybe 0 c,
               addressStateRefLatestBlockDataRefNumber = 0
             }

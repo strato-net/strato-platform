@@ -1,4 +1,8 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeOperators #-}
 
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -6,10 +10,16 @@
 module Blockchain.Data.AddressStateDB (
   AddressState(..),
   CodePtr(..),
-  blankAddressState
+  blankAddressState,
+  resolveCodePtr,
+  codePtrToSHA,
+  resolvedCodePtrToSHA,
+  codePtrToCodeKind
 ) where
 
-
+import           Prelude hiding (lookup)
+import           Control.Monad
+import           Control.Monad.Change.Alter
 import           Data.Default
 import           Data.Maybe                         (maybeToList)
 
@@ -21,6 +31,7 @@ import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Util
@@ -80,3 +91,24 @@ instance RLPSerializable AddressState where
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
 
+resolveCodePtr :: (Address `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
+resolveCodePtr (CodeAtAddress addr _) = lookup Proxy addr >>= \case
+  Nothing -> pure Nothing
+  Just AddressState{..} -> resolveCodePtr addressStateCodeHash
+resolveCodePtr codePtr = pure $ Just codePtr
+
+codePtrToSHA :: (Address `Alters` AddressState) m => CodePtr -> m (Maybe Keccak256)
+codePtrToSHA = resolveCodePtr >=> \case
+  Just (EVMCode hsh) -> pure $ Just hsh
+  Just (SolidVMCode _ hsh) -> pure $ Just hsh
+  _ -> pure Nothing -- CodeAtAddress cannot happen here
+
+resolvedCodePtrToSHA :: CodePtr -> Keccak256
+resolvedCodePtrToSHA (EVMCode hsh) = hsh
+resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
+resolvedCodePtrToSHA _ = emptyHash
+
+codePtrToCodeKind :: (Address `Alters` AddressState) m => CodePtr -> m CodeKind
+codePtrToCodeKind = resolveCodePtr >=> \case
+  Just (SolidVMCode _ _) -> pure SolidVM
+  _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?

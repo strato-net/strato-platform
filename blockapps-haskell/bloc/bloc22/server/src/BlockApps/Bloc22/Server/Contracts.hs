@@ -295,6 +295,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
             case ptr of
               EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) hsh
               SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) hsh
+              CodeAtAddress _ _ -> throwIO . AnError $ "sourceToContractDetails somehow returned CodeAtAddress"
 
 postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
 postContractsXabi PostXabiRequest{..} =

@@ -19,7 +19,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.SolidVM.Model
 import qualified Slipstream.Data.Action as SS
 
 convert :: BS.Action -> Either String SS.Action -- 🤔
