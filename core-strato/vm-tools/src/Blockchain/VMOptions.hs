@@ -18,6 +18,7 @@ module Blockchain.VMOptions (
   flags_transactionRootVerification,
   flags_startingBlock,
   flags_miner,
+  flags_gasOn
   ) where
 
 import           Blockchain.Mining
@@ -46,3 +47,4 @@ defineFlag "svmDev" (False::Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (False::Bool) "Whether to have verbose logging in SolidVM"
 defineFlag "cacheTransactionResults" True "Keep transaction results in an LRU cache to avoid reruns"
 defineEQFlag "miner" [| Instant :: MinerType |] "MINER" "What mining algorithm"
+defineFlag "gasOn" (True::Bool) "Whether to charge for transactions or not"

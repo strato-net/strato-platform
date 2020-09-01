@@ -147,7 +147,7 @@ function newnode {
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
-                         +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
+                         --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   if [ "${USE_STRATO_API}" = true ]; then
       tbFlag="--blockstanbul=${blockstanbul}"
