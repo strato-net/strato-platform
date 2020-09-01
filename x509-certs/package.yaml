@@ -20,6 +20,7 @@ library:
   source-dirs: src
   ghc-options: -Wall -O2 
   dependencies:
+  - aeson
   - asn1-encoding
   - asn1-types
   - bytestring
@@ -31,6 +32,7 @@ library:
   - memory
   - pem
   - random
+  - text
   - time
   - transformers
   - secp256k1-haskell
