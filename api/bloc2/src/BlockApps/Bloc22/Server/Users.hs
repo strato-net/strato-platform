@@ -9,19 +9,11 @@
 
 module BlockApps.Bloc22.Server.Users (
   TRD(..),
-
-  TransactionHeader(..),
---  genNonces,
---  constructArgValues,
   forStateT,
---  getAccountTxParams,
---  getArgValues,
   cacheLookup,
-  
   getBlocTransactionResult,
   getBlocTransactionResult',
   postBlocTransactionResults
---  postUsersContractMethodList'
   ) where
 
 import           ClassyPrelude                     ((<>), Hashable)
@@ -67,17 +59,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Wei
-
-data TransactionHeader = TransactionHeader
-  { transactionheaderToAddr   :: Maybe Address
-  , transactionheaderFromAddr :: Address
-  , transactionheaderTxParams :: TxParams
-  , transactionheaderValue    :: Wei
-  , transactionheaderCode     :: ByteString
-  , transactionheaderChainId  :: Maybe ChainId
-  }
-
+  
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
   , trdHash   :: Keccak256

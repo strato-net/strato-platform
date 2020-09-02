@@ -837,3 +837,12 @@ getArgValues argsMap argNamesTypes = do
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
 
+data TransactionHeader = TransactionHeader
+  { transactionheaderToAddr   :: Maybe Address
+  , transactionheaderFromAddr :: Address
+  , transactionheaderTxParams :: TxParams
+  , transactionheaderValue    :: Wei
+  , transactionheaderCode     :: ByteString
+  , transactionheaderChainId  :: Maybe ChainId
+  }
+
