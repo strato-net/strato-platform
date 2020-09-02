@@ -20,6 +20,7 @@ module BlockApps.Bloc22.Server.Utils
 import           Control.Concurrent               (threadDelay)
 import           Control.Monad                    (forM, unless, when)
 import           Control.Monad.IO.Class           (liftIO)
+import           Control.Monad.Logger
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.Map.Strict                  as M
 import           Data.Maybe
@@ -39,7 +40,8 @@ import           UnliftIO
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
 
-maybeTxBatchResult :: [Keccak256] -> Bloc [Maybe TransactionResult]
+maybeTxBatchResult :: (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+                      [Keccak256] -> m [Maybe TransactionResult]
 maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (batchTransactionResultClient hashes))
   where maybeHeads btxr =
           let list = map (flip M.lookup btxr) hashes
@@ -48,7 +50,8 @@ maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (batchTransactionResultCl
             Just trs -> listToMaybe trs
 
 
-getBatchBlocTxStatus :: [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe TransactionResult)]
+getBatchBlocTxStatus :: (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+                        [Keccak256] -> m [(BlocTransactionStatus, Maybe TransactionResult)]
 getBatchBlocTxStatus hashes = do
   mtxrs <- maybeTxBatchResult hashes
   forM mtxrs $ \mtxr ->

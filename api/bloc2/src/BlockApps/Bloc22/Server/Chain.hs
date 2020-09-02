@@ -13,6 +13,7 @@ module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Applicative               (liftA2)
 import           Control.Monad                     (when, unless)
+import           Control.Monad.Trans.Control
 import           Crypto.Random.Entropy
 import qualified Data.ByteString.Base16            as B16
 import           Data.Foldable                     (for_)
@@ -43,6 +44,7 @@ import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Change.Alter
+import           Control.Monad.Composable.BlocSQL
 import           Handlers.Chain
 
 import           UnliftIO
@@ -67,7 +69,8 @@ replaceMembers Struct{..} addrs m =
           TypeArrayDynamic (SimpleType TypeAddress) -> m'
           _ -> m
 
-createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
+createChainInfo :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                   ChainInput -> m (Maybe Int32, ChainInfo)
 createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
@@ -134,7 +137,8 @@ postChainInfo chainInput = do
   for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
-postChainInfos :: [ChainInput] -> Bloc [ChainId]
+postChainInfos :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                  [ChainInput] -> m [ChainId]
 postChainInfos chainInputs = do
   chainInfos <- traverse createChainInfo chainInputs
   chainIds <- blocStrato . postChainsClient $ map snd chainInfos
