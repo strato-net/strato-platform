@@ -17,13 +17,14 @@ module BlockApps.Bloc22.Server.Users (
   genNonces,
   constructArgValues,
   forStateT,
+  getAccountTxParams,
   
   postUsersContractMethod',
-  postUsersSend',
   postUsersSendList',
   postUsersContractEVM',
   postUsersContractSolidVM',
   getBlocTransactionResult,
+  getBlocTransactionResult',
   postBlocTransactionResults
 --  postUsersContractMethodList'
   ) where
@@ -126,27 +127,6 @@ makeLenses ''BatchState
 
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
 forStateT s as = flip evalStateT s . for as
-
-postUsersSend' :: Should CacheNonce -> TransferParameters -> Signer -> Bloc BlocTransactionResult
-postUsersSend' cacheNonce TransferParameters{..} sign = do
-    params <- getAccountTxParams cacheNonce fromAddress chainId txParams
-    tx <- signAndPrepare sign fromAddress metadata $
-      TransactionHeader
-        (Just toAddress)
-        fromAddress
-        params
-        (Wei (fromIntegral $ unStrung value))
-        ByteString.empty
-        chainId
-    txHash <- blocStrato $ postTx tx
-    void . blocModify $ \conn -> runInsertMany conn hashNameTable [
-      ( Nothing
-      , constant txHash
-      , constant (0 :: Int32)
-      , constant (0 :: Int32)
-      , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
-      )]
-    getBlocTransactionResult' [txHash] resolve
 
 postUsersContractEVM' :: Should CacheNonce -> ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $ do

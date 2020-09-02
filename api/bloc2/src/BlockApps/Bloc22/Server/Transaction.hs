@@ -13,9 +13,11 @@ import           Control.Arrow
 import           Control.Lens                      hiding (from, ix)
 import           Control.Monad
 import           Control.Monad.Reader
+import qualified Data.Aeson                        as Aeson
 import qualified Data.ByteString                   as B
 import qualified Data.ByteString.Base16            as B16
 import qualified Data.ByteString.Char8             as BC
+import qualified Data.ByteString.Lazy              as BL
 import           Data.Conduit
 import           Data.Conduit.TQueue
 import           Data.Int                          (Int32)
@@ -24,6 +26,7 @@ import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
+import qualified Data.Text.Encoding                as Text
 import           Opaleye                           hiding (not, null, index, max)
 import           UnliftIO
 
@@ -119,7 +122,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (transferpayloadMetadata p)
                         (transferpayloadChainid p <|> chainId)
                         resolve
-            fmap ((:[]) . BlocTxResult) $ postUsersSend' cacheNonce btp (callSignature userName)
+            fmap ((:[]) . BlocTxResult) $ postUsersSend' cacheNonce btp userName
           xs -> do
             p <- mapM fromTransfer xs
             let btlp = TransferListParameters
@@ -408,3 +411,25 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
         | (txHash,(_,cmId, funcName)) <- zip hashes txsCmIdsFuncNames
         ]
       getBatchBlocTransactionResult' hashes resolve
+
+postUsersSend' :: Should CacheNonce -> TransferParameters -> Text -> Bloc BlocTransactionResult
+postUsersSend' cacheNonce TransferParameters{..} userName = do
+    let sign = callSignature userName
+    params <- getAccountTxParams cacheNonce fromAddress chainId txParams
+    tx <- signAndPrepare sign fromAddress metadata $
+      TransactionHeader
+        (Just toAddress)
+        fromAddress
+        params
+        (Wei (fromIntegral $ unStrung value))
+        B.empty
+        chainId
+    txHash <- blocStrato $ postTx tx
+    void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+      ( Nothing
+      , constant txHash
+      , constant (0 :: Int32)
+      , constant (0 :: Int32)
+      , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
+      )]
+    getBlocTransactionResult' [txHash] resolve
