@@ -10,13 +10,14 @@
 module BlockApps.Bloc22.Server.Users (
   TRD(..),
 
-  getBatchBlocTransactionResult',
-  constructArgValuesAndSource,
+--  getBatchBlocTransactionResult',
+--  constructArgValuesAndSource,
   TransactionHeader(..),
   genNonces,
   constructArgValues,
   forStateT,
   getAccountTxParams,
+  getArgValues,
   
   getBlocTransactionResult,
   getBlocTransactionResult',
@@ -194,12 +195,6 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
 
 getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
-
-getBatchBlocTransactionResult' :: [Keccak256] -> Bool -> Bloc [BlocTransactionResult]
-getBatchBlocTransactionResult' hashes resolve =
-  if resolve
-    then postBlocTransactionResults True hashes
-    else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults :: Bool -> [Keccak256] -> Bloc [BlocTransactionResult]
 postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
@@ -387,22 +382,6 @@ constructArgValues args argNamesTypes = do
       Just argsMap -> do
         vals <- getArgValues argsMap argNamesTypes
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
-
-constructArgValuesAndSource :: Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> Bloc (ByteString, Text)
-constructArgValuesAndSource args argNamesTypes = do
-    case args of
-      Nothing ->
-        if Map.null argNamesTypes
-          then return (ByteString.empty, "()")
-          else throwIO (UserError "no arguments provided to function.")
-      Just argsMap -> do
-        vals <- getArgValues argsMap argNamesTypes
-        let valsAsText = map valueToText vals
-        return $
-          (
-            toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
-            "(" <> Text.intercalate "," valsAsText <> ")"
-          )
 
 getAccountTxParams :: Should CacheNonce -> Address -> Maybe ChainId -> Maybe TxParams -> Bloc TxParams
 getAccountTxParams cacheNonce addr chainId mTxParams = do

@@ -45,10 +45,14 @@ import           BlockApps.Bloc22.Server.Users
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Logging
+import           BlockApps.Solidity.ArgValue
 import qualified BlockApps.Solidity.Contract       as C
+import           BlockApps.Solidity.Storage
 import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
+import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
@@ -64,8 +68,6 @@ import           Data.RLP
 import           Handlers.Transaction
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
-
-
 
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
 mergeTxParams (Just inner) (Just outer) = Just $
@@ -650,4 +652,26 @@ preparePostTx time from tx = flip RawTransaction' "" $ RawTransaction
     toAddr = transactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ transactionChainId tx
     metadata = Map.toList <$> transactionMetadata tx
+
+getBatchBlocTransactionResult' :: [Keccak256] -> Bool -> Bloc [BlocTransactionResult]
+getBatchBlocTransactionResult' hashes resolve =
+  if resolve
+    then postBlocTransactionResults True hashes
+    else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
+
+constructArgValuesAndSource :: Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> Bloc (ByteString, Text)
+constructArgValuesAndSource args argNamesTypes = do
+    case args of
+      Nothing ->
+        if Map.null argNamesTypes
+          then return (B.empty, "()")
+          else throwIO (UserError "no arguments provided to function.")
+      Just argsMap -> do
+        vals <- getArgValues argsMap argNamesTypes
+        let valsAsText = map valueToText vals
+        return $
+          (
+            toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
+            "(" <> Text.intercalate "," valsAsText <> ")"
+          )
 
