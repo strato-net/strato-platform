@@ -1457,7 +1457,7 @@ async function pingOauth(user, options) {
 
 /**
  * @static
- * This function creates a private chain based on arguments given
+ * This function gives back information (including the address) given a contract
  * @example
  *
  * const globalConfig = fsUtil.getYaml("config.yaml");
@@ -1483,8 +1483,7 @@ async function pingOauth(user, options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~Contract} contract This must be the name of the contract
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
- * field are populated
+ * @returns {Object} Returns an object with information including the address, given a contract
  */
 
 async function waitForAddress(user, contract, _options) {
