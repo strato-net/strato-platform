@@ -19,13 +19,13 @@ import qualified Data.ByteString.Char8             as BC
 import           Data.Conduit
 import           Data.Conduit.TQueue
 import           Data.Int                          (Int32)
+import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Opaleye                           hiding (not, null, index, max)
 import           UnliftIO
-
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
@@ -39,14 +39,18 @@ import           BlockApps.Bloc22.Server.Users
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Logging
-import           BlockApps.Solidity.Contract()
+import qualified BlockApps.Solidity.Contract       as C
+import           BlockApps.Solidity.Struct
+import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types            hiding (Transaction (..))
+import           BlockApps.XAbiConverter
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Wei
 import           Handlers.Transaction
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
+
 
 
 
@@ -190,7 +194,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                                 MethodCall n a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
                         chainId
                         resolve
-            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp (callSignature userName)
+            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp userName
         GENESIS -> case txs of
           [] -> return []
           xs -> do
@@ -344,3 +348,63 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
     | (txHash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
     ]
   getBatchBlocTransactionResult' hashes resolve
+
+postUsersContractMethodList' :: Should CacheNonce -> FunctionListParameters -> Text -> Bloc [BlocTransactionResult]
+postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
+  let sign = callSignature userName
+  if null txs
+    then return []
+    else do
+      let txsWithChainids = map (methodcallChainid %~ (<|> chainId)) txs
+      txsWithParams <- genNonces cacheNonce fromAddr methodcallChainid methodcallTxParams txsWithChainids
+      txsCmIdsFuncNames <- forStateT Map.empty txsWithParams $
+        \(MethodCall{..}) -> do
+          mtuple <- use $ at methodcallContractName
+          (mapKey, xabi) <- case mtuple of
+            Just (cmId, x) -> return (cmId, x)
+            Nothing -> do
+              (mapKey' :: Int32,x') <- lift $ blocQuery1 "postUsersContractMethodList'" $ proc () -> do
+                (_,_,_,_,_,_,cmId,x'') <- getContractsContractLatestQuery methodcallContractName -< ()
+                returnA -< (cmId,x'')
+              x <- lift $ deserializeXabi x'
+              at methodcallContractName <?= (mapKey', x)
+          contract' <- case xAbiToContract xabi of
+            Left err -> throwIO . AnError $ Text.pack err
+            Right c -> return c
+          let maybeFunc = OMap.lookup methodcallMethodName (fields $ C.mainStruct contract')
+
+          sel <-
+            case maybeFunc of
+             Just (_, TypeFunction selector _ _) -> return selector
+             _ -> lift $ throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+          let xabiArgs = maybe Map.empty funcArgs . Map.lookup methodcallMethodName $ xabiFuncs xabi
+          (argsBin, argsAsSource) <-
+            lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
+          let methodcallMetadataWithCallInfo = Just $
+                Map.insert "funcName" methodcallMethodName
+                $ Map.insert "args" argsAsSource
+                $ fromMaybe Map.empty methodcallMetadata
+          tx <- lift . signAndPrepare sign fromAddr methodcallMetadataWithCallInfo $
+            TransactionHeader
+              (Just methodcallContractAddress)
+              fromAddr
+              (fromMaybe emptyTxParams _methodcallTxParams)
+              (Wei (fromIntegral $ unStrung methodcallValue))
+              (sel <> argsBin)
+              _methodcallChainid
+          -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+          return (tx,mapKey,methodcallMethodName)
+      let finalTxs = [tx | (tx,_,_) <- txsCmIdsFuncNames]
+      mapM_ ($logDebugLS "postUsersContractMethodList'/txs") finalTxs
+      hashes <- blocStrato $ postTxList finalTxs
+      mapM_ ($logInfoLS "postUsersContractMethodList'/hashes") hashes
+      void . blocModify $ \conn -> runInsertMany conn hashNameTable
+        [( Nothing
+        , constant txHash
+        , constant cmId
+        , constant (2 :: Int32)
+        , constant funcName
+        )
+        | (txHash,(_,cmId, funcName)) <- zip hashes txsCmIdsFuncNames
+        ]
+      getBatchBlocTransactionResult' hashes resolve
