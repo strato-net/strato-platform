@@ -12,24 +12,12 @@ module BlockApps.Bloc22.Server.Users (
   postUsersUploadListEVM',
   postUsersUploadListSolidVM',
   postUsersContractMethod',
-  postUsersSendList,
   postUsersSend',
   postUsersSendList',
   postUsersContractEVM',
-  postUsersUploadList,
-  postUsersContract,
-  postUsersSend,
-  getUsers,
-  postUsersUser,
-  getUsersUser,
-  getUsersKeyStore,
-  postUsersKeyStore,
-  postUsersFill,
   postUsersContractSolidVM',
   getBlocTransactionResult,
   postBlocTransactionResults,
-  postUsersContractMethod,
-  postUsersContractMethodList,
   postUsersContractMethodList'
   ) where
 
@@ -43,7 +31,6 @@ import           Control.Monad.Except
 import           Control.Monad.Extra
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Lazy
-import           Crypto.HaskoinShim
 import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
@@ -69,18 +56,15 @@ import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
-import           Database.PostgreSQL.Simple        (SqlError(..))
 import           Opaleye                           hiding (not, null, index, max)
 import           System.Clock
 import           UnliftIO
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Bloc22.Crypto
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
-import qualified BlockApps.Bloc22.Monad            as M
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Logging
@@ -96,7 +80,6 @@ import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
 import           BlockApps.Strato.Types            (Strung(..))
-import qualified BlockApps.Strato.Types            as Deprecated
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
@@ -109,7 +92,6 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
 import           Handlers.AccountInfo
-import           Handlers.Faucet
 import           Handlers.Transaction
 
 data TransactionHeader = TransactionHeader
@@ -139,103 +121,6 @@ makeLenses ''BatchState
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
 forStateT s as = flip evalStateT s . for as
 
-getUsers :: Bloc [UserName]
-getUsers = do
-  gtfoMyLawn <- asks deployMode
-  case gtfoMyLawn of
-    M.Public -> throwIO (CouldNotFind "no /users endpoint. thank.")
-    M.Enterprise -> blocTransaction $ map UserName <$> blocQuery getUsersQuery
-
-getUsersUser :: UserName -> Bloc [Address]
-getUsersUser (UserName name) = blocTransaction $
-  blocQuery $ getUsersUserQuery name
-
-postUsersUser :: UserName -> Password -> Bloc Address
-postUsersUser (UserName name) pass = blocTransaction $ do
-  keyStore <- newKeyStore pass
-  createdUser <- blocModify $ postUsersUserQuery name keyStore
-  unless createdUser (throwIO (DBError "failed to create user"))
-  return $ keystoreAcctAddress keyStore
-
-getUsersKeyStore :: UserName -> Address -> Password -> Bloc KeyStore
-getUsersKeyStore userName addr password = do
-  let err = throwIO . UserError $ "invalid username or password"
-  uids <- blocQuery . getUserIdQuery $ userName
-  cryptos <- case listToMaybe uids of
-    Nothing -> err
-    Just uid -> blocQuery $ proc () -> do
-      (_, salt, pw, nonce, seckey, pubkey, addr', uid') <- queryTable keyStoreTable -< ()
-      restrict -< uid' .== constant (uid :: Int32)
-              .&& addr' .== constant addr
-      returnA -< (salt, pw, nonce, seckey, pubkey, addr')
-  case listToMaybe cryptos of
-    Nothing -> err
-    Just (salt, pw, nonce, seckey, pubkey, addr') ->
-      case decryptSecKey password salt nonce seckey of
-        Nothing -> err
-        Just _ -> return $ KeyStore salt pw nonce seckey pubkey addr'
-
-postUsersKeyStore :: UserName -> PostUsersKeyStoreRequest -> Bloc Bool
-postUsersKeyStore username (PostUsersKeyStoreRequest password keystore) = do
-  let err = throwIO . UserError $ "invalid username or password"
-  uids <- blocQuery . getUserIdQuery $ username
-  uid <- case uids of
-    [] -> err
-    uid':_ -> return uid'
-  cryptos <- blocQuery $ proc () -> do
-      (_, salt, _, nonce, seckey, _, _, uid') <- queryTable keyStoreTable -< ()
-      restrict -< uid' .== constant (uid :: Int32)
-      returnA -< (salt, nonce, seckey)
-  case catMaybes . map (\(s, n, sk) -> decryptSecKey password s n sk) $ cryptos of
-    [] -> err
-    _ -> blocModify (insertKeyStore uid keystore) `catch`
-          \s@SqlError{..} -> throwIO . AlreadyExists $
-            "keystore could not be inserted: " <> Text.pack (show s)
-
-waitForBalance :: Address -> Bloc ()
-waitForBalance addr = waitFor "no user account found" go
-  where go :: Bloc Bool
-        go = do
-          let params = accountsFilterParams{qaAddress = Just addr, qaMinBalance = Just 1}
-          accts <- blocStrato $ getAccountsFilter params
-          $logInfoLS "waitForBalance/req" params
-          $logInfoLS "waitForBalance/resp" accts
-          return . not $ null accts
-
-postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
-postUsersFill _ addr resolve = blocTransaction $ do
-  when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
-  hashes <- blocStrato $ postFaucetClient addr
-  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
-    ( Nothing
-    , constant h
-    , constant (0 :: Int32)
-    , constant (0 :: Int32)
-    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode Deprecated.defaultPostTx{Deprecated.posttransactionTo = Just addr})
-    ) | h <- hashes]
-  result <- getBlocTransactionResult' hashes resolve
-  when (resolve && Success == blocTransactionStatus result) $ do
-    waitForBalance addr
-  $logInfoLS "postUsersFill/resolve" resolve
-  $logInfoLS "postUsersFill/result" result
-  when (Failure == blocTransactionStatus result) $
-    throwIO $ UnavailableError "faucet transaction failed; please try again"
-  return result
-
-postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
-postUsersSend userName addr chainId resolve
-  (PostSendParameters toAddr value password mTxParams md) = do
-    sk <- getAccountSecKey userName password addr
-    let btp = TransferParameters
-                addr
-                toAddr
-                value
-                mTxParams
-                md
-                chainId
-                resolve
-    postUsersSend' (Don't CacheNonce) btp (return . signTransaction sk)
-
 postUsersSend' :: Should CacheNonce -> TransferParameters -> Signer -> Bloc BlocTransactionResult
 postUsersSend' cacheNonce TransferParameters{..} sign = do
     params <- getAccountTxParams cacheNonce fromAddress chainId txParams
@@ -256,27 +141,6 @@ postUsersSend' cacheNonce TransferParameters{..} sign = do
       , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
       )]
     getBlocTransactionResult' [txHash] resolve
-
-postUsersContract :: UserName -> Address -> Maybe ChainId -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
-postUsersContract userName addr chainId resolve
-  (PostUsersContractRequest src password maybeContract args mTxParams value md) = do
-  sk <- getAccountSecKey userName password addr
-  let bcp = ContractParameters
-              addr
-              src
-              maybeContract
-              args
-              value
-              mTxParams
-              md
-              chainId
-              resolve
-      cacheNonce = Don't CacheNonce
-  case join $ fmap (Map.lookup "VM") $ md of
-    Just "EVM" -> postUsersContractEVM' cacheNonce bcp (return . signTransaction sk)
-    Just "SolidVM" -> postUsersContractSolidVM' cacheNonce bcp (return . signTransaction sk)
-    Nothing -> postUsersContractEVM' cacheNonce bcp (return . signTransaction sk) -- The EVM is the default VM
-    Just vmName -> throwIO $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
 postUsersContractEVM' :: Should CacheNonce -> ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $ do
@@ -345,23 +209,6 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
     , constant contractdetailsName
     )]
   getBlocTransactionResult' [txHash] resolve
-
-postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
-postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts msrcs _resolve) = do
-  sk <- getAccountSecKey userName pw addr
-  let getSrc c = uploadlistcontractSrc c <|> (msrcs >>= Map.lookup (uploadlistcontractContractName c))
-      setSrc c = c{uploadlistcontractSrc = getSrc c}
-      bclp = ContractListParameters
-               addr
-               (setSrc <$> contracts)
-               chainId
-               (resolve || _resolve)
-      cacheNonce = Don't CacheNonce
-  case Map.lookup "VM" =<< uploadlistcontractMetadata (head contracts) of  --Determine VM option by the metadata of the first tx in list
-    Just "EVM" -> postUsersUploadListEVM' cacheNonce bclp (return . signTransaction sk)
-    Just "SolidVM" -> postUsersUploadListSolidVM' cacheNonce bclp (return . signTransaction sk)
-    Nothing -> postUsersUploadListEVM' cacheNonce bclp (return . signTransaction sk) -- The EVM is the default VM
-    Just vmName -> throwIO $ UserError $ Text.pack $ "Invalid value for VM choice: " ++ show vmName ++ ", valid options are 'EVM' or 'SolidVM'"
 
 postUsersUploadListSolidVM' :: Should CacheNonce -> ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
@@ -477,16 +324,6 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
     ]
   getBatchBlocTransactionResult' hashes resolve
 
-postUsersSendList :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendListRequest -> Bloc [BlocTransactionResult]
-postUsersSendList userName addr chainId resolve (PostSendListRequest pw resolve' txs) = do
-  sk <- getAccountSecKey userName pw addr
-  let btlp = TransferListParameters
-               addr
-               txs
-               chainId
-               (resolve || resolve')
-  postUsersSendList' (Don't CacheNonce) btlp (return . signTransaction sk)
-
 postUsersSendList' :: Should CacheNonce -> TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersSendList' cacheNonce TransferListParameters{..} sign = do
   let txsWithChainids = map (sendtransactionChainid %~ (<|> chainId)) txs
@@ -513,22 +350,6 @@ postUsersSendList' cacheNonce TransferListParameters{..} sign = do
     | (tx,txHash) <- zip txs'' hashes
     ]
   getBatchBlocTransactionResult' hashes resolve
-
-postUsersContractMethodList
-  :: UserName
-  -> Address
-  -> Maybe ChainId
-  -> Bool
-  -> PostMethodListRequest
-  -> Bloc [BlocTransactionResult]
-postUsersContractMethodList userName userAddr chainId resolve PostMethodListRequest{..} = do
-  sk <- getAccountSecKey userName postmethodlistrequestPassword userAddr
-  let bflp = FunctionListParameters
-               userAddr
-               postmethodlistrequestTxs
-               chainId
-               (resolve || postmethodlistrequestResolve)
-  postUsersContractMethodList' (Don't CacheNonce) bflp (return . signTransaction sk)
 
 cacheLookup :: (Eq k, Hashable k)
             => Cache.Cache k v
@@ -648,36 +469,6 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} sign = do
         ]
       getBatchBlocTransactionResult' hashes resolve
 
-postUsersContractMethod
-  :: UserName
-  -> Address
-  -> ContractName
-  -> Address
-  -> Maybe ChainId
-  -> Bool
-  -> PostUsersContractMethodRequest
-  -> Bloc BlocTransactionResult
-postUsersContractMethod
-  userName
-  userAddr
-  (ContractName contractName)
-  contractAddr
-  chainId
-  resolve
-  (PostUsersContractMethodRequest password funcName args value mTxParams md) = do
-    sk <- getAccountSecKey userName password userAddr
-    let bfp = FunctionParameters
-                userAddr
-                contractName
-                contractAddr
-                funcName
-                args
-                value
-                mTxParams
-                md
-                chainId
-                resolve
-    postUsersContractMethod' (Don't CacheNonce) bfp (return . signTransaction sk)
 
 postUsersContractMethod' :: Should CacheNonce -> FunctionParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
@@ -1001,27 +792,6 @@ getAccountNonce addr chainIds = do
       let mkCid AddressStateRef{..} = ChainId <$> toMaybe 0 addressStateRefChainId
           mkNonce AddressStateRef{..} = Nonce $ fromInteger addressStateRefNonce
       return . Map.fromList $ map (mkCid &&& mkNonce) accts
-
-getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
-getAccountSecKey userName password addr = do
-  uIds <- blocQuery . getUserIdQuery $ userName
-  cryptos <- case listToMaybe uIds of
-    Nothing -> throwIO . UserError $
-      "no user found with name: " <> getUserName userName
-    Just uId -> blocQuery $ proc () -> do
-      (_,salt,_,nonce,encSecKey,_,addr',uId') <-
-        queryTable keyStoreTable -< ()
-      restrict -< uId' .== constant (uId::Int32)
-        .&& addr' .== constant addr
-      returnA -< (salt,nonce,encSecKey)
-  skMaybe <- case listToMaybe cryptos of
-    Nothing -> throwIO . UserError $
-      "address does not exist for user:" <> getUserName userName
-    Just (salt,nonce,encSecKey) -> return $
-      decryptSecKey password salt nonce encSecKey
-  case skMaybe of
-    Nothing -> throwIO $ UserError "incorrect password"
-    Just sk -> return sk
 
 prepareUnsignedTx :: TransactionHeader -> UnsignedTransaction
 prepareUnsignedTx TransactionHeader{..} = UnsignedTransaction
