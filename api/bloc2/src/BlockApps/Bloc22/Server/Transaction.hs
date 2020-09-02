@@ -130,7 +130,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) p)
                         chainId
                         resolve
-            fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp (callSignature userName)
+            fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp userName
         CONTRACT -> case txs of
           [] -> return []
           [x] -> do
@@ -152,7 +152,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                             Just "SolidVM" -> postUsersContractSolidVM'
                             Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
                                                $ "Invalid value for VM choice: " ++ show vm
-            fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp (callSignature userName)
+            fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp userName
           xs -> do
             ps <- mapM fromContract xs
             let bclp = ContractListParameters
@@ -433,3 +433,104 @@ postUsersSend' cacheNonce TransferParameters{..} userName = do
       , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
       )]
     getBlocTransactionResult' [txHash] resolve
+
+postUsersContractEVM' :: Should CacheNonce -> ContractParameters -> Text -> Bloc BlocTransactionResult
+postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
+  let sign = callSignature userName
+  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+  --TODO: check what happens with mismatching args
+  $logInfoLS "postUsersContractEVM'/args" args
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "EVM" src contract >>= \case
+    Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
+    Just x -> pure x
+  let
+    (bin,leftOver) = B16.decode $ Text.encodeUtf8 contractdetailsBin
+    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
+  unless (B.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
+  let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
+  argsBin <- constructArgValues args xabiArgs
+  tx <- signAndPrepare sign fromAddr metadata' $
+    TransactionHeader
+      Nothing
+      fromAddr
+      params
+      (Wei (fromIntegral (maybe 0 unStrung value)))
+      (bin <> argsBin)
+      chainId
+  $logDebugLS "postUsersContractEVM'/tx" tx
+  txHash <- blocStrato $ postTx tx
+  $logInfoLS "postUsersContractEVM'/hash" txHash
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+    ( Nothing
+    , constant txHash
+    , constant cmId
+    , constant (1 :: Int32)
+    , constant contractdetailsName
+    )]
+  getBlocTransactionResult' [txHash] resolve
+
+postUsersContractSolidVM' :: Should CacheNonce -> ContractParameters -> Text -> Bloc BlocTransactionResult
+postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
+  let sign = callSignature userName
+  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+  --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
+  $logInfoLS "postUsersContractSolidVM'/args" args
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" src contract >>= \case
+    Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+    Just x -> pure x
+
+  let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
+  (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
+
+  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource)]
+
+  tx <- signAndPrepare sign fromAddr metadata' $
+    TransactionHeader
+      Nothing
+      fromAddr
+      params
+      (Wei (fromIntegral (maybe 0 unStrung value)))
+      (BC.pack $ Text.unpack src)
+      chainId
+  $logDebugLS "postUsersContractSolidVM'/tx" tx
+  txHash <- blocStrato $ postTx tx
+  $logInfoLS "postUsersContractSolidVM'/hash" txHash
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+    ( Nothing
+    , constant txHash
+    , constant cmId
+    , constant (1 :: Int32)
+    , constant contractdetailsName
+    )]
+  getBlocTransactionResult' [txHash] resolve
+
+
+
+
+postUsersSendList' :: Should CacheNonce -> TransferListParameters -> Text -> Bloc [BlocTransactionResult]
+postUsersSendList' cacheNonce TransferListParameters{..} userName = do
+  let sign = callSignature userName
+  let txsWithChainids = map (sendtransactionChainid %~ (<|> chainId)) txs
+  txsWithParams <- genNonces cacheNonce fromAddr sendtransactionChainid sendtransactionTxParams txsWithChainids
+  txs'' <- mapM
+    (\(SendTransaction toAddr (Strung value) params cid md) -> do
+        let header = TransactionHeader
+              (Just toAddr)
+              fromAddr
+              (fromMaybe emptyTxParams params)
+              (Wei $ fromIntegral value)
+              (B.empty)
+              cid
+        signAndPrepare sign fromAddr md header
+    ) txsWithParams
+  hashes <- blocStrato $ postTxList txs''
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable
+    [( Nothing
+    , constant txHash
+    , constant (0 :: Int32)
+    , constant (0 :: Int32)
+    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
+    )
+    | (tx,txHash) <- zip txs'' hashes
+    ]
+  getBatchBlocTransactionResult' hashes resolve
