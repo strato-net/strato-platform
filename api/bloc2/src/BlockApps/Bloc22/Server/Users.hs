@@ -12,7 +12,6 @@ module BlockApps.Bloc22.Server.Users (
 
   getBatchBlocTransactionResult',
   constructArgValuesAndSource,
-  signAndPrepare,
   TransactionHeader(..),
   genNonces,
   constructArgValues,
@@ -25,7 +24,7 @@ module BlockApps.Bloc22.Server.Users (
 --  postUsersContractMethodList'
   ) where
 
-import           ClassyPrelude                     ((<>), Hashable, getCurrentTime, UTCTime(..))
+import           ClassyPrelude                     ((<>), Hashable)
 import           Control.Concurrent
 import           Control.Applicative               ((<|>), liftA2)
 import           Control.Arrow
@@ -50,7 +49,6 @@ import           Data.List                         (partition, sortOn)
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
-import           Data.RLP
 import           Data.Semigroup                    (Max(..))
 import           Data.Set                          (isSubsetOf)
 import qualified Data.Set                          as S
@@ -66,7 +64,6 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
-import           BlockApps.Ethereum
 import           BlockApps.Logging
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract()
@@ -80,10 +77,8 @@ import           BlockApps.SolidityVarReader
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
-import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
@@ -97,8 +92,6 @@ data TransactionHeader = TransactionHeader
   , transactionheaderCode     :: ByteString
   , transactionheaderChainId  :: Maybe ChainId
   }
-
-type Signer = UnsignedTransaction -> Bloc Transaction
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
@@ -450,60 +443,3 @@ getAccountNonce addr chainIds = do
           mkNonce AddressStateRef{..} = Nonce $ fromInteger addressStateRefNonce
       return . Map.fromList $ map (mkCid &&& mkNonce) accts
 
-prepareUnsignedTx :: TransactionHeader -> UnsignedTransaction
-prepareUnsignedTx TransactionHeader{..} = UnsignedTransaction
-  { unsignedTransactionNonce =
-      fromMaybe (Nonce 0) (txparamsNonce transactionheaderTxParams)
-  , unsignedTransactionGasPrice =
-      fromMaybe (Wei 1) (txparamsGasPrice transactionheaderTxParams)
-  , unsignedTransactionGasLimit =
-      fromMaybe (Gas 100000000) (txparamsGasLimit transactionheaderTxParams)
-  , unsignedTransactionTo = transactionheaderToAddr
-  , unsignedTransactionValue = transactionheaderValue
-  , unsignedTransactionInitOrData = transactionheaderCode
-  , unsignedTransactionChainId = transactionheaderChainId
-  }
-
-preparePostTx
-  :: UTCTime
-  -> Address
-  -> Transaction
-  -> RawTransaction'
-preparePostTx time from tx = flip RawTransaction' "" $ RawTransaction
-  time
-  from
-  (fromIntegral nonce')
-  (fromIntegral gasPrice)
-  (fromIntegral gasLimit)
-  toAddr
-  (fromIntegral value)
-  code
-  chainId
-  (fromIntegral r)
-  (fromIntegral s)
-  v
-  metadata
-  0
-  kecc
-  API
-  where
-    kecc = hash (rlpSerialize tx)
-    r = transactionR tx
-    s = transactionS tx
-    v = transactionV tx
-    Gas gasLimit = transactionGasLimit tx
-    Wei gasPrice = transactionGasPrice tx
-    Nonce nonce' = transactionNonce tx
-    Wei value = transactionValue tx
-    code = transactionInitOrData tx
-    toAddr = transactionTo tx
-    chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ transactionChainId tx
-    metadata = Map.toList <$> transactionMetadata tx
-
-addMetadata :: Maybe (Map Text Text) -> Transaction -> Transaction
-addMetadata m t = t{transactionMetadata = m}
-
-signAndPrepare :: Signer -> Address -> Maybe (Map Text Text) -> TransactionHeader -> Bloc RawTransaction'
-signAndPrepare sign from md th = do
-  time <- liftIO getCurrentTime
-  fmap (preparePostTx time from . addMetadata md) . sign $ prepareUnsignedTx th

@@ -22,12 +22,14 @@ import qualified Data.ByteString.Lazy              as BL
 import           Data.Conduit
 import           Data.Conduit.TQueue
 import           Data.Int                          (Int32)
+import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
+import           Data.Time.Clock
 import           Opaleye                           hiding (not, null, index, max)
 import           UnliftIO
 
@@ -49,13 +51,19 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Json
+import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Address   (formatAddressWithoutColor)
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Gas
+import           Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
+import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
+import           Data.RLP
 import           Handlers.Transaction
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
-
 
 
 
@@ -240,7 +248,6 @@ callSignature userName unsigned@UnsignedTransaction{..} = do
 
 postUsersUploadListEVM' :: Should CacheNonce -> ContractListParameters -> Text -> Bloc [BlocTransactionResult]
 postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
-  let sign = callSignature userName
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
@@ -264,7 +271,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       argsBin <- lift $ constructArgValues (Just args) xabiArgs
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
-      tx <- lift . signAndPrepare sign fromAddr metadata' $
+      tx <- lift . signAndPrepare userName fromAddr metadata' $
           TransactionHeader
             Nothing
             fromAddr
@@ -298,7 +305,6 @@ evmUploadListError = Text.concat
 
 postUsersUploadListSolidVM' :: Should CacheNonce -> ContractListParameters -> Text -> Bloc [BlocTransactionResult]
 postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
-  let sign = callSignature userName
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
@@ -331,7 +337,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
-      tx <- lift . signAndPrepare sign fromAddr metadata' $
+      tx <- lift . signAndPrepare userName fromAddr metadata' $
           TransactionHeader
             Nothing
             fromAddr
@@ -356,7 +362,6 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
 
 postUsersContractMethodList' :: Should CacheNonce -> FunctionListParameters -> Text -> Bloc [BlocTransactionResult]
 postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
-  let sign = callSignature userName
   if null txs
     then return []
     else do
@@ -389,7 +394,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
                 Map.insert "funcName" methodcallMethodName
                 $ Map.insert "args" argsAsSource
                 $ fromMaybe Map.empty methodcallMetadata
-          tx <- lift . signAndPrepare sign fromAddr methodcallMetadataWithCallInfo $
+          tx <- lift . signAndPrepare userName fromAddr methodcallMetadataWithCallInfo $
             TransactionHeader
               (Just methodcallContractAddress)
               fromAddr
@@ -416,9 +421,8 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
 
 postUsersSend' :: Should CacheNonce -> TransferParameters -> Text -> Bloc BlocTransactionResult
 postUsersSend' cacheNonce TransferParameters{..} userName = do
-    let sign = callSignature userName
     params <- getAccountTxParams cacheNonce fromAddress chainId txParams
-    tx <- signAndPrepare sign fromAddress metadata $
+    tx <- signAndPrepare userName fromAddress metadata $
       TransactionHeader
         (Just toAddress)
         fromAddress
@@ -438,7 +442,6 @@ postUsersSend' cacheNonce TransferParameters{..} userName = do
 
 postUsersContractEVM' :: Should CacheNonce -> ContractParameters -> Text -> Bloc BlocTransactionResult
 postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
-  let sign = callSignature userName
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   $logInfoLS "postUsersContractEVM'/args" args
@@ -451,7 +454,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
   unless (B.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
-  tx <- signAndPrepare sign fromAddr metadata' $
+  tx <- signAndPrepare userName fromAddr metadata' $
     TransactionHeader
       Nothing
       fromAddr
@@ -473,7 +476,6 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
 
 postUsersContractSolidVM' :: Should CacheNonce -> ContractParameters -> Text -> Bloc BlocTransactionResult
 postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
-  let sign = callSignature userName
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
@@ -486,7 +488,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
 
   let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", cName), ("args", argsAsSource)]
 
-  tx <- signAndPrepare sign fromAddr metadata' $
+  tx <- signAndPrepare userName fromAddr metadata' $
     TransactionHeader
       Nothing
       fromAddr
@@ -511,7 +513,6 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
 
 postUsersSendList' :: Should CacheNonce -> TransferListParameters -> Text -> Bloc [BlocTransactionResult]
 postUsersSendList' cacheNonce TransferListParameters{..} userName = do
-  let sign = callSignature userName
   let txsWithChainids = map (sendtransactionChainid %~ (<|> chainId)) txs
   txsWithParams <- genNonces cacheNonce fromAddr sendtransactionChainid sendtransactionTxParams txsWithChainids
   txs'' <- mapM
@@ -523,7 +524,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} userName = do
               (Wei $ fromIntegral value)
               (B.empty)
               cid
-        signAndPrepare sign fromAddr md header
+        signAndPrepare userName fromAddr md header
     ) txsWithParams
   hashes <- blocStrato $ postTxList txs''
   void . blocModify $ \conn -> runInsertMany conn hashNameTable
@@ -539,7 +540,6 @@ postUsersSendList' cacheNonce TransferListParameters{..} userName = do
 
 postUsersContractMethod' :: Should CacheNonce -> FunctionParameters -> Text -> Bloc BlocTransactionResult
 postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
-    let sign = callSignature userName
     params <- getAccountTxParams cacheNonce fromAddr chainId txParams
 
     let err = CouldNotFind $ Text.concat
@@ -571,7 +571,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
           $ Map.insert "args" argsAsSource
           $ fromMaybe Map.empty metadata
 
-    tx <- signAndPrepare sign fromAddr (Just metadataWithCallInfo) $
+    tx <- signAndPrepare userName fromAddr (Just metadataWithCallInfo) $
       TransactionHeader
         (Just contractAddr)
         fromAddr
@@ -590,3 +590,64 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
       , constant funcName
       )]
     getBlocTransactionResult' [txHash] resolve
+
+
+addMetadata :: Maybe (Map Text Text) -> Transaction -> Transaction
+addMetadata m t = t{transactionMetadata = m}
+
+signAndPrepare :: Text -> Address -> Maybe (Map Text Text) -> TransactionHeader -> Bloc RawTransaction'
+signAndPrepare userName from md th = do
+  time <- liftIO getCurrentTime
+  fmap (preparePostTx time from . addMetadata md) . callSignature userName $ prepareUnsignedTx th
+
+prepareUnsignedTx :: TransactionHeader -> UnsignedTransaction
+prepareUnsignedTx TransactionHeader{..} = UnsignedTransaction
+  { unsignedTransactionNonce =
+      fromMaybe (Nonce 0) (txparamsNonce transactionheaderTxParams)
+  , unsignedTransactionGasPrice =
+      fromMaybe (Wei 1) (txparamsGasPrice transactionheaderTxParams)
+  , unsignedTransactionGasLimit =
+      fromMaybe (Gas 100000000) (txparamsGasLimit transactionheaderTxParams)
+  , unsignedTransactionTo = transactionheaderToAddr
+  , unsignedTransactionValue = transactionheaderValue
+  , unsignedTransactionInitOrData = transactionheaderCode
+  , unsignedTransactionChainId = transactionheaderChainId
+  }
+
+
+preparePostTx
+  :: UTCTime
+  -> Address
+  -> Transaction
+  -> RawTransaction'
+preparePostTx time from tx = flip RawTransaction' "" $ RawTransaction
+  time
+  from
+  (fromIntegral nonce')
+  (fromIntegral gasPrice)
+  (fromIntegral gasLimit)
+  toAddr
+  (fromIntegral value)
+  code
+  chainId
+  (fromIntegral r)
+  (fromIntegral s)
+  v
+  metadata
+  0
+  kecc
+  API
+  where
+    kecc = hash (rlpSerialize tx)
+    r = transactionR tx
+    s = transactionS tx
+    v = transactionV tx
+    Gas gasLimit = transactionGasLimit tx
+    Wei gasPrice = transactionGasPrice tx
+    Nonce nonce' = transactionNonce tx
+    Wei value = transactionValue tx
+    code = transactionInitOrData tx
+    toAddr = transactionTo tx
+    chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ transactionChainId tx
+    metadata = Map.toList <$> transactionMetadata tx
+
