@@ -14,6 +14,7 @@ import           Control.Lens                      hiding (from, ix)
 import           Control.Monad
 import           Control.Monad.Reader
 import qualified Data.Aeson                        as Aeson
+import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as B
 import qualified Data.ByteString.Base16            as B16
 import qualified Data.ByteString.Char8             as BC
@@ -48,6 +49,7 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
+import           Blockchain.Strato.Model.Address   (formatAddressWithoutColor)
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Wei
 import           Handlers.Transaction
@@ -188,7 +190,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
-            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp (callSignature userName)
+            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp userName
           xs -> do
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
@@ -534,3 +536,57 @@ postUsersSendList' cacheNonce TransferListParameters{..} userName = do
     | (tx,txHash) <- zip txs'' hashes
     ]
   getBatchBlocTransactionResult' hashes resolve
+
+postUsersContractMethod' :: Should CacheNonce -> FunctionParameters -> Text -> Bloc BlocTransactionResult
+postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
+    let sign = callSignature userName
+    params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+
+    let err = CouldNotFind $ Text.concat
+                [ "postUsersContractMethod': Couldn't find contract details for "
+                , contractName
+                , " at address "
+                , Text.pack $ formatAddressWithoutColor contractAddr
+                ]
+    (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
+      getContractDetailsAndMetadataId
+        (ContractName contractName)
+        contractAddr
+        chainId
+    contract' <- case xAbiToContract xabi of
+      Left e -> throwIO . AnError $ Text.pack e
+      Right c -> return c
+
+    let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
+        xabiArgs = maybe Map.empty funcArgs . Map.lookup funcName $ xabiFuncs xabi
+
+    sel <-
+      case maybeFunc of
+       Just (_, TypeFunction selector _ _) -> return selector
+       _ -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
+
+    (argsBin, argsAsSource) <- constructArgValuesAndSource (Just args) xabiArgs
+    let metadataWithCallInfo =
+          Map.insert "funcName" funcName
+          $ Map.insert "args" argsAsSource
+          $ fromMaybe Map.empty metadata
+
+    tx <- signAndPrepare sign fromAddr (Just metadataWithCallInfo) $
+      TransactionHeader
+        (Just contractAddr)
+        fromAddr
+        params
+        (Wei (maybe 0 (fromIntegral . unStrung) value))
+        ((sel::ByteString) <> (argsBin::ByteString))
+        chainId
+    $logDebugLS "postUsersContractMethod'/tx" tx
+    txHash <- blocStrato $ postTx tx
+    $logInfoLS "postUsersContractMethod'/hash" txHash
+    void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+      ( Nothing
+      , constant txHash
+      , constant cmId
+      , constant (2 :: Int32)
+      , constant funcName
+      )]
+    getBlocTransactionResult' [txHash] resolve
