@@ -170,6 +170,18 @@ import jwt from "jsonwebtoken";
  * @property {Object} xabi: An object defining the contract metadata
  */
 
+ /**
+ * @typedef {Object} ChainHash The hash of a chain
+ * @property {String} hash The hash of a chain
+ */
+
+ /**
+ * @typedef {Object} ChainInfo Info about a chain such as members/balances/etc.
+ * @property {Array<Object>} balances Balances existing within the chain
+ * @property {Array<Object>} members Members of the chain
+ * @property {String} label Name of the chain
+ */
+
 // =====================================================================
 //   util
 // =====================================================================
@@ -1054,9 +1066,9 @@ async function sendMany(user, sendTxs, options) {
  * //     transaction_function_name: '',
  * //     storedData: 10 } ]
  * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
+ * @param {module:rest~Contract} contracts This the contract to search for
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * @returns {Object} If `options.async` is set, only the hashes are populated, otherwise all the
  * field are populated
  */
 
@@ -1099,10 +1111,10 @@ async function search(user, contract, options) {
  * //     transaction_function_name: '',
  * //     storedData: 10 } ]
  * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
+ * @param {module:rest~Contract} contract This the contract to search for
  * @param {module:rest~Predicate} predicate This identifies the predicate that determines when to stop the search
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * @returns {Object} If `options.async` is set, only the hashes are populated, otherwise all the
  * field are populated
  */
 
@@ -1142,9 +1154,9 @@ async function searchUntil(user, contract, predicate, options) {
  * //        storedData: 0 } ],
  * //   contentRange: { start: 0, end: 0, count: 1 } }
  * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
+ * @param {module:rest~Contract} contract This the contract to search for
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
+ * @returns {Object} If `options.async` is set, only the hashes are populated, otherwise all the
  * field are populated
  */
 
@@ -1228,7 +1240,7 @@ async function searchWithContentRange(user, contract, options) {
  * //        stringValue: '_2003_' } ],
  * //   contentRange: { start: 0, end: 3, count: 4 } }
  * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~Contract[]} contracts This contains a list of contracts to compile
+ * @param {module:rest~Contract} contract This the contract to search for
  * @param {module:rest~Predicate} predicate This identifies the predicate that determines when to stop the search
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
@@ -1271,8 +1283,7 @@ async function searchWithContentRangeUntil(user, contract, predicate, options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~ChainID} chainID This must be the chainID of an existing private chain
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
- * field are populated
+ * @returns {module:rest~ChainInfo} Info about requested chain
  */
 
 async function getChain(user, chainId, options) {
@@ -1305,8 +1316,7 @@ async function getChain(user, chainId, options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param {module:rest~ChainIDs} chainIDs This must be the array of chainIDs of existing private chains
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
- * field are populated
+ * @returns {module:rest~ChainInfo[]} Info about requested chain(s)
  */
 
 async function getChains(user, chainIds, options) {
@@ -1357,8 +1367,7 @@ async function getChains(user, chainIds, options) {
  * @param {module:rest~Chain} chain This must be the object containing the arguments for the chain
  * @param {module:rest~Contract} contract This must be the name of the contract
  * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
- * field are populated
+ * @returns {module:rest~ChainHash} Hash of the newly created chain
  */
 
 async function createChain(user, chain, contract, options) {
