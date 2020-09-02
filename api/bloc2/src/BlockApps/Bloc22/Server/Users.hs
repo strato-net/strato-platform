@@ -9,8 +9,15 @@
 
 module BlockApps.Bloc22.Server.Users (
   TRD(..),
-  postUsersUploadListEVM',
-  postUsersUploadListSolidVM',
+
+  getBatchBlocTransactionResult',
+  constructArgValuesAndSource,
+  signAndPrepare,
+  TransactionHeader(..),
+  genNonces,
+  constructArgValues,
+  forStateT,
+  
   postUsersContractMethod',
   postUsersSend',
   postUsersSendList',
@@ -86,7 +93,6 @@ import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
@@ -210,119 +216,8 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
     )]
   getBlocTransactionResult' [txHash] resolve
 
-postUsersUploadListSolidVM' :: Should CacheNonce -> ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
-postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
-  let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
-  txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
-  namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name mSrc args params value cid md) -> do
-      (src, cmId, xabi) <- case mSrc of
-        Just src -> do
-          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" src (Just name) >>= \case
-            Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
-            Just x -> pure x
-          at name <?= (src, cmId', contractdetailsXabi cd)
-        Nothing -> do
-          mtuple <- use $ at name
-          case mtuple of
-            Just (src, cmId', x) -> return (src, cmId', x)
-            Nothing -> do
-              mContract <- lift . blocQueryMaybe $ proc () -> do
-                (_,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-                returnA -< (src,cmId',x'')
-              case mContract of
-                Nothing -> throwIO . UserError $ Text.concat
-                  [ "Upload List (SolidVM): When deploying multiple contract creation transactions, "
-                  , "the contracts' source code must be supplied when using SolidVM. "
-                  , "Please try supplying the contracts' source code and try again. "
-                  , "If you continue to receive this error message, please contact your administrator."
-                  ]
-                Just (src,(cmId' :: Int32),x') -> do
-                  x <- lift $ deserializeXabi x'
-                  at name <?= (src, cmId', x)
-      let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
-      (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
-      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
-      tx <- lift . signAndPrepare sign fromAddr metadata' $
-          TransactionHeader
-            Nothing
-            fromAddr
-            (fromMaybe emptyTxParams params)
-            (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (BC.pack $ Text.unpack src)
-            cid
-      return ((name,cmId),tx)
-  let
-    txs = map snd namesCmIdsTxs
-  hashes <- blocStrato (postTxList txs)
-  void . blocModify $ \conn -> runInsertMany conn hashNameTable
-    [( Nothing
-    , constant txHash
-    , constant cmId
-    , constant (1 :: Int32)
-    , constant name
-    )
-    | (txHash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
-    ]
-  getBatchBlocTransactionResult' hashes resolve
 
-evmUploadListError :: Text
-evmUploadListError = Text.concat
-  [ "Upload List (EVM): When deploying multiple contract creation transactions, "
-  , "the contracts' source code must be uploaded via the /compile route "
-  , "ahead of time. Please try uploading the contracts' source code via "
-  , "the /compile route, and try again. If you continue to receive this "
-  , "error message, please contact your administrator."
-  ]
-
-postUsersUploadListEVM' :: Should CacheNonce -> ContractListParameters -> Signer -> Bloc [BlocTransactionResult]
-postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
-  let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
-  txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
-  namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name mSrc args params value cid md) -> do
-      when (isJust mSrc) . lift . throwIO $ UserError evmUploadListError
-      mtuple <- use $ at name
-      (bin, src, cmId, xabi) <- case mtuple of
-        Just (b, src, cmId', x) -> return (b, src, cmId', x)
-        Nothing -> do
-          mContract <- lift . blocQueryMaybe $ proc () -> do
-            (bin16,_,cHash,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-            returnA -< (bin16,cHash,src,cmId',x'')
-          case mContract of
-            Nothing -> throwIO $ UserError evmUploadListError
-            Just (_,SolidVMCode _ _,_,_,_) -> throwIO $ UserError evmContractSolidVMError
-            Just (b16,_,src,(cmId' :: Int32),x') -> do
-              let (b, leftOver) = Base16.decode b16
-              unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
-              x <- lift $ deserializeXabi x'
-              at name <?= (b, src, cmId', x)
-      let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
-      argsBin <- lift $ constructArgValues (Just args) xabiArgs
-      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
-      tx <- lift . signAndPrepare sign fromAddr metadata' $
-          TransactionHeader
-            Nothing
-            fromAddr
-            (fromMaybe emptyTxParams params)
-            (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (bin <> argsBin)
-            cid
-      return ((name,cmId),tx)
-  let
-    txs = map snd namesCmIdsTxs
-  hashes <- blocStrato (postTxList txs)
-  void . blocModify $ \conn -> runInsertMany conn hashNameTable
-    [( Nothing
-    , constant txHash
-    , constant cmId
-    , constant (1 :: Int32)
-    , constant name
-    )
-    | (txHash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
-    ]
-  getBatchBlocTransactionResult' hashes resolve
 
 postUsersSendList' :: Should CacheNonce -> TransferListParameters -> Signer -> Bloc [BlocTransactionResult]
 postUsersSendList' cacheNonce TransferListParameters{..} sign = do
