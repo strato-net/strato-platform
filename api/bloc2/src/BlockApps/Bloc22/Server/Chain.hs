@@ -127,7 +127,8 @@ creationBlockHash :: Keccak256
 creationBlockHash = fromJust $
   stringKeccak256 "0000000000000000000000000000000000000000000000000000000000000000"
 
-postChainInfo :: ChainInput -> Bloc ChainId
+postChainInfo :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                 ChainInput -> m ChainId
 postChainInfo chainInput = do
   (mCmId, chainInfo) <- createChainInfo chainInput
   chainId <- blocStrato $ postChainClient chainInfo
