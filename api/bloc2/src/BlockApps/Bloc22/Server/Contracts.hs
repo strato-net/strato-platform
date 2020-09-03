@@ -11,7 +11,7 @@ module BlockApps.Bloc22.Server.Contracts where
 import           ClassyPrelude                   ((<>))
 import           Control.Arrow
 import           Control.Monad                   (join)
-import           Control.Monad.Reader.Class      (asks)
+import           Control.Monad.Trans.Control
 import           Data.Foldable
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
@@ -41,13 +41,15 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
+import           Control.Monad.Composable.BlocSQL
 import           Handlers.Storage
 import qualified MaybeNamed
 
 hexStorageToWord256 :: HexStorage -> Word256
 hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
 
-getContracts :: Maybe ChainId -> Bloc GetContractsResponse
+getContracts :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+                Maybe ChainId -> m GetContractsResponse
 getContracts chainId = blocTransaction $ do
   let
     -- current bloc returns milliseconds
@@ -63,12 +65,14 @@ getContracts chainId = blocTransaction $ do
   let reducedResponseMap = addressesToMap contractsAddresses
   return . GetContractsResponse $ reducedResponseMap
 
-getContractsData :: ContractName -> Bloc [Address]
+getContractsData :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+                    ContractName -> m [Address]
 getContractsData (ContractName contractName) = blocTransaction $ do
   (addresses :: [(Address, Maybe ChainId)]) <- blocQuery $ getContractsDataAddressesQuery contractName
   return $ fst <$> addresses
 
-getContractsContract :: ContractName -> Address -> Maybe ChainId -> Bloc ContractDetails
+getContractsContract :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+                        ContractName -> Address -> Maybe ChainId -> m ContractDetails
 getContractsContract name addr chainId =
   let err = UserError $ Text.concat
               [ "getContractsContract: Couldn't find contract details for "
@@ -89,14 +93,15 @@ translateStorageMap storage' =
       storage k = fromMaybe 0 $ Map.lookup k storageMap
   in storage
 
-getContractsState :: ContractName
+getContractsState :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                     ContractName
                   -> Address
                   -> Maybe ChainId
                   -> Maybe Text
                   -> Maybe Integer
                   -> Maybe Integer
                   -> Bool
-                  -> Bloc GetContractsStateResponses -- state-translation
+                  -> m GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) address chainId mName mCount mOffset mLength = do
   let err = UserError $ Text.concat
               [ "getContractsState: Couldn't find "
@@ -108,7 +113,7 @@ getContractsState contract@(ContractName contractName) address chainId mName mCo
   let eitherErrorOrContract' = xAbiToContract $ contractdetailsXabi details
   contract' <- either (throwIO . UserError . Text.pack) return eitherErrorOrContract'
 
-  fetchLimit <- asks stateFetchLimit
+  fetchLimit <- fmap stateFetchLimit getBlocEnv
   let ofs = fromMaybe 0 mOffset
       cnt = fromMaybe fetchLimit mCount
 
@@ -161,7 +166,8 @@ getContractsState contract@(ContractName contractName) address chainId mName mCo
     ]
   return $ Map.fromList ret
   where
-    getStorageRange :: Address -> (Word256, Word256) -> Bloc [StorageAddress]
+    getStorageRange :: (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+                       Address -> (Word256, Word256) -> m [StorageAddress]
     getStorageRange a (o,c) = do
       blocStrato $ getStorageClient
         storageFilterParams{ qsAddress = Just a
@@ -170,8 +176,10 @@ getContractsState contract@(ContractName contractName) address chainId mName mCo
                            , qsChainId = MaybeNamed.Unnamed <$> chainId
                            }
 
-postContractsBatchStates :: [PostContractsBatchStatesRequest]
-                        -> Bloc [GetContractsStateResponses]
+postContractsBatchStates :: (MonadIO m, MonadBaseControl IO m,
+                             MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                            [PostContractsBatchStatesRequest]
+                         -> m [GetContractsStateResponses]
 postContractsBatchStates = traverse flattenRequest
   where flattenRequest PostContractsBatchStatesRequest{..} =
           getContractsState postcontractsbatchstatesrequestContractName
@@ -182,7 +190,8 @@ postContractsBatchStates = traverse flattenRequest
                             postcontractsbatchstatesrequestOffset
                             (fromMaybe False postcontractsbatchstatesrequestLength)
 
-getContractsDetails :: Address -> Maybe ChainId -> Bloc ContractDetails
+getContractsDetails :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+                       Address -> Maybe ChainId -> m ContractDetails
 getContractsDetails contractAddress chainId = do
   let err = UserError $ Text.concat
               [ "getContractsDetails: couldn't find contract details for address "
@@ -193,7 +202,8 @@ getContractsDetails contractAddress chainId = do
   mdetails <- getContractDetailsByAddressOnly contractAddress chainId
   maybe (throwIO err) (return . completeContractDetailXabi) mdetails
 
-getContractsFunctions :: ContractName -> Address -> Maybe ChainId -> Bloc [FunctionName]
+getContractsFunctions :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+                         ContractName -> Address -> Maybe ChainId -> m [FunctionName]
 getContractsFunctions contractName contractId chainId = blocTransaction $ do
   let err = UserError $ Text.concat
               [ "getContractsFunctions: couldn't find contract details for "
@@ -206,7 +216,8 @@ getContractsFunctions contractName contractId chainId = blocTransaction $ do
   mXabi <- getContractXabi contractName contractId chainId
   maybe (throwIO err) (return . map FunctionName . Map.keys . xabiFuncs) mXabi
 
-getContractsSymbols :: ContractName -> Address -> Maybe ChainId -> Bloc [SymbolName]
+getContractsSymbols :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+                       ContractName -> Address -> Maybe ChainId -> m [SymbolName]
 getContractsSymbols contractName contractId chainId = blocTransaction $ do
   let err = UserError $ Text.concat
               [ "getContractsSymbols: couldn't find contract details for "
@@ -219,7 +230,8 @@ getContractsSymbols contractName contractId chainId = blocTransaction $ do
   mXabi <- getContractXabi contractName contractId chainId
   maybe (throwIO err) (return . map SymbolName . Map.keys . xabiVars) mXabi
 
-getContractsEnum :: ContractName -> Address -> EnumName -> Maybe ChainId -> Bloc [EnumValue]
+getContractsEnum :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+                    ContractName -> Address -> EnumName -> Maybe ChainId -> m [EnumValue]
 getContractsEnum contractName contractId (EnumName enumName) chainId = do
   let err = UserError $ Text.concat
               [ "getContractsEnum: couldn't find contract details for "
@@ -235,12 +247,14 @@ getContractsEnum contractName contractId (EnumName enumName) chainId = do
       let enums = concat [names | (n, Enum names _) <- Map.toList (xabiTypes xabi), n == enumName]
       in return $ map EnumValue enums
 
-getContractsStateMapping :: ContractName
+getContractsStateMapping :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
+                             HasBlocSQL m, HasBlocEnv m) =>
+                            ContractName
                          -> Address
                          -> SymbolName
                          -> Text
                          -> Maybe ChainId
-                         -> Bloc GetContractsStateMappingResponse
+                         -> m GetContractsStateMappingResponse
                          -- state-translation
 getContractsStateMapping contract@(ContractName contractName) address (SymbolName mappingName) keyName chainId = do
   let err = UserError $ Text.concat
@@ -257,7 +271,7 @@ getContractsStateMapping contract@(ContractName contractName) address (SymbolNam
   storage' <- blocStrato $ getStorageClient
     storageFilterParams{qsAddress = Just address}
 
-  fetchLimit <- fromInteger <$> asks stateFetchLimit
+  fetchLimit <- fromInteger <$> fmap stateFetchLimit getBlocEnv
 
   let storageMap = Map.fromList $ map (\s -> case kind s of
         EVM -> (hexStorageToWord256 $ key s, hexStorageToWord256 $ value s)
@@ -275,10 +289,12 @@ getContractsStateMapping contract@(ContractName contractName) address (SymbolNam
    Left e -> throwIO . UserError $ Text.pack e
    Right val -> return $ Map.fromList [(mappingName, Map.fromList [(keyName, val)])]
 
-getContractsStates :: ContractName -> Bloc [GetContractsStatesResponse] -- state-translation
+getContractsStates :: MonadIO m =>
+                      ContractName -> m [GetContractsStatesResponse] -- state-translation
 getContractsStates _ = throwIO $ Unimplemented "getContractsStates"
 
-postContractsCompile :: [PostCompileRequest] -> Bloc [PostCompileResponse]
+postContractsCompile :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+                        [PostCompileRequest] -> m [PostCompileResponse]
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
@@ -297,7 +313,8 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
               EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) hsh
               SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) hsh
 
-postContractsXabi :: PostXabiRequest -> Bloc PostXabiResponse
+postContractsXabi :: MonadIO m =>
+                     PostXabiRequest -> m PostXabiResponse
 postContractsXabi PostXabiRequest{..} =
    let xabis :: Either String (Map.Map Text Xabi)
        xabis = do
