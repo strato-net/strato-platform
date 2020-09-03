@@ -15,6 +15,7 @@ library
                , merkle-patricia-db
                , obelisk-backend
                , obelisk-route
+               , slipstream
                , solid-vm
                , strato-model
                , text

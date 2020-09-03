@@ -6,6 +6,7 @@
 module OutputDataSpec where
 
 import Conduit
+import Control.Monad.Reader
 import qualified Data.ByteString as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
@@ -25,6 +26,7 @@ import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+import UnliftIO
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAddress
@@ -66,8 +68,8 @@ spec = do
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }]
 
-      g <- newGlobals fakeHandle
-      [contractInsert, vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g input .| sinkList
+      g <- newIORef $ newGlobals fakeHandle
+      [contractInsert, vehicleCreate, vehicleInsert] <- runLoggingT . flip runReaderT g . runConduit $ createInserts input .| sinkList
 
       contractInsert `shouldBe`
           [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
@@ -141,10 +143,11 @@ spec = do
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }]
-      g <- newGlobals fakeHandle
-      addToHistoryList g cHash
+      g <- newIORef $ newGlobals fakeHandle
       [contractInsert, vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
-        <- runLoggingT . runConduit $ createInserts g input .| sinkList
+        <- runLoggingT . flip runReaderT g $ do
+          addToHistoryList cHash
+          runConduit $ createInserts input .| sinkList
 
       contractInsert `shouldBe`
           [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
@@ -255,9 +258,9 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]
             }]
 
-      g <- newGlobals fakeHandle
+      g <- newIORef $ newGlobals fakeHandle
       [contractInsert, vehicleCreate, vehicleInsert] <-
-          runLoggingT . runConduit $ createInserts g input .| sinkList
+          runLoggingT . flip runReaderT g . runConduit $ createInserts input .| sinkList
 
       contractInsert `shouldBe`
           [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
@@ -345,9 +348,9 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
             ]
           }]
 
-    g <- newGlobals fakeHandle
+    g <- newIORef $ newGlobals fakeHandle
     [contractInsert, swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
+        runLoggingT . flip runReaderT g . runConduit $ createInserts input .| sinkList
 
     contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
   VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
@@ -446,10 +449,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           contractData = M.singleton "array_nums" . V.ValueArrayDynamic
                        . I.singleton 1 $ V.ValueArraySentinel 1
           }]
-    g <- newGlobals fakeHandle
+    g <- newIORef $ newGlobals fakeHandle
 
     [_, swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
+        runLoggingT . flip runReaderT g . runConduit $ createInserts input .| sinkList
 
     T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
     T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]
@@ -478,7 +481,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                                                   . V.ValueArraySentinel $ 1)
                                     ]
           }]
-    g <- newGlobals fakeHandle
+    g <- newIORef $ newGlobals fakeHandle
 
-    cs <- runLoggingT . runConduit $ createInsertIndexTable g input .| sinkList
+    cs <- runLoggingT . flip runReaderT g . runConduit $ createInsertIndexTable input .| sinkList
     cs `shouldNotBe` []

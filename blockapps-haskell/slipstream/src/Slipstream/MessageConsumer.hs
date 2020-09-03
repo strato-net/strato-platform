@@ -1,6 +1,8 @@
 {-# LANGUAGE
-      OverloadedStrings
+      DeriveGeneric
     , FlexibleContexts
+    , LambdaCase
+    , OverloadedStrings
     , TemplateHaskell
 #-}
 

@@ -1,11 +1,14 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Slipstream.Globals
   ( module Slipstream.Globals
@@ -18,6 +21,7 @@ import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
+import           Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Cache.LRU              as LRU
@@ -42,6 +46,10 @@ import           Blockchain.Strato.Model.CodePtr
 import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
+
+instance MonadIO m => Modifiable Globals (ReaderT (IORef Globals) m) where
+  get _ = liftIO . readIORef =<< ask
+  put _ g = ask >>= liftIO . flip writeIORef g
 
 newGlobals :: Handle -> Globals
 newGlobals = Globals Set.empty Set.empty Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))

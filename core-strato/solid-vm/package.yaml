@@ -22,6 +22,7 @@ library:
     - SolidVM.Solidity.Parse.Statement
     - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Parse.Declarations
+    - SolidVM.Solidity.Xabi
     - SolidVM.Solidity.Xabi.Statement
     - SolidVM.Solidity.Xabi.Type
     - CodeCollection

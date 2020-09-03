@@ -38,6 +38,7 @@ import Slipstream.Globals
 import Slipstream.GlobalsColdStorage
 import Slipstream.Options
 import Slipstream.OutputData
+import UnliftIO hiding (handle)
 
 workerConnStr :: ConnectionString
 workerConnStr = BC.pack $ printf "host=%s port=%d user=%s password=%s dbname=%s"
@@ -99,7 +100,7 @@ main = do
 
       let state = mkConfiguredKafkaState ("slipstream" :: KafkaClientId) . fromIntegral $ flags_kafkaMaxBytes
 
-      gref <- newGlobals handle
+      gref <- newIORef $ newGlobals handle
       lift . runKafka state $ getAndProcessMessages env conn gref
     case msg of
       Left e -> liftIO . die $ show e

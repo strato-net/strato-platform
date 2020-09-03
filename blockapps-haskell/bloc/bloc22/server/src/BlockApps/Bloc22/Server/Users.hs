@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE RecordWildCards     #-}

@@ -440,10 +440,6 @@ parseActionFromJSON = toAction . BL.fromStrict
 parseActions :: [B.ByteString] -> [((Address, Maybe ChainId), [AggregateAction])]
 parseActions = snd . aggregate . map parseActionFromJSON
 
-instance MonadIO m => Mod.Modifiable Globals (ReaderT (IORef Globals) m) where
-  get _ = liftIO . readIORef =<< ask
-  put _ g = ask >>= liftIO . flip writeIORef g
-
 instance (A.Selectable CodePtr (Int32, ContractDetails)) (ReaderT (IORef Globals) Bloc) where
   select _ = lift . getContractDetailsByCodeHash
 
@@ -469,7 +465,6 @@ processTheMessages env conn g messages = do
   enterBloc2 env . flip runReaderT g $ processActions (outputData conn) actions
 
 processActions :: ( MonadLogger m
-                  , MonadIO m
                   , MonadUnliftIO m
                   , Mod.Modifiable Globals m
                   , A.Selectable CodePtr (Int32, ContractDetails) m

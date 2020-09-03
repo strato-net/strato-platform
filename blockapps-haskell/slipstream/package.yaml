@@ -41,6 +41,7 @@ library:
     - lifted-base
     - lrucache
     - milena
+    - monad-alter
     - mtl
     - network
     - ordered-containers
@@ -75,6 +76,7 @@ executables:
       - servant-client
       - slipstream
       - template-haskell
+      - unliftio
       - wai-middleware-prometheus
       - warp
 
@@ -95,6 +97,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - mtl
       - persistent
       - persistent-sqlite
       - QuickCheck
@@ -102,4 +105,5 @@ tests:
       - strato-model
       - text
       - time
+      - unliftio
       - vector

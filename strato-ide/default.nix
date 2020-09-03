@@ -25,8 +25,7 @@ project ./. ({ pkgs, hackGet, ... }: {
     blockapps-mpdbs = ../core-strato/blockapps-mpdbs;
     blockapps-solidity = ../blockapps-haskell/solidity;
     blockapps-strato-api = ../blockapps-haskell/strato/api;
-    blockapps-strato-client = ../blockapps-haskell/strato/client;
-    blockapps-tools = ../core-strato/blockapps-tools;
+    blockapps-strato-client = ../blockapps-haskell/strato/client; blockapps-tools = ../core-strato/blockapps-tools;
     blockapps-util = ../core-strato/blockapps-util;
     blockapps-vault-wrapper-api = ../blockapps-haskell/vault-wrapper/api;
     blockapps-vault-wrapper-client = ../blockapps-haskell/vault-wrapper/client;
@@ -110,6 +109,7 @@ project ./. ({ pkgs, hackGet, ... }: {
         ver = "0.11.5";
         sha256 = "0l2cajsyxiq3zsn5scqw82j635dvkbr90vp68cnn0pbdapi8krj0";
       } {};
+      blockapps-bloc22-server = pkgs.haskell.lib.dontCheck super.blockapps-bloc22-server;
       blockapps-strato-client = pkgs.haskell.lib.dontCheck super.blockapps-strato-client;
       hpack = pkgs.haskell.lib.dontCheck hpackHackage;
       milena = pkgs.haskell.lib.dontCheck super.milena;

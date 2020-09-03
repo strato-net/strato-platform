@@ -13,7 +13,7 @@ module Frontend where
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
 import qualified Blockchain.Database.MerklePatricia.StateRoot as MP
 import Control.Monad
-impor Control.Applicative
+import Control.Applicative
 import qualified Data.Aeson as Aeson
 import Data.Bifunctor (bimap)
 import Data.ByteString.Lazy (fromStrict, toStrict)
