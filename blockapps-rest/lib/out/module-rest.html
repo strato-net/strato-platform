@@ -1,0 +1,9554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Module: rest</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Module: rest</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        
+            
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description">This is the main blockapps-rest interface.</div>
+        
+
+        
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line10">line 10</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".call"><span class="type-signature">(async, static) </span>call<span class="signature">(user, callArgs, options)</span><span class="type-signature"> &rarr; {Array|<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callArgs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~CallArgs">module:rest~CallArgs</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This defines the method and the method arguments</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line837">line 837</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.isAsync` is set, this returns
+a transaction result object that contains the transaction hash. You can use `resolveResult` or `resolveResults`
+call to get the final results. If the `options.isAsync` is not set (default), it returns the result of the call as an
+array.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array</span>
+|
+
+<span class="param-type"><a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Consider the following contract
+// contract SimpleStorage {
+//   uint storedData;
+//
+//   function set(uint x) {
+//       storedData = x;
+//   }
+//
+//   function get() returns (uint) {
+//       return storedData;
+//   }
+// }
+
+const contractArgs = {
+  name: "SimpleStorage",
+  source: arraySrc,
+  args: {} // Any constructor args would go here. We dont have any.
+};
+const contract = await rest.createContract(stratoUser, contractArgs, options);
+
+const callArgs = {
+  contract,
+  method: "get",
+  args: {}
+};
+
+const callResult = await rest.call(stratoUser, callArgs, options);
+
+console.log(callResult);
+// returns ['0' ...]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".callList"><span class="type-signature">(async, static) </span>callList<span class="signature">(user, callListArgs, options)</span><span class="type-signature"> &rarr; {Array.&lt;Array>|Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callListArgs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;<a href="module-rest.html#~CallArgs">module:rest~CallArgs</a>></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">A list of function calls</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line906">line 906</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.isAsync` is set, this returns
+a list of transaction result objects that each contain the transaction hash. You can use `resolveResult`
+or `resolveResults` call to get the final results. If the `options.isAsync` is not set (default), it returns the
+results of transaction execution as a 2 dimensional array.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;Array></span>
+|
+
+<span class="param-type">Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Consider the following contract
+// contract SimpleStorage {
+//   uint storedData;
+//
+//   function set(uint x) {
+//       storedData = x;
+//   }
+//
+//   function get() returns (uint) {
+//       return storedData;
+//   }
+// }
+
+const contractArgs = {
+  name: "SimpleStorage",
+  source: arraySrc,
+  args: {} // Any constructor args would go here. We dont have any.
+};
+const contract = await rest.createContract(stratoUser, contractArgs, options);
+
+const callArgs = {
+  contract,
+  method: "get",
+  args: {}
+};
+
+const callResult = await rest.callList(stratoUser, [callArgs], options);
+
+console.log(callResult);
+// returns [ ['0' ...] ]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".compileContracts"><span class="type-signature">(async, static) </span>compileContracts<span class="signature">(user, contracts, options)</span><span class="type-signature"> &rarr; {Array.&lt;<a href="module-rest.html#~Contract">module:rest~Contract</a>>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contracts</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;<a href="module-rest.html#~Contract">module:rest~Contract</a>></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This contains a list of contracts to compile</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line457">line 457</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Returns a list of contracts with the `name` and `codeHash` values populated
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;<a href="module-rest.html#~Contract">module:rest~Contract</a>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const contract = { name: "SimpleStorage", source: "...contract source" }
+const result = await rest.compileContracts(
+ stratoUser,
+ [contract],
+ options
+);
+// returns
+// [ { contractName: 'SimpleStorage',
+//     codeHash: '4552b102deb8f69bba4ca79847913c6878892787c0ff4592245452c00e324779' } ]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createChain"><span class="type-signature">(async, static) </span>createChain<span class="signature">(user, chain, contract, options)</span><span class="type-signature"> &rarr; {<a href="module-rest.html#~ChainHash">module:rest~ChainHash</a>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>chain</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Chain">module:rest~Chain</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must be the object containing the arguments for the chain</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contract</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must be the name of the contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1373">line 1373</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Hash of the newly created chain
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-rest.html#~ChainHash">module:rest~ChainHash</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const createChainArgs = (uid, members) => {
+ const contractName = `TestContract_${uid}`;
+ const memberList = members.map(address => {
+   return { address: address, enode };
+ });
+ const balanceList = members.map(address => {
+   return { address: address, balance };
+ });
+
+ const chain = {
+   label: `airline-${uid}`,
+   src: `contract ${contractName} { }`,
+   members: memberList,
+   balances: balanceList,
+   contractName
+ };
+
+ return { chain, contractName };
+
+ };
+ const uid = 5;
+ const { chain, contractName: name } = createChainArgs(uid, [
+   stratoUser.address
+ ]);
+const chainId = await rest.createChain(stratoUser, chain, contract, options);
+// Returns
+// "a72d6955662b1d2da4d338f8c87833592ebc490938308a42d3d528180ae55530"</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createContract"><span class="type-signature">(async, static) </span>createContract<span class="signature">(user, contract, options)</span><span class="type-signature"> &rarr; {<a href="module-rest.html#~Contract">module:rest~Contract</a>|<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contract</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This object describes the contract to upload</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line496">line 496</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.async` is set, it returns a transaction result
+object with the transaction. Final result can be obtained by using the `resolveResult` call. If `options.async` is not
+set (default), this call returns a contract with the `name` and `address` values populated
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+|
+
+<span class="param-type"><a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
+const contractArgs = {
+  name: "SimpleStorage",
+  source: simpleStorageSrc,
+  args: {} // Any constructor args would go here. We dont have any.
+};
+const result = await rest.createContract(stratoUser, contractArgs, options);
+// returns
+// { name: 'SimpleStorage',
+//   address: '5043751be046762926fc563fefb33e62919bf8b7' }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createContractList"><span class="type-signature">(async, static) </span>createContractList<span class="signature">(user, contracts, options)</span><span class="type-signature"> &rarr; {Array.&lt;<a href="module-rest.html#~Contract">module:rest~Contract</a>>|Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contracts</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;<a href="module-rest.html#~Contract">module:rest~Contract</a>></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is a list of contracts to upload</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line566">line 566</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.async` is set, it returns a list of
+transaction result objects. Final results can be obtained by using the `resolveResults` call. If `options.async` is
+not set (default), this call returns a list of contracts with the `name` and `address` values populated
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;<a href="module-rest.html#~Contract">module:rest~Contract</a>></span>
+|
+
+<span class="param-type">Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
+const contractArgs = {
+  name: "SimpleStorage",
+  source: simpleStorageSrc,
+  args: {} // Any constructor args would go here. We dont have any.
+};
+const result = await rest.createContractList(stratoUser, [contractArgs], options);
+// returns
+// [{ bin:
+//     '608060405234801561001057600080...6504300c1825957a56e0c10029',
+//    chainId: null,
+//    address: 'b728ad420aadd7082380e2024b935dd2898f6117',
+//    'bin-runtime':
+//     '6080604052600436106049576000357...6504300c1825957a56e0c10029',
+//    codeHash:
+//     { kind: 'EVM',
+//       digest:
+//        '4552b102deb8f69bba4ca79847913c6878892787c0ff4592245452c00e324779' },
+//    name: 'SimpleStorage',
+//    src:
+//     'contract SimpleStorage {...}',
+//    xabi:
+//     { modifiers: {},
+//       funcs: [Object],
+//       kind: 'ContractKind',
+//       types: [Object],
+//       using: {},
+//       constr: null,
+//       events: {},
+//       vars: [Object] } } ]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createKey"><span class="type-signature">(async, static) </span>createKey<span class="signature">(user, options)</span><span class="type-signature"> &rarr; {String}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line645">line 645</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The address corresponding to the key pair for this user
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">String</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Initialize ba-rest oaut-utility
+const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
+
+// Get token using client-credential flow
+const tokenResponse = await oauth.getAccessTokenByClientSecret();
+
+// Extract token from token response
+const oauthUser = { token: tokenResponse.token.access_token };
+
+const key = await rest.createKey(oauthUser, options);
+// Returns cdc7e277d9aecbce6aba5b9b16de815cadad3d2a</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createOrGetKey"><span class="type-signature">(async, static) </span>createOrGetKey<span class="signature">(user, options)</span><span class="type-signature"> &rarr; {String}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line672">line 672</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The address corresponding to the key pair for this user
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">String</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Initialize ba-rest oaut-utility
+const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
+
+// Get token using client-credential flow
+const tokenResponse = await oauth.getAccessTokenByClientSecret();
+
+// Extract token from token response
+const oauthUser = { token: tokenResponse.token.access_token };
+
+const key = await rest.createOrGetKey(oauthUser, options);
+// Returns cdc7e277d9aecbce6aba5b9b16de815cadad3d2a</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createUser"><span class="type-signature">(async, static) </span>createUser<span class="signature">(user, options)</span><span class="type-signature"> &rarr; {<a href="module-rest.html#~User">module:rest~User</a>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line421">line 421</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>var user = await rest.createUser({token: `${token}`}, options)
+// returns a STRATO user
+// { token: "eyJhbGc...ondq6g", address: "25eaa2879018122d7ba25fe4d9701ac367c44bf5"}</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".getAccounts"><span class="type-signature">(async, static) </span>getAccounts<span class="signature">(user, options)</span><span class="type-signature"> &rarr; {Array.&lt;<a href="module-rest.html#~Account">module:rest~Account</a>>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the user performing the query and contains the
+authentication token for the API call</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line390">line 390</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A list of account details
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;<a href="module-rest.html#~Account">module:rest~Account</a>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>var accounts = await rest.getAccounts(user, {...options, query: {address: user.address}})
+// returns a list of one account corresponding to the users' address
+// [ { contractRoot:'56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+//     next: '/eth/v1.2/account?address=25eaa2879018122d7ba25fe4d9701ac367c44bf5&amp;index=5',
+//     kind: 'AddressStateRef',
+//     balance: '2000000000000000000000',
+//     address: '25eaa2879018122d7ba25fe4d9701ac367c44bf5',
+//     latestBlockNum: 1,
+//     codeHash:'c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470',
+//     code: '',
+//     nonce: 0 } ]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".getArray"><span class="type-signature">(async, static) </span>getArray<span class="signature">(user, contract, name, options)</span><span class="type-signature"> &rarr; {Array}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contract</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This object describes the contract to fetch state for. Minimally
+contains the address and the name of the contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the name of the array variable in the smart contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line771">line 771</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Returns an array of values corresponding to the onchain state of the array variable named in the call
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Consider the following contract
+// contract DocArray {
+//   uint256[] arr;
+//
+//   constructor() public {
+//       arr = new uint256[](10);
+//       for (uint256 i = 0; i &lt; 10; i++) {
+//           arr[i] = i + 1;
+//       }
+//   }
+// }
+
+const contractArgs = {
+  name: "DocArray",
+  source: arraySrc,
+  args: {} // Any constructor args would go here. We dont have any.
+};
+
+const contract = await rest.createContract(stratoUser, contractArgs, options);
+
+const array_state = await rest.getArray(stratoUser, contract, "arr", options);
+// returns [ '1', '2', '3', '4', '5', '6', '7', '8', '9', '10' ]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".getChain"><span class="type-signature">(async, static) </span>getChain<span class="signature">(user, chainID, options)</span><span class="type-signature"> &rarr; {<a href="module-rest.html#~ChainInfo">module:rest~ChainInfo</a>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>chainID</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~ChainHash">module:rest~ChainHash</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must be the chainID of an existing private chain</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1297">line 1297</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Info about requested chain
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-rest.html#~ChainInfo">module:rest~ChainInfo</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const globalConfig = fsUtil.getYaml("config.yaml");
+const options = { config: globalConfig, logger: console };
+const queryOptions = {
+  ...options,
+  query: {}
+};
+const chainId = await rest.createChain(stratoUser, chain, contract, options);
+const result = await rest.getChain(stratoUser, chainId, options);
+// Returns
+// { id:
+//    'f99d95cf739bb7cc66fe16e352cd346def7d3c4b3f145f859072a2aae7119344',
+//   info:
+//    { balances: [ [Object], [Object] ],
+//      members: [ [Object] ],
+//      label: 'airline-2' } }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".getChains"><span class="type-signature">(async, static) </span>getChains<span class="signature">(user, chainIDs, options)</span><span class="type-signature"> &rarr; {Array.&lt;<a href="module-rest.html#~ChainInfo">module:rest~ChainInfo</a>>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>chainIDs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;<a href="module-rest.html#~ChainHash">module:rest~ChainHash</a>></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must be the array of chainIDs of existing private chains</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1330">line 1330</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Info about requested chain(s)
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;<a href="module-rest.html#~ChainInfo">module:rest~ChainInfo</a>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const globalConfig = fsUtil.getYaml("config.yaml");
+const options = { config: globalConfig, logger: console };
+const queryOptions = {
+  ...options,
+  query: {}
+};
+const result = await rest.getChains(stratoUser, [], options);
+// Returns
+// [ { id:
+//      'f99d95cf739bb7cc66fe16e352cd346def7d3c4b3f145f859072a2aae7119344',
+//     info: { balances: [Array], members: [Array], label: 'airline-2' } },
+//   { id:
+//      'a72d6955662b1d2da4d338f8c87833592ebc490938308a42d3d528180ae55530',
+//     info: { balances: [Array], members: [Array], label: 'airline-3' } },
+//   { id:
+//      '9f3a050a34faaab7d6d4c5c17bd70b0d1c2c9a6d40c1681323167fb43407bf18',
+//     info: { balances: [Array], members: [Array], label: 'airline-5' } } ]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".getKey"><span class="type-signature">(async, static) </span>getKey<span class="signature">(user, options)</span><span class="type-signature"> &rarr; {String}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line617">line 617</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">String</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Initialize ba-rest oaut-utility
+const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
+
+// Get token using client-credential flow
+const tokenResponse = await oauth.getAccessTokenByClientSecret();
+
+// Extract token from token response
+const oauthUser = { token: tokenResponse.token.access_token };
+
+const key = await rest.getKey(oauthUser, options);
+// Returns cdc7e277d9aecbce6aba5b9b16de815cadad3d2a</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".getState"><span class="type-signature">(async, static) </span>getState<span class="signature">(user, contract, options)</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contract</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This object describes the contract to fetch state for. Minimally
+contains the address and the name of the contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line732">line 732</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Returns an object with all accessible functions and state variables in this smart contract
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Consider the following contract
+// contract SimpleStorage {
+//   uint storedData;
+//
+//   function set(uint x) {
+//       storedData = x;
+//   }
+//
+//   function get() returns (uint) {
+//       return storedData;
+//   }
+// }
+
+const contractArgs = {
+  name: "SimpleStorage",
+  source: arraySrc,
+  args: {} // Any constructor args would go here. We dont have any.
+};
+const contract = await rest.createContract(stratoUser, contractArgs, options);
+const state = await rest.getState(stratoUser, contract, options);
+// returns
+// { get: 'function () returns (uint)',
+//   set: 'function (uint) returns ()',
+//   storedData: '0' }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".pingOauth"><span class="type-signature">(async, static) </span>pingOauth<span class="signature">(user, options)</span><span class="type-signature"> &rarr; {String}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1449">line 1449</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">String</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const globalConfig = fsUtil.getYaml("config.yaml");
+const options = { config: globalConfig, logger: console };
+const queryOptions = {
+  ...options,
+  query: {}
+};
+const result = await rest.pingOauth(stratoUser, options);
+
+// Returns
+// 'success'</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".resolveResult"><span class="type-signature">(async, static) </span>resolveResult<span class="signature">(user, pendingTxResult, options)</span><span class="type-signature"> &rarr; {<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>pendingTxResult</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The tx result to resolve. Must contain the transaction hash.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line286">line 286</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
+const contractArgs = {
+  name: "SimpleStorage",
+  source: simpleStorageSrc,
+  args: {} // Any constructor args would go here. We dont have any.
+};
+const txResult = await rest.createContract(stratoUser, contractArgs, {
+  ...options,
+  isAsync: true
+});
+const result = await rest.resolveResult(stratoUser, txResult, options);
+// Returns
+// { status: 'Success',
+// hash:
+//  '3d25c575751bf4e9a502eef255dd5224f2b9585e339edc51fca02c33a45b177d',
+// txResult:
+//  { deletedStorage: '',
+//    contractsDeleted: '',
+//    gasUsed: '13955',
+//    stateDiff: '',
+//    time: 0.000694605,
+//    kind: 'EVM',
+//    chainId: null,
+//    response:
+//     '608060405260043...a6504300c1825957a56e0c10029',
+//    blockHash:
+//     '82bb60c456661c8e05caa36b227be8e717bf2b7c7ae0de30fcd7b295d731be9b',
+//    transactionHash:
+//     '3d25c575751bf4e9a502eef255dd5224f2b9585e339edc51fca02c33a45b177d',
+//    etherUsed: '13955',
+//    newStorage: '',
+//    message: 'Success!',
+//    trace: '',
+//    contractsCreated: 'bf68d882d8e95d94926379538ccab45932e26c03' },
+// data:
+//  { tag: 'Upload',
+//    contents:
+//     { bin: 'bin removed.',
+//       chainId: null,
+//       address: 'bf68d882d8e95d94926379538ccab45932e26c03',
+//       'bin-runtime': 'bin-runtime removed.',
+//       codeHash: [Object],
+//       name: 'SimpleStorage',
+//       src: 'source removed.',
+//       xabi: 'xabi removed.' },
+//    src: 'source removed.' } }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".resolveResults"><span class="type-signature">(async, static) </span>resolveResults<span class="signature">(user, pendingTxResults, options)</span><span class="type-signature"> &rarr; {Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>pendingTxResults</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The tx results to resolve. Must contain the transaction hash.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line348">line 348</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
+const contractArgs = {
+  name: "SimpleStorage",
+  source: simpleStorageSrc,
+  args: {} // Any constructor args would go here. We dont have any.
+};
+const txResults = await rest.createContractList(stratoUser, [contractArgs], {
+  ...options,
+  isAsync: true
+});
+const results = await rest.resolveResults(stratoUser, txResults, options);
+// Returns
+// [{ status: 'Success',
+// hash:
+//  '3d25c575751bf4e9a502eef255dd5224f2b9585e339edc51fca02c33a45b177d',
+// txResult:
+//  { deletedStorage: '',
+//    contractsDeleted: '',
+//    gasUsed: '13955',
+//    stateDiff: '',
+//    time: 0.000694605,
+//    kind: 'EVM',
+//    chainId: null,
+//    response:
+//     '608060405260043...a6504300c1825957a56e0c10029',
+//    blockHash:
+//     '82bb60c456661c8e05caa36b227be8e717bf2b7c7ae0de30fcd7b295d731be9b',
+//    transactionHash:
+//     '3d25c575751bf4e9a502eef255dd5224f2b9585e339edc51fca02c33a45b177d',
+//    etherUsed: '13955',
+//    newStorage: '',
+//    message: 'Success!',
+//    trace: '',
+//    contractsCreated: 'bf68d882d8e95d94926379538ccab45932e26c03' },
+// data:
+//  { tag: 'Upload',
+//    contents:
+//     { bin: 'bin removed.',
+//       chainId: null,
+//       address: 'bf68d882d8e95d94926379538ccab45932e26c03',
+//       'bin-runtime': 'bin-runtime removed.',
+//       codeHash: [Object],
+//       name: 'SimpleStorage',
+//       src: 'source removed.',
+//       xabi: 'xabi removed.' },
+//    src: 'source removed.' } }]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".search"><span class="type-signature">(async, static) </span>search<span class="signature">(user, contracts, options)</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contracts</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This the contract to search for</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1083">line 1083</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.async` is set, only the hashes are populated, otherwise all the
+field are populated
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const globalConfig = fsUtil.getYaml("config.yaml");
+const options = { config: globalConfig, logger: console };
+const queryOptions = {
+  ...options,
+  query: {}
+};
+const searchResults = await rest.search(
+ stratoUser,
+ { name: "SimpleStorage" },
+ queryOptions
+);
+// Returns
+// [ { address: '2793d0f3afc31720ef18f6736073154e9131b21e',
+//     chainId: '',
+//     block_hash:
+//      '5f306c319d9493fa77d14516e6fa12accc9e6a1b31b3e32ea016270e529b5cda',
+//     block_timestamp: '2020-08-04 15:59:20 UTC',
+//     block_number: '5',
+//     transaction_hash:
+//      '3e6ed2346d35c38c2c87c9cdb5603d914998886e7110675db840ff870fe55784',
+//     transaction_sender: '28aced430a5121bbc8613e8415583c47cb9a4516',
+//     transaction_function_name: '',
+//     storedData: 10 } ]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".searchUntil"><span class="type-signature">(async, static) </span>searchUntil<span class="signature">(user, contract, predicate, options)</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contract</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This the contract to search for</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>predicate</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the predicate that determines when to stop the search</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1129">line 1129</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.async` is set, only the hashes are populated, otherwise all the
+field are populated
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const globalConfig = fsUtil.getYaml("config.yaml");
+const options = { config: globalConfig, logger: console };
+const queryOptions = {
+  ...options,
+  query: {}
+};
+// predicate is created: to wait until response is available otherwise throws the error
+function predicate(data) {};
+const result = await rest.searchUntil(stratoUser, {name: "SimpleStorage"}, predicate, queryOptions);
+// Returns
+// [ { address: '60fb089dc62858df014819d618aa3f43391ddb9c',
+//     chainId: '',
+//     block_hash:
+//      'fb7edc20a2678ca60024f81d926d1637eb418012beae2fedb7e7c4250406ea82',
+//     block_timestamp: '2020-08-04 20:48:18 UTC',
+//     block_number: '3',
+//     transaction_hash:
+//      '32321367696882da2feb9483fa31346f68abf77cc1a01ace6ef5a2b774bc8d38',
+//     transaction_sender: '594f19ad4a55d6434711a51f628f22abf4afc55a',
+//     transaction_function_name: '',
+//     storedData: 10 } ]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".searchWithContentRange"><span class="type-signature">(async, static) </span>searchWithContentRange<span class="signature">(user, contract, options)</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contract</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This the contract to search for</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1171">line 1171</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.async` is set, only the hashes are populated, otherwise all the
+field are populated
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const globalConfig = fsUtil.getYaml("config.yaml");
+const options = { config: globalConfig, logger: console };
+const queryOptions = {
+  ...options,
+  query: {}
+};
+const result = await rest.searchWithContentRange(stratoUser, { name: "SimpleStorage" }, queryOptions);
+// Returns
+// { data:
+//    [ { address: '1db4cdb5051bceb5fd0cfa8f186472bd47b5a29e',
+//        chainId: '',
+//        block_hash:
+//         '202f910a94fe10b5f0e2fa1ab40cfad94dada3d5cd38a46255bfbb168d7f2229',
+//        block_timestamp: '2020-08-06 14:41:05 UTC',
+//        block_number: '2',
+//        transaction_hash:
+//         '5cdeb87bdcce330b0c4c69bc78b1320773374c0db6423abc4806f43f545a14ca',
+//        transaction_sender: 'd7b9e349d779247462aedfce35cdaf9b1eb495dc',
+//        transaction_function_name: '',
+//        storedData: 0 } ],
+//   contentRange: { start: 0, end: 0, count: 1 } }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".searchWithContentRangeUntil"><span class="type-signature">(async, static) </span>searchWithContentRangeUntil<span class="signature">(user, contract, predicate, options)</span><span class="type-signature"> &rarr; {Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contract</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This the contract to search for</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>predicate</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the predicate that determines when to stop the search</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1258">line 1258</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.async` is set, only the hashes are populated, otherwise all the
+field are populated
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const globalConfig = fsUtil.getYaml("config.yaml");
+const options = { config: globalConfig, logger: console };
+const queryOptions = {
+  ...options,
+  query: {}
+};
+// predicate is created: to wait until response is available otherwise throws the error
+function predicate(response) {
+ return response.data.length >= 4;
+}
+const result = await rest.searchWithContentRangeUntil(stratoUser, contracts[0], predicate, queryOptions);
+// Returns
+// { data:
+//    [ { address: '07c9cb29ac43fe2257143074fb344203accb53eb',
+//        chainId: '',
+//        block_hash:
+//         '0e39030b10d80e5abaaf90a4b2d2322644fbb7b3b5cc0c8ea52a95d91adcd4ff',
+//        block_timestamp: '2020-08-05 16:49:28 UTC',
+//        block_number: '2',
+//        transaction_hash:
+//         '8c05b2ad6e8759122856c00f0646793073e0982d64ebd30ab3fb55a33da5cecf',
+//        transaction_sender: 'ebc383a8d64c07b3f472da8612bb463cf338c0b4',
+//        transaction_function_name: '',
+//        intValue: 2000,
+//        stringValue: '_2000_' },
+//      { address: '64560dd4c8789663303e97937f732976d98dab95',
+//        chainId: '',
+//        block_hash:
+//         '6840a306239c9f0e31359f9950a12e2a3595690273d38ce52bae970e26cd80e6',
+//        block_timestamp: '2020-08-05 16:49:29 UTC',
+//        block_number: '3',
+//        transaction_hash:
+//         '07e8b895559737c76e5323d3b2f1e6c893a91d68eb6fa08c6fb461133c37e4ad',
+//        transaction_sender: 'ebc383a8d64c07b3f472da8612bb463cf338c0b4',
+//        transaction_function_name: '',
+//        intValue: 2001,
+//        stringValue: '_2001_' },
+//      { address: '9f7f1f4a6479463145bab645b64acecc230f9332',
+//        chainId: '',
+//        block_hash:
+//         '50c25b7e693904b545bc7b9003c0eb57a6149d0bd42f12aac72962e01ae8588a',
+//        block_timestamp: '2020-08-05 16:49:30 UTC',
+//        block_number: '4',
+//        transaction_hash:
+//         '3a5e19730a8f32d71a707c78349c418375010d3ff98c74aa0f9156477ba98822',
+//        transaction_sender: 'ebc383a8d64c07b3f472da8612bb463cf338c0b4',
+//        transaction_function_name: '',
+//        intValue: 2002,
+//        stringValue: '_2002_' },
+//      { address: 'c1307553863b1a932f2a5d994926b64ecedc890e',
+//        chainId: '',
+//        block_hash:
+//         '1e674f96f42c08897d51ede082c95756493c26deb552588f854c44aa6f5adc4a',
+//        block_timestamp: '2020-08-05 16:49:31 UTC',
+//        block_number: '5',
+//        transaction_hash:
+//         'f93499e6e003d993ea5b2bf38d581da7e988a61c6a4077ebf60a242782e95b9c',
+//        transaction_sender: 'ebc383a8d64c07b3f472da8612bb463cf338c0b4',
+//        transaction_function_name: '',
+//        intValue: 2003,
+//        stringValue: '_2003_' } ],
+//   contentRange: { start: 0, end: 3, count: 4 } }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".send"><span class="type-signature">(async, static) </span>send<span class="signature">(user, sendTx, options)</span><span class="type-signature"> &rarr; {<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>sendTx</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~SendArgs">module:rest~SendArgs</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This describes the recipient, amount of tokens and the chain id (optional) for
+the token transfer</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line976">line 976</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.async` is set, only the hashes are populated, otherwise all the
+field are populated
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const sendArgs = {
+  toAddress: "cdc7e277d9aecbce6aba5b9b16de815cadad3d2b",
+  value: 100000000
+};
+
+const result = await rest.send(stratoUser, sendArgs, options);
+// Returns
+// { hash:
+//  '168f76ccf50582953d2fc9cbdc3bb60bd777562662dd9a2330ef29edab282a5c',
+// gasLimit: 32100000000,
+// codeOrData: '',
+// chainId: null,
+// gasPrice: 1,
+// to: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2b',
+// value: '100000000',
+// from: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2a',
+// r:
+//  'a657713d295f159566fd1a8618cc12931e965b0f9a509a7125d2572fba73a3c1',
+// metadata: null,
+// s:
+//  'c46bf8706053e9809064bd8d0f89c6ac0c963bc4b274a31cf8922ff9db858fd',
+// v: '1b',
+// nonce: 19,
+// src: 'source removed.',
+// bin: 'bin removed.',
+// 'bin-runtime': 'bin-runtime removed.',
+// xabi: 'xabi removed.' }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".sendMany"><span class="type-signature">(async, static) </span>sendMany<span class="signature">(user, sendTx, options)</span><span class="type-signature"> &rarr; {Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>sendTx</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;<a href="module-rest.html#~SendArgs">module:rest~SendArgs</a>></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This describes the recipient, amount of tokens and the chain id (optional) for
+the token transfer</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1027">line 1027</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If `options.async` is set, only the hashes are populated, otherwise all the
+field are populated
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;<a href="module-rest.html#~TxResultWrapper">module:rest~TxResultWrapper</a>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const sendArgs = {
+  toAddress: "cdc7e277d9aecbce6aba5b9b16de815cadad3d2b",
+  value: 100000000
+};
+
+const result = await rest.send(stratoUser, [sendArgs], options);
+// Returns
+// [{ hash:
+//  '168f76ccf50582953d2fc9cbdc3bb60bd777562662dd9a2330ef29edab282a5c',
+// gasLimit: 32100000000,
+// codeOrData: '',
+// chainId: null,
+// gasPrice: 1,
+// to: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2b',
+// value: '100000000',
+// from: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2a',
+// r:
+//  'a657713d295f159566fd1a8618cc12931e965b0f9a509a7125d2572fba73a3c1',
+// metadata: null,
+// s:
+//  'c46bf8706053e9809064bd8d0f89c6ac0c963bc4b274a31cf8922ff9db858fd',
+// v: '1b',
+// nonce: 19,
+// src: 'source removed.',
+// bin: 'bin removed.',
+// 'bin-runtime': 'bin-runtime removed.',
+// xabi: 'xabi removed.' }]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".waitForAddress"><span class="type-signature">(async, static) </span>waitForAddress<span class="signature">(user, contract, options)</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~User">module:rest~User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must contain the token for the user</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contract</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This must be the name of the contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Options">module:rest~Options</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the options and configurations for this call</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line1489">line 1489</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Returns an object with information including the address, given a contract
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const globalConfig = fsUtil.getYaml("config.yaml");
+const options = { config: globalConfig, logger: console };
+const queryOptions = {
+  ...options,
+  query: {}
+};
+const result = await rest.waitForAddress(stratoUser, contract, queryOptions);
+
+// Returns
+// { address: '2b755e392056c9b58f4f71da7ea8f47f553dd50b',
+//   chainId: '',
+//   block_hash:
+//    '4cd55ea1189677fc32be1b4bbd9f93d75c81610c7bafb4f09964197a6b3096fa',
+//   block_timestamp: '2020-08-12 16:14:16 UTC',
+//   block_number: '2',
+//   transaction_hash:
+//    'f67484a3c5b9a1c57a66d843ee8e9dc72280336f6dccd8ec798873a64fb61f2d',
+//   transaction_sender: 'b311acca558955c4b6296306f0e4a7ee0eb8f13d',
+//   transaction_function_name: '',
+//   storedData: 0 }</code></pre>
+
+
+
+        
+    
+
+    
+        <h3 class="subsection-title">Type Definitions</h3>
+
+        
+                
+<h4 class="name" id="~Account">Account</h4>
+
+
+
+
+<div class="description">
+    This object defines a STRATO account
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>kind</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Account type</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>balance</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Eth balance in wei</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>address</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Account address</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>latestBlockNum</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Last block number in which the state for this account was changed</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>codeHash</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Code hash. Relevant if this is a contract account</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>nonce:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Account nonce</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line73">line 73</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~CallArgs">CallArgs</h4>
+
+
+
+
+<div class="description">
+    This object defines a function call to a STRATO smart contract
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>contract</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~Contract">module:rest~Contract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Defines the contract on which to call the method. Should contain `name`
+and `address`.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>method</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Name of the method to call</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>args</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Arguments for the method call</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>value:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional. Number of tokens to send to the smart contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>chainid:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional chain id of the private chain if the contract is being called on a private chain</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>txParams:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~TxParams">module:rest~TxParams</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional. Defines gas limit and gas price for transaction execution</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line84">line 84</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~Chain">Chain</h4>
+
+
+
+
+<div class="description">
+    The object containing arguments of a chain
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>label</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The name of the chain</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>src</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Source contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>memberList</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Array containing the members of the chain</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>balanceList</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Array containng the balances of each member of the chain</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line173">line 173</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~ChainHash">ChainHash</h4>
+
+
+
+
+<div class="description">
+    The hash of a chain
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>hash</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The hash of a chain</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line181">line 181</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~ChainInfo">ChainInfo</h4>
+
+
+
+
+<div class="description">
+    Info about a chain such as members/balances/etc.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>balances</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;Object></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Balances existing within the chain</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>members</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;Object></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Members of the chain</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>label</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Name of the chain</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line186">line 186</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~CodeHash">CodeHash</h4>
+
+
+
+
+<div class="description">
+    This object defines the codeHash and the vm type in an uploaded contract object
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>kind</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the type of VM used. Is either `SolidVM` or `EVM`</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>digest</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the code hash</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line96">line 96</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~Config">Config</h4>
+
+
+
+
+<div class="description">
+    This contains node configuration information
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>VM</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identifies the type of VM to use. It must equal one of `EVM` or `SolidVM`</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>apiDebug</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This flag enables debug output to be sent to the logger</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>nodes</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;<a href="module-rest.html#~Node">module:rest~Node</a>></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This contains a collection of STRATO nodes which are being used.
+It must have atleast one member</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>timeout</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Length of time to wait before giving up on a request in milliseconds</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line48">line 48</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~Contract">Contract</h4>
+
+
+
+
+<div class="description">
+    This object defines a STRATO smart contract
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Name of the smart contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>source</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Source code for the smart contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>args</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional arguments for the smart contract constructor</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>codeHash:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Contract code hash. Not required. Populated by the compileContract call.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>address:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Contract address. Not required. Populated by uploading a contract to STRATO.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line103">line 103</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~Node">Node</h4>
+
+
+
+
+<div class="description">
+    This identifies a STRATO node and contains OAuth discovery urls to
+authenticate to this node.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>id</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Node identifier</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>url</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The base url of the node of the form `{PROTOCOL}://{HOST}:{PORT}`</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>publicKey</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the public key of the node. Used to verify the identify of the node.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>port</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the port number of the STRATO process on this node. Usually equals `30303`</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>oauth</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~OAuthConfig">module:rest~OAuthConfig</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This describes the oauth configuration of a STRATO node</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line37">line 37</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~OAuthConfig">OAuthConfig</h4>
+
+
+
+
+<div class="description">
+    This object describes the oauth configuration of a STRATO node
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>appTokenCookieName</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Specifies the HTTP only cookie name. Used to identify
+authentication cookie if cookies are used instead of headers</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>scope</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Identifies OAuth scope</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>appTokenCookieMaxAge</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Used to set auth cookie expiration</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>clientId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">OAuth client id for client credential and auth code grant flows</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>clientSecret</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">OAuth client secret corresponding to the clientId</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>openIdDiscoveryUrl</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Discovery url for OAuth</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>redirectUri</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">OAuth callback url for auth code grant flow</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>logoutRedirectUri</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Redirect URI to redirect user after a successful logout</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line24">line 24</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~Options">Options</h4>
+
+
+
+
+<div class="description">
+    This object defines options, configurations and metadata for the STRATO node
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>config</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Config</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This contains node identifiers, configuration and metadata options for this call.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>logger</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is a logger interface. It uses the `console` by default but can be
+set to custom logger like winston.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>headers</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This allows adding custom HTTP headers for requests to STRATO</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>query</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This allows adding custom HTTP query params to requests.
+Useful for searching contracts</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>history</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;String></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This allows us to specify contract names for which to track history
+when uploading smart contract source code</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>noindex</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;String></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This allows us to specify contract names for which to skip relational
+indexing when uploading smart contract source code</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>isAsync</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">If set, the call returns a transaction hash instead of waiting for a transaction
+confirmation. Default value is `false`.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line57">line 57</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~SendArgs">SendArgs</h4>
+
+
+
+
+<div class="description">
+    This object defines the shape of a request for transfer tokens
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>toAddress</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Address of the receiver</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>value</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">amount of tokens to transfer in wei</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>txParams:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~TxParams">module:rest~TxParams</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional. Defines gas limit and gas price for transaction execution</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>chainid:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional chain id of the private chain if the transfer is being executed on a private chain</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line112">line 112</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~TxData">TxData</h4>
+
+
+
+
+<div class="description">
+    This is the formatted output of a transaction execution
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>Tag</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This identified the type of the transaction. Is one of `Call`, `Upload` or `Send`</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contents</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array</span>
+|
+
+<span class="param-type"><a href="module-rest.html#~UploadedContract">module:rest~UploadedContract</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the formatted output of executing the transaction</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line120">line 120</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~TxParams">TxParams</h4>
+
+
+
+
+<div class="description">
+    This object defines transaction specific options for STRATO.
+There should be no need to change the defaults for most use cases.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>gasLimit</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the upper limit for the amount of gas this transaction should consume.
+Defaults to 32100000000 wei</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>gasPrice</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the price of gas the user is willing to pay. Defaults to 1 wei</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line127">line 127</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~TxResult">TxResult</h4>
+
+
+
+
+<div class="description">
+    The result of submitting a transaction to STRATO.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>contractsDeleted</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Comma separated list of contract addresses that were deleted as a result of
+executing this transaction</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>gasUsed</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Amount of gas used by this transaction in hexadecimal</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>stateDiff</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>time</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Amount of time the VM took to execute this tramsaction</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>kind</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Type of VM used to execute this transaction. `SolidVM` or `EVM`</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>chainid</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Chain id (present if transaction was executed on a private chain)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>response</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Raw output of executing transaction</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>blockHash</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Block hash of the block in which this transaction was finalized</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>transactionHash</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Transaction hash</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>etherUsed</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Amount of ether used to execute this transaction (`gasUsed` * `gasPrice`)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>contractsCreated</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Comma separated list of contract addresses created as a result of executing this
+transaction</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line135">line 135</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~TxResultWrapper">TxResultWrapper</h4>
+
+
+
+
+<div class="description">
+    The result of submitting a transaction to STRATO.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>status</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Status of the transaction. One of `Pending`, `Success` or `Failure`.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>hash</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Transaction hash</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>txResult</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~TxResult">module:rest~TxResult</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Result of the execution of the transaction</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~TxData">module:rest~TxData</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Data returned by the execution of a STRATO transaction</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line153">line 153</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~UploadedContract">UploadedContract</h4>
+
+
+
+
+<div class="description">
+    This object describes the result of uploading one contract in a list of smart
+contracts being uploaded to STRATO
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Name of the smart contract</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>chainId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Chain identifier if the smart contract is being uploaded to a private chain.
+This property is `null` for main chain smart contracts</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>address:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Contract address. Not required. Populated by uploading a contract to STRATO.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>codeHash:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-rest.html#~CodeHash">module:rest~CodeHash</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Describes the codehash and the VM used to generate the code hash</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>bin:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The compiled Solidity byte code</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>xabi:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">An object defining the contract metadata</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line161">line 161</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="~User">User</h4>
+
+
+
+
+<div class="description">
+    This identifies a user
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>token</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the OAuth JWT corresponding to this user.
+STRATO uses the JWT to identify the user and unlock the user's private key to sign transactions.
+The token must be present in most cases.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>address</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">This is the address corresponding to the user's private key.
+This is an optional parameter.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rest.js.html">rest.js</a>, <a href="rest.js.html#line15">line 15</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-rest.html">rest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.5</a> on Fri Sep 04 2020 14:34:36 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
