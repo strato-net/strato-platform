@@ -2,8 +2,28 @@ import fs from 'fs'
 import yaml from 'js-yaml';
 
 /**
+ * This is the fsUtil interface
+ * @module fsUtil
+ */
+
+/**
  * Reads a file and return its content
+ * @example
+ * const simpleStorageSrc = fsUtil.get("SimpleStorage.sol");
+ * // Returns
+ * // contract SimpleStorage {
+ * //     uint storedData;
+ * //
+ * //     function set(uint x) {
+ * //         storedData = x;
+ * //     }
+ * //
+ * //     function get() returns (uint) {
+ * //         return storedData;
+ * //     }
+ * // }
  * @method get
+ * @param {String} filename The name of the file to be retrieved
  * @return {String}
  */
 
@@ -14,7 +34,20 @@ function get(filename) {
 
 /**
  * Reads a yaml file and return its content
+ * @example
+ * const result = fsUtil.getYaml("config.yaml");
+ * // Returns
+ * // { apiDebug: false,
+ * //  timeout: 600000,
+ * //  nodes:
+ * //   [ { id: 0,
+ * //       url: 'http://localhost',
+ * //       publicKey:
+ * //        'publickey',
+ * //       port: 30303,
+ * //       oauth: [Object] } ] }
  * @method getYaml
+ * @param {String} filename The name of the yaml file to be retrieved
  * @return {String}
  */
 
@@ -25,7 +58,13 @@ function getYaml(filename) {
 
 /**
  * Reads a JSON file and return its content
+ * @example
+ * const result = fsUtil.getYaml("test.json");
+ * // Returns
+ * // { test: 'testing json' }
  * @method getJson
+ * @param {String} filename The name of the json file to be retrieved
+ * @param {*} options
  * @return {String}
  */
 

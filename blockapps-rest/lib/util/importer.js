@@ -4,6 +4,11 @@ const cwd = nodepath.resolve(process.cwd());
 
 let nameStore = [];
 
+/**
+ * This is the importer interface
+ * @module importer
+ */
+
 function getImportsTree(fullname) {
   // console.log('getImportsTree', fullname);
   let importFullnames = [];
