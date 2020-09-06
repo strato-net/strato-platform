@@ -20,10 +20,15 @@ import           Servant                     hiding (ServerError)
 import qualified Servant                     as SERVANT (ServerError)
 import           UnliftIO
 
+import           Control.Monad.Composable.SQL hiding (SQLM)
+
 type SQLM = ReaderT SQLDB (LoggingT IO)
 
 instance Mod.Accessible SQLDB SQLM where
   access _ = ask
+
+instance HasSQL SQLM where
+  getSQLPool = fmap unSQLDB ask
 
 runSQLM :: ConnectionPool -> SQLM a -> IO a
 runSQLM pool = runLoggingT . flip runReaderT (SQLDB pool)

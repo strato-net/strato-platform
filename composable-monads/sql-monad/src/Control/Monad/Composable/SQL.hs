@@ -4,19 +4,15 @@
 module Control.Monad.Composable.SQL where
 
 import           Control.Monad.Reader
-import           Data.Pool (Pool)
 
---import           Database.Persist.Sql
-
-import           Database.PostgreSQL.Simple         (Connection)
---                                                     withTransaction)
+import qualified Database.Persist.Sql as SQL
 
 newtype SQLData = SQLData Int deriving (Show)
 
 type SQLM = ReaderT SQLData
 
 class HasSQL m where
-  getSQLPool :: m (Pool Connection)
+  getSQLPool :: m SQL.ConnectionPool
 
 runSQLM :: SQLM m a -> m a
 runSQLM f = do

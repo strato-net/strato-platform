@@ -43,6 +43,7 @@ library:
   - servant-client-core
   - servant-multipart
 #  - servant-swagger-tags
+  - sql-monad
   - strato-model
   - swagger2
   - template-haskell
