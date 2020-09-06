@@ -119,7 +119,7 @@ data NamedChainId = UnnamedChainIds [ChainId]
 instance (Functor m, HasSQL m) => Accessible SQLDB m where
   access _ = fmap SQLDB getSQLPool
   
-instance (MonadIO m, Functor m, Applicative m, MonadUnliftIO m, HasSQL m) => Selectable AccountsFilterParams [AddressStateRef] m where
+instance (MonadIO m, MonadUnliftIO m, HasSQL m) => Selectable AccountsFilterParams [AddressStateRef] m where
   select _ a@AccountsFilterParams{..} | a == accountsFilterParams =
     throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
                                       | otherwise = do
