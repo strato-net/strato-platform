@@ -5,7 +5,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Handlers.Stats (
   API,
@@ -22,7 +24,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 
-import           SQLM
+import           Control.Monad.Composable.SQL
 
 newtype TotalDifficulty = TotalDifficulty Integer
 
@@ -54,15 +56,15 @@ type API =
   "stats" :> "totaltx" :> Get '[JSON] TransactionCount
   :<|> "stats" :> "difficulty" :> Get '[JSON] TotalDifficulty
 
-server :: ServerT API SQLM
+server :: HasSQL m => ServerT API m
 server = getStatTx :<|> getStatDiff
 
 ---------------------
 
-instance Accessible TotalDifficulty SQLM where
+instance HasSQL m => Accessible TotalDifficulty m where
   access _ = TotalDifficulty . blockDataRefTotalDifficulty <$> getBestBlock
 
-instance Accessible TransactionCount SQLM where
+instance HasSQL m => Accessible TransactionCount m where
   access _ = do
     tx <- sqlQuery $ E.select $ E.from $ \(_ :: E.SqlExpr (E.Entity RawTransaction)) -> return E.countRows
     return .TransactionCount $ myval (tx :: [E.Value Integer])

@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Handlers.Storage
@@ -35,6 +36,8 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.ChainId
+
+import           Control.Monad.Composable.SQL
 
 import           Settings
 import           SQLM
@@ -77,7 +80,7 @@ getStorageClient = uncurryStorageFilterParams getStorageClient'
       qsKey qsMinKey qsMaxKey qsValue qsMinValue qsMaxValue
       qsAddress qsChainId qsChainIds
 
-server :: ServerT API SQLM
+server :: HasSQL m => ServerT API m
 server = getStorage
 
 
@@ -98,7 +101,7 @@ instance ToSchema StorageAddress
 storage2StorageAddress :: Storage -> Address -> StorageAddress
 storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) (storageKind stor) addr)
 
-instance Selectable StorageFilterParams [StorageAddress] SQLM where
+instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
   select _ StorageFilterParams{..} = do
     chainids <-
       case (qsChainId, qsChainIds) of

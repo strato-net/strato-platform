@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
@@ -52,6 +53,8 @@ import           Blockchain.EthConf          (runKafkaConfigured)
 import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
 import           Blockchain.Util             (getCurrentMicrotime)
+
+import           Control.Monad.Composable.SQL
 
 import           Settings
 import           SortDirection
@@ -123,7 +126,7 @@ getTxsFilter :<|> postTx :<|> postTxList =
       qtValue qtMinValue qtMaxValue qtBlockNumber qtChainId
       qtChainIds qtSortby
 
-server :: ServerT API SQLM
+server :: (MonadLogger m, HasSQL m) => ServerT API m
 server = getTransaction :<|> postTransactionC :<|> postTransactionListC
   where postTransactionC rt      = runConduit $ postTransaction rt `fuseUpstream` emitKafkaTransactions
         postTransactionListC rts = runConduit $ postTransactionList rts `fuseUpstream` emitKafkaTransactions
@@ -136,7 +139,7 @@ data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
                   | AllChains
 
-instance Selectable TxsFilterParams [RawTransaction] SQLM where
+instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
   select _ t@TxsFilterParams{..} | t == txsFilterParams { qtChainId = qtChainId
                                                         , qtChainIds = qtChainIds
                                                         , qtSortby = qtSortby

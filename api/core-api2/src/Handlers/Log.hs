@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Handlers.Log (
@@ -23,9 +24,10 @@ import           Blockchain.Data.Json          ()
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.Keccak256   hiding (hash)
 
+import           Control.Monad.Composable.SQL
+
 import           Settings
 import           SortDirection
-import           SQLM
 
 type API = 
   "log" :> QueryParam "address" Address
@@ -34,7 +36,7 @@ type API =
         :> Get '[JSON] [LogDB]
 
 
-server :: ServerT API SQLM
+server :: HasSQL m => ServerT API m
 server = getLog
 
 ---------------------
@@ -45,7 +47,7 @@ data LogsFilterParams = LogsFilterParams
   , qlSortby  :: Maybe Sortby
   } deriving (Eq, Ord, Show)
 
-instance Selectable LogsFilterParams [LogDB] SQLM where
+instance HasSQL m => Selectable LogsFilterParams [LogDB] m where
   select _ LogsFilterParams{..} =
     fmap (Just . nub . map E.entityVal) . sqlQuery $ E.select $ E.from $ \lg -> do
       let criteria = catMaybes

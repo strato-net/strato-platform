@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -19,17 +20,18 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
 
+import           Control.Monad.Composable.SQL
+
 import           Settings
-import           SQLM
 
 type API = "transaction" :> "last" :> "queued" :> Get '[JSON] [RawTransaction']
 
-server :: ServerT API SQLM
+server :: HasSQL m => ServerT API m
 server = getQueuedTransactions
 
 ---------------------
 
-instance Accessible [RawTransaction] SQLM where
+instance HasSQL m => Accessible [RawTransaction] m where
   access _ = fmap (map entityVal) . sqlQuery $
     selectList [ RawTransactionBlockNumber ==. (-1) ]
                [ LimitTo (fromIntegral $ appFetchLimit :: Int)

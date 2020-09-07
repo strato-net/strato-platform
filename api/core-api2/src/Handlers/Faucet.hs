@@ -52,13 +52,14 @@ import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util                (getCurrentMicrotime)
+import           Control.Monad.Composable.SQL
 
 import           Text.Format
 
 import           FaucetKey
 import           SQLM
 import           UnliftIO
-  
+
 type API = 
   "faucet" :> ReqBody '[FormUrlEncoded] Address
            :> Post '[JSON] [Keccak256]
@@ -77,7 +78,7 @@ postFaucetClient
   :<|> postFaucetMultipartClient
   :<|> postDataFaucetClient = client (Proxy @API)
 
-server :: ServerT API SQLM
+server :: (MonadLogger m, HasSQL m) => ServerT API m
 server  =
   postFaucetC
   :<|> postFaucetMultipartC
@@ -159,7 +160,7 @@ acquireNewMaxNonce minNonce = do
         in (next, next)
   liftIO $ atomicModifyIORef' appFaucetNonce findNext
 
-instance Selectable Address Integer SQLM where
+instance HasSQL m => Selectable Address Integer m where
   select _ addr = fmap (fmap (addressStateRefNonce . E.entityVal) . listToMaybe) . sqlQuery $ E.select $
     E.from $ \accStateRef -> do
     E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0

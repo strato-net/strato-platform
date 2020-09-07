@@ -1,7 +1,11 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 
 module Handlers.BlkLast
   ( API
@@ -23,8 +27,8 @@ import           Blockchain.Data.Transaction
 import           Blockchain.DB.SQLDB
 
 import           Settings
-import           SQLM
 
+import           Control.Monad.Composable.SQL
 
 type API = 
   "block" :> "last"
@@ -34,15 +38,15 @@ type API =
 getBlkLastClient :: Integer -> ClientM [Block']
 getBlkLastClient = client (Proxy @API)
 
-server :: ServerT API SQLM
+server :: HasSQL m => ServerT API m
 server = getBlkLast
 
 ---------------------
 
-class Monad m => GetLastBlocks m where
+class HasSQL m => GetLastBlocks m where
   getLastBlocks :: Integer -> m [Block]
 
-instance GetLastBlocks SQLM where
+instance HasSQL m => GetLastBlocks m where
   getLastBlocks n = do
     blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $ E.select $
         E.from $ \a -> do

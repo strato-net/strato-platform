@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -22,7 +23,7 @@ import           Servant.Client
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
-import           SQLM
+import           Control.Monad.Composable.SQL
 
 type API = 
   "transactionResult" :> Capture "txHash" Keccak256
@@ -31,12 +32,12 @@ type API =
 getTransactionResultClient :: Keccak256 -> ClientM [TransactionResult]
 getTransactionResultClient = client (Proxy @API)
 
-server :: ServerT API SQLM
+server :: HasSQL m => ServerT API m
 server = getTransactionResult
 
 ---------------------------
 
-instance Selectable Keccak256 [TransactionResult] SQLM where
+instance HasSQL m => Selectable Keccak256 [TransactionResult] m where
   select _ txHash = fmap (Just . map E.entityVal) . sqlQuery $ E.select $
     E.from $ \(txr) -> do
     let matchHash = (txr E.^. TransactionResultTransactionHash) E.==. (E.val txHash)

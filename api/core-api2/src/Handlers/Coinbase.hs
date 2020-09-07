@@ -14,14 +14,13 @@ import           Servant
 import           Servant.Client
 
 import           Blockchain.EthConf
-import           SQLM
 
 type API = "coinbase" :> Get '[JSON] Value
 
 coinbaseClient :: ClientM Value
 coinbaseClient = client (Proxy @API)
 
-server :: ServerT API SQLM
+server :: Applicative m => ServerT API m
 server = getCoinbase
 
 -------------------------

@@ -17,7 +17,7 @@ import           UnliftIO
 
 type API = "peers" :> Get '[JSON] Value
 
-server :: ServerT API SQLM
+server :: MonadIO m => ServerT API m
 server = getPeers
 
 ---------------------

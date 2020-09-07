@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
@@ -48,6 +49,7 @@ import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.TypeLits
+import           Control.Monad.Composable.SQL
 import           SQLM
 import           UnliftIO
 
@@ -61,7 +63,7 @@ postChainClient :: ChainInfo -> ClientM ChainId
 postChainsClient :: [ChainInfo] -> ClientM [ChainId]
 getChainClient :<|> postChainClient :<|> postChainsClient = client (Proxy @API)
 
-server :: ServerT API SQLM
+server :: (MonadLogger m, HasSQL m) => ServerT API m
 server = getChain :<|> postChain :<|> postChains
 
 -----------------------
@@ -70,7 +72,7 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
-instance Selectable ChainId ChainInfo SQLM where
+instance HasSQL m => Selectable ChainId ChainInfo m where
   selectMany _ = fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos
   select     _ = fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo
 

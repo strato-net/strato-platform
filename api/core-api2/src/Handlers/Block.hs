@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Handlers.Block
@@ -37,10 +38,11 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
-import           SQLM
+import           Control.Monad.Composable.SQL
 
 import           Settings
 import           SortDirection
+import           SQLM
 import           UnliftIO
 
 type API = 
@@ -104,12 +106,12 @@ getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
       qbMinGasLim qbMaxGasLim qbNumber qbMinNumber qbMaxNumber
       qbIndex qbChainId qbSortby
 
-server :: ServerT API SQLM
+server :: HasSQL m => ServerT API m
 server = getBlockInfo
 
 ---------------------
 
-instance Selectable BlocksFilterParams [Block] SQLM where
+instance HasSQL m => Selectable BlocksFilterParams [Block] m where
   select _ b@BlocksFilterParams{..} | b == blocksFilterParams{qbSortby = qbSortby} =
     throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " (map T.unpack blockQueryParams)
                                     | otherwise = do

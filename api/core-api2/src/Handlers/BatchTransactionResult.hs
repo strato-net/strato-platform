@@ -4,7 +4,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans   #-}
 
 module Handlers.BatchTransactionResult
@@ -27,6 +29,8 @@ import           Blockchain.Strato.Model.Keccak256
 import           SQLM
 import           UnliftIO
 
+import           Control.Monad.Composable.SQL
+
 type API = 
   "transactionResult" :> "batch" :> ReqBody '[JSON,PlainText] [Keccak256]
                                  :> Post '[JSON] (M.Map Keccak256 [TransactionResult])
@@ -34,10 +38,10 @@ type API =
 batchTransactionResultClient :: [Keccak256] -> ClientM (M.Map Keccak256 [TransactionResult])
 batchTransactionResultClient = client (Proxy @API)
 
-server :: ServerT API SQLM
+server :: HasSQL m => ServerT API m
 server = postBatchTransactionResult
 
-instance Selectable Keccak256 [TransactionResult] SQLM where
+instance HasSQL m => Selectable Keccak256 [TransactionResult] m where
   selectMany _ []     = throwIO $ MissingParameterError "missing parameter: hashes"
   selectMany _ hashes = do
     txrs <- sqlQuery . E.select . E.from $ \txr -> do
@@ -52,7 +56,8 @@ instance Selectable Keccak256 [TransactionResult] SQLM where
         grouped = foldl theFold baseMap (E.entityVal <$> txrs)
     return grouped
 
-postBatchTransactionResult :: Selectable Keccak256 [TransactionResult] m => [Keccak256] -> m (M.Map Keccak256 [TransactionResult])
+postBatchTransactionResult :: Selectable Keccak256 [TransactionResult] m =>
+                              [Keccak256] -> m (M.Map Keccak256 [TransactionResult])
 postBatchTransactionResult = selectMany (Proxy @[TransactionResult])
 
 

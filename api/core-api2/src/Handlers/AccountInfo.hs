@@ -115,7 +115,7 @@ server = getAccount
 data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
   
-instance (MonadIO m, HasSQL m) => Selectable AccountsFilterParams [AddressStateRef] m where
+instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
   select _ a@AccountsFilterParams{..} | a == accountsFilterParams =
     throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
                                       | otherwise = do

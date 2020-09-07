@@ -11,12 +11,11 @@ module Handlers.Version (
 import           Data.Aeson
 import           GHC.Generics
 import           Servant
-import           SQLM
 import           Versioning
 
 type API = "version" :> Get '[JSON] Value
 
-server :: ServerT API SQLM
+server :: Applicative m => ServerT API m
 server = getVersion
 
 -------------------------
