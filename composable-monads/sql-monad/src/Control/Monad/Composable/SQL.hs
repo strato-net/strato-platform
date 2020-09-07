@@ -1,18 +1,20 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 
-{-# OPTIONS -fno-warn-deprecations #-}
+module           Control.Monad.Composable.SQL where
 
-module Control.Monad.Composable.SQL where
 
 import           Control.Monad.Reader
 
-import qualified Database.Persist.Sql as SQL
+import           Blockchain.DB.SQLDB
+
+
 
 newtype SQLData = SQLData Int deriving (Show)
 
 type SQLM = ReaderT SQLData
 
-class HasSQL m where
-  getSQLPool :: m SQL.ConnectionPool
+type HasSQL m = HasSQLDB m
 
 runSQLM :: SQLM m a -> m a
 runSQLM f = do

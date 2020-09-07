@@ -39,7 +39,6 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 
-import           Control.Monad.Change.Modify
 import           Control.Monad.Composable.SQL
 
 import           Settings
@@ -108,18 +107,15 @@ uncurryAccountsFilterParams f AccountsFilterParams{..} = f
   qaMinNonce qaMaxNonce qaMaxNumber qaCode qaCodeHash
   qaChainId
 
-server :: (HasSQL m, MonadUnliftIO m) => ServerT API m
+server :: HasSQL m => ServerT API m
 server = getAccount
 
 ---------------------------
 
 data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
-
-instance (Functor m, HasSQL m) => Accessible SQLDB m where
-  access _ = fmap SQLDB getSQLPool
   
-instance (MonadIO m, MonadUnliftIO m, HasSQL m) => Selectable AccountsFilterParams [AddressStateRef] m where
+instance (MonadIO m, HasSQL m) => Selectable AccountsFilterParams [AddressStateRef] m where
   select _ a@AccountsFilterParams{..} | a == accountsFilterParams =
     throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
                                       | otherwise = do
