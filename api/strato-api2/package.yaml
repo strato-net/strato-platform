@@ -32,6 +32,7 @@ executables:
     - servant-multipart
     - servant-swagger
     - servant-swagger-ui
+    - sql-monad
     - swagger2
     - transformers
     - unliftio

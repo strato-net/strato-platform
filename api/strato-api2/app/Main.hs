@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -39,6 +40,8 @@ import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Server
 import           BlockApps.Init
 import           Blockchain.EthConf
+
+import           Control.Monad.Composable.SQL    hiding (runSQLM, SQLM)
 
 import           Text.Tools
 
@@ -88,7 +91,7 @@ type CoreAPI =
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
   
-coreServer :: ServerT CoreAPI SQLM
+coreServer :: (MonadLogger m, HasSQL m) => ServerT CoreAPI m
 coreServer = Account.server
   :<|> BatchTransactionResult.server
   :<|> BlkLast.server
@@ -107,7 +110,7 @@ coreServer = Account.server
   :<|> UUID.server
   :<|> Version.server
 
-fullServer :: ServerT FullAPI SQLM
+fullServer :: (MonadLogger m, HasSQL m) => ServerT FullAPI m
 fullServer = coreServer :<|> bloc
 
 ----------------
