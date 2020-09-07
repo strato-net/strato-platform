@@ -75,8 +75,9 @@ tests:
       - aeson-qq
       - base16-bytestring
       - binary
-#      - crypto-pubkey         if we need to compare with eth-encryption's ecdh, add these back
-#      - crypto-pubkey-types
+      - cryptonite
+      - crypto-pubkey
+      - crypto-pubkey-types
       - ethereum-encryption
       - ethereum-rlp
       - integer-gmp
@@ -85,6 +86,7 @@ tests:
       - hspec
       - QuickCheck
 
+
 benchmarks:
   word256:
     source-dirs: bench/
@@ -92,3 +94,7 @@ benchmarks:
     dependencies:
       - strato-model
       - criterion
+
+
+
+
