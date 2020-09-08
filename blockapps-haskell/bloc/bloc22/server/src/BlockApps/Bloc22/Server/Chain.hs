@@ -18,7 +18,7 @@ import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromJust, fromMaybe)
+import           Data.Maybe                        (catMaybes, fromJust, fromMaybe, maybeToList)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Text.Encoding                (encodeUtf8)
@@ -65,13 +65,16 @@ replaceMembers Struct{..} addrs m =
           _ -> m
 
 createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
-createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _) = do
+createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
-  let src = fromMaybe "" msrc
   let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
-  mContract <- fmap snd <$> getContractDetailsForContract theVM src cname
+  mContract <- case msrc of
+    Just src -> fmap snd <$> getContractDetailsForContract theVM src cname
+    Nothing -> case mCodePtr of
+      Just codePtr -> getContractDetailsByCodeHash codePtr
+      Nothing -> fmap snd <$> getContractDetailsForContract theVM "" cname
   (cAcctInfo, codeInfo) <- case mContract of
       Nothing -> return ([],[])
       Just (_, ContractDetails{..}) -> do
@@ -88,17 +91,17 @@ createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _
           let balMap = Map.fromList $ map (unNamedTuple @"address" @"balance") balances
               govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
 
-          (contractHash, b, s) <-
+          (contractHash, b) <-
             case theVM of
-              "EVM" -> return (contractdetailsCodeHash, contractdetailsBinRuntime, src)
+              "EVM" -> return (contractdetailsCodeHash, contractdetailsBinRuntime)
               "SolidVM" -> do
-                return (contractdetailsCodeHash, "", src)
+                return (contractdetailsCodeHash, "")
               _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               b' = fst . B16.decode $ encodeUtf8 b
-              codeInfo' = CodeInfo b' s contractdetailsName
-          return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
+              codeInfo' = maybeToList $ (\s -> CodeInfo b' s contractdetailsName) <$> msrc
+          return ([contractAcctInfo],codeInfo') -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let maybeNonContract a b | a == governanceAddress = Nothing
                            | otherwise = Just $ NonContract a b
