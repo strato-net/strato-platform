@@ -23,9 +23,8 @@ import           Data.Time
 import qualified Data.Sequence                as S
 import           GHC.Generics
 import           Test.QuickCheck
-import           Test.QuickCheck.Instances.Text()
+import           Test.QuickCheck.Instances()
 
-import           Blockchain.MiscArbitrary()
 import           Blockchain.MiscJSON()
 import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Address

@@ -64,7 +64,7 @@ RawTransaction
     gasLimit Integer sqltype=numeric(1000,0)
     toAddress Address Maybe
     value Integer sqltype=numeric(1000,0)
-    codeOrData BS.ByteString
+    codeOrData Code
     chainId Word256
     r Integer
     s Integer

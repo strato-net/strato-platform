@@ -60,6 +60,7 @@ import           Text.Read.Lex
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
@@ -119,6 +120,12 @@ instance RLPEncodable CodePtr where
   rlpDecode (RLP.Array [RLP.String "AtAddress", a, n]) = CodeAtAddress <$> rlpDecode a <*> rlpDecode n
   rlpDecode ch = EVMCode <$> rlpDecode ch
 
+instance RLPEncodable Code where
+  rlpEncode (Code cb) = rlpEncode cb
+  rlpEncode (PtrToCode cp) = RLP.Array [rlpEncode cp]
+
+  rlpDecode (RLP.Array [x]) = PtrToCode <$> rlpDecode x
+  rlpDecode x = Code <$> rlpDecode x
 --------------------------------------------------------------------------------
 
 
@@ -135,7 +142,7 @@ data Transaction = Transaction
   , transactionGasLimit   :: Gas
   , transactionTo         :: Maybe Address
   , transactionValue      :: Wei
-  , transactionInitOrData :: ByteString
+  , transactionInitOrData :: Code
   , transactionChainId    :: Maybe ChainId
   , transactionV          :: Word8
   , transactionR          :: Word256
@@ -195,7 +202,7 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionGasLimit   :: Gas
   , unsignedTransactionTo         :: Maybe Address
   , unsignedTransactionValue      :: Wei
-  , unsignedTransactionInitOrData :: ByteString
+  , unsignedTransactionInitOrData :: Code
   , unsignedTransactionChainId    :: Maybe ChainId
   } deriving (Eq,Show,Generic)
 

@@ -5,7 +5,7 @@ module Blockchain.Data.ArbitraryInstances where
 import           Data.DeriveTH
 import           Data.Maybe                         (fromJust, isJust)
 import           Test.QuickCheck
-import           Test.QuickCheck.Instances.Text()
+import           Test.QuickCheck.Instances()
 
 import           Data.ByteString.Arbitrary
 import qualified Data.ByteString                    as B
@@ -15,13 +15,11 @@ import           System.IO.Unsafe                   (unsafePerformIO)
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia
-import           Blockchain.MiscArbitrary()
 import           Blockchain.Util
 
 import qualified Network.Haskoin.Crypto             as H
@@ -132,9 +130,6 @@ instance Arbitrary RawTransaction where
                                 <*> arbitrary
                                 <*> arbitrary
                                 <*> arbitrary
-
-instance Arbitrary Code where
-  arbitrary = Code <$> arbitrary
 
 instance Arbitrary StateRoot where
     arbitrary = StateRoot <$> fastRandBs 32

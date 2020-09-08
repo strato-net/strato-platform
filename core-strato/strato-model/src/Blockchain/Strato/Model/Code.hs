@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Blockchain.Strato.Model.Code where
 
 import           Control.DeepSeq
@@ -7,13 +8,17 @@ import           Data.Binary
 import qualified Data.ByteString     as B
 import qualified Data.ByteString.Base16     as B16
 import           Data.Data
+import           Data.DeriveTH
 import qualified Data.Text as T
 import           Data.Text.Encoding  (encodeUtf8, decodeUtf8)
+import           Database.Persist.TH
 import           GHC.Generics
 import           Data.Aeson
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.CodePtr
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances()
 
 data Code = Code { codeBytes :: B.ByteString }
           | PtrToCode { ptrToCode :: CodePtr } 
@@ -21,6 +26,10 @@ data Code = Code { codeBytes :: B.ByteString }
 
 instance Binary Code where
 instance NFData Code
+
+derive makeArbitrary ''Code
+
+derivePersistField "Code"
 
 instance RLPSerializable Code where
     rlpEncode (Code bytes) = rlpEncode bytes

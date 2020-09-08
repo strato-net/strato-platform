@@ -80,6 +80,7 @@ import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
@@ -94,7 +95,7 @@ data TransactionHeader = TransactionHeader
   , transactionheaderFromAddr :: Address
   , transactionheaderTxParams :: TxParams
   , transactionheaderValue    :: Wei
-  , transactionheaderCode     :: ByteString
+  , transactionheaderCode     :: Code
   , transactionheaderChainId  :: Maybe ChainId
   }
 
@@ -222,7 +223,7 @@ postUsersSend' cacheNonce TransferParameters{..} sign = do
         fromAddress
         params
         (Wei (fromIntegral $ unStrung value))
-        ByteString.empty
+        (Code ByteString.empty)
         chainId
     txHash <- blocStrato $ postTx tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
@@ -275,7 +276,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (bin <> argsBin)
+      (Code $ bin <> argsBin)
       chainId
   $logDebugLS "postUsersContractEVM'/tx" tx
   txHash <- blocStrato $ postTx tx
@@ -309,7 +310,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (BC.pack $ Text.unpack src)
+      (Code . BC.pack $ Text.unpack src)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- blocStrato $ postTx tx
@@ -380,7 +381,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (BC.pack $ Text.unpack src)
+            (Code . BC.pack $ Text.unpack src)
             cid
       return ((name,cmId),tx)
   let
@@ -437,7 +438,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (bin <> argsBin)
+            (Code $ bin <> argsBin)
             cid
       return ((name,cmId),tx)
   let
@@ -475,7 +476,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} sign = do
               fromAddr
               (fromMaybe emptyTxParams params)
               (Wei $ fromIntegral value)
-              (ByteString.empty)
+              (Code ByteString.empty)
               cid
         signAndPrepare sign fromAddr md header
     ) txsWithParams
@@ -618,7 +619,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} sign = do
               fromAddr
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
-              (sel <> argsBin)
+              (Code $ sel <> argsBin)
               _methodcallChainid
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
@@ -707,7 +708,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
         fromAddr
         params
         (Wei (maybe 0 (fromIntegral . unStrung) value))
-        ((sel::ByteString) <> (argsBin::ByteString))
+        (Code $ (sel::ByteString) <> (argsBin::ByteString))
         chainId
     $logDebugLS "postUsersContractMethod'/tx" tx
     txHash <- blocStrato $ postTx tx

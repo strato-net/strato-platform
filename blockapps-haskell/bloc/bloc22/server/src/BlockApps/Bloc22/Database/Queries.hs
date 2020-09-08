@@ -617,7 +617,9 @@ getContractDetailsAndMetadataId (ContractName contractName) addr chainId = do
         for tuple' $ detailsWith (Just addr) chainId
 
 getContractDetailsByCodeHash :: CodePtr -> Bloc (Maybe (Int32, ContractDetails))
-getContractDetailsByCodeHash codeHash = do
+getContractDetailsByCodeHash = \case
+  CodeAtAddress addr name -> fmap (fmap (\cd -> cd{contractdetailsName=Text.pack name})) <$> getContractDetailsAndMetadataIdByAddressOnly addr Nothing
+  codeHash -> do
     mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
     for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
       xabi <- deserializeXabi xabi'

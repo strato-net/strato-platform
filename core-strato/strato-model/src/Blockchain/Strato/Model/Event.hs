@@ -13,8 +13,8 @@ import           GHC.Generics
 import           Data.Aeson
 import           Data.DeriveTH
 import           Test.QuickCheck
+import           Test.QuickCheck.Instances()
 
-import           Blockchain.MiscArbitrary()
 import           Blockchain.MiscJSON()
 import           Blockchain.Strato.Model.Address
 
