@@ -19,6 +19,7 @@ executables:
     - aeson
     - bloc2
     - bloc2api
+    - blockapps-data
     - blockapps-init
     - blockapps-util
     - bytestring

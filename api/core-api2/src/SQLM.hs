@@ -15,7 +15,6 @@ import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.Trans.Reader
 import qualified Data.ByteString.Lazy.Char8  as BLC
 import qualified Data.Text                   as T
-import           Database.Persist.Sql
 import           Servant                     hiding (ServerError)
 import qualified Servant                     as SERVANT (ServerError)
 import           UnliftIO
@@ -24,9 +23,6 @@ type SQLM = ReaderT SQLDB (LoggingT IO)
 
 instance Mod.Accessible SQLDB SQLM where
   access _ = ask
-
-runSQLM :: ConnectionPool -> SQLM a -> IO a
-runSQLM pool = runLoggingT . flip runReaderT (SQLDB pool)
 
 data ApiError
   = NoFilterError String

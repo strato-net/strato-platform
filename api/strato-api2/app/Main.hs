@@ -15,6 +15,7 @@ module Main where
 import           Blockchain.Output
 import           Control.Lens.Operators
 import           Control.Monad.Trans.Except
+import           Control.Monad.Trans.Reader
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.HashMap.Strict.InsOrd           as H
@@ -39,6 +40,7 @@ import           Servant.Swagger.UI
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Server
 import           BlockApps.Init
+import           Blockchain.DB.SQLDB             hiding (createPostgresqlPool)
 import           Blockchain.EthConf
 
 import           Control.Monad.Composable.SQL    hiding (runSQLM, SQLM)
@@ -64,8 +66,6 @@ import qualified Handlers.UUID                   as UUID
 import qualified Handlers.Version                as Version
 import           SQLM
 import           UnliftIO                        hiding (Handler)
-
-
 
 type CoreAPI =
   "eth" :> "v1.2" :>
@@ -115,15 +115,16 @@ fullServer = coreServer :<|> bloc
 
 ----------------
 
-enterCoreServer  :: ConnectionPool -> SQLM a -> Handler a
-enterCoreServer pool x = Handler $ do
-  y <- liftIO . try . runSQLM pool $ x `catch` handleRuntimeError `catch` handleApiError
-  case y of
-    Right a -> pure a
-    Left e -> throwE $ apiErrorToServantErr e
-
 hoistCoreServer :: ConnectionPool -> Server FullAPI
-hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (enterCoreServer pool) fullServer
+hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
+  where
+    convertErrors r x = Handler $ do
+      y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
+      case y of
+        Right a -> pure a
+        Left e -> throwE $ apiErrorToServantErr e
+    runM = runLoggingT .
+           flip runReaderT (SQLDB pool)
 
 
 fullAPI :: Proxy FullAPI
