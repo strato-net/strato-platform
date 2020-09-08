@@ -5,6 +5,11 @@ import request from "sync-request";
 import getPem from "rsa-pem-from-mod-exp";
 import "@babel/polyfill";
 
+/**
+ * This is the oauthUtil interface
+ * @module oauthUtil
+ */
+
 class OAuthUtil {
   constructor(oauthConfig) {
     this.appTokenCookieName = oauthConfig.appTokenCookieName;

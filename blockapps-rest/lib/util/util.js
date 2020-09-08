@@ -116,8 +116,16 @@ function usc(args) {
 
 /**
  * Parse a command line argument as an integer
- * @param {*} argName Name of the command line argument
- * @param {*} defaultValue Default value to use if argument is not present
+ * @example
+ * // Given the command: node index.js --size 10
+ * const result = util.getArgInt("--size", 0);
+ * console.log(result);
+ * // Returns
+ * // 10
+ * @method getArgInt
+ * @param {String} argName Name of the command line argument
+ * @param {Int} defaultValue Default value to use if argument is not present
+ * @return {Int}
  */
 function getArgInt(argName, defaultValue) {
   const index = process.argv.indexOf(argName);
