@@ -629,7 +629,9 @@ zeroBytesLength :: OutputTx -> Int
 zeroBytesLength OutputTx{otBaseTx=bt} | isMessageTX bt = length $ filter (==0) $ B.unpack $ transactionData bt
 zeroBytesLength OutputTx{otBaseTx=bt} = length $ filter (==0) $ B.unpack codeBytes' --is ContractCreationTX
                   where
-                    Code codeBytes' = transactionInit bt
+                    codeBytes' = case transactionInit bt of
+                      Code cb -> cb
+                      PtrToCode _ -> "" -- TODO: lookup code?
 
 calculateIntrinsicGas' :: Integer -> OutputTx -> Gas
 calculateIntrinsicGas' blockNum = intrinsicGas (blockIsHomestead blockNum)

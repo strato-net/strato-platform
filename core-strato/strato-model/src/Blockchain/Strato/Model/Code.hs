@@ -11,11 +11,12 @@ import qualified Data.Text as T
 import           Data.Text.Encoding  (encodeUtf8, decodeUtf8)
 import           GHC.Generics
 import           Data.Aeson
-import           Data.Aeson.Types
 
 import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.CodePtr
 
-newtype Code = Code { codeBytes :: B.ByteString }
+data Code = Code { codeBytes :: B.ByteString }
+          | PtrToCode { ptrToCode :: CodePtr } 
   deriving (Show, Eq, Read, Ord, Generic, Data)
 
 instance Binary Code where
@@ -23,10 +24,13 @@ instance NFData Code
 
 instance RLPSerializable Code where
     rlpEncode (Code bytes) = rlpEncode bytes
-    rlpDecode = Code . rlpDecode
+    rlpEncode (PtrToCode codePtr) = RLPArray [rlpEncode codePtr]
+    rlpDecode (RLPArray [x]) = PtrToCode $ rlpDecode x
+    rlpDecode x = Code $ rlpDecode x
 
 instance ToJSON Code where
   toJSON (Code bytes) = String . decodeUtf8 . B16.encode $ bytes
+  toJSON (PtrToCode codePtr) = toJSON codePtr
 
 instance FromJSON Code where
   parseJSON (String text) = return . Code . fst . B16.decode . encodeUtf8 . drop0x $ text
@@ -34,7 +38,7 @@ instance FromJSON Code where
           drop0x t = if "0x" `T.isPrefixOf` t
                        then T.drop 2 t
                        else t
-  parseJSON x = typeMismatch "Code" x
+  parseJSON x = PtrToCode <$> parseJSON x
 
 data PrecompiledCode = NullContract
                      | ECRecover

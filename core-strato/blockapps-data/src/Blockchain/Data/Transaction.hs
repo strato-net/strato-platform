@@ -144,6 +144,8 @@ txAndTime2RawTX origin tx blkNum time =
         RawTransaction time signer nonce' gp gl (Just to') val dat (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (ContractCreationTX nonce' gp gl val (Code init') cid r s v md) ->
         RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX nonce' gp gl val (PtrToCode cp) cid r s v md) ->
+        RawTransaction time signer nonce' gp gl Nothing val (rlpSerialize $ rlpEncode cp) (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (PrivateHashTX h ch) ->
         RawTransaction time signer 0 0 0 Nothing 0 B.empty 0 (fromIntegral $ keccak256ToWord256 h) (fromIntegral $ keccak256ToWord256 ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
   where

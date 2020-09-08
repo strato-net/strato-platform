@@ -107,7 +107,7 @@ create :: SolidVMBase m
        -> m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash' chainId' metadata = do
+create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' metadata = do
   recordCreate
   let env' = Env.Environment {
         Env.blockHeader = blockData,
@@ -117,6 +117,13 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress (Code initCode) txHash
         Env.chainId=chainId',
         Env.metadata=metadata
       }
+
+  initCode <- case code of
+    Code c -> pure c
+    PtrToCode cp -> do
+      hsh <- codePtrToSHA cp
+      fromMaybe "" . fmap snd . join <$> traverse getCode hsh
+  
   fmap (either solidvmErrorResults id) . runSM (Just initCode) env' $ do
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
@@ -266,12 +273,14 @@ getCodeAndCollection address' = do
     else do
     codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
+    resolvedCodeHash <- resolveCodePtr codeHash
     (contractName', ch, cc) <-
-      case codeHash of
-        SolidVMCode cn ch' -> do
+      case resolvedCodeHash of
+        Just (SolidVMCode cn ch') -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')
-        ch -> internalError "SolidVM for non-solidvm code" (format ch)
+        Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
+        Nothing -> internalError "SolidVM for non-existent code" (format codeHash)
 
 
     let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts

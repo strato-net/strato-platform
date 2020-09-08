@@ -302,7 +302,10 @@ runOperation CODECOPY = do
   memP <- pop
   codeP <- pop
   size <- pop
-  Code c <- getEnvVar envCode
+  code <- getEnvVar envCode
+  let c = case code of
+            Code c' -> c'
+            PtrToCode _ -> ""
 
   mStoreByteString memP $ safeTake size $ safeDrop codeP $ c
 
@@ -1075,7 +1078,12 @@ create :: EVMBase m
        -> Maybe (M.Map T.Text T.Text)
        -> m ExecResults
 create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
-       value gasPrice availableGas newAddress initCode txHash chainId metadata = do
+       value gasPrice availableGas newAddress code txHash chainId metadata = do
+  initCode <- Code <$> case code of
+    Code c -> pure c
+    PtrToCode cp -> do
+      codeHash <- resolveCodePtr cp
+      fromMaybe "" <$> traverse getEVMCode' codeHash
   let env =
         Environment{
           envGasPrice = gasPrice,

@@ -135,8 +135,11 @@ showHash val =
    Just x  -> show x
 
 showInfo::(Address,AddressState')->String
-showInfo (key,AddressState'{nonce'=n, balance'=b, storage'=s, contractCode'=Code c}) =
-    show (pretty key) ++ "[#ed]" ++ "(" ++ show n ++ "): " ++ show b ++
+showInfo (key,AddressState'{nonce'=n, balance'=b, storage'=s, contractCode'=co}) =
+  let c = case co of
+            Code c' -> c'
+            PtrToCode _ -> ""
+   in show (pretty key) ++ "[#ed]" ++ "(" ++ show n ++ "): " ++ show b ++
          (if M.null s
           then ""
           else (", " ++) . show . M.toList . M.map showHexInt . M.mapKeys showHash $ s
