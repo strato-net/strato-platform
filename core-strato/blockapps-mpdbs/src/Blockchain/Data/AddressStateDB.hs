@@ -91,13 +91,13 @@ instance RLPSerializable AddressState where
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
 
-resolveCodePtr :: (Address `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
-resolveCodePtr (CodeAtAddress addr _) = lookup Proxy addr >>= \case
+resolveCodePtr :: ((Address, Maybe Word256) `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
+resolveCodePtr (CodeAtAddress addr _) = lookup Proxy (addr, (Nothing :: Maybe Word256)) >>= \case
   Nothing -> pure Nothing
   Just AddressState{..} -> resolveCodePtr addressStateCodeHash
 resolveCodePtr codePtr = pure $ Just codePtr
 
-codePtrToSHA :: (Address `Alters` AddressState) m => CodePtr -> m (Maybe Keccak256)
+codePtrToSHA :: ((Address, Maybe Word256) `Alters` AddressState) m => CodePtr -> m (Maybe Keccak256)
 codePtrToSHA = resolveCodePtr >=> \case
   Just (EVMCode hsh) -> pure $ Just hsh
   Just (SolidVMCode _ hsh) -> pure $ Just hsh
@@ -108,7 +108,7 @@ resolvedCodePtrToSHA (EVMCode hsh) = hsh
 resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
 resolvedCodePtrToSHA _ = emptyHash
 
-codePtrToCodeKind :: (Address `Alters` AddressState) m => CodePtr -> m CodeKind
+codePtrToCodeKind :: ((Address, Maybe Word256) `Alters` AddressState) m => CodePtr -> m CodeKind
 codePtrToCodeKind = resolveCodePtr >=> \case
   Just (SolidVMCode _ _) -> pure SolidVM
   _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?

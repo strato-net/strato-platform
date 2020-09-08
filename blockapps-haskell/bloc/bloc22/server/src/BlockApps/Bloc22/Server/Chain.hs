@@ -93,9 +93,9 @@ createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs memb
 
           (contractHash, b) <-
             case theVM of
-              "EVM" -> return (contractdetailsCodeHash, contractdetailsBinRuntime)
+              "EVM" -> return (fromMaybe contractdetailsCodeHash mCodePtr, contractdetailsBinRuntime)
               "SolidVM" -> do
-                return (contractdetailsCodeHash, "")
+                return (fromMaybe contractdetailsCodeHash mCodePtr, "")
               _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage

@@ -38,7 +38,7 @@ import           Blockchain.Strato.StateDiff
 
 type SqlDbM m = SQL.SqlPersistT m
 
-sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, (Address `Alters` AddressState) m)=>
+sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, ((Address, Maybe Word256) `Alters` AddressState) m)=>
            Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m ()
 sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot

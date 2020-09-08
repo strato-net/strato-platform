@@ -162,7 +162,7 @@ chainDiff :: ( HasStateDB m
              , Modifiable BlockHashRoot m
              , Modifiable GenesisRoot m
              , Modifiable BestBlockRoot m
-             , (Address `Alters` AddressState) m
+             , ((Address, Maybe Word256) `Alters` AddressState) m
              )
           => Word256 -> Integer -> Keccak256 -> m (Maybe StateDiff)
 chainDiff chainId newBlockNum newBlockHash = do
@@ -179,7 +179,7 @@ chainDiff chainId newBlockNum newBlockHash = do
 stateDiff :: ( HasCodeDB m
              , HasHashDB m
              , (MP.StateRoot `Alters` MP.NodeData) m
-             , (Address `Alters` AddressState) m
+             , ((Address, Maybe Word256) `Alters` AddressState) m
              ) 
           => Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m StateDiff
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
@@ -213,7 +213,7 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
 accountEnd :: ( HasHashDB m
               , HasCodeDB m
               , (MP.StateRoot `Alters` MP.NodeData) m
-              , (Address `Alters` AddressState) m
+              , ((Address, Maybe Word256) `Alters` AddressState) m
               )
            => [N.Nibble] -> Val -> m (Address, AccountDiff 'Eventual)
 accountEnd k v = do
@@ -225,7 +225,7 @@ accountEnd k v = do
 accountUpdate :: ( HasHashDB m
                  , HasCodeDB m
                  , (MP.StateRoot `Alters` MP.NodeData) m
-                 , (Address `Alters` AddressState) m
+                 , ((Address, Maybe Word256) `Alters` AddressState) m
                  ) 
               => [N.Nibble] -> Val -> Val -> m (Address, AccountDiff 'Incremental)
 accountUpdate k vOld vNew = do
@@ -238,7 +238,7 @@ accountUpdate k vOld vNew = do
 eventualAccountState :: ( HasHashDB m
                         , HasCodeDB m
                         , (MP.StateRoot `Alters` MP.NodeData) m
-                        , (Address `Alters` AddressState) m
+                        , ((Address, Maybe Word256) `Alters` AddressState) m
                         )
                      => AddressState -> m (AccountDiff 'Eventual)
 eventualAccountState
@@ -265,7 +265,7 @@ eventualAccountState
 incrementalAccountState :: ( HasHashDB m
                            , HasCodeDB m
                            , (MP.StateRoot `Alters` MP.NodeData) m
-                           , (Address `Alters` AddressState) m
+                           , ((Address, Maybe Word256) `Alters` AddressState) m
                            ) 
                         => AddressState -> AddressState -> m (AccountDiff 'Incremental)
 incrementalAccountState oldState newState = do
@@ -333,7 +333,7 @@ decodeStorageKV k v = do
 lookupAddress :: HasHashDB m => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (HasHashDB m, HasCodeDB m, (Address `Alters` AddressState) m) => CodePtr -> m (CodeKind, ByteString)
+lookupCode :: (HasHashDB m, HasCodeDB m, ((Address, Maybe Word256) `Alters` AddressState) m) => CodePtr -> m (CodeKind, ByteString)
 lookupCode (EVMCode ch) = lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = lookupInMPDB "contract code" getCode ch
 lookupCode cp@(CodeAtAddress _ _) = maybe (pure (EVM, "")) lookupCode =<< resolveCodePtr cp

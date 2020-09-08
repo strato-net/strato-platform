@@ -66,6 +66,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
+import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
@@ -128,6 +129,7 @@ makeLenses ''SState
 type SM m = StateT SState m
 
 type MonadSM m = ( (Address `A.Alters` AddressState) m
+                 , ((Address, Maybe Word256) `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` DBCode) m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
@@ -173,6 +175,48 @@ instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
+
+instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (N.NibbleString `A.Alters` N.NibbleString) m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , Mod.Modifiable MP.StateRoot m
+         ) => ((Address, Maybe Word256) `A.Alters` AddressState) (SM m) where
+  lookup _ (addr, cid) = do
+    mSR <- A.lookup (A.Proxy @MP.StateRoot) cid
+    case mSR of
+      Nothing -> pure Nothing
+      Just sr -> do
+        flushMemAddressStateDB -- TODO: These flushes are needed so that reads won't be corrupted by cached address states
+                               --       , and so that modifications (put/delete) will be persisted.
+                               --       What we should do is change the MemAddressStateDB to be a Map (Address, Maybe Word256) AddressState instead
+                               --       , thus avoiding the need for these side effects
+        existingSR <- Mod.get (Mod.Proxy @MP.StateRoot)
+        Mod.put (Mod.Proxy @MP.StateRoot) sr
+        mAS <- getAddressStateMaybe addr
+        Mod.put (Mod.Proxy @MP.StateRoot) existingSR
+        pure mAS
+  insert _ (addr, cid) as = do
+    mSR <- A.lookup (A.Proxy @MP.StateRoot) cid
+    case mSR of
+      Nothing -> pure ()
+      Just sr -> do
+        flushMemAddressStateDB
+        existingSR <- Mod.get (Mod.Proxy @MP.StateRoot)
+        Mod.put (Mod.Proxy @MP.StateRoot) sr
+        putAddressState addr as
+        flushMemAddressStateDB
+        Mod.put (Mod.Proxy @MP.StateRoot) existingSR
+  delete _ (addr, cid) = do
+    mSR <- A.lookup (A.Proxy @MP.StateRoot) cid
+    case mSR of
+      Nothing -> pure ()
+      Just sr -> do
+        flushMemAddressStateDB
+        existingSR <- Mod.get (Mod.Proxy @MP.StateRoot)
+        Mod.put (Mod.Proxy @MP.StateRoot) sr
+        deleteAddressState addr
+        flushMemAddressStateDB
+        Mod.put (Mod.Proxy @MP.StateRoot) existingSR
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.NodeData) (SM m) where
   lookup p   = lift . A.lookup p

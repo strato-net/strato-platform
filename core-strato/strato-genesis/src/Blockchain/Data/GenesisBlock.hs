@@ -46,6 +46,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf                   (runKafkaConfigured)
+import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
 
@@ -260,7 +261,7 @@ initializeChainDBs :: ( MonadLogger m
                       , HasHashDB m
                       , HasSQLDB m
                       , HasStateDB m
-                      , (Ad.Address `A.Alters` AddressState) m
+                      , ((Ad.Address, Maybe Word256) `A.Alters` AddressState) m
                       )
                    => Ext.Word256
                    -> ChainInfo
