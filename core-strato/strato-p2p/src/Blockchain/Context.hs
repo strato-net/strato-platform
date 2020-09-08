@@ -55,6 +55,7 @@ module Blockchain.Context
 
 import           Conduit
 import           Control.Applicative
+import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
@@ -87,6 +88,7 @@ import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Stream.VMEvent             ( HasVMEventsSink(..)
                                                        , VMEvent(..)
                                                        , fetchLastVMEvents
@@ -101,6 +103,10 @@ import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 import           Blockchain.Util                       (toMaybe)
+import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
+import           Servant.Client
+import qualified Strato.Strato23.API                   as VC
+import qualified Strato.Strato23.Client                as VC
 
 import           UnliftIO
 
@@ -138,6 +144,7 @@ data Config = Config
   , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
   , configConnectionTimeout  :: ConnectionTimeout
   , configMaxReturnedHeaders :: MaxReturnedHeaders
+  , configVaultClient        :: ClientEnv
   , configContext            :: IORef Context
   , configBlockstanbulWireMessages :: IORef (S.OSet Keccak256)
   }
@@ -351,11 +358,40 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
+
+instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) where
+  sign bs = do
+    vc <- asks configVaultClient 
+    $logInfoS "HasVault" "Calling vault-wrapper for a signature"
+    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
+  
+  getPub = do
+    vc <- asks configVaultClient 
+    $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+  
+  getShared pub = do
+    vc <- asks configVaultClient 
+    $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
+    waitOnVault $ liftIO $ runClientM (VC.getSharedKey "nodekey" pub) vc
+
+
+waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
+waitOnVault action = do
+  res <- action
+  case res of
+    Left err -> do
+      $logErrorS "HasVault" . T.pack $ "Got an error from vault-wrapper: " ++ show err
+      liftIO $ threadDelay 2000000
+      waitOnVault action
+    Right val -> return val
+
 type MonadP2P m = ( MonadIO m
                   , MonadLogger m
                   , MonadResource m
                   , MonadUnliftIO m
                   , Stacks Block m
+                  , HasVault m
                   , All '[Mod.Accessible, Mod.Modifiable]
                       '[ ActionTimestamp
                        , [BlockData]
@@ -425,6 +461,11 @@ initConfig :: ( MonadLogger m
 initConfig wireMessagesRef maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  vaultClient <- do
+    mgr <- liftIO $ newManager defaultManagerSettings
+    url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
+    return $ ClientEnv mgr url Nothing
+
   initState <- newIORef initContext
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -433,6 +474,7 @@ initConfig wireMessagesRef maxHeaders = do
     , configVmEventsSink = void . produceVMEventsM
     , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
+    , configVaultClient = vaultClient
     , configContext = initState
     , configBlockstanbulWireMessages = wireMessagesRef
     }

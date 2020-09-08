@@ -6,15 +6,15 @@ import qualified Data.ByteString as B
 import Data.Monoid ((<>))
 
 import Blockchain.Data.RLP
-import Blockchain.ExtendedECDSA.Model.ExtendedSignature
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Secp256k1
 
 type RawExtraData = B.ByteString
 
 data IstanbulExtra = IstanbulExtra {
   _validatorList :: [Address],
-  _proposedSig :: Maybe ExtendedSignature,
-  _commitment :: [ExtendedSignature]
+  _proposedSig :: Maybe Signature,
+  _commitment :: [Signature]
 } deriving (Eq, Show)
 makeLenses ''IstanbulExtra
 
@@ -36,6 +36,8 @@ instance RLPSerializable IstanbulExtra where
                         _ -> Just . rlpDecode $ rp)
                     (map rlpDecode rcs)
   rlpDecode x = error $ "invalid rlp for istanbul extra: " ++ show x
+
+
 
 uncookRawExtra :: ExtraData -> RawExtraData
 uncookRawExtra (ExtraData vn ist') =

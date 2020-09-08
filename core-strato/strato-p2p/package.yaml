@@ -46,6 +46,8 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-haskoin
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
     - blockstanbul
     - bytestring
     - conduit
@@ -101,7 +103,7 @@ library:
 tests:
   strato-p2p-client-test:
     source-dirs: test
-    ghc-options: -Wall -Werror
+    ghc-options: -Wall -Werror -dynamic
     main: Main.hs
     dependencies:
       - QuickCheck

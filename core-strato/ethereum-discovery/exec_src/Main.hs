@@ -5,6 +5,7 @@ import qualified Network.Socket               as S
 import           BlockApps.Init
 import           Blockchain.Output
 import           Executable.EthereumDiscovery
+import           Executable.Options()
 import           HFlags
 
 main :: IO ()
