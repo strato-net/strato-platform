@@ -11,14 +11,17 @@ module Executable.EthereumVM (
 ) where
 
 import           Conduit
+import           Control.Applicative                   ((<|>))
 import           Control.Arrow                         ((&&&), (***))
 import           Control.Lens                          hiding (Context)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
 import           Blockchain.Output
 import qualified Data.ByteString                       as BS
+import qualified Data.ByteString.Char8          as BC
 import           Data.Conduit.List                     (fold)
 import           Data.Foldable                         hiding (fold)
 import           Data.List
@@ -29,6 +32,7 @@ import qualified Data.Map                              as M
 import           Data.Maybe                            (catMaybes, isNothing, fromMaybe)
 import qualified Data.Set                              as S
 import           Data.Time.Clock.POSIX
+import           Data.Traversable                      (for)
 import qualified Network.Kafka.Protocol                as KP
 import           Prometheus
 import           Text.Printf
@@ -65,6 +69,7 @@ import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef       (updateSQLBalanceAndNonce)
 import           Blockchain.Data.ExecResults
+import           Blockchain.DB.CodeDB                  (getCode)
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
 import           Blockchain.DB.StorageDB
 import qualified Blockchain.SolidVM                    as SolidVM
@@ -172,7 +177,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
 insertNewChains :: (
                    )
                 => [OutputGenesis]
-                -> ContextM [(Word256, ChainInfo, MP.StateRoot, Maybe Action)]
+                -> ContextM [(Word256, ChainInfo, MP.StateRoot, [Action])]
 insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
   let (cId, cInfo) = ogGenesisInfo
   $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
@@ -185,22 +190,18 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
     Nothing -> do
       $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
       let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
-      let maybeSource =
-            case codeInfo $ chainInfo cInfo of
-              [] -> Nothing
-              (s:_) -> Just $ codeInfoSource s
       sr' <- chainInfoToGenesisState theVM cInfo
       (sr, mAction) <-
         case theVM of
-          "SolidVM" -> runChainConstructor cId maybeSource
-          _ -> return (sr', Nothing)
+          "SolidVM" -> runChainConstructors cId cInfo
+          _ -> return (sr', [])
       Just (cId, cInfo, sr, mAction) <$ putChainGenesisInfo cId (unsafeCreateKeccak256FromWord256 0) sr
 
-outputNewChains :: [(Word256, ChainInfo, MP.StateRoot, Maybe Action)] -> ConduitT a VmOutEvent ContextM ()
-outputNewChains = traverse_ $ \(cId, cInfo, sr, mAction) -> do
+outputNewChains :: [(Word256, ChainInfo, MP.StateRoot, [Action])] -> ConduitT a VmOutEvent ContextM ()
+outputNewChains = traverse_ $ \(cId, cInfo, sr, actions) -> do
   yield . OutIndexEvent $ NewChainInfo cId cInfo
   yield $ OutToStateDiff cId cInfo sr
-  for_ mAction $ yield . OutAction
+  for_ actions $ yield . OutAction
 
 processBlocks :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
               => [OutputBlock]
@@ -260,8 +261,8 @@ outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
 outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
 
 -- TODO: maybe move this into solid-vm?
-runChainConstructor :: SolidVM.SolidVMBase m => Word256 -> Maybe T.Text -> m (MP.StateRoot, Maybe Action)
-runChainConstructor cId maybeSource = do
+runChainConstructors :: SolidVM.SolidVMBase m => Word256 -> ChainInfo -> m (MP.StateRoot, [Action])
+runChainConstructors cId cInfo = do
   -- We are inventing the rules of how the constructor should run when a chain is created.
   -- Since all VM runs need some environment variables passed in, we need to define what all of
   -- those variables should be.  The truth is, most of these variables are rarely used, but we
@@ -269,7 +270,27 @@ runChainConstructor cId maybeSource = do
   -- I've set most of these variables to default dummy values below...  We might decide to refine
   -- some of these variables in the future.
 
-  ExecResults {erAction=maybeAction} <- SolidVM.call
+  let getSrcBS = BC.pack . T.unpack . codeInfoSource
+      getCodeHash ci = SolidVMCode (T.unpack $ codeInfoName ci) (hash $ getSrcBS ci)
+      codeHashMap = M.fromList . map (getCodeHash &&& codeInfoSource) $ codeInfo $ chainInfo cInfo
+      resolveSrc a ch = do
+        mcp <- resolveCodePtr ch
+        msrc <- runMaybeT $ do
+          cp <- MaybeT $ pure mcp
+          hsh <- MaybeT $ pure $ case cp of
+            SolidVMCode _ h -> Just h
+            EVMCode h -> Just h
+            CodeAtAddress _ _ -> Nothing
+          (MaybeT $ pure $ M.lookup cp codeHashMap) <|>
+            MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
+        pure $ Just (a,msrc)
+
+  actions <- fmap catMaybes . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
+    addrSrc <- case aInfo of
+      NonContract{} -> pure Nothing
+      ContractNoStorage a _ ch -> resolveSrc a ch
+      ContractWithStorage a _ ch _ -> resolveSrc a ch
+    fmap (join . fmap erAction) . for addrSrc $ \(addr,ms) -> SolidVM.call
          False --isRunningTests
          True --isHomestead
          False --noValueTransfer
@@ -292,7 +313,7 @@ runChainConstructor cId maybeSource = do
             (unsafeCreateKeccak256FromWord256 0))
          0 --callDepth
          (Address 0) --receiveAddress
-         (Address 0x100) --codeAddress
+         addr --codeAddress
          (Address 0) --sender
          0 --value
          1 --gasPrice
@@ -303,13 +324,13 @@ runChainConstructor cId maybeSource = do
          (Just cId)
          (Just $ M.fromList $
            [("args", "()"), ("funcName", "<constructor>")]
-           ++ case maybeSource of Nothing -> []; Just s -> [("src", s)])
+           ++ case ms of Nothing -> []; Just s -> [("src", s)])
 
   flushMemStorageDB
   Mem.flushMemAddressStateDB
 
   sr <- Mod.get (Proxy @MP.StateRoot)
-  return (sr, maybeAction)
+  return (sr, actions)
 
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
                                        , Mod.Modifiable BlockHashRoot m
