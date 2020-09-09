@@ -111,10 +111,12 @@ project ./. ({ pkgs, hackGet, ... }: {
       } {};
       blockapps-bloc22-server = pkgs.haskell.lib.dontCheck super.blockapps-bloc22-server;
       blockapps-strato-client = pkgs.haskell.lib.dontCheck super.blockapps-strato-client;
+      ethereum-encryption = pkgs.haskell.lib.dontCheck super.ethereum-encryption;
       hpack = pkgs.haskell.lib.dontCheck hpackHackage;
       milena = pkgs.haskell.lib.dontCheck super.milena;
       postgresql-typed = pkgs.haskell.lib.dontCheck postgresql-typedHackage;
       servant = pkgs.haskell.lib.dontCheck super.servant;
+      strato-model = pkgs.haskell.lib.dontCheck super.strato-model;
       strato-redis-blockdb = pkgs.haskell.lib.dontCheck super.strato-redis-blockdb;
       mkDerivation = drv: super.mkDerivation (drv // { jailbreak = true; doHaddock = false;});
   };
