@@ -6,8 +6,9 @@
 module Control.Monad.Composable.BlocSQL where
 
 import           Control.Monad.Reader
-import           Data.Pool (Pool)
-import           Database.PostgreSQL.Simple         (Connection)
+import           Data.Pool
+import           Data.Word
+import           Database.PostgreSQL.Simple
 
 import           Control.Monad.Change.Modify
 
@@ -17,8 +18,26 @@ type BlocSQLM = ReaderT BlocSQLData
 
 type HasBlocSQL m = Accessible BlocSQLData m
 
-runBlocSQLM :: BlocSQLM m a -> m a
-runBlocSQLM f = do
-  let x = undefined
-  runReaderT f $ BlocSQLData x
+runBlocSQLM :: MonadIO m => String -> Word16 -> String -> String -> BlocSQLM m a -> m a
+runBlocSQLM host port user password f = do
+
+  let dbConnectInfo =
+        ConnectInfo {
+            connectHost = host
+          , connectPort = port
+          , connectUser = user
+          , connectPassword = password
+          , connectDatabase = "bloc22"
+          }
+                      
+--  dbCreateConn <- connect dbConnectInfo
+
+--  doesNotExist22 <- null <$>
+--    (query_ dbCreateConn dbExistsQuery22 :: IO [Only Int])
+--  when doesNotExist22 $ void $ execute_ dbCreateConn Bloc22.createDatabase
+
+--  close dbCreateConn
+
+  pool <- liftIO $ createPool (connect dbConnectInfo) close 5 3 5
+  runReaderT f $ BlocSQLData pool
 

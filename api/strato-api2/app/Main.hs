@@ -151,8 +151,7 @@ hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM)
                             globalSourceCache = error "globalSourceCache undefined",
                             txTBQueue = error "txTBQueue undefined"
                             } .
-           runBlocSQLM
-
+           runBlocSQLM "postgres" 5432 "postgres" "api"
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
