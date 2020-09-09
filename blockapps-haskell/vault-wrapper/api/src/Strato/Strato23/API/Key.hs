@@ -21,3 +21,8 @@ type GetKey = "key"
 type PostKey = "key"
             :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
             :> Post '[JSON] AddressAndKey
+
+type GetSharedKey = "sharedkey"
+                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
+                 :> ReqBody '[JSON] PublicKey
+                 :> Get '[JSON] SharedKey

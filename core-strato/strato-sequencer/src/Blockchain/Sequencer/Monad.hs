@@ -75,6 +75,8 @@ import           Control.Monad.State
 
 import           Data.Binary
 import qualified Data.ByteString                           as B
+import qualified Data.ByteString.Base16                    as B16
+import qualified Data.ByteString.Char8                     as C8
 import qualified Data.ByteString.Lazy                      as BL
 import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue
@@ -82,9 +84,11 @@ import           Data.Foldable                             (foldl',toList)
 import           Data.IORef
 import           Data.Map                                  (Map)
 import qualified Data.Map                                  as M
+import           Data.Maybe
 import qualified Data.Sequence                             as Q
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
+import qualified Database.LevelDB                          as LDB
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
@@ -100,25 +104,31 @@ import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
 import           Text.Format
 
-import qualified Database.LevelDB                          as LDB
+import           Servant.Client
+import qualified Strato.Strato23.API.Types                 as VC hiding (Address(..))
+import qualified Strato.Strato23.Client                    as VC
+
+
+
 
 data Modification a = Modification a | Deletion
 
 data SequencerContext = SequencerContext
   { _dependentBlockDB    :: DependentBlockDB
-  , _seenTransactionDB   :: SeenTransactionDB
-  , _dbeRegistry         :: Map Keccak256 DependentBlockEntry
-  , _blockHashRegistry   :: Map Keccak256 (Modification OutputBlock)
-  , _txHashRegistry      :: Map Keccak256 (Modification OutputTx)
-  , _chainHashRegistry   :: Map Keccak256 (Modification ChainHashEntry)
-  , _chainIdRegistry     :: Map Word256 (Modification ChainIdEntry)
-  , _getChainsDB         :: GetChainsDB
-  , _getTransactionsDB   :: GetTransactionsDB
-  , _ldbBatchOps         :: Q.Seq LDB.BatchOp
+  , _seenTransactionDB   :: !SeenTransactionDB
+  , _dbeRegistry         :: !(Map Keccak256 DependentBlockEntry)
+  , _blockHashRegistry   :: !(Map Keccak256 (Modification OutputBlock))
+  , _txHashRegistry      :: !(Map Keccak256 (Modification OutputTx))
+  , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
+  , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
+  , _getChainsDB         :: !GetChainsDB
+  , _getTransactionsDB   :: !GetTransactionsDB
+  , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
@@ -132,6 +142,7 @@ type MonadBlockstanbul m = ( MonadIO m
                            , Mod.Accessible BlockPeriod m
                            , Mod.Accessible RoundPeriod m
                            , Mod.Accessible (TQueue VoteResult) m
+                           , HasVault m
                            )
 
 newtype BlockPeriod = BlockPeriod { unBlockPeriod :: NominalDiffTime }
@@ -150,6 +161,7 @@ data SequencerConfig = SequencerConfig
   , cablePackage            :: CablePackage
   , maxEventsPerIter        :: Int
   , maxUsPerIter            :: Int
+  , vaultClient             :: Maybe ClientEnv -- Nothing in tests
   }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (ResourceT (LoggingT IO)))
@@ -161,11 +173,11 @@ instance HasDependentBlockDB SequencerM where
 
 instance Mod.Modifiable GetChainsDB SequencerM where
   get _ = use getChainsDB
-  put _ = assign getChainsDB
+  put _ g = modify' $ getChainsDB .~ g
 
 instance Mod.Modifiable GetTransactionsDB SequencerM where
   get _ = use getTransactionsDB
-  put _ = assign getTransactionsDB
+  put _ g = modify' $ getTransactionsDB .~ g
 
 instance HasPrivateHashDB SequencerM where
   requestChain = insertGetChainsDB
@@ -250,7 +262,7 @@ genericInsertSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
                        -> a
                        -> SequencerM ()
 genericInsertSequencer registry p k a = do
-  registry . at k ?= Modification a
+  modify' $ registry . at k ?~ Modification a
   addLdbBatchOps . (:[]) $ batchInsertInLDB p k a
 
 genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
@@ -259,7 +271,7 @@ genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
                        -> NSKey a
                        -> SequencerM ()
 genericDeleteSequencer registry p k = do
-  registry . at k ?= Deletion
+  modify' $ registry . at k ?~ Deletion
   addLdbBatchOps . (:[]) $ batchDeleteInLDB p k
 
 instance (Keccak256 `A.Alters` OutputBlock) SequencerM where
@@ -313,19 +325,19 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
       Just v -> return $ Just v
       Nothing -> genericLookupDependentBlockDB k
   insert _ k v = do
-    dbeRegistry . at k ?= v
+    modify' $ dbeRegistry . at k ?~ v
     addLdbBatchOps . (:[]) $ genericBatchInsertDependentBlockDB k v
   delete _ k = do
-    dbeRegistry . at k .= Nothing
+    modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
-  put _ = assign seenTransactionDB
+  put _ = modify' . (.~) seenTransactionDB
 
 instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
   get _ = use ldbBatchOps
-  put _ = assign ldbBatchOps
+  put _ = modify' . (.~) ldbBatchOps
 
 instance Mod.Accessible (IORef RoundNumber) SequencerM where
   access _ = use latestRoundNumber
@@ -355,7 +367,38 @@ instance (Keccak256 `A.Alters` ()) SequencerM where
 
 instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
-  putBlockstanbulContext = assign (blockstanbulContext . _Just)
+  putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
+
+
+-- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key, 
+-- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot 
+-- easier than making a whole new SequencerM definition just to get a different HasVault instance
+testPriv :: PrivateKey
+testPriv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
+
+instance HasVault SequencerM where
+  sign mesg = do
+    mVc <- asks vaultClient    
+    case mVc of
+      Nothing -> return $ signMsg testPriv mesg
+      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
+
+  getPub = error "called getPub in SequencerM, but this should never happen"
+  getShared _ = error "called getShared in SequencerM, but this should never happen"
+
+waitOnVault :: (Show a) => SequencerM (Either a b) -> SequencerM b
+waitOnVault action = do
+  $logInfoS "HasVault" "Asking the vault-wrapper to sign a Blockstanbul message"
+  res <- action
+  case res of
+    Left err -> do 
+      $logErrorS "HasVault" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
+      liftIO $ threadDelay 2000000 -- 2 seconds
+      waitOnVault action
+    Right val -> do 
+      $logInfoS "HasVault" "Got a signature from vault" 
+      return val
+  
 
 prunePrivacyDBs :: SequencerM ()
 prunePrivacyDBs = do
@@ -363,9 +406,7 @@ prunePrivacyDBs = do
   prune txHashRegistry
   prune chainHashRegistry
   prune chainIdRegistry
-  where prune = flip (%=) . M.mapMaybe $ \case
-          Modification a -> Just $ Modification a
-          Deletion       -> Nothing
+  where prune r = modify' $ r .~ M.empty
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
@@ -398,7 +439,7 @@ pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
 pairToVmTx = uncurry VmTx
 
 clearDBERegistry :: SequencerM ()
-clearDBERegistry = dbeRegistry .= M.empty
+clearDBERegistry = modify' $ dbeRegistry .~ M.empty
 
 createFirstTimer :: ( MonadBlockstanbul m
                     , Mod.Accessible View m

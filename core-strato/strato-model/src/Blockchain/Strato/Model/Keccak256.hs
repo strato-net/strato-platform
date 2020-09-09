@@ -52,6 +52,7 @@ import              Web.PathPieces
 import              FastKeccak256
 import              Blockchain.Data.RLP
 import              Blockchain.Strato.Model.ExtendedWord
+import              Blockchain.Strato.Model.Util
 import qualified    Text.Colors                          as CL
 import              Text.Format
 
@@ -86,7 +87,9 @@ instance RLPSerializable Keccak256 where
     rlpDecode (RLPScalar 0) = unsafeCreateKeccak256FromWord256 0 --special case seems to be allowed, even if length of zeros is wrong
     rlpDecode x             = error ("Missing case in rlpDecode for Keccak256: " ++ show x)
     --rlpEncode (Keccak256 0) = RLPNumber 0
-    rlpEncode (Keccak256 val) = RLPString val
+    rlpEncode (Keccak256 val) | B.length val >= 32 = RLPString $ B.take 32 val
+                              | otherwise = RLPString $ B.replicate (32 - B.length val) 0
+                                                        `B.append` val
 
 -- Someday we should remove the second RLP library...
 instance RLP2.RLPEncodable Keccak256 where
@@ -129,11 +132,11 @@ keccak256ToHex (Keccak256 sha) = BC.unpack $ B16.encode sha
 
 -- todo: this shouldn't be partial... ever...
 keccak256FromHex :: String -> Keccak256
-keccak256FromHex = Keccak256 . fst . B16.decode . BC.pack
+keccak256FromHex = Keccak256 . fst . B16.decode . BC.pack . padZeros 64
 
 stringKeccak256 :: String -> Maybe Keccak256
 stringKeccak256 string =
-  case B16.decode $ BC.pack string of
+  case B16.decode $ BC.pack (padZeros 64 string) of
     (x, "") -> Just $ Keccak256 x
     _ -> Nothing
 

@@ -38,7 +38,7 @@ import           UnliftIO.Exception
 import           UnliftIO.STM
 
 import           Blockchain.Constants                  hiding (ethVersion)
-import           Blockchain.Context
+import           Blockchain.Context                    hiding (Inbound, Outbound)
 import           Blockchain.Data.Block
 import           Blockchain.Data.Control               (P2PCNC(..))
 import           Blockchain.Data.RLP

@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Blockstanbul.Messages where
 
 import Control.DeepSeq
@@ -26,12 +27,13 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
-import Blockchain.ExtendedECDSA
 import Blockchain.Output
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Secp256k1
 import qualified Text.Colors as CL
 import Text.Format
+
 
 type RoundNumber = Word256
 type SequenceNumber = Word256
@@ -52,14 +54,15 @@ instance Format View where
 
 data MsgAuth = MsgAuth {
   sender :: Address,
-  signature :: ExtendedSignature
+  signature :: Signature
 } deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 data TrustedMessage = Preprepare View Block
                     | Prepare View Keccak256
-                    | Commit View Keccak256 ExtendedSignature
+                    | Commit View Keccak256 Signature
                     | RoundChange {roundchangeView :: View }
                     deriving (Eq, Show, Generic, Binary, NFData, Data)
+
 
 instance Format TrustedMessage where
   format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
@@ -145,6 +148,11 @@ data OutEvent = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
               | NewCheckpoint Checkpoint
               deriving (Eq, Show, Generic)
 
+type EOutEvent = Either OutEvent OutEvent
+
+fromE :: Either a a -> a
+fromE = either id id
+
 instance Format OutEvent where
   format (OMsg (MsgAuth s _) msg) = "OMsg " ++ format msg ++ " " ++ format s
   format (ToCommit blk) = "ToCommit " ++ format (blockHash blk)
@@ -176,30 +184,32 @@ inShortLog loc iev = $logInfoS loc . pack $
     NewBeneficiary (MsgAuth s _) b -> CL.blue "NEW_BENEFICIARY " ++ format s ++ " " ++ show b
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
 
-outShortLog :: MonadLogger m => Text -> OutEvent -> m ()
-outShortLog loc oev = $logInfoS loc . pack $
-  case oev of
-    OMsg a m -> shortFormat $ WireMessage a m
-    ToCommit blk -> CL.blue "TO_COMMIT " ++ blkNum blk
-    MakeBlockCommand -> CL.blue "MAKE_BLOCK_COMMAND"
-    ResetTimer rn -> CL.blue "RESET_TIMER " ++ show rn
-    GapFound h r p -> CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
-    LeadFound h r p -> CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
-    PendingVote r d s-> CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
-    VoteResponse resp -> CL.blue "VOTE_RESPONSE " ++ show resp
-    NewCheckpoint ckpt -> CL.blue "NEW_CHECKPOINT " ++ show ckpt
+outShortLog :: MonadLogger m => Text -> EOutEvent -> m ()
+outShortLog loc eoev = do
+  let prefix = either (const $ CL.red "GOSSIP ") (const "") eoev
+  $logInfoS loc . pack $
+    case fromE eoev of
+      OMsg a m -> shortFormat $ WireMessage a m
+      ToCommit blk -> prefix ++ CL.blue "TO_COMMIT " ++ blkNum blk
+      MakeBlockCommand -> prefix ++ CL.blue "MAKE_BLOCK_COMMAND"
+      ResetTimer rn -> prefix ++ CL.blue "RESET_TIMER " ++ show rn
+      GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
+      LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
+      PendingVote r d s-> prefix ++ CL.blue "PENDING_VOTE " ++ format r ++ " " ++ (if d then "AUTH" else "DROP") ++ " FROM " ++ format s
+      VoteResponse resp -> prefix ++ CL.blue "VOTE_RESPONSE " ++ show resp
+      NewCheckpoint ckpt -> prefix ++ CL.blue "NEW_CHECKPOINT " ++ show ckpt
 
 instance NFData OutEvent
 
-getHash :: TrustedMessage -> Word256
+getHash :: TrustedMessage -> B.ByteString 
 -- This is wrong, because this means that the prepare and commits
 -- will have the same signature despite being different messages.
 -- It also needs a code for the message type.
 getHash = \case
-              (Preprepare _ blk) -> keccak256ToWord256 . blockHash $ blk
-              (Prepare _ di) -> keccak256ToWord256 di
-              (Commit _ di _) -> keccak256ToWord256 di
-              (RoundChange _) -> keccak256ToWord256 $ hash "TODO(tim): this signature is predictable"
+              (Preprepare _ blk) -> keccak256ToByteString . blockHash $ blk
+              (Prepare _ di) -> keccak256ToByteString di
+              (Commit _ di _) -> keccak256ToByteString di
+              (RoundChange _) -> keccak256ToByteString $ hash "TODO(tim): this signature is predictable"
 
 instance RLPSerializable View where
   rlpEncode (View r s) = RLPArray [rlpEncode r, rlpEncode s]

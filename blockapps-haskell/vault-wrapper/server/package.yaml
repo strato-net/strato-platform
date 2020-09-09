@@ -33,6 +33,7 @@ library:
     - bytestring
     - cache
     - clock
+    - cryptonite
     - http-client
     - lens
     - monad-control
@@ -51,7 +52,6 @@ library:
     - servant
     - servant-server
     - text
-
 
 
 executables:
@@ -89,20 +89,35 @@ executables:
       - opaleye
       - text
 
+  migrate-nodekey:
+    source-dirs: app
+    main: MigrateNodeKey.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - base64-bytestring
+      - bytestring
+      - cryptonite
+      - hflags
+      - opaleye
+      - saltine
+      - strato-model
+      - text
+
 tests:
   vault-wrapper-spec:
     source-dirs: test/
     main: Spec.hs
     dependencies:
+      - base16-bytestring
+      - blockapps-ethereum
+      - blockapps-haskoin
       - blockapps-vault-wrapper-server
       - bytestring
-      - hspec
+      - ethereum-encryption
       - clockwork
       - cryptonite
+      - haskoin-shim
+      - hspec
       - secp256k1-haskell
-      - haskoin-shim 
-      - blockapps-haskoin
-      - base16-bytestring
       - strato-model
-      - blockapps-ethereum
-      - ethereum-encryption

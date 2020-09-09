@@ -1,3 +1,4 @@
+#strato-version:<VERSION>
 #strato-getting-started-min-version:2.7
 version: "3"
 volumes:
@@ -112,16 +113,17 @@ services:
     - vault-wrapper
     environment:
     - BLOC_DEBUG=${BLOC_DEBUG}
+    - gasOn=${gasOn:-true}
     - kafkaHost=kafka
     - kafkaPort=9092
     - nonceCounterTimeout=${nonceCounterTimeout:-10}
-    - sourceCacheTimeout=${sourceCacheTimeout:-60}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
     - PROCESS_MONITORING=${PROCESS_MONITORING}
+    - sourceCacheTimeout=${sourceCacheTimeout:-60}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
     - SMD_MODE=${SMD_MODE}
@@ -182,13 +184,13 @@ services:
     - kafka
     - postgres
     - redis
+    - vault-wrapper
     environment:
     - addBootnodes=${addBootnodes}
     - averageTxsPerBlock=${averageTxsPerBlock}
     - blockstanbul=${blockstanbul}
     - blockstanbulAdmins=${blockstanbulAdmins}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
-    - blockstanbulPrivateKey=${blockstanbulPrivateKey}
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
@@ -198,9 +200,14 @@ services:
     - debugFail=${debugFail}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
+    - extraFaucets=${extraFaucets}
     - faucetEnabled=${faucetEnabled}
+    - gasOn=${gasOn:-true}
+    - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
+    - isAdmin=${isAdmin:-false}
+    - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka
     - lazyBlocks=${lazyBlocks}
     - maxConn=${maxConn}
@@ -233,7 +240,9 @@ services:
     - USE_STRATO_API=${USE_STRATO_API}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
+    - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
+    - wireMessageCacheSize=${wireMessageCacheSize}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
