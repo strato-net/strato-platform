@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImplicitParams             #-}
@@ -58,11 +59,7 @@ data CacheNonce = CacheNonce
 
 type Bloc = ReaderT BlocEnv (LoggingT IO)
 
-class HasBlocEnv m where
-  getBlocEnv :: m BlocEnv
-
-instance HasBlocEnv Bloc where
-  getBlocEnv = ask
+type HasBlocEnv m = Accessible BlocEnv m
   
 dbErrorToUserError :: MonadUnliftIO m => m a -> m a
 dbErrorToUserError = flip catch $ \case
@@ -321,7 +318,7 @@ blocStrato :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCallStack) =>
               ClientM x -> m x
 blocStrato client' = do
   logInfoCS callStack "Querying Strato"
-  blocEnv <- getBlocEnv
+  blocEnv <- access Proxy
   resultEither <-
     liftIO $ runClientM client' (ClientEnv (httpManager blocEnv) (urlStrato blocEnv) Nothing)
   either (blocError . StratoError) return resultEither
@@ -330,10 +327,13 @@ blocVaultWrapper :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCallStack) =>
                     ClientM x -> m x
 blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault Wrapper"
-  blocEnv <- getBlocEnv
+  blocEnv <- access Proxy
   resultEither <-
     liftIO $ runClientM client' (ClientEnv (httpManager blocEnv) (urlVaultWrapper blocEnv) Nothing)
   either (blocError . VaultWrapperError) return resultEither
 
 blocMaybe :: MonadIO m => Text -> Maybe x -> m x
 blocMaybe msg = maybe (throwIO (CouldNotFind msg)) return
+
+getBlocEnv :: HasBlocEnv m => m BlocEnv
+getBlocEnv = access Proxy

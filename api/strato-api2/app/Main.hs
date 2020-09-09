@@ -16,6 +16,7 @@ module Main where
 import           Blockchain.Output
 import           Control.Lens.Operators
 import           Control.Monad.Reader            (MonadTrans, lift)
+import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
@@ -40,6 +41,7 @@ import           Servant.Swagger.UI
 
 
 import           BlockApps.Bloc22.API
+import           BlockApps.Bloc22.Monad          hiding (handleRuntimeError)
 import           BlockApps.Bloc22.Server
 import           BlockApps.Init
 import           Blockchain.DB.SQLDB             hiding (createPostgresqlPool)
@@ -70,6 +72,7 @@ import           SQLM
 import           UnliftIO                        hiding (Handler)
 
 import           Control.Monad.Change.Modify
+import           Control.Monad.Composable.BlocSQL
 
 type CoreAPI =
   "eth" :> "v1.2" :>
@@ -114,7 +117,8 @@ coreServer = Account.server
   :<|> UUID.server
   :<|> Version.server
 
-fullServer :: (MonadLogger m, HasSQL m) => ServerT FullAPI m
+fullServer :: (MonadBaseControl IO m, MonadLogger m, HasSQL m, HasBlocSQL m, HasBlocEnv m) =>
+              ServerT FullAPI m
 fullServer = coreServer :<|> bloc
 
 ----------------
@@ -135,7 +139,19 @@ hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM)
         Right a -> pure a
         Left e -> throwE $ apiErrorToServantErr e
     runM = runLoggingT .
-           flip runReaderT (SQLDB pool)
+           flip runReaderT (SQLDB pool) .
+           flip runReaderT BlocEnv{
+                            urlStrato = error "urlStrato undefined",
+                            urlVaultWrapper = error "urlVaultWrapper undefined",
+                            httpManager = error "httpManager undefined",
+                            dbPool = error "dbPool undefined",
+                            deployMode = error "deployMode undefined",
+                            stateFetchLimit = error "stateFetchLimit undefined",
+                            globalNonceCounter = error "globalNonceCounter undefined",
+                            globalSourceCache = error "globalSourceCache undefined",
+                            txTBQueue = error "txTBQueue undefined"
+                            } .
+           runBlocSQLM
 
 
 fullAPI :: Proxy FullAPI

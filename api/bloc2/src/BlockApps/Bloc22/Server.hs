@@ -25,11 +25,18 @@ import           BlockApps.Bloc22.Server.Chain
 --import           BlockApps.Bloc22.Server.Users
 
 import Control.Monad.Change.Alter
+import Control.Monad.Logger
+import Control.Monad.Trans.Control
+
+import BlockApps.Bloc22.Monad
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Data.ChainInfo
 
+import Control.Monad.Composable.BlocSQL
 
-bloc :: (MonadIO m, Selectable ChainId ChainInfo m) => ServerT BlocAPI m
+bloc :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m,
+         Selectable ChainId ChainInfo m) =>
+        ServerT BlocAPI m
 --bloc :: (MonadIO m, MonadLogger m, Selectable ChainId ChainInfo m) => ServerT BlocAPI m
 bloc = return gitInfo
 --  :<|> postUsersFill
@@ -50,7 +57,7 @@ bloc = return gitInfo
 --  :<|> postBlocTransactionResults
 --  :<|> postChainInfo
   :<|> getChainInfo
---  :<|> postChainInfos
+  :<|> postChainInfos
 --  :<|> postBlocTransactionParallel
 --  :<|> postBlocTransaction
 

@@ -17,6 +17,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - aeson
+    - bloc-sql-monad
     - bloc2
     - bloc2api
     - blockapps-data
@@ -30,6 +31,7 @@ executables:
     - insert-ordered-containers
     - lens
     - monad-alter
+    - monad-control
     - monad-logger
     - mtl
     - servant-multipart
