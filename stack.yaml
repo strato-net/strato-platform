@@ -5,6 +5,7 @@ packages:
 - api/strato-api2
 - composable-monads/sql-monad
 - composable-monads/bloc-sql-monad
+- composable-monads/vault-monad
 - blockapps-haskell/bloc/bloc22/api
 - blockapps-haskell/bloc/bloc22/client
 - blockapps-haskell/bloc/bloc22/server
