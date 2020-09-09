@@ -54,6 +54,7 @@ library:
   - persistent-template
   - quickcheck-instances
   - resourcet
+  - secp256k1-haskell # remove
   - strato-conf
   - strato-model
   - swagger2
@@ -88,6 +89,7 @@ tests:
       - containers
       - ethereum-rlp
       - hspec
+      - secp256k1-haskell
       - strato-model
       - text
       - unordered-containers

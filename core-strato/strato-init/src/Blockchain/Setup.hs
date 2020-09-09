@@ -47,6 +47,10 @@ import qualified Executable.EthDiscoverySetup       as EthDiscovery
 
 import qualified Text.Colors                        as CL
 
+
+decodedFaucets :: [Address]
+decodedFaucets = fromMaybe [] . Ae.decodeStrict . C.pack $ flags_extraFaucets
+
 createKafkaTopic  ::  TopicName -> IO ()
 createKafkaTopic topic = do
   result <- runKafka (mkKafkaState "strato-setup" (fromString flags_kafkahost, 9092)) $ updateMetadata topic
@@ -104,8 +108,6 @@ addStandardGenesisBlockIfNeeded genesisBlockName = do
   Preconditions: installed LevelDB, Postgres, Kafka, Redis.
 -}
 
-decodedFaucets :: [Address]
-decodedFaucets = fromMaybe [] . Ae.decodeStrict . C.pack $ flags_extraFaucets
 
 oneTimeSetup  ::  String -> IO ()
 oneTimeSetup genesisBlockName = do
@@ -137,7 +139,6 @@ oneTimeSetup genesisBlockName = do
       inflateDir stratoAPICerts
       inflateDir stratoAPIConfigDir
 
-      putStrLn $ CL.red "WARNING: the private key for this strato node is being written to the file .ethereumH/ethconf.yaml.  Please keep it secure; anyone who reads it will become you."
       encodeFile (".ethereumH" </> "ethconf.yaml") ethconf
       makeReadOnly $ ".ethereumH" </> "ethconf.yaml"
 

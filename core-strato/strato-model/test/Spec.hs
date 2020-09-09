@@ -2,27 +2,49 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-import Control.Monad
-import qualified Data.Aeson as Ae
-import Data.Aeson.QQ
-import qualified Data.Bits as Bits
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as C8
-import Data.Word
-import GHC.Exts
-import GHC.Integer.GMP.Internals
-import Test.Hspec
-import Test.QuickCheck
+{-# LANGUAGE PackageImports #-}
 
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.Keccak256
-import Network.Haskoin.Internals (BigWord(..))
+
+import           Control.Monad
+import           Crypto.Random.Entropy
+import qualified Data.Aeson                         as Ae
+import           Data.Aeson.QQ
+import qualified Data.Bits                          as Bits
+import           Data.Binary
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as C8
+import qualified Data.ByteString.Short              as BSS
+import           Data.Maybe
+import           Data.Word ()
+import           GHC.Exts
+import           GHC.Integer.GMP.Internals
+import           Test.Hspec
+import           Test.QuickCheck
+
+import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1  as SEC 
+import           Network.Haskoin.Internals          (BigWord(..))
+
+-- all the different crypto modules to compare to ours
+import qualified Blockchain.ExtendedECDSA           as HK
+import qualified Network.Haskoin.Crypto             as HK
+import qualified Network.Haskoin.Internals          as HK
+
+import qualified Crypto.Secp256k1                   as SEC
+
+import qualified Crypto.Types.PubKey.ECC            as CR
+import "crypto-pubkey" Crypto.PubKey.ECC.DH         as CR
+
+
 
 main :: IO ()
 main = hspec spec
+
 
 spec :: Spec
 spec = do
@@ -103,3 +125,131 @@ spec = do
 
     it "round trips correctly" $ property $ \(ptr::CodePtr) -> do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr
+
+  describe "secp256k1 operations (using secp256k1-haskell)" $ do
+    let mPrv = importPrivateKey $ fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
+        prv = fromMaybe (error "could not import private key") mPrv
+        pub = derivePublicKey prv 
+        mesg = keccak256ToByteString $ hash $ C8.pack "hey guys!" 
+        sig = signMsg prv mesg
+  
+    it "can export public key as SEC bytestring" $ do
+      B.length (exportPublicKey False pub) `shouldBe` 65
+    it "can convert public key to and from JSON encoding" $ do
+      Ae.decode (Ae.encode pub) `shouldBe` Just pub
+    it "can convert signature to and from JSON encoding" $ do
+      Ae.decode (Ae.encode sig) `shouldBe` Just sig
+    it "can convert signature to and from RLP encoding" $ do
+      let encSig = rlpSerialize (rlpEncode sig)
+      rlpDecode (rlpDeserialize encSig) `shouldBe` sig
+    it "can convert signature to and from Binary encoding" $ do
+      let encSig = encode sig
+      decode encSig `shouldBe` sig
+    it "can export and import signature as a bytestring" $ do
+      let sigBS = exportSignature sig
+      importSignature sigBS `shouldBe` sig
+    it "arbitrary sigs can be exported/imported" $ property $ \s -> do
+      let sigBS = exportSignature s
+      B.length sigBS `shouldBe` 65
+      importSignature sigBS `shouldBe` s
+    it "exported sigs can be used for recovery" $ do
+      let sigBS = exportSignature sig
+          sig' = importSignature sigBS
+      recoverPub sig' mesg `shouldBe` Just pub
+    
+    it "can recover public keys from signatures" $ do
+      let mRecPub = recoverPub sig mesg
+      (Just pub) `shouldBe` mRecPub
+
+    it "can generate ECDH shared secret" $ do
+      let mOtherPriv = importPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
+          otherPriv = fromMaybe (error "could not import the other priv key") mOtherPriv
+          otherPub = derivePublicKey otherPriv
+          sec1 = deriveSharedKey prv otherPub
+          sec2 = deriveSharedKey otherPriv pub
+      sec1 `shouldBe` sec2 
+
+    it "test address derivation, signatures, and signature recovery on arbitrary private keys" $ property $ \k -> do
+      let sig' = signMsg k mesg
+          pub' = derivePublicKey k
+          add = fromPublicKey pub'
+          mRecPub = recoverPub sig' mesg
+      Just pub' `shouldBe` mRecPub
+      fromPublicKey (fromJust mRecPub) `shouldBe` add
+      fromPublicKey (fromJust mRecPub) `shouldBe` fromPrivateKey k
+      fromPrivateKey k `shouldBe` add
+    
+  describe "the secp256k1 module works exactly like Haskoin on test values" $ do
+    let testPrivBS = fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
+        hkPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey testPrivBS
+        ecPriv = fromMaybe (error "couldn't get EC key") $ importPrivateKey testPrivBS
+
+        otherPrivBS = fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d"
+        hkOtherPriv = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey otherPrivBS
+        ecOtherPriv = fromMaybe (error "couldn't get EC key") $ importPrivateKey otherPrivBS
+        hkOtherPub = HK.derivePubKey hkOtherPriv 
+        ecOtherPub = derivePublicKey ecOtherPriv
+
+    it "can derive the same Ethereum address" $ do
+      let hkAddr = prvKey2Address hkPriv
+          ecAddr = fromPrivateKey ecPriv
+      hkAddr `shouldBe` ecAddr
+    
+    it "can create the same ECDSA recoverable signature" $ do
+      let mesg = hash $ C8.pack "hey guys!"
+          (HK.ExtendedSignature (HK.Signature hr hs) hv) = HK.detExtSignMsg (keccak256ToWord256 mesg) hkPriv
+          (Signature (SEC.CompactRecSig er es ev)) = signMsg ecPriv $ keccak256ToByteString mesg
+          hkSigVals = [ word256ToBytes $ fromIntegral hr
+                      , word256ToBytes $ fromIntegral hs
+                      ]
+          ecSigVals = [ BSS.fromShort $ er
+                      , BSS.fromShort $ es
+                      ]
+          hvInt = (if hv then 1 else 0) :: Integer
+          ecInt = toInteger ev
+      hkSigVals `shouldBe` ecSigVals
+      hvInt `shouldBe` ecInt
+    
+    it "can recover the same address from a signature" $ do
+      let mesg = hash $ C8.pack "hey guys!"
+          hkMsg = keccak256ToWord256 mesg
+          ecMsg = keccak256ToByteString mesg
+          hkSig = HK.detExtSignMsg hkMsg hkPriv
+          ecSig = signMsg ecPriv ecMsg
+          hkPub = fromMaybe (error "couldn't recover haskoin sig") (HK.getPubKeyFromSignature hkSig hkMsg)
+          ecPub = fromMaybe (error "couldn't recover ec sig") (recoverPub ecSig ecMsg)
+      fromPublicKey ecPub `shouldBe` pubKey2Address hkPub
+
+    it "can generate the same ECDH shared secrets" $ do
+      let SEC.SharedKey ecECDH = deriveSharedKey ecPriv ecOtherPub
+          hkPoint = HK.pubKeyPoint hkOtherPub
+          hkPubX = HK.getBigWordInteger (fromMaybe (error "couldn't get X") $ HK.getX hkPoint)
+          hkPubY = HK.getBigWordInteger (fromMaybe (error "couldn't get Y") $ HK.getY hkPoint)
+          hkPubPoint = CR.Point hkPubX hkPubY 
+          CR.SharedKey hkECDH = CR.getShared (CR.getCurveByName CR.SEC_p256k1) (HK.fromPrvKey hkPriv) hkPubPoint
+      (HK.getBigWordInteger $ bytesToWord256 ecECDH) `shouldBe` hkECDH
+
+    it "can generate the same ECDH shared secrets on 100 entropic keys" $ do
+      replicateM_ 100 $ do 
+        ent1 <- getEntropy 32
+        ent2 <- getEntropy 32
+        let hkPriv1 = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey ent1
+            crPriv1 = HK.fromPrvKey hkPriv1
+            ecPriv1 = fromMaybe (error "couldn't get EC key") $ importPrivateKey ent1
+            crPub1 = CR.calculatePublic (CR.getCurveByName CR.SEC_p256k1) crPriv1
+            ecPub1 = derivePublicKey ecPriv1
+  
+            hkPriv2 = fromMaybe (error "couldn't get HK key") $ HK.decodePrvKey HK.makePrvKey ent2
+            crPriv2 = HK.fromPrvKey hkPriv2
+            ecPriv2 = fromMaybe (error "couldn't get EC key") $ importPrivateKey ent2
+            crPub2 = CR.calculatePublic (CR.getCurveByName CR.SEC_p256k1) crPriv2
+            ecPub2 = derivePublicKey ecPriv2
+  
+  
+            CR.SharedKey crShared1 = CR.getShared (CR.getCurveByName CR.SEC_p256k1) crPriv1 crPub2
+            SEC.SharedKey ecShared1 = deriveSharedKey ecPriv1 ecPub2
+            CR.SharedKey crShared2 = CR.getShared (CR.getCurveByName CR.SEC_p256k1) crPriv2 crPub1
+            SEC.SharedKey ecShared2 = deriveSharedKey ecPriv2 ecPub1
+  
+        crShared1 `shouldBe` (HK.getBigWordInteger $ bytesToWord256 ecShared1) 
+        crShared2 `shouldBe` (HK.getBigWordInteger $ bytesToWord256 ecShared2) 

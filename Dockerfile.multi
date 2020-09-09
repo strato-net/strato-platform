@@ -16,11 +16,20 @@ RUN apt-get -y update && apt-get install -y \
       netbase \
       netcat-openbsd \
       postgresql-client \
-      libsecp256k1-dev \ 
+      git \
+      make \
   && apt-get autoremove \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get clean \
-  && locale-gen en_US.UTF-8
+  && locale-gen en_US.UTF-8 \
+  && git clone https://github.com/blockapps/secp256k1 \
+  && cd secp256k1/ \
+  && ./autogen.sh \
+  && ./configure --enable-experimental --enable-module-ecdh --enable-module-recovery --prefix=/usr/ \
+  && make \
+  && make install \
+  && cd .. \
+  && rm -rf secp256k1
 
 ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \

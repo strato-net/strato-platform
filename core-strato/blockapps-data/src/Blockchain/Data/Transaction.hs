@@ -61,6 +61,12 @@ import           System.Clock
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 
+
+--TODO: remove some of these, reorganize
+--import qualified Crypto.Secp256k1 as SEC
+--import qualified Data.ByteString.Short as BSS
+--import qualified Blockchain.Strato.Model.Secp256k1 as EC
+
 instance TransactionLike Transaction where
     txHash        = \case
                        PrivateHashTX{..} -> transactionTxHash
@@ -272,6 +278,17 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
 {-
   Switch to Either?
 -}
+
+{-whoSignedThisTransaction :: Transaction -> Maybe Address
+whoSignedThisTransaction tx = case tx of
+  PrivateHashTX{} -> Just (Address 0)
+  t -> fromPublicKey <$> EC.recoverPub sig mesg
+        where
+          intToBSS = BSS.toShort . word256ToBytes . fromInteger
+          sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
+          mesg = keccak256ToByteString $ partialTransactionHash t
+-}
+
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction tx = case tx of
   PrivateHashTX{} -> Just (Address 0)

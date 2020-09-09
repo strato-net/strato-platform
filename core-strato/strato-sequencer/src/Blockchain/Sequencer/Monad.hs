@@ -75,6 +75,8 @@ import           Control.Monad.State
 
 import           Data.Binary
 import qualified Data.ByteString                           as B
+import qualified Data.ByteString.Base16                    as B16
+import qualified Data.ByteString.Char8                     as C8
 import qualified Data.ByteString.Lazy                      as BL
 import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue
@@ -82,9 +84,11 @@ import           Data.Foldable                             (foldl',toList)
 import           Data.IORef
 import           Data.Map                                  (Map)
 import qualified Data.Map                                  as M
+import           Data.Maybe
 import qualified Data.Sequence                             as Q
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
+import qualified Database.LevelDB                          as LDB
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
@@ -100,11 +104,17 @@ import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
 import           Text.Format
 
-import qualified Database.LevelDB                          as LDB
+import           Servant.Client
+import qualified Strato.Strato23.API.Types                 as VC hiding (Address(..))
+import qualified Strato.Strato23.Client                    as VC
+
+
+
 
 data Modification a = Modification a | Deletion
 
@@ -132,6 +142,7 @@ type MonadBlockstanbul m = ( MonadIO m
                            , Mod.Accessible BlockPeriod m
                            , Mod.Accessible RoundPeriod m
                            , Mod.Accessible (TQueue VoteResult) m
+                           , HasVault m
                            )
 
 newtype BlockPeriod = BlockPeriod { unBlockPeriod :: NominalDiffTime }
@@ -150,6 +161,7 @@ data SequencerConfig = SequencerConfig
   , cablePackage            :: CablePackage
   , maxEventsPerIter        :: Int
   , maxUsPerIter            :: Int
+  , vaultClient             :: Maybe ClientEnv -- Nothing in tests
   }
 
 type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (ResourceT (LoggingT IO)))
@@ -356,6 +368,37 @@ instance (Keccak256 `A.Alters` ()) SequencerM where
 instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
+
+
+-- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key, 
+-- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot 
+-- easier than making a whole new SequencerM definition just to get a different HasVault instance
+testPriv :: PrivateKey
+testPriv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
+
+instance HasVault SequencerM where
+  sign mesg = do
+    mVc <- asks vaultClient    
+    case mVc of
+      Nothing -> return $ signMsg testPriv mesg
+      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash mesg)) vc
+
+  getPub = error "called getPub in SequencerM, but this should never happen"
+  getShared _ = error "called getShared in SequencerM, but this should never happen"
+
+waitOnVault :: (Show a) => SequencerM (Either a b) -> SequencerM b
+waitOnVault action = do
+  $logInfoS "HasVault" "Asking the vault-wrapper to sign a Blockstanbul message"
+  res <- action
+  case res of
+    Left err -> do 
+      $logErrorS "HasVault" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
+      liftIO $ threadDelay 2000000 -- 2 seconds
+      waitOnVault action
+    Right val -> do 
+      $logInfoS "HasVault" "Got a signature from vault" 
+      return val
+  
 
 prunePrivacyDBs :: SequencerM ()
 prunePrivacyDBs = do

@@ -19,6 +19,7 @@ library:
     - Blockchain.Strato.Discovery.P2PUtil
     - Executable.EthereumDiscovery
     - Executable.EthDiscoverySetup
+    - Executable.Options
   dependencies:
     - base16-bytestring
     - binary
@@ -26,6 +27,8 @@ library:
     - blockapps-datadefs
     - blockapps-haskoin
     - blockapps-util
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
     - bytestring
     - classy-prelude
     - cpu
@@ -37,6 +40,8 @@ library:
     - ethereum-rlp
     - exceptions
     - format
+    - hflags
+    - http-client
     - monad-alter
     - mtl
     - network-uri
@@ -45,6 +50,7 @@ library:
     - prometheus-client
     - random
     - resourcet
+    - servant-client
     - split
     - strato-conf
     - strato-model
