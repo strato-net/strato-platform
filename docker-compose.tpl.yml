@@ -113,16 +113,17 @@ services:
     - vault-wrapper
     environment:
     - BLOC_DEBUG=${BLOC_DEBUG}
+    - gasOn=${gasOn:-true}
     - kafkaHost=kafka
     - kafkaPort=9092
     - nonceCounterTimeout=${nonceCounterTimeout:-10}
-    - sourceCacheTimeout=${sourceCacheTimeout:-60}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
     - PROCESS_MONITORING=${PROCESS_MONITORING}
+    - sourceCacheTimeout=${sourceCacheTimeout:-60}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
     - SMD_MODE=${SMD_MODE}
@@ -201,6 +202,7 @@ services:
     - evmTraceMode=${evmTraceMode}
     - extraFaucets=${extraFaucets}
     - faucetEnabled=${faucetEnabled}
+    - gasOn=${gasOn:-true}
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}

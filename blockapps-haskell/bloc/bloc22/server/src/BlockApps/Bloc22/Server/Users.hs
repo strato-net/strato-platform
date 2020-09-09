@@ -47,6 +47,7 @@ import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
 import           Database.PostgreSQL.Simple        (SqlError(..))
 import           Opaleye                           hiding (not, null, index, max)
+import           Text.Format
 import           System.Clock
 import           UnliftIO
 
@@ -772,7 +773,7 @@ recurseTRDs resolve hashes = go 0 (toPending hashes)
           if num >= 600
             then return pending'
             else do
-              $logDebugLS "recurseTRDs/pending'" $ map trdHash pending'
+              $logDebugLS "recurseTRDs/pending'" $ map (format . trdHash) pending'
               void . liftIO $ threadDelay 100000
               go (num + 1) pending'
       return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
@@ -984,7 +985,10 @@ getAccountNonce addr chainIds = do
   $logInfoLS "getAccountNonce/req" params
   $logInfoLS "getAccountNonce/resp" mAccts
   case mAccts of
-    [] -> throwIO . UserError $ "User does not have a balance"
+    [] -> do
+      requireBalance <- asks gasOn
+      if requireBalance then throwIO . UserError $ "User does not have a balance"
+      else return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
     accts -> do
       let mkCid AddressStateRef{..} = ChainId <$> toMaybe 0 addressStateRefChainId
           mkNonce AddressStateRef{..} = Nonce $ fromInteger addressStateRefNonce

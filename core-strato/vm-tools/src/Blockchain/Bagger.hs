@@ -47,6 +47,7 @@ import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx 
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256        hiding (hash)
 import qualified Blockchain.Verification            as V
+import           Blockchain.VMOptions               (flags_gasOn)
 
 import           Executable.EVMFlags                (flags_maxTxsPerBlock)
 
@@ -382,8 +383,13 @@ removeFromSeen :: MonadBagger m => OutputTx -> m ()
 removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
-getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$>
-  A.lookupWithDefault (A.Proxy @DD.AddressState) addr
+getAddressNonceAndBalance addr = do 
+  (nonce, balance) <- (DD.addressStateNonce &&& DD.addressStateBalance) <$>
+      A.lookupWithDefault (A.Proxy @DD.AddressState) addr
+  if flags_gasOn then 
+    return (nonce, balance) 
+  else 
+    return (nonce, 9999999999999999999999999999) -- fake a high balance, so all TXs are accepted
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
 addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)
