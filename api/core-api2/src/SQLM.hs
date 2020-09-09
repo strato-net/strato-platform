@@ -9,20 +9,12 @@
 
 module SQLM where
 
-import           Blockchain.DB.SQLDB
 import           Blockchain.Output
-import qualified Control.Monad.Change.Modify as Mod
-import           Control.Monad.Trans.Reader
 import qualified Data.ByteString.Lazy.Char8  as BLC
 import qualified Data.Text                   as T
 import           Servant                     hiding (ServerError)
 import qualified Servant                     as SERVANT (ServerError)
 import           UnliftIO
-
-type SQLM = ReaderT SQLDB (LoggingT IO)
-
-instance Mod.Accessible SQLDB SQLM where
-  access _ = ask
 
 data ApiError
   = NoFilterError String

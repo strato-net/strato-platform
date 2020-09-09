@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -67,6 +68,9 @@ import qualified Handlers.Version                as Version
 import           SQLM
 import           UnliftIO                        hiding (Handler)
 
+import Control.Monad.Reader                      (MonadTrans, lift)
+import Control.Monad.Change.Modify
+
 type CoreAPI =
   "eth" :> "v1.2" :>
   (
@@ -114,6 +118,13 @@ fullServer :: (MonadLogger m, HasSQL m) => ServerT FullAPI m
 fullServer = coreServer :<|> bloc
 
 ----------------
+
+instance {-# OVERLAPPING #-} (Monad m) => Accessible a (ReaderT a m) where
+  access _ = ask
+
+instance (Monad m, Accessible a m, MonadTrans t) => Accessible a (t m) where
+  access p = lift (access p)
+
 
 hoistCoreServer :: ConnectionPool -> Server FullAPI
 hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer

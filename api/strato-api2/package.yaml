@@ -29,7 +29,9 @@ executables:
     - http-types
     - insert-ordered-containers
     - lens
+    - monad-alter
     - monad-logger
+    - mtl
     - servant-multipart
     - servant-swagger
     - servant-swagger-ui
