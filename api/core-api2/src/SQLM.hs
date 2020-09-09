@@ -46,12 +46,12 @@ apiErrorToServantErr = \case
   DeprecatedError str -> err400 { errBody = BLC.pack str }
   RuntimeError e -> err500 { errBody = BLC.pack $ "Runtime exception: " ++ show e }
 
-handleRuntimeError :: SomeException -> SQLM a
+handleRuntimeError :: MonadIO m => SomeException -> m a
 handleRuntimeError (e :: SomeException) = case fromException e of
   Just (_ :: ApiError) -> throwIO e
   Nothing -> throwIO $ RuntimeError e
 
-handleApiError :: ApiError -> SQLM a
+handleApiError :: (MonadIO m, MonadLogger m) => ApiError -> m a
 handleApiError = \case
   e@(RuntimeError _) -> do
     $logErrorS "handleApiError/RuntimeError" . T.pack $
