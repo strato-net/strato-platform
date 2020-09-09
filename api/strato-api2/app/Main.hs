@@ -15,6 +15,7 @@ module Main where
 
 import           Blockchain.Output
 import           Control.Lens.Operators
+import           Control.Monad.Reader            (MonadTrans, lift)
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
@@ -68,8 +69,7 @@ import qualified Handlers.Version                as Version
 import           SQLM
 import           UnliftIO                        hiding (Handler)
 
-import Control.Monad.Reader                      (MonadTrans, lift)
-import Control.Monad.Change.Modify
+import           Control.Monad.Change.Modify
 
 type CoreAPI =
   "eth" :> "v1.2" :>
