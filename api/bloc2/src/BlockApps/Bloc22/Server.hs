@@ -10,6 +10,7 @@ module BlockApps.Bloc22.Server where
 
 import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
 import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 --import           Control.Monad.Logger
 import           Data.HashMap.Strict.InsOrd
 import           Data.Proxy
@@ -21,7 +22,7 @@ import           BlockApps.Bloc22.API
 --import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Chain
 import           BlockApps.Bloc22.Server.Contracts
---import           BlockApps.Bloc22.Server.Transaction
+import           BlockApps.Bloc22.Server.Transaction
 import           BlockApps.Bloc22.Server.Users
 
 import Control.Monad.Change.Alter
@@ -33,9 +34,10 @@ import Blockchain.Strato.Model.ChainId
 import Blockchain.Data.ChainInfo
 
 import Control.Monad.Composable.BlocSQL
+import Control.Monad.Composable.Vault
 
-bloc :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m,
-         Selectable ChainId ChainInfo m) =>
+bloc :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m, MonadLogger m, HasBlocSQL m,
+         HasBlocEnv m, HasVault m, Selectable ChainId ChainInfo m) =>
         ServerT BlocAPI m
 bloc = return gitInfo
 --  :<|> postUsersFill
@@ -57,8 +59,8 @@ bloc = return gitInfo
   :<|> postChainInfo
   :<|> getChainInfo
   :<|> postChainInfos
---  :<|> postBlocTransactionParallel
---  :<|> postBlocTransaction
+  :<|> postBlocTransactionParallel
+  :<|> postBlocTransaction
 
 --serveBloc :: BlocEnv -> Server BlocAPI
 --serveBloc env = hoistServer blocApi (enterBloc env) bloc

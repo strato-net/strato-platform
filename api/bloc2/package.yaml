@@ -70,7 +70,9 @@ library:
     - time
     - transformers
     - unliftio
+    - unliftio-core
     - unordered-containers
+    - vault-monad
     - vector
 
 tests:

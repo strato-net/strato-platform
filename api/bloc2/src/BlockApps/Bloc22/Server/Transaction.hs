@@ -83,6 +83,7 @@ import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.Vault
 
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
 mergeTxParams (Just inner) (Just outer) = Just $
@@ -92,7 +93,7 @@ mergeTxParams (Just inner) (Just outer) = Just $
 mergeTxParams inner outer = inner <|> outer
 
 txWorker :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m,
-             MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+             MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasVault m) =>
             m ()
 txWorker = forever $ do
   tbqueue <- fmap txTBQueue getBlocEnv
@@ -104,7 +105,7 @@ txWorker = forever $ do
           lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
 
 postBlocTransactionParallel :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m,
-                                MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                                MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                                Maybe Text
                             -> Maybe ChainId
                             -> Bool -- resolve
@@ -120,7 +121,7 @@ postBlocTransactionParallel a b resolve queue c =
     else postBlocTransaction' (Do CacheNonce) a b resolve c
 
 postBlocTransaction :: (MonadBaseControl IO m, MonadUnliftIO m,
-                        MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                        MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                        Maybe Text
                     -> Maybe ChainId
                     -> Bool
@@ -129,7 +130,7 @@ postBlocTransaction :: (MonadBaseControl IO m, MonadUnliftIO m,
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransaction' :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m,
-                         MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                         MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                         Should CacheNonce
                      -> Maybe Text
                      -> Maybe ChainId
@@ -256,7 +257,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           BlocGenesis f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
 
-callSignature :: (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+callSignature :: (MonadIO m, MonadLogger m, HasVault m) =>
                  Text -> UnsignedTransaction -> m Transaction
 callSignature userName unsigned@UnsignedTransaction{..} = do
   let msgHash = rlpHash unsigned
@@ -277,7 +278,7 @@ callSignature userName unsigned@UnsignedTransaction{..} = do
 --------------------------
 
 postUsersUploadListEVM' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                            HasBlocSQL m, HasBlocEnv m) =>
+                            HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                            Should CacheNonce -> ContractListParameters -> Text -> m [BlocTransactionResult]
 postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
@@ -336,7 +337,7 @@ evmUploadListError = Text.concat
   ]
 
 postUsersUploadListSolidVM' :: (MonadIO m, MonadBaseControl IO m,
-                                MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                                MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                                Should CacheNonce -> ContractListParameters -> Text -> m [BlocTransactionResult]
 postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
@@ -394,7 +395,8 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
     ]
   getBatchBlocTransactionResult' hashes resolve
 
-postUsersContractMethodList' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+postUsersContractMethodList' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
+                                 HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                                 Should CacheNonce -> FunctionListParameters -> Text -> m [BlocTransactionResult]
 postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
   if null txs
@@ -455,7 +457,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
       getBatchBlocTransactionResult' hashes resolve
 
 postUsersSend' :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m,
-                   MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                   MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                   Should CacheNonce -> TransferParameters -> Text -> m BlocTransactionResult
 postUsersSend' cacheNonce TransferParameters{..} userName = do
     params <- getAccountTxParams cacheNonce fromAddress chainId txParams
@@ -478,7 +480,7 @@ postUsersSend' cacheNonce TransferParameters{..} userName = do
     getBlocTransactionResult' [txHash] resolve
 
 postUsersContractEVM' :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m,
-                          MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                          MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                          Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
 postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
@@ -514,7 +516,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
   getBlocTransactionResult' [txHash] resolve
 
 postUsersContractSolidVM' :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m,
-                              MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                              MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                              Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
 postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
@@ -553,7 +555,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
 
 
 postUsersSendList' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                       HasBlocSQL m, HasBlocEnv m) =>
+                       HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                       Should CacheNonce -> TransferListParameters -> Text -> m [BlocTransactionResult]
 postUsersSendList' cacheNonce TransferListParameters{..} userName = do
   let txsWithChainids = map (sendtransactionChainid %~ (<|> chainId)) txs
@@ -582,7 +584,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} userName = do
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersContractMethod' :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m,
-                             MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                             MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasVault m) =>
                             Should CacheNonce -> FunctionParameters -> Text -> m BlocTransactionResult
 postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
     params <- getAccountTxParams cacheNonce fromAddr chainId txParams
@@ -640,7 +642,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
 addMetadata :: Maybe (Map Text Text) -> Transaction -> Transaction
 addMetadata m t = t{transactionMetadata = m}
 
-signAndPrepare :: (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+signAndPrepare :: (MonadIO m, MonadLogger m, HasVault m) =>
                   Text -> Address -> Maybe (Map Text Text) -> TransactionHeader -> m RawTransaction'
 signAndPrepare userName from md th = do
   time <- liftIO getCurrentTime

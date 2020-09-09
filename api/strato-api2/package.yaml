@@ -41,6 +41,7 @@ executables:
     - swagger2
     - transformers
     - unliftio
+    - vault-monad
     - wai
     - wai-cors
     - wai-extra

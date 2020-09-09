@@ -22,7 +22,7 @@ import           Servant.Mock
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Git
---import           BlockApps.Bloc22.API.Transaction
+import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Crypto
@@ -55,8 +55,8 @@ type BlocAPI =
   -- /chains endpoints
   :<|> PostChainInfos
   -- /transaction endpoints
---  :<|> PostBlocTransactionParallel
---  :<|> PostBlocTransaction
+  :<|> PostBlocTransactionParallel
+  :<|> PostBlocTransaction
 
 markdownBloc :: String
 markdownBloc = markdown $ docs blocApi

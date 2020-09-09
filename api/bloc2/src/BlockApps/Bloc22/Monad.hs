@@ -52,6 +52,7 @@ import           Blockchain.Strato.Model.Nonce
 
 import           Control.Monad.Change.Modify        hiding (modify)
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.Vault     hiding (httpManager)
 
 data Should a = Don't a | Do a
 data Compile = Compile
@@ -94,7 +95,7 @@ data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
 
 data BlocEnv = BlocEnv
   { urlStrato          :: BaseUrl
-  , urlVaultWrapper    :: BaseUrl
+  --, urlVaultWrapper    :: BaseUrl
   , httpManager        :: Manager
   , deployMode         :: DeployMode
   , stateFetchLimit    :: Integer
@@ -322,13 +323,13 @@ blocStrato client' = do
     liftIO $ runClientM client' (ClientEnv (httpManager blocEnv) (urlStrato blocEnv) Nothing)
   either (blocError . StratoError) return resultEither
 
-blocVaultWrapper :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCallStack) =>
+blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
                     ClientM x -> m x
 blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault Wrapper"
-  blocEnv <- access Proxy
+  VaultData url mgr <- access Proxy
   resultEither <-
-    liftIO $ runClientM client' (ClientEnv (httpManager blocEnv) (urlVaultWrapper blocEnv) Nothing)
+    liftIO $ runClientM client' (ClientEnv mgr url Nothing)
   either (blocError . VaultWrapperError) return resultEither
 
 blocMaybe :: MonadIO m => Text -> Maybe x -> m x
