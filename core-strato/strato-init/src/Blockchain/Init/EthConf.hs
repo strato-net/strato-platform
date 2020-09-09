@@ -1,20 +1,25 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 module Blockchain.Init.EthConf (genEthConf) where
 
-import Control.Monad
+import           Control.Concurrent
 import qualified Data.ByteString.Base16             as B16
-import qualified Data.ByteString.Base64             as B64
 import qualified Data.ByteString.Char8              as C8
-import Data.Coerce
-import Data.Maybe
-import Data.Either.Extra
-import System.Entropy
-import System.Environment
+import           Data.Maybe
+import qualified Data.Text                          as T
+import           Network.HTTP.Client                (newManager, defaultManagerSettings)
+import           Network.HTTP.Types.Status
+import           Servant.Client
+import           System.Entropy
+import           Text.Format
 
-import Blockchain.EthConf
-import Blockchain.Init.Options
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.EthConf
+import           Blockchain.Init.Options
+import           Blockchain.Strato.Model.Address
+import           Strato.Strato23.Client
+import qualified Strato.Strato23.API                as VC
+
+
 
 defaultSqlConfig :: SqlConf
 defaultSqlConfig =
@@ -46,9 +51,6 @@ defaultBlockConfig =
       blockTime = 13,
       minBlockDifficulty = 131072
     }
-
-defaultPrivKey :: PrivKey
-defaultPrivKey = PrivKey 0
 
 defaultEthUniqueId :: EthUniqueId
 defaultEthUniqueId =
@@ -87,7 +89,6 @@ defaultConfig :: EthConf
 defaultConfig =
     EthConf {
       ethUniqueId        = defaultEthUniqueId,
-      privKey            = defaultPrivKey,
       sqlConfig          = defaultSqlConfig,
       redisBlockDBConfig = defaultRedisBlockDBConfig,
       levelDBConfig      = defaultLevelDBConfig,
@@ -96,6 +97,46 @@ defaultConfig =
       quarryConfig       = defaultQuarryConfig,
       discoveryConfig    = defaultDiscoveryConfig
     }
+
+
+getNodeKey :: IO (VC.PublicKey, Address)
+getNodeKey = do
+  mgr <- newManager defaultManagerSettings
+  vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl 
+  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+  putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
+  ak <- waitOnVault clientEnv $ runClientM (getKey (T.pack "nodekey") Nothing) clientEnv
+  return (VC.unPubKey ak, VC.unAddress ak)
+
+waitOnVault :: ClientEnv -> IO (Either ClientError VC.AddressAndKey) -> IO VC.AddressAndKey
+waitOnVault clientEnv request = do
+  res <- request
+  case res of
+    Left (FailureResponse _ (Response (Status code _) _ _ body)) -> case code of
+      503 -> do -- 503 is thrown when the password is not set
+        putStrLn "vault password is not set. I'll keep trying until it is set"
+        threadDelay 2000000 -- 2 seconds
+        waitOnVault clientEnv request
+      400 -> -- 400 is thrown when the key does not exist
+        if flags_generateKey then do 
+          putStrLn "nodekey does not exist -  I'm going to create one"
+          waitOnVault clientEnv $ runClientM (postKey $ T.pack "nodekey") clientEnv
+        else do
+          putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
+          threadDelay 5000000 -- 5 seconds
+          waitOnVault clientEnv request
+      _ -> do
+        putStrLn $ "unexpected error thrown by vault-wrapper: " ++ show body
+        putStrLn "will keep retrying anyway"
+        threadDelay 5000000 -- 5 seconds
+        waitOnVault clientEnv request
+    Left err -> do 
+      putStrLn $ "unexpected servant error: " ++ show err
+      putStrLn "will keep retrying anyway"
+      threadDelay 5000000 -- 5 seconds
+      waitOnVault clientEnv request
+    Right val -> return val
+
 
 genEthConf :: IO EthConf
 genEthConf = do
@@ -118,15 +159,13 @@ genEthConf = do
                   return "localhost"
          host' -> return host'
 
+
+  (pub, addr) <- getNodeKey 
+  putStrLn $ "the node's public key: " ++ format pub
+  putStrLn $ "the node's address: " ++ format addr
+
+
   bytes <- getEntropy 20
-  myPrivKey <-
-    if flags_singlePrivateKey
-      then do
-        !skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-        let !bs = fromRight (error $ "Invalid base64 NODEKEY: " ++ show skey) . B64.decode . C8.pack $ skey
-        when (C8.length bs /= 32) $ error $ "The private key decoded from NODEKEY is the wrong length: NODEKEY: " ++ show skey ++ ", decoded: '" ++ C8.unpack (B16.encode bs) ++ "'"
-        return . PrivKey . fromIntegral $ bytesToWord256 bs
-      else generatePrivKey
   let user'' =  case maybePGuser of
                     Nothing  -> "postgres"
                     Just ""  -> "postgres"
@@ -154,13 +193,12 @@ genEthConf = do
 
 
   return cfg {
-                   privKey = myPrivKey,
                    sqlConfig = pgCfg'',
                    kafkaConfig = kafkaCfg,
                    ethUniqueId = defaultEthUniqueId {
                      peerId = uniqueString
                    },
                    quarryConfig = (quarryConfig cfg) {
-                    coinbaseAddress = formatAddressWithoutColor . fromInteger $ coerce myPrivKey
+                    coinbaseAddress = formatAddressWithoutColor addr
                    }
                  }

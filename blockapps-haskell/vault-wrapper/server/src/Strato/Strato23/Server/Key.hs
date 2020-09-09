@@ -7,10 +7,14 @@ module Strato.Strato23.Server.Key where
 import           Data.ByteString (ByteString)
 import           Data.Maybe                       (fromMaybe, isJust)
 import           Data.Text                        (Text)
+
 import           Strato.Strato23.API
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Monad
 import           Strato.Strato23.Database.Queries
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Secp256k1
+
 
 getKey :: Text -> Maybe Text -> VaultM AddressAndKey
 getKey headerUserName queryParamUserName = withSecretKey $ \key -> do
@@ -21,7 +25,7 @@ getKey headerUserName queryParamUserName = withSecretKey $ \key -> do
     then return $ AddressAndKey addr pub -- not specified, to guarantee correctness
     else case decryptSecKey key nonce encKey of
       Nothing -> vaultWrapperError IncorrectPasswordError
-      Just pKey -> return $ AddressAndKey (deriveAddress pKey) (derivePublicKey pKey)
+      Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
       -- TODO: maybe we can remove addr and pub columns since we just derive them everytime
 
 postKey :: Text -> VaultM AddressAndKey
@@ -32,4 +36,15 @@ postKey userName = withSecretKey $ \key -> do
     then vaultWrapperError $ UserError ("User " <> userName <> " already exists")
     else case decryptSecKey key keystoreAcctNonce keystoreAcctEncSecKey of
       Nothing -> vaultWrapperError IncorrectPasswordError
-      Just pKey -> return $ AddressAndKey (deriveAddress pKey) keystoreAcctPubKey
+      Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) keystoreAcctPubKey
+
+
+-- Get an ECDH shared secret from the user's private key and a supplied public key
+getSharedKey :: Text -> PublicKey -> VaultM SharedKey
+getSharedKey userName otherPub = withSecretKey $ \key -> do
+  (_ :: ByteString, nonce, encKey, (_ :: Address), (_ :: PublicKey)) <- 
+                          toUserError ("User " <> userName <> " doesn't exist")
+                          . vaultQuery1 $ getUserKeyQuery userName
+  case decryptSecKey key nonce encKey of
+    Nothing -> vaultWrapperError IncorrectPasswordError
+    Just pKey -> return $ deriveSharedKey pKey otherPub

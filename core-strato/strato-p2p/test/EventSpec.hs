@@ -17,29 +17,23 @@ import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Crypto.PubKey.ECC.DH
-import           Crypto.PubKey.ECC.Types
-import           Data.Bits                             (shiftR)
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Base16                as B16
 import qualified Data.ByteString.Char8                 as BC
-import           Data.Coerce
 import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue                   hiding (newTQueueIO)
 import           Data.Default                          (def)
 import           Data.Foldable                         (for_, toList)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe                            (fromJust)
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
-import           Data.Word                             (Word8)
 import           Text.Printf
 
 import           Blockchain.Blockstanbul
-import           Blockchain.Blockstanbul.EventLoop
 import           Blockchain.Blockstanbul.HTTPAdmin
+import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Block                 hiding (bestBlockNumber)
@@ -56,7 +50,7 @@ import           Blockchain.Options                    (AuthorizationMode(..))
 import           Blockchain.Output
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
-import qualified  Blockchain.Sequencer.DB.DependentBlockDB as DBDB
+import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB
 import           Blockchain.Sequencer.DB.GetChainsDB
 import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
@@ -66,11 +60,11 @@ import           Blockchain.Sequencer.Monad
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256           (Keccak256, unsafeCreateKeccak256FromWord256)
+import           Blockchain.Strato.Model.Secp256k1
 
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
 
-import qualified Network.Haskoin.Crypto                as HK
 
 import           Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted        as L
@@ -79,27 +73,6 @@ import           Test.QuickCheck
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
 
--- TODO: these were imported from ethereum-encryption, which is still using
---       crypto-pubkey and crypto-random. Remove these once ethereum-encryption
---       switches over to cryptonite
-theCurve :: Curve
-theCurve = getCurveByName SEC_p256k1
-
-pointToString :: Point -> String
-pointToString = BC.unpack . B16.encode . pointToBytes
-
-pointToBytes :: Point -> B.ByteString
-pointToBytes (Point x y) = B.pack $ intToBytes x ++ intToBytes y
-pointToBytes PointO      = error "pointToBytes got value PointO, I don't know what to do here"
-
-intToBytes :: Integer -> [Word8]
-intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
-
-makeHKPrvKey :: PrivateNumber -> Maybe HK.PrvKey
-makeHKPrvKey = HK.makePrvKey . coerce
-
-getAddress :: PrivateNumber -> Address
-getAddress = prvKey2Address . fromJust . makeHKPrvKey
 
 data TestContext = TestContext
   { _blocks                :: [Block]
@@ -109,6 +82,7 @@ data TestContext = TestContext
   , _connectionTimeout     :: ConnectionTimeout
   , _maxReturnedHeaders    :: MaxReturnedHeaders
   , _peerAddr              :: PeerAddress
+  , _prvKey                :: PrivateKey
   , _shaBlockDataMap       :: Map Keccak256 DataDefs.BlockData
   , _worldBestBlock        :: WorldBestBlock
   , _bestBlock             :: BestBlock
@@ -234,6 +208,7 @@ instance MonadIO m => HasPrivateHashDB (MonadTest m) where
   requestChain = insertGetChainsDB
   requestTransaction = insertGetTransactionsDB
 
+
 genericTestLookup :: (MonadState s m, Ord k)
                   => Lens' s (Map k (Modification a))
                   -> Mod.Proxy a
@@ -317,6 +292,19 @@ instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
   putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
 
+instance MonadIO m => HasVault (MonadTest m) where
+  sign bs = do
+    pk <- use prvKey
+    return $ signMsg pk bs
+  
+  getPub = do
+    pk <- use prvKey
+    return $ derivePublicKey pk
+  
+  getShared pub = do
+    pk <- use prvKey
+    return $ deriveSharedKey pk pub
+
 instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
   lookup _  k = do
     wms <- readIORef =<< use pbftMessages
@@ -343,17 +331,14 @@ instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessa
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
 
-newBlockstanbulContext :: PrivateNumber -> [Address] -> BlockstanbulContext
-newBlockstanbulContext pk as =
+newBlockstanbulContext :: Address -> [Address] -> BlockstanbulContext
+newBlockstanbulContext paddr as =
   let ckpt = startingCheckpoint as
-      hkpk = fromJust $ makeHKPrvKey pk
-   in newContext ckpt hkpk
+  in newContext ckpt paddr
 
 emptyBlockstanbulContext :: BlockstanbulContext
-emptyBlockstanbulContext = newBlockstanbulContext
-  (error "emptyBlockstanbulContext: Evaluating private key")
-  []
-
+emptyBlockstanbulContext = newBlockstanbulContext undefined []
+  
 newSequencerContext :: MonadIO m => BlockstanbulContext -> m SequencerContext
 newSequencerContext bc = do
   -- loopCh <- atomically newTMChan
@@ -376,8 +361,8 @@ newSequencerContext bc = do
 
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
-testContext :: IORef (S.OSet Keccak256) -> SequencerContext -> TestContext
-testContext wireMessagesRef ctx = TestContext
+testContext :: IORef (S.OSet Keccak256) -> PrivateKey -> SequencerContext -> TestContext
+testContext wireMessagesRef prv ctx = TestContext
   { _blocks                = []
   , _blockHeaders          = []
   , _remainingBlockHeaders = RemainingBlockHeaders []
@@ -385,6 +370,7 @@ testContext wireMessagesRef ctx = TestContext
   , _connectionTimeout     = ConnectionTimeout 60
   , _maxReturnedHeaders    = MaxReturnedHeaders 1000
   , _peerAddr              = PeerAddress Nothing
+  , _prvKey                = prv
   , _shaBlockDataMap       = M.empty
   , _worldBestBlock        = WorldBestBlock (BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0)
   , _bestBlock             = BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
@@ -411,23 +397,23 @@ runTestPeer :: TestContextM a -> IO ()
 runTestPeer f = do
   seqCtx <- newSequencerContext emptyBlockstanbulContext
   wmr <- newIORef (S.empty)
-  ctx <- newIORef $ testContext wmr seqCtx
+  ctx <- newIORef $ testContext wmr undefined seqCtx
   void . runNoLoggingT . runResourceT $ runReaderT f ctx
 
-execTestPeer :: PrivateNumber
+execTestPeer :: PrivateKey
              -> [Address]
              -> TestContextM a
              -> IO (a, TestContext)
 execTestPeer pk as f = do
-  seqCtx <- newSequencerContext $ newBlockstanbulContext pk as
+  seqCtx <- newSequencerContext $ newBlockstanbulContext (fromPrivateKey pk) as
   wmr <- newIORef (S.empty)
-  ctx <- newIORef $ testContext wmr seqCtx
+  ctx <- newIORef $ testContext wmr pk seqCtx
   a <- runLoggingT . runResourceT $ runReaderT f ctx
   ctx' <- readIORef ctx
   return (a, ctx')
 
 data P2PPeer m = P2PPeer
-  { _p2pPeerPrivKey     :: PrivateNumber
+  { _p2pPeerPrivKey     :: PrivateKey
   , _p2pPeerPPeer       :: DataPeer.PPeer
   , _p2pPeerUnseqSource :: TQueue SeqLoopEvent
   , _p2pPeerSeqSource   :: TMChan P2pEvent
@@ -442,15 +428,15 @@ createPeer :: Seq.MonadSequencer m
            -> String
            -> IO (P2PPeer m)
 createPeer unseqSink name ipAddr = do
-  privKey <- generatePrivate theCurve
+  privKey <- newPrivateKey
   unseqSource <- newTQueueIO
   seqSource <- newBroadcastTMChanIO
   let sequencer = runConduit $ sourceTQueue unseqSource
                             .| mapMC (Seq.runSequencerBatch . (:[]))
                             .| (awaitForever $ yieldMany . Seq._toP2p)
                             .| sinkTMChan seqSource
-      pubkey = calculatePublic theCurve privKey
-      ppeer = DataPeer.buildPeer ( Just $ pointToString pubkey
+      pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
+      ppeer = DataPeer.buildPeer ( Just pubkeystr
                                  , ipAddr
                                  , 30303
                                  )
@@ -484,15 +470,13 @@ createConnection server client = do
   clientToServer <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqSource server
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqSource client
-  let runServer = runEthServerConduit (_p2pPeerPrivKey server)
-                                      (_p2pPeerPPeer client)
+  let runServer = runEthServerConduit (_p2pPeerPPeer client)
                                       (sourceTQueue clientToServer)
                                       (sinkTQueue serverToClient)
                                       (sourceTMChan serverSeqSource)
                                       (_p2pPeerUnseqSink server)
                                       (_p2pPeerName server ++ " -> " ++ _p2pPeerName client)
-      runClient = runEthClientConduit (_p2pPeerPrivKey client)
-                                      (_p2pPeerPPeer server)
+      runClient = runEthClientConduit (_p2pPeerPPeer server)
                                       (sourceTQueue serverToClient)
                                       (sinkTQueue clientToServer)
                                       (sourceTMChan clientSeqSource)
@@ -506,7 +490,7 @@ createConnection server client = do
     runServer
     runClient
 
-runConnectionWith :: (PrivateNumber -> m (Maybe SomeException) -> IO b) 
+runConnectionWith :: (PrivateKey -> m (Maybe SomeException) -> IO b) 
                   -> P2PConnection m 
                   -> IO (b, b)
 runConnectionWith f connection =
@@ -515,7 +499,7 @@ runConnectionWith f connection =
    in concurrently runServer runClient
 
 makeValidators :: [P2PPeer m] -> [Address]
-makeValidators = map (getAddress . _p2pPeerPrivKey)
+makeValidators = map (fromPrivateKey . _p2pPeerPrivKey)
 
 -- endlessStreamOfIPAddresses :: [String]
 -- endlessStreamOfIPAddresses = generateThem
@@ -571,7 +555,7 @@ spec = do
         ]
       let validators' = take 2 peers
           validatorAddresses = makeValidators validators'
-          runForTwoSeconds :: PrivateNumber -> TestContextM a -> IO TestContext
+          runForTwoSeconds :: PrivateKey -> TestContextM a -> IO TestContext
           runForTwoSeconds pk = fmap snd . execTestPeer pk validatorAddresses . timeout 2000000
           runSequencers = mapConcurrently (\p -> runForTwoSeconds (_p2pPeerPrivKey p) (_p2pPeerSequencer p)) peers
           runConnections = mapConcurrently (runConnectionWith runForTwoSeconds) connections

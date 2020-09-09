@@ -1,24 +1,32 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module AuthenticationSpec where
 
-import Control.Lens
-import Data.Maybe (fromMaybe, isJust, catMaybes)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import Data.Monoid ((<>))
-import qualified Data.Set as S
-import Data.Time.Clock.POSIX
-import Test.Hspec
-import Test.QuickCheck
 
-import Blockchain.Blockstanbul.Authentication
-import Blockchain.Data.Address
-import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.StateRoot
-import qualified Network.Haskoin.Crypto as HK
+
+
+import           Control.Lens
+import           Data.Maybe                 (isJust)
+import qualified Data.ByteString            as B
+import qualified Data.ByteString.Base16     as B16
+import qualified Data.ByteString.Char8      as C8
+import           Data.Monoid ((<>))
+import           Data.Maybe
+import qualified Data.Set                   as S
+import           Data.Time.Clock.POSIX
+import           Test.Hspec
+import           Test.QuickCheck
+
+import           Blockchain.Blockstanbul.Authentication
+import           Blockchain.Data.Address
+import           Blockchain.Data.Block
+import           Blockchain.Data.DataDefs
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.StateRoot
+
 
 testBlock :: Block
 testBlock =
@@ -47,23 +55,23 @@ testBlock =
 testValidators :: [Address]
 testValidators = [Address 0x101, Address 0xaaa]
 
-private :: HK.PrvKey
-private = fromMaybe (error "working key now fails") $ HK.makePrvKey 0x3f06311cf94c7eafd54e0ffc8d914cf05a051188000fee52a29f3ec834e5abc5
+private :: PrivateKey
+private = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
 
-keys :: [HK.PrvKey]
-keys = catMaybes [ HK.makePrvKey 0x2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d
-                 , HK.makePrvKey 0xafed2a302584130b650e6ef7727e0daefa3a3d557a8bd45c20418f2c2fab1a95
-                 , HK.makePrvKey 0x3734309034f9b5bf36142295eec56ecb6ea4b095b3fe85e82797cbefdd7c1925
-                 , HK.makePrvKey 0xafed2a302584130b650e6ef7727e0daefa3a3d557a8bd45c20418f2c2fab1a95
-                 ]
+
+
+instance HasVault IO where
+  sign bs = return $ signMsg private bs 
+  getPub = error "called getPub, but this should never happen"
+  getShared _ = error "called getShared, but this should never happen"
 
 spec :: Spec
 spec = do
   describe "Commitment seals" $ do
     it "verifies the signatures" $ do
       let digest = unsafeCreateKeccak256FromWord256 0x1234
-          want = Just . prvKey2Address $ private
-          sig = commitmentSeal digest private
+          want = Just . fromPrivateKey $ private
+      sig <- commitmentSeal digest
       let got = verifyCommitmentSeal digest sig
       got `shouldBe` want
 
@@ -71,11 +79,11 @@ spec = do
     it "verifies the signatures, without including the seals" $ do
       let istExtra = IstanbulExtra testValidators Nothing []
           initialExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
-          sig = proposerSeal (set extraLens initialExtra testBlock) private
-          sealedExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
+      sig <- proposerSeal (set extraLens initialExtra testBlock)
+      let sealedExtra = uncookRawExtra $ ExtraData (B.replicate 32 0) (Just istExtra)
           sealedBlock = set extraLens sealedExtra testBlock
           got = verifyProposerSeal sealedBlock sig
-          want = Just . prvKey2Address $ private
+          want = Just . fromPrivateKey $ private
       got `shouldBe` want
 
   describe "Istanbul extra data" $ do
@@ -121,7 +129,7 @@ spec = do
       got `shouldBe` Left "unexpected block number: have 40, wanted 301"
 
     it "Rejects a block with the wrong validator list" $ do
-      let vals = S.map prvKey2Address . S.singleton $ private
+      let vals = S.map fromPrivateKey . S.singleton $ private
           blk = addValidators vals testBlock
           got = replayHistoricBlock (S.singleton 0xdeadbeef) 39 blk
       got `shouldBe` Left "mismatched validators"
@@ -135,35 +143,37 @@ spec = do
     it "Rejects a block with a bad proposer's signature" $ do
       let vals = S.singleton 0xdeadbeef
           blk' = addValidators vals testBlock
-          seal = proposerSeal blk' private
-          blk = addProposerSeal seal blk'
+      seal <- proposerSeal blk'
+      let blk = addProposerSeal seal blk'
           got = replayHistoricBlock vals 39 blk
-      got `shouldBe` Left "proposer 80976e7d04c8ae9b3a1c08278a5c385e5b0ff446 not a validator"
+      got `shouldBe` Left "proposer 00b54e93ee2eba3086a55f4249873e291d1ab06c not a validator"
 
     it "Rejects a block without commit seals" $ do
-      let vals = S.fromList $ map prvKey2Address [private]
+      let vals = S.fromList $ map fromPrivateKey [private]
           blk' = addValidators vals testBlock
-          seal = proposerSeal blk' private
-          blk = addProposerSeal seal blk'
+      seal <- proposerSeal blk'
+      let blk = addProposerSeal seal blk'
           got = replayHistoricBlock vals 39 blk
       got `shouldBe` Left "not enough commit seals (have 0 out of 1)"
 
     it "Rejects a block with an unknown seal" $ do
-      let vals = S.fromList $ map prvKey2Address [private]
+      let mFakeKey = importPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
+          fakeKey = fromMaybe (error "could not import fake key") mFakeKey
+          vals = S.fromList $ map fromPrivateKey [private]
           blk'' = addValidators vals testBlock
-          pSeal = proposerSeal blk'' private
-          blk' = addProposerSeal pSeal blk''
-          cSeal = commitmentSeal (blockHash blk') (head keys)
+      pSeal <- proposerSeal blk'' 
+      let blk' = addProposerSeal pSeal blk''
+          cSeal = signMsg (fakeKey) (keccak256ToByteString $ blockHash blk')
           blk = addCommitmentSeals [cSeal] blk'
           got = replayHistoricBlock vals 39 blk
-      got `shouldBe` Left "unknown signers: 807da1d7f5286530d0a71a2e87df146b8fefec96"
+      got `shouldBe` Left "unknown signers: 9a4a1b2b0e0d2b5d378ecc392d337a6557602559" 
 
     it "Accepts a block with 1 validator" $ do
-      let vals = S.fromList $ map prvKey2Address [private]
+      let vals = S.fromList $ map fromPrivateKey [private]
           blk'' = addValidators vals testBlock
-          pSeal = proposerSeal blk'' private
-          blk' = addProposerSeal pSeal blk''
-          cSeal = commitmentSeal (blockHash blk') private
-          blk = addCommitmentSeals [cSeal] blk'
+      pSeal <- proposerSeal blk''
+      let blk' = addProposerSeal pSeal blk''
+      cSeal <- commitmentSeal (blockHash blk')
+      let blk = addCommitmentSeals [cSeal] blk'
           got = replayHistoricBlock vals 39 blk
       got `shouldBe` Right (40, S.elemAt 0 vals)

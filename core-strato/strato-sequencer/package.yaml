@@ -23,6 +23,8 @@ library:
     - blockapps-datadefs
     - blockapps-haskoin
     - blockapps-privacy
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
     - blockstanbul
     - bytestring
     - clock
@@ -32,6 +34,7 @@ library:
     - ethereum-rlp
     - extra
     - format
+    - http-client
     - lens
     - leveldb-haskell
     - lifted-async
@@ -43,6 +46,7 @@ library:
     - stm-conduit
     - strato-conf
     - strato-model
+    - servant-client
     - text
     - time
     - blockapps-util
@@ -61,19 +65,21 @@ executables:
     dependencies:
       - aeson
       - async
-      - base64-bytestring
       - blockapps-data
-      - blockapps-haskoin
       - blockapps-init
       - blockapps-util
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-client
       - blockstanbul
       - bytestring
       - extra
       - hflags
+      - http-client
       - milena
       - prometheus-client
       - safe
       - seqevents
+      - servant-client
       - stm
       - stm-chans
       - strato-conf
@@ -98,6 +104,7 @@ executables:
       - entropy
       - haskoin-shim
       - hflags
+      - http-client
       - prometheus-client
       - seqevents
       - strato-model
