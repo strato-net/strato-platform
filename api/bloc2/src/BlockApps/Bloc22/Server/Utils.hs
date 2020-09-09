@@ -33,6 +33,9 @@ import           BlockApps.Bloc22.Monad
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Keccak256
+
+import           Control.Monad.Composable.CoreAPI
+
 import           Handlers.BatchTransactionResult
 
 import           UnliftIO
@@ -40,7 +43,7 @@ import           UnliftIO
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
 
-maybeTxBatchResult :: (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+maybeTxBatchResult :: (MonadIO m, MonadLogger m, HasCoreAPI m) =>
                       [Keccak256] -> m [Maybe TransactionResult]
 maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (batchTransactionResultClient hashes))
   where maybeHeads btxr =
@@ -50,7 +53,7 @@ maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (batchTransactionResultCl
             Just trs -> listToMaybe trs
 
 
-getBatchBlocTxStatus :: (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+getBatchBlocTxStatus :: (MonadIO m, MonadLogger m, HasCoreAPI m) =>
                         [Keccak256] -> m [(BlocTransactionStatus, Maybe TransactionResult)]
 getBatchBlocTxStatus hashes = do
   mtxrs <- maybeTxBatchResult hashes

@@ -63,6 +63,7 @@ import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.CoreAPI
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
@@ -100,7 +101,7 @@ emptyBatchState = BatchState Map.empty Map.empty
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                              MonadUnliftIO m, HasBlocSQL m, HasBlocEnv m) =>
+                              MonadUnliftIO m, HasBlocSQL m, HasBlocEnv m, HasCoreAPI m) =>
                              [Keccak256] -> Bool -> m BlocTransactionResult
 getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': no TX hashes"
 getBlocTransactionResult' hashes@(txh:_) resolve =
@@ -115,22 +116,22 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                             HasBlocSQL m, HasBlocEnv m) =>
+                             HasBlocSQL m, HasBlocEnv m, HasCoreAPI m) =>
                             Keccak256 -> Bool -> m BlocTransactionResult
 getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
 
 postBlocTransactionResults :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                               HasBlocSQL m, HasBlocEnv m) =>
+                               HasBlocSQL m, HasBlocEnv m, HasCoreAPI m) =>
                               Bool -> [Keccak256] -> m [BlocTransactionResult]
 postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
-recurseTRDs :: (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+recurseTRDs :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
                Bool
             -> [Keccak256]
             -> m [TRD]
 recurseTRDs resolve hashes = go 0 (toPending hashes)
   where
-    go :: (MonadIO m, MonadLogger m, HasBlocEnv m) => Int -> [TRD] -> m [TRD]
+    go :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) => Int -> [TRD] -> m [TRD]
     go num list = do
       let his = map (trdHash &&& trdIndex) list
       statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus (map fst his)

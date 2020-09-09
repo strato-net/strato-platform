@@ -42,6 +42,7 @@ import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.CoreAPI
 import           Handlers.Storage
 import qualified MaybeNamed
 
@@ -93,7 +94,8 @@ translateStorageMap storage' =
       storage k = fromMaybe 0 $ Map.lookup k storageMap
   in storage
 
-getContractsState :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+getContractsState :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+                      HasBlocEnv m, HasCoreAPI m) =>
                      ContractName
                   -> Address
                   -> Maybe ChainId
@@ -166,7 +168,7 @@ getContractsState contract@(ContractName contractName) address chainId mName mCo
     ]
   return $ Map.fromList ret
   where
-    getStorageRange :: (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+    getStorageRange :: (MonadIO m, MonadLogger m, HasCoreAPI m) =>
                        Address -> (Word256, Word256) -> m [StorageAddress]
     getStorageRange a (o,c) = do
       blocStrato $ getStorageClient
@@ -177,7 +179,7 @@ getContractsState contract@(ContractName contractName) address chainId mName mCo
                            }
 
 postContractsBatchStates :: (MonadIO m, MonadBaseControl IO m,
-                             MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+                             MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasCoreAPI m) =>
                             [PostContractsBatchStatesRequest]
                          -> m [GetContractsStateResponses]
 postContractsBatchStates = traverse flattenRequest
@@ -248,7 +250,7 @@ getContractsEnum contractName contractId (EnumName enumName) chainId = do
       in return $ map EnumValue enums
 
 getContractsStateMapping :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                             HasBlocSQL m, HasBlocEnv m) =>
+                             HasBlocSQL m, HasBlocEnv m, HasCoreAPI m) =>
                             ContractName
                          -> Address
                          -> SymbolName

@@ -34,6 +34,7 @@ library:
     - clock
     - common-log
     - conduit
+    - core-api-monad
     - core-api2
     - cryptonite
     - directory

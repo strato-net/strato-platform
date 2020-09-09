@@ -46,6 +46,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.CoreAPI
 import           Handlers.Chain
 
 import           UnliftIO
@@ -128,7 +129,8 @@ creationBlockHash :: Keccak256
 creationBlockHash = fromJust $
   stringKeccak256 "0000000000000000000000000000000000000000000000000000000000000000"
 
-postChainInfo :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+postChainInfo :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+                  HasBlocEnv m, HasCoreAPI m) =>
                  ChainInput -> m ChainId
 postChainInfo chainInput = do
   (mCmId, chainInfo) <- createChainInfo chainInput
@@ -139,7 +141,8 @@ postChainInfo chainInput = do
   for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
-postChainInfos :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+postChainInfos :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+                   HasBlocEnv m, HasCoreAPI m) =>
                   [ChainInput] -> m [ChainId]
 postChainInfos chainInputs = do
   chainInfos <- traverse createChainInfo chainInputs

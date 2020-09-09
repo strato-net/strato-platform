@@ -34,10 +34,11 @@ import Blockchain.Strato.Model.ChainId
 import Blockchain.Data.ChainInfo
 
 import Control.Monad.Composable.BlocSQL
+import Control.Monad.Composable.CoreAPI
 import Control.Monad.Composable.Vault
 
 bloc :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m, MonadLogger m, HasBlocSQL m,
-         HasBlocEnv m, HasVault m, Selectable ChainId ChainInfo m) =>
+         HasBlocEnv m, HasVault m, HasCoreAPI m, Selectable ChainId ChainInfo m) =>
         ServerT BlocAPI m
 bloc = return gitInfo
 --  :<|> postUsersFill

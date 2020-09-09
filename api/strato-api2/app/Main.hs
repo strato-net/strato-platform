@@ -47,6 +47,7 @@ import           BlockApps.Init
 import           Blockchain.DB.SQLDB             hiding (createPostgresqlPool)
 import           Blockchain.EthConf
 
+import           Control.Monad.Composable.CoreAPI hiding (httpManager)
 import           Control.Monad.Composable.SQL    hiding (runSQLM, SQLM)
 import           Control.Monad.Composable.Vault  hiding (httpManager)
 
@@ -119,7 +120,7 @@ coreServer = Account.server
   :<|> Version.server
 
 fullServer :: (MonadBaseControl IO m, MonadLogger m, HasSQL m, HasBlocSQL m, HasBlocEnv m,
-               HasVault m) =>
+               HasVault m, HasCoreAPI m) =>
               ServerT FullAPI m
 fullServer = coreServer :<|> bloc
 
@@ -143,9 +144,6 @@ hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM)
     runM = runLoggingT .
            flip runReaderT (SQLDB pool) .
            flip runReaderT BlocEnv{
-                            urlStrato = error "urlStrato undefined",
-                            -- urlVaultWrapper = error "urlVaultWrapper undefined",
-                            httpManager = error "httpManager undefined",
                             deployMode = error "deployMode undefined",
                             stateFetchLimit = error "stateFetchLimit undefined",
                             globalNonceCounter = error "globalNonceCounter undefined",
@@ -153,7 +151,8 @@ hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM)
                             txTBQueue = error "txTBQueue undefined"
                             } .
            runBlocSQLM "postgres" 5432 "postgres" "api" .
-           runVaultM "http://localhost"
+           runVaultM "http://localhost" .
+           runCoreAPIM "http://localhost"
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy

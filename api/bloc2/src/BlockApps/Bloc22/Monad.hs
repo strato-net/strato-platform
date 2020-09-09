@@ -34,7 +34,6 @@ import qualified Data.Text                          as Text
 import           Database.PostgreSQL.Simple         (Connection,
                                                      withTransaction)
 import           GHC.Stack
-import           Network.HTTP.Client                hiding (responseBody, Proxy)
 import           Network.HTTP.Types.Status
 import           Opaleye
 import           Servant
@@ -52,6 +51,7 @@ import           Blockchain.Strato.Model.Nonce
 
 import           Control.Monad.Change.Modify        hiding (modify)
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.CoreAPI   hiding (httpManager)
 import           Control.Monad.Composable.Vault     hiding (httpManager)
 
 data Should a = Don't a | Do a
@@ -94,10 +94,7 @@ blocError err = do
 data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
 
 data BlocEnv = BlocEnv
-  { urlStrato          :: BaseUrl
-  --, urlVaultWrapper    :: BaseUrl
-  , httpManager        :: Manager
-  , deployMode         :: DeployMode
+  { deployMode         :: DeployMode
   , stateFetchLimit    :: Integer
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
   , globalSourceCache  :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
@@ -314,13 +311,13 @@ blocTransaction bloc = do
   BlocSQLData pool <- access Proxy
   withResource pool (\conn -> liftBaseOp_ (withTransaction conn) bloc)
 
-blocStrato :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCallStack) =>
+blocStrato :: (MonadIO m, MonadLogger m, HasCoreAPI m, HasCallStack) =>
               ClientM x -> m x
 blocStrato client' = do
   logInfoCS callStack "Querying Strato"
-  blocEnv <- access Proxy
+  CoreAPIData url mgr <- access Proxy
   resultEither <-
-    liftIO $ runClientM client' (ClientEnv (httpManager blocEnv) (urlStrato blocEnv) Nothing)
+    liftIO $ runClientM client' (ClientEnv mgr url Nothing)
   either (blocError . StratoError) return resultEither
 
 blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>

@@ -24,6 +24,7 @@ executables:
     - blockapps-init
     - blockapps-util
     - bytestring
+    - core-api-monad
     - core-api2
     - format
     - hflags
