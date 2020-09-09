@@ -24,7 +24,6 @@ import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.HashMap.Strict.InsOrd           as H
 import           Data.Proxy
 import           Data.Swagger
-import           Database.Persist.Postgresql
 import           HFlags
 import           Network.HTTP.Types.Status
 import           Network.Wai
@@ -44,11 +43,9 @@ import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Monad          hiding (handleRuntimeError)
 import           BlockApps.Bloc22.Server
 import           BlockApps.Init
-import           Blockchain.DB.SQLDB             hiding (createPostgresqlPool)
-import           Blockchain.EthConf
 
 import           Control.Monad.Composable.CoreAPI hiding (httpManager)
-import           Control.Monad.Composable.SQL    hiding (runSQLM, SQLM)
+import           Control.Monad.Composable.SQL    hiding (SQLM)
 import           Control.Monad.Composable.Vault  hiding (httpManager)
 
 import           Text.Tools
@@ -133,8 +130,8 @@ instance (Monad m, Accessible a m, MonadTrans t) => Accessible a (t m) where
   access p = lift (access p)
 
 
-hoistCoreServer :: ConnectionPool -> Server FullAPI
-hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
+hoistCoreServer :: Server FullAPI
+hoistCoreServer = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
   where
     convertErrors r x = Handler $ do
       y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
@@ -142,7 +139,7 @@ hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM)
         Right a -> pure a
         Left e -> throwE $ apiErrorToServantErr e
     runM = runLoggingT .
-           flip runReaderT (SQLDB pool) .
+           runSQLM .
            flip runReaderT BlocEnv{
                             deployMode = error "deployMode undefined",
                             stateFetchLimit = error "stateFetchLimit undefined",
@@ -169,18 +166,17 @@ main = do
 
   --print theDoc
   blockappsInit "core-api"
-  pool <- runNoLoggingT $ createPostgresqlPool connStr 20
-  run 3001 $ app pool theDoc
+  run 3001 $ app theDoc
 
-app :: ConnectionPool -> Swagger -> Application
-app pool theDoc = 
+app :: Swagger -> Application
+app theDoc = 
   prometheus def{prometheusInstrumentApp = False}
   $ instrumentApp "core-api"
   $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
 --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
   $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw))
-  $ hoistCoreServer pool :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404
+  $ hoistCoreServer :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404
 
 
 

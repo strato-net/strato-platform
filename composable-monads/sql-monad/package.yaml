@@ -6,9 +6,11 @@ dependencies:
 
 library:
   source-dirs: src
-  dependencies:
+  dependencies: 
   - blockapps-data
+  - monad-logger
   - mtl
-  - persistent
-  - postgresql-simple
-  - resource-pool
+  - strato-conf
+  - unliftio-core
+  
+  

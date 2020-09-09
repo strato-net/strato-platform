@@ -4,20 +4,20 @@
 module           Control.Monad.Composable.SQL where
 
 
+import           Control.Monad.IO.Unlift
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 
 import           Blockchain.DB.SQLDB
 
+import           Blockchain.EthConf
 
-
-newtype SQLData = SQLData Int deriving (Show)
-
-type SQLM = ReaderT SQLData
+type SQLM = ReaderT SQLDB
 
 type HasSQL m = HasSQLDB m
 
-runSQLM :: SQLM m a -> m a
+runSQLM :: MonadUnliftIO m => SQLM m a -> m a
 runSQLM f = do
-  let x = 1
-  runReaderT f $ SQLData x
+  pool <- runNoLoggingT $ createPostgresqlPool connStr 20
+  runReaderT f pool
 
