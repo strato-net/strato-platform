@@ -20,9 +20,9 @@ import           Servant.Swagger
 import           BlockApps.Bloc22.API
 --import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Chain
---import           BlockApps.Bloc22.Server.Contracts
+import           BlockApps.Bloc22.Server.Contracts
 --import           BlockApps.Bloc22.Server.Transaction
---import           BlockApps.Bloc22.Server.Users
+import           BlockApps.Bloc22.Server.Users
 
 import Control.Monad.Change.Alter
 import Control.Monad.Logger
@@ -37,25 +37,24 @@ import Control.Monad.Composable.BlocSQL
 bloc :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m,
          Selectable ChainId ChainInfo m) =>
         ServerT BlocAPI m
---bloc :: (MonadIO m, MonadLogger m, Selectable ChainId ChainInfo m) => ServerT BlocAPI m
 bloc = return gitInfo
 --  :<|> postUsersFill
---  :<|> getContracts
---  :<|> postContractsBatchStates
---  :<|> getContractsData
---  :<|> getContractsContract
---  :<|> getContractsState
---  :<|> getContractsDetails
---  :<|> getContractsFunctions
---  :<|> getContractsSymbols
---  :<|> getContractsStateMapping
---  :<|> getContractsStates
---  :<|> getContractsEnum
---  :<|> postContractsCompile
---  :<|> postContractsXabi
---  :<|> getBlocTransactionResult
---  :<|> postBlocTransactionResults
---  :<|> postChainInfo
+  :<|> getContracts
+  :<|> postContractsBatchStates
+  :<|> getContractsData
+  :<|> getContractsContract
+  :<|> getContractsState
+  :<|> getContractsDetails
+  :<|> getContractsFunctions
+  :<|> getContractsSymbols
+  :<|> getContractsStateMapping
+  :<|> getContractsStates
+  :<|> getContractsEnum
+  :<|> postContractsCompile
+  :<|> postContractsXabi
+  :<|> getBlocTransactionResult
+  :<|> postBlocTransactionResults
+  :<|> postChainInfo
   :<|> getChainInfo
   :<|> postChainInfos
 --  :<|> postBlocTransactionParallel
