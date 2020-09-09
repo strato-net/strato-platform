@@ -1,4 +1,5 @@
 import path from 'path'
+import { Keccak } from 'sha3'
 
 /**
  * This is the util interface
@@ -45,6 +46,11 @@ function isHash(hash) {
 
 /**
  * Checks if the given string is a checksummed address
+ * @example
+ * const result = isChecksumAddress('0x2AE66CDc592e10B60f9097a7b0D3C59fce29876');
+ * console.log(result);
+ * // Returns
+ * // true
  * @method isChecksumAddress
  * @param {String} address the given HEX adress
  * @return {Boolean}
@@ -52,7 +58,9 @@ function isHash(hash) {
 function isChecksumAddress(_address) {
   // Check each case
   const address = _address.replace('0x', '')
-  const addressHash = sha3(address.toLowerCase())
+  const addressHash = Keccak(256);
+  addressHash.update(address.toLowerCase());
+  addressHash.digest('hex');
   for (let i = 0; i < 40; i++) {
     // the nth letter should be uppercase if the nth digit of casemap is 1
     if ((parseInt(addressHash[i], 16) > 7 && address[i].toUpperCase() !== address[i]) || (parseInt(addressHash[i], 16) <= 7 && address[i].toLowerCase() !== address[i])) {
@@ -73,10 +81,6 @@ function isChecksumAddress(_address) {
  */
 function iuid() {
   return this.uid(undefined, 12);
-}
-
-function sha3(address) {
-  throw new Error('sha3 not found')
 }
 
 /**
@@ -204,12 +208,39 @@ function timeout(ms) {
 }
 
 /**
- * Check for intersection
+ * Check for intersection.
+ * @example
+ * const listA = [
+ *   {
+ *     accountAddress: 'testAddress1',
+ *     username: 'user1'
+ *   },
+ *   {
+ *     accountAddress: 'testAddress2',
+ *     username: 'user2'
+ *   },
+ *   {
+ *     accountAddress: 'testAddress3',
+ *     username: 'user3'
+ *   },
+ * ]
+ * const listB = [
+ *   {
+ *     username: 'user2'
+ *   }
+ * ]
+ * const comparator = function (a, b) { return a.username == b.username; };
+ * const result = util.filter_isContained(listA, listB, comparator);
+ * console.log(result);
+ * // Returns - An array of elements found in Set A that were not included in Set B
+ * // [ { accountAddress: 'testAddress1', username: 'user1' },
+ * // { accountAddress: 'testAddress3', username: 'user3' } ]
  * @method filter_isContained
- * @param {*} setA A list
- * @param {*} setB Another list
+ * @param {Array} setA A list
+ * @param {Array} setB Another list
  * @param {*} comparator Comparator to compare elements of setA and setB
  * @param {*} isDebug Debug mode
+ * @return {Array}
  */
 // TODO: pass options instead of isDebug
  function filter_isContained(setA, setB, comparator, isDebug) {
