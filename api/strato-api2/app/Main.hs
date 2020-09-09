@@ -144,7 +144,6 @@ hoistCoreServer pool = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM)
                             urlStrato = error "urlStrato undefined",
                             urlVaultWrapper = error "urlVaultWrapper undefined",
                             httpManager = error "httpManager undefined",
-                            dbPool = error "dbPool undefined",
                             deployMode = error "deployMode undefined",
                             stateFetchLimit = error "stateFetchLimit undefined",
                             globalNonceCounter = error "globalNonceCounter undefined",

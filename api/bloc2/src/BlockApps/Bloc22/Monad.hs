@@ -27,7 +27,7 @@ import qualified Data.HashMap.Lazy                  as HashMap
 import           Data.Int                           (Int32)
 import           Data.Map.Strict                    (Map)
 import           Data.Maybe                         (fromMaybe)
-import           Data.Pool (Pool, withResource)
+import           Data.Pool                          (withResource)
 import           Data.Profunctor.Product.Default
 import           Data.Text                          (Text)
 import qualified Data.Text                          as Text
@@ -96,7 +96,6 @@ data BlocEnv = BlocEnv
   { urlStrato          :: BaseUrl
   , urlVaultWrapper    :: BaseUrl
   , httpManager        :: Manager
-  , dbPool             :: Pool Connection
   , deployMode         :: DeployMode
   , stateFetchLimit    :: Integer
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
