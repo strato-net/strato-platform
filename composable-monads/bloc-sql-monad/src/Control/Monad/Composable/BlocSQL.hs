@@ -1,3 +1,5 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS -fno-warn-deprecations #-}
 
@@ -7,16 +9,16 @@ import           Control.Monad.Reader
 import           Data.Pool (Pool)
 import           Database.PostgreSQL.Simple         (Connection)
 
+import           Control.Monad.Change.Modify
 
-newtype BlocSQLData = BlocSQLData Int deriving (Show)
+newtype BlocSQLData = BlocSQLData (Pool Connection) deriving (Show)
 
 type BlocSQLM = ReaderT BlocSQLData
 
-class HasBlocSQL m where
-  getBlocSQLPool :: m (Pool Connection)
+type HasBlocSQL m = Accessible BlocSQLData m
 
-runSQLM :: BlocSQLM m a -> m a
-runSQLM f = do
-  let x = 1
+runBlocSQLM :: BlocSQLM m a -> m a
+runBlocSQLM f = do
+  let x = undefined
   runReaderT f $ BlocSQLData x
 

@@ -33,7 +33,7 @@ import qualified Data.Text                          as Text
 import           Database.PostgreSQL.Simple         (Connection,
                                                      withTransaction)
 import           GHC.Stack
-import           Network.HTTP.Client                hiding (responseBody)
+import           Network.HTTP.Client                hiding (responseBody, Proxy)
 import           Network.HTTP.Types.Status
 import           Opaleye
 import           Servant
@@ -49,6 +49,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Nonce
 
+import           Control.Monad.Change.Modify        hiding (modify)
 import           Control.Monad.Composable.BlocSQL
 
 data Should a = Don't a | Do a
@@ -62,9 +63,6 @@ class HasBlocEnv m where
 
 instance HasBlocEnv Bloc where
   getBlocEnv = ask
-
-instance HasBlocSQL Bloc where
-  getBlocSQLPool = asks dbPool
   
 dbErrorToUserError :: MonadUnliftIO m => m a -> m a
 dbErrorToUserError = flip catch $ \case
@@ -273,7 +271,7 @@ blocQuery :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y, Has
              Query x -> m [y]
 blocQuery q = do
   traverse_ (logInfoCS callStack . Text.pack) (showSql q)
-  pool <- getBlocSQLPool
+  BlocSQLData pool <- access Proxy
   withResource pool $ liftIO . flip runQuery q
 
 blocQueryMaybe
@@ -300,7 +298,7 @@ blocModify :: (HasCallStack, MonadIO m, MonadBaseControl IO m, HasBlocSQL m, Mon
               (Connection -> IO x) -> m x
 blocModify modify = do
   logInfoCS callStack "Updating the database"
-  pool <- getBlocSQLPool
+  BlocSQLData pool <- access Proxy
   withResource pool (liftIO . modify)
 
 blocModify1 :: (HasCallStack, MonadIO m, MonadBaseControl IO m, HasBlocSQL m, MonadLogger m) =>
@@ -316,7 +314,7 @@ blocModify1 modify = do
 blocTransaction :: (MonadBaseControl IO m, HasBlocSQL m) =>
                    m x -> m x
 blocTransaction bloc = do
-  pool <- getBlocSQLPool
+  BlocSQLData pool <- access Proxy
   withResource pool (\conn -> liftBaseOp_ (withTransaction conn) bloc)
 
 blocStrato :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCallStack) =>
