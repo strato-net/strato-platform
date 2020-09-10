@@ -141,7 +141,6 @@ hoistCoreServer = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) full
     runM = runLoggingT .
            runSQLM .
            flip runReaderT BlocEnv{
-                            deployMode = error "deployMode undefined",
                             stateFetchLimit = error "stateFetchLimit undefined",
                             globalNonceCounter = error "globalNonceCounter undefined",
                             globalSourceCache = error "globalSourceCache undefined",

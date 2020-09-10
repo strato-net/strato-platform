@@ -91,11 +91,8 @@ blocError err = do
       printf "err: %s\nCallstack:%s" (show err) (prettyCallStack callStack)
     throwIO err
 
-data DeployMode = Enterprise | Public deriving (Eq, Enum, Show, Ord)
-
 data BlocEnv = BlocEnv
-  { deployMode         :: DeployMode
-  , stateFetchLimit    :: Integer
+  { stateFetchLimit    :: Integer
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
   , globalSourceCache  :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
   , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
