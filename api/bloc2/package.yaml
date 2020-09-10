@@ -60,6 +60,7 @@ library:
     - relapse
     - resource-pool
     - saltine
+    - secp256k1-haskell
     - servant
     - servant-client
     - servant-server

@@ -18,12 +18,14 @@ import           Control.Monad.Extra
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.State.Lazy
+import qualified Crypto.Secp256k1                  as S
 import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as B
 import qualified Data.ByteString.Base16            as B16
 import qualified Data.ByteString.Char8             as BC
 import qualified Data.ByteString.Lazy              as BL
+import qualified Data.ByteString.Short                  as BSS
 import qualified Data.Cache                        as Cache
 import qualified Data.Cache.Internal               as Cache
 import           Data.Conduit
@@ -41,6 +43,7 @@ import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Time.Clock
+import           Data.Word
 import           Opaleye                           hiding (not, null, index, max)
 import           System.Clock
 import           UnliftIO
@@ -70,6 +73,7 @@ import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin
+import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Address   (formatAddressWithoutColor)
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
@@ -257,7 +261,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
         fromGenesis = \case
           BlocGenesis f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
-
+{-
 callSignature :: (MonadIO m, MonadLogger m, HasVault m) =>
                  Text -> UnsignedTransaction -> m Transaction
 callSignature userName unsigned@UnsignedTransaction{..} = do
@@ -274,6 +278,35 @@ callSignature userName unsigned@UnsignedTransaction{..} = do
     (unHex v)
     (unHex r)
     (unHex s)
+    Nothing
+  -}
+
+-- so we can convert R and S from the signature, and add 27 to V, per
+-- Ethereum protocol (and backwards compatibility)
+getSigVals :: Signature -> (Word256, Word256, Word8)
+getSigVals (Signature (S.CompactRecSig r s v)) =
+  let convert = bytesToWord256 . BSS.fromShort
+  in (convert r, convert s, v + 0x1b)
+ 
+
+  
+callSignature :: (MonadIO m, MonadLogger m, HasVault m) =>
+                 Text -> UnsignedTransaction -> m Transaction
+callSignature userName unsigned@UnsignedTransaction{..} = do
+  let msgHash = rlpHash unsigned
+  sig <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
+  let (r, s, v) = getSigVals sig
+  return $ Transaction
+    unsignedTransactionNonce
+    unsignedTransactionGasPrice
+    unsignedTransactionGasLimit
+    unsignedTransactionTo
+    unsignedTransactionValue
+    unsignedTransactionInitOrData
+    unsignedTransactionChainId
+    v
+    r
+    s
     Nothing
 
 --------------------------
