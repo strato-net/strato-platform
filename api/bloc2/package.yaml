@@ -41,6 +41,7 @@ library:
     - extra
     - filepath
     - format
+    - hashable
     - haskoin-shim
     - http-client
     - http-types

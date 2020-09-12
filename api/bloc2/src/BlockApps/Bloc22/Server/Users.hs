@@ -8,16 +8,16 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
+{-# OPTIONS -fno-warn-unused-top-binds #-}
+
 module BlockApps.Bloc22.Server.Users (
-  TRD(..),
-  forStateT,
-  cacheLookup,
   getBlocTransactionResult,
+  postBlocTransactionResults,
+  getBatchBlocTransactionResult',
   getBlocTransactionResult',
-  postBlocTransactionResults
+  forStateT
   ) where
 
-import           ClassyPrelude                     ((<>), Hashable)
 import           Control.Concurrent
 import           Control.Arrow
 import           Control.Lens                      hiding (from, ix)
@@ -30,7 +30,6 @@ import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
 import           Data.ByteString.Short             (fromShort)
-import qualified Data.Cache                        as Cache
 import           Data.Either
 import           Data.Int                          (Int32)
 import           Data.List                         (sortOn)
@@ -40,7 +39,7 @@ import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
-import           System.Clock
+import           Text.Format
 import           UnliftIO
 
 import           BlockApps.Bloc22.API.Users
@@ -61,7 +60,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
-
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
 
@@ -78,21 +76,6 @@ data BatchState = BatchState
   }
 makeLenses ''BatchState
 
-forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
-forStateT s as = flip evalStateT s . for as
-
-
-
-cacheLookup :: (Eq k, Hashable k)
-            => Cache.Cache k v
-            -> TimeSpec
-            -> k
-            -> STM (Maybe v)
-cacheLookup c t k = Cache.lookupSTM True k c t
-
-
-
-
 
 emptyBatchState :: BatchState
 emptyBatchState = BatchState Map.empty Map.empty
@@ -100,8 +83,8 @@ emptyBatchState = BatchState Map.empty Map.empty
 -- getBlocTransactionResult' will return only one of the results
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
-getBlocTransactionResult' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                              MonadUnliftIO m, HasBlocSQL m, HasBlocEnv m, HasCoreAPI m) =>
+getBlocTransactionResult' :: (MonadIO m, MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m,
+                              HasBlocSQL m, HasCoreAPI m) =>
                              [Keccak256] -> Bool -> m BlocTransactionResult
 getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': no TX hashes"
 getBlocTransactionResult' hashes@(txh:_) resolve =
@@ -115,23 +98,32 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
         [] -> return $ head results
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
-getBlocTransactionResult :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                             HasBlocSQL m, HasBlocEnv m, HasCoreAPI m) =>
+getBlocTransactionResult :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+                             HasCoreAPI m) =>
                             Keccak256 -> Bool -> m BlocTransactionResult
 getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
 
-postBlocTransactionResults :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                               HasBlocSQL m, HasBlocEnv m, HasCoreAPI m) =>
+
+getBatchBlocTransactionResult' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+                                   HasCoreAPI m) =>
+                                  [Keccak256] -> Bool -> m [BlocTransactionResult]
+getBatchBlocTransactionResult' hashes resolve =
+  if resolve
+    then postBlocTransactionResults True hashes
+    else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
+
+postBlocTransactionResults :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+                               HasCoreAPI m) =>
                               Bool -> [Keccak256] -> m [BlocTransactionResult]
 postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
-recurseTRDs :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
+recurseTRDs :: (MonadIO m, MonadLogger m, HasCoreAPI m) =>
                Bool
             -> [Keccak256]
             -> m [TRD]
 recurseTRDs resolve hashes = go 0 (toPending hashes)
   where
-    go :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) => Int -> [TRD] -> m [TRD]
+    go :: (MonadIO m, MonadLogger m, HasCoreAPI m) => Int -> [TRD] -> m [TRD]
     go num list = do
       let his = map (trdHash &&& trdIndex) list
       statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus (map fst his)
@@ -147,7 +139,7 @@ recurseTRDs resolve hashes = go 0 (toPending hashes)
           if num >= 600
             then return pending'
             else do
-              $logDebugLS "recurseTRDs/pending'" $ map trdHash pending'
+              $logDebugLS "recurseTRDs/pending'" $ map (format . trdHash) pending'
               void . liftIO $ threadDelay 100000
               go (num + 1) pending'
       return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
@@ -162,6 +154,10 @@ recurseTRDs resolve hashes = go 0 (toPending hashes)
       if c d p
         then (d : merge ds (p:ps) c)
         else (p : merge (d:ds) ps c)
+
+forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
+forStateT s as = flip evalStateT s . for as
+
 
 evalAndReturn :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
                  [TRD] -> m [BlocTransactionResult]

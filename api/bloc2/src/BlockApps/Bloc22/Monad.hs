@@ -93,6 +93,7 @@ blocError err = do
 
 data BlocEnv = BlocEnv
   { stateFetchLimit    :: Integer
+  , gasOn              :: Bool
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
   , globalSourceCache  :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
   , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)

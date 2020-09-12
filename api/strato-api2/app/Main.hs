@@ -21,7 +21,8 @@ import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8      as BLC
-import qualified Data.HashMap.Strict.InsOrd           as H
+import qualified Data.Cache                      as Cache
+import qualified Data.HashMap.Strict.InsOrd      as H
 import           Data.Proxy
 import           Data.Swagger
 import           HFlags
@@ -35,7 +36,7 @@ import           Servant
 import           Servant.Multipart
 import           Servant.Swagger
 import           Servant.Swagger.UI
-
+import           System.Clock
 
 
 
@@ -138,17 +139,26 @@ hoistCoreServer = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) full
       case y of
         Right a -> pure a
         Left e -> throwE $ apiErrorToServantErr e
-    runM = runLoggingT .
-           runSQLM .
-           flip runReaderT BlocEnv{
-                            stateFetchLimit = error "stateFetchLimit undefined",
-                            globalNonceCounter = error "globalNonceCounter undefined",
-                            globalSourceCache = error "globalSourceCache undefined",
-                            txTBQueue = error "txTBQueue undefined"
+    runM f = do
+      let stateFetchLimit'=100
+          nonceCounterTimeout=10
+          sourceCacheTimeout=60
+          txQueueSize=4096
+      nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
+      sourceCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
+      tbqueue <- newTBQueueIO txQueueSize
+      runLoggingT .
+        runSQLM .
+        flip runReaderT BlocEnv{
+                            gasOn = False,
+                            stateFetchLimit = stateFetchLimit',
+                            globalNonceCounter = nonceCache,
+                            globalSourceCache = sourceCache,
+                            txTBQueue = tbqueue
                             } .
-           runBlocSQLM "postgres" 5432 "postgres" "api" .
-           runVaultM "http://localhost" .
-           runCoreAPIM "http://localhost"
+        runBlocSQLM "postgres" 5432 "postgres" "api" .
+        runVaultM "http://vault-wrapper:8000/strato/v2.3" .
+        runCoreAPIM "http://strato:3000/eth/v1.2" $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
