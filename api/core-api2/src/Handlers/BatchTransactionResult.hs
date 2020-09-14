@@ -11,6 +11,7 @@
 
 module Handlers.BatchTransactionResult
   ( API
+  , postBatchTransactionResult
   , batchTransactionResultClient
   , server
   ) where

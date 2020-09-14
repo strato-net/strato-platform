@@ -20,7 +20,6 @@ module BlockApps.Bloc22.Server.Utils
 import           Control.Concurrent               (threadDelay)
 import           Control.Monad                    (forM, unless, when)
 import           Control.Monad.IO.Class           (liftIO)
-import           Control.Monad.Logger
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.Map.Strict                  as M
 import           Data.Maybe
@@ -34,7 +33,7 @@ import           BlockApps.Bloc22.Monad
 import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Keccak256
 
-import           Control.Monad.Composable.CoreAPI
+import           Control.Monad.Composable.SQL
 
 import           Handlers.BatchTransactionResult
 
@@ -43,9 +42,9 @@ import           UnliftIO
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
 
-maybeTxBatchResult :: (MonadIO m, MonadLogger m, HasCoreAPI m) =>
+maybeTxBatchResult :: HasSQL m =>
                       [Keccak256] -> m [Maybe TransactionResult]
-maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (batchTransactionResultClient hashes))
+maybeTxBatchResult hashes = maybeHeads <$> postBatchTransactionResult hashes
   where maybeHeads btxr =
           let list = map (flip M.lookup btxr) hashes
           in flip map list $ \mtrs -> case mtrs of
@@ -53,7 +52,7 @@ maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (batchTransactionResultCl
             Just trs -> listToMaybe trs
 
 
-getBatchBlocTxStatus :: (MonadIO m, MonadLogger m, HasCoreAPI m) =>
+getBatchBlocTxStatus :: HasSQL m =>
                         [Keccak256] -> m [(BlocTransactionStatus, Maybe TransactionResult)]
 getBatchBlocTxStatus hashes = do
   mtxrs <- maybeTxBatchResult hashes

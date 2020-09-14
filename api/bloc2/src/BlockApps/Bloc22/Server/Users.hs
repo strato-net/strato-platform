@@ -61,7 +61,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Composable.BlocSQL
-import           Control.Monad.Composable.CoreAPI
+import           Control.Monad.Composable.SQL
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
@@ -84,7 +84,7 @@ emptyBatchState = BatchState Map.empty Map.empty
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' :: (MonadIO m, MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m,
-                              HasBlocSQL m, HasCoreAPI m) =>
+                              HasBlocSQL m, HasSQL m) =>
                              [Keccak256] -> Bool -> m BlocTransactionResult
 getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': no TX hashes"
 getBlocTransactionResult' hashes@(txh:_) resolve =
@@ -98,14 +98,13 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
         [] -> return $ head results
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
-getBlocTransactionResult :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
-                             HasCoreAPI m) =>
+getBlocTransactionResult :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasSQL m) =>
                             Keccak256 -> Bool -> m BlocTransactionResult
 getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
 
 
 getBatchBlocTransactionResult' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
-                                   HasCoreAPI m) =>
+                                   HasSQL m) =>
                                   [Keccak256] -> Bool -> m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
   if resolve
@@ -113,17 +112,18 @@ getBatchBlocTransactionResult' hashes resolve =
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
-                               HasCoreAPI m) =>
+                               HasSQL m) =>
+
                               Bool -> [Keccak256] -> m [BlocTransactionResult]
 postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
-recurseTRDs :: (MonadIO m, MonadLogger m, HasCoreAPI m) =>
+recurseTRDs :: (MonadLogger m, HasSQL m) =>
                Bool
             -> [Keccak256]
             -> m [TRD]
 recurseTRDs resolve hashes = go 0 (toPending hashes)
   where
-    go :: (MonadIO m, MonadLogger m, HasCoreAPI m) => Int -> [TRD] -> m [TRD]
+    go :: (MonadLogger m, HasSQL m) => Int -> [TRD] -> m [TRD]
     go num list = do
       let his = map (trdHash &&& trdIndex) list
       statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus (map fst his)
