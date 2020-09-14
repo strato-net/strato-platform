@@ -321,7 +321,7 @@ postUsersSend' cacheNonce TransferParameters{..} userName = do
         (Wei (fromIntegral $ unStrung value))
         ByteString.empty
         chainId
-    txHash <- blocStrato $ postTx tx
+    txHash <- postTransaction tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
       ( Nothing
       , constant txHash
@@ -356,7 +356,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
       (bin <> argsBin)
       chainId
   $logDebugLS "postUsersContractEVM'/tx" tx
-  txHash <- blocStrato $ postTx tx
+  txHash <- postTransaction tx
   $logInfoLS "postUsersContractEVM'/hash" txHash
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
@@ -392,7 +392,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       (BC.pack $ Text.unpack src)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
-  txHash <- blocStrato $ postTx tx
+  txHash <- postTransaction tx
   $logInfoLS "postUsersContractSolidVM'/hash" txHash
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
     ( Nothing
@@ -450,7 +450,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
       return ((name,cmId),tx)
   let
     txs = map snd namesCmIdsTxs
-  hashes <- blocStrato (postTxList txs)
+  hashes <- postTransactionList txs
   void . blocModify $ \conn -> runInsertMany conn hashNameTable
     [( Nothing
     , constant txHash
@@ -509,7 +509,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
       return ((name,cmId),tx)
   let
     txs = map snd namesCmIdsTxs
-  hashes <- blocStrato (postTxList txs)
+  hashes <- postTransactionList txs
   void . blocModify $ \conn -> runInsertMany conn hashNameTable
     [( Nothing
     , constant txHash
@@ -538,7 +538,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} userName = do
               cid
         signAndPrepare userName fromAddr md header
     ) txsWithParams
-  hashes <- blocStrato $ postTxList txs''
+  hashes <- postTransactionList txs''
   void . blocModify $ \conn -> runInsertMany conn hashNameTable
     [( Nothing
     , constant txHash
@@ -598,7 +598,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
           return (tx,mapKey,methodcallMethodName)
       let finalTxs = [tx | (tx,_,_) <- txsCmIdsFuncNames]
       mapM_ ($logDebugLS "postUsersContractMethodList'/txs") finalTxs
-      hashes <- blocStrato $ postTxList finalTxs
+      hashes <- postTransactionList finalTxs
       mapM_ ($logInfoLS "postUsersContractMethodList'/hashes") hashes
       void . blocModify $ \conn -> runInsertMany conn hashNameTable
         [( Nothing
@@ -655,7 +655,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
         ((sel::ByteString) <> (argsBin::ByteString))
         chainId
     $logDebugLS "postUsersContractMethod'/tx" tx
-    txHash <- blocStrato $ postTx tx
+    txHash <- postTransaction tx
     $logInfoLS "postUsersContractMethod'/hash" txHash
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
       ( Nothing

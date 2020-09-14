@@ -20,6 +20,8 @@ module Handlers.Transaction
   , getTxsFilter
   , postTx
   , postTxList
+  , postTransaction
+  , postTransactionList
   , server
   ) where
 
@@ -127,9 +129,7 @@ getTxsFilter :<|> postTx :<|> postTxList =
       qtChainIds qtSortby
 
 server :: (MonadLogger m, HasSQL m) => ServerT API m
-server = getTransaction :<|> postTransactionC :<|> postTransactionListC
-  where postTransactionC rt      = runConduit $ postTransaction rt `fuseUpstream` emitKafkaTransactions
-        postTransactionListC rts = runConduit $ postTransactionList rts `fuseUpstream` emitKafkaTransactions
+server = getTransaction :<|> postTransaction :<|> postTransactionList
 
 ---------------------------
 
@@ -206,20 +206,23 @@ instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
 
     return . Just $ nub txs
 
-postTransaction :: (MonadIO m, MonadLogger m) => RawTransaction' -> ConduitT a IngestEvent m Keccak256
-postTransaction (RawTransaction' raw "") = do
+postTransactionC :: (MonadIO m, MonadLogger m) => RawTransaction' -> ConduitT a IngestEvent m Keccak256
+postTransactionC (RawTransaction' raw "") = do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
   ts <- liftIO getCurrentMicrotime
   yield . IETx ts $ IngestTx API tx'
   $logInfoS "postTransaction" . T.pack $ "Successfully inserted tx: " ++ format h
   return h
-postTransaction _ =
+postTransactionC _ =
   throwIO $ DeprecatedError "The 'next' parameter is no longer supported"
 
+postTransaction :: (MonadIO m, MonadLogger m) =>
+                   RawTransaction' -> m Keccak256
+postTransaction rt      = runConduit $ postTransactionC rt `fuseUpstream` emitKafkaTransactions
 
-postTransactionList :: (MonadIO m, MonadLogger m) => [RawTransaction'] -> ConduitT a IngestEvent m [Keccak256]
-postTransactionList raws = do
+postTransactionListC :: (MonadIO m, MonadLogger m) => [RawTransaction'] -> ConduitT a IngestEvent m [Keccak256]
+postTransactionListC raws = do
   handlerStart <- liftIO $ getTime Realtime
 
   parserStart <- liftIO $ getTime Realtime
@@ -248,6 +251,12 @@ postTransactionList raws = do
     success (a, _) =
       case a of String _ -> True
                 _        -> False
+
+postTransactionList :: (MonadIO m, MonadLogger m) =>
+                       [RawTransaction'] -> m [Keccak256]
+postTransactionList rts = runConduit $ postTransactionListC rts `fuseUpstream` emitKafkaTransactions
+
+
 
 getTransaction :: Selectable TxsFilterParams [RawTransaction] m
                => Maybe Address -> Maybe Address -> Maybe Address -> Maybe Keccak256
