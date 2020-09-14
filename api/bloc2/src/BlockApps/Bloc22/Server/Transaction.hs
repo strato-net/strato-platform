@@ -105,8 +105,7 @@ mergeTxParams (Just inner) (Just outer) = Just $
            (txparamsNonce inner <|> txparamsNonce outer)
 mergeTxParams inner outer = inner <|> outer
 
-txWorker :: (MonadUnliftIO m, MonadLogger m,
-             HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
+txWorker :: (MonadLogger m, HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
             m ()
 txWorker = forever $ do
   tbqueue <- fmap txTBQueue getBlocEnv
@@ -117,7 +116,7 @@ txWorker = forever $ do
   where processTxs = awaitForever $ \(a,b,r,c) ->
           lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
 
-postBlocTransactionParallel :: (MonadUnliftIO m, MonadLogger m,
+postBlocTransactionParallel :: (MonadLogger m,
                                 HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                                Maybe Text
                             -> Maybe ChainId
@@ -133,7 +132,7 @@ postBlocTransactionParallel a b resolve queue c =
       pure [] 
     else postBlocTransaction' (Do CacheNonce) a b resolve c
 
-postBlocTransaction :: (MonadUnliftIO m, MonadLogger m,
+postBlocTransaction :: (MonadLogger m,
                         HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                        Maybe Text
                     -> Maybe ChainId
@@ -142,7 +141,7 @@ postBlocTransaction :: (MonadUnliftIO m, MonadLogger m,
                     -> m [BlocChainOrTransactionResult]
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
-postBlocTransaction' :: (MonadIO m, MonadUnliftIO m, MonadLogger m,
+postBlocTransaction' :: (MonadLogger m,
                          HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                         Should CacheNonce
                      -> Maybe Text

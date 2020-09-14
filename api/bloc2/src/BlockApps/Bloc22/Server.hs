@@ -10,8 +10,6 @@ module BlockApps.Bloc22.Server where
 
 import           Control.Lens             ((&), (.~), (?~), over, makeLenses)
 import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
---import           Control.Monad.Logger
 import           Data.HashMap.Strict.InsOrd
 import           Data.Proxy
 import           Data.Swagger
@@ -19,7 +17,6 @@ import           Servant
 import           Servant.Swagger
 
 import           BlockApps.Bloc22.API
---import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Chain
 import           BlockApps.Bloc22.Server.Contracts
 import           BlockApps.Bloc22.Server.Transaction
@@ -37,7 +34,7 @@ import Control.Monad.Composable.CoreAPI
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 
-bloc :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasBlocSQL m,
+bloc :: (MonadIO m, MonadLogger m, HasBlocSQL m,
          HasBlocEnv m, HasVault m, HasCoreAPI m, HasSQL m, Selectable ChainId ChainInfo m) =>
         ServerT BlocAPI m
 bloc = return gitInfo
