@@ -90,6 +90,7 @@ import           Blockchain.Strato.Model.Wei
 
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
+import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Vault
 
 import           Handlers.AccountInfo
@@ -106,7 +107,7 @@ mergeTxParams (Just inner) (Just outer) = Just $
 mergeTxParams inner outer = inner <|> outer
 
 txWorker :: (MonadIO m, MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m,
-             HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m) =>
+             HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
             m ()
 txWorker = forever $ do
   tbqueue <- fmap txTBQueue getBlocEnv
@@ -118,7 +119,7 @@ txWorker = forever $ do
           lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
 
 postBlocTransactionParallel :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m, MonadLogger m,
-                                HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m) =>
+                                HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                                Maybe Text
                             -> Maybe ChainId
                             -> Bool -- resolve
@@ -134,7 +135,7 @@ postBlocTransactionParallel a b resolve queue c =
     else postBlocTransaction' (Do CacheNonce) a b resolve c
 
 postBlocTransaction :: (MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m,
-                        HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m) =>
+                        HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                        Maybe Text
                     -> Maybe ChainId
                     -> Bool
@@ -143,7 +144,7 @@ postBlocTransaction :: (MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m,
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransaction' :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m, MonadLogger m,
-                         HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m) =>
+                         HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                         Should CacheNonce
                      -> Maybe Text
                      -> Maybe ChainId

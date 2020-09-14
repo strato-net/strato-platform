@@ -35,6 +35,7 @@ import qualified Data.Set                    as S
 import qualified Data.Text                   as T
 import qualified GHC.Generics                as GHCG
 import           Network.Socket.Internal
+import           Text.Regex
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
@@ -81,7 +82,10 @@ instance RLPSerializable Enode where
   rlpDecode _ = error "error in rlpDecode for Enode type: bad RLPObject"
 
 instance FromJSON Enode where
-  parseJSON (String str) = return (readEnode $ T.unpack str)
+  parseJSON (String str) =
+    case readEnodeOrFail $ T.unpack str of
+      Left e -> fail e
+      Right val -> return val
   parseJSON x = error $ "could not parse JSON for Enode: " ++ show x
 
 instance ToJSON Enode where
@@ -124,26 +128,28 @@ showEnode (Enode (OrgId pk) ip tp up) =
 
 readEnode :: String -> Enode
 readEnode input =
-    let suffix = dropWhile (/='/') input
-        pksuffix = dropWhile (=='/') suffix
-        (pk, temp) = break (=='@') pksuffix
-        ipsuffix = dropWhile (=='@') temp
-        (ip, temp2) = break (==':') ipsuffix
-        tcpsuffix = dropWhile (==':') temp2
-        (tcp, temp3) = break (=='?') tcpsuffix
-        udpsuffix = dropWhile (/='=') temp3
-        udp = dropWhile (=='=') udpsuffix
-        up =
-          case udp of
-            [] -> Nothing
-            _ -> Just (read udp)
-     in (Enode (OrgId . fst $ B16.decode (C8.pack pk)) (readIP ip) (read tcp) up)
-
+  case readEnodeOrFail input of
+    Left e -> error e
+    Right val -> val
+  
+readEnodeOrFail :: String -> Either String Enode
+readEnodeOrFail input =
+  case matchRegex (mkRegex "^enode://([0-9a-f]{128})@([^:]+)\\:([0-9]+)(\\?discport=([0-9]+))?$") input of
+    Nothing -> Left $ "enode is in the wrong format: " ++ input
+    Just [pubkey, ip, port, _, discport] ->
+      Right $ Enode (OrgId . fst $ B16.decode (C8.pack pubkey)) (readIP ip) (read port) $
+                    case discport of
+                      "" -> Nothing
+                      _ -> Just $ read discport
+    _ -> error "internal error in 'readEnodeOrFail': regex returned with wrong number of matches"
 
 instance PersistFieldSql Enode where
   sqlType _ = SqlString
 
 instance PersistField Enode where
   toPersistValue = PersistText . T.pack . showEnode
-  fromPersistValue (PersistText t) = return . readEnode $ T.unpack t
+  fromPersistValue (PersistText t) =
+    case readEnodeOrFail $ T.unpack t of
+      Left e -> fail e
+      Right val -> return val
   fromPersistValue x = Left . T.pack $ "PersistField Enode: expected PersistText: " ++ show x

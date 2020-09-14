@@ -47,10 +47,12 @@ import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
+import           Control.Monad.Composable.SQL
 import           Handlers.Chain
 
 import           UnliftIO
 
+import qualified Handlers.Chain as CORE
 
 governanceAddress :: Address
 governanceAddress = Address 0x100
@@ -129,40 +131,40 @@ creationBlockHash :: Keccak256
 creationBlockHash = fromJust $
   stringKeccak256 "0000000000000000000000000000000000000000000000000000000000000000"
 
-postChainInfo :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
-                  HasBlocEnv m, HasCoreAPI m) =>
+postChainInfo :: (MonadIO m, MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+                  HasBlocEnv m, HasSQL m) =>
                  ChainInput -> m ChainId
 postChainInfo chainInput = do
-  (mCmId, chainInfo) <- createChainInfo chainInput
-  chainId <- blocStrato $ postChainClient chainInfo
+  (mCmId, chainInfo') <- createChainInfo chainInput
+  chainId <- CORE.postChain chainInfo'
   let isAsync = fromMaybe False $ chaininputAsync chainInput
-  unless isAsync $ undefined chainId -- TODO- put waitForChainInfos back in here
---  unless isAsync $ waitForChainInfo chainId
+  unless isAsync $ waitForChainInfo chainId
   for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
-postChainInfos :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
-                   HasBlocEnv m, HasCoreAPI m) =>
+postChainInfos :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m, MonadLogger m, HasBlocSQL m,
+                   HasSQL m, HasBlocEnv m, HasCoreAPI m) =>
                   [ChainInput] -> m [ChainId]
 postChainInfos chainInputs = do
   chainInfos <- traverse createChainInfo chainInputs
   chainIds <- blocStrato . postChainsClient $ map snd chainInfos
   let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
       asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
-  unless (null asyncChains) $ undefined asyncChains -- TODO- put waitForChainInfos back in here
---  unless (null asyncChains) $ waitForChainInfos asyncChains
+  unless (null asyncChains) $ waitForChainInfos asyncChains
   let cmIdChains = catMaybes $ zipWith (liftA2 (,)) (map fst chainInfos) (map Just chainIds)
   for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainIds
 
-waitForChainInfo :: (MonadIO m, MonadLogger m, Selectable ChainId ChainInfo m) =>
+waitForChainInfo :: (MonadLogger m, Selectable ChainId ChainInfo m,
+                     HasSQL m) =>
                     ChainId -> m ()
 waitForChainInfo chainId = waitForChainInfos [chainId]
 
-waitForChainInfos :: (MonadIO m, MonadLogger m, Selectable ChainId ChainInfo m) =>
+waitForChainInfos :: (MonadUnliftIO m, MonadLogger m, Selectable ChainId ChainInfo m,
+                      HasSQL m) =>
                      [ChainId] -> m ()
 waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
-  where go :: (MonadLogger m, Selectable ChainId ChainInfo m) => m Bool
+  where go :: (MonadUnliftIO m, MonadLogger m, Selectable ChainId ChainInfo m) => m Bool
         go = do
           infos <- getChainInfo chainIds
           $logInfoLS "waitForChainInfo/req" chainIds
@@ -170,7 +172,7 @@ waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
           return $ length infos == length chainIds
 
 
-getChainInfo :: Selectable ChainId ChainInfo m =>
+getChainInfo :: (Selectable ChainId ChainInfo m) =>
                 [ChainId] -> m [ChainIdChainOutput]
 getChainInfo chainIds = do
   chainIdChainInfos <- getChain chainIds
