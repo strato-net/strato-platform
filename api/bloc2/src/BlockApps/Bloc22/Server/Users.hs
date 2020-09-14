@@ -82,8 +82,7 @@ emptyBatchState = BatchState Map.empty Map.empty
 -- getBlocTransactionResult' will return only one of the results
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
-getBlocTransactionResult' :: (MonadIO m, MonadUnliftIO m, MonadLogger m,
-                              HasBlocSQL m, HasSQL m) =>
+getBlocTransactionResult' :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasSQL m) =>
                              [Keccak256] -> Bool -> m BlocTransactionResult
 getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': no TX hashes"
 getBlocTransactionResult' hashes@(txh:_) resolve =
