@@ -130,7 +130,7 @@ creationBlockHash :: Keccak256
 creationBlockHash = fromJust $
   stringKeccak256 "0000000000000000000000000000000000000000000000000000000000000000"
 
-postChainInfo :: (MonadIO m, MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+postChainInfo :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
                   HasBlocEnv m, HasSQL m) =>
                  ChainInput -> m ChainId
 postChainInfo chainInput = do
@@ -141,7 +141,7 @@ postChainInfo chainInput = do
   for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
-postChainInfos :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m, MonadLogger m, HasBlocSQL m,
+postChainInfos :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
                    HasSQL m, HasBlocEnv m) =>
                   [ChainInput] -> m [ChainId]
 postChainInfos chainInputs = do
@@ -159,11 +159,11 @@ waitForChainInfo :: (MonadLogger m, Selectable ChainId ChainInfo m,
                     ChainId -> m ()
 waitForChainInfo chainId = waitForChainInfos [chainId]
 
-waitForChainInfos :: (MonadUnliftIO m, MonadLogger m, Selectable ChainId ChainInfo m,
+waitForChainInfos :: (MonadLogger m, Selectable ChainId ChainInfo m,
                       HasSQL m) =>
                      [ChainId] -> m ()
 waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
-  where go :: (MonadUnliftIO m, MonadLogger m, Selectable ChainId ChainInfo m) => m Bool
+  where go :: (MonadLogger m, Selectable ChainId ChainInfo m) => m Bool
         go = do
           infos <- getChainInfo chainIds
           $logInfoLS "waitForChainInfo/req" chainIds
