@@ -46,7 +46,6 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
-import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
 import           Handlers.Chain
 
@@ -143,11 +142,11 @@ postChainInfo chainInput = do
   return chainId
 
 postChainInfos :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m, MonadLogger m, HasBlocSQL m,
-                   HasSQL m, HasBlocEnv m, HasCoreAPI m) =>
+                   HasSQL m, HasBlocEnv m) =>
                   [ChainInput] -> m [ChainId]
 postChainInfos chainInputs = do
   chainInfos <- traverse createChainInfo chainInputs
-  chainIds <- blocStrato . postChainsClient $ map snd chainInfos
+  chainIds <- postChains $ map snd chainInfos
   let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
       asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
   unless (null asyncChains) $ waitForChainInfos asyncChains
