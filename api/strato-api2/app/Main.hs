@@ -16,7 +16,6 @@ module Main where
 import           Blockchain.Output
 import           Control.Lens.Operators
 import           Control.Monad.Reader            (MonadTrans, lift)
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
@@ -117,8 +116,7 @@ coreServer = Account.server
   :<|> UUID.server
   :<|> Version.server
 
-fullServer :: (MonadBaseControl IO m, MonadLogger m, HasSQL m, HasBlocSQL m, HasBlocEnv m,
-               HasVault m, HasCoreAPI m) =>
+fullServer :: (MonadLogger m, HasSQL m, HasBlocSQL m, HasBlocEnv m, HasVault m, HasCoreAPI m) =>
               ServerT FullAPI m
 fullServer = coreServer :<|> bloc
 

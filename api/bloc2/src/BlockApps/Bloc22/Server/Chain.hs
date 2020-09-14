@@ -14,7 +14,6 @@ module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Applicative               (liftA2)
 import           Control.Monad                     (when, unless)
-import           Control.Monad.Trans.Control
 import           Crypto.Random.Entropy
 import qualified Data.ByteString.Base16            as B16
 import           Data.Foldable                     (for_)
@@ -72,7 +71,7 @@ replaceMembers Struct{..} addrs m =
           TypeArrayDynamic (SimpleType TypeAddress) -> m'
           _ -> m
 
-createChainInfo :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
+createChainInfo :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
                    ChainInput -> m (Maybe Int32, ChainInfo)
 createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
@@ -130,7 +129,7 @@ creationBlockHash :: Keccak256
 creationBlockHash = fromJust $
   stringKeccak256 "0000000000000000000000000000000000000000000000000000000000000000"
 
-postChainInfo :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+postChainInfo :: (MonadIO m, MonadLogger m, HasBlocSQL m,
                   HasBlocEnv m, HasSQL m) =>
                  ChainInput -> m ChainId
 postChainInfo chainInput = do
@@ -141,7 +140,7 @@ postChainInfo chainInput = do
   for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
   return chainId
 
-postChainInfos :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+postChainInfos :: (MonadIO m, MonadLogger m, HasBlocSQL m,
                    HasSQL m, HasBlocEnv m) =>
                   [ChainInput] -> m [ChainId]
 postChainInfos chainInputs = do

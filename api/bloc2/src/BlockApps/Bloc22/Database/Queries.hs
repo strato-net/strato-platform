@@ -13,7 +13,6 @@ module BlockApps.Bloc22.Database.Queries where
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Control
 import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
@@ -397,11 +396,11 @@ getContractsDataNamesQuery contractName =
       restrict -< name .== constant contractName
       returnA -< constant ("Latest"::Text)
 
-getContractsMetaDataId :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+getContractsMetaDataId :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                           Text -> Address -> Maybe ChainId -> m (Maybe Int32)
 getContractsMetaDataId name contractId = fmap (fmap fst) . getContractDetailsAndMetadataId (ContractName name) contractId
 
-getContractDetailsByAddressOnly :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+getContractDetailsByAddressOnly :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                                    Address -> Maybe ChainId -> m (Maybe ContractDetails)
 getContractDetailsByAddressOnly contractAddr chainId = do
   mName <- fmap listToMaybe . blocQuery $ contractNameFromAddress contractAddr chainId
@@ -571,7 +570,7 @@ decodeXabiJSON xabi' = case decode (fromStrict xabi') of
   Nothing -> throwIO $ DBError "Corrupted Xabi stored in database"
   Just x -> return x
 
-getContractDetailsByMetadataId :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+getContractDetailsByMetadataId :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                                   Int32 -> Address -> Maybe ChainId -> m ContractDetails
 getContractDetailsByMetadataId cmId addr chainId = do
   (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src,_ :: Int32,xabi') <-
@@ -588,11 +587,11 @@ getContractDetailsByMetadataId cmId addr chainId = do
     , contractdetailsChainId = chainId
     }
 
-getContractDetails :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+getContractDetails :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                       ContractName -> Address -> Maybe ChainId -> m (Maybe ContractDetails)
 getContractDetails name contractId = fmap (fmap snd) . getContractDetailsAndMetadataId name contractId
 
-getContractDetailsAndMetadataId :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+getContractDetailsAndMetadataId :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                                    ContractName -> Address -> Maybe ChainId -> m (Maybe (Int32, ContractDetails))
 getContractDetailsAndMetadataId (ContractName contractName) addr chainId = do
     let
@@ -617,7 +616,7 @@ getContractDetailsAndMetadataId (ContractName contractName) addr chainId = do
           getContractsContractLatestQuery contractName
         for tuple' $ detailsWith (Just addr) chainId
 
-getContractDetailsByCodeHash :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+getContractDetailsByCodeHash :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                                 CodePtr -> m (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeHash codeHash = do
     mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
@@ -645,7 +644,7 @@ WITH contract_id AS (
  )
 SELECT id FROM contract_id UNION SELECT id FROM new_contract_id;
 -}
-createContractQuery :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+createContractQuery :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                        Text -> m Int32
 createContractQuery contractName = do
   cIds <- blocQuery $ proc () -> do
@@ -658,7 +657,7 @@ createContractQuery contractName = do
       [(Nothing, constant contractName)]
       fst
 
-createContractBatchQuery :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+createContractBatchQuery :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                             [Text] -> m (Map Text Int32)
 createContractBatchQuery names = do
   cidMap <- fmap Map.fromList . blocQuery $ proc () -> do
@@ -672,7 +671,7 @@ createContractBatchQuery names = do
   return $ Map.union newCids cidMap
 
 insertContractSourceQuery
-  :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+  :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
      Text
   -> m (Int32, Keccak256)
 insertContractSourceQuery src = do
@@ -690,7 +689,7 @@ Insert metadata into contract metadata table if metadata table does not contain 
 and xcodehash combination.
 -}
 insertContractMetaDataQuery
-  :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+  :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
      Int32
   -> Text
   -> Text
@@ -714,7 +713,7 @@ insertContractMetaDataQuery
       (\ (contractmetadataId,_,_,_,_,_,_,_) -> contractmetadataId)
 
 insertContractMetaDataBatchQuery
-  :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+  :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
      Keccak256
   -> [(Int32, ContractDetails)]
   -> m (Map Int32 Int32)
@@ -808,7 +807,7 @@ instance Default Constant (Maybe ChainId) (Column PGBytea) where
                 Nothing -> BS.empty
                 Just cid -> word256ToByteString $ unChainId cid
 
-insertContractInstance :: (MonadIO m, MonadBaseControl IO m, HasBlocSQL m, MonadLogger m) =>
+insertContractInstance :: (MonadIO m, HasBlocSQL m, MonadLogger m) =>
                           Int32 -> Address -> Maybe ChainId -> m Int32
 insertContractInstance cmId address chainId = blocModify1 $ \conn -> runInsertManyReturning conn contractsInstanceTable
   [
@@ -828,7 +827,7 @@ evmContractSolidVMError = Text.concat
   , "If you are intending to use EVM, please modify your contracts and try again."
   ]
 
-getContractDetailsForContract :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
+getContractDetailsForContract :: (MonadIO m, MonadLogger m,
                                   HasBlocSQL m, HasBlocEnv m) =>
                                  Text -> Text -> Maybe Text -> m (Maybe (Text, (Int32, ContractDetails)))
 getContractDetailsForContract theVM src mContract = do
@@ -867,7 +866,7 @@ getContractDetailsForContract theVM src mContract = do
             "EVM" -> throwIO $ UserError evmContractSolidVMError
             _ -> pure x
 
-sourceToContractDetails :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+sourceToContractDetails :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                            Should Compile -> Text -> m (Map Text (Int32, ContractDetails))
 sourceToContractDetails shouldCompile source = do
   let createContractDetails =
@@ -891,7 +890,7 @@ sourceToContractDetails shouldCompile source = do
           , contractdetailsChainId = Nothing
           }))
 
-compileContract :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+compileContract :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                    Text -> m (Map Text (Int32, ContractDetails))
 compileContract source = do
   let eVerXabis = parseXabi "-" $ Text.unpack source
@@ -928,7 +927,7 @@ compileContract source = do
   return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
 
 -- SolidVM only
-createMetadataNoCompile :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+createMetadataNoCompile :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                            Text -> m (Map Text (Int32, ContractDetails))
 createMetadataNoCompile source = do
   let eVerXabis = parseXabi "-" $ Text.unpack source
@@ -956,7 +955,7 @@ createMetadataNoCompile source = do
   let cmIdDetails = Map.elems . Map.intersectionWith (,) mdIdMap $ Map.fromList idDetails
   return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
 
-getContractXabiByMetadataId :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
+getContractXabiByMetadataId :: (MonadIO m, MonadLogger m,
                                 HasBlocSQL m, HasCallStack) =>
                                Int32 -> m Xabi
 getContractXabiByMetadataId cmId = do
@@ -964,7 +963,7 @@ getContractXabiByMetadataId cmId = do
   deserializeXabi xabi'
   where ninth (_,_,_,_,_,_,_,_,x) = x
 
-getContractXabi :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+getContractXabi :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                    ContractName -> Address -> Maybe ChainId -> m (Maybe Xabi)
 getContractXabi contractName contractId =
   fmap (fmap contractdetailsXabi) . getContractDetails contractName contractId

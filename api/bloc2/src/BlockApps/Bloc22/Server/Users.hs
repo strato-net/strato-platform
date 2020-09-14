@@ -23,7 +23,6 @@ import           Control.Arrow
 import           Control.Lens                      hiding (from, ix)
 import           Control.Monad
 import           Control.Monad.Except
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.State.Lazy
 import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
@@ -83,7 +82,7 @@ emptyBatchState = BatchState Map.empty Map.empty
 -- getBlocTransactionResult' will return only one of the results
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
-getBlocTransactionResult' :: (MonadIO m, MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m,
+getBlocTransactionResult' :: (MonadIO m, MonadUnliftIO m, MonadLogger m,
                               HasBlocSQL m, HasSQL m) =>
                              [Keccak256] -> Bool -> m BlocTransactionResult
 getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': no TX hashes"
@@ -98,12 +97,12 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
         [] -> return $ head results
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
-getBlocTransactionResult :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m, HasSQL m) =>
+getBlocTransactionResult :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasSQL m) =>
                             Keccak256 -> Bool -> m BlocTransactionResult
 getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
 
 
-getBatchBlocTransactionResult' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+getBatchBlocTransactionResult' :: (MonadIO m, MonadLogger m, HasBlocSQL m,
                                    HasSQL m) =>
                                   [Keccak256] -> Bool -> m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
@@ -111,7 +110,7 @@ getBatchBlocTransactionResult' hashes resolve =
     then postBlocTransactionResults True hashes
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
-postBlocTransactionResults :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m,
+postBlocTransactionResults :: (MonadIO m, MonadLogger m, HasBlocSQL m,
                                HasSQL m) =>
 
                               Bool -> [Keccak256] -> m [BlocTransactionResult]
@@ -159,7 +158,7 @@ forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
 forStateT s as = flip evalStateT s . for as
 
 
-evalAndReturn :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+evalAndReturn :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                  [TRD] -> m [BlocTransactionResult]
 evalAndReturn list = forStateT emptyBatchState list $
     \(TRD status txHash _ mtxr) -> case status of
@@ -173,7 +172,7 @@ evalAndReturn list = forStateT emptyBatchState list $
             2 -> functionResult txHash mtxr cmId tdata
             _ -> throwIO $ InternalError $ Text.pack $ "Unexpected transaction type: got" ++ show ttype
 
-contractResult :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+contractResult :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                   Keccak256
                -> Maybe TransactionResult
                -> Int32
@@ -206,7 +205,7 @@ contractResult txHash mtxr cmId name = do
           contractDetailsMap . at cn <?= cds
       return $ BlocTransactionResult Success txHash mtxr (Just $ Upload details)
 
-functionResult :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+functionResult :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                   Keccak256
                -> Maybe TransactionResult
                -> Int32

@@ -27,7 +27,6 @@ import           BlockApps.Bloc22.Server.Users
 
 import Control.Monad.Change.Alter
 import Control.Monad.Logger
-import Control.Monad.Trans.Control
 
 import BlockApps.Bloc22.Monad
 import Blockchain.Strato.Model.ChainId
@@ -38,7 +37,7 @@ import Control.Monad.Composable.CoreAPI
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 
-bloc :: (MonadIO m, MonadBaseControl IO m, MonadUnliftIO m, MonadLogger m, HasBlocSQL m,
+bloc :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasBlocSQL m,
          HasBlocEnv m, HasVault m, HasCoreAPI m, HasSQL m, Selectable ChainId ChainInfo m) =>
         ServerT BlocAPI m
 bloc = return gitInfo

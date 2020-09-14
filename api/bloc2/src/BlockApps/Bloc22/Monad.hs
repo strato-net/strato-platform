@@ -259,7 +259,7 @@ formatTopLocation [] = "[-]"
 formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
 
 blocQuery :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y, HasBlocSQL m,
-              MonadIO m, MonadBaseControl IO m, MonadLogger m) =>
+              MonadIO m, MonadLogger m) =>
              Query x -> m [y]
 blocQuery q = do
   traverse_ (logInfoCS callStack . Text.pack) (showSql q)
@@ -268,7 +268,7 @@ blocQuery q = do
 
 blocQueryMaybe
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y,
-      MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m)
+      MonadIO m, MonadLogger m, HasBlocSQL m)
   => Query x
   -> m (Maybe y)
 blocQueryMaybe q = blocQuery q >>= \case
@@ -278,7 +278,7 @@ blocQueryMaybe q = blocQuery q >>= \case
 
 blocQuery1
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y,
-      MonadIO m, MonadBaseControl IO m, MonadLogger m, HasBlocSQL m) =>
+      MonadIO m, MonadLogger m, HasBlocSQL m) =>
   Text -> Query x -> m y
 blocQuery1 loc q = blocQuery q >>= \case
     [] -> blocError . DBError . Text.concat $ ["blocQuery1: ", loc, ": No result, expected one row"]
@@ -286,14 +286,14 @@ blocQuery1 loc q = blocQuery q >>= \case
     _:_:_ -> throwIO . DBError . Text.concat $
        ["blocQuery1: ", loc, ": Multiple results, expected one row"]
 
-blocModify :: (HasCallStack, MonadIO m, MonadBaseControl IO m, HasBlocSQL m, MonadLogger m) =>
+blocModify :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
               (Connection -> IO x) -> m x
 blocModify modify = do
   logInfoCS callStack "Updating the database"
   BlocSQLData pool <- access Proxy
   withResource pool (liftIO . modify)
 
-blocModify1 :: (HasCallStack, MonadIO m, MonadBaseControl IO m, HasBlocSQL m, MonadLogger m) =>
+blocModify1 :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
                (Connection -> IO [x]) -> m x
 blocModify1 modify = do
   logInfoCS callStack "Updating the database"
@@ -303,7 +303,7 @@ blocModify1 modify = do
     [y]   -> return y
     _:_:_ -> throwIO $ DBError "Multiple results, expected one row"
 
-blocTransaction :: (MonadBaseControl IO m, HasBlocSQL m) =>
+blocTransaction :: HasBlocSQL m =>
                    m x -> m x
 blocTransaction bloc = do
   BlocSQLData pool <- access Proxy

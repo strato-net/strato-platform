@@ -6,6 +6,7 @@
 module Control.Monad.Composable.BlocSQL where
 
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Control
 import           Data.Pool
 import           Data.Word
 import           Database.PostgreSQL.Simple
@@ -16,7 +17,7 @@ newtype BlocSQLData = BlocSQLData (Pool Connection) deriving (Show)
 
 type BlocSQLM = ReaderT BlocSQLData
 
-type HasBlocSQL m = Accessible BlocSQLData m
+type HasBlocSQL m = (Accessible BlocSQLData m, MonadBaseControl IO m)
 
 runBlocSQLM :: MonadIO m => String -> Word16 -> String -> String -> BlocSQLM m a -> m a
 runBlocSQLM host port user password f = do
