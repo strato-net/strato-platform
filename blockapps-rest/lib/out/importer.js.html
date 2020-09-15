@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: importer.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: importer.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import fs from 'fs'
+import nodepath from 'path'
+const cwd = nodepath.resolve(process.cwd());
+
+let nameStore = [];
+
+/**
+ * This is the importer interface
+ * @module importer
+ */
+
+function getImportsTree(fullname) {
+  // console.log('getImportsTree', fullname);
+  let importFullnames = [];
+  isImported(fullname);
+  let array = fs.readFileSync(fullname).toString().split('\n');
+  let parentPath = splitPath(fullname);
+  for (let i = 0; i &lt; array.length; i++) {
+    let line = array[i];
+    if (line.startsWith('import')) {
+      // console.log('getImportsTree', 'line', line);
+      let importName = getImportName(line);
+      let importFullname = parentPath + nodepath.sep + importName;
+      // console.log('getImportsTree', 'importFullname', importFullname);
+      if (isImported(importFullname)) continue;
+      importFullnames.push(importFullname);
+      importFullnames = importFullnames.concat(getImportsTree(importFullname));
+    }
+  }
+  return importFullnames;
+}
+
+// supported formats:
+// import * as symbolName from "filename";
+// import {symbol1 as alias, symbol2} from "filename";
+// import "filename";
+function getImportName(line) {
+  let importName = line.split('"').slice(-2, -1)[0];
+  // console.log('importName', importName);
+  return importName;
+}
+
+/**
+ * readFileLines() reads a root file and parse all imports recursively
+ *
+ * @method readFileLines
+ * @param {String} input name of file to be read
+ * @return {String}
+ */
+
+function readFileLines(fullname) {
+  let buffer = '';
+  isImported(fullname);
+  //buffer += '// --- start: ' + fullname + '\n';
+  let array = fs.readFileSync(fullname).toString().split('\n');
+  for (let i = 0; i &lt; array.length; i++) {
+    let line = array[i];
+    if (line.startsWith('import')) {
+      buffer += importFile(fullname, line) + '\n';
+    } else {
+      line = line.replace('\r', ' '); // Windows fix
+      buffer += line + '\n';
+    }
+  }
+  //buffer += '// --- end: ' + fullname + '\n';
+  return buffer;
+}
+
+//
+//  importFile() reconstruct the import file path, and read it, unless it was already imported
+//
+//  @param {String} fullname
+//  @param {String} line - the import line command
+// /
+
+/**
+ * importFile() reconstruct the import file path, and read it, unless it was already imported
+ *
+ * @method importFile
+ * @param {String} fullname name of file
+ * @param {String} line the import line command
+ * @return {String}
+ */
+
+function importFile(fullname, line) {
+  let buffer = '//' + line + '\n';
+  let importName = line.replace(/import[\s]+/i, '').replace(/\"/gi, '').replace(';', '');
+  importName = importName.replace('\r', '');  // Windows fix
+  if (isImported(importName)) {
+    buffer += '// exists\n';
+    return buffer;
+  }
+  // if import name starts with '/' - read relative to project root -LS
+  if (importName.indexOf('/') == 0) {
+    return buffer + readFileLines(nodepath.join(cwd, importName));
+  }
+  let parentPath = splitPath(fullname);
+  return buffer + readFileLines(nodepath.join(parentPath, importName));
+}
+
+// isImported() checks if a file is already imported
+//
+// @param {String} fullname
+// @returns {Boolean} isImported
+//
+
+/**
+ * isImported() checks if a file is already imported
+ *
+ * @method isImported
+ * @param {String} fullname name of file
+ * @return {Boolean}
+ */
+
+function isImported(fullname) {
+  let array = fullname.split(nodepath.sep);
+  array = array.length &lt;= 1 ? fullname.split('/') : array; // Windows fix
+  let name = array.pop();
+  if (nameStore.indexOf(name) > -1) {
+    return true;
+  }
+  nameStore.push(name);
+  return false;
+}
+
+/**
+ * splitPath() get the path part of a full name
+ *
+ * @method splitPath
+ * @param {String} fullname name of file
+ * @return {Array}
+ */
+
+function splitPath(fullname) {
+  let array = fullname.split(nodepath.sep);
+  array = array.length &lt;= 1 ? fullname.split('/') : array; // Windows fix
+  let path = array.slice(0, array.length - 1).join(nodepath.sep);
+  return path;
+}
+
+function combine(filename) {
+  nameStore = [];
+  return new Promise(function(resolve, reject) {
+    const string = readFileLines(filename);
+    resolve(string);
+  });
+}
+
+export default {
+  combine,
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-importer.html">importer</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.5</a> on Thu Sep 10 2020 11:24:42 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

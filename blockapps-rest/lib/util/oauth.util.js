@@ -5,10 +5,8 @@ import request from "sync-request";
 import getPem from "rsa-pem-from-mod-exp";
 import "@babel/polyfill";
 
-/**
- * This is the oauthUtil interface
- * @module oauthUtil
- */
+
+/** Class representing the OAuth util. */
 
 class OAuthUtil {
   constructor(oauthConfig) {
