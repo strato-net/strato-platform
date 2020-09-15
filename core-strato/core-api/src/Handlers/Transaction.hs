@@ -52,8 +52,8 @@ import           Blockchain.EthConf          (runKafkaConfigured)
 import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
 import           Blockchain.Util             (getCurrentMicrotime)
+import           Options
 
-import           Settings
 import           SortDirection
 import           SQLM
 import           UnliftIO
@@ -195,7 +195,7 @@ instance Selectable TxsFilterParams [RawTransaction] SQLM where
         E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
 
         -- E.offset $ (limit * offset)
-        E.limit $ appFetchLimit
+        E.limit $ fromIntegral flags_appFetchLimit
         E.orderBy $ [(sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionBlockNumber),
                       (sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionNonce)]
 
