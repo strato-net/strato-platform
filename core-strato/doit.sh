@@ -158,6 +158,8 @@ function newnode {
       runBackgroundProcess core-api >> logs/core-api 2>&1
   fi
 
+  echo "Starting strato-api2"
+  runBackgroundProcess strato-api2 >> logs/strato-api2 2>&1
   
 
 
