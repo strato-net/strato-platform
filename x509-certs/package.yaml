@@ -37,9 +37,9 @@ library:
   - transformers
   - secp256k1-haskell
   - x509
-#   - x509-util
+  - x509-validation
 #  - x509-store
-#  - x509-validation
+#  - x509-util
 
 
 tests:
