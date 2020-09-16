@@ -160,7 +160,7 @@ pipeline {
               rm -rf node_modules
               npm install
               #npm run test:blockhash
-              npm run test:truchainz
+              #npm run test:truchainz
               npm run test:multicontract
               npm run test:slipstream
               npm run test:solidvm
