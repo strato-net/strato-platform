@@ -18,8 +18,8 @@ import           Servant
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
+import           Options
 
-import           Settings
 import           SQLM
 
 type API = "transaction" :> "last" :> "queued" :> Get '[JSON] [RawTransaction']
@@ -32,7 +32,7 @@ server = getQueuedTransactions
 instance Accessible [RawTransaction] SQLM where
   access _ = fmap (map entityVal) . sqlQuery $
     selectList [ RawTransactionBlockNumber ==. (-1) ]
-               [ LimitTo (fromIntegral $ appFetchLimit :: Int)
+               [ LimitTo (fromIntegral $ flags_appFetchLimit :: Int)
                , Desc RawTransactionNonce
                ]
 

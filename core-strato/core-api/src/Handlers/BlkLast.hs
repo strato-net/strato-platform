@@ -21,8 +21,8 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.DB.SQLDB
+import           Options
 
-import           Settings
 import           SQLM
 
 
@@ -46,7 +46,7 @@ instance GetLastBlocks SQLM where
   getLastBlocks n = do
     blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $ E.select $
         E.from $ \a -> do
-          E.limit $ max 1 $ min (fromIntegral n :: Int64) appFetchLimit
+          E.limit $ max 1 $ min (fromIntegral n :: Int64) $ fromIntegral flags_appFetchLimit
           E.orderBy [E.desc (a E.^. BlockDataRefNumber)]
           return a
 

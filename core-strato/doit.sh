@@ -155,13 +155,11 @@ function newnode {
 	  runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
   else
       echo "Starting core-api"
-      runBackgroundProcess core-api >> logs/core-api 2>&1
+      runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
   fi
 
   echo "Starting strato-api2"
   runBackgroundProcess strato-api2 >> logs/strato-api2 2>&1
-  
-
 
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation

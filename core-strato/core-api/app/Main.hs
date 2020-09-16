@@ -37,6 +37,7 @@ import           Servant.Swagger.UI
 
 import           BlockApps.Init
 import           Blockchain.EthConf
+import           Options                         ()
 
 import           Text.Tools
 

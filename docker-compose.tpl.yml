@@ -187,6 +187,7 @@ services:
     - vault-wrapper
     environment:
     - addBootnodes=${addBootnodes}
+    - appFetchLimit=${appFetchLimit}
     - averageTxsPerBlock=${averageTxsPerBlock}
     - blockstanbul=${blockstanbul}
     - blockstanbulAdmins=${blockstanbulAdmins}
