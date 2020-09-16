@@ -98,7 +98,8 @@ pipeline {
         }
       }
     }
-
+    
+/*
     stage('Some quick tests without OAuth') {
       steps {
         parallel(
@@ -128,6 +129,7 @@ pipeline {
         )
       }
     }
+*/
 
     stage('Deploy with OAuth') {
 
