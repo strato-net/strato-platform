@@ -152,6 +152,8 @@ pipeline {
               docker build -f Dockerfile.test .
             '''
           },
+	  
+	  /*
           '(quick) Integration tests' : {
             sh '''#!/bin/bash -le
               set -x
@@ -159,9 +161,9 @@ pipeline {
               pushd strato-worktree/tests
               rm -rf node_modules
               npm install
-              #npm run test:blockhash
-              #npm run test:truchainz
-              #npm run test:multicontract
+              npm run test:blockhash
+              npm run test:truchainz
+              npm run test:multicontract
               npm run test:slipstream
               npm run test:solidvm
               npm run test:uploadOrder
@@ -171,7 +173,8 @@ pipeline {
               popd
             '''
           },
-
+	  */
+	  
           'STRATO API Tests': {
             withCredentials([
                usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
