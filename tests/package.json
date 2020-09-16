@@ -15,7 +15,7 @@
     "test:upload10k": "mocha load/uploadString.test.js --batchCount 100 --batchSize 100",
     "test:loadFF": "mocha load/stratoLoadFiscalFactory.test.js --batchCount 100 --batchSize 100",
     "test:loadFFEvents": "mocha load/stratoLoadFiscalFactoryEvent.test.js --batchCount 100 --batchSize 100",
-    "test:truchainz": "mocha e2e/createChain.test.js && mocha e2e/governance.test.js",
+    //"test:truchainz": "mocha e2e/createChain.test.js && mocha e2e/governance.test.js",
     "test:multicontract": "mocha e2e/multicontract.test.js",
     "test:uploadOrder": "mocha e2e/uploadOrder.test.js",
     "test:slipstream": "mocha e2e/slipstream.test.js"
