@@ -142,7 +142,7 @@ pipeline {
             dir ('strato-worktree/tests') {
               sh 'rm -rf node_modules'
               sh 'npm install'
-              sh 'npm run test:blockhash'
+              //sh 'npm run test:blockhash'
               sh 'npm run test:truchainz'
               sh 'npm run test:multicontract'
               sh 'npm run test:slipstream'
