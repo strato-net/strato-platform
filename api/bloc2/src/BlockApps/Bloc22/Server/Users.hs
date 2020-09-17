@@ -15,6 +15,7 @@ module BlockApps.Bloc22.Server.Users (
   postBlocTransactionResults,
   getBatchBlocTransactionResult',
   getBlocTransactionResult',
+  postUsersFill,
   forStateT
   ) where
 
@@ -38,11 +39,13 @@ import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
+import           Opaleye                           hiding (not, null, index, max)
 import           Text.Format
 import           UnliftIO
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
+import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
@@ -54,13 +57,17 @@ import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
+import qualified BlockApps.Strato.Types            as Deprecated
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
+import           Handlers.AccountInfo
+import           Handlers.Faucet
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
@@ -249,3 +256,39 @@ convertResultResToVals byteResp responseTypes =
 
 
 
+---------------------------------
+
+postUsersFill :: (HasCoreAPI m, HasBlocSQL m, MonadLogger m, HasSQL m) =>
+                 UserName  -> Address -> Bool -> m BlocTransactionResult
+postUsersFill _ addr resolve = blocTransaction $ f addr resolve
+
+f :: (MonadIO m, MonadLogger m, HasSQL m, HasBlocSQL m, HasCoreAPI m) =>
+     Address -> Bool -> m BlocTransactionResult
+f addr resolve = do
+  when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
+  hashes <- blocStrato $ postFaucetClient addr
+  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+    ( Nothing
+    , constant h
+    , constant (0 :: Int32)
+    , constant (0 :: Int32)
+    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode Deprecated.defaultPostTx{Deprecated.posttransactionTo = Just addr})
+    ) | h <- hashes]
+  result <- getBlocTransactionResult' hashes resolve
+  when (resolve && Success == blocTransactionStatus result) $ do
+    waitForBalance addr
+  $logInfoLS "postUsersFill/resolve" resolve
+  $logInfoLS "postUsersFill/result" result
+  when (Failure == blocTransactionStatus result) $
+    throwIO $ UnavailableError "faucet transaction failed; please try again"
+  return result
+
+waitForBalance :: (MonadIO m, MonadLogger m,  HasCoreAPI m) => Address -> m ()
+waitForBalance addr = waitFor "no user account found" go
+  where go :: (MonadIO m, MonadLogger m, HasCoreAPI m) => m Bool
+        go = do
+          let params = accountsFilterParams{qaAddress = Just addr, qaMinBalance = Just 1}
+          accts <- blocStrato $ getAccountsFilter params
+          $logInfoLS "waitForBalance/req" params
+          $logInfoLS "waitForBalance/resp" accts
+          return . not $ null accts

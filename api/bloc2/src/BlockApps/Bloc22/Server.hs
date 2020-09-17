@@ -38,7 +38,7 @@ bloc :: (MonadIO m, MonadLogger m, HasBlocSQL m,
          HasBlocEnv m, HasVault m, HasCoreAPI m, HasSQL m, Selectable ChainId ChainInfo m) =>
         ServerT BlocAPI m
 bloc = return gitInfo
---  :<|> postUsersFill
+  :<|> postUsersFill
   :<|> getContracts
   :<|> postContractsBatchStates
   :<|> getContractsData

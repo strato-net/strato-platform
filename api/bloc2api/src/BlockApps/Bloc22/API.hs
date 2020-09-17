@@ -31,7 +31,7 @@ type BlocAPI =
   -- / endpoint, for smoke test. Also exports git details.
   GetGitInfo
   -- /users endpoints
---  :<|> PostUsersFill
+  :<|> PostUsersFill
   -- /contracts endpoints
   :<|> GetContracts
   :<|> PostContractsBatchStates
