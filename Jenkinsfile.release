@@ -54,82 +54,8 @@ pipeline {
       }
     }
 
+
     stage('Deploy') {
-      steps {
-        withCredentials([
-            usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
-        ]) {
-          sh '''#!/bin/bash -le
-            set -x
-            rm -rf strato-getting-started
-            git clone https://github.com/blockapps/strato-getting-started
-            cp strato-worktree/docker-compose.yml strato-getting-started/
-            cd strato-getting-started
-            export genesis=smokeTest
-            export NODE_HOST=$(</host)
-            export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
-            export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-            export EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-            export PASSWORD=123
-            ./strato -m 1 --single
-            docker ps
-            # Few quick tests
-            check_availability() {
-              counter=0
-              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
-              do
-                if [[ "$counter" -gt 120 ]]; then
-                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
-                  exit 73
-                fi
-                echo "waiting for STRATO health endpoint to be available through nginx"
-                counter=$((counter+1))
-                sleep 1
-              done
-              echo "STRATO health endpoint is available through nginx - node is running"
-            }
-            check_availability
-            echo "Restarting docker containers to simulate computer restart..."
-            docker-compose -p strato --log-level ERROR stop
-            docker-compose -p strato --log-level ERROR start
-            PASSWORD=${PASSWORD} ./strato --set-password
-            check_availability
-          '''
-        }
-      }
-    }
-
-    stage('Some quick tests without OAuth') {
-      steps {
-        parallel(
-          'Apex tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo "Running apex unit tests"
-              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
-              docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
-            '''
-          },
-
-          'STRATO API Tests': {
-            withCredentials([
-               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
-            ]) {
-                sh '''#!/bin/bash -le
-                  set -x
-                  rm -rf strato-api-tests
-                  git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
-                  cd strato-api-tests
-                  docker build --tag strato-api-tests .
-                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=false -e DEBUG_LOG=false strato-api-tests
-                '''
-              }
-          },
-        )
-      }
-    }
-
-    stage('Deploy with OAuth') {
 
       steps {
         withCredentials([
@@ -187,7 +113,7 @@ pipeline {
       }
     }
 
-    stage('Some quick tests w/OAuth') {
+    stage('Some quick tests') {
       steps {
         parallel(
           'Apex tests': {
